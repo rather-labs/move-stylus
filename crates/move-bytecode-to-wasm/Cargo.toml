@@ -1,0 +1,10 @@
+[package]
+name = "move-bytecode-to-wasm"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+move-package.workspace = true
+
+walrus = "0.23"
+wasmprinter = "0.227"
