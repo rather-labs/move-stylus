@@ -5,6 +5,8 @@ members = [
     "crates/*",
 ]
 
+exclude = ["example-rust"]
+
 # Dependencies that should be kept in sync through the whole workspace
 [workspace.dependencies]
 anyhow = "1.0.52"

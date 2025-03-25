@@ -2,9 +2,9 @@
 /// The named address is set in the `Move.toml`.
 module hello_world::hello_world;
 
-const ITEM_PRICE: u64 = 100;
+const ITEM_PRICE: u32 = 100;
 
 /// Returns the "Hello, World!" as a `String`.
-public fun hello_world(): u64 {
+public fun hello_world(): u32 {
     ITEM_PRICE
 }

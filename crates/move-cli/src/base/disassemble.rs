@@ -43,8 +43,6 @@ impl Disassemble {
         } = self;
         // Make sure the package is built
         let package = config.compile_package(&rerooted_path, &mut Vec::new())?;
-        println!("package: {:#?}", package);
-        println!("rerooted_path: {:?}", rerooted_path);
 
         translate_package(&package, &rerooted_path);
 

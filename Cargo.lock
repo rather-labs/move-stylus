@@ -752,6 +752,7 @@ dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash",
+ "serde",
 ]
 
 [[package]]
@@ -1264,8 +1265,11 @@ dependencies = [
 name = "move-bytecode-to-wasm"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "move-binary-format",
  "move-package",
  "walrus",
+ "wasmparser 0.227.1",
  "wasmprinter",
 ]
 
@@ -3112,8 +3116,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0f51cad774fb3c9461ab9bccc9c62dfb7388397b5deda31bf40e8108ccd678b2"
 dependencies = [
  "bitflags 2.8.0",
+ "hashbrown 0.15.2",
  "indexmap 2.7.1",
  "semver",
+ "serde",
 ]
 
 [[package]]
