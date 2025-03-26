@@ -1,9 +1,11 @@
 use std::path::Path;
 
 use move_package::compilation::compiled_package::CompiledPackage;
+use wasm_validation::validate_stylus_wasm;
 
 mod hostio;
 mod translation;
+mod wasm_validation;
 
 pub fn translate_package(package: &CompiledPackage, rerooted_path: &Path) {
     println!("package: {:#?}", package);
@@ -54,20 +56,10 @@ pub fn translate_package(package: &CompiledPackage, rerooted_path: &Path) {
         .emit_wasm_file(build_directory.join("output.wasm"))
         .unwrap();
 
-    validate_wasm(&module.emit_wasm());
+    validate_stylus_wasm(&mut module).unwrap();
 
     // Convert to WAT format
     let wat = wasmprinter::print_bytes(module.emit_wasm()).expect("Failed to generate WAT");
     std::fs::write(build_directory.join("output.wat"), wat.as_bytes())
         .expect("Failed to write WAT file");
-}
-
-/// Validate the Wasm module using the wasmparser crate
-/// TODO: Validate Stylus specific constraints
-fn validate_wasm(wasm: &[u8]) {
-    let mut validator = wasmparser::Validator::new();
-
-    validator
-        .validate_all(wasm)
-        .expect("Failed to validate Wasm");
 }
