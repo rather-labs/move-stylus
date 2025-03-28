@@ -1,9 +1,12 @@
 use std::path::Path;
 
 use move_package::compilation::compiled_package::CompiledPackage;
+use translation::map_signatures;
+use wasm_validation::validate_stylus_wasm;
 
 mod hostio;
 mod translation;
+mod wasm_validation;
 
 pub fn translate_package(package: &CompiledPackage, rerooted_path: &Path) {
     println!("package: {:#?}", package);
@@ -30,8 +33,15 @@ pub fn translate_package(package: &CompiledPackage, rerooted_path: &Path) {
         "Compilation for multiple functions is not supported yet"
     );
 
+    let types = map_signatures(&root_compiled_module.signatures);
+
     let function_def = &root_compiled_module.function_defs[0];
     let function_handle = &root_compiled_module.function_handles[0];
+
+    let function_arguments = types[function_handle.parameters.0 as usize].clone();
+    let function_return = types[function_handle.return_.0 as usize].clone();
+    let function_name =
+        root_compiled_module.identifiers[function_handle.name.0 as usize].to_string();
 
     let build_directory = rerooted_path.join("build/wasm");
     // Create the build directory if it doesn't exist
@@ -41,33 +51,23 @@ pub fn translate_package(package: &CompiledPackage, rerooted_path: &Path) {
 
     let function_id = translation::translate_function(
         function_def,
-        function_handle,
+        &function_arguments,
+        &function_return,
         &root_compiled_module.constant_pool,
         &mut module,
-        &root_compiled_module.signatures,
     )
     .unwrap();
 
-    hostio::add_entrypoint(&mut module, function_id);
+    hostio::add_entrypoint(&mut module, function_id, &function_name);
 
     module
         .emit_wasm_file(build_directory.join("output.wasm"))
         .unwrap();
 
-    validate_wasm(&module.emit_wasm());
+    validate_stylus_wasm(&mut module).unwrap();
 
     // Convert to WAT format
     let wat = wasmprinter::print_bytes(module.emit_wasm()).expect("Failed to generate WAT");
     std::fs::write(build_directory.join("output.wat"), wat.as_bytes())
         .expect("Failed to write WAT file");
-}
-
-/// Validate the Wasm module using the wasmparser crate
-/// TODO: Validate Stylus specific constraints
-fn validate_wasm(wasm: &[u8]) {
-    let mut validator = wasmparser::Validator::new();
-
-    validator
-        .validate_all(wasm)
-        .expect("Failed to validate Wasm");
 }
