@@ -50,11 +50,8 @@ pub fn translate_function(
     Ok(function)
 }
 
-pub fn map_signatures(signatures: &[Signature]) -> Vec<Vec<ValType>> {
-    signatures
-        .iter()
-        .map(|s| s.0.iter().map(map_signature_token).collect())
-        .collect()
+pub fn map_signature(signature: &Signature) -> Vec<ValType> {
+    signature.0.iter().map(map_signature_token).collect()
 }
 
 fn map_signature_token(signature_token: &SignatureToken) -> ValType {
