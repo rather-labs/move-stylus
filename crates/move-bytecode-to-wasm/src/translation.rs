@@ -1,22 +1,22 @@
 use anyhow::Result;
 use move_binary_format::file_format::{
-    Bytecode, Constant, FunctionDefinition, FunctionHandle, Signature, SignatureToken, Visibility,
+    Bytecode, Constant, FunctionDefinition, Signature, SignatureToken, Visibility,
 };
 use walrus::{FunctionBuilder, FunctionId, InstrSeqBuilder, Module, ValType};
 
 pub fn translate_function(
     function_def: &FunctionDefinition,
-    function_handle: &FunctionHandle,
+    function_arguments: &[ValType],
+    function_return: &[ValType],
     constant_pool: &[Constant],
     module: &mut Module,
-    signatures: &[Signature],
 ) -> Result<FunctionId> {
-    assert!(
+    anyhow::ensure!(
         function_def.acquires_global_resources.is_empty(),
         "Acquiring global resources is not supported yet"
     );
 
-    assert!(
+    anyhow::ensure!(
         function_def.visibility == Visibility::Public,
         "Only public functions are supported"
     );
@@ -26,23 +26,18 @@ pub fn translate_function(
         .as_ref()
         .ok_or(anyhow::anyhow!("Function has no code"))?;
 
-    assert!(
+    anyhow::ensure!(
         code.jump_tables.is_empty(),
         "Jump tables are not supported yet"
     );
 
-    let types = map_signatures(signatures);
-
-    let function_arguments = types[function_handle.parameters.0 as usize].clone();
-    assert!(
+    anyhow::ensure!(
         function_arguments.is_empty(),
         "Function arguments are not supported yet"
     );
 
-    let function_return = types[function_handle.return_.0 as usize].clone();
-
     let mut function_builder =
-        FunctionBuilder::new(&mut module.types, &function_arguments, &function_return);
+        FunctionBuilder::new(&mut module.types, function_arguments, function_return);
 
     let mut function_body = function_builder.func_body();
 
@@ -55,7 +50,7 @@ pub fn translate_function(
     Ok(function)
 }
 
-fn map_signatures(signatures: &[Signature]) -> Vec<Vec<ValType>> {
+pub fn map_signatures(signatures: &[Signature]) -> Vec<Vec<ValType>> {
     signatures
         .iter()
         .map(|s| s.0.iter().map(map_signature_token).collect())
