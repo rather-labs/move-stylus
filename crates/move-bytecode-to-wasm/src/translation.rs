@@ -4,6 +4,11 @@ use move_binary_format::file_format::{
 };
 use walrus::{FunctionBuilder, FunctionId, InstrSeqBuilder, Module, ValType};
 
+/// Translate a Move function to a Stylus WASM function
+///
+/// Functions should be normalized to the form: f(i32 pointer, i32 length) -> (i32 pointer, i32 length, i32 status)
+/// It receives a pointer to the arguments from memory, and the length of the arguments, that it should unpack
+/// Returns a pointer to the return data, the length of the return data and a status
 pub fn translate_function(
     function_def: &FunctionDefinition,
     function_arguments: &[ValType],
@@ -36,16 +41,34 @@ pub fn translate_function(
         "Function arguments are not supported yet"
     );
 
-    let mut function_builder =
-        FunctionBuilder::new(&mut module.types, function_arguments, function_return);
+    anyhow::ensure!(
+        function_return.is_empty(),
+        "Function return is not supported yet"
+    );
+
+    let mut function_builder = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32, ValType::I32, ValType::I32],
+    );
 
     let mut function_body = function_builder.func_body();
+
+    let args_pointer = module.locals.add(ValType::I32);
+    let args_length = module.locals.add(ValType::I32);
+
+    // TODO: load arguments from memory
 
     for instruction in code.code.iter() {
         map_bytecode_instruction(instruction, constant_pool, &mut function_body);
     }
 
-    let function = function_builder.finish(vec![], &mut module.funcs);
+    // TODO: write return data to memory and return status
+    function_body.i32_const(0);
+    function_body.i32_const(0);
+    function_body.i32_const(0);
+
+    let function = function_builder.finish(vec![args_pointer, args_length], &mut module.funcs);
 
     Ok(function)
 }

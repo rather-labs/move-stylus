@@ -12,6 +12,8 @@ pub fn read_args(module: &mut Module) -> (FunctionId, ImportId) {
     module.add_import_func("vm_hooks", "read_args", read_args_type)
 }
 
+/// Host function to write the result to memory
+/// Receives a pointer to the memory and the length of the result
 pub fn write_result(module: &mut Module) -> (FunctionId, ImportId) {
     let write_result_type = module.types.add(&[ValType::I32, ValType::I32], &[]);
     module.add_import_func("vm_hooks", "write_result", write_result_type)
