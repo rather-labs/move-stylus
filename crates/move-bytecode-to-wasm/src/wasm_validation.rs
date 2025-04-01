@@ -292,7 +292,7 @@ mod tests {
     fn test_validate_stylus_wasm() {
         let mut module = hostio::new_module_with_host();
         let factorial = add_valid_wasm_function(&mut module);
-        hostio::add_entrypoint(&mut module, factorial, "factorial");
+        hostio::add_entrypoint(&mut module, factorial);
 
         validate_stylus_wasm(&mut module).unwrap();
     }
@@ -301,7 +301,7 @@ mod tests {
     fn test_validate_invalid_wasm() {
         let mut module = hostio::new_module_with_host();
         let factorial = add_invalid_wasm_function(&mut module);
-        hostio::add_entrypoint(&mut module, factorial, "factorial");
+        hostio::add_entrypoint(&mut module, factorial);
 
         let result = validate_stylus_wasm(&mut module);
         assert!(result.is_err());
@@ -323,7 +323,7 @@ mod tests {
         // We are not adding the pay_for_memory_grow import
 
         let factorial = add_valid_wasm_function(&mut module);
-        hostio::add_entrypoint(&mut module, factorial, "factorial");
+        hostio::add_entrypoint(&mut module, factorial);
 
         let result = validate_stylus_wasm(&mut module);
         assert!(result.is_err());
@@ -346,7 +346,7 @@ mod tests {
         module.add_import_func("vm_hooks", "pay_for_memory_grow", pay_for_memory_grow_type);
 
         let factorial = add_valid_wasm_function(&mut module);
-        hostio::add_entrypoint(&mut module, factorial, "factorial");
+        hostio::add_entrypoint(&mut module, factorial);
 
         let result = validate_stylus_wasm(&mut module);
         assert!(result.is_err());
@@ -368,7 +368,7 @@ mod tests {
         module.add_import_func("vm_hooks", "pay_for_memory_grow", pay_for_memory_grow_type);
 
         let factorial = add_valid_wasm_function(&mut module);
-        hostio::add_entrypoint(&mut module, factorial, "factorial");
+        hostio::add_entrypoint(&mut module, factorial);
 
         let result = validate_stylus_wasm(&mut module);
         assert!(result.is_err());
