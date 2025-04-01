@@ -3,7 +3,7 @@ pub use entrypoint_router::add_entrypoint;
 pub use entrypoint_router::build_entrypoint_router;
 use walrus::{Module, ModuleConfig};
 
-use crate::memory::setup_module_memory;
+use crate::memory::initialize_module_memory;
 
 pub mod entrypoint_router;
 pub mod host_functions;
@@ -14,7 +14,7 @@ pub fn new_module_with_host() -> Module {
     let config = ModuleConfig::new();
     let mut module = Module::with_config(config);
 
-    setup_module_memory(&mut module);
+    initialize_module_memory(&mut module);
     host_functions::add_pay_for_memory_grow(&mut module);
 
     module

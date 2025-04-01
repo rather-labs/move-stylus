@@ -1,9 +1,9 @@
 use walrus::{
-    FunctionBuilder, FunctionId, Module, ValType,
+    FunctionBuilder, FunctionId, MemoryId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg},
 };
 
-use crate::{abi_types::function_encoding::AbiFunctionSelector, memory::get_allocator_function_id};
+use crate::abi_types::function_encoding::AbiFunctionSelector;
 
 use super::host_functions;
 
@@ -16,10 +16,10 @@ use super::host_functions;
 /// Status is 0 for success and non-zero for failure.
 pub fn build_entrypoint_router(
     module: &mut Module,
+    allocator_func: FunctionId,
+    memory_id: MemoryId,
     functions: &[(FunctionId, AbiFunctionSelector)],
 ) {
-    let (allocator_func, memory_id) = get_allocator_function_id();
-
     let (read_args_function, _) = host_functions::read_args(module);
     let (write_return_data_function, _) = host_functions::write_result(module);
 
@@ -110,7 +110,7 @@ pub fn add_entrypoint(module: &mut Module, func: FunctionId) {
 #[cfg(test)]
 mod tests {
     use move_binary_format::file_format::Signature;
-    use walrus::{ModuleConfig, ir::StoreKind};
+    use walrus::{MemoryId, ModuleConfig, ir::StoreKind};
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
     use crate::{
@@ -120,12 +120,12 @@ mod tests {
 
     use super::*;
 
-    fn build_module() -> Module {
+    fn build_module() -> (Module, FunctionId, MemoryId) {
         let config = ModuleConfig::new();
         let mut module = Module::with_config(config);
-        setup_module_memory(&mut module);
+        let (allocator_func, memory_id) = setup_module_memory(&mut module);
 
-        module
+        (module, allocator_func, memory_id)
     }
 
     fn add_noop_return_zero_function(module: &mut Module) -> (FunctionId, AbiFunctionSelector) {
@@ -256,7 +256,7 @@ mod tests {
 
     #[test]
     fn test_build_entrypoint_router_noop() {
-        let mut raw_module = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module();
 
         let (noop_return_zero, function_selector_return_zero) =
             add_noop_return_zero_function(&mut raw_module);
@@ -265,6 +265,8 @@ mod tests {
 
         build_entrypoint_router(
             &mut raw_module,
+            allocator_func,
+            memory_id,
             &[
                 (noop_return_zero, function_selector_return_zero),
                 (noop_return_one, function_selector_return_one),
@@ -296,7 +298,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "unreachable")]
     fn test_build_entrypoint_router_no_match() {
-        let mut raw_module = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module();
 
         let (noop_return_zero, function_selector_return_zero) =
             add_noop_return_zero_function(&mut raw_module);
@@ -305,6 +307,8 @@ mod tests {
 
         build_entrypoint_router(
             &mut raw_module,
+            allocator_func,
+            memory_id,
             &[
                 (noop_return_zero, function_selector_return_zero),
                 (noop_return_one, function_selector_return_one),
@@ -320,7 +324,11 @@ mod tests {
         entrypoint.call(&mut store, data_len).unwrap();
     }
 
-    fn add_data_write_function(module: &mut Module) -> (FunctionId, AbiFunctionSelector) {
+    fn add_data_write_function(
+        module: &mut Module,
+        allocator_func: FunctionId,
+        memory_id: MemoryId,
+    ) -> (FunctionId, AbiFunctionSelector) {
         let mut noop_builder = FunctionBuilder::new(
             &mut module.types,
             &[ValType::I32, ValType::I32],
@@ -330,8 +338,6 @@ mod tests {
 
         let args_pointer = module.locals.add(ValType::I32);
         let args_length = module.locals.add(ValType::I32);
-
-        let (allocator_func, memory_id) = get_allocator_function_id();
 
         let data = [2; 4];
         let data_size = data.len() as i32;
@@ -367,12 +373,15 @@ mod tests {
 
     #[test]
     fn test_build_entrypoint_router_data_write() {
-        let mut raw_module = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module();
 
-        let (data_write, function_selector_data_write) = add_data_write_function(&mut raw_module);
+        let (data_write, function_selector_data_write) =
+            add_data_write_function(&mut raw_module, allocator_func, memory_id);
 
         build_entrypoint_router(
             &mut raw_module,
+            allocator_func,
+            memory_id,
             &[(data_write, function_selector_data_write)],
         );
         display_module(&mut raw_module);

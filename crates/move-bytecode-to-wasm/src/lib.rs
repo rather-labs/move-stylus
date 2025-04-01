@@ -67,7 +67,14 @@ pub fn translate_package(package: &CompiledPackage, rerooted_path: &Path) {
         &function_name,
         move_function_arguments,
     );
-    hostio::build_entrypoint_router(&mut module, &[(function_id, function_selector)]);
+
+    let (allocator_func, memory_id) = memory::get_allocator_function_id();
+    hostio::build_entrypoint_router(
+        &mut module,
+        allocator_func,
+        memory_id,
+        &[(function_id, function_selector)],
+    );
 
     module
         .emit_wasm_file(build_directory.join("output.wasm"))
