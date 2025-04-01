@@ -12,3 +12,6 @@ walrus = "0.23"
 wasmprinter = "0.227"
 wasmparser = "0.227"
 tiny-keccak = { version = "2.0.2", features = ["keccak"] }
+
+[dev-dependencies]
+wasmtime = "31.0.0"

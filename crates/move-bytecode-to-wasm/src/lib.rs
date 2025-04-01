@@ -6,7 +6,9 @@ use wasm_validation::validate_stylus_wasm;
 
 mod abi_types;
 mod hostio;
+mod memory;
 mod translation;
+mod utils;
 mod wasm_validation;
 
 pub fn translate_package(package: &CompiledPackage, rerooted_path: &Path) {
