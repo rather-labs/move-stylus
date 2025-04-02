@@ -180,112 +180,42 @@ fn validate_pay_for_memory_grow_import(module: &mut Module) -> Result<(), WasmVa
 
 #[cfg(test)]
 mod tests {
-    use walrus::{FunctionBuilder, FunctionId, Module, ModuleConfig, ValType, ir::BinaryOp};
+    use walrus::{FunctionBuilder, FunctionId, Module, ModuleConfig, ValType};
 
     use crate::hostio;
 
     use super::*;
 
     fn add_valid_wasm_function(module: &mut Module) -> FunctionId {
-        // Building this factorial implementation:
-        // https://github.com/WebAssembly/testsuite/blob/7816043/fac.wast#L46-L66
-        let mut factorial = FunctionBuilder::new(&mut module.types, &[], &[ValType::I32]);
+        // Function type should match the entrypoint function
+        let mut noop_func =
+            FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
 
         let i = module.locals.add(ValType::I32);
-        let res = module.locals.add(ValType::I32);
 
-        factorial
-            .func_body()
-            .i32_const(10)
-            .local_set(i)
-            .i32_const(1)
-            .local_set(res)
-            .block(None, |done| {
-                let done_id = done.id();
-                done.loop_(None, |loop_| {
-                    let loop_id = loop_.id();
-                    loop_
-                        .local_get(i)
-                        .i32_const(0)
-                        .binop(BinaryOp::I32Eq)
-                        .if_else(
-                            None,
-                            |then| {
-                                then.br(done_id);
-                            },
-                            |else_| {
-                                else_
-                                    .local_get(i)
-                                    .local_get(res)
-                                    .binop(BinaryOp::I32Mul)
-                                    .local_set(res)
-                                    .local_get(i)
-                                    .i32_const(1)
-                                    .binop(BinaryOp::I32Sub)
-                                    .local_set(i);
-                            },
-                        )
-                        .br(loop_id);
-                });
-            })
-            .local_get(res)
-            .return_();
+        noop_func.func_body().i32_const(0).return_();
 
-        let factorial = factorial.finish(vec![], &mut module.funcs);
+        let noop_func = noop_func.finish(vec![i], &mut module.funcs);
 
-        module.exports.add("factorial", factorial);
+        module.exports.add("noop", noop_func);
 
-        factorial
+        noop_func
     }
 
     fn add_invalid_wasm_function(module: &mut Module) -> FunctionId {
-        // Building this factorial implementation:
-        // https://github.com/WebAssembly/testsuite/blob/7816043/fac.wast#L46-L66
-        let mut factorial = FunctionBuilder::new(&mut module.types, &[], &[ValType::I32]);
+        // Function type should match the entrypoint function
+        let mut noop_func =
+            FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
 
         let i = module.locals.add(ValType::I32);
-        let res = module.locals.add(ValType::I32);
 
-        factorial
-            .func_body()
-            .i32_const(10)
-            .local_set(i)
-            .i32_const(1)
-            .local_set(res)
-            .block(None, |done| {
-                let done_id = done.id();
-                done.loop_(None, |loop_| {
-                    let loop_id = loop_.id();
-                    loop_
-                        .local_get(i)
-                        .i32_const(0)
-                        .binop(BinaryOp::I32Eq)
-                        .if_else(
-                            None,
-                            |then| {
-                                then.br(done_id);
-                            },
-                            |else_| {
-                                else_
-                                    .local_get(i)
-                                    .local_get(res)
-                                    .binop(BinaryOp::I32Mul)
-                                    .local_set(res)
-                                    .local_get(i)
-                                    .i32_const(1)
-                                    .binop(BinaryOp::I32Sub)
-                                    .local_set(i);
-                            },
-                        )
-                        .br(loop_id);
-                });
-            }); // <- missing return, the stack is inconsistent
+        noop_func.func_body().return_(); // <---The return is missing in the stack
 
-        let factorial = factorial.finish(vec![], &mut module.funcs);
+        let noop_func = noop_func.finish(vec![i], &mut module.funcs);
 
-        module.exports.add("factorial", factorial);
+        module.exports.add("noop", noop_func);
 
-        factorial
+        noop_func
     }
 
     #[test]

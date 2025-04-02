@@ -141,7 +141,7 @@ fn map_bytecode_instruction<'a, 'b>(
             }
         }
         // TODO: ensure this is the last instruction
-        Bytecode::Ret => builder.return_().unreachable(),
+        Bytecode::Ret => builder, // TODO: implement return args write to memory
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
 }

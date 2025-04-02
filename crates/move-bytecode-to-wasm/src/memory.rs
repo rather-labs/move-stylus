@@ -14,6 +14,23 @@ pub fn get_allocator_function_id() -> (FunctionId, MemoryId) {
         .expect("Allocator function not set")
 }
 
+/// Initialize the module memory and sets the global allocator function
+/// that can be later used inside modules to allocate memory
+///
+/// The allocator function is stored as OnceLock to ensure that it is only initialized once,
+/// it cannot be used in multiple tests
+///
+/// For tests use the function `setup_module_memory` directly to get a local setup
+pub fn initialize_module_memory(module: &mut Module) {
+    let (allocator_function_id, memory_id) = setup_module_memory(module);
+
+    if !cfg!(test) {
+        ALLOCATOR_FUNCTION_ID
+            .set((allocator_function_id, memory_id))
+            .expect("Allocator function already set");
+    }
+}
+
 /// Setup the module memory
 /// This function adds the following components to the module:
 /// - memory export
@@ -27,7 +44,7 @@ pub fn get_allocator_function_id() -> (FunctionId, MemoryId) {
 ///     - Alignment is assumed to be 1 byte (no alignment) - Alignment is not implemented in the current function
 ///     - Memory is allocated in pages of 64KiB
 ///     - Memory starts at offset 0
-pub fn setup_module_memory(module: &mut Module) -> FunctionId {
+pub fn setup_module_memory(module: &mut Module) -> (FunctionId, MemoryId) {
     let memory_id = module.memories.add_local(false, false, 1, None, None);
     module.exports.add("memory", memory_id);
 
@@ -126,11 +143,7 @@ pub fn setup_module_memory(module: &mut Module) -> FunctionId {
         module.exports.add("allocator", func);
     }
 
-    ALLOCATOR_FUNCTION_ID
-        .set((func, memory_id))
-        .expect("Allocator function already set");
-
-    func
+    (func, memory_id)
 }
 
 #[cfg(test)]
