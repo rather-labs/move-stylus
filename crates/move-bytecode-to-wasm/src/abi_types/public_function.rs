@@ -136,8 +136,7 @@ impl PublicFunction {
 
 #[cfg(test)]
 mod tests {
-    use alloy::sol;
-    use alloy_sol_types::SolType;
+    use alloy::{dyn_abi::SolType, sol};
     use move_binary_format::file_format::{Signature, SignatureToken};
     use walrus::{
         FunctionBuilder, MemoryId, ModuleConfig,

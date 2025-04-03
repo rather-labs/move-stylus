@@ -8,3 +8,7 @@ const ITEM_PRICE: u32 = 100;
 public fun hello_world(): u32 {
   ITEM_PRICE
 }
+
+public fun echo(x: u32): u32 {
+  x
+}

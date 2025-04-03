@@ -208,7 +208,7 @@ fn add_unpack_instruction_for_signature_token(
 
 #[cfg(test)]
 mod tests {
-    use alloy::sol;
+    use alloy::{dyn_abi::SolType, sol};
     use move_binary_format::file_format::Signature;
     use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
     use wasmtime::{Engine, IntoFunc, Linker, Module as WasmModule, Store, TypedFunc, WasmParams};

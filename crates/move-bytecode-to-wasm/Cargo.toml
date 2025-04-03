@@ -8,8 +8,8 @@ anyhow.workspace = true
 move-package.workspace = true
 move-binary-format.workspace = true
 
-alloy-primitives = "0.8.25"
-alloy-sol-types = "0.8.25"
+alloy-primitives = "1.0.0"
+alloy-sol-types = "1.0.0"
 walrus = "0.23"
 wasmprinter = "0.228"
 wasmparser = "0.228"

@@ -2,7 +2,7 @@ use anyhow::Result;
 use move_binary_format::file_format::{
     Bytecode, Constant, FunctionDefinition, Signature, SignatureToken, Visibility,
 };
-use walrus::{FunctionBuilder, FunctionId, InstrSeqBuilder, Module, ValType};
+use walrus::{FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType};
 
 /// Translate a Move function to a Stylus WASM function
 ///
@@ -36,16 +36,26 @@ pub fn translate_function(
         "Jump tables are not supported yet"
     );
 
+    let input_variables: Vec<LocalId> = function_arguments
+        .iter()
+        .map(|arg| module.locals.add(*arg))
+        .collect();
+
     let mut function_builder =
         FunctionBuilder::new(&mut module.types, function_arguments, function_return);
 
     let mut function_body = function_builder.func_body();
 
     for instruction in code.code.iter() {
-        map_bytecode_instruction(instruction, constant_pool, &mut function_body);
+        map_bytecode_instruction(
+            instruction,
+            constant_pool,
+            &mut function_body,
+            &input_variables,
+        );
     }
 
-    let function = function_builder.finish(vec![], &mut module.funcs);
+    let function = function_builder.finish(input_variables, &mut module.funcs);
 
     Ok(function)
 }
@@ -80,6 +90,7 @@ fn map_bytecode_instruction<'a, 'b>(
     instruction: &Bytecode,
     constants: &[Constant],
     builder: &'a mut InstrSeqBuilder<'b>,
+    input_variables: &[LocalId],
 ) -> &'a mut InstrSeqBuilder<'b> {
     match instruction {
         // Load a fixed constant
@@ -117,8 +128,9 @@ fn map_bytecode_instruction<'a, 'b>(
                 _ => panic!("Unsupported constant: {:?}", constant),
             }
         }
+        Bytecode::MoveLoc(local_id) => builder.local_get(input_variables[*local_id as usize]),
         // TODO: ensure this is the last instruction
-        Bytecode::Ret => builder, // TODO: implement return args write to memory
+        Bytecode::Ret => builder.return_(),
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
 }

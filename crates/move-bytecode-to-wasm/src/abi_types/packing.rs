@@ -303,7 +303,7 @@ fn load_return_type_to_local(
 
 #[cfg(test)]
 mod tests {
-    use alloy::sol;
+    use alloy::{dyn_abi::SolType, sol};
     use move_binary_format::file_format::Signature;
     use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
     use wasmtime::{
