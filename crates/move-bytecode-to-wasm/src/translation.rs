@@ -36,39 +36,16 @@ pub fn translate_function(
         "Jump tables are not supported yet"
     );
 
-    anyhow::ensure!(
-        function_arguments.is_empty(),
-        "Function arguments are not supported yet"
-    );
-
-    anyhow::ensure!(
-        function_return.is_empty(),
-        "Function return is not supported yet"
-    );
-
-    let mut function_builder = FunctionBuilder::new(
-        &mut module.types,
-        &[ValType::I32, ValType::I32],
-        &[ValType::I32, ValType::I32, ValType::I32],
-    );
+    let mut function_builder =
+        FunctionBuilder::new(&mut module.types, function_arguments, function_return);
 
     let mut function_body = function_builder.func_body();
-
-    let args_pointer = module.locals.add(ValType::I32);
-    let args_length = module.locals.add(ValType::I32);
-
-    // TODO: load arguments from memory
 
     for instruction in code.code.iter() {
         map_bytecode_instruction(instruction, constant_pool, &mut function_body);
     }
 
-    // TODO: write return data to memory and return status
-    function_body.i32_const(0);
-    function_body.i32_const(0);
-    function_body.i32_const(0);
-
-    let function = function_builder.finish(vec![args_pointer, args_length], &mut module.funcs);
+    let function = function_builder.finish(vec![], &mut module.funcs);
 
     Ok(function)
 }

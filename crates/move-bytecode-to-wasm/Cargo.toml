@@ -8,10 +8,12 @@ anyhow.workspace = true
 move-package.workspace = true
 move-binary-format.workspace = true
 
+alloy-primitives = "0.8.25"
+alloy-sol-types = "0.8.25"
 walrus = "0.23"
-wasmprinter = "0.227"
-wasmparser = "0.227"
-tiny-keccak = { version = "2.0.2", features = ["keccak"] }
+wasmprinter = "0.228"
+wasmparser = "0.228"
 
 [dev-dependencies]
+alloy = "0.13.0"
 wasmtime = "31.0.0"
