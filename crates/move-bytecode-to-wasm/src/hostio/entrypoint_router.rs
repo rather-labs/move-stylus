@@ -7,12 +7,9 @@ use crate::abi_types::public_function::PublicFunction;
 
 use super::host_functions;
 
-/// Builds an entrypoint router for the list of functions provided
+/// Builds an entrypoint router for the list of public functions provided
 /// and adds it to the module exporting it as `user_entrypoint`
 ///
-/// Only Move public functions should be included here and they all should have been normalized as f(i32 pointer, i32 length) -> (i32 pointer, i32 length, i32 status)
-/// They receive a pointer to the arguments from memory, and the length of the arguments
-/// Returns a pointer to the return data, the length of the return data and a status
 /// Status is 0 for success and non-zero for failure.
 pub fn build_entrypoint_router(
     module: &mut Module,
@@ -22,6 +19,7 @@ pub fn build_entrypoint_router(
 ) {
     let (read_args_function, _) = host_functions::read_args(module);
     let (write_return_data_function, _) = host_functions::write_result(module);
+    let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
 
     let args_len = module.locals.add(ValType::I32);
     let selector_variable = module.locals.add(ValType::I32);
@@ -69,6 +67,7 @@ pub fn build_entrypoint_router(
             args_pointer,
             args_len,
             write_return_data_function,
+            storage_flush_cache_function,
             allocator_func,
         );
     }
@@ -171,6 +170,10 @@ mod tests {
                 "write_result",
                 |_return_data_pointer: u32, _return_data_length: u32| {},
             )
+            .unwrap();
+
+        linker
+            .func_wrap("vm_hooks", "storage_flush_cache", |_: i32| {})
             .unwrap();
 
         let mut store = Store::new(&engine, data);

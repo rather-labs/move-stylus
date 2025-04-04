@@ -55,6 +55,7 @@ impl PublicFunction {
         args_pointer: LocalId,
         args_len: LocalId,
         write_return_data_function: FunctionId,
+        storage_flush_cache_function: FunctionId,
         allocator_func: FunctionId,
     ) {
         router_builder.block(None, |block| {
@@ -88,7 +89,8 @@ impl PublicFunction {
             // Stack: [return_data_pointer] [return_data_length]
             block.call(write_return_data_function);
 
-            // TODO: flush cache??
+            block.i32_const(0); // Do not clear cache
+            block.call(storage_flush_cache_function);
 
             // Return status
             block.local_get(status);
@@ -196,6 +198,10 @@ mod tests {
             )
             .unwrap();
 
+        linker
+            .func_wrap("vm_hooks", "storage_flush_cache", |_: i32| Ok(()))
+            .unwrap();
+
         let mut store = Store::new(&engine, ());
         let instance = linker.instantiate(&mut store, &module).unwrap();
 
@@ -224,6 +230,7 @@ mod tests {
     ) {
         // Build mock router
         let (write_return_data_function, _) = host_functions::write_result(module);
+        let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
 
         let selector = module.locals.add(ValType::I32);
         let args_pointer = module.locals.add(ValType::I32);
@@ -263,6 +270,7 @@ mod tests {
             args_pointer,
             args_len,
             write_return_data_function,
+            storage_flush_cache_function,
             allocator_func,
         );
 
