@@ -1,35 +1,9 @@
-use std::sync::OnceLock;
-
 use walrus::{
     ConstExpr, FunctionBuilder, FunctionId, MemoryId, Module, ValType,
     ir::{BinaryOp, Value},
 };
 
 const MEMORY_PAGE_SIZE: i32 = 65536;
-static ALLOCATOR_FUNCTION_ID: OnceLock<(FunctionId, MemoryId)> = OnceLock::new();
-
-pub fn get_allocator_function_id() -> (FunctionId, MemoryId) {
-    *ALLOCATOR_FUNCTION_ID
-        .get()
-        .expect("Allocator function not set")
-}
-
-/// Initialize the module memory and sets the global allocator function
-/// that can be later used inside modules to allocate memory
-///
-/// The allocator function is stored as OnceLock to ensure that it is only initialized once,
-/// it cannot be used in multiple tests
-///
-/// For tests use the function `setup_module_memory` directly to get a local setup
-pub fn initialize_module_memory(module: &mut Module) {
-    let (allocator_function_id, memory_id) = setup_module_memory(module);
-
-    if !cfg!(test) {
-        ALLOCATOR_FUNCTION_ID
-            .set((allocator_function_id, memory_id))
-            .expect("Allocator function already set");
-    }
-}
 
 /// Setup the module memory
 /// This function adds the following components to the module:

@@ -1,8 +1,13 @@
-use move_binary_format::file_format::{Signature, SignatureToken};
+use alloy_primitives::keccak256;
+use move_binary_format::file_format::Signature;
 
-use super::hashing::selector;
+use super::type_mapping::map_move_type_to_sol_name;
 
 pub type AbiFunctionSelector = [u8; 4];
+
+fn selector<T: AsRef<[u8]>>(bytes: T) -> AbiFunctionSelector {
+    keccak256(bytes)[..4].try_into().unwrap()
+}
 
 /// Calculate the function selector according to Solidity's [ABI encoding](https://docs.soliditylang.org/en/latest/abi-spec.html#function-selector)
 pub fn move_signature_to_abi_selector(
@@ -11,7 +16,7 @@ pub fn move_signature_to_abi_selector(
 ) -> AbiFunctionSelector {
     let mut parameter_strings = Vec::new();
     for signature_token in signature.0.iter() {
-        parameter_strings.push(move_token_to_abi_type_string(signature_token));
+        parameter_strings.push(map_move_type_to_sol_name(signature_token));
     }
     selector(format!(
         "{}({})",
@@ -20,36 +25,10 @@ pub fn move_signature_to_abi_selector(
     ))
 }
 
-fn move_token_to_abi_type_string(signature_token: &SignatureToken) -> String {
-    match signature_token {
-        SignatureToken::Bool => "bool".to_string(),
-        SignatureToken::U8 => "uint8".to_string(),
-        SignatureToken::U16 => "uint16".to_string(),
-        SignatureToken::U32 => "uint32".to_string(),
-        SignatureToken::U64 => "uint64".to_string(),
-        SignatureToken::U128 => "uint128".to_string(),
-        SignatureToken::U256 => "uint256".to_string(),
-        SignatureToken::Address => "address".to_string(),
-        SignatureToken::Vector(boxed_signature_token) => {
-            format!("{}[]", move_token_to_abi_type_string(boxed_signature_token))
-        }
-        SignatureToken::Signer => panic!("Signer is not supported"), // TODO: review how to handle this on public functions
-        SignatureToken::Datatype(_) => panic!("Datatype is not supported yet"), // TODO
-        SignatureToken::TypeParameter(_) => panic!("TypeParameter is not supported"), // TODO
-        SignatureToken::DatatypeInstantiation(_) => {
-            panic!("DatatypeInstantiation is not supported") // TODO
-        }
-        SignatureToken::Reference(_) => {
-            panic!("Reference is not allowed as a public function argument")
-        }
-        SignatureToken::MutableReference(_) => {
-            panic!("MutableReference is not allowed as a public function argument")
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use move_binary_format::file_format::SignatureToken;
+
     use super::*;
 
     #[test]
@@ -73,6 +52,17 @@ mod tests {
         assert_eq!(
             move_signature_to_abi_selector("testArray", &signature),
             selector("testArray(uint128[],bool[])")
+        );
+
+        let signature = Signature(vec![
+            SignatureToken::Vector(Box::new(SignatureToken::Vector(Box::new(
+                SignatureToken::U128,
+            )))),
+            SignatureToken::Vector(Box::new(SignatureToken::Bool)),
+        ]);
+        assert_eq!(
+            move_signature_to_abi_selector("testArray", &signature),
+            selector("testArray(uint128[][],bool[])")
         );
     }
 }
