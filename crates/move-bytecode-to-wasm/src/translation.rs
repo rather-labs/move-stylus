@@ -24,13 +24,15 @@ fn map_bytecode_instruction<'a, 'b>(
                         bytes.try_into().expect("Constant is not a u8"),
                     ))
                 }
-                SignatureToken::U16 => builder.i32_const(i32::from_le_bytes(
-                    constant
-                        .data
-                        .clone()
-                        .try_into()
-                        .expect("Constant is not a u16"),
-                )),
+                SignatureToken::U16 => {
+                    let mut bytes = constant.data.clone();
+                    // pad to 4 bytes on the right
+                    bytes.resize(4, 0);
+
+                    builder.i32_const(i32::from_le_bytes(
+                        bytes.try_into().expect("Constant is not a u16"),
+                    ))
+                }
                 SignatureToken::U32 => builder.i32_const(i32::from_le_bytes(
                     constant
                         .data

@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use move_bytecode_to_wasm::translate_package;
+use move_bytecode_to_wasm::translate_single_module;
 use move_package::{BuildConfig, LintFlag, source_package::layout::SourcePackageLayout};
 use walrus::Module;
 use wasmtime::{Caller, Engine, Extern, Linker, Memory, Module as WasmModule, Store, TypedFunc};
@@ -101,7 +101,7 @@ pub fn reroot_path(path: Option<&Path>) -> anyhow::Result<PathBuf> {
     Ok(PathBuf::from("."))
 }
 
-pub fn translate_test_package(path: &str) -> Module {
+pub fn translate_test_package(path: &str, module_name: &str) -> Module {
     let temp_install_directory = std::env::temp_dir().join("move-bytecode-to-wasm");
 
     let build_config = BuildConfig {
@@ -132,5 +132,5 @@ pub fn translate_test_package(path: &str) -> Module {
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
 
-    translate_package(&package)
+    translate_single_module(&package, module_name)
 }
