@@ -1,10 +1,25 @@
 module 0x01::uint_16;
 
-const ITEM_PRICE: u16 = 1616;
+const INT_AS_CONST: u16 = 1616;
 
-public fun get_const(): u16 {
-  ITEM_PRICE
+public fun get_constant(): u16 {
+  INT_AS_CONST
 }
+
+public fun get_constant_local(): u16 {
+  let x: u16 = INT_AS_CONST;
+  x
+}
+
+// Forces the compiler to store literals on locals
+public fun get_local(_z: u16): u16 {
+  let x: u16 = 100;
+  let y: u16 = 50;
+  identity(x);
+  identity_3(x, y);
+
+  identity_2(x, y)
+} 
 
 public fun echo(x: u16): u16 {
   identity(x)
@@ -20,4 +35,8 @@ fun identity(x: u16): u16 {
 
 fun identity_2(_x: u16, y: u16): u16 {
   y
+}
+
+fun identity_3(_x: u16, y: u16): (u16, u16) {
+  (y, y)
 }

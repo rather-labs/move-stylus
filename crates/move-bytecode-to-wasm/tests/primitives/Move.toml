@@ -1,5 +1,3 @@
 [package]
-name = "example"
+name = "test_primitives"
 edition = "2024"
-
-# [addresses]

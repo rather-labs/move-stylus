@@ -93,9 +93,12 @@ pub fn setup_wasmtime_module(
 pub fn reroot_path(path: Option<&Path>) -> anyhow::Result<PathBuf> {
     let path = path
         .map(Path::canonicalize)
-        .unwrap_or_else(|| PathBuf::from(".").canonicalize())?;
+        .unwrap_or_else(|| PathBuf::from(".").canonicalize())
+        .map_err(|e| anyhow::anyhow!("failed to canonicalize path: {}", e))?;
+
     // Always root ourselves to the package root, and then compile relative to that.
-    let rooted_path = SourcePackageLayout::try_find_root(&path)?;
+    let rooted_path = SourcePackageLayout::try_find_root(&path)
+        .map_err(|e| anyhow::anyhow!("failed to find package root: {}", e))?;
     std::env::set_current_dir(rooted_path).unwrap();
 
     Ok(PathBuf::from("."))
