@@ -151,3 +151,34 @@ pub fn add_swap_i64_bytes_function(module: &mut Module) -> FunctionId {
     function_builder.name("swap_i64_bytes".to_string());
     function_builder.finish(vec![input_param], &mut module.funcs)
 }
+
+/// Converts the input string to camel case.
+pub fn snake_to_camel(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    // .len returns byte count but ok in this case!
+
+    #[derive(PartialEq)]
+    enum ChIs {
+        FirstOfStr,
+        NextOfSepMark,
+        Other,
+    }
+
+    let mut flag = ChIs::FirstOfStr;
+
+    for ch in input.chars() {
+        if flag == ChIs::FirstOfStr {
+            result.push(ch.to_ascii_lowercase());
+            flag = ChIs::Other;
+        } else if ch == '_' {
+            flag = ChIs::NextOfSepMark;
+        } else if flag == ChIs::NextOfSepMark {
+            result.push(ch.to_ascii_uppercase());
+            flag = ChIs::Other;
+        } else {
+            result.push(ch);
+        }
+    }
+
+    result
+}

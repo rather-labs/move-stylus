@@ -15,14 +15,15 @@ fn map_bytecode_instruction<'a, 'b>(
         Bytecode::LdConst(global_index) => {
             let constant = &constants[global_index.0 as usize];
             match constant.type_ {
-                SignatureToken::U8 | SignatureToken::U16 | SignatureToken::U32 => builder
-                    .i32_const(i32::from_le_bytes(
-                        constant
-                            .data
-                            .clone()
-                            .try_into()
-                            .expect("Constant does not fit in u32"),
-                    )),
+                SignatureToken::U8 | SignatureToken::U16 | SignatureToken::U32 => {
+                    let mut bytes = constant.data.clone();
+                    assert!(bytes.len() <= 4, "Constant is too large to fit in u32");
+
+                    // pad to 4 bytes on the right
+                    bytes.resize(4, 0);
+
+                    builder.i32_const(i32::from_le_bytes(bytes.try_into().unwrap()))
+                }
                 SignatureToken::U64 => builder.i64_const(i64::from_le_bytes(
                     constant
                         .data

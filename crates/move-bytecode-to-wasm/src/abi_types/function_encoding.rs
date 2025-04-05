@@ -1,6 +1,8 @@
 use alloy_primitives::keccak256;
 use move_binary_format::file_format::Signature;
 
+use crate::utils::snake_to_camel;
+
 use super::type_mapping::map_move_type_to_sol_name;
 
 pub type AbiFunctionSelector = [u8; 4];
@@ -18,6 +20,9 @@ pub fn move_signature_to_abi_selector(
     for signature_token in signature.0.iter() {
         parameter_strings.push(map_move_type_to_sol_name(signature_token));
     }
+
+    let function_name = snake_to_camel(function_name);
+
     selector(format!(
         "{}({})",
         function_name,
@@ -50,7 +55,7 @@ mod tests {
             SignatureToken::Vector(Box::new(SignatureToken::Bool)),
         ]);
         assert_eq!(
-            move_signature_to_abi_selector("testArray", &signature),
+            move_signature_to_abi_selector("test_array", &signature),
             selector("testArray(uint128[],bool[])")
         );
 
@@ -61,7 +66,7 @@ mod tests {
             SignatureToken::Vector(Box::new(SignatureToken::Bool)),
         ]);
         assert_eq!(
-            move_signature_to_abi_selector("testArray", &signature),
+            move_signature_to_abi_selector("test_array", &signature),
             selector("testArray(uint128[][],bool[])")
         );
     }
