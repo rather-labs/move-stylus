@@ -10,5 +10,17 @@ public fun hello_world(): u32 {
 }
 
 public fun echo(x: u32): u32 {
+  identity(x)
+}
+
+public fun echo_2(x: u32, y: u32): u32 {
+  identity_2(x, y)
+}
+
+fun identity(x: u32): u32 {
   x
+}
+
+fun identity_2(_x: u32, y: u32): u32 {
+  y
 }

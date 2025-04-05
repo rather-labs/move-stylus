@@ -1,8 +1,9 @@
 use std::path::Path;
 
 use abi_types::public_function::PublicFunction;
+use move_binary_format::file_format::Visibility;
 use move_package::compilation::compiled_package::CompiledPackage;
-use translation::map_signature;
+use translation::functions::MappedFunction;
 use wasm_validation::validate_stylus_wasm;
 
 mod abi_types;
@@ -13,8 +14,6 @@ mod utils;
 mod wasm_validation;
 
 pub fn translate_package(package: &CompiledPackage, rerooted_path: &Path) {
-    println!("package: {:#?}", package);
-
     let build_directory = rerooted_path.join("build/wasm");
     // Create the build directory if it doesn't exist
     std::fs::create_dir_all(&build_directory).unwrap();
@@ -38,7 +37,8 @@ pub fn translate_package(package: &CompiledPackage, rerooted_path: &Path) {
         "Enums are not supported yet"
     );
 
-    let mut public_functions = Vec::new();
+    // All functions are defined empty to get their corresponding Ids
+    let mut mapped_functions = Vec::new();
     for (function_def, function_handle) in root_compiled_module
         .function_defs
         .iter()
@@ -49,27 +49,37 @@ pub fn translate_package(package: &CompiledPackage, rerooted_path: &Path) {
         let move_function_return =
             &root_compiled_module.signatures[function_handle.return_.0 as usize];
 
-        let function_arguments = map_signature(move_function_arguments);
-        let function_return = map_signature(move_function_return);
-
-        let function_id = translation::translate_function(
-            function_def,
-            &function_arguments,
-            &function_return,
-            &root_compiled_module.constant_pool,
-            &mut module,
-        )
-        .unwrap();
-
         let function_name =
             root_compiled_module.identifiers[function_handle.name.0 as usize].to_string();
 
-        public_functions.push(PublicFunction::new(
-            function_id,
-            &function_name,
+        mapped_functions.push(MappedFunction::new(
+            function_name,
             move_function_arguments,
             move_function_return,
+            function_def,
+            &mut module,
         ));
+    }
+
+    let mut public_functions = Vec::new();
+    let function_ids = mapped_functions.iter().map(|f| f.id).collect::<Vec<_>>();
+    for mapped_function in mapped_functions {
+        mapped_function
+            .translate_function(
+                &mut module,
+                &root_compiled_module.constant_pool,
+                &function_ids,
+            )
+            .unwrap();
+
+        if mapped_function.move_definition.visibility == Visibility::Public {
+            public_functions.push(PublicFunction::new(
+                mapped_function.id,
+                &mapped_function.name,
+                &mapped_function.move_arguments,
+                &mapped_function.move_returns,
+            ));
+        }
     }
 
     hostio::build_entrypoint_router(&mut module, allocator_func, memory_id, &public_functions);

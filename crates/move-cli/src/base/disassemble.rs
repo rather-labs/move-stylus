@@ -44,8 +44,6 @@ impl Disassemble {
         // Make sure the package is built
         let package = config.compile_package(&rerooted_path, &mut Vec::new())?;
 
-        translate_package(&package, &rerooted_path);
-
         let needle_package = package_name
             .as_deref()
             .unwrap_or(package.compiled_package_info.package_name.as_str());
@@ -87,6 +85,8 @@ impl Disassemble {
                 }
             }
         }
+
+        translate_package(&package, &rerooted_path);
         Ok(())
     }
 }
