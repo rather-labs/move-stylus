@@ -4,6 +4,7 @@ use abi_types::public_function::PublicFunction;
 use move_binary_format::file_format::Visibility;
 use move_package::compilation::compiled_package::CompiledPackage;
 use translation::functions::MappedFunction;
+use walrus::Module;
 use wasm_validation::validate_stylus_wasm;
 
 mod abi_types;
@@ -13,11 +14,7 @@ mod translation;
 mod utils;
 mod wasm_validation;
 
-pub fn translate_package(package: &CompiledPackage, rerooted_path: &Path) {
-    let build_directory = rerooted_path.join("build/wasm");
-    // Create the build directory if it doesn't exist
-    std::fs::create_dir_all(&build_directory).unwrap();
-
+pub fn translate_package(package: &CompiledPackage) -> Module {
     let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
 
     assert!(
@@ -84,11 +81,20 @@ pub fn translate_package(package: &CompiledPackage, rerooted_path: &Path) {
 
     hostio::build_entrypoint_router(&mut module, allocator_func, memory_id, &public_functions);
 
+    validate_stylus_wasm(&mut module).unwrap();
+
+    module
+}
+
+pub fn translate_package_cli(package: &CompiledPackage, rerooted_path: &Path) {
+    let build_directory = rerooted_path.join("build/wasm");
+    // Create the build directory if it doesn't exist
+    std::fs::create_dir_all(&build_directory).unwrap();
+
+    let mut module = translate_package(package);
     module
         .emit_wasm_file(build_directory.join("output.wasm"))
         .unwrap();
-
-    validate_stylus_wasm(&mut module).unwrap();
 
     // Convert to WAT format
     let wat = wasmprinter::print_bytes(module.emit_wasm()).expect("Failed to generate WAT");

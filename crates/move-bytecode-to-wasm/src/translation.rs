@@ -15,13 +15,15 @@ fn map_bytecode_instruction<'a, 'b>(
         Bytecode::LdConst(global_index) => {
             let constant = &constants[global_index.0 as usize];
             match constant.type_ {
-                SignatureToken::U8 => builder.i32_const(i32::from_le_bytes(
-                    constant
-                        .data
-                        .clone()
-                        .try_into()
-                        .expect("Constant is not a u8"),
-                )),
+                SignatureToken::U8 => {
+                    let mut bytes = constant.data.clone();
+                    // pad to 4 bytes on the right
+                    bytes.resize(4, 0);
+
+                    builder.i32_const(i32::from_le_bytes(
+                        bytes.try_into().expect("Constant is not a u8"),
+                    ))
+                }
                 SignatureToken::U16 => builder.i32_const(i32::from_le_bytes(
                     constant
                         .data
