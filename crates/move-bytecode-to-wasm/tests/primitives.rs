@@ -27,10 +27,10 @@ fn test_uint_8() {
 
     sol!(
         #[allow(missing_docs)]
-        function get_const() external returns (uint8);
+        function getConst() external returns (uint8);
     );
 
-    let data = get_constCall::abi_encode(&get_constCall::new(()));
+    let data = getConstCall::abi_encode(&getConstCall::new(()));
     let expected_result = <sol!((uint8,))>::abi_encode_params(&(88,));
 
     run_test(&mut translated_package, data, expected_result);
