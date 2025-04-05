@@ -1,5 +1,7 @@
 use anyhow::Result;
-use move_binary_format::file_format::{Constant, FunctionDefinition, Signature, SignatureToken};
+use move_binary_format::file_format::{
+    CodeUnit, Constant, FunctionDefinition, Signature, SignatureToken,
+};
 use walrus::{FunctionBuilder, FunctionId, LocalId, Module, ValType};
 
 use crate::translation::map_bytecode_instruction;
@@ -10,7 +12,8 @@ pub struct MappedFunction {
     pub move_arguments: Signature,
     pub move_returns: Signature,
     pub move_definition: FunctionDefinition,
-    pub input_variables: Vec<LocalId>,
+    pub move_code_unit: CodeUnit,
+    pub local_variables: Vec<LocalId>,
 }
 
 impl MappedFunction {
@@ -20,11 +23,19 @@ impl MappedFunction {
         move_returns: &Signature,
         move_definition: &FunctionDefinition,
         module: &mut Module,
+        move_module_signatures: &[Signature],
     ) -> Self {
+        assert!(
+            move_definition.acquires_global_resources.is_empty(),
+            "Acquiring global resources is not supported yet"
+        );
+
+        let code = move_definition.code.clone().expect("Function has no code");
+
         let function_arguments = map_signature(move_arguments);
         let function_returns = map_signature(move_returns);
 
-        let input_variables: Vec<LocalId> = function_arguments
+        let mut local_variables: Vec<LocalId> = function_arguments
             .iter()
             .map(|arg| module.locals.add(*arg))
             .collect();
@@ -33,7 +44,16 @@ impl MappedFunction {
             FunctionBuilder::new(&mut module.types, &function_arguments, &function_returns);
 
         // Building an empty function to get the function id
-        let id = function_builder.finish(input_variables.clone(), &mut module.funcs);
+        let id = function_builder.finish(local_variables.clone(), &mut module.funcs);
+
+        let move_locals = &code.locals;
+        let mapped_locals = map_signature(&move_module_signatures[move_locals.0 as usize]);
+        let mapped_locals: Vec<LocalId> = mapped_locals
+            .iter()
+            .map(|arg| module.locals.add(*arg))
+            .collect();
+
+        local_variables.extend(mapped_locals);
 
         Self {
             id,
@@ -41,7 +61,8 @@ impl MappedFunction {
             move_arguments: move_arguments.clone(),
             move_returns: move_returns.clone(),
             move_definition: move_definition.clone(),
-            input_variables,
+            move_code_unit: code,
+            local_variables,
         }
     }
 
@@ -62,20 +83,8 @@ impl MappedFunction {
         constant_pool: &[Constant],
         function_ids: &[FunctionId],
     ) -> Result<()> {
-        let function_def = &self.move_definition;
-
         anyhow::ensure!(
-            function_def.acquires_global_resources.is_empty(),
-            "Acquiring global resources is not supported yet"
-        );
-
-        let code = function_def
-            .code
-            .as_ref()
-            .ok_or(anyhow::anyhow!("Function has no code"))?;
-
-        anyhow::ensure!(
-            code.jump_tables.is_empty(),
+            self.move_code_unit.jump_tables.is_empty(),
             "Jump tables are not supported yet"
         );
 
@@ -83,13 +92,13 @@ impl MappedFunction {
 
         let mut function_body = function_builder.func_body();
 
-        for instruction in code.code.iter() {
+        for instruction in self.move_code_unit.code.iter() {
             map_bytecode_instruction(
                 instruction,
                 constant_pool,
                 function_ids,
                 &mut function_body,
-                &self.input_variables,
+                &self.local_variables,
             );
         }
 

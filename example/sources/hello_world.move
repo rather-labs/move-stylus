@@ -2,11 +2,25 @@
 /// The named address is set in the `Move.toml`.
 module hello_world::hello_world;
 
-const ITEM_PRICE: u32 = 100;
+const INT_AS_CONST: u32 = 100;
 
-/// Returns the "Hello, World!" as a `String`.
-public fun hello_world(): u32 {
-  ITEM_PRICE
+public fun get_constant(): u32 {
+  INT_AS_CONST
+}
+
+public fun get_constant_local(): u32 {
+  let x: u32 = INT_AS_CONST;
+  x
+}
+
+// Forces the compiler to store literals on locals
+public fun get_local(z_: u32): u32 {
+  let x: u32 = 100;
+  let y: u32 = 50;
+  identity(x);
+  identity_3(x, y);
+
+  identity_2(x, y)
 }
 
 public fun echo(x: u32): u32 {
@@ -23,4 +37,8 @@ fun identity(x: u32): u32 {
 
 fun identity_2(_x: u32, y: u32): u32 {
   y
+}
+
+fun identity_3(_x: u32, y: u32): (u32, u32) {
+  (y, y)
 }

@@ -58,6 +58,7 @@ pub fn translate_package(package: &CompiledPackage, rerooted_path: &Path) {
             move_function_return,
             function_def,
             &mut module,
+            &root_compiled_module.signatures,
         ));
     }
 
