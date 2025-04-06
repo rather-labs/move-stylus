@@ -15,7 +15,10 @@ fn map_bytecode_instruction<'a, 'b>(
         Bytecode::LdConst(global_index) => {
             let constant = &constants[global_index.0 as usize];
             match constant.type_ {
-                SignatureToken::U8 | SignatureToken::U16 | SignatureToken::U32 => {
+                SignatureToken::U8
+                | SignatureToken::U16
+                | SignatureToken::U32
+                | SignatureToken::Bool => {
                     let mut bytes = constant.data.clone();
                     assert!(bytes.len() <= 4, "Constant is too large to fit in u32");
 
@@ -35,8 +38,8 @@ fn map_bytecode_instruction<'a, 'b>(
             }
         }
         // Load literals
-        Bytecode::LdFalse => builder.i64_const(0),
-        Bytecode::LdTrue => builder.i64_const(1),
+        Bytecode::LdFalse => builder.i32_const(0),
+        Bytecode::LdTrue => builder.i32_const(1),
         Bytecode::LdU8(literal) => builder.i32_const(*literal as i32),
         Bytecode::LdU16(literal) => builder.i32_const(*literal as i32),
         Bytecode::LdU32(literal) => builder.i32_const(*literal as i32),

@@ -1,4 +1,4 @@
-module 0x01::hello_world;
+module 0x01::bool_type;
 
 const BOOL_AS_CONST: bool = true;
 

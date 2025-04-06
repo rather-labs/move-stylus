@@ -166,3 +166,38 @@ fn test_uint_64() {
     let expected_result = <sol!((uint64,))>::abi_encode_params(&(222,));
     run_test(&mut translated_package, data, expected_result);
 }
+
+#[test]
+fn test_bool() {
+    const MODULE_NAME: &str = "bool_type";
+
+    sol!(
+        #[allow(missing_docs)]
+        function getConstant() external returns (bool);
+        function getLocal(bool _z) external returns (bool);
+        function echo(bool x) external returns (bool);
+        function echo2(bool x, bool y) external returns (bool);
+    );
+
+    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
+    let expected_result = <sol!((bool,))>::abi_encode_params(&(true,));
+    run_test(&mut translated_package, data, expected_result);
+
+    let data = getLocalCall::abi_encode(&getLocalCall::new((true,)));
+    let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
+    run_test(&mut translated_package, data, expected_result);
+
+    let data = echoCall::abi_encode(&echoCall::new((true,)));
+    let expected_result = <sol!((bool,))>::abi_encode_params(&(true,));
+    run_test(&mut translated_package, data, expected_result);
+
+    let data = echoCall::abi_encode(&echoCall::new((false,)));
+    let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
+    run_test(&mut translated_package, data, expected_result);
+
+    let data = echo2Call::abi_encode(&echo2Call::new((true, false)));
+    let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
+    run_test(&mut translated_package, data, expected_result);
+}
