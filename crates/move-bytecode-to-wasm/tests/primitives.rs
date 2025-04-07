@@ -1,4 +1,10 @@
-use alloy::{dyn_abi::SolType, primitives::U256, sol, sol_types::SolCall};
+use alloy::{
+    dyn_abi::SolType,
+    hex::FromHex,
+    primitives::{Address, U256},
+    sol,
+    sol_types::SolCall,
+};
 use common::{ModuleData, setup_wasmtime_module, translate_test_package};
 use walrus::Module;
 
@@ -59,6 +65,77 @@ fn test_bool() {
 
     let data = echo2Call::abi_encode(&echo2Call::new((true, false)));
     let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
+    run_test(&mut translated_package, data, expected_result);
+}
+
+#[test]
+fn test_address() {
+    const MODULE_NAME: &str = "address_type";
+    const SOURCE_PATH: &str = "tests/primitives/address.move";
+
+    sol!(
+        #[allow(missing_docs)]
+        function getConstant() external returns (address);
+        function getLocal(address _z) external returns (address);
+        function getCopiedLocal() external returns (address, address);
+        function echo(address x) external returns (address);
+        function echo2(address x, address y) external returns (address);
+    );
+
+    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
+    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
+        "0x0000000000000000000000000000000000000001",
+    )
+    .unwrap(),));
+    run_test(&mut translated_package, data, expected_result);
+
+    let data = getLocalCall::abi_encode(&getLocalCall::new((Address::from_hex(
+        "0x0000000000000000000000000000000000000022",
+    )
+    .unwrap(),)));
+    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
+        "0x0000000000000000000000000000000000000011",
+    )
+    .unwrap(),));
+    run_test(&mut translated_package, data, expected_result);
+
+    let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
+    let expected_result = <sol!((address, address))>::abi_encode_params(&(
+        Address::from_hex("0x0000000000000000000000000000000000000001").unwrap(),
+        Address::from_hex("0x0000000000000000000000000000000000000022").unwrap(),
+    ));
+    run_test(&mut translated_package, data, expected_result);
+
+    let data = echoCall::abi_encode(&echoCall::new((Address::from_hex(
+        "0x0000000000000000000000000000000000000033",
+    )
+    .unwrap(),)));
+    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
+        "0x0000000000000000000000000000000000000033",
+    )
+    .unwrap(),));
+    run_test(&mut translated_package, data, expected_result);
+
+    let data = echoCall::abi_encode(&echoCall::new((Address::from_hex(
+        "0x0000000000000000000000000000000000000044",
+    )
+    .unwrap(),)));
+    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
+        "0x0000000000000000000000000000000000000044",
+    )
+    .unwrap(),));
+    run_test(&mut translated_package, data, expected_result);
+
+    let data = echo2Call::abi_encode(&echo2Call::new((
+        Address::from_hex("0x0000000000000000000000000000000000000055").unwrap(),
+        Address::from_hex("0x0000000000000000000000000000000000000066").unwrap(),
+    )));
+    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
+        "0x0000000000000000000000000000000000000066",
+    )
+    .unwrap(),));
     run_test(&mut translated_package, data, expected_result);
 }
 

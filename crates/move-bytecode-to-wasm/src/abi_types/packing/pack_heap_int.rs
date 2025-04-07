@@ -96,7 +96,49 @@ pub fn pack_u256_instructions(
             StoreKind::I64 { atomic: false },
             MemArg {
                 align: 0,
-                // Abi is left-padded to 32 bytes
+                offset: i * 8,
+            },
+        );
+    }
+
+    block.local_get(pointer);
+    block.i32_const(encoded_size as i32);
+}
+
+/// Address is packed as a u256, but endianness is not relevant
+pub fn pack_address_instructions(
+    block: &mut InstrSeqBuilder,
+    module: &mut Module,
+    memory: MemoryId,
+    alloc_function: FunctionId,
+    local: LocalId,
+) {
+    let encoded_size = sol_data::Uint::<128>::ENCODED_SIZE.expect("U64 should have a fixed size");
+
+    let pointer = module.locals.add(ValType::I32);
+
+    // Allocate memory for the packed value
+    block.i32_const(encoded_size as i32);
+    block.call(alloc_function);
+    block.local_set(pointer);
+
+    for i in 0..4 {
+        block.local_get(pointer);
+        block.local_get(local);
+
+        block.load(
+            memory,
+            LoadKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: i * 8,
+            },
+        );
+        block.store(
+            memory,
+            StoreKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
                 offset: i * 8,
             },
         );

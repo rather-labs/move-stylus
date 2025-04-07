@@ -103,6 +103,48 @@ pub fn unpack_u256_instructions(
     block.i32_const(encoded_size as i32);
 }
 
+/// Address is packed as a u256, but endianness is not relevant
+pub fn unpack_address_instructions(
+    block: &mut InstrSeqBuilder,
+    module: &mut Module,
+    memory: MemoryId,
+    current_pointer: LocalId,
+    allocator: FunctionId,
+) {
+    let encoded_size = sol_data::Uint::<256>::ENCODED_SIZE.expect("U256 should have a fixed size");
+
+    block.i32_const(encoded_size as i32);
+    block.call(allocator);
+
+    let unpacked_pointer = module.locals.add(ValType::I32);
+    block.local_set(unpacked_pointer);
+
+    for i in 0..4 {
+        block.local_get(unpacked_pointer);
+        block.local_get(current_pointer);
+        block.load(
+            memory,
+            LoadKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: i * 8,
+            },
+        );
+
+        block.store(
+            memory,
+            StoreKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: i * 8,
+            },
+        );
+    }
+
+    block.local_get(unpacked_pointer);
+    block.i32_const(encoded_size as i32);
+}
+
 #[cfg(test)]
 mod tests {
     use alloy::{dyn_abi::SolType, primitives::U256, sol};

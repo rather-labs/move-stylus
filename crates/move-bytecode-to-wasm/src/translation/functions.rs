@@ -118,7 +118,7 @@ fn map_signature_token(signature_token: &SignatureToken) -> ValType {
         SignatureToken::U64 => ValType::I64,
         SignatureToken::U128 => ValType::I32, // Reference to a memory location
         SignatureToken::U256 => ValType::I32, // Reference to a memory location
-        SignatureToken::Address => panic!("Address is not supported"),
+        SignatureToken::Address => ValType::I32, // Reference to a memory location
         SignatureToken::Signer => panic!("Signer is not supported"),
         SignatureToken::Vector(_) => panic!("Vector is not supported"),
         SignatureToken::Datatype(_) => panic!("Datatype is not supported"),

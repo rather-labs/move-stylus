@@ -1,6 +1,8 @@
 use alloy_sol_types::{SolType, sol_data};
 use move_binary_format::file_format::{Signature, SignatureToken};
-use unpack_heap_int::{unpack_u128_instructions, unpack_u256_instructions};
+use unpack_heap_int::{
+    unpack_address_instructions, unpack_u128_instructions, unpack_u256_instructions,
+};
 use unpack_native_int::{unpack_i32_type_instructions, unpack_i64_type_instructions};
 use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType, ir::BinaryOp};
 
@@ -109,7 +111,7 @@ fn add_unpack_instruction_for_signature_token(
             unpack_u256_instructions(block, module, memory, current_pointer, allocator);
         }
         SignatureToken::Address => {
-            panic!("Address is not supported yet"); // TODO
+            unpack_address_instructions(block, module, memory, current_pointer, allocator);
         }
         SignatureToken::Vector(_) => panic!("Vector is not supported"), // TODO
         SignatureToken::Signer => panic!("Signer is not supported"), // TODO: review how to handle this on public functions

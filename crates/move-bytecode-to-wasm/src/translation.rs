@@ -68,6 +68,18 @@ fn map_bytecode_instruction(
                         module, memory, allocator, &bytes,
                     );
                 }
+                SignatureToken::Address => {
+                    // Address is treated as a u256
+                    let bytes: [u8; 32] = constant
+                        .data
+                        .clone()
+                        .try_into()
+                        .expect("Constant is not a u256");
+
+                    mapped_function.add_load_literal_heap_type_to_memory_instructions(
+                        module, memory, allocator, &bytes,
+                    );
+                }
                 _ => panic!("Unsupported constant: {:?}", constant),
             }
         }

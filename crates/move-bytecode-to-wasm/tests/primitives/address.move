@@ -1,4 +1,4 @@
-module 0x01::hello_world;
+module 0x01::address_type;
 
 const ADDRESS_AS_CONST: address = @0x01;
 
