@@ -4,154 +4,179 @@ use walrus::{
     ir::{LoadKind, MemArg, StoreKind},
 };
 
-use crate::utils::add_swap_i64_bytes_function;
+use crate::{
+    translation::intermediate_types::{
+        address::IAddress,
+        heap_integers::{IU128, IU256},
+    },
+    utils::add_swap_i64_bytes_function,
+};
 
-pub fn unpack_u128_instructions(
-    block: &mut InstrSeqBuilder,
-    module: &mut Module,
-    memory: MemoryId,
-    current_pointer: LocalId,
-    allocator: FunctionId,
-) {
-    let encoded_size = sol_data::Uint::<128>::ENCODED_SIZE.expect("U128 should have a fixed size");
+use super::Unpackable;
 
-    // Big-endian to Little-endian
-    let swap_i64_bytes_function = add_swap_i64_bytes_function(module);
+impl Unpackable for IU128 {
+    fn add_unpack_instructions(
+        &self,
+        block: &mut InstrSeqBuilder,
+        module: &mut Module,
+        current_pointer: LocalId,
+        memory: MemoryId,
+        allocator: FunctionId,
+    ) {
+        let encoded_size =
+            sol_data::Uint::<128>::ENCODED_SIZE.expect("U128 should have a fixed size");
 
-    block.i32_const(encoded_size as i32);
-    block.call(allocator);
+        // Big-endian to Little-endian
+        let swap_i64_bytes_function = add_swap_i64_bytes_function(module);
 
-    let unpacked_pointer = module.locals.add(ValType::I32);
-    block.local_set(unpacked_pointer);
+        block.i32_const(encoded_size as i32);
+        block.call(allocator);
 
-    for i in 0..2 {
+        let unpacked_pointer = module.locals.add(ValType::I32);
+        block.local_set(unpacked_pointer);
+
+        for i in 0..2 {
+            block.local_get(unpacked_pointer);
+            block.local_get(current_pointer);
+            block.load(
+                memory,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    // Abi encoded value is left padded to 32 bytes
+                    offset: 16 + i * 8,
+                },
+            );
+            block.call(swap_i64_bytes_function);
+        }
+
+        // store in reverse order
+        for i in 0..2 {
+            block.store(
+                memory,
+                StoreKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: i * 8,
+                },
+            );
+        }
+
         block.local_get(unpacked_pointer);
-        block.local_get(current_pointer);
-        block.load(
-            memory,
-            LoadKind::I64 { atomic: false },
-            MemArg {
-                align: 0,
-                // Abi encoded value is left padded to 32 bytes
-                offset: 16 + i * 8,
-            },
-        );
-        block.call(swap_i64_bytes_function);
+        block.i32_const(encoded_size as i32);
     }
-
-    // store in reverse order
-    for i in 0..2 {
-        block.store(
-            memory,
-            StoreKind::I64 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: i * 8,
-            },
-        );
-    }
-
-    block.local_get(unpacked_pointer);
-    block.i32_const(encoded_size as i32);
 }
 
-pub fn unpack_u256_instructions(
-    block: &mut InstrSeqBuilder,
-    module: &mut Module,
-    memory: MemoryId,
-    current_pointer: LocalId,
-    allocator: FunctionId,
-) {
-    let encoded_size = sol_data::Uint::<256>::ENCODED_SIZE.expect("U256 should have a fixed size");
+impl Unpackable for IU256 {
+    fn add_unpack_instructions(
+        &self,
+        block: &mut InstrSeqBuilder,
+        module: &mut Module,
+        current_pointer: LocalId,
+        memory: MemoryId,
+        allocator: FunctionId,
+    ) {
+        let encoded_size =
+            sol_data::Uint::<256>::ENCODED_SIZE.expect("U256 should have a fixed size");
 
-    // Big-endian to Little-endian
-    let swap_i64_bytes_function = add_swap_i64_bytes_function(module);
+        // Big-endian to Little-endian
+        let swap_i64_bytes_function = add_swap_i64_bytes_function(module);
 
-    block.i32_const(encoded_size as i32);
-    block.call(allocator);
+        block.i32_const(encoded_size as i32);
+        block.call(allocator);
 
-    let unpacked_pointer = module.locals.add(ValType::I32);
-    block.local_set(unpacked_pointer);
+        let unpacked_pointer = module.locals.add(ValType::I32);
+        block.local_set(unpacked_pointer);
 
-    for i in 0..4 {
+        for i in 0..4 {
+            block.local_get(unpacked_pointer);
+            block.local_get(current_pointer);
+            block.load(
+                memory,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: i * 8,
+                },
+            );
+            block.call(swap_i64_bytes_function);
+        }
+
+        // store in reverse order
+        for i in 0..4 {
+            block.store(
+                memory,
+                StoreKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: i * 8,
+                },
+            );
+        }
+
         block.local_get(unpacked_pointer);
-        block.local_get(current_pointer);
-        block.load(
-            memory,
-            LoadKind::I64 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: i * 8,
-            },
-        );
-        block.call(swap_i64_bytes_function);
+        block.i32_const(encoded_size as i32);
     }
-
-    // store in reverse order
-    for i in 0..4 {
-        block.store(
-            memory,
-            StoreKind::I64 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: i * 8,
-            },
-        );
-    }
-
-    block.local_get(unpacked_pointer);
-    block.i32_const(encoded_size as i32);
 }
 
-/// Address is packed as a u256, but endianness is not relevant
-pub fn unpack_address_instructions(
-    block: &mut InstrSeqBuilder,
-    module: &mut Module,
-    memory: MemoryId,
-    current_pointer: LocalId,
-    allocator: FunctionId,
-) {
-    let encoded_size = sol_data::Uint::<256>::ENCODED_SIZE.expect("U256 should have a fixed size");
+impl Unpackable for IAddress {
+    /// Address is packed as a u160, but endianness is not relevant
+    fn add_unpack_instructions(
+        &self,
+        block: &mut InstrSeqBuilder,
+        module: &mut Module,
+        current_pointer: LocalId,
+        memory: MemoryId,
+        allocator: FunctionId,
+    ) {
+        let encoded_size =
+            sol_data::Address::ENCODED_SIZE.expect("Address should have a fixed size");
 
-    block.i32_const(encoded_size as i32);
-    block.call(allocator);
+        block.i32_const(encoded_size as i32);
+        block.call(allocator);
 
-    let unpacked_pointer = module.locals.add(ValType::I32);
-    block.local_set(unpacked_pointer);
+        let unpacked_pointer = module.locals.add(ValType::I32);
+        block.local_set(unpacked_pointer);
 
-    for i in 0..4 {
+        for i in 0..4 {
+            block.local_get(unpacked_pointer);
+            block.local_get(current_pointer);
+            block.load(
+                memory,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: i * 8,
+                },
+            );
+
+            block.store(
+                memory,
+                StoreKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: i * 8,
+                },
+            );
+        }
+
         block.local_get(unpacked_pointer);
-        block.local_get(current_pointer);
-        block.load(
-            memory,
-            LoadKind::I64 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: i * 8,
-            },
-        );
-
-        block.store(
-            memory,
-            StoreKind::I64 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: i * 8,
-            },
-        );
+        block.i32_const(encoded_size as i32);
     }
-
-    block.local_get(unpacked_pointer);
-    block.i32_const(encoded_size as i32);
 }
 
 #[cfg(test)]
 mod tests {
-    use alloy::{dyn_abi::SolType, primitives::U256, sol};
+    use alloy::{
+        dyn_abi::SolType,
+        hex::FromHex,
+        primitives::{Address, U256},
+        sol,
+    };
     use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
     use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults};
 
-    use crate::memory::setup_module_memory;
+    use crate::{memory::setup_module_memory, translation::intermediate_types::IParam};
 
     use super::*;
 
@@ -186,7 +211,7 @@ mod tests {
         (linker, instance, store, entrypoint)
     }
 
-    fn test_uint_128(data: &[u8], expected_result: u128) {
+    fn test_uint<T: IParam>(data: &[u8], int_type: T, expected_result_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id) = build_module();
 
         let mut function_builder =
@@ -204,11 +229,11 @@ mod tests {
         func_body.drop();
 
         // Args data should already be stored in memory
-        unpack_u128_instructions(
+        int_type.add_unpack_instructions(
             &mut func_body,
             &mut raw_module,
-            memory_id,
             args_pointer,
+            memory_id,
             allocator,
         );
         func_body.drop();
@@ -221,54 +246,6 @@ mod tests {
 
         let result = entrypoint.call(&mut store, ()).unwrap();
         assert_eq!(result, data.len() as i32);
-
-        let expected_result_bytes = expected_result.to_le_bytes();
-
-        let memory = instance.get_memory(&mut store, "memory").unwrap();
-        let mut result_memory_data = vec![0; expected_result_bytes.len()];
-        memory
-            .read(&mut store, result as usize, &mut result_memory_data)
-            .unwrap();
-        assert_eq!(result_memory_data, expected_result_bytes);
-    }
-
-    fn test_uint_256(data: &[u8], expected_result: U256) {
-        let (mut raw_module, allocator, memory_id) = build_module();
-
-        let mut function_builder =
-            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
-
-        let args_pointer = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-        func_body.i32_const(0);
-        func_body.local_set(args_pointer);
-
-        // Mock args allocation
-        func_body.i32_const(data.len() as i32);
-        func_body.call(allocator);
-        func_body.drop();
-
-        // Args data should already be stored in memory
-        unpack_u256_instructions(
-            &mut func_body,
-            &mut raw_module,
-            memory_id,
-            args_pointer,
-            allocator,
-        );
-        func_body.drop();
-
-        let function = function_builder.finish(vec![], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module::<i32>(&mut raw_module, data.to_vec(), "test_function");
-
-        let result = entrypoint.call(&mut store, ()).unwrap();
-        assert_eq!(result, data.len() as i32);
-
-        let expected_result_bytes = expected_result.to_le_bytes::<32>();
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; expected_result_bytes.len()];
@@ -282,35 +259,68 @@ mod tests {
     fn test_unpack_u128() {
         type IntType = u128;
         type SolType = sol!((uint128,));
+        let int_type = IU128;
 
         let data = SolType::abi_encode_params(&(88,));
-        test_uint_128(&data, 88);
+        test_uint(&data, int_type, &88u128.to_le_bytes());
 
         let data = SolType::abi_encode_params(&(IntType::MAX,));
-        test_uint_128(&data, IntType::MAX); // max
+        test_uint(&data, int_type, &IntType::MAX.to_le_bytes()); // max
 
         let data = SolType::abi_encode_params(&(IntType::MIN,));
-        test_uint_128(&data, IntType::MIN); // min
+        test_uint(&data, int_type, &IntType::MIN.to_le_bytes()); // min
 
         let data = SolType::abi_encode_params(&(IntType::MAX - 1,));
-        test_uint_128(&data, IntType::MAX - 1); // max -1 (avoid symmetry)
+        test_uint(&data, int_type, &(IntType::MAX - 1).to_le_bytes()); // max -1 (avoid symmetry)
     }
 
     #[test]
     fn test_unpack_u256() {
         type IntType = U256;
         type SolType = sol!((uint256,));
+        let int_type = IU256;
 
         let data = SolType::abi_encode_params(&(U256::from(88),));
-        test_uint_256(&data, U256::from(88));
+        test_uint(&data, int_type, &U256::from(88).to_le_bytes::<32>());
 
         let data = SolType::abi_encode_params(&(IntType::MAX,));
-        test_uint_256(&data, IntType::MAX); // max
+        test_uint(&data, int_type, &IntType::MAX.to_le_bytes::<32>()); // max
 
         let data = SolType::abi_encode_params(&(IntType::MIN,));
-        test_uint_256(&data, IntType::MIN); // min
+        test_uint(&data, int_type, &IntType::MIN.to_le_bytes::<32>()); // min
 
         let data = SolType::abi_encode_params(&(IntType::MAX - U256::from(1),));
-        test_uint_256(&data, IntType::MAX - U256::from(1)); // max -1 (avoid symmetry)
+        test_uint(
+            &data,
+            int_type,
+            &(IntType::MAX - U256::from(1)).to_le_bytes::<32>(),
+        ); // max -1 (avoid symmetry)
+    }
+
+    #[test]
+    fn test_unpack_address() {
+        type SolType = sol!((address,));
+        let int_type = IAddress;
+
+        let data = SolType::abi_encode_params(&(Address::ZERO,));
+        test_uint(&data, int_type, &data);
+
+        let data = SolType::abi_encode_params(&(Address::from_hex(
+            "0x1234567890abcdef1234567890abcdef12345678",
+        )
+        .unwrap(),));
+        test_uint(&data, int_type, &data);
+
+        let data = SolType::abi_encode_params(&(Address::from_hex(
+            "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        )
+        .unwrap(),));
+        test_uint(&data, int_type, &data);
+
+        let data = SolType::abi_encode_params(&(Address::from_hex(
+            "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE",
+        )
+        .unwrap(),));
+        test_uint(&data, int_type, &data);
     }
 }

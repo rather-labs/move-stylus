@@ -86,11 +86,13 @@ pub fn add_entrypoint(module: &mut Module, func: FunctionId) {
 
 #[cfg(test)]
 mod tests {
-    use move_binary_format::file_format::Signature;
     use walrus::{MemoryId, ModuleConfig};
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
-    use crate::{memory::setup_module_memory, utils::display_module};
+    use crate::{
+        memory::setup_module_memory, translation::intermediate_types::ISignature,
+        utils::display_module,
+    };
 
     use super::*;
 
@@ -109,7 +111,14 @@ mod tests {
 
         let noop = noop_builder.finish(vec![], &mut module.funcs);
 
-        PublicFunction::new(noop, "noop", &Signature(vec![]), &Signature(vec![]))
+        PublicFunction::new(
+            noop,
+            "noop",
+            ISignature {
+                arguments: vec![],
+                returns: vec![],
+            },
+        )
     }
 
     fn add_noop_2_function(module: &mut Module) -> PublicFunction {
@@ -119,7 +128,14 @@ mod tests {
 
         let noop = noop_builder.finish(vec![], &mut module.funcs);
 
-        PublicFunction::new(noop, "noop_2", &Signature(vec![]), &Signature(vec![]))
+        PublicFunction::new(
+            noop,
+            "noop_2",
+            ISignature {
+                arguments: vec![],
+                returns: vec![],
+            },
+        )
     }
 
     struct ReadArgsData {
@@ -193,16 +209,14 @@ mod tests {
         let noop = add_noop_function(&mut raw_module);
         let noop_2 = add_noop_2_function(&mut raw_module);
 
-        build_entrypoint_router(
-            &mut raw_module,
-            allocator_func,
-            memory_id,
-            &[noop.clone(), noop_2.clone()],
-        );
+        let noop_selector_data = noop.get_selector().to_vec();
+        let noop_2_selector_data = noop_2.get_selector().to_vec();
+
+        build_entrypoint_router(&mut raw_module, allocator_func, memory_id, &[noop, noop_2]);
         display_module(&mut raw_module);
 
         let data = ReadArgsData {
-            data: noop.get_selector().to_vec(),
+            data: noop_selector_data,
         };
         let data_len = data.data.len() as i32;
 
@@ -212,7 +226,7 @@ mod tests {
         assert_eq!(result, 0);
 
         let data = ReadArgsData {
-            data: noop_2.get_selector().to_vec(),
+            data: noop_2_selector_data,
         };
         let data_len = data.data.len() as i32;
 
@@ -230,16 +244,11 @@ mod tests {
         let noop = add_noop_function(&mut raw_module);
         let noop_2 = add_noop_2_function(&mut raw_module);
 
-        build_entrypoint_router(
-            &mut raw_module,
-            allocator_func,
-            memory_id,
-            &[noop.clone(), noop_2.clone()],
-        );
+        build_entrypoint_router(&mut raw_module, allocator_func, memory_id, &[noop, noop_2]);
         display_module(&mut raw_module);
 
         // Invalid selector
-        let data = ReadArgsData { data: vec![0; 0] };
+        let data = ReadArgsData { data: vec![] };
         let data_len = data.data.len() as i32;
 
         let (_, mut store, entrypoint) = setup_wasmtime_module(&mut raw_module, data);
@@ -255,12 +264,7 @@ mod tests {
         let noop = add_noop_function(&mut raw_module);
         let noop_2 = add_noop_2_function(&mut raw_module);
 
-        build_entrypoint_router(
-            &mut raw_module,
-            allocator_func,
-            memory_id,
-            &[noop.clone(), noop_2.clone()],
-        );
+        build_entrypoint_router(&mut raw_module, allocator_func, memory_id, &[noop, noop_2]);
         display_module(&mut raw_module);
 
         // Invalid selector

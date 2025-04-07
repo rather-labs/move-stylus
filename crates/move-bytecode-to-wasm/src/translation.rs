@@ -1,11 +1,15 @@
 use functions::MappedFunction;
-use move_binary_format::file_format::{Bytecode, Constant, SignatureToken};
+use intermediate_types::SignatureTokenToIntermediateType;
+use move_binary_format::file_format::{Bytecode, Constant};
 use walrus::{
     FunctionId, MemoryId, Module, ValType,
     ir::{MemArg, StoreKind},
 };
 
 pub mod functions;
+/// The types in this module represent an intermediate Rust representation of Move types
+/// that is used to generate the WASM code.
+pub mod intermediate_types;
 
 fn map_bytecode_instruction(
     instruction: &Bytecode,
@@ -20,68 +24,16 @@ fn map_bytecode_instruction(
         // Load a fixed constant
         Bytecode::LdConst(global_index) => {
             let constant = &constants[global_index.0 as usize];
-            match constant.type_ {
-                SignatureToken::U8
-                | SignatureToken::U16
-                | SignatureToken::U32
-                | SignatureToken::Bool => {
-                    let mut bytes = constant.data.clone();
-                    assert!(bytes.len() <= 4, "Constant is too large to fit in u32");
-
-                    // pad to 4 bytes on the right
-                    bytes.resize(4, 0);
-
-                    mapped_function
-                        .add_i32_const(module, i32::from_le_bytes(bytes.try_into().unwrap()));
-                }
-                SignatureToken::U64 => {
-                    mapped_function.add_i64_const(
-                        module,
-                        i64::from_le_bytes(
-                            constant
-                                .data
-                                .clone()
-                                .try_into()
-                                .expect("Constant is not a u64"),
-                        ),
-                    );
-                }
-                SignatureToken::U128 => {
-                    let bytes: [u8; 16] = constant
-                        .data
-                        .clone()
-                        .try_into()
-                        .expect("Constant is not a u128");
-
-                    mapped_function.add_load_literal_heap_type_to_memory_instructions(
-                        module, memory, allocator, &bytes,
-                    );
-                }
-                SignatureToken::U256 => {
-                    let bytes: [u8; 32] = constant
-                        .data
-                        .clone()
-                        .try_into()
-                        .expect("Constant is not a u256");
-
-                    mapped_function.add_load_literal_heap_type_to_memory_instructions(
-                        module, memory, allocator, &bytes,
-                    );
-                }
-                SignatureToken::Address => {
-                    // Address is treated as a u256
-                    let bytes: [u8; 32] = constant
-                        .data
-                        .clone()
-                        .try_into()
-                        .expect("Constant is not a u256");
-
-                    mapped_function.add_load_literal_heap_type_to_memory_instructions(
-                        module, memory, allocator, &bytes,
-                    );
-                }
-                _ => panic!("Unsupported constant: {:?}", constant),
-            }
+            constant
+                .type_
+                .to_intermediate_type()
+                .load_constant_instructions(
+                    module,
+                    mapped_function.id,
+                    &constant.data,
+                    allocator,
+                    memory,
+                );
         }
         // Load literals
         Bytecode::LdFalse => mapped_function.add_i32_const(module, 0),
@@ -117,7 +69,7 @@ fn map_bytecode_instruction(
                 .local_set(mapped_function.local_variables[*local_id as usize]);
         }
         Bytecode::MoveLoc(local_id) => {
-            // Values and references are loaded from the variable
+            // Values and references are loaded into a new variable
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
             mapped_function
                 .get_function_body_builder(module)

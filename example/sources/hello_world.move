@@ -1,20 +1,33 @@
 module 0x01::hello_world;
 
-const ADDRESS_AS_CONST: address = @0x01;
+// An empty vector of bool elements.
+const EMPTY_VECTOR: vector<bool> = vector[];
 
-public fun get_constant(): address {
-  ADDRESS_AS_CONST
+// A vector of u8 elements.
+const VECTOR_U8: vector<u8> = vector[10, 20, 30];
+
+// A vector of vector<u8> elements.
+const VECTOR_VECTOR_U8: vector<vector<u8>> = vector[
+  vector[10, 20],
+  vector[30, 40]
+];
+
+public fun get_empty_vector(): vector<bool> {
+  EMPTY_VECTOR
 }
 
-public fun get_constant_local(): address {
-  let x: address = ADDRESS_AS_CONST;
-  x
+public fun get_vector_u8(): vector<u8> {
+  VECTOR_U8
+}
+
+public fun get_vector_vector_u8(): vector<vector<u8>> {
+  VECTOR_VECTOR_U8
 }
 
 // Forces the compiler to store literals on locals
-public fun get_local(_z: address): address {
-  let x: address = @0xFF;
-  let y: address = @0x11;
+public fun get_local(_z: vector<u8>): vector<u8> {
+  let x: vector<u8> = vector[10, 20, 30];
+  let y: vector<u8> = vector[11, 22, 33];
   identity(x);
   identity_3(x, y);
 
@@ -22,34 +35,34 @@ public fun get_local(_z: address): address {
 }
 
 // Forces the compiler to store literals on locals
-public fun get_copied_local(): (address, address) {
-  let x: address = @0x01;
+public fun get_copied_local(): (vector<u8>, vector<u8>) {
+  let x: vector<u8> = vector[10, 20, 30];
 
   let y = x; // copy
   let mut z = x; // move
   identity(y);
   identity(z);
 
-  z = @0x22;
+  z = vector[11, 22, 33];
   (y, z)
 }
 
-public fun echo(x: address): address {
+public fun echo(x: vector<u8>): vector<u8> {
   identity(x)
 }
 
-public fun echo_2(x: address, y: address): address {
+public fun echo_2(x: vector<u8>, y: vector<u8>): vector<u8> {
   identity_2(x, y)
 }
 
-fun identity(x: address): address {
+fun identity(x: vector<u8>): vector<u8> {
   x
 }
 
-fun identity_2(_x: address, y: address): address {
+fun identity_2(_x: vector<u8>, y: vector<u8>): vector<u8> {
   y
 }
 
-fun identity_3(_x: address, y: address): (address, address) {
+fun identity_3(_x: vector<u8>, y: vector<u8>): (vector<u8>, vector<u8>) {
   (y, y)
 }

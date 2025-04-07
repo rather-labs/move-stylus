@@ -1,5 +1,6 @@
-use move_binary_format::file_format::Signature;
 use walrus::{FunctionId, InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
+
+use crate::translation::intermediate_types::ISignature;
 
 use super::{
     function_encoding::{AbiFunctionSelector, move_signature_to_abi_selector},
@@ -12,29 +13,20 @@ use super::{
 ///
 /// It allows functions to be executed as contracts calls, by unpacking the arguments using `read_args` from the host,
 /// injecting these arguments in the functions and packing the return values using `write_result` host function.
-#[derive(Clone)]
 pub struct PublicFunction {
     function_id: FunctionId,
     function_selector: AbiFunctionSelector,
-    function_arguments_signature: Signature,
-    function_return_signature: Signature,
+    signature: ISignature,
 }
 
 impl PublicFunction {
-    pub fn new(
-        function_id: FunctionId,
-        function_name: &str,
-        function_arguments_signature: &Signature,
-        function_return_signature: &Signature,
-    ) -> Self {
-        let function_selector =
-            move_signature_to_abi_selector(function_name, function_arguments_signature);
+    pub fn new(function_id: FunctionId, function_name: &str, signature: ISignature) -> Self {
+        let function_selector = move_signature_to_abi_selector(function_name, &signature.arguments);
 
         Self {
             function_id,
             function_selector,
-            function_arguments_signature: function_arguments_signature.clone(),
-            function_return_signature: function_return_signature.clone(),
+            signature,
         }
     }
 
@@ -115,7 +107,7 @@ impl PublicFunction {
         build_unpack_instructions(
             block,
             module,
-            &self.function_arguments_signature,
+            &self.signature.arguments,
             args_pointer,
             args_length,
             memory_id,
@@ -125,7 +117,7 @@ impl PublicFunction {
 
         build_pack_instructions(
             block,
-            &self.function_return_signature,
+            &self.signature.returns,
             module,
             memory_id,
             allocator_func,
@@ -140,14 +132,21 @@ impl PublicFunction {
 #[cfg(test)]
 mod tests {
     use alloy::{dyn_abi::SolType, sol};
-    use move_binary_format::file_format::{Signature, SignatureToken};
     use walrus::{
         FunctionBuilder, MemoryId, ModuleConfig,
         ir::{LoadKind, MemArg},
     };
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
-    use crate::{hostio::host_functions, memory::setup_module_memory, utils::display_module};
+    use crate::{
+        hostio::host_functions,
+        memory::setup_module_memory,
+        translation::intermediate_types::{
+            boolean::IBool,
+            simple_integers::{IU16, IU32, IU64},
+        },
+        utils::display_module,
+    };
 
     use super::*;
 
@@ -318,16 +317,10 @@ mod tests {
         let public_function = PublicFunction::new(
             function,
             "test_function",
-            &Signature(vec![
-                SignatureToken::Bool,
-                SignatureToken::U16,
-                SignatureToken::U64,
-            ]),
-            &Signature(vec![
-                SignatureToken::U32,
-                SignatureToken::U16,
-                SignatureToken::U64,
-            ]),
+            ISignature {
+                arguments: vec![Box::new(IBool), Box::new(IU16), Box::new(IU64)],
+                returns: vec![Box::new(IU32), Box::new(IU16), Box::new(IU64)],
+            },
         );
 
         let mut data =
@@ -391,16 +384,10 @@ mod tests {
         let public_function = PublicFunction::new(
             function,
             "test_function",
-            &Signature(vec![
-                SignatureToken::U32,
-                SignatureToken::U32,
-                SignatureToken::U64,
-            ]),
-            &Signature(vec![
-                SignatureToken::U32,
-                SignatureToken::U32,
-                SignatureToken::U64,
-            ]),
+            ISignature {
+                arguments: vec![Box::new(IU32), Box::new(IU32), Box::new(IU64)],
+                returns: vec![Box::new(IU32), Box::new(IU32), Box::new(IU64)],
+            },
         );
 
         let mut data =

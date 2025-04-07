@@ -1,16 +1,15 @@
 use anyhow::Result;
-use move_binary_format::file_format::{
-    CodeUnit, Constant, FunctionDefinition, Signature, SignatureToken,
-};
+use move_binary_format::file_format::{CodeUnit, Constant, FunctionDefinition, Signature};
 use walrus::{FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType};
 
-use crate::translation::map_bytecode_instruction;
+use crate::translation::{intermediate_types::ISignature, map_bytecode_instruction};
+
+use super::intermediate_types::SignatureTokenToIntermediateType;
 
 pub struct MappedFunction {
     pub id: FunctionId,
     pub name: String,
-    pub move_arguments: Signature,
-    pub move_returns: Signature,
+    pub signature: ISignature,
     pub move_definition: FunctionDefinition,
     pub move_code_unit: CodeUnit,
     pub local_variables: Vec<LocalId>,
@@ -32,8 +31,9 @@ impl MappedFunction {
 
         let code = move_definition.code.clone().expect("Function has no code");
 
-        let function_arguments = map_signature(move_arguments);
-        let function_returns = map_signature(move_returns);
+        let signature = ISignature::from_signatures(move_arguments, move_returns);
+        let function_arguments = signature.get_argument_wasm_types();
+        let function_returns = signature.get_return_wasm_types();
 
         let mut local_variables: Vec<LocalId> = function_arguments
             .iter()
@@ -58,8 +58,7 @@ impl MappedFunction {
         Self {
             id,
             name,
-            move_arguments: move_arguments.clone(),
-            move_returns: move_returns.clone(),
+            signature,
             move_definition: move_definition.clone(),
             move_code_unit: code,
             local_variables,
@@ -105,28 +104,20 @@ impl MappedFunction {
     }
 }
 
-pub fn map_signature(signature: &Signature) -> Vec<ValType> {
-    signature.0.iter().map(map_signature_token).collect()
+pub fn get_function_body_builder(module: &mut Module, function_id: FunctionId) -> InstrSeqBuilder {
+    module
+        .funcs
+        .get_mut(function_id)
+        .kind
+        .unwrap_local_mut()
+        .builder_mut()
+        .func_body()
 }
 
-fn map_signature_token(signature_token: &SignatureToken) -> ValType {
-    match signature_token {
-        SignatureToken::Bool => ValType::I32,
-        SignatureToken::U8 => ValType::I32,
-        SignatureToken::U16 => ValType::I32,
-        SignatureToken::U32 => ValType::I32,
-        SignatureToken::U64 => ValType::I64,
-        SignatureToken::U128 => ValType::I32, // Reference to a memory location
-        SignatureToken::U256 => ValType::I32, // Reference to a memory location
-        SignatureToken::Address => ValType::I32, // Reference to a memory location
-        SignatureToken::Signer => panic!("Signer is not supported"),
-        SignatureToken::Vector(_) => panic!("Vector is not supported"),
-        SignatureToken::Datatype(_) => panic!("Datatype is not supported"),
-        SignatureToken::Reference(_) => panic!("Reference is not supported"),
-        SignatureToken::MutableReference(_) => panic!("MutableReference is not supported"),
-        SignatureToken::TypeParameter(_) => panic!("TypeParameter is not supported"),
-        SignatureToken::DatatypeInstantiation(_) => {
-            panic!("DatatypeInstantiation is not supported")
-        }
-    }
+pub fn map_signature(signature: &Signature) -> Vec<ValType> {
+    signature
+        .0
+        .iter()
+        .map(|token| token.to_intermediate_type().to_wasm_type())
+        .collect()
 }

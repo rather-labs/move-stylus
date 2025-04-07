@@ -1,26 +1,49 @@
-use alloy_sol_types::{SolType, sol_data};
-use move_binary_format::file_format::{Signature, SignatureToken};
-use pack_heap_int::{pack_address_instructions, pack_u128_instructions, pack_u256_instructions};
-use pack_native_int::{pack_i32_type_instructions, pack_i64_type_instructions};
 use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType, ir::BinaryOp};
+
+use crate::translation::intermediate_types::IParam;
 
 mod pack_heap_int;
 mod pack_native_int;
 
-/// Builds the instructions to pack the abi encoded values to WASM function return values
+pub trait Packable {
+    /// Adds the instructions to pack the value into memory according to Solidity's ABI encoding.
+    fn add_pack_instructions(
+        &self,
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        local: LocalId,
+        memory: MemoryId,
+        alloc_function: FunctionId,
+    );
+
+    /// Adds the instructions to load the value into a local variable.
+    /// This is used to reverse the order of the stack before packing
+    ///
+    /// For native types this will load the variable itself.
+    /// For heap types this will load the reference to the heap value
+    fn add_load_local_instructions(
+        &self,
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+    ) -> LocalId;
+}
+
+/// Builds the instructions to pack WASM return values into memory according to Solidity's ABI encoding.
 ///
 /// Each return value is encoded and loaded in memory. Complex data types are copied to
 /// have a contiguous memory layout.
 ///
 /// Variables should have been loaded in the WASM stack before calling this function.
+///
+/// Returns a pointer to the memory holding the return data and the length of the encoded data.
 pub fn build_pack_instructions(
     builder: &mut InstrSeqBuilder,
-    function_return_signature: &Signature,
+    function_return_signature: &[Box<dyn IParam>],
     module: &mut Module,
     memory: MemoryId,
     alloc_function: FunctionId,
 ) {
-    if function_return_signature.0.is_empty() {
+    if function_return_signature.is_empty() {
         builder.i32_const(0);
         builder.i32_const(0);
         return;
@@ -29,8 +52,8 @@ pub fn build_pack_instructions(
     // We need to load all return types into locals in order to reverse the read order
     // Otherwise they would be popped in reverse order
     let mut locals = Vec::new();
-    for signature_token in function_return_signature.0.iter().rev() {
-        let local = load_return_type_to_local(module, builder, signature_token);
+    for signature_token in function_return_signature.iter().rev() {
+        let local = signature_token.add_load_local_instructions(builder, module);
         locals.push(local);
     }
     locals.reverse();
@@ -39,15 +62,8 @@ pub fn build_pack_instructions(
     let length = module.locals.add(ValType::I32);
 
     let mut first_token = false;
-    for (local, signature_token) in locals.iter().zip(function_return_signature.0.iter()) {
-        add_pack_instruction_for_signature_token(
-            builder,
-            module,
-            *local,
-            signature_token,
-            memory,
-            alloc_function,
-        );
+    for (local, signature_token) in locals.iter().zip(function_return_signature.iter()) {
+        signature_token.add_pack_instructions(builder, module, *local, memory, alloc_function);
 
         // If the first one, we store the pointer and initialize the length
         if !first_token {
@@ -68,129 +84,23 @@ pub fn build_pack_instructions(
     builder.local_get(length);
 }
 
-/// Adds the instructions to pack the abi type and load it in memory
-///
-/// Each block will leave the memory pointer and the length of the packed value in the WASM stack.
-/// [pointer, length]
-fn add_pack_instruction_for_signature_token(
-    block: &mut InstrSeqBuilder,
-    module: &mut Module,
-    local: LocalId,
-    signature_token: &SignatureToken,
-    memory: MemoryId,
-    alloc_function: FunctionId,
-) {
-    match signature_token {
-        SignatureToken::Bool => {
-            let encoded_size = sol_data::Bool::ENCODED_SIZE.expect("Bool should have a fixed size");
-            pack_i32_type_instructions(block, module, memory, alloc_function, local, encoded_size);
-        }
-        SignatureToken::U8 => {
-            let encoded_size =
-                sol_data::Uint::<8>::ENCODED_SIZE.expect("U8 should have a fixed size");
-            pack_i32_type_instructions(block, module, memory, alloc_function, local, encoded_size);
-        }
-        SignatureToken::U16 => {
-            let encoded_size =
-                sol_data::Uint::<16>::ENCODED_SIZE.expect("U16 should have a fixed size");
-            pack_i32_type_instructions(block, module, memory, alloc_function, local, encoded_size);
-        }
-        SignatureToken::U32 => {
-            let encoded_size =
-                sol_data::Uint::<32>::ENCODED_SIZE.expect("U32 should have a fixed size");
-            pack_i32_type_instructions(block, module, memory, alloc_function, local, encoded_size);
-        }
-        SignatureToken::U64 => {
-            let encoded_size =
-                sol_data::Uint::<64>::ENCODED_SIZE.expect("U64 should have a fixed size");
-            pack_i64_type_instructions(block, module, memory, alloc_function, local, encoded_size);
-        }
-        SignatureToken::U128 => {
-            pack_u128_instructions(block, module, memory, alloc_function, local);
-        }
-        SignatureToken::U256 => {
-            pack_u256_instructions(block, module, memory, alloc_function, local);
-        }
-        SignatureToken::Address => {
-            pack_address_instructions(block, module, memory, alloc_function, local);
-        }
-        SignatureToken::Vector(_) => panic!("Vector is not supported"), // TODO
-        SignatureToken::Signer => panic!("Signer is not supported"), // TODO: review how to handle this on public functions
-        SignatureToken::Datatype(_) => panic!("Datatype is not supported yet"), // TODO
-        SignatureToken::TypeParameter(_) => panic!("TypeParameter is not supported"), // TODO
-        SignatureToken::DatatypeInstantiation(_) => {
-            panic!("DatatypeInstantiation is not supported") // TODO
-        }
-        SignatureToken::Reference(_) => {
-            panic!("Reference is not allowed as a public function argument")
-        }
-        SignatureToken::MutableReference(_) => {
-            panic!("MutableReference is not allowed as a public function argument")
-        }
-    }
-}
-
-fn load_return_type_to_local(
-    module: &mut Module,
-    builder: &mut InstrSeqBuilder,
-    signature_token: &SignatureToken,
-) -> LocalId {
-    match signature_token {
-        SignatureToken::Bool | SignatureToken::U8 | SignatureToken::U16 | SignatureToken::U32 => {
-            let local = module.locals.add(ValType::I32);
-            builder.local_set(local);
-            local
-        }
-        SignatureToken::U64 => {
-            let local = module.locals.add(ValType::I64);
-            builder.local_set(local);
-            local
-        }
-        SignatureToken::U128 => {
-            // Load the reference
-            let local = module.locals.add(ValType::I32);
-            builder.local_set(local);
-            local
-        }
-        SignatureToken::U256 => {
-            // Load the reference
-            let local = module.locals.add(ValType::I32);
-            builder.local_set(local);
-            local
-        }
-        SignatureToken::Address => {
-            // Load the reference
-            let local = module.locals.add(ValType::I32);
-            builder.local_set(local);
-            local
-        }
-        SignatureToken::Vector(_) => panic!("Vector is not supported"), // TODO
-        SignatureToken::Signer => panic!("Signer is not supported"), // TODO: review how to handle this on public functions
-        SignatureToken::Datatype(_) => panic!("Datatype is not supported yet"), // TODO
-        SignatureToken::TypeParameter(_) => panic!("TypeParameter is not supported"), // TODO
-        SignatureToken::DatatypeInstantiation(_) => {
-            panic!("DatatypeInstantiation is not supported") // TODO
-        }
-        SignatureToken::Reference(_) => {
-            panic!("Reference is not allowed as a public function argument")
-        }
-        SignatureToken::MutableReference(_) => {
-            panic!("MutableReference is not allowed as a public function argument")
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use alloy::{dyn_abi::SolType, sol};
-    use move_binary_format::file_format::Signature;
     use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
     use wasmtime::{
         Caller, Engine, Extern, IntoFunc, Linker, Module as WasmModule, Store, TypedFunc,
         WasmParams,
     };
 
-    use crate::{memory::setup_module_memory, utils::display_module};
+    use crate::{
+        memory::setup_module_memory,
+        translation::intermediate_types::{
+            boolean::IBool,
+            simple_integers::{IU16, IU64},
+        },
+        utils::display_module,
+    };
 
     use super::*;
 
@@ -256,11 +166,7 @@ mod tests {
 
         build_pack_instructions(
             &mut func_body,
-            &Signature(vec![
-                SignatureToken::Bool,
-                SignatureToken::U16,
-                SignatureToken::U64,
-            ]),
+            &[Box::new(IBool), Box::new(IU16), Box::new(IU64)],
             &mut raw_module,
             memory_id,
             allocator_func,
@@ -332,11 +238,7 @@ mod tests {
 
         build_pack_instructions(
             &mut func_body,
-            &Signature(vec![
-                SignatureToken::Bool,
-                SignatureToken::U16,
-                SignatureToken::U64,
-            ]),
+            &[Box::new(IBool), Box::new(IU16), Box::new(IU64)],
             &mut raw_module,
             memory_id,
             allocator_func,

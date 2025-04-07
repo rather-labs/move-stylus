@@ -12,6 +12,7 @@ mod hostio;
 mod memory;
 mod translation;
 mod utils;
+mod wasm_helpers;
 mod wasm_validation;
 
 pub fn translate_single_module(package: &CompiledPackage, module_name: &str) -> Module {
@@ -97,8 +98,7 @@ pub fn translate_package(
                 public_functions.push(PublicFunction::new(
                     mapped_function.id,
                     &mapped_function.name,
-                    &mapped_function.move_arguments,
-                    &mapped_function.move_returns,
+                    mapped_function.signature,
                 ));
             }
         }
