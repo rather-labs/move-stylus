@@ -88,6 +88,8 @@ pub fn translate_package(
                     &mut module,
                     &root_compiled_module.constant_pool,
                     &function_ids,
+                    memory_id,
+                    allocator_func,
                 )
                 .unwrap();
 

@@ -1,4 +1,4 @@
-module 0x01::hello_world;
+module 0x01::uint_128;
 
 const INT_AS_CONST: u128 = 128128;
 

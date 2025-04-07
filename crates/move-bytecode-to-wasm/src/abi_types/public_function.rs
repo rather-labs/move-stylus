@@ -119,6 +119,7 @@ impl PublicFunction {
             args_pointer,
             args_length,
             memory_id,
+            allocator_func,
         );
         block.call(self.function_id);
 

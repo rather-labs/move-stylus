@@ -1,11 +1,11 @@
 use alloy_sol_types::{SolType, sol_data};
 use move_binary_format::file_format::{Signature, SignatureToken};
-use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
-    ir::{BinaryOp, MemArg, StoreKind},
-};
+use pack_heap_int::pack_u128_instructions;
+use pack_native_int::{pack_i32_type_instructions, pack_i64_type_instructions};
+use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType, ir::BinaryOp};
 
-use crate::utils::{add_swap_i32_bytes_function, add_swap_i64_bytes_function};
+mod pack_heap_int;
+mod pack_native_int;
 
 /// Builds the instructions to pack the abi encoded values to WASM function return values
 ///
@@ -83,160 +83,30 @@ fn add_pack_instruction_for_signature_token(
     match signature_token {
         SignatureToken::Bool => {
             let encoded_size = sol_data::Bool::ENCODED_SIZE.expect("Bool should have a fixed size");
-
-            let pointer = module.locals.add(ValType::I32);
-
-            // Allocate memory for the packed value
-            block.i32_const(encoded_size as i32);
-            block.call(alloc_function);
-            block.local_tee(pointer);
-
-            // Load the local value to the stack
-            block.local_get(local);
-
-            // Little-endian to Big-endian
-            let swap_i32_bytes_function = add_swap_i32_bytes_function(module);
-            block.call(swap_i32_bytes_function);
-
-            block.store(
-                memory,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    // Abi is left-padded to 32 bytes
-                    offset: 28,
-                },
-            );
-
-            block.local_get(pointer);
-            block.i32_const(encoded_size as i32);
+            pack_i32_type_instructions(block, module, memory, alloc_function, local, encoded_size);
         }
         SignatureToken::U8 => {
             let encoded_size =
                 sol_data::Uint::<8>::ENCODED_SIZE.expect("U8 should have a fixed size");
-
-            let pointer = module.locals.add(ValType::I32);
-
-            // Allocate memory for the packed value
-            block.i32_const(encoded_size as i32);
-            block.call(alloc_function);
-            block.local_tee(pointer);
-
-            // Load the local value to the stack
-            block.local_get(local);
-
-            // Little-endian to Big-endian
-            let swap_i32_bytes_function = add_swap_i32_bytes_function(module);
-            block.call(swap_i32_bytes_function);
-
-            block.store(
-                memory,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    // Abi is left-padded to 32 bytes
-                    offset: 28,
-                },
-            );
-
-            block.local_get(pointer);
-            block.i32_const(encoded_size as i32);
+            pack_i32_type_instructions(block, module, memory, alloc_function, local, encoded_size);
         }
         SignatureToken::U16 => {
             let encoded_size =
                 sol_data::Uint::<16>::ENCODED_SIZE.expect("U16 should have a fixed size");
-
-            let pointer = module.locals.add(ValType::I32);
-
-            // Allocate memory for the packed value
-            block.i32_const(encoded_size as i32);
-            block.call(alloc_function);
-            block.local_tee(pointer);
-
-            // Load the local value to the stack
-            block.local_get(local);
-
-            // Little-endian to Big-endian
-            let swap_i32_bytes_function = add_swap_i32_bytes_function(module);
-            block.call(swap_i32_bytes_function);
-
-            block.store(
-                memory,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    // Abi is left-padded to 32 bytes
-                    offset: 28,
-                },
-            );
-
-            block.local_get(pointer);
-            block.i32_const(encoded_size as i32);
+            pack_i32_type_instructions(block, module, memory, alloc_function, local, encoded_size);
         }
         SignatureToken::U32 => {
             let encoded_size =
                 sol_data::Uint::<32>::ENCODED_SIZE.expect("U32 should have a fixed size");
-
-            let pointer = module.locals.add(ValType::I32);
-
-            // Allocate memory for the packed value
-            block.i32_const(encoded_size as i32);
-            block.call(alloc_function);
-            block.local_tee(pointer);
-
-            // Load the local value to the stack
-            block.local_get(local);
-
-            // Little-endian to Big-endian
-            let swap_i32_bytes_function = add_swap_i32_bytes_function(module);
-            block.call(swap_i32_bytes_function);
-
-            block.store(
-                memory,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    // Abi is left-padded to 32 bytes
-                    offset: 28,
-                },
-            );
-
-            block.local_get(pointer);
-            block.i32_const(encoded_size as i32);
+            pack_i32_type_instructions(block, module, memory, alloc_function, local, encoded_size);
         }
         SignatureToken::U64 => {
             let encoded_size =
                 sol_data::Uint::<64>::ENCODED_SIZE.expect("U64 should have a fixed size");
-
-            let pointer = module.locals.add(ValType::I32);
-
-            // Allocate memory for the packed value
-            block.i32_const(encoded_size as i32);
-            block.call(alloc_function);
-            block.local_tee(pointer);
-
-            // Load the local value to the stack
-            block.local_get(local);
-
-            // Little-endian to Big-endian
-            let swap_i64_bytes_function = add_swap_i64_bytes_function(module);
-            block.call(swap_i64_bytes_function);
-
-            block.store(
-                memory,
-                StoreKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    // Abi is left-padded to 32 bytes
-                    offset: 24,
-                },
-            );
-
-            block.local_get(pointer);
-            block.i32_const(encoded_size as i32);
+            pack_i64_type_instructions(block, module, memory, alloc_function, local, encoded_size);
         }
         SignatureToken::U128 => {
-            panic!("U128 is not supported yet"); // TODO
+            pack_u128_instructions(block, module, memory, alloc_function, local);
         }
         SignatureToken::U256 => {
             panic!("U256 is not supported yet"); // TODO
@@ -277,7 +147,10 @@ fn load_return_type_to_local(
             local
         }
         SignatureToken::U128 => {
-            panic!("U128 is not supported yet"); // TODO
+            // Load the reference
+            let local = module.locals.add(ValType::I32);
+            builder.local_set(local);
+            local
         }
         SignatureToken::U256 => {
             panic!("U256 is not supported yet"); // TODO

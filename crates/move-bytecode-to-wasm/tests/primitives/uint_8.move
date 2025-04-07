@@ -19,7 +19,20 @@ public fun get_local(_z: u8): u8 {
   identity_3(x, y);
 
   identity_2(x, y)
-} 
+}
+
+// Forces the compiler to store literals on locals
+public fun get_copied_local(): (u8, u8) {
+  let x: u8 = 100;
+  
+  let y = x; // copy
+  let mut z = x; // move
+  identity(y);
+  identity(z);
+
+  z = 111;
+  (y, z) // (100, 111)
+}
 
 public fun echo(x: u8): u8 {
   identity(x)

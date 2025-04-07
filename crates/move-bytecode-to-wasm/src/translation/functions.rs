@@ -2,7 +2,7 @@ use anyhow::Result;
 use move_binary_format::file_format::{
     CodeUnit, Constant, FunctionDefinition, Signature, SignatureToken,
 };
-use walrus::{FunctionBuilder, FunctionId, LocalId, Module, ValType};
+use walrus::{FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType};
 
 use crate::translation::map_bytecode_instruction;
 
@@ -66,15 +66,14 @@ impl MappedFunction {
         }
     }
 
-    fn get_function_builder<'a>(&self, module: &'a mut Module) -> &'a mut FunctionBuilder {
-        let function_builder = module
+    pub fn get_function_body_builder<'a>(&self, module: &'a mut Module) -> InstrSeqBuilder<'a> {
+        module
             .funcs
             .get_mut(self.id)
             .kind
             .unwrap_local_mut()
-            .builder_mut();
-
-        function_builder
+            .builder_mut()
+            .func_body()
     }
 
     pub fn translate_function(
@@ -82,23 +81,23 @@ impl MappedFunction {
         module: &mut Module,
         constant_pool: &[Constant],
         function_ids: &[FunctionId],
+        memory: MemoryId,
+        allocator: FunctionId,
     ) -> Result<()> {
         anyhow::ensure!(
             self.move_code_unit.jump_tables.is_empty(),
             "Jump tables are not supported yet"
         );
 
-        let function_builder = self.get_function_builder(module);
-
-        let mut function_body = function_builder.func_body();
-
         for instruction in self.move_code_unit.code.iter() {
             map_bytecode_instruction(
                 instruction,
                 constant_pool,
                 function_ids,
-                &mut function_body,
-                &self.local_variables,
+                self,
+                module,
+                allocator,
+                memory,
             );
         }
 
@@ -117,8 +116,8 @@ fn map_signature_token(signature_token: &SignatureToken) -> ValType {
         SignatureToken::U16 => ValType::I32,
         SignatureToken::U32 => ValType::I32,
         SignatureToken::U64 => ValType::I64,
-        SignatureToken::U128 => panic!("U128 is not supported"),
-        SignatureToken::U256 => panic!("U256 is not supported"),
+        SignatureToken::U128 => ValType::I32, // Reference to a memory location
+        SignatureToken::U256 => ValType::I32, // Reference to a memory location
         SignatureToken::Address => panic!("Address is not supported"),
         SignatureToken::Signer => panic!("Signer is not supported"),
         SignatureToken::Vector(_) => panic!("Vector is not supported"),

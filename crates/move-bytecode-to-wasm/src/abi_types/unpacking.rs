@@ -1,11 +1,11 @@
 use alloy_sol_types::{SolType, sol_data};
 use move_binary_format::file_format::{Signature, SignatureToken};
-use walrus::{
-    InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
-};
+use unpack_heap_int::unpack_u128_instructions;
+use unpack_native_int::{unpack_i32_type_instructions, unpack_i64_type_instructions};
+use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType, ir::BinaryOp};
 
-use crate::utils::{add_swap_i32_bytes_function, add_swap_i64_bytes_function};
+mod unpack_heap_int;
+mod unpack_native_int;
 
 /// Builds the instructions to unpack the abi encoded values to WASM function parameters
 ///
@@ -18,24 +18,35 @@ pub fn build_unpack_instructions(
     args_pointer: LocalId,
     args_len: LocalId,
     memory: MemoryId,
+    allocator: FunctionId,
 ) {
     let length = module.locals.add(ValType::I32);
+    let current_pointer = module.locals.add(ValType::I32);
+
     function_builder.i32_const(0);
     function_builder.local_set(length);
+
+    function_builder.local_get(args_pointer);
+    function_builder.local_set(current_pointer);
 
     for signature_token in function_arguments_signature.0.iter() {
         add_unpack_instruction_for_signature_token(
             function_builder,
             signature_token,
-            args_pointer,
+            current_pointer,
             memory,
-            length,
+            allocator,
             module,
         );
 
         function_builder.local_get(length);
         function_builder.binop(BinaryOp::I32Add);
-        function_builder.local_set(length);
+        function_builder.local_tee(length);
+
+        // Update the current pointer: args_pointer + current_length
+        function_builder.local_get(args_pointer);
+        function_builder.binop(BinaryOp::I32Add);
+        function_builder.local_set(current_pointer);
     }
 
     // Validation block
@@ -61,128 +72,38 @@ pub fn build_unpack_instructions(
 fn add_unpack_instruction_for_signature_token(
     block: &mut InstrSeqBuilder,
     signature_token: &SignatureToken,
-    args_pointer: LocalId,
+    current_pointer: LocalId,
     memory: MemoryId,
-    prev_length: LocalId,
+    allocator: FunctionId,
     module: &mut Module,
 ) {
     match signature_token {
         SignatureToken::Bool => {
             let encoded_size = sol_data::Bool::ENCODED_SIZE.expect("Bool should have a fixed size");
-
-            // Load the value
-            block.local_get(args_pointer);
-            block.local_get(prev_length);
-            block.binop(BinaryOp::I32Add);
-            block.load(
-                memory,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    // Abi is left-padded to 32 bytes
-                    offset: 28,
-                },
-            );
-            // Big-endian to Little-endian
-            let swap_i32_bytes_function = add_swap_i32_bytes_function(module);
-            block.call(swap_i32_bytes_function);
-
-            block.i32_const(encoded_size as i32);
+            unpack_i32_type_instructions(block, module, memory, current_pointer, encoded_size);
         }
         SignatureToken::U8 => {
             let encoded_size =
                 sol_data::Uint::<8>::ENCODED_SIZE.expect("U8 should have a fixed size");
-
-            // Load the value
-            block.local_get(args_pointer);
-            block.local_get(prev_length);
-            block.binop(BinaryOp::I32Add);
-            block.load(
-                memory,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    // Abi is left-padded to 32 bytes
-                    offset: 28,
-                },
-            );
-            // Big-endian to Little-endian
-            let swap_i32_bytes_function = add_swap_i32_bytes_function(module);
-            block.call(swap_i32_bytes_function);
-
-            block.i32_const(encoded_size as i32);
+            unpack_i32_type_instructions(block, module, memory, current_pointer, encoded_size);
         }
         SignatureToken::U16 => {
             let encoded_size =
                 sol_data::Uint::<16>::ENCODED_SIZE.expect("U16 should have a fixed size");
-
-            // Load the value
-            block.local_get(args_pointer);
-            block.local_get(prev_length);
-            block.binop(BinaryOp::I32Add);
-            block.load(
-                memory,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    // Abi is left-padded to 32 bytes
-                    offset: 28,
-                },
-            );
-            // Big-endian to Little-endian
-            let swap_i32_bytes_function = add_swap_i32_bytes_function(module);
-            block.call(swap_i32_bytes_function);
-
-            block.i32_const(encoded_size as i32);
+            unpack_i32_type_instructions(block, module, memory, current_pointer, encoded_size);
         }
         SignatureToken::U32 => {
             let encoded_size =
                 sol_data::Uint::<32>::ENCODED_SIZE.expect("U32 should have a fixed size");
-
-            // Load the value
-            block.local_get(args_pointer);
-            block.local_get(prev_length);
-            block.binop(BinaryOp::I32Add);
-            block.load(
-                memory,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    // Abi is left-padded to 32 bytes
-                    offset: 28,
-                },
-            );
-            // Big-endian to Little-endian
-            let swap_i32_bytes_function = add_swap_i32_bytes_function(module);
-            block.call(swap_i32_bytes_function);
-
-            block.i32_const(encoded_size as i32);
+            unpack_i32_type_instructions(block, module, memory, current_pointer, encoded_size);
         }
         SignatureToken::U64 => {
             let encoded_size =
                 sol_data::Uint::<64>::ENCODED_SIZE.expect("U64 should have a fixed size");
-
-            // Load the value
-            block.local_get(args_pointer);
-            block.local_get(prev_length);
-            block.binop(BinaryOp::I32Add);
-            block.load(
-                memory,
-                LoadKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    // Abi is left-padded to 32 bytes
-                    offset: 24,
-                },
-            );
-            // Big-endian to Little-endian
-            let swap_i64_bytes_function = add_swap_i64_bytes_function(module);
-            block.call(swap_i64_bytes_function);
-
-            block.i32_const(encoded_size as i32);
+            unpack_i64_type_instructions(block, module, memory, current_pointer, encoded_size);
         }
         SignatureToken::U128 => {
-            panic!("U128 is not supported yet"); // TODO
+            unpack_u128_instructions(block, module, memory, current_pointer, allocator);
         }
         SignatureToken::U256 => {
             panic!("U256 is not supported yet"); // TODO
@@ -259,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_build_unpack_instructions() {
-        let (mut raw_module, _, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module();
 
         let validator_func_type = raw_module
             .types
@@ -285,6 +206,7 @@ mod tests {
             args_pointer,
             args_len,
             memory_id,
+            allocator_func,
         );
 
         // validation
@@ -317,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_build_unpack_instructions_reversed() {
-        let (mut raw_module, _, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module();
 
         let validator_func_type = raw_module
             .types
@@ -343,6 +265,7 @@ mod tests {
             args_pointer,
             args_len,
             memory_id,
+            allocator_func,
         );
 
         // validation
@@ -376,7 +299,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "unreachable")]
     fn test_build_unpack_instructions_invalid_data_length() {
-        let (mut raw_module, _, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module();
 
         let validator_func_type = raw_module
             .types
@@ -402,6 +325,7 @@ mod tests {
             args_pointer,
             args_len,
             memory_id,
+            allocator_func,
         );
 
         // validation
@@ -427,7 +351,7 @@ mod tests {
 
     #[test]
     fn test_build_unpack_instructions_offset_memory() {
-        let (mut raw_module, _, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module();
 
         let validator_func_type = raw_module
             .types
@@ -453,6 +377,7 @@ mod tests {
             args_pointer,
             args_len,
             memory_id,
+            allocator_func,
         );
 
         // validation

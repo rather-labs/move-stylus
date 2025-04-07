@@ -19,7 +19,20 @@ public fun get_local(_z: bool): bool {
   identity_3(x, y);
 
   identity_2(x, y)
-} 
+}
+
+// Forces the compiler to store literals on locals
+public fun get_copied_local(): (bool, bool) {
+  let x: bool = true;
+  
+  let y = x; // copy
+  let mut z = x; // move
+  identity(y);
+  identity(z);
+
+  z = false;
+  (y, z) // (true, false)
+}
 
 public fun echo(x: bool): bool {
   identity(x)

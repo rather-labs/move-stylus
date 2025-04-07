@@ -4,7 +4,7 @@ use std::{
 };
 
 use move_bytecode_to_wasm::translate_single_module;
-use move_package::{BuildConfig, LintFlag, source_package::layout::SourcePackageLayout};
+use move_package::{BuildConfig, LintFlag};
 use walrus::Module;
 use wasmtime::{Caller, Engine, Extern, Linker, Memory, Module as WasmModule, Store, TypedFunc};
 
@@ -90,29 +90,43 @@ pub fn setup_wasmtime_module(
     (memory, store, entrypoint)
 }
 
-pub fn reroot_path(path: Option<&Path>) -> anyhow::Result<PathBuf> {
-    let path = path
-        .map(Path::canonicalize)
-        .unwrap_or_else(|| PathBuf::from(".").canonicalize())
-        .map_err(|e| anyhow::anyhow!("failed to canonicalize path: {}", e))?;
+pub fn reroot_path(path: &Path) -> PathBuf {
+    // Copy files to temp to avoid file locks
+    let temp_install_directory = std::env::temp_dir()
+        .join("move-bytecode-to-wasm")
+        .join(path);
 
-    // Always root ourselves to the package root, and then compile relative to that.
-    let rooted_path = SourcePackageLayout::try_find_root(&path)
-        .map_err(|e| anyhow::anyhow!("failed to find package root: {}", e))?;
-    std::env::set_current_dir(rooted_path).unwrap();
+    // copy source file to dir
+    let _ = std::fs::create_dir_all(temp_install_directory.join("sources"));
+    std::fs::copy(
+        path,
+        temp_install_directory
+            .join("sources")
+            .join(path.file_name().unwrap()),
+    )
+    .unwrap();
 
-    Ok(PathBuf::from("."))
+    // create Move.toml in dir
+    std::fs::write(
+        temp_install_directory.join("Move.toml"),
+        "[package]
+name = \"test_primitives\"
+edition = \"2024\"
+
+",
+    )
+    .unwrap();
+
+    temp_install_directory
 }
 
 pub fn translate_test_package(path: &str, module_name: &str) -> Module {
-    let temp_install_directory = std::env::temp_dir().join("move-bytecode-to-wasm");
-
     let build_config = BuildConfig {
         dev_mode: false,
         test_mode: false,
         generate_docs: false,
         save_disassembly: false,
-        install_dir: Some(temp_install_directory),
+        install_dir: None,
         force_recompilation: false,
         lock_file: None,
         fetch_deps_only: false,
@@ -130,7 +144,7 @@ pub fn translate_test_package(path: &str, module_name: &str) -> Module {
 
     let path = Path::new(path);
 
-    let rerooted_path = reroot_path(Some(path)).unwrap();
+    let rerooted_path = reroot_path(path);
     let package = build_config
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
