@@ -1,4 +1,4 @@
-use alloy::{dyn_abi::SolType, sol, sol_types::SolCall};
+use alloy::{dyn_abi::SolType, primitives::U256, sol, sol_types::SolCall};
 use common::{ModuleData, setup_wasmtime_module, translate_test_package};
 use walrus::Module;
 
@@ -269,5 +269,48 @@ fn test_uint_128() {
 
     let data = echo2Call::abi_encode(&echo2Call::new((111, 222)));
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(222,));
+    run_test(&mut translated_package, data, expected_result);
+}
+
+#[test]
+fn test_uint_256() {
+    const MODULE_NAME: &str = "uint_256";
+    const SOURCE_PATH: &str = "tests/primitives/uint_256.move";
+
+    sol!(
+        #[allow(missing_docs)]
+        function getConstant() external returns (uint256);
+        function getLocal(uint256 _z) external returns (uint256);
+        function getCopiedLocal() external returns (uint256, uint256);
+        function echo(uint256 x) external returns (uint256);
+        function echo2(uint256 x, uint256 y) external returns (uint256);
+    );
+
+    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(256256),));
+    run_test(&mut translated_package, data, expected_result);
+
+    let data = getLocalCall::abi_encode(&getLocalCall::new((U256::from(111),)));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(50),));
+    run_test(&mut translated_package, data, expected_result);
+
+    let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
+    let expected_result =
+        <sol!((uint256, uint256))>::abi_encode_params(&(U256::from(100), U256::from(111)));
+    run_test(&mut translated_package, data, expected_result);
+
+    let data = echoCall::abi_encode(&echoCall::new((U256::from(222),)));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(222),));
+    run_test(&mut translated_package, data, expected_result);
+
+    // Echo max uint256
+    let data = echoCall::abi_encode(&echoCall::new((U256::MAX,)));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::MAX,));
+    run_test(&mut translated_package, data, expected_result);
+
+    let data = echo2Call::abi_encode(&echo2Call::new((U256::from(111), U256::from(222))));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(222),));
     run_test(&mut translated_package, data, expected_result);
 }

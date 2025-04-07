@@ -57,6 +57,17 @@ fn map_bytecode_instruction(
                         module, memory, allocator, &bytes,
                     );
                 }
+                SignatureToken::U256 => {
+                    let bytes: [u8; 32] = constant
+                        .data
+                        .clone()
+                        .try_into()
+                        .expect("Constant is not a u256");
+
+                    mapped_function.add_load_literal_heap_type_to_memory_instructions(
+                        module, memory, allocator, &bytes,
+                    );
+                }
                 _ => panic!("Unsupported constant: {:?}", constant),
             }
         }
@@ -68,6 +79,13 @@ fn map_bytecode_instruction(
         Bytecode::LdU32(literal) => mapped_function.add_i32_const(module, *literal as i32),
         Bytecode::LdU64(literal) => mapped_function.add_i64_const(module, *literal as i64),
         Bytecode::LdU128(literal) => mapped_function
+            .add_load_literal_heap_type_to_memory_instructions(
+                module,
+                memory,
+                allocator,
+                &literal.to_le_bytes(),
+            ),
+        Bytecode::LdU256(literal) => mapped_function
             .add_load_literal_heap_type_to_memory_instructions(
                 module,
                 memory,
@@ -132,7 +150,7 @@ impl MappedFunction {
 
         let mut builder = self.get_function_body_builder(module);
 
-        builder.i32_const(16);
+        builder.i32_const(bytes.len() as i32);
         builder.call(allocator);
         builder.local_set(pointer);
 

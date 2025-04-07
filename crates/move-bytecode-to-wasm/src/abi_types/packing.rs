@@ -1,6 +1,6 @@
 use alloy_sol_types::{SolType, sol_data};
 use move_binary_format::file_format::{Signature, SignatureToken};
-use pack_heap_int::pack_u128_instructions;
+use pack_heap_int::{pack_u128_instructions, pack_u256_instructions};
 use pack_native_int::{pack_i32_type_instructions, pack_i64_type_instructions};
 use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType, ir::BinaryOp};
 
@@ -109,7 +109,7 @@ fn add_pack_instruction_for_signature_token(
             pack_u128_instructions(block, module, memory, alloc_function, local);
         }
         SignatureToken::U256 => {
-            panic!("U256 is not supported yet"); // TODO
+            pack_u256_instructions(block, module, memory, alloc_function, local);
         }
         SignatureToken::Address => {
             panic!("Address is not supported yet"); // TODO
@@ -153,7 +153,10 @@ fn load_return_type_to_local(
             local
         }
         SignatureToken::U256 => {
-            panic!("U256 is not supported yet"); // TODO
+            // Load the reference
+            let local = module.locals.add(ValType::I32);
+            builder.local_set(local);
+            local
         }
         SignatureToken::Address => {
             panic!("Address is not supported yet"); // TODO
