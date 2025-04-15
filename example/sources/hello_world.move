@@ -4,7 +4,14 @@ module 0x01::hello_world;
 const EMPTY_VECTOR: vector<bool> = vector[];
 
 // A vector of u8 elements.
-const VECTOR_U8: vector<u8> = vector[10, 20, 30];
+const VECTOR_U8: vector<u8> = vector[1, 1, 1, 1, 1, 1];
+const VECTOR_U16: vector<u16> = vector[10, 20, 30];
+const VECTOR_U32: vector<u32> = vector[10, 20, 30];
+const VECTOR_U64: vector<u64> = vector[10, 20, 30];
+const VECTOR_U128: vector<u128> = vector[10, 20, 30];
+const VECTOR_U256: vector<u256> = vector[10, 20, 30];
+const VECTOR_ADDRESS: vector<address> = vector[@0x01, @0x02, @0x03];
+const VECTOR_BOOLEAN: vector<bool> = vector[true, false, true];
 
 // A vector of vector<u8> elements.
 const VECTOR_VECTOR_U8: vector<vector<u8>> = vector[

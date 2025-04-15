@@ -1,156 +1,18 @@
-use alloy_sol_types::{SolType, sol_data};
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    InstrSeqBuilder, LocalId, MemoryId, Module,
     ir::{MemArg, StoreKind},
 };
 
-use crate::{
-    translation::intermediate_types::{
-        boolean::IBool,
-        simple_integers::{IU8, IU16, IU32, IU64},
-    },
-    utils::{add_swap_i32_bytes_function, add_swap_i64_bytes_function},
-};
-
-use super::Packable;
-
-impl Packable for IBool {
-    fn add_pack_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-        local: LocalId,
-        memory: MemoryId,
-        alloc_function: FunctionId,
-    ) {
-        let encoded_size = sol_data::Bool::ENCODED_SIZE.expect("Bool should have a fixed size");
-        pack_i32_type_instructions(builder, module, memory, alloc_function, local, encoded_size);
-    }
-
-    fn add_load_local_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-    ) -> LocalId {
-        let local = module.locals.add(ValType::I32);
-        builder.local_set(local);
-        local
-    }
-}
-
-impl Packable for IU8 {
-    fn add_pack_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-        local: LocalId,
-        memory: MemoryId,
-        alloc_function: FunctionId,
-    ) {
-        let encoded_size = sol_data::Uint::<8>::ENCODED_SIZE.expect("U8 should have a fixed size");
-        pack_i32_type_instructions(builder, module, memory, alloc_function, local, encoded_size);
-    }
-
-    fn add_load_local_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-    ) -> LocalId {
-        let local = module.locals.add(ValType::I32);
-        builder.local_set(local);
-        local
-    }
-}
-
-impl Packable for IU16 {
-    fn add_pack_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-        local: LocalId,
-        memory: MemoryId,
-        alloc_function: FunctionId,
-    ) {
-        let encoded_size =
-            sol_data::Uint::<16>::ENCODED_SIZE.expect("U16 should have a fixed size");
-        pack_i32_type_instructions(builder, module, memory, alloc_function, local, encoded_size);
-    }
-
-    fn add_load_local_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-    ) -> LocalId {
-        let local = module.locals.add(ValType::I32);
-        builder.local_set(local);
-        local
-    }
-}
-
-impl Packable for IU32 {
-    fn add_pack_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-        local: LocalId,
-        memory: MemoryId,
-        alloc_function: FunctionId,
-    ) {
-        let encoded_size =
-            sol_data::Uint::<32>::ENCODED_SIZE.expect("U32 should have a fixed size");
-        pack_i32_type_instructions(builder, module, memory, alloc_function, local, encoded_size);
-    }
-
-    fn add_load_local_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-    ) -> LocalId {
-        let local = module.locals.add(ValType::I32);
-        builder.local_set(local);
-        local
-    }
-}
-
-impl Packable for IU64 {
-    fn add_pack_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-        local: LocalId,
-        memory: MemoryId,
-        alloc_function: FunctionId,
-    ) {
-        let encoded_size =
-            sol_data::Uint::<64>::ENCODED_SIZE.expect("U64 should have a fixed size");
-        pack_i64_type_instructions(builder, module, memory, alloc_function, local, encoded_size);
-    }
-
-    fn add_load_local_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-    ) -> LocalId {
-        let local = module.locals.add(ValType::I64);
-        builder.local_set(local);
-        local
-    }
-}
+use crate::utils::{add_swap_i32_bytes_function, add_swap_i64_bytes_function};
 
 pub fn pack_i32_type_instructions(
     block: &mut InstrSeqBuilder,
     module: &mut Module,
     memory: MemoryId,
-    alloc_function: FunctionId,
     local: LocalId,
-    encoded_size: usize,
+    writer_pointer: LocalId,
 ) {
-    let pointer = module.locals.add(ValType::I32);
-
-    // Allocate memory for the packed value
-    block.i32_const(encoded_size as i32);
-    block.call(alloc_function);
-    block.local_tee(pointer);
+    block.local_get(writer_pointer);
 
     // Load the local value to the stack
     block.local_get(local);
@@ -168,25 +30,16 @@ pub fn pack_i32_type_instructions(
             offset: 28,
         },
     );
-
-    block.local_get(pointer);
-    block.i32_const(encoded_size as i32);
 }
 
 pub fn pack_i64_type_instructions(
     block: &mut InstrSeqBuilder,
     module: &mut Module,
     memory: MemoryId,
-    alloc_function: FunctionId,
     local: LocalId,
-    encoded_size: usize,
+    writer_pointer: LocalId,
 ) {
-    let pointer = module.locals.add(ValType::I32);
-
-    // Allocate memory for the packed value
-    block.i32_const(encoded_size as i32);
-    block.call(alloc_function);
-    block.local_tee(pointer);
+    block.local_get(writer_pointer);
 
     // Load the local value to the stack
     block.local_get(local);
@@ -204,9 +57,6 @@ pub fn pack_i64_type_instructions(
             offset: 24,
         },
     );
-
-    block.local_get(pointer);
-    block.i32_const(encoded_size as i32);
 }
 
 #[cfg(test)]
@@ -215,7 +65,10 @@ mod tests {
     use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
     use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults};
 
-    use crate::memory::setup_module_memory;
+    use crate::{
+        abi_types::packing::Packable, memory::setup_module_memory,
+        translation::intermediate_types::IntermediateType,
+    };
 
     use super::*;
 
@@ -270,15 +123,24 @@ mod tests {
         };
         func_body.local_set(local);
 
+        let writer_pointer = raw_module.locals.add(ValType::I32);
+
+        func_body.i32_const(int_type.encoded_size() as i32);
+        func_body.call(alloc_function);
+        func_body.local_set(writer_pointer);
+
         // Args data should already be stored in memory
         int_type.add_pack_instructions(
             &mut func_body,
             &mut raw_module,
             local,
+            writer_pointer,
+            writer_pointer, // unused for this type
             memory_id,
             alloc_function,
         );
-        func_body.drop();
+
+        func_body.local_get(writer_pointer);
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
@@ -301,20 +163,28 @@ mod tests {
     fn test_pack_u8() {
         type IntType = u8;
         type SolType = sol!((uint8,));
-        let int_type = IU8;
+        let int_type = IntermediateType::IU8;
 
         let expected_result = SolType::abi_encode_params(&(88,));
-        test_uint(int_type, Int::U32(88), &expected_result);
+        test_uint(int_type.clone(), Int::U32(88), &expected_result);
 
         let expected_result = SolType::abi_encode_params(&(IntType::MAX,));
-        test_uint(int_type, Int::U32(IntType::MAX as u32), &expected_result); // max
+        test_uint(
+            int_type.clone(),
+            Int::U32(IntType::MAX as u32),
+            &expected_result,
+        ); // max
 
         let expected_result = SolType::abi_encode_params(&(IntType::MIN,));
-        test_uint(int_type, Int::U32(IntType::MIN as u32), &expected_result); // min
+        test_uint(
+            int_type.clone(),
+            Int::U32(IntType::MIN as u32),
+            &expected_result,
+        ); // min
 
         let expected_result = SolType::abi_encode_params(&(IntType::MAX - 1,));
         test_uint(
-            int_type,
+            int_type.clone(),
             Int::U32((IntType::MAX - 1) as u32),
             &expected_result,
         ); // max -1 (avoid symmetry)
@@ -324,20 +194,28 @@ mod tests {
     fn test_unpack_u16() {
         type IntType = u16;
         type SolType = sol!((uint16,));
-        let int_type = IU16;
+        let int_type = IntermediateType::IU16;
 
         let expected_result = SolType::abi_encode_params(&(1616,));
-        test_uint(int_type, Int::U32(1616), &expected_result);
+        test_uint(int_type.clone(), Int::U32(1616), &expected_result);
 
         let expected_result = SolType::abi_encode_params(&(IntType::MAX,));
-        test_uint(int_type, Int::U32(IntType::MAX as u32), &expected_result); // max
+        test_uint(
+            int_type.clone(),
+            Int::U32(IntType::MAX as u32),
+            &expected_result,
+        ); // max
 
         let expected_result = SolType::abi_encode_params(&(IntType::MIN,));
-        test_uint(int_type, Int::U32(IntType::MIN as u32), &expected_result); // min
+        test_uint(
+            int_type.clone(),
+            Int::U32(IntType::MIN as u32),
+            &expected_result,
+        ); // min
 
         let expected_result = SolType::abi_encode_params(&(IntType::MAX - 1,));
         test_uint(
-            int_type,
+            int_type.clone(),
             Int::U32((IntType::MAX - 1) as u32),
             &expected_result,
         ); // max -1 (avoid symmetry)
@@ -347,37 +225,45 @@ mod tests {
     fn test_unpack_u32() {
         type IntType = u32;
         type SolType = sol!((uint32,));
-        let int_type = IU32;
+        let int_type = IntermediateType::IU32;
 
         let expected_result = SolType::abi_encode_params(&(323232,));
-        test_uint(int_type, Int::U32(323232), &expected_result);
+        test_uint(int_type.clone(), Int::U32(323232), &expected_result);
 
         let expected_result = SolType::abi_encode_params(&(IntType::MAX,));
-        test_uint(int_type, Int::U32(IntType::MAX), &expected_result); // max
+        test_uint(int_type.clone(), Int::U32(IntType::MAX), &expected_result); // max
 
         let expected_result = SolType::abi_encode_params(&(IntType::MIN,));
-        test_uint(int_type, Int::U32(IntType::MIN), &expected_result); // min
+        test_uint(int_type.clone(), Int::U32(IntType::MIN), &expected_result); // min
 
         let expected_result = SolType::abi_encode_params(&(IntType::MAX - 1,));
-        test_uint(int_type, Int::U32(IntType::MAX - 1), &expected_result); // max -1 (avoid symmetry)
+        test_uint(
+            int_type.clone(),
+            Int::U32(IntType::MAX - 1),
+            &expected_result,
+        ); // max -1 (avoid symmetry)
     }
 
     #[test]
     fn test_unpack_u64() {
         type IntType = u64;
         type SolType = sol!((uint64,));
-        let int_type = IU64;
+        let int_type = IntermediateType::IU64;
 
         let expected_result = SolType::abi_encode_params(&(6464646464,));
-        test_uint(int_type, Int::U64(6464646464), &expected_result);
+        test_uint(int_type.clone(), Int::U64(6464646464), &expected_result);
 
         let expected_result = SolType::abi_encode_params(&(IntType::MAX,));
-        test_uint(int_type, Int::U64(IntType::MAX), &expected_result); // max
+        test_uint(int_type.clone(), Int::U64(IntType::MAX), &expected_result); // max
 
         let expected_result = SolType::abi_encode_params(&(IntType::MIN,));
-        test_uint(int_type, Int::U64(IntType::MIN), &expected_result); // min
+        test_uint(int_type.clone(), Int::U64(IntType::MIN), &expected_result); // min
 
         let expected_result = SolType::abi_encode_params(&(IntType::MAX - 1,));
-        test_uint(int_type, Int::U64(IntType::MAX - 1), &expected_result); // max -1 (avoid symmetry)
+        test_uint(
+            int_type.clone(),
+            Int::U64(IntType::MAX - 1),
+            &expected_result,
+        ); // max -1 (avoid symmetry)
     }
 }

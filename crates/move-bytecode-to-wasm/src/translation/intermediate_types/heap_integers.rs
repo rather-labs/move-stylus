@@ -5,27 +5,18 @@ use walrus::{
 
 use crate::translation::functions::get_function_body_builder;
 
-use super::{IParam, IntermediateType};
-
 #[derive(Clone, Copy)]
 pub struct IU128;
 
-impl IParam for IU128 {}
-
-impl IntermediateType for IU128 {
-    fn to_wasm_type(&self) -> ValType {
-        ValType::I32
-    }
-
-    fn load_constant_instructions(
-        &self,
+impl IU128 {
+    pub fn load_constant_instructions(
         module: &mut Module,
         function_id: FunctionId,
-        bytes: &[u8],
+        bytes: &mut std::vec::IntoIter<u8>,
         allocator: FunctionId,
         memory: MemoryId,
     ) {
-        let bytes: [u8; 16] = bytes.try_into().expect("Constant is not a u128");
+        let bytes: [u8; 16] = bytes.take(16).collect::<Vec<u8>>().try_into().unwrap();
 
         let pointer = module.locals.add(ValType::I32);
 
@@ -61,22 +52,15 @@ impl IntermediateType for IU128 {
 #[derive(Clone, Copy)]
 pub struct IU256;
 
-impl IParam for IU256 {}
-
-impl IntermediateType for IU256 {
-    fn to_wasm_type(&self) -> ValType {
-        ValType::I32
-    }
-
-    fn load_constant_instructions(
-        &self,
+impl IU256 {
+    pub fn load_constant_instructions(
         module: &mut Module,
         function_id: FunctionId,
-        bytes: &[u8],
+        bytes: &mut std::vec::IntoIter<u8>,
         allocator: FunctionId,
         memory: MemoryId,
     ) {
-        let bytes: [u8; 32] = bytes.try_into().expect("Constant is not a u256");
+        let bytes: [u8; 32] = bytes.take(32).collect::<Vec<u8>>().try_into().unwrap();
 
         let pointer = module.locals.add(ValType::I32);
 

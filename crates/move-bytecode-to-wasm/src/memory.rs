@@ -115,6 +115,10 @@ pub fn setup_module_memory(module: &mut Module) -> (FunctionId, MemoryId) {
             .add("available_memory", global_available_memory);
 
         module.exports.add("allocator", func);
+        module.exports.add(
+            "global_next_free_memory_pointer",
+            global_next_free_memory_pointer,
+        );
     }
 
     (func, memory_id)

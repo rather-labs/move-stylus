@@ -1,20 +1,35 @@
 use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType, ir::BinaryOp};
 
-use crate::translation::intermediate_types::IParam;
+use crate::translation::intermediate_types::{
+    IntermediateType,
+    address::IAddress,
+    boolean::IBool,
+    heap_integers::{IU128, IU256},
+    simple_integers::{IU8, IU16, IU32, IU64},
+    vector::IVector,
+};
 
 mod unpack_heap_int;
 mod unpack_native_int;
+mod unpack_vector;
 
 pub trait Unpackable {
     /// Adds the instructions to unpack the abi encoded type to WASM function parameters
     ///
     /// Each parameter is decoded and loaded in the WASM stack. Complex data types are kept in memory
     /// and the pointer is pushed onto the stack in the parameter location.
+    ///
+    /// The reader pointer should be updated internally when a value is read from the args
+    /// The calldata reader pointer should never be updated, it is considered static for each type value
+    ///
+    /// The stack at the end contains the value(or pointer to the value):
+    /// [value/ptr i32/i64]
     fn add_unpack_instructions(
         &self,
         function_builder: &mut InstrSeqBuilder,
         module: &mut Module,
-        current_pointer: LocalId,
+        reader_pointer: LocalId,
+        calldata_reader_pointer: LocalId,
         memory: MemoryId,
         allocator: FunctionId,
     );
@@ -24,55 +39,137 @@ pub trait Unpackable {
 ///
 /// Each parameter is decoded and loaded in the WASM stack. Complex data types are kept in memory
 /// and the pointer is pushed onto the stack in the parameter location.
-pub fn build_unpack_instructions(
+pub fn build_unpack_instructions<T: Unpackable>(
     function_builder: &mut InstrSeqBuilder,
     module: &mut Module,
-    function_arguments_signature: &[Box<dyn IParam>],
+    function_arguments_signature: &[T],
     args_pointer: LocalId,
     args_len: LocalId,
     memory: MemoryId,
     allocator: FunctionId,
 ) {
-    let length = module.locals.add(ValType::I32);
-    let current_pointer = module.locals.add(ValType::I32);
-
-    function_builder.i32_const(0);
-    function_builder.local_set(length);
+    let reader_pointer = module.locals.add(ValType::I32);
+    let calldata_reader_pointer = module.locals.add(ValType::I32);
 
     function_builder.local_get(args_pointer);
-    function_builder.local_set(current_pointer);
+    function_builder.local_tee(reader_pointer);
+    function_builder.local_set(calldata_reader_pointer);
 
+    // The ABI encoded params are always a tuple
+    // Static types are stored in-place, but dynamic types are referenced to the call data
     for signature_token in function_arguments_signature.iter() {
         signature_token.add_unpack_instructions(
             function_builder,
             module,
-            current_pointer,
+            reader_pointer,
+            calldata_reader_pointer,
             memory,
             allocator,
         );
-
-        function_builder.local_get(length);
-        function_builder.binop(BinaryOp::I32Add);
-        function_builder.local_tee(length);
-
-        // Update the current pointer: args_pointer + current_length
-        function_builder.local_get(args_pointer);
-        function_builder.binop(BinaryOp::I32Add);
-        function_builder.local_set(current_pointer);
     }
 
     // Validation block
     function_builder.block(None, |block| {
         let block_id = block.id();
 
-        // Validate that current offset matches (args_pointer + args_len)
+        // Validate that read bytes == args_len
         // To ensure all bytes are consumed and no extra bytes are left
+        block.local_get(reader_pointer);
+        block.local_get(args_pointer);
+        block.binop(BinaryOp::I32Sub);
         block.local_get(args_len);
-        block.local_get(length);
         block.binop(BinaryOp::I32Eq);
         block.br_if(block_id);
         block.unreachable(); // Throws an error
     });
+}
+
+impl Unpackable for IntermediateType {
+    fn add_unpack_instructions(
+        &self,
+        function_builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        reader_pointer: LocalId,
+        calldata_reader_pointer: LocalId,
+        memory: MemoryId,
+        allocator: FunctionId,
+    ) {
+        match self {
+            IntermediateType::IBool => IBool::add_unpack_instructions(
+                function_builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                memory,
+                allocator,
+            ),
+            IntermediateType::IU8 => IU8::add_unpack_instructions(
+                function_builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                memory,
+                allocator,
+            ),
+            IntermediateType::IU16 => IU16::add_unpack_instructions(
+                function_builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                memory,
+                allocator,
+            ),
+            IntermediateType::IU32 => IU32::add_unpack_instructions(
+                function_builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                memory,
+                allocator,
+            ),
+            IntermediateType::IU64 => IU64::add_unpack_instructions(
+                function_builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                memory,
+                allocator,
+            ),
+            IntermediateType::IU128 => IU128::add_unpack_instructions(
+                function_builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                memory,
+                allocator,
+            ),
+            IntermediateType::IU256 => IU256::add_unpack_instructions(
+                function_builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                memory,
+                allocator,
+            ),
+            IntermediateType::IAddress => IAddress::add_unpack_instructions(
+                function_builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                memory,
+                allocator,
+            ),
+            IntermediateType::IVector(inner) => IVector::add_unpack_instructions(
+                inner,
+                function_builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                memory,
+                allocator,
+            ),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -81,14 +178,7 @@ mod tests {
     use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
     use wasmtime::{Engine, IntoFunc, Linker, Module as WasmModule, Store, TypedFunc, WasmParams};
 
-    use crate::{
-        memory::setup_module_memory,
-        translation::intermediate_types::{
-            boolean::IBool,
-            simple_integers::{IU16, IU64},
-        },
-        utils::display_module,
-    };
+    use crate::{memory::setup_module_memory, utils::display_module};
 
     use super::*;
 
@@ -152,7 +242,11 @@ mod tests {
         build_unpack_instructions(
             &mut func_body,
             &mut raw_module,
-            &[Box::new(IBool), Box::new(IU16), Box::new(IU64)],
+            &[
+                IntermediateType::IBool,
+                IntermediateType::IU16,
+                IntermediateType::IU64,
+            ],
             args_pointer,
             args_len,
             memory_id,
@@ -207,7 +301,11 @@ mod tests {
         build_unpack_instructions(
             &mut func_body,
             &mut raw_module,
-            &[Box::new(IU64), Box::new(IU16), Box::new(IBool)],
+            &[
+                IntermediateType::IU64,
+                IntermediateType::IU16,
+                IntermediateType::IBool,
+            ],
             args_pointer,
             args_len,
             memory_id,
@@ -263,7 +361,11 @@ mod tests {
         build_unpack_instructions(
             &mut func_body,
             &mut raw_module,
-            &[Box::new(IU64), Box::new(IU16), Box::new(IBool)],
+            &[
+                IntermediateType::IU64,
+                IntermediateType::IU16,
+                IntermediateType::IBool,
+            ],
             args_pointer,
             args_len,
             memory_id,
@@ -311,7 +413,11 @@ mod tests {
         build_unpack_instructions(
             &mut func_body,
             &mut raw_module,
-            &[Box::new(IBool), Box::new(IU16), Box::new(IU64)],
+            &[
+                IntermediateType::IBool,
+                IntermediateType::IU16,
+                IntermediateType::IU64,
+            ],
             args_pointer,
             args_len,
             memory_id,

@@ -24,16 +24,22 @@ fn map_bytecode_instruction(
         // Load a fixed constant
         Bytecode::LdConst(global_index) => {
             let constant = &constants[global_index.0 as usize];
+            let mut data = constant.data.clone().into_iter();
             constant
                 .type_
                 .to_intermediate_type()
                 .load_constant_instructions(
                     module,
                     mapped_function.id,
-                    &constant.data,
+                    &mut data,
                     allocator,
                     memory,
                 );
+            assert!(
+                data.next().is_none(),
+                "Constant data not consumed: {:?}",
+                data
+            );
         }
         // Load literals
         Bytecode::LdFalse => mapped_function.add_i32_const(module, 0),
@@ -86,7 +92,7 @@ fn map_bytecode_instruction(
         Bytecode::Pop => {
             mapped_function.get_function_body_builder(module).drop();
         }
-        // TODO: ensure this is the last instruction
+        // TODO: ensure this is the last instruction in the move code
         Bytecode::Ret => {
             mapped_function.get_function_body_builder(module).return_();
         }

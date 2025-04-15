@@ -139,13 +139,8 @@ mod tests {
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
     use crate::{
-        hostio::host_functions,
-        memory::setup_module_memory,
-        translation::intermediate_types::{
-            boolean::IBool,
-            simple_integers::{IU16, IU32, IU64},
-        },
-        utils::display_module,
+        hostio::host_functions, memory::setup_module_memory,
+        translation::intermediate_types::IntermediateType, utils::display_module,
     };
 
     use super::*;
@@ -318,8 +313,16 @@ mod tests {
             function,
             "test_function",
             ISignature {
-                arguments: vec![Box::new(IBool), Box::new(IU16), Box::new(IU64)],
-                returns: vec![Box::new(IU32), Box::new(IU16), Box::new(IU64)],
+                arguments: vec![
+                    IntermediateType::IBool,
+                    IntermediateType::IU16,
+                    IntermediateType::IU64,
+                ],
+                returns: vec![
+                    IntermediateType::IU32,
+                    IntermediateType::IU16,
+                    IntermediateType::IU64,
+                ],
             },
         );
 
@@ -385,8 +388,16 @@ mod tests {
             function,
             "test_function",
             ISignature {
-                arguments: vec![Box::new(IU32), Box::new(IU32), Box::new(IU64)],
-                returns: vec![Box::new(IU32), Box::new(IU32), Box::new(IU64)],
+                arguments: vec![
+                    IntermediateType::IU32,
+                    IntermediateType::IU32,
+                    IntermediateType::IU64,
+                ],
+                returns: vec![
+                    IntermediateType::IU32,
+                    IntermediateType::IU32,
+                    IntermediateType::IU64,
+                ],
             },
         );
 

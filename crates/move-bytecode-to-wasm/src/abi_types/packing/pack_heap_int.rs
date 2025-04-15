@@ -1,6 +1,5 @@
-use alloy_sol_types::{SolType, sol_data};
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    InstrSeqBuilder, LocalId, MemoryId, Module,
     ir::{LoadKind, MemArg, StoreKind},
 };
 
@@ -12,32 +11,19 @@ use crate::{
     utils::add_swap_i64_bytes_function,
 };
 
-use super::Packable;
-
-impl Packable for IU128 {
-    fn add_pack_instructions(
-        &self,
+impl IU128 {
+    pub fn add_pack_instructions(
         block: &mut InstrSeqBuilder,
         module: &mut Module,
         local: LocalId,
+        writer_pointer: LocalId,
         memory: MemoryId,
-        alloc_function: FunctionId,
     ) {
-        let encoded_size =
-            sol_data::Uint::<128>::ENCODED_SIZE.expect("U128 should have a fixed size");
-
         // Little-endian to Big-endian
         let swap_i64_bytes_function = add_swap_i64_bytes_function(module);
 
-        let pointer = module.locals.add(ValType::I32);
-
-        // Allocate memory for the packed value
-        block.i32_const(encoded_size as i32);
-        block.call(alloc_function);
-        block.local_set(pointer);
-
         for i in 0..2 {
-            block.local_get(pointer);
+            block.local_get(writer_pointer);
             block.local_get(local);
 
             // Load from right to left
@@ -62,47 +48,22 @@ impl Packable for IU128 {
                 },
             );
         }
-
-        block.local_get(pointer);
-        block.i32_const(encoded_size as i32);
-    }
-
-    fn add_load_local_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-    ) -> LocalId {
-        // Load the reference
-        let local = module.locals.add(ValType::I32);
-        builder.local_set(local);
-        local
     }
 }
 
-impl Packable for IU256 {
-    fn add_pack_instructions(
-        &self,
+impl IU256 {
+    pub fn add_pack_instructions(
         block: &mut InstrSeqBuilder,
         module: &mut Module,
         local: LocalId,
+        writer_pointer: LocalId,
         memory: MemoryId,
-        alloc_function: FunctionId,
     ) {
-        let encoded_size =
-            sol_data::Uint::<128>::ENCODED_SIZE.expect("U64 should have a fixed size");
-
         // Little-endian to Big-endian
         let swap_i64_bytes_function = add_swap_i64_bytes_function(module);
 
-        let pointer = module.locals.add(ValType::I32);
-
-        // Allocate memory for the packed value
-        block.i32_const(encoded_size as i32);
-        block.call(alloc_function);
-        block.local_set(pointer);
-
         for i in 0..4 {
-            block.local_get(pointer);
+            block.local_get(writer_pointer);
             block.local_get(local);
 
             // Load from right to left
@@ -126,45 +87,20 @@ impl Packable for IU256 {
                 },
             );
         }
-
-        block.local_get(pointer);
-        block.i32_const(encoded_size as i32);
-    }
-
-    fn add_load_local_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-    ) -> LocalId {
-        // Load the reference
-        let local = module.locals.add(ValType::I32);
-        builder.local_set(local);
-        local
     }
 }
 
-impl Packable for IAddress {
+impl IAddress {
     /// Address is packed as a u160, but endianness is not relevant
-    fn add_pack_instructions(
-        &self,
+    pub fn add_pack_instructions(
         block: &mut InstrSeqBuilder,
-        module: &mut Module,
+        _module: &mut Module,
         local: LocalId,
+        writer_pointer: LocalId,
         memory: MemoryId,
-        alloc_function: FunctionId,
     ) {
-        let encoded_size =
-            sol_data::Uint::<128>::ENCODED_SIZE.expect("U64 should have a fixed size");
-
-        let pointer = module.locals.add(ValType::I32);
-
-        // Allocate memory for the packed value
-        block.i32_const(encoded_size as i32);
-        block.call(alloc_function);
-        block.local_set(pointer);
-
         for i in 0..4 {
-            block.local_get(pointer);
+            block.local_get(writer_pointer);
             block.local_get(local);
 
             block.load(
@@ -184,20 +120,6 @@ impl Packable for IAddress {
                 },
             );
         }
-
-        block.local_get(pointer);
-        block.i32_const(encoded_size as i32);
-    }
-
-    fn add_load_local_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-    ) -> LocalId {
-        // Load the reference
-        let local = module.locals.add(ValType::I32);
-        builder.local_set(local);
-        local
     }
 }
 
@@ -212,7 +134,10 @@ mod tests {
     use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
     use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults};
 
-    use crate::memory::setup_module_memory;
+    use crate::{
+        abi_types::packing::Packable, memory::setup_module_memory,
+        translation::intermediate_types::IntermediateType,
+    };
 
     use super::*;
 
@@ -254,6 +179,7 @@ mod tests {
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
         let local = raw_module.locals.add(ValType::I32);
+        let writer_pointer = raw_module.locals.add(ValType::I32);
 
         let mut func_body = function_builder.func_body();
 
@@ -262,15 +188,22 @@ mod tests {
         func_body.call(alloc_function);
         func_body.local_set(local);
 
+        func_body.i32_const(int_type.encoded_size() as i32);
+        func_body.call(alloc_function);
+        func_body.local_set(writer_pointer);
+
         // Args data should already be stored in memory
         int_type.add_pack_instructions(
             &mut func_body,
             &mut raw_module,
             local,
+            writer_pointer,
+            writer_pointer, // unused for this type
             memory_id,
             alloc_function,
         );
-        func_body.drop();
+
+        func_body.local_get(writer_pointer);
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
@@ -293,20 +226,32 @@ mod tests {
     fn test_pack_u128() {
         type IntType = u128;
         type SolType = sol!((uint128,));
-        let int_type = IU128;
+        let int_type = IntermediateType::IU128;
 
         let expected_result = SolType::abi_encode_params(&(128128128128,));
-        test_uint(int_type, &128128128128u128.to_le_bytes(), &expected_result);
+        test_uint(
+            int_type.clone(),
+            &128128128128u128.to_le_bytes(),
+            &expected_result,
+        );
 
         let expected_result = SolType::abi_encode_params(&(IntType::MAX,));
-        test_uint(int_type, &IntType::MAX.to_le_bytes(), &expected_result); // max
+        test_uint(
+            int_type.clone(),
+            &IntType::MAX.to_le_bytes(),
+            &expected_result,
+        ); // max
 
         let expected_result = SolType::abi_encode_params(&(IntType::MIN,));
-        test_uint(int_type, &IntType::MIN.to_le_bytes(), &expected_result); // min
+        test_uint(
+            int_type.clone(),
+            &IntType::MIN.to_le_bytes(),
+            &expected_result,
+        ); // min
 
         let expected_result = SolType::abi_encode_params(&(IntType::MAX - 1,));
         test_uint(
-            int_type,
+            int_type.clone(),
             &(IntType::MAX - 1).to_le_bytes(),
             &expected_result,
         ); // max -1 (avoid symmetry)
@@ -316,32 +261,32 @@ mod tests {
     fn test_pack_u256() {
         type IntType = U256;
         type SolType = sol!((uint256,));
-        let int_type = IU256;
+        let int_type = IntermediateType::IU256;
 
         let expected_result = SolType::abi_encode_params(&(U256::from(256256256256u128),));
         test_uint(
-            int_type,
+            int_type.clone(),
             &U256::from(256256256256u128).to_le_bytes::<32>(),
             &expected_result,
         );
 
         let expected_result = SolType::abi_encode_params(&(IntType::MAX,));
         test_uint(
-            int_type,
+            int_type.clone(),
             &IntType::MAX.to_le_bytes::<32>(),
             &expected_result,
         ); // max
 
         let expected_result = SolType::abi_encode_params(&(IntType::MIN,));
         test_uint(
-            int_type,
+            int_type.clone(),
             &IntType::MIN.to_le_bytes::<32>(),
             &expected_result,
         ); // min
 
         let expected_result = SolType::abi_encode_params(&(IntType::MAX - U256::from(1),));
         test_uint(
-            int_type,
+            int_type.clone(),
             &(IntType::MAX - U256::from(1)).to_le_bytes::<32>(),
             &expected_result,
         ); // max -1 (avoid symmetry)
@@ -350,27 +295,27 @@ mod tests {
     #[test]
     fn test_pack_address() {
         type SolType = sol!((address,));
-        let int_type = IAddress;
+        let int_type = IntermediateType::IAddress;
 
         let expected_result = SolType::abi_encode_params(&(Address::ZERO,));
-        test_uint(int_type, &expected_result, &expected_result);
+        test_uint(int_type.clone(), &expected_result, &expected_result);
 
         let expected_result = SolType::abi_encode_params(&(Address::from_hex(
             "0x1234567890abcdef1234567890abcdef12345678",
         )
         .unwrap(),));
-        test_uint(int_type, &expected_result, &expected_result);
+        test_uint(int_type.clone(), &expected_result, &expected_result);
 
         let expected_result = SolType::abi_encode_params(&(Address::from_hex(
             "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
         )
         .unwrap(),));
-        test_uint(int_type, &expected_result, &expected_result);
+        test_uint(int_type.clone(), &expected_result, &expected_result);
 
         let expected_result = SolType::abi_encode_params(&(Address::from_hex(
             "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE",
         )
         .unwrap(),));
-        test_uint(int_type, &expected_result, &expected_result);
+        test_uint(int_type.clone(), &expected_result, &expected_result);
     }
 }

@@ -5,27 +5,18 @@ use walrus::{
 
 use crate::translation::functions::get_function_body_builder;
 
-use super::{IParam, IntermediateType};
-
 #[derive(Clone, Copy)]
 pub struct IAddress;
 
-impl IParam for IAddress {}
-
-impl IntermediateType for IAddress {
-    fn to_wasm_type(&self) -> ValType {
-        ValType::I32
-    }
-
-    fn load_constant_instructions(
-        &self,
+impl IAddress {
+    pub fn load_constant_instructions(
         module: &mut Module,
         function_id: FunctionId,
-        bytes: &[u8],
+        bytes: &mut std::vec::IntoIter<u8>,
         allocator: FunctionId,
         memory: MemoryId,
     ) {
-        let bytes: [u8; 32] = bytes.try_into().expect("Address should be 32 bytes");
+        let bytes: [u8; 32] = bytes.take(32).collect::<Vec<u8>>().try_into().unwrap();
 
         // Ensure the first 12 bytes are 0. Abi encoding restricts the address to be 20 bytes
         assert!(bytes[0..12].iter().all(|b| *b == 0));
