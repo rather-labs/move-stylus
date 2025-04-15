@@ -3,6 +3,7 @@
 
 use super::reroot_path;
 use clap::*;
+use move_bytecode_to_wasm::translate_package_cli;
 use move_package::BuildConfig;
 use std::path::Path;
 
@@ -23,11 +24,12 @@ impl Build {
             return Ok(());
         }
 
-        config.clone().cli_compile_package(
+        let compiled = config.clone().cli_compile_package(
             &rerooted_path,
             &mut std::io::stdout(),
             &mut std::io::stdin().lock(),
         )?;
+        translate_package_cli(&compiled, &rerooted_path);
         Ok(())
     }
 }

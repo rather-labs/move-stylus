@@ -3,6 +3,7 @@ resolver = "2"
 
 members = [
     "crates/*",
+    "example",
 ]
 
 exclude = ["example-rust"]

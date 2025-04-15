@@ -1,0 +1,14 @@
+[package]
+name = "move-hello-world-example"
+version = "0.1.11"
+edition = "2021"
+
+[[bin]]
+name = "interaction"
+path = "scripts/interaction.rs"
+
+[dependencies]
+dotenv = "0.15.0"
+ethers = "2.0"
+eyre = "0.6.8"
+tokio = { version = "1.44.2", features = ["macros", "rt-multi-thread"] }

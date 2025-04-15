@@ -35,6 +35,11 @@ impl MappedFunction {
         let function_arguments = signature.get_argument_wasm_types();
         let function_returns = signature.get_return_wasm_types();
 
+        assert!(
+            function_returns.len() <= 1,
+            "Multiple return values are not supported yet"
+        );
+
         let mut local_variables: Vec<LocalId> = function_arguments
             .iter()
             .map(|arg| module.locals.add(*arg))

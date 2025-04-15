@@ -1,2 +1,5 @@
 target
 example/build
+nitro-devnode
+
+.env
