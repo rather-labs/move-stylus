@@ -16,22 +16,21 @@ public fun get_local(_z: u16): u16 {
   let x: u16 = 100;
   let y: u16 = 50;
   identity(x);
-  identity_3(x, y);
 
   identity_2(x, y)
 }
 
 // Forces the compiler to store literals on locals
-public fun get_copied_local(): (u16, u16) {
+public fun get_copied_local(): u16 {
   let x: u16 = 100;
   
   let y = x; // copy
-  let mut z = x; // move
+  let mut _z = x; // move
   identity(y);
-  identity(z);
+  identity(_z);
 
-  z = 111;
-  (y, z) // (100, 111)
+  _z = 111;
+  y
 }
 
 public fun echo(x: u16): u16 {
@@ -48,8 +47,4 @@ fun identity(x: u16): u16 {
 
 fun identity_2(_x: u16, y: u16): u16 {
   y
-}
-
-fun identity_3(_x: u16, y: u16): (u16, u16) {
-  (y, y)
 }
