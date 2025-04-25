@@ -5,26 +5,14 @@ use alloy::{
     sol,
     sol_types::SolCall,
 };
-use common::{ModuleData, setup_wasmtime_module, translate_test_package};
-use walrus::Module;
+use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
 
 mod common;
 
-fn run_test(translated_package: &mut Module, call_data: Vec<u8>, expected_result: Vec<u8>) {
-    let data = ModuleData {
-        data: call_data,
-        return_data: vec![],
-    };
-    let data_len = data.data.len() as i32;
-
-    let (_, mut store, entrypoint) = setup_wasmtime_module(translated_package, data);
-
-    let result = entrypoint.call(&mut store, data_len).unwrap();
+fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) {
+    let (result, return_data) = runtime.call_entrypoint(call_data);
     assert_eq!(result, 0);
-
-    let store_data = store.data();
-
-    assert_eq!(store_data.return_data, expected_result);
+    assert_eq!(return_data, expected_result);
 }
 
 #[test]
@@ -42,30 +30,31 @@ fn test_bool() {
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
 
     let data = getConstantCall::abi_encode(&getConstantCall::new(()));
     let expected_result = <sol!((bool,))>::abi_encode_params(&(true,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getLocalCall::abi_encode(&getLocalCall::new((true,)));
     let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
     let expected_result = <sol!((bool,))>::abi_encode_params(&(true,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echoCall::abi_encode(&echoCall::new((true,)));
     let expected_result = <sol!((bool,))>::abi_encode_params(&(true,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echoCall::abi_encode(&echoCall::new((false,)));
     let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echo2Call::abi_encode(&echo2Call::new((true, false)));
     let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 }
 
 #[test]
@@ -83,13 +72,14 @@ fn test_address() {
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
 
     let data = getConstantCall::abi_encode(&getConstantCall::new(()));
     let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
         "0x0000000000000000000000000000000000000001",
     )
     .unwrap(),));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getLocalCall::abi_encode(&getLocalCall::new((Address::from_hex(
         "0x0000000000000000000000000000000000000022",
@@ -99,14 +89,14 @@ fn test_address() {
         "0x0000000000000000000000000000000000000011",
     )
     .unwrap(),));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
     let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
         "0x0000000000000000000000000000000000000001",
     )
     .unwrap(),));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echoCall::abi_encode(&echoCall::new((Address::from_hex(
         "0x0000000000000000000000000000000000000033",
@@ -116,7 +106,7 @@ fn test_address() {
         "0x0000000000000000000000000000000000000033",
     )
     .unwrap(),));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echoCall::abi_encode(&echoCall::new((Address::from_hex(
         "0x0000000000000000000000000000000000000044",
@@ -126,7 +116,7 @@ fn test_address() {
         "0x0000000000000000000000000000000000000044",
     )
     .unwrap(),));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echo2Call::abi_encode(&echo2Call::new((
         Address::from_hex("0x0000000000000000000000000000000000000055").unwrap(),
@@ -136,7 +126,7 @@ fn test_address() {
         "0x0000000000000000000000000000000000000066",
     )
     .unwrap(),));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 }
 
 #[test]
@@ -154,31 +144,32 @@ fn test_uint_8() {
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
 
     let data = getConstantCall::abi_encode(&getConstantCall::new(()));
     let expected_result = <sol!((uint8,))>::abi_encode_params(&(88,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getLocalCall::abi_encode(&getLocalCall::new((111,)));
     let expected_result = <sol!((uint8,))>::abi_encode_params(&(50,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
     let expected_result = <sol!((uint8,))>::abi_encode_params(&(100,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echoCall::abi_encode(&echoCall::new((222,)));
     let expected_result = <sol!((uint8,))>::abi_encode_params(&(222,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     // Echo max uint8
     let data = echoCall::abi_encode(&echoCall::new((u8::MAX,)));
     let expected_result = <sol!((uint8,))>::abi_encode_params(&(u8::MAX,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echo2Call::abi_encode(&echo2Call::new((111, 222)));
     let expected_result = <sol!((uint8,))>::abi_encode_params(&(222,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 }
 
 #[test]
@@ -196,31 +187,32 @@ fn test_uint_16() {
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
 
     let data = getConstantCall::abi_encode(&getConstantCall::new(()));
     let expected_result = <sol!((uint16,))>::abi_encode_params(&(1616,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getLocalCall::abi_encode(&getLocalCall::new((111,)));
     let expected_result = <sol!((uint16,))>::abi_encode_params(&(50,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
     let expected_result = <sol!((uint16,))>::abi_encode_params(&(100,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echoCall::abi_encode(&echoCall::new((222,)));
     let expected_result = <sol!((uint16,))>::abi_encode_params(&(222,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     // Echo max uint16
     let data = echoCall::abi_encode(&echoCall::new((u16::MAX,)));
     let expected_result = <sol!((uint16,))>::abi_encode_params(&(u16::MAX,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echo2Call::abi_encode(&echo2Call::new((111, 222)));
     let expected_result = <sol!((uint16,))>::abi_encode_params(&(222,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 }
 
 #[test]
@@ -238,31 +230,32 @@ fn test_uint_32() {
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
 
     let data = getConstantCall::abi_encode(&getConstantCall::new(()));
     let expected_result = <sol!((uint32,))>::abi_encode_params(&(3232,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getLocalCall::abi_encode(&getLocalCall::new((111,)));
     let expected_result = <sol!((uint32,))>::abi_encode_params(&(50,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
     let expected_result = <sol!((uint32,))>::abi_encode_params(&(100,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echoCall::abi_encode(&echoCall::new((222,)));
     let expected_result = <sol!((uint32,))>::abi_encode_params(&(222,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     // Echo max uint32
     let data = echoCall::abi_encode(&echoCall::new((u32::MAX,)));
     let expected_result = <sol!((uint32,))>::abi_encode_params(&(u32::MAX,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echo2Call::abi_encode(&echo2Call::new((111, 222)));
     let expected_result = <sol!((uint32,))>::abi_encode_params(&(222,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 }
 
 #[test]
@@ -280,31 +273,32 @@ fn test_uint_64() {
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
 
     let data = getConstantCall::abi_encode(&getConstantCall::new(()));
     let expected_result = <sol!((uint64,))>::abi_encode_params(&(6464,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getLocalCall::abi_encode(&getLocalCall::new((111,)));
     let expected_result = <sol!((uint64,))>::abi_encode_params(&(50,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
     let expected_result = <sol!((uint64,))>::abi_encode_params(&(100,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echoCall::abi_encode(&echoCall::new((222,)));
     let expected_result = <sol!((uint64,))>::abi_encode_params(&(222,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     // Echo max uint64
     let data = echoCall::abi_encode(&echoCall::new((u64::MAX,)));
     let expected_result = <sol!((uint64,))>::abi_encode_params(&(u64::MAX,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echo2Call::abi_encode(&echo2Call::new((111, 222)));
     let expected_result = <sol!((uint64,))>::abi_encode_params(&(222,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 }
 
 #[test]
@@ -322,31 +316,32 @@ fn test_uint_128() {
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
 
     let data = getConstantCall::abi_encode(&getConstantCall::new(()));
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(128128,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getLocalCall::abi_encode(&getLocalCall::new((111,)));
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(50,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(100,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echoCall::abi_encode(&echoCall::new((222,)));
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(222,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     // Echo max uint128
     let data = echoCall::abi_encode(&echoCall::new((u128::MAX,)));
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(u128::MAX,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echo2Call::abi_encode(&echo2Call::new((111, 222)));
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(222,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 }
 
 #[test]
@@ -364,29 +359,30 @@ fn test_uint_256() {
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
 
     let data = getConstantCall::abi_encode(&getConstantCall::new(()));
     let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(256256),));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getLocalCall::abi_encode(&getLocalCall::new((U256::from(111),)));
     let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(50),));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
     let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(100),));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echoCall::abi_encode(&echoCall::new((U256::from(222),)));
     let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(222),));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     // Echo max uint256
     let data = echoCall::abi_encode(&echoCall::new((U256::MAX,)));
     let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::MAX,));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 
     let data = echo2Call::abi_encode(&echo2Call::new((U256::from(111), U256::from(222))));
     let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(222),));
-    run_test(&mut translated_package, data, expected_result);
+    run_test(&runtime, data, expected_result);
 }
