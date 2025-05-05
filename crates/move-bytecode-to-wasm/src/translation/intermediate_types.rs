@@ -157,6 +157,51 @@ impl IntermediateType {
             }
         }
     }
+
+    pub fn copy_loc_instructions(
+        &self,
+        module: &mut Module,
+        function_id: FunctionId,
+        _allocator: FunctionId,
+        _memory: MemoryId,
+        source_ptr: LocalId,
+    ) -> LocalId {
+        let builder = &mut get_function_body_builder(module, function_id);
+    
+        match self {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64 => {
+                builder.local_get(source_ptr);
+                source_ptr
+            }
+    
+            IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress => {
+                // these are on the heap, pointer must be copied
+                let local = module.locals.add(ValType::I32);
+                builder.local_get(source_ptr);
+                builder.local_set(local);
+                local
+            }
+    
+            IntermediateType::IVector(inner) => {
+                IVector::copy_loc_instructions(
+                    inner,
+                    module,
+                    function_id,
+                    _allocator,
+                    _memory,
+                    source_ptr,
+                )
+            }
+    
+            _ => unimplemented!("copy for {:?}", self),
+        }
+    }    
 }
 
 pub trait SignatureTokenToIntermediateType {

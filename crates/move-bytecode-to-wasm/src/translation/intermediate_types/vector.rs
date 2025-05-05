@@ -1,6 +1,6 @@
 use walrus::{
-    FunctionId, MemoryId, Module, ValType,
-    ir::{MemArg, StoreKind},
+    FunctionId, MemoryId, Module, ValType, LocalId,
+    ir::{MemArg, StoreKind, BinaryOp},
 };
 
 use crate::translation::functions::get_function_body_builder;
@@ -91,7 +91,112 @@ impl IVector {
             "Store offset is not aligned with the needed bytes"
         );
     }
+
+    pub fn copy_loc_instructions(
+        inner: &IntermediateType,
+        module: &mut Module,
+        function_id: FunctionId,
+        allocator: FunctionId,
+        memory: MemoryId,
+        source_ptr: LocalId,
+    ) -> LocalId {
+        let data_size = inner.stack_data_size() as u32;
+        let builder = &mut get_function_body_builder(module, function_id);
+    
+        let new_ptr = module.locals.add(ValType::I32);
+        let len = module.locals.add(ValType::I32);
+        let offset = module.locals.add(ValType::I32);
+    
+        // Load length from source_ptr[0]
+        builder.local_get(source_ptr);
+        builder.load(
+            memory,
+            StoreKind::I32 { atomic: false },
+            MemArg { align: 0, offset: 0 },
+        );
+        builder.local_set(len);
+    
+        // Allocate space: 4 + len * data_size
+        builder.local_get(len);
+        builder.i32_const(data_size as i32);
+        builder.binop(BinaryOp::I32Mul);
+        builder.i32_const(4);
+        builder.binop(BinaryOp::I32Add);
+        builder.call(allocator);
+        builder.local_set(new_ptr);
+    
+        // Store length at new_ptr[0]
+        builder.local_get(new_ptr);
+        builder.local_get(len);
+        builder.store(
+            memory,
+            StoreKind::I32 { atomic: false },
+            MemArg { align: 0, offset: 0 },
+        );
+    
+        // Initialize offset = 0
+        builder.i32_const(0);
+        builder.local_set(offset);
+
+        // Loop over elements
+        let break_block = builder.block();
+        let loop_id = builder.loop_();
+    
+        // if offset >= len, break
+        builder.local_get(offset);
+        builder.local_get(len);
+        builder.binop(BinaryOp::I32GeU);
+        builder.br_if(break_block, BrIf::IfTrue); 
+    
+        // Calculate source and destination addresses
+        builder.local_get(source_ptr);
+        builder.i32_const(4);
+        builder.local_get(offset);
+        builder.i32_const(data_size as i32);
+        builder.binop(BinaryOp::I32Mul);
+        builder.binop(BinaryOp::I32Add); // source addr
+    
+        builder.load(
+            memory,
+            if data_size == 4 {
+                StoreKind::I32 { atomic: false }
+            } else {
+                StoreKind::I64 { atomic: false }
+            },
+            MemArg { align: 0, offset: 0 },
+        );
+    
+        builder.local_get(new_ptr);
+        builder.i32_const(4);
+        builder.local_get(offset);
+        builder.i32_const(data_size as i32);
+        builder.binop(BinaryOp::I32Mul);
+        builder.binop(BinaryOp::I32Add); // dest addr
+    
+        builder.store(
+            memory,
+            if data_size == 4 {
+                StoreKind::I32 { atomic: false }
+            } else {
+                StoreKind::I64 { atomic: false }
+            },
+            MemArg { align: 0, offset: 0 },
+        );
+    
+        // offset += 1
+        builder.local_get(offset);
+        builder.i32_const(1);
+        builder.binop(BinaryOp::I32Add);
+        builder.local_set(offset);
+    
+        builder.br(loop_id); // repeat
+    
+        builder.end(); // loop end
+        builder.end(); // break block
+        new_ptr
+    }    
 }
+
 
 #[cfg(test)]
 mod tests {

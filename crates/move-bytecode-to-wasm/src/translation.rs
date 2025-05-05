@@ -81,14 +81,24 @@ fn map_bytecode_instruction(
                 .get_function_body_builder(module)
                 .local_get(mapped_function.local_variables[*local_id as usize]);
         }
+
         Bytecode::CopyLoc(local_id) => {
-            // Values or references from the stack are copied to the local variable
-            // This works for stack and heap types
-            // Note: This is valid because heap types are currently immutable, this may change in the future
+            let ty = mapped_function.local_types[*local_id as usize].clone();
+            let src_local = mapped_function.local_variables[*local_id as usize];
+        
+            let copied = ty.copy_loc_instructions(
+                module,
+                mapped_function.id,
+                allocator,
+                memory,
+                src_local,
+            );
+        
             mapped_function
                 .get_function_body_builder(module)
-                .local_get(mapped_function.local_variables[*local_id as usize]);
+                .local_get(copied);
         }
+        
         Bytecode::Pop => {
             mapped_function.get_function_body_builder(module).drop();
         }
