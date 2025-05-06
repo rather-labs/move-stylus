@@ -1,4 +1,4 @@
-module 0x00::import_std;
+module 0x00::use_stdlib;
 
 public fun test_append() {
     let mut str = b"hello".to_ascii_string();

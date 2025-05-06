@@ -8,8 +8,8 @@ mod common;
 #[test]
 #[should_panic(expected = "Unsupported signature token: Struct(DatatypeHandleIndex(0))")]
 fn test_use_stdlib() {
-    const MODULE_NAME: &str = "import_std";
-    const SOURCE_PATH: &str = "tests/imports/import_std.move";
+    const MODULE_NAME: &str = "use_stdlib";
+    const SOURCE_PATH: &str = "tests/stdlib/use_stdlib.move";
 
     translate_test_package(SOURCE_PATH, MODULE_NAME);
 }
