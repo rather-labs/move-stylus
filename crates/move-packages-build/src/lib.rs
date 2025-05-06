@@ -18,7 +18,7 @@ const DEPENDENCIES: [ImplicitDepenencyInfo; 1] = [ImplicitDepenencyInfo {
     rev: "framework/mainnet",
 }];
 
-/// Process the `DEPENDENCIES` tables and return them ready to be injected
+/// Process the `DEPENDENCIES` table and return them ready to be injected
 pub fn implicit_dependencies() -> Dependencies {
     let mut dependencies = Dependencies::new();
     for dependency in DEPENDENCIES {
