@@ -6,11 +6,9 @@ use base::{
     build::Build, coverage::Coverage, disassemble::Disassemble, docgen::Docgen, info::Info,
     migrate::Migrate, new::New, test::Test,
 };
-use dependencies::inject_implicit_dependencies;
 use move_package::BuildConfig;
 
 pub mod base;
-pub mod dependencies;
 
 /// Default directory where saved Move resources live
 pub const DEFAULT_STORAGE_DIR: &str = "storage";
@@ -21,6 +19,7 @@ pub const DEFAULT_BUILD_DIR: &str = ".";
 use anyhow::Result;
 use clap::Parser;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+use move_packages_build::implicit_dependencies;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_test_utils::gas_schedule::CostTable;
 use std::path::PathBuf;
@@ -70,12 +69,11 @@ pub enum Command {
 pub fn run_cli(
     natives: Vec<NativeFunctionRecord>,
     cost_table: &CostTable,
-    move_args: Move,
+    mut move_args: Move,
     cmd: Command,
 ) -> Result<()> {
-    let mut move_args = move_args;
-    inject_implicit_dependencies(&mut move_args);
-    println!("MOVE ARGS: {move_args:#?}");
+    move_args.build_config.implicit_dependencies = implicit_dependencies();
+
     // TODO: right now, the gas metering story for move-cli (as a library) is a bit of a mess.
     //         1. It's still using the old CostTable.
     //         2. The CostTable only affects sandbox runs, but not unit tests, which use a unit cost table.
