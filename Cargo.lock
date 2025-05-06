@@ -3998,6 +3998,7 @@ dependencies = [
  "anyhow",
  "move-binary-format",
  "move-package",
+ "move-packages-build",
  "walrus",
  "wasmparser 0.228.0",
  "wasmprinter 0.228.0",
