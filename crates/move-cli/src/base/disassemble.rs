@@ -33,6 +33,8 @@ pub struct Disassemble {
 
 impl Disassemble {
     pub fn execute(self, path: Option<&Path>, config: BuildConfig) -> anyhow::Result<()> {
+        println!("CONFIG: {config:#?}");
+
         let rerooted_path = reroot_path(path)?;
         let Self {
             interactive,
