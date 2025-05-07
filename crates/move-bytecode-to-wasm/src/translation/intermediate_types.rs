@@ -109,7 +109,7 @@ impl IntermediateType {
         allocator: FunctionId,
         memory: MemoryId,
         src_ptr: LocalId,
-    ) -> LocalId {
+    ) {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8

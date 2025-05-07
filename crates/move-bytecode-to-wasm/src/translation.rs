@@ -1,4 +1,4 @@
-use intermediate_types::SignatureTokenToIntermediateType;
+use intermediate_types::{IntermediateType, SignatureTokenToIntermediateType};
 use move_binary_format::file_format::{Bytecode, Constant};
 use walrus::{
     FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
@@ -17,6 +17,7 @@ fn map_bytecode_instruction(
     function_ids: &[FunctionId],
     builder: &mut InstrSeqBuilder,
     local_variables: &[LocalId],
+    local_variables_type: &[IntermediateType],
     module_locals: &mut ModuleLocals,
     allocator: FunctionId,
     memory: MemoryId,
@@ -87,12 +88,18 @@ fn map_bytecode_instruction(
             builder.local_get(local_variables[*local_id as usize]);
         }
         Bytecode::CopyLoc(local_id) => {
-            // Values or references from the stack are copied to the local variable
-            // This works for stack and heap types
-            // Note: This is valid because heap types are currently immutable, this may change in the future
+            let idx = *local_id as usize;
+            let ptr = local_variables[idx];
+            let ty = &local_variables_type[idx];
         
-            builder.local_get(local_variables[*local_id as usize]);
-        }
+            ty.copy_loc_instructions(
+                module_locals,
+                builder,
+                allocator,
+                memory,
+                ptr,
+            );
+        }        
         Bytecode::Pop => {
             builder.drop();
         }

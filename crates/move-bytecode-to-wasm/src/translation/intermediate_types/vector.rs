@@ -1,6 +1,6 @@
 use walrus::{
-    FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
-    ir::{MemArg, StoreKind},
+    FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType, LocalId,
+    ir::{MemArg, StoreKind, LoadKind, BinaryOp},
 };
 
 use super::IntermediateType;
@@ -159,12 +159,18 @@ impl IVector {
                 // recursive call
                 inner.copy_loc_instructions(
                     module_locals,
-                    builder,
+                    loop_block,
                     allocator,
                     memory,
                     src_offset_ptr,
                 );
 
+                loop_block.load(
+                    memory,
+                    LoadKind::I32 { atomic: false },
+                    MemArg { align: 0, offset: 0 },
+                );
+                
                 // store value at dest address
                 loop_block.store(
                     memory,
@@ -185,7 +191,7 @@ impl IVector {
                 loop_block.br(loop_block.id());
             });
         }); 
-        builder.local_get(ptr)
+        builder.local_get(ptr);
     }    
 }
 
