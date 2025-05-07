@@ -1,17 +1,15 @@
 use walrus::{
-    FunctionId, MemoryId, Module, ValType,
+    FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
     ir::{MemArg, StoreKind},
 };
-
-use crate::translation::functions::get_function_body_builder;
 
 #[derive(Clone, Copy)]
 pub struct IAddress;
 
 impl IAddress {
     pub fn load_constant_instructions(
-        module: &mut Module,
-        function_id: FunctionId,
+        module_locals: &mut ModuleLocals,
+        builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
         allocator: FunctionId,
         memory: MemoryId,
@@ -21,9 +19,7 @@ impl IAddress {
         // Ensure the first 12 bytes are 0. Abi encoding restricts the address to be 20 bytes
         assert!(bytes[0..12].iter().all(|b| *b == 0));
 
-        let pointer = module.locals.add(ValType::I32);
-
-        let mut builder = get_function_body_builder(module, function_id);
+        let pointer = module_locals.add(ValType::I32);
 
         builder.i32_const(bytes.len() as i32);
         builder.call(allocator);

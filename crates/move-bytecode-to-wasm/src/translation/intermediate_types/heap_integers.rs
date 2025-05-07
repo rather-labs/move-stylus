@@ -1,26 +1,22 @@
 use walrus::{
-    FunctionId, MemoryId, Module, ValType,
+    FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
     ir::{MemArg, StoreKind},
 };
-
-use crate::translation::functions::get_function_body_builder;
 
 #[derive(Clone, Copy)]
 pub struct IU128;
 
 impl IU128 {
     pub fn load_constant_instructions(
-        module: &mut Module,
-        function_id: FunctionId,
+        module_locals: &mut ModuleLocals,
+        builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
         allocator: FunctionId,
         memory: MemoryId,
     ) {
         let bytes: [u8; 16] = bytes.take(16).collect::<Vec<u8>>().try_into().unwrap();
 
-        let pointer = module.locals.add(ValType::I32);
-
-        let mut builder = get_function_body_builder(module, function_id);
+        let pointer = module_locals.add(ValType::I32);
 
         builder.i32_const(bytes.len() as i32);
         builder.call(allocator);
@@ -54,17 +50,15 @@ pub struct IU256;
 
 impl IU256 {
     pub fn load_constant_instructions(
-        module: &mut Module,
-        function_id: FunctionId,
+        module_locals: &mut ModuleLocals,
+        builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
         allocator: FunctionId,
         memory: MemoryId,
     ) {
         let bytes: [u8; 32] = bytes.take(32).collect::<Vec<u8>>().try_into().unwrap();
 
-        let pointer = module.locals.add(ValType::I32);
-
-        let mut builder = get_function_body_builder(module, function_id);
+        let pointer = module_locals.add(ValType::I32);
 
         builder.i32_const(bytes.len() as i32);
         builder.call(allocator);

@@ -1,9 +1,7 @@
 use walrus::{
-    FunctionId, MemoryId, Module, ValType,
+    FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
     ir::{MemArg, StoreKind},
 };
-
-use crate::translation::functions::get_function_body_builder;
 
 use super::IntermediateType;
 
@@ -13,8 +11,8 @@ pub struct IVector;
 impl IVector {
     pub fn load_constant_instructions(
         inner: &IntermediateType,
-        module: &mut Module,
-        function_id: FunctionId,
+        module_locals: &mut ModuleLocals,
+        builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
         allocator: FunctionId,
         memory: MemoryId,
@@ -27,9 +25,7 @@ impl IVector {
         // Vec len as i32 + data size * vec len
         let needed_bytes = 4 + data_size * (vec_len as usize);
 
-        let pointer = module.locals.add(ValType::I32);
-
-        let mut builder = get_function_body_builder(module, function_id);
+        let pointer = module_locals.add(ValType::I32);
 
         builder.i32_const(needed_bytes as i32);
         builder.call(allocator);
@@ -51,9 +47,7 @@ impl IVector {
         builder.local_get(pointer);
         while (store_offset as usize) < needed_bytes {
             // Load the inner type
-            inner.load_constant_instructions(module, function_id, bytes, allocator, memory);
-
-            let mut builder = get_function_body_builder(module, function_id);
+            inner.load_constant_instructions(module_locals, builder, bytes, allocator, memory);
 
             if data_size == 4 {
                 // Store i32
@@ -96,7 +90,7 @@ impl IVector {
 #[cfg(test)]
 mod tests {
     use alloy::primitives::U256;
-    use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
+    use walrus::{FunctionBuilder, FunctionId, MemoryId, Module, ModuleConfig, ValType};
     use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults};
 
     use crate::memory::setup_module_memory;
@@ -140,19 +134,20 @@ mod tests {
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
-        function_builder.func_body();
-        let function = function_builder.finish(vec![], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
+        let mut builder = function_builder.func_body();
 
         let data = data.to_vec();
         IVector::load_constant_instructions(
             &inner_type,
-            &mut raw_module,
-            function,
+            &mut raw_module.locals,
+            &mut builder,
             &mut data.into_iter(),
             allocator,
             memory_id,
         );
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
 
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module::<i32>(&mut raw_module, vec![], "test_function");
