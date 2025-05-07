@@ -1,6 +1,8 @@
 use walrus::{FunctionId, InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
 
-use crate::translation::intermediate_types::ISignature;
+use crate::translation::{
+    functions::add_unpack_function_return_values_instructions, intermediate_types::ISignature,
+};
 
 use super::{
     function_encoding::{AbiFunctionSelector, move_signature_to_abi_selector},
@@ -114,6 +116,16 @@ impl PublicFunction {
             allocator_func,
         );
         block.call(self.function_id);
+        if !self.signature.returns.is_empty() {
+            let pointer = module.locals.add(ValType::I32);
+            block.local_set(pointer);
+            add_unpack_function_return_values_instructions(
+                block,
+                &self.signature.returns,
+                pointer,
+                memory_id,
+            );
+        }
 
         build_pack_instructions(
             block,
@@ -139,8 +151,10 @@ mod tests {
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
     use crate::{
-        hostio::host_functions, memory::setup_module_memory,
-        translation::intermediate_types::IntermediateType, utils::display_module,
+        hostio::host_functions,
+        memory::setup_module_memory,
+        translation::{functions::prepare_function_return, intermediate_types::IntermediateType},
+        utils::display_module,
     };
 
     use super::*;
@@ -284,7 +298,7 @@ mod tests {
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
             &[ValType::I32, ValType::I32, ValType::I64],
-            &[ValType::I32, ValType::I32, ValType::I64],
+            &[ValType::I32],
         );
 
         let param1 = raw_module.locals.add(ValType::I32);
@@ -309,6 +323,19 @@ mod tests {
         let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
+        let returns = vec![
+            IntermediateType::IU32,
+            IntermediateType::IU16,
+            IntermediateType::IU64,
+        ];
+        prepare_function_return(
+            function,
+            &returns,
+            &mut raw_module,
+            memory_id,
+            allocator_func,
+        );
+
         let public_function = PublicFunction::new(
             function,
             "test_function",
@@ -318,11 +345,7 @@ mod tests {
                     IntermediateType::IU16,
                     IntermediateType::IU64,
                 ],
-                returns: vec![
-                    IntermediateType::IU32,
-                    IntermediateType::IU16,
-                    IntermediateType::IU64,
-                ],
+                returns,
             },
         );
 
@@ -359,7 +382,7 @@ mod tests {
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
             &[ValType::I32, ValType::I32, ValType::I64],
-            &[ValType::I32, ValType::I32, ValType::I64],
+            &[ValType::I32],
         );
 
         let param1 = raw_module.locals.add(ValType::I32);
@@ -376,10 +399,12 @@ mod tests {
         func_body.local_get(param2);
         func_body.i32_const(1);
         func_body.binop(BinaryOp::I32Add);
+        func_body.drop();
 
         func_body.local_get(param3);
         func_body.i64_const(1);
         func_body.binop(BinaryOp::I64Add);
+        func_body.drop();
 
         let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
@@ -393,11 +418,7 @@ mod tests {
                     IntermediateType::IU32,
                     IntermediateType::IU64,
                 ],
-                returns: vec![
-                    IntermediateType::IU32,
-                    IntermediateType::IU32,
-                    IntermediateType::IU64,
-                ],
+                returns: vec![IntermediateType::IU32],
             },
         );
 

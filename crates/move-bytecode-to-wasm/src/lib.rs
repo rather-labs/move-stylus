@@ -105,6 +105,9 @@ pub fn translate_package(
 
         hostio::build_entrypoint_router(&mut module, allocator_func, memory_id, &public_functions);
 
+        // Convert to WAT format
+        let wat = wasmprinter::print_bytes(module.emit_wasm()).expect("Failed to generate WAT");
+        println!("{}", wat);
         validate_stylus_wasm(&mut module).unwrap();
 
         modules.insert(module_name, module);

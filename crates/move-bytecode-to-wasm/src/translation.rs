@@ -1,4 +1,6 @@
-use functions::MappedFunction;
+use functions::{
+    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
+};
 use intermediate_types::SignatureTokenToIntermediateType;
 use move_binary_format::file_format::{Bytecode, Constant};
 use walrus::{
@@ -67,6 +69,18 @@ fn map_bytecode_instruction(
             mapped_function
                 .get_function_body_builder(module)
                 .call(function_ids[function_handle_index.0 as usize]);
+            if !mapped_function.signature.returns.is_empty() {
+                let pointer = module.locals.add(ValType::I32);
+                mapped_function
+                    .get_function_body_builder(module)
+                    .local_set(pointer);
+                add_unpack_function_return_values_instructions(
+                    &mut mapped_function.get_function_body_builder(module),
+                    &mapped_function.signature.returns,
+                    pointer,
+                    memory,
+                );
+            }
         }
         // Locals
         Bytecode::StLoc(local_id) => {
@@ -94,7 +108,13 @@ fn map_bytecode_instruction(
         }
         // TODO: ensure this is the last instruction in the move code
         Bytecode::Ret => {
-            mapped_function.get_function_body_builder(module).return_();
+            prepare_function_return(
+                mapped_function.id,
+                &mapped_function.signature.returns,
+                module,
+                memory,
+                allocator,
+            );
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
