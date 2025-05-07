@@ -21,16 +21,16 @@ public fun get_local(_z: bool): bool {
 }
 
 // Forces the compiler to store literals on locals
-public fun get_copied_local(): bool {
+public fun get_copied_local(): (bool, bool) {
   let x: bool = true;
   
   let y = x; // copy
-  let mut _z = x; // move
+  let mut z = x; // move
   identity(y);
-  identity(_z);
+  identity(z);
 
-  _z = false;
-  y //
+  z = false;
+  (y, z)
 }
 
 public fun echo(x: bool): bool {

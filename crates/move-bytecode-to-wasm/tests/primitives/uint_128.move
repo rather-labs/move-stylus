@@ -21,16 +21,16 @@ public fun get_local(_z: u128): u128 {
 }
 
 // Forces the compiler to store literals on locals
-public fun get_copied_local(): u128 {
+public fun get_copied_local(): (u128, u128) {
   let x: u128 = 100;
   
   let y = x; // copy
-  let mut _z = x; // move
+  let mut z = x; // move
   identity(y);
-  identity(_z);
+  identity(z);
 
-  _z = 111;
-  y
+  z = 111;
+  (y, z)
 }
 
 public fun echo(x: u128): u128 {
