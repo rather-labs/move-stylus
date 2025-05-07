@@ -1,6 +1,6 @@
 use anyhow::Result;
 use move_binary_format::file_format::{CodeUnit, Constant, FunctionDefinition, Signature};
-use walrus::{FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType};
+use walrus::{FunctionBuilder, FunctionId, LocalId, MemoryId, Module, ValType};
 
 use crate::translation::{intermediate_types::ISignature, map_bytecode_instruction};
 
@@ -70,16 +70,6 @@ impl MappedFunction {
         }
     }
 
-    pub fn get_function_body_builder<'a>(&self, module: &'a mut Module) -> InstrSeqBuilder<'a> {
-        module
-            .funcs
-            .get_mut(self.id)
-            .kind
-            .unwrap_local_mut()
-            .builder_mut()
-            .func_body()
-    }
-
     pub fn translate_function(
         &self,
         module: &mut Module,
@@ -93,13 +83,22 @@ impl MappedFunction {
             "Jump tables are not supported yet"
         );
 
+        let mut builder = module
+            .funcs
+            .get_mut(self.id)
+            .kind
+            .unwrap_local_mut()
+            .builder_mut()
+            .func_body();
+
         for instruction in self.move_code_unit.code.iter() {
             map_bytecode_instruction(
                 instruction,
                 constant_pool,
                 function_ids,
-                self,
-                module,
+                &mut builder,
+                &self.local_variables,
+                &mut module.locals,
                 allocator,
                 memory,
             );
@@ -107,16 +106,6 @@ impl MappedFunction {
 
         Ok(())
     }
-}
-
-pub fn get_function_body_builder(module: &mut Module, function_id: FunctionId) -> InstrSeqBuilder {
-    module
-        .funcs
-        .get_mut(function_id)
-        .kind
-        .unwrap_local_mut()
-        .builder_mut()
-        .func_body()
 }
 
 pub fn map_signature(signature: &Signature) -> Vec<ValType> {
