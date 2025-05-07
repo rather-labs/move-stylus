@@ -90,6 +90,7 @@ fn map_bytecode_instruction(
             // Values or references from the stack are copied to the local variable
             // This works for stack and heap types
             // Note: This is valid because heap types are currently immutable, this may change in the future
+        
             builder.local_get(local_variables[*local_id as usize]);
         }
         Bytecode::Pop => {

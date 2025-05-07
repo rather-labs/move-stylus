@@ -102,6 +102,31 @@ impl IntermediateType {
         }
     }
 
+    pub fn copy_loc_instructions(
+        &self,
+        module_locals: &mut ModuleLocals,
+        builder: &mut InstrSeqBuilder,
+        allocator: FunctionId,
+        memory: MemoryId,
+        src_ptr: LocalId,
+    ) -> LocalId {
+        match self {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress => {
+                builder.local_get(src_ptr);
+            },
+            IntermediateType::IVector(inner) => {
+                IVector::copy_loc_instructions(inner, module_locals, builder, allocator, memory, src_ptr);
+            }
+        }
+    }
+
     pub fn add_load_memory_to_local_instructions(
         &self,
         module_locals: &mut ModuleLocals,

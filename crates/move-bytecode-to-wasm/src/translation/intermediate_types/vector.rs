@@ -85,6 +85,108 @@ impl IVector {
             "Store offset is not aligned with the needed bytes"
         );
     }
+
+    pub fn copy_loc_instructions(
+        inner: &IntermediateType,
+        module_locals: &mut ModuleLocals,
+        builder: &mut InstrSeqBuilder,
+        allocator: FunctionId,
+        memory: MemoryId,
+        src_ptr: LocalId,
+    ) {
+        // Set locals
+        let ptr = module_locals.add(ValType::I32);
+        let offset = module_locals.add(ValType::I32);
+        let len = module_locals.add(ValType::I32);
+        let data_size = module_locals.add(ValType::I32);
+        let src_offset_ptr = module_locals.add(ValType::I32);
+
+        builder.i32_const(inner.stack_data_size() as i32);
+        builder.local_set(data_size);
+
+        builder.local_get(src_ptr);
+        builder.load(
+            memory,
+            LoadKind::I32 { atomic: false },
+            MemArg { align: 0, offset: 0 },
+        );
+        builder.local_tee(len);
+
+        builder.local_get(data_size);
+        builder.binop(BinaryOp::I32Mul);
+        builder.i32_const(4);
+        builder.binop(BinaryOp::I32Add);
+        builder.call(allocator);
+        builder.local_tee(ptr);
+
+        builder.local_get(len);
+        builder.store(
+            memory,
+            StoreKind::I32 { atomic: false },
+            MemArg { align: 0, offset: 0 },
+        );
+
+        builder.i32_const(0);
+        builder.local_set(offset);
+    
+        builder.block(None, |break_block| {
+            let break_label = break_block.id();
+            break_block.loop_(None, |loop_block| {
+                loop_block.local_get(offset);
+                loop_block.local_get(len);
+                loop_block.binop(BinaryOp::I32GeU);
+                loop_block.br_if(break_label);
+
+                // src address
+                loop_block.local_get(offset);
+                loop_block.local_get(data_size);
+                loop_block.binop(BinaryOp::I32Mul);
+                loop_block.i32_const(4);
+                loop_block.binop(BinaryOp::I32Add);
+                loop_block.local_get(src_ptr);
+                loop_block.binop(BinaryOp::I32Add);
+                loop_block.local_set(src_offset_ptr);
+
+                // dest address
+                loop_block.local_get(offset);
+                loop_block.local_get(data_size);
+                loop_block.binop(BinaryOp::I32Mul);
+                loop_block.i32_const(4);
+                loop_block.binop(BinaryOp::I32Add);
+                loop_block.local_get(ptr);
+                loop_block.binop(BinaryOp::I32Add);
+
+                // recursive call
+                inner.copy_loc_instructions(
+                    module_locals,
+                    builder,
+                    allocator,
+                    memory,
+                    src_offset_ptr,
+                );
+
+                // store value at dest address
+                loop_block.store(
+                    memory,
+                    if inner.stack_data_size() == 4 {
+                        StoreKind::I32 { atomic: false }
+                    } else {
+                        StoreKind::I64 { atomic: false }
+                    },
+                    MemArg { align: 0, offset: 0 },
+                );
+
+                // increment offset
+                loop_block.local_get(offset);
+                loop_block.i32_const(1);
+                loop_block.binop(BinaryOp::I32Add);
+                loop_block.local_set(offset);
+
+                loop_block.br(loop_block.id());
+            });
+        }); 
+        builder.local_get(ptr)
+    }    
 }
 
 #[cfg(test)]
