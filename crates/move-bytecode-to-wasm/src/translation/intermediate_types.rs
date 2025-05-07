@@ -5,11 +5,9 @@ use move_binary_format::file_format::{Signature, SignatureToken};
 use simple_integers::{IU8, IU16, IU32, IU64};
 use vector::IVector;
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
     ir::{LoadKind, MemArg},
 };
-
-use super::functions::get_function_body_builder;
 
 pub mod address;
 pub mod boolean;
@@ -68,41 +66,35 @@ impl IntermediateType {
     /// For heap and reference types, the actual value is stored in memory and a pointer is returned
     pub fn load_constant_instructions(
         &self,
-        module: &mut Module,
-        function_id: FunctionId,
+        module_locals: &mut ModuleLocals,
+        builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
         allocator: FunctionId,
         memory: MemoryId,
     ) {
         match self {
-            IntermediateType::IBool => {
-                IBool::load_constant_instructions(module, function_id, bytes, allocator, memory)
-            }
-            IntermediateType::IU8 => {
-                IU8::load_constant_instructions(module, function_id, bytes, allocator, memory)
-            }
-            IntermediateType::IU16 => {
-                IU16::load_constant_instructions(module, function_id, bytes, allocator, memory)
-            }
-            IntermediateType::IU32 => {
-                IU32::load_constant_instructions(module, function_id, bytes, allocator, memory)
-            }
-            IntermediateType::IU64 => {
-                IU64::load_constant_instructions(module, function_id, bytes, allocator, memory)
-            }
+            IntermediateType::IBool => IBool::load_constant_instructions(builder, bytes),
+            IntermediateType::IU8 => IU8::load_constant_instructions(builder, bytes),
+            IntermediateType::IU16 => IU16::load_constant_instructions(builder, bytes),
+            IntermediateType::IU32 => IU32::load_constant_instructions(builder, bytes),
+            IntermediateType::IU64 => IU64::load_constant_instructions(builder, bytes),
             IntermediateType::IU128 => {
-                IU128::load_constant_instructions(module, function_id, bytes, allocator, memory)
+                IU128::load_constant_instructions(module_locals, builder, bytes, allocator, memory)
             }
             IntermediateType::IU256 => {
-                IU256::load_constant_instructions(module, function_id, bytes, allocator, memory)
+                IU256::load_constant_instructions(module_locals, builder, bytes, allocator, memory)
             }
-            IntermediateType::IAddress => {
-                IAddress::load_constant_instructions(module, function_id, bytes, allocator, memory)
-            }
+            IntermediateType::IAddress => IAddress::load_constant_instructions(
+                module_locals,
+                builder,
+                bytes,
+                allocator,
+                memory,
+            ),
             IntermediateType::IVector(inner) => IVector::load_constant_instructions(
                 inner,
-                module,
-                function_id,
+                module_locals,
+                builder,
                 bytes,
                 allocator,
                 memory,
@@ -112,7 +104,7 @@ impl IntermediateType {
 
     pub fn add_load_memory_to_local_instructions(
         &self,
-        module: &mut Module,
+        module_locals: &mut ModuleLocals,
         builder: &mut InstrSeqBuilder,
         pointer: LocalId,
         memory: MemoryId,
@@ -126,7 +118,7 @@ impl IntermediateType {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::IVector(_) => {
-                let local = module.locals.add(ValType::I32);
+                let local = module_locals.add(ValType::I32);
 
                 builder.local_get(pointer);
                 builder.load(
@@ -142,7 +134,7 @@ impl IntermediateType {
                 local
             }
             IntermediateType::IU64 => {
-                let local = module.locals.add(ValType::I64);
+                let local = module_locals.add(ValType::I64);
 
                 builder.local_get(pointer);
                 builder.load(
@@ -160,12 +152,12 @@ impl IntermediateType {
         }
     }
 
-    /// Adds the instructions to load the value into the local variable
+    /// Adds the instructions to load the value into a local variable
     /// Pops the next value from the stack and stores it in the a variable
     pub fn add_stack_to_local_instructions(
         &self,
-        module: &mut Module,
-        function_id: FunctionId,
+        module_locals: &mut ModuleLocals,
+        builder: &mut InstrSeqBuilder,
     ) -> LocalId {
         match self {
             IntermediateType::IBool
@@ -176,14 +168,12 @@ impl IntermediateType {
             | IntermediateType::IU256
             | IntermediateType::IVector(_)
             | IntermediateType::IAddress => {
-                let local = module.locals.add(ValType::I32);
-                let mut builder = get_function_body_builder(module, function_id);
+                let local = module_locals.add(ValType::I32);
                 builder.local_set(local);
                 local
             }
             IntermediateType::IU64 => {
-                let local = module.locals.add(ValType::I64);
-                let mut builder = get_function_body_builder(module, function_id);
+                let local = module_locals.add(ValType::I64);
                 builder.local_set(local);
                 local
             }

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use move_binary_format::file_format::{CodeUnit, Constant, FunctionDefinition, Signature};
 use walrus::{
-    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleLocals, ValType,
     ir::{LoadKind, MemArg, StoreKind},
 };
 
@@ -73,16 +73,6 @@ impl MappedFunction {
         }
     }
 
-    pub fn get_function_body_builder<'a>(&self, module: &'a mut Module) -> InstrSeqBuilder<'a> {
-        module
-            .funcs
-            .get_mut(self.id)
-            .kind
-            .unwrap_local_mut()
-            .builder_mut()
-            .func_body()
-    }
-
     pub fn translate_function(
         &self,
         module: &mut Module,
@@ -96,13 +86,22 @@ impl MappedFunction {
             "Jump tables are not supported yet"
         );
 
+        let mut builder = module
+            .funcs
+            .get_mut(self.id)
+            .kind
+            .unwrap_local_mut()
+            .builder_mut()
+            .func_body();
+
         for instruction in self.move_code_unit.code.iter() {
             map_bytecode_instruction(
                 instruction,
                 constant_pool,
                 function_ids,
+                &mut builder,
                 self,
-                module,
+                &mut module.locals,
                 allocator,
                 memory,
             );
@@ -110,16 +109,6 @@ impl MappedFunction {
 
         Ok(())
     }
-}
-
-pub fn get_function_body_builder(module: &mut Module, function_id: FunctionId) -> InstrSeqBuilder {
-    module
-        .funcs
-        .get_mut(function_id)
-        .kind
-        .unwrap_local_mut()
-        .builder_mut()
-        .func_body()
 }
 
 pub fn map_signature(signature: &Signature) -> Vec<ValType> {
@@ -135,10 +124,17 @@ pub fn map_signature(signature: &Signature) -> Vec<ValType> {
 /// The returns values are read from memory and pushed to the stack
 pub fn add_unpack_function_return_values_instructions(
     builder: &mut InstrSeqBuilder,
+    module_locals: &mut ModuleLocals,
     returns: &[IntermediateType],
-    pointer: LocalId,
     memory: MemoryId,
 ) {
+    if returns.is_empty() {
+        return;
+    }
+
+    let pointer = module_locals.add(ValType::I32);
+    builder.local_set(pointer);
+
     let mut offset = 0;
     for return_ty in returns.iter() {
         builder.local_get(pointer);
@@ -166,9 +162,9 @@ pub fn add_unpack_function_return_values_instructions(
 /// This is necessary because the Stylus VM does not support multiple return values
 /// Values are written to memory and a pointer to the first value is returned
 pub fn prepare_function_return(
-    function_id: FunctionId,
+    module_locals: &mut ModuleLocals,
+    builder: &mut InstrSeqBuilder,
     returns: &[IntermediateType],
-    module: &mut Module,
     memory: MemoryId,
     allocator: FunctionId,
 ) {
@@ -176,15 +172,13 @@ pub fn prepare_function_return(
         let mut locals = Vec::new();
         let mut total_size = 0;
         for return_ty in returns.iter().rev() {
-            let local = return_ty.add_stack_to_local_instructions(module, function_id);
+            let local = return_ty.add_stack_to_local_instructions(module_locals, builder);
             locals.push(local);
             total_size += return_ty.stack_data_size();
         }
         locals.reverse();
 
-        let pointer = module.locals.add(ValType::I32);
-
-        let mut builder = get_function_body_builder(module, function_id);
+        let pointer = module_locals.add(ValType::I32);
 
         builder.i32_const(total_size as i32);
         builder.call(allocator);
@@ -213,8 +207,7 @@ pub fn prepare_function_return(
         }
 
         builder.local_get(pointer);
-        builder.return_();
-    } else {
-        get_function_body_builder(module, function_id).return_();
     }
+
+    builder.return_();
 }

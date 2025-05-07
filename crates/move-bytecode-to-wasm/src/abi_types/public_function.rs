@@ -116,16 +116,12 @@ impl PublicFunction {
             allocator_func,
         );
         block.call(self.function_id);
-        if !self.signature.returns.is_empty() {
-            let pointer = module.locals.add(ValType::I32);
-            block.local_set(pointer);
-            add_unpack_function_return_values_instructions(
-                block,
-                &self.signature.returns,
-                pointer,
-                memory_id,
-            );
-        }
+        add_unpack_function_return_values_instructions(
+            block,
+            &mut module.locals,
+            &self.signature.returns,
+            memory_id,
+        );
 
         build_pack_instructions(
             block,
@@ -320,21 +316,21 @@ mod tests {
         func_body.i64_const(1);
         func_body.binop(BinaryOp::I64Add);
 
-        let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
         let returns = vec![
             IntermediateType::IU32,
             IntermediateType::IU16,
             IntermediateType::IU64,
         ];
         prepare_function_return(
-            function,
+            &mut raw_module.locals,
+            &mut func_body,
             &returns,
-            &mut raw_module,
             memory_id,
             allocator_func,
         );
+
+        let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
 
         let public_function = PublicFunction::new(
             function,
