@@ -2,16 +2,18 @@ use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
 use move_binary_format::file_format::{Signature, SignatureToken};
-use simple_integers::{IU8, IU16, IU32, IU64};
+use signer::ISigner;
+use simple_integers::{IU16, IU32, IU64, IU8};
 use vector::IVector;
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
     ir::{LoadKind, MemArg},
+    FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
 };
 
 pub mod address;
 pub mod boolean;
 pub mod heap_integers;
+pub mod signer;
 pub mod simple_integers;
 pub mod vector;
 
@@ -26,6 +28,7 @@ pub enum IntermediateType {
     IU256,
     IAddress,
     IVector(Box<IntermediateType>),
+    ISigner,
 }
 
 impl IntermediateType {
@@ -41,6 +44,7 @@ impl IntermediateType {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
+            | IntermediateType::ISigner
             | IntermediateType::IVector(_) => ValType::I32,
         }
     }
@@ -56,6 +60,7 @@ impl IntermediateType {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
+            | IntermediateType::ISigner
             | IntermediateType::IVector(_) => 4,
         }
     }
@@ -91,6 +96,15 @@ impl IntermediateType {
                 allocator,
                 memory,
             ),
+
+            IntermediateType::ISigner => ISigner::load_constant_instructions(
+                module_locals,
+                builder,
+                bytes,
+                allocator,
+                memory,
+            ),
+
             IntermediateType::IVector(inner) => IVector::load_constant_instructions(
                 inner,
                 module_locals,
@@ -117,6 +131,7 @@ impl IntermediateType {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
+            | IntermediateType::ISigner
             | IntermediateType::IVector(_) => {
                 let local = module_locals.add(ValType::I32);
 
@@ -168,6 +183,7 @@ impl SignatureTokenToIntermediateType for SignatureToken {
             SignatureToken::U128 => IntermediateType::IU128,
             SignatureToken::U256 => IntermediateType::IU256,
             SignatureToken::Address => IntermediateType::IAddress,
+            SignatureToken::Signer => IntermediateType::ISigner,
             SignatureToken::Vector(token) => {
                 IntermediateType::IVector(Box::new(token.to_intermediate_type()))
             }

@@ -1,5 +1,5 @@
 use alloy_primitives::keccak256;
-use alloy_sol_types::{SolType, sol_data};
+use alloy_sol_types::{sol_data, SolType};
 
 use crate::{translation::intermediate_types::IntermediateType, utils::snake_to_camel};
 
@@ -44,7 +44,9 @@ impl SolName for IntermediateType {
             IntermediateType::IU64 => sol_data::Uint::<64>::SOL_NAME.to_string(),
             IntermediateType::IU128 => sol_data::Uint::<128>::SOL_NAME.to_string(),
             IntermediateType::IU256 => sol_data::Uint::<256>::SOL_NAME.to_string(),
-            IntermediateType::IAddress => sol_data::Address::SOL_NAME.to_string(),
+            IntermediateType::IAddress | IntermediateType::ISigner => {
+                sol_data::Address::SOL_NAME.to_string()
+            }
             IntermediateType::IVector(inner) => format!("{}[]", inner.sol_name()),
         }
     }
@@ -66,6 +68,13 @@ mod tests {
         assert_eq!(
             move_signature_to_abi_selector("transfer", signature),
             selector("transfer(address,uint256)")
+        );
+
+        // TODO: Check if this makes sense
+        let signature: &[IntermediateType] = &[IntermediateType::ISigner];
+        assert_eq!(
+            move_signature_to_abi_selector("set_owner", signature),
+            selector("setOwner(address)")
         );
 
         let signature: &[IntermediateType] = &[

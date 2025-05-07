@@ -1,12 +1,13 @@
-use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType, ir::BinaryOp};
+use walrus::{ir::BinaryOp, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType};
 
 use crate::translation::intermediate_types::{
-    IntermediateType,
     address::IAddress,
     boolean::IBool,
     heap_integers::{IU128, IU256},
-    simple_integers::{IU8, IU16, IU32, IU64},
+    signer::ISigner,
+    simple_integers::{IU16, IU32, IU64, IU8},
     vector::IVector,
+    IntermediateType,
 };
 
 mod unpack_heap_int;
@@ -152,6 +153,14 @@ impl Unpackable for IntermediateType {
                 allocator,
             ),
             IntermediateType::IAddress => IAddress::add_unpack_instructions(
+                function_builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                memory,
+                allocator,
+            ),
+            IntermediateType::ISigner => ISigner::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,

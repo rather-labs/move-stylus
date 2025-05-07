@@ -1,12 +1,13 @@
 use walrus::{
-    InstrSeqBuilder, LocalId, MemoryId, Module,
     ir::{LoadKind, MemArg, StoreKind},
+    InstrSeqBuilder, LocalId, MemoryId, Module,
 };
 
 use crate::{
     translation::intermediate_types::{
         address::IAddress,
         heap_integers::{IU128, IU256},
+        signer::ISigner,
     },
     utils::add_swap_i64_bytes_function,
 };
@@ -120,6 +121,18 @@ impl IAddress {
                 },
             );
         }
+    }
+}
+
+impl ISigner {
+    pub fn add_pack_instructions(
+        block: &mut InstrSeqBuilder,
+        module: &mut Module,
+        local: LocalId,
+        writer_pointer: LocalId,
+        memory: MemoryId,
+    ) {
+        IAddress::add_pack_instructions(block, module, local, writer_pointer, memory)
     }
 }
 

@@ -1,12 +1,13 @@
-use alloy_sol_types::{SolType, sol_data};
+use alloy_sol_types::{sol_data, SolType};
 use pack_native_int::{pack_i32_type_instructions, pack_i64_type_instructions};
-use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType, ir::BinaryOp};
+use walrus::{ir::BinaryOp, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType};
 
 use crate::translation::intermediate_types::{
-    IntermediateType,
     address::IAddress,
     heap_integers::{IU128, IU256},
+    signer::ISigner,
     vector::IVector,
+    IntermediateType,
 };
 
 mod pack_heap_int;
@@ -137,6 +138,7 @@ impl Packable for IntermediateType {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IVector(_)
+            | IntermediateType::ISigner
             | IntermediateType::IAddress => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
@@ -179,6 +181,9 @@ impl Packable for IntermediateType {
             IntermediateType::IAddress => {
                 IAddress::add_pack_instructions(builder, module, local, writer_pointer, memory)
             }
+            IntermediateType::ISigner => {
+                ISigner::add_pack_instructions(builder, module, local, writer_pointer, memory)
+            }
             IntermediateType::IVector(inner) => IVector::add_pack_instructions(
                 inner,
                 builder,
@@ -202,6 +207,7 @@ impl Packable for IntermediateType {
             IntermediateType::IU128 => sol_data::Uint::<128>::ENCODED_SIZE.unwrap(),
             IntermediateType::IU256 => sol_data::Uint::<256>::ENCODED_SIZE.unwrap(),
             IntermediateType::IAddress => sol_data::Address::ENCODED_SIZE.unwrap(),
+            IntermediateType::ISigner => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::IVector(_) => 32,
         }
     }
