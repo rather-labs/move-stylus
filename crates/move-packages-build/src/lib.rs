@@ -9,13 +9,13 @@ use move_package::source_package::parsed_manifest::{
 mod implicit_dependency_info;
 
 /// Base git repository where dependencies are located
-const GIT_BASE_REPOSITORY: &str = "https://github.com/MystenLabs/sui.git";
+const GIT_BASE_REPOSITORY: &str = "https://github.com/rather-labs/move-stylus-dependencies.git";
 
 /// List of implicit dependencies supported by the compiler
 const DEPENDENCIES: [ImplicitDepenencyInfo; 1] = [ImplicitDepenencyInfo {
     name: "MoveStdlib",
-    subdir: "crates/sui-framework/packages/move-stdlib",
-    rev: "framework/mainnet",
+    subdir: "move-stdlib",
+    rev: "master",
 }];
 
 /// Process the `DEPENDENCIES` table and return them ready to be injected
