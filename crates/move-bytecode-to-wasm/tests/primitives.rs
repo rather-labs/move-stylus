@@ -136,52 +136,13 @@ fn test_signer() {
 
     sol!(
         #[allow(missing_docs)]
-        // function getConstant() external returns (address);
-        // function getLocal(address _z) external returns (address);
-        // function getCopiedLocal() external returns (address);
         function echo(address x) external returns (address);
         function echo2(address x, address y) external returns (address);
     );
 
-    /*
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
 
-    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
-    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
-        "0x0000000000000000000000000000000000000001",
-    )
-    .unwrap(),));
-    run_test(&runtime, data, expected_result);
-
-    let data = getLocalCall::abi_encode(&getLocalCall::new((Address::from_hex(
-        "0x0000000000000000000000000000000000000022",
-    )
-    .unwrap(),)));
-    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
-        "0x0000000000000000000000000000000000000011",
-    )
-    .unwrap(),));
-    run_test(&runtime, data, expected_result);
-
-    let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
-    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
-        "0x0000000000000000000000000000000000000001",
-    )
-    .unwrap(),));
-    run_test(&runtime, data, expected_result);
-
-    let data = echoCall::abi_encode(&echoCall::new((Address::from_hex(
-        "0x0000000000000000000000000000000000000033",
-    )
-    .unwrap(),)));
-    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
-        "0x0000000000000000000000000000000000000033",
-    )
-    .unwrap(),));
-    run_test(&runtime, data, expected_result);
-    */
-
     let data = echoCall::abi_encode(&echoCall::new((Address::from_hex(
         "0x0000000000000000000000000000000000000044",
     )
@@ -191,19 +152,17 @@ fn test_signer() {
     )
     .unwrap(),));
 
-    /*
     run_test(&runtime, data, expected_result);
 
     let data = echo2Call::abi_encode(&echo2Call::new((
         Address::from_hex("0x0000000000000000000000000000000000000055").unwrap(),
         Address::from_hex("0x0000000000000000000000000000000000000066").unwrap(),
     )));
-    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
-        "0x0000000000000000000000000000000000000066",
-    )
-    .unwrap(),));
+    let expected_result = <sol!((address, address))>::abi_encode_params(&(
+        Address::from_hex("0x0000000000000000000000000000000000000055").unwrap(),
+        Address::from_hex("0x0000000000000000000000000000000000000066").unwrap(),
+    ));
     run_test(&runtime, data, expected_result);
-    */
 }
 
 #[test]

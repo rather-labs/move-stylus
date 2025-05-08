@@ -1,51 +1,18 @@
-module 0x01::address_type;
+module 0x01::signer_type;
 
-/*
-const ADDRESS_AS_CONST: address = @0x01;
-
-public fun get_constant(): address {
-  ADDRESS_AS_CONST
+// Echoes the signer
+public fun echo(s: signer): signer {
+  identity(s)
 }
 
-public fun get_constant_local(): address {
-  let x: address = ADDRESS_AS_CONST;
-  x
-}
-
-// Forces the compiler to store literals on locals
-public fun get_local(_z: address): address {
-  let x: address = @0xFF;
-  let y: address = @0x11;
-  identity(x);
-
-  identity_2(x, y)
-}
-
-// Forces the compiler to store literals on locals
-public fun get_copied_local(): address {
-  let x: address = @0x01;
-
-  let y = x; // copy
-  let mut _z = x; // move
-  identity(y);
-  identity(_z);
-
-  _z = @0x22;
-  y
-}
-*/
-public fun echo(x: signer): signer {
-  identity(x)
-}
-
-public fun echo_2(x: address, y: address): address {
-  identity_2(x, y)
+public fun echo_2(s1: signer, s2: signer): (signer, signer) {
+  identity_2(s1, s2)
 }
 
 fun identity(x: signer): signer {
   x
 }
 
-fun identity_2(_x: address, y: address): address {
-  y
+fun identity_2(x: signer, y: signer): (signer, signer) {
+    (x, y)
 }
