@@ -3,7 +3,9 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg},
 };
 
-use crate::abi_types::public_function::PublicFunction;
+use crate::{
+    abi_types::public_function::PublicFunction, runtime_error_codes::ERROR_NO_FUNCTION_MATCH,
+};
 
 use super::host_functions;
 
@@ -72,8 +74,10 @@ pub fn build_entrypoint_router(
         );
     }
 
-    // When no match is found, we just panic (TODO: handle fallback)
-    router_builder.unreachable();
+    // When no match is found, return error code
+    // TODO: allow fallback function definition
+    router_builder.i32_const(ERROR_NO_FUNCTION_MATCH);
+    router_builder.return_();
 
     let router = router.finish(vec![args_len], &mut module.funcs);
     add_entrypoint(module, router);
@@ -257,7 +261,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "unreachable")]
     fn test_build_entrypoint_router_no_match() {
         let (mut raw_module, allocator_func, memory_id) = build_module();
 
@@ -273,6 +276,7 @@ mod tests {
 
         let (_, mut store, entrypoint) = setup_wasmtime_module(&mut raw_module, data);
 
-        entrypoint.call(&mut store, data_len).unwrap();
+        let result = entrypoint.call(&mut store, data_len).unwrap();
+        assert_eq!(result, ERROR_NO_FUNCTION_MATCH);
     }
 }

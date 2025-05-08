@@ -1,4 +1,4 @@
-use walrus::{ir::BinaryOp, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType};
+use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType};
 
 use crate::translation::intermediate_types::{
     address::IAddress,
@@ -23,8 +23,7 @@ pub trait Unpackable {
     /// The reader pointer should be updated internally when a value is read from the args
     /// The calldata reader pointer should never be updated, it is considered static for each type value
     ///
-    /// The stack at the end contains the value(or pointer to the value):
-    /// [value/ptr i32/i64]
+    /// The stack at the end contains the value(or pointer to the value) as **i32/i64**
     fn add_unpack_instructions(
         &self,
         function_builder: &mut InstrSeqBuilder,
@@ -45,7 +44,6 @@ pub fn build_unpack_instructions<T: Unpackable>(
     module: &mut Module,
     function_arguments_signature: &[T],
     args_pointer: LocalId,
-    args_len: LocalId,
     memory: MemoryId,
     allocator: FunctionId,
 ) {
@@ -68,21 +66,6 @@ pub fn build_unpack_instructions<T: Unpackable>(
             allocator,
         );
     }
-
-    // Validation block
-    function_builder.block(None, |block| {
-        let block_id = block.id();
-
-        // Validate that read bytes == args_len
-        // To ensure all bytes are consumed and no extra bytes are left
-        block.local_get(reader_pointer);
-        block.local_get(args_pointer);
-        block.binop(BinaryOp::I32Sub);
-        block.local_get(args_len);
-        block.binop(BinaryOp::I32Eq);
-        block.br_if(block_id);
-        block.unreachable(); // Throws an error
-    });
 }
 
 impl Unpackable for IntermediateType {
@@ -257,7 +240,6 @@ mod tests {
                 IntermediateType::IU64,
             ],
             args_pointer,
-            args_len,
             memory_id,
             allocator_func,
         );
@@ -316,7 +298,6 @@ mod tests {
                 IntermediateType::IBool,
             ],
             args_pointer,
-            args_len,
             memory_id,
             allocator_func,
         );
@@ -376,7 +357,6 @@ mod tests {
                 IntermediateType::IBool,
             ],
             args_pointer,
-            args_len,
             memory_id,
             allocator_func,
         );
@@ -428,7 +408,6 @@ mod tests {
                 IntermediateType::IU64,
             ],
             args_pointer,
-            args_len,
             memory_id,
             allocator_func,
         );

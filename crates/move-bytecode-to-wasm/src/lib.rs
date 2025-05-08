@@ -10,6 +10,7 @@ use wasm_validation::validate_stylus_wasm;
 mod abi_types;
 mod hostio;
 mod memory;
+mod runtime_error_codes;
 mod translation;
 mod utils;
 mod wasm_helpers;
