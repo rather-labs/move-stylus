@@ -2,7 +2,6 @@ use walrus::{FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals};
 
 use super::address::IAddress;
 
-#[derive(Clone, Copy)]
 pub struct ISigner;
 
 impl ISigner {
