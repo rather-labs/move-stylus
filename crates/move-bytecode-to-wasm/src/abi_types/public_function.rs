@@ -73,7 +73,7 @@ impl PublicFunction {
             block.local_set(args_len);
 
             // Wrap function to pack/unpack parameters
-            self.wrap_public_function(module, block, args_pointer, args_len, allocator_func);
+            self.wrap_public_function(module, block, args_pointer, allocator_func);
 
             // Stack: [return_data_pointer] [return_data_length] [status]
             let status = module.locals.add(ValType::I32);
@@ -101,7 +101,6 @@ impl PublicFunction {
         module: &mut Module,
         block: &mut InstrSeqBuilder,
         args_pointer: LocalId,
-        args_length: LocalId,
         allocator_func: FunctionId,
     ) {
         let memory_id = module.get_memory_id().expect("memory not found");
@@ -111,7 +110,6 @@ impl PublicFunction {
             module,
             &self.signature.arguments,
             args_pointer,
-            args_length,
             memory_id,
             allocator_func,
         );
