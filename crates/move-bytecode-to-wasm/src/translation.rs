@@ -88,11 +88,13 @@ fn map_bytecode_instruction(
             builder.local_get(local_variables[*local_id as usize]);
         }
         Bytecode::CopyLoc(local_id) => {
-            let idx = *local_id as usize;
-            let ptr = local_variables[idx];
-            let ty = &local_variables_type[idx];
-
-            ty.copy_loc_instructions(module_locals, builder, allocator, memory, ptr);
+            local_variables_type[*local_id as usize].copy_loc_instructions(
+                module_locals,
+                builder,
+                allocator,
+                memory,
+                local_variables[*local_id as usize],
+            );
         }
         Bytecode::Pop => {
             builder.drop();

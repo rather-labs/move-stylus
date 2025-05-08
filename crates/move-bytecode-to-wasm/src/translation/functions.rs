@@ -45,16 +45,16 @@ impl MappedFunction {
         );
 
         // === Handle argument locals ===
-        let arg_local_ids: Vec<LocalId> = function_arguments
+        let arg_local_ids = function_arguments
             .iter()
             .map(|arg| module.locals.add(*arg))
-            .collect();
+            .collect::<Vec<LocalId>>();
 
-        let arg_intermediate_types: Vec<IntermediateType> = move_arguments
+        let arg_intermediate_types = move_arguments
             .0
             .iter()
             .map(|token| token.to_intermediate_type())
-            .collect();
+            .collect::<Vec<IntermediateType>>();
 
         // === Create the function ===
         let function_builder =
@@ -66,32 +66,19 @@ impl MappedFunction {
         let move_locals = &code.locals;
         let signature_tokens = &move_module_signatures[move_locals.0 as usize].0;
 
-        let local_valtypes: Vec<ValType> = signature_tokens
-            .iter()
-            .map(|token| token.to_intermediate_type().to_wasm_type())
-            .collect();
-
-        let local_intermediate_types: Vec<IntermediateType> = signature_tokens
+        let local_intermediate_types = signature_tokens
             .iter()
             .map(|token| token.to_intermediate_type())
-            .collect();
+            .collect::<Vec<IntermediateType>>();
 
-        let local_ids: Vec<LocalId> = local_valtypes
+        let local_ids = local_intermediate_types
             .iter()
-            .map(|val| module.locals.add(*val))
-            .collect();
+            .map(|ty| module.locals.add(ty.to_wasm_type()))
+            .collect::<Vec<LocalId>>();
 
         // === Combine all locals and types ===
-        let local_variables = arg_local_ids
-            .iter()
-            .chain(local_ids.iter())
-            .copied()
-            .collect();
-
-        let local_variables_type = arg_intermediate_types
-            .into_iter()
-            .chain(local_intermediate_types.into_iter())
-            .collect();
+        let local_variables = [arg_local_ids, local_ids].concat();
+        let local_variables_type = [arg_intermediate_types, local_intermediate_types].concat();
 
         Self {
             id,

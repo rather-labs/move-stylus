@@ -92,19 +92,19 @@ impl IVector {
         builder: &mut InstrSeqBuilder,
         allocator: FunctionId,
         memory: MemoryId,
-        src_ptr: LocalId,
+        src_address_local: LocalId,
     ) {
-        // Set locals
-        let ptr = module_locals.add(ValType::I32);
-        let offset = module_locals.add(ValType::I32);
+        // === Local declarations ===
+        let dst_address_local = module_locals.add(ValType::I32);
+        let copied_elem_local = module_locals.add(inner.to_wasm_type());
+
+        let index = module_locals.add(ValType::I32);
         let len = module_locals.add(ValType::I32);
-        let data_size = module_locals.add(ValType::I32);
-        let src_offset_ptr = module_locals.add(ValType::I32);
 
-        builder.i32_const(inner.stack_data_size() as i32);
-        builder.local_set(data_size);
+        let data_size = inner.stack_data_size() as i32;
 
-        builder.local_get(src_ptr);
+        // === Read vector length ===
+        builder.local_get(src_address_local);
         builder.load(
             memory,
             LoadKind::I32 { atomic: false },
@@ -115,13 +115,15 @@ impl IVector {
         );
         builder.local_tee(len);
 
-        builder.local_get(data_size);
+        // === Allocate memory for copy ===
+        builder.i32_const(data_size);
         builder.binop(BinaryOp::I32Mul);
-        builder.i32_const(4);
+        builder.i32_const(4); // +4 for length prefix
         builder.binop(BinaryOp::I32Add);
         builder.call(allocator);
-        builder.local_tee(ptr);
+        builder.local_tee(dst_address_local);
 
+        // === Write length at beginning of new memory ===
         builder.local_get(len);
         builder.store(
             memory,
@@ -132,78 +134,79 @@ impl IVector {
             },
         );
 
+        // === Loop to copy elements ===
         builder.i32_const(0);
-        builder.local_set(offset);
+        builder.local_set(index);
 
-        builder.block(None, |break_block| {
-            let break_label = break_block.id();
-            break_block.loop_(None, |loop_block| {
-                loop_block.local_get(offset);
-                loop_block.local_get(len);
-                loop_block.binop(BinaryOp::I32GeU);
-                loop_block.br_if(break_label);
+        builder.loop_(None, |loop_block| {
+            // === Compute address of to copy element ===
+            loop_block.local_get(index);
+            loop_block.i32_const(data_size);
+            loop_block.binop(BinaryOp::I32Mul);
+            loop_block.i32_const(4); // skip vector length
+            loop_block.binop(BinaryOp::I32Add);
+            loop_block.local_get(src_address_local);
+            loop_block.binop(BinaryOp::I32Add);
 
-                // src address
-                loop_block.local_get(offset);
-                loop_block.local_get(data_size);
-                loop_block.binop(BinaryOp::I32Mul);
-                loop_block.i32_const(4);
-                loop_block.binop(BinaryOp::I32Add);
-                loop_block.local_get(src_ptr);
-                loop_block.binop(BinaryOp::I32Add);
-                loop_block.local_set(src_offset_ptr);
+            // === Load element into local ===
+            loop_block.load(
+                memory,
+                match inner {
+                    IntermediateType::IU64 => LoadKind::I64 { atomic: false },
+                    _ => LoadKind::I32 { atomic: false },
+                },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+            loop_block.local_set(copy_value_local);
 
-                // dest address
-                loop_block.local_get(offset);
-                loop_block.local_get(data_size);
-                loop_block.binop(BinaryOp::I32Mul);
-                loop_block.i32_const(4);
-                loop_block.binop(BinaryOp::I32Add);
-                loop_block.local_get(ptr);
-                loop_block.binop(BinaryOp::I32Add);
+            // === Compute destination address of element ===
+            loop_block.local_get(index);
+            loop_block.i32_const(data_size);
+            loop_block.binop(BinaryOp::I32Mul);
+            loop_block.i32_const(4);
+            loop_block.binop(BinaryOp::I32Add);
+            loop_block.local_get(dst_address_local);
+            loop_block.binop(BinaryOp::I32Add);
 
-                // recursive call
-                inner.copy_loc_instructions(
-                    module_locals,
-                    loop_block,
-                    allocator,
-                    memory,
-                    src_offset_ptr,
-                );
+            // === Copy element recursively ===
+            inner.copy_loc_instructions(
+                module_locals,
+                loop_block,
+                allocator,
+                memory,
+                copied_elem_local,
+            );
 
-                loop_block.load(
-                    memory,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
+            // === Store result from stack into memory ===
+            loop_block.store(
+                memory,
+                match inner {
+                    IntermediateType::IU64 => StoreKind::I64 { atomic: false },
+                    _ => StoreKind::I32 { atomic: false },
+                },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
 
-                // store value at dest address
-                loop_block.store(
-                    memory,
-                    if inner.stack_data_size() == 4 {
-                        StoreKind::I32 { atomic: false }
-                    } else {
-                        StoreKind::I64 { atomic: false }
-                    },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
+            // === index++ ===
+            loop_block.local_get(index);
+            loop_block.i32_const(1);
+            loop_block.binop(BinaryOp::I32Add);
+            loop_block.local_tee(index);
 
-                // increment offset
-                loop_block.local_get(offset);
-                loop_block.i32_const(1);
-                loop_block.binop(BinaryOp::I32Add);
-                loop_block.local_set(offset);
-
-                loop_block.br(loop_block.id());
-            });
+            // === Continue if index < len ===
+            loop_block.local_get(len);
+            loop_block.binop(BinaryOp::I32LtU);
+            loop_block.br_if(loop_block.id());
         });
-        builder.local_get(ptr);
+
+        // === Return pointer to copied vector ===
+        builder.local_get(dst_address_local);
     }
 }
 
@@ -582,5 +585,71 @@ mod tests {
             IntermediateType::IVector(Box::new(IntermediateType::IU256)),
             &expected_result_bytes,
         );
+    }
+
+    // #[test]
+    fn test_copy_vector_u32() {
+        let data = [
+            &[3u8], // length
+            1u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+
+        let expected_result_bytes = [
+            3u32.to_le_bytes().as_slice(), // length
+            1u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+
+        let (mut raw_module, allocator, memory_id) = build_module();
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+        let mut builder = function_builder.func_body();
+
+        let mut data_iter = data.clone().into_iter();
+        let src_local = raw_module.locals.add(ValType::I32);
+
+        // Load the constant vector and store the pointer in a local
+        IVector::load_constant_instructions(
+            &IntermediateType::IU32,
+            &mut raw_module.locals,
+            &mut builder,
+            &mut data_iter,
+            allocator,
+            memory_id,
+        );
+        builder.local_set(src_local);
+
+        // Call the copy logic
+        IVector::copy_loc_instructions(
+            &IntermediateType::IU32,
+            &mut raw_module.locals,
+            &mut builder,
+            allocator,
+            memory_id,
+            src_local,
+        );
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_copy_vector", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32>(&mut raw_module, vec![], "test_copy_vector");
+
+        let result = entrypoint.call(&mut store, ()).unwrap();
+        assert_eq!(result, 0);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut result_memory_data = vec![0; expected_result_bytes.len()];
+        memory
+            .read(&mut store, result as usize, &mut result_memory_data)
+            .unwrap();
+
+        assert_eq!(result_memory_data, expected_result_bytes);
     }
 }

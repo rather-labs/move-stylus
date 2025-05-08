@@ -108,7 +108,7 @@ impl IntermediateType {
         builder: &mut InstrSeqBuilder,
         allocator: FunctionId,
         memory: MemoryId,
-        src_ptr: LocalId,
+        local: LocalId,
     ) {
         match self {
             IntermediateType::IBool
@@ -119,7 +119,7 @@ impl IntermediateType {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress => {
-                builder.local_get(src_ptr);
+                builder.local_get(local);
             }
             IntermediateType::IVector(inner) => {
                 IVector::copy_loc_instructions(
@@ -128,7 +128,7 @@ impl IntermediateType {
                     builder,
                     allocator,
                     memory,
-                    src_ptr,
+                    local,
                 );
             }
         }
