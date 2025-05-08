@@ -27,8 +27,8 @@ pub enum IntermediateType {
     IU128,
     IU256,
     IAddress,
-    IVector(Box<IntermediateType>),
     ISigner,
+    IVector(Box<IntermediateType>),
 }
 
 impl IntermediateType {
@@ -96,7 +96,6 @@ impl IntermediateType {
                 allocator,
                 memory,
             ),
-
             IntermediateType::ISigner => ISigner::load_constant_instructions(
                 module_locals,
                 builder,
@@ -104,7 +103,6 @@ impl IntermediateType {
                 allocator,
                 memory,
             ),
-
             IntermediateType::IVector(inner) => IVector::load_constant_instructions(
                 inner,
                 module_locals,
@@ -182,7 +180,8 @@ impl IntermediateType {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IVector(_)
-            | IntermediateType::IAddress => {
+            | IntermediateType::IAddress
+            | IntermediateType::ISigner => {
                 let local = module_locals.add(ValType::I32);
                 builder.local_set(local);
                 local
