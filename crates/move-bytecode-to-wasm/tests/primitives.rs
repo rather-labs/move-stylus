@@ -395,47 +395,77 @@ fn test_multi_values_return() {
 
     sol!(
         #[allow(missing_docs)]
-        function getConstants() external returns (uint256, uint64, uint32, uint8, bool, address);
-        function getConstantsReversed() external returns (address, bool, uint8, uint32, uint64, uint256);
-        function getConstantsNested() external returns (uint256, uint64, uint32, uint8, bool, address);
+        function getConstants() external returns (uint256, uint64, uint32, uint8, bool, address, uint32[], uint128[]);
+        function getConstantsReversed() external returns (uint128[], uint32[], address, bool, uint8, uint32, uint64, uint256);
+        function getConstantsNested() external returns (uint256, uint64, uint32, uint8, bool, address, uint32[], uint128[]);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
 
     let data = getConstantsCall::abi_encode(&getConstantsCall::new(()));
-    let expected_result =
-        <sol!((uint256, uint64, uint32, uint8, bool, address))>::abi_encode_params(&(
-            U256::from(256256),
-            6464,
-            3232,
-            88,
-            true,
-            Address::from_hex("0x0000000000000000000000000000000000000001").unwrap(),
-        ));
+    let expected_result = <sol!((
+        uint256,
+        uint64,
+        uint32,
+        uint8,
+        bool,
+        address,
+        uint32[],
+        uint128[]
+    ))>::abi_encode_params(&(
+        U256::from(256256),
+        6464,
+        3232,
+        88,
+        true,
+        Address::from_hex("0x0000000000000000000000000000000000000001").unwrap(),
+        vec![10, 20, 30],
+        vec![100, 200, 300],
+    ));
     run_test(&runtime, data, expected_result);
 
     let data = getConstantsReversedCall::abi_encode(&getConstantsReversedCall::new(()));
-    let expected_result =
-        <sol!((address, bool, uint8, uint32, uint64, uint256))>::abi_encode_params(&(
-            Address::from_hex("0x0000000000000000000000000000000000000001").unwrap(),
-            true,
-            88,
-            3232,
-            6464,
-            U256::from(256256),
-        ));
+    let expected_result = <sol!((
+        uint128[],
+        uint32[],
+        address,
+        bool,
+        uint8,
+        uint32,
+        uint64,
+        uint256
+    ))>::abi_encode_params(&(
+        vec![100, 200, 300],
+        vec![10, 20, 30],
+        Address::from_hex("0x0000000000000000000000000000000000000001").unwrap(),
+        true,
+        88,
+        3232,
+        6464,
+        U256::from(256256),
+    ));
     run_test(&runtime, data, expected_result);
 
     let data = getConstantsNestedCall::abi_encode(&getConstantsNestedCall::new(()));
-    let expected_result =
-        <sol!((uint256, uint64, uint32, uint8, bool, address))>::abi_encode_params(&(
-            U256::from(256256),
-            6464,
-            3232,
-            88,
-            true,
-            Address::from_hex("0x0000000000000000000000000000000000000001").unwrap(),
-        ));
+    let expected_result = <sol!((
+        uint256,
+        uint64,
+        uint32,
+        uint8,
+        bool,
+        address,
+        uint32[],
+        uint128[]
+    ))>::abi_encode_params(&(
+        U256::from(256256),
+        6464,
+        3232,
+        88,
+        true,
+        Address::from_hex("0x0000000000000000000000000000000000000001").unwrap(),
+        vec![10, 20, 30],
+        vec![100, 200, 300],
+    ));
     run_test(&runtime, data, expected_result);
 }
