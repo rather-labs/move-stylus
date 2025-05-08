@@ -1,10 +1,13 @@
 use anyhow::Result;
 use move_binary_format::file_format::{CodeUnit, Constant, FunctionDefinition, Signature};
-use walrus::{FunctionBuilder, FunctionId, LocalId, MemoryId, Module, ValType};
+use walrus::{
+    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleLocals, ValType,
+    ir::{LoadKind, MemArg, StoreKind},
+};
 
 use crate::translation::{intermediate_types::ISignature, map_bytecode_instruction};
 
-use super::intermediate_types::SignatureTokenToIntermediateType;
+use super::intermediate_types::{IntermediateType, SignatureTokenToIntermediateType};
 
 pub struct MappedFunction {
     pub id: FunctionId,
@@ -37,7 +40,7 @@ impl MappedFunction {
 
         assert!(
             function_returns.len() <= 1,
-            "Multiple return values are not supported yet"
+            "Multiple return values is not enabled in Stylus VM"
         );
 
         let mut local_variables: Vec<LocalId> = function_arguments
@@ -97,7 +100,7 @@ impl MappedFunction {
                 constant_pool,
                 function_ids,
                 &mut builder,
-                &self.local_variables,
+                self,
                 &mut module.locals,
                 allocator,
                 memory,
@@ -114,4 +117,97 @@ pub fn map_signature(signature: &Signature) -> Vec<ValType> {
         .iter()
         .map(|token| token.to_intermediate_type().to_wasm_type())
         .collect()
+}
+
+/// Adds the instructions to unpack the return values from memory
+///
+/// The returns values are read from memory and pushed to the stack
+pub fn add_unpack_function_return_values_instructions(
+    builder: &mut InstrSeqBuilder,
+    module_locals: &mut ModuleLocals,
+    returns: &[IntermediateType],
+    memory: MemoryId,
+) {
+    if returns.is_empty() {
+        return;
+    }
+
+    let pointer = module_locals.add(ValType::I32);
+    builder.local_set(pointer);
+
+    let mut offset = 0;
+    for return_ty in returns.iter() {
+        builder.local_get(pointer);
+        if return_ty.stack_data_size() == 4 {
+            builder.load(
+                memory,
+                LoadKind::I32 { atomic: false },
+                MemArg { align: 0, offset },
+            );
+        } else if return_ty.stack_data_size() == 8 {
+            builder.load(
+                memory,
+                LoadKind::I64 { atomic: false },
+                MemArg { align: 0, offset },
+            );
+        } else {
+            unreachable!("Unsupported type size");
+        }
+        offset += return_ty.stack_data_size();
+    }
+}
+
+/// Packs the return values into a tuple if the function has return values
+///
+/// This is necessary because the Stylus VM does not support multiple return values
+/// Values are written to memory and a pointer to the first value is returned
+pub fn prepare_function_return(
+    module_locals: &mut ModuleLocals,
+    builder: &mut InstrSeqBuilder,
+    returns: &[IntermediateType],
+    memory: MemoryId,
+    allocator: FunctionId,
+) {
+    if !returns.is_empty() {
+        let mut locals = Vec::new();
+        let mut total_size = 0;
+        for return_ty in returns.iter().rev() {
+            let local = return_ty.add_stack_to_local_instructions(module_locals, builder);
+            locals.push(local);
+            total_size += return_ty.stack_data_size();
+        }
+        locals.reverse();
+
+        let pointer = module_locals.add(ValType::I32);
+
+        builder.i32_const(total_size as i32);
+        builder.call(allocator);
+        builder.local_set(pointer);
+
+        let mut offset = 0;
+        for (return_ty, local) in returns.iter().zip(locals.iter()) {
+            builder.local_get(pointer);
+            builder.local_get(*local);
+            if return_ty.stack_data_size() == 4 {
+                builder.store(
+                    memory,
+                    StoreKind::I32 { atomic: false },
+                    MemArg { align: 0, offset },
+                );
+            } else if return_ty.stack_data_size() == 8 {
+                builder.store(
+                    memory,
+                    StoreKind::I64 { atomic: false },
+                    MemArg { align: 0, offset },
+                );
+            } else {
+                unreachable!("Unsupported type size");
+            }
+            offset += return_ty.stack_data_size();
+        }
+
+        builder.local_get(pointer);
+    }
+
+    builder.return_();
 }

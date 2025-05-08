@@ -21,16 +21,16 @@ public fun get_local(_z: address): address {
 }
 
 // Forces the compiler to store literals on locals
-public fun get_copied_local(): address {
+public fun get_copied_local(): (address, address) {
   let x: address = @0x01;
 
   let y = x; // copy
-  let mut _z = x; // move
+  let mut z = x; // move
   identity(y);
-  identity(_z);
+  identity(z);
 
-  _z = @0x22;
-  y
+  z = @0x22;
+  (y, z)
 }
 
 public fun echo(x: address): address {

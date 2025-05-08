@@ -1,7 +1,10 @@
+use functions::{
+    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
+};
 use intermediate_types::SignatureTokenToIntermediateType;
 use move_binary_format::file_format::{Bytecode, Constant};
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
+    FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
     ir::{MemArg, StoreKind},
 };
 
@@ -16,7 +19,7 @@ fn map_bytecode_instruction(
     constants: &[Constant],
     function_ids: &[FunctionId],
     builder: &mut InstrSeqBuilder,
-    local_variables: &[LocalId],
+    mapped_function: &MappedFunction,
     module_locals: &mut ModuleLocals,
     allocator: FunctionId,
     memory: MemoryId,
@@ -76,28 +79,40 @@ fn map_bytecode_instruction(
         // Function calls
         Bytecode::Call(function_handle_index) => {
             builder.call(function_ids[function_handle_index.0 as usize]);
+            add_unpack_function_return_values_instructions(
+                builder,
+                module_locals,
+                &mapped_function.signature.returns,
+                memory,
+            );
         }
         // Locals
         Bytecode::StLoc(local_id) => {
-            builder.local_set(local_variables[*local_id as usize]);
+            builder.local_set(mapped_function.local_variables[*local_id as usize]);
         }
         Bytecode::MoveLoc(local_id) => {
             // Values and references are loaded into a new variable
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
-            builder.local_get(local_variables[*local_id as usize]);
+            builder.local_get(mapped_function.local_variables[*local_id as usize]);
         }
         Bytecode::CopyLoc(local_id) => {
             // Values or references from the stack are copied to the local variable
             // This works for stack and heap types
             // Note: This is valid because heap types are currently immutable, this may change in the future
-            builder.local_get(local_variables[*local_id as usize]);
+            builder.local_get(mapped_function.local_variables[*local_id as usize]);
         }
         Bytecode::Pop => {
             builder.drop();
         }
         // TODO: ensure this is the last instruction in the move code
         Bytecode::Ret => {
-            builder.return_();
+            prepare_function_return(
+                module_locals,
+                builder,
+                &mapped_function.signature.returns,
+                memory,
+                allocator,
+            );
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
