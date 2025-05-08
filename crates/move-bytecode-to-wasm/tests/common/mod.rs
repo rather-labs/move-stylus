@@ -5,6 +5,7 @@ use std::{
 
 use move_bytecode_to_wasm::translate_single_module;
 use move_package::{BuildConfig, LintFlag};
+use move_packages_build::implicit_dependencies;
 use walrus::Module;
 
 pub mod runtime_sandbox;
@@ -56,7 +57,7 @@ pub fn translate_test_package(path: &str, module_name: &str) -> Module {
         silence_warnings: false,
         warnings_are_errors: false,
         additional_named_addresses: BTreeMap::new(),
-        implicit_dependencies: BTreeMap::new(),
+        implicit_dependencies: implicit_dependencies(),
         json_errors: false,
         lint_flag: LintFlag::default(),
     };
