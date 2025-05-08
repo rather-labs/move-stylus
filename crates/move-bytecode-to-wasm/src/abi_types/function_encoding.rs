@@ -70,7 +70,6 @@ mod tests {
             selector("transfer(address,uint256)")
         );
 
-        // TODO: Check if this makes sense
         let signature: &[IntermediateType] = &[IntermediateType::ISigner];
         assert_eq!(
             move_signature_to_abi_selector("set_owner", signature),

@@ -381,4 +381,31 @@ mod tests {
         .unwrap(),));
         test_uint(&data, int_type.clone(), &data);
     }
+
+    #[test]
+    fn test_unpack_signer() {
+        type SolType = sol!((address,));
+        let int_type = IntermediateType::ISigner;
+
+        let data = SolType::abi_encode_params(&(Address::ZERO,));
+        test_uint(&data, int_type.clone(), &data);
+
+        let data = SolType::abi_encode_params(&(Address::from_hex(
+            "0x1234567890abcdef1234567890abcdef12345678",
+        )
+        .unwrap(),));
+        test_uint(&data, int_type.clone(), &data);
+
+        let data = SolType::abi_encode_params(&(Address::from_hex(
+            "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        )
+        .unwrap(),));
+        test_uint(&data, int_type.clone(), &data);
+
+        let data = SolType::abi_encode_params(&(Address::from_hex(
+            "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE",
+        )
+        .unwrap(),));
+        test_uint(&data, int_type.clone(), &data);
+    }
 }

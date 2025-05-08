@@ -178,11 +178,11 @@ impl Packable for IntermediateType {
             IntermediateType::IU256 => {
                 IU256::add_pack_instructions(builder, module, local, writer_pointer, memory)
             }
-            IntermediateType::IAddress => {
-                IAddress::add_pack_instructions(builder, module, local, writer_pointer, memory)
-            }
             IntermediateType::ISigner => {
                 ISigner::add_pack_instructions(builder, module, local, writer_pointer, memory)
+            }
+            IntermediateType::IAddress => {
+                IAddress::add_pack_instructions(builder, module, local, writer_pointer, memory)
             }
             IntermediateType::IVector(inner) => IVector::add_pack_instructions(
                 inner,
