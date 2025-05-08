@@ -387,7 +387,6 @@ fn test_uint_256() {
     run_test(&runtime, data, expected_result);
 }
 
-
 #[test]
 fn test_vec_u32() {
     const MODULE_NAME: &str = "vec_u32";
@@ -406,13 +405,13 @@ fn test_vec_u32() {
     let data = getLiteralCall::abi_encode(&getLiteralCall::new(()));
     let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
     run_test(&runtime, data, expected_result);
-    
+
     let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
     let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
     run_test(&runtime, data, expected_result);
-    
-    // let data = echoCall::abi_encode(&echoCall::new((vec![1u32, 2u32, 3u32],)));
-    // let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
+
+    let data = echoCall::abi_encode(&echoCall::new((vec![1u32, 2u32, 3u32],)));
+    let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
     // run_test(&runtime, data, expected_result);
 }
 
@@ -438,11 +437,11 @@ fn test_vec_u128() {
     let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
     let expected_result = <sol!((uint128[],))>::abi_encode_params(&(vec![1u128, 2u128, 3u128],));
     run_test(&runtime, data, expected_result);
-    
+
     // let data = echoCall::abi_encode(&echoCall::new((vec![1u256, 2u256, 3u256],)));
     // let expected_result = <sol!((uint256[],))>::abi_encode_params(&(vec![1u256, 2u256, 3u256],));
     // run_test(&runtime, data, expected_result);
-}   
+}
 
 #[test]
 fn test_vec_vec_128() {
@@ -463,7 +462,7 @@ fn test_vec_vec_128() {
     let expected_result = <sol!((uint128[][],))>::abi_encode_params(&(vec![
         vec![1u128, 2u128, 3u128],
         vec![4u128, 5u128, 6u128],
-        vec![7u128, 8u128, 9u128]
+        vec![7u128, 8u128, 9u128],
     ],));
     run_test(&runtime, data, expected_result);
 
@@ -471,19 +470,19 @@ fn test_vec_vec_128() {
     let expected_result = <sol!((uint128[][],))>::abi_encode_params(&(vec![
         vec![1u128, 2u128, 3u128],
         vec![4u128, 5u128, 6u128],
-        vec![7u128, 8u128, 9u128]
+        vec![7u128, 8u128, 9u128],
     ],));
     run_test(&runtime, data, expected_result);
 
     let data = echoCall::abi_encode(&echoCall::new((vec![
         vec![1u128, 2u128, 3u128],
         vec![4u128, 5u128, 6u128],
-        vec![7u128, 8u128, 9u128]
+        vec![7u128, 8u128, 9u128],
     ],)));
     let expected_result = <sol!((uint128[][],))>::abi_encode_params(&(vec![
         vec![1u128, 2u128, 3u128],
         vec![4u128, 5u128, 6u128],
-        vec![7u128, 8u128, 9u128]
+        vec![7u128, 8u128, 9u128],
     ],));
     // run_test(&runtime, data, expected_result);
-}   
+}

@@ -1,6 +1,6 @@
 use walrus::{
-    FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType, LocalId,
-    ir::{MemArg, StoreKind, LoadKind, BinaryOp},
+    FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use super::IntermediateType;
@@ -108,7 +108,10 @@ impl IVector {
         builder.load(
             memory,
             LoadKind::I32 { atomic: false },
-            MemArg { align: 0, offset: 0 },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
         );
         builder.local_tee(len);
 
@@ -123,12 +126,15 @@ impl IVector {
         builder.store(
             memory,
             StoreKind::I32 { atomic: false },
-            MemArg { align: 0, offset: 0 },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
         );
 
         builder.i32_const(0);
         builder.local_set(offset);
-    
+
         builder.block(None, |break_block| {
             let break_label = break_block.id();
             break_block.loop_(None, |loop_block| {
@@ -168,9 +174,12 @@ impl IVector {
                 loop_block.load(
                     memory,
                     LoadKind::I32 { atomic: false },
-                    MemArg { align: 0, offset: 0 },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
                 );
-                
+
                 // store value at dest address
                 loop_block.store(
                     memory,
@@ -179,7 +188,10 @@ impl IVector {
                     } else {
                         StoreKind::I64 { atomic: false }
                     },
-                    MemArg { align: 0, offset: 0 },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
                 );
 
                 // increment offset
@@ -190,9 +202,9 @@ impl IVector {
 
                 loop_block.br(loop_block.id());
             });
-        }); 
+        });
         builder.local_get(ptr);
-    }    
+    }
 }
 
 #[cfg(test)]

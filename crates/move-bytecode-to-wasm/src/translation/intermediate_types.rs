@@ -120,9 +120,16 @@ impl IntermediateType {
             | IntermediateType::IU256
             | IntermediateType::IAddress => {
                 builder.local_get(src_ptr);
-            },
+            }
             IntermediateType::IVector(inner) => {
-                IVector::copy_loc_instructions(inner, module_locals, builder, allocator, memory, src_ptr);
+                IVector::copy_loc_instructions(
+                    inner,
+                    module_locals,
+                    builder,
+                    allocator,
+                    memory,
+                    src_ptr,
+                );
             }
         }
     }
@@ -196,6 +203,7 @@ impl SignatureTokenToIntermediateType for SignatureToken {
             SignatureToken::Vector(token) => {
                 IntermediateType::IVector(Box::new(token.to_intermediate_type()))
             }
+
             _ => panic!("Unsupported signature token: {:?}", self),
         }
     }

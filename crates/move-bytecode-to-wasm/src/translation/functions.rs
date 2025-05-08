@@ -2,7 +2,10 @@ use anyhow::Result;
 use move_binary_format::file_format::{CodeUnit, Constant, FunctionDefinition, Signature};
 use walrus::{FunctionBuilder, FunctionId, LocalId, MemoryId, Module, ValType};
 
-use crate::translation::{intermediate_types::{ISignature, IntermediateType}, map_bytecode_instruction};
+use crate::translation::{
+    intermediate_types::{ISignature, IntermediateType},
+    map_bytecode_instruction,
+};
 
 use super::intermediate_types::SignatureTokenToIntermediateType;
 
@@ -29,67 +32,67 @@ impl MappedFunction {
             move_definition.acquires_global_resources.is_empty(),
             "Acquiring global resources is not supported yet"
         );
-    
+
         let code = move_definition.code.clone().expect("Function has no code");
-    
+
         let signature = ISignature::from_signatures(move_arguments, move_returns);
         let function_arguments = signature.get_argument_wasm_types();
         let function_returns = signature.get_return_wasm_types();
-    
+
         assert!(
             function_returns.len() <= 1,
             "Multiple return values are not supported yet"
         );
-    
+
         // === Handle argument locals ===
         let arg_local_ids: Vec<LocalId> = function_arguments
             .iter()
             .map(|arg| module.locals.add(*arg))
             .collect();
-    
+
         let arg_intermediate_types: Vec<IntermediateType> = move_arguments
             .0
             .iter()
             .map(|token| token.to_intermediate_type())
             .collect();
-    
+
         // === Create the function ===
         let function_builder =
             FunctionBuilder::new(&mut module.types, &function_arguments, &function_returns);
-    
+
         let id = function_builder.finish(arg_local_ids.clone(), &mut module.funcs);
-    
+
         // === Handle declared locals ===
         let move_locals = &code.locals;
         let signature_tokens = &move_module_signatures[move_locals.0 as usize].0;
-    
+
         let local_valtypes: Vec<ValType> = signature_tokens
             .iter()
             .map(|token| token.to_intermediate_type().to_wasm_type())
             .collect();
-    
+
         let local_intermediate_types: Vec<IntermediateType> = signature_tokens
             .iter()
             .map(|token| token.to_intermediate_type())
             .collect();
-    
+
         let local_ids: Vec<LocalId> = local_valtypes
             .iter()
             .map(|val| module.locals.add(*val))
             .collect();
-    
+
         // === Combine all locals and types ===
         let local_variables = arg_local_ids
             .iter()
             .chain(local_ids.iter())
             .copied()
             .collect();
-    
+
         let local_variables_type = arg_intermediate_types
             .into_iter()
             .chain(local_intermediate_types.into_iter())
             .collect();
-    
+
         Self {
             id,
             name,
