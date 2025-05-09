@@ -129,6 +129,7 @@ fn test_address() {
     run_test(&runtime, data, expected_result);
 }
 
+#[ignore = "must implement the signer injection on the VM side first"]
 #[test]
 fn test_signer() {
     const MODULE_NAME: &str = "signer_type";
