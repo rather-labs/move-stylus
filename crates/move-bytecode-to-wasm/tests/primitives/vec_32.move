@@ -1,4 +1,4 @@
-module 0x01::vec_u32;
+module 0x01::vec_32;
 
 // Forces the compiler to store literals on locals
 public fun get_literal(): vector<u32> {

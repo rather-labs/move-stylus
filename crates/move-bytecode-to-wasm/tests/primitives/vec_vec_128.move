@@ -16,4 +16,3 @@ public fun get_copied_local(): vector<vector<u128>> {
 public fun echo(x: vector<vector<u128>>): vector<vector<u128>> {
   x
 }
-

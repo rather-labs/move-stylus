@@ -183,6 +183,34 @@ impl IntermediateType {
             }
         }
     }
+
+    /// Adds the instructions to load the value into a local variable
+    /// Pops the next value from the stack and stores it in the a variable
+    pub fn add_stack_to_local_instructions(
+        &self,
+        module_locals: &mut ModuleLocals,
+        builder: &mut InstrSeqBuilder,
+    ) -> LocalId {
+        match self {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IVector(_)
+            | IntermediateType::IAddress => {
+                let local = module_locals.add(ValType::I32);
+                builder.local_set(local);
+                local
+            }
+            IntermediateType::IU64 => {
+                let local = module_locals.add(ValType::I64);
+                builder.local_set(local);
+                local
+            }
+        }
+    }
 }
 
 pub trait SignatureTokenToIntermediateType {
@@ -230,8 +258,16 @@ impl ISignature {
         Self { arguments, returns }
     }
 
+    /// Returns the wasm types of the return values
+    ///
+    /// If the function has return values, the return type will always be a tuple (represented by an I32 pointer),
+    /// as the multi-value return feature is not enabled in Stylus VM.
     pub fn get_return_wasm_types(&self) -> Vec<ValType> {
-        self.returns.iter().map(|t| t.to_wasm_type()).collect()
+        if self.returns.is_empty() {
+            vec![]
+        } else {
+            vec![ValType::I32]
+        }
     }
 
     pub fn get_argument_wasm_types(&self) -> Vec<ValType> {

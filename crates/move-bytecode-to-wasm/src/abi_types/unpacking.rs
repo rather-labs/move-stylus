@@ -1,4 +1,4 @@
-use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType, ir::BinaryOp};
+use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType};
 
 use crate::translation::intermediate_types::{
     IntermediateType,
@@ -22,8 +22,7 @@ pub trait Unpackable {
     /// The reader pointer should be updated internally when a value is read from the args
     /// The calldata reader pointer should never be updated, it is considered static for each type value
     ///
-    /// The stack at the end contains the value(or pointer to the value):
-    /// [value/ptr i32/i64]
+    /// The stack at the end contains the value(or pointer to the value) as **i32/i64**
     fn add_unpack_instructions(
         &self,
         function_builder: &mut InstrSeqBuilder,
@@ -44,7 +43,6 @@ pub fn build_unpack_instructions<T: Unpackable>(
     module: &mut Module,
     function_arguments_signature: &[T],
     args_pointer: LocalId,
-    args_len: LocalId,
     memory: MemoryId,
     allocator: FunctionId,
 ) {
@@ -67,21 +65,6 @@ pub fn build_unpack_instructions<T: Unpackable>(
             allocator,
         );
     }
-
-    // Validation block
-    function_builder.block(None, |block| {
-        let block_id = block.id();
-
-        // Validate that read bytes == args_len
-        // To ensure all bytes are consumed and no extra bytes are left
-        block.local_get(reader_pointer);
-        block.local_get(args_pointer);
-        block.binop(BinaryOp::I32Sub);
-        block.local_get(args_len);
-        block.binop(BinaryOp::I32Eq);
-        block.br_if(block_id);
-        block.unreachable(); // Throws an error
-    });
 }
 
 impl Unpackable for IntermediateType {
@@ -248,7 +231,6 @@ mod tests {
                 IntermediateType::IU64,
             ],
             args_pointer,
-            args_len,
             memory_id,
             allocator_func,
         );
@@ -307,7 +289,6 @@ mod tests {
                 IntermediateType::IBool,
             ],
             args_pointer,
-            args_len,
             memory_id,
             allocator_func,
         );
@@ -341,59 +322,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "unreachable")]
-    fn test_build_unpack_instructions_invalid_data_length() {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
-
-        let validator_func_type = raw_module
-            .types
-            .add(&[ValType::I64, ValType::I32, ValType::I32], &[]);
-        let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);
-
-        let mut function_builder =
-            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32, ValType::I32], &[]);
-
-        let args_len = raw_module.locals.add(ValType::I32);
-        let args_pointer = raw_module.locals.add(ValType::I32);
-
-        let mut func_body = function_builder.func_body();
-        // Args data should already be stored in memory
-        build_unpack_instructions(
-            &mut func_body,
-            &mut raw_module,
-            &[
-                IntermediateType::IU64,
-                IntermediateType::IU16,
-                IntermediateType::IBool,
-            ],
-            args_pointer,
-            args_len,
-            memory_id,
-            allocator_func,
-        );
-
-        // validation
-        func_body.call(validator_func);
-
-        let function = function_builder.finish(vec![args_pointer, args_len], &mut raw_module.funcs);
-        raw_module.exports.add("test_function", function);
-
-        display_module(&mut raw_module);
-
-        let data = <sol!((uint64, uint16))>::abi_encode_params(&(123456789012345, 1234));
-        println!("data: {:?}", data);
-        let data_len = data.len() as i32;
-        let (_, mut store, entrypoint) = setup_wasmtime_module::<(i32, i32), _>(
-            &mut raw_module,
-            data,
-            "test_function",
-            |_: u64, _: u32, _: u32| {},
-        );
-
-        entrypoint.call(&mut store, (0, data_len)).unwrap();
-    }
-
-    #[test]
     fn test_build_unpack_instructions_offset_memory() {
         let (mut raw_module, allocator_func, memory_id) = build_module();
 
@@ -419,7 +347,6 @@ mod tests {
                 IntermediateType::IU64,
             ],
             args_pointer,
-            args_len,
             memory_id,
             allocator_func,
         );

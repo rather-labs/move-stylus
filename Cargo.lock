@@ -3998,6 +3998,7 @@ dependencies = [
  "anyhow",
  "move-binary-format",
  "move-package",
+ "move-packages-build",
  "walrus",
  "wasmparser 0.228.0",
  "wasmprinter 0.228.0",
@@ -4074,6 +4075,7 @@ dependencies = [
  "move-disassembler",
  "move-docgen",
  "move-package",
+ "move-packages-build",
  "move-stdlib-natives",
  "move-unit-test",
  "move-vm-runtime",
@@ -4358,6 +4360,13 @@ dependencies = [
  "vfs",
  "walkdir",
  "whoami",
+]
+
+[[package]]
+name = "move-packages-build"
+version = "0.1.0"
+dependencies = [
+ "move-package",
 ]
 
 [[package]]

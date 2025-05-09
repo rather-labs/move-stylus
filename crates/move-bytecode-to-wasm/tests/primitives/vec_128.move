@@ -1,4 +1,4 @@
-module 0x01::vec_u128;
+module 0x01::vec_128;
 
 // Forces the compiler to store literals on locals
 public fun get_literal(): vector<u128> {

@@ -1,6 +1,8 @@
 use walrus::{FunctionId, InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
 
-use crate::translation::intermediate_types::ISignature;
+use crate::translation::{
+    functions::add_unpack_function_return_values_instructions, intermediate_types::ISignature,
+};
 
 use super::{
     function_encoding::{AbiFunctionSelector, move_signature_to_abi_selector},
@@ -71,7 +73,7 @@ impl PublicFunction {
             block.local_set(args_len);
 
             // Wrap function to pack/unpack parameters
-            self.wrap_public_function(module, block, args_pointer, args_len, allocator_func);
+            self.wrap_public_function(module, block, args_pointer, allocator_func);
 
             // Stack: [return_data_pointer] [return_data_length] [status]
             let status = module.locals.add(ValType::I32);
@@ -99,7 +101,6 @@ impl PublicFunction {
         module: &mut Module,
         block: &mut InstrSeqBuilder,
         args_pointer: LocalId,
-        args_length: LocalId,
         allocator_func: FunctionId,
     ) {
         let memory_id = module.get_memory_id().expect("memory not found");
@@ -109,11 +110,16 @@ impl PublicFunction {
             module,
             &self.signature.arguments,
             args_pointer,
-            args_length,
             memory_id,
             allocator_func,
         );
         block.call(self.function_id);
+        add_unpack_function_return_values_instructions(
+            block,
+            &mut module.locals,
+            &self.signature.returns,
+            memory_id,
+        );
 
         build_pack_instructions(
             block,
@@ -139,8 +145,10 @@ mod tests {
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
     use crate::{
-        hostio::host_functions, memory::setup_module_memory,
-        translation::intermediate_types::IntermediateType, utils::display_module,
+        hostio::host_functions,
+        memory::setup_module_memory,
+        translation::{functions::prepare_function_return, intermediate_types::IntermediateType},
+        utils::display_module,
     };
 
     use super::*;
@@ -284,7 +292,7 @@ mod tests {
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
             &[ValType::I32, ValType::I32, ValType::I64],
-            &[ValType::I32, ValType::I32, ValType::I64],
+            &[ValType::I32],
         );
 
         let param1 = raw_module.locals.add(ValType::I32);
@@ -306,6 +314,19 @@ mod tests {
         func_body.i64_const(1);
         func_body.binop(BinaryOp::I64Add);
 
+        let returns = vec![
+            IntermediateType::IU32,
+            IntermediateType::IU16,
+            IntermediateType::IU64,
+        ];
+        prepare_function_return(
+            &mut raw_module.locals,
+            &mut func_body,
+            &returns,
+            memory_id,
+            allocator_func,
+        );
+
         let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
@@ -318,11 +339,7 @@ mod tests {
                     IntermediateType::IU16,
                     IntermediateType::IU64,
                 ],
-                returns: vec![
-                    IntermediateType::IU32,
-                    IntermediateType::IU16,
-                    IntermediateType::IU64,
-                ],
+                returns,
             },
         );
 
@@ -359,7 +376,7 @@ mod tests {
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
             &[ValType::I32, ValType::I32, ValType::I64],
-            &[ValType::I32, ValType::I32, ValType::I64],
+            &[ValType::I32],
         );
 
         let param1 = raw_module.locals.add(ValType::I32);
@@ -376,10 +393,12 @@ mod tests {
         func_body.local_get(param2);
         func_body.i32_const(1);
         func_body.binop(BinaryOp::I32Add);
+        func_body.drop();
 
         func_body.local_get(param3);
         func_body.i64_const(1);
         func_body.binop(BinaryOp::I64Add);
+        func_body.drop();
 
         let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
@@ -393,11 +412,7 @@ mod tests {
                     IntermediateType::IU32,
                     IntermediateType::IU64,
                 ],
-                returns: vec![
-                    IntermediateType::IU32,
-                    IntermediateType::IU32,
-                    IntermediateType::IU64,
-                ],
+                returns: vec![IntermediateType::IU32],
             },
         );
 

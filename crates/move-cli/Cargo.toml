@@ -29,6 +29,7 @@ move-unit-test.workspace = true
 move-bytecode-viewer.workspace = true
 
 move-bytecode-to-wasm.workspace = true
+move-packages-build.workspace = true
 
 [[bin]]
 name = "move"
