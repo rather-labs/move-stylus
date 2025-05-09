@@ -477,6 +477,8 @@ fn test_vec_32() {
 
     sol!(
         #[allow(missing_docs)]
+        function getConstant() external returns (uint32[]);
+        function getConstantLocal() external returns (uint32[]);
         function getLiteral() external returns (uint32[]);
         function getCopiedLocal() external returns (uint32[]);
         function echo(uint32[] x) external returns (uint32[]);
@@ -484,6 +486,14 @@ fn test_vec_32() {
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
+
+    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
+    let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
+    run_test(&runtime, data, expected_result);
+
+    let data = getConstantLocalCall::abi_encode(&getConstantLocalCall::new(()));
+    let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
+    run_test(&runtime, data, expected_result);
 
     // getLiteral() should return [1, 2, 3]
     let data = getLiteralCall::abi_encode(&getLiteralCall::new(()));
@@ -508,6 +518,8 @@ fn test_vec_128() {
 
     sol!(
         #[allow(missing_docs)]
+        function getConstant() external returns (uint128[]);
+        function getConstantLocal() external returns (uint128[]);
         function getLiteral() external returns (uint128[]);
         function getCopiedLocal() external returns (uint128[]);
         function echo(uint128[] x) external returns (uint128[]);
@@ -515,6 +527,14 @@ fn test_vec_128() {
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
+
+    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
+    let expected_result = <sol!((uint128[],))>::abi_encode_params(&(vec![1u128, 2u128, 3u128],));
+    run_test(&runtime, data, expected_result);
+
+    let data = getConstantLocalCall::abi_encode(&getConstantLocalCall::new(()));
+    let expected_result = <sol!((uint128[],))>::abi_encode_params(&(vec![1u128, 2u128, 3u128],));
+    run_test(&runtime, data, expected_result);
 
     // getLiteral() should return [1, 2, 3]
     let data = getLiteralCall::abi_encode(&getLiteralCall::new(()));
@@ -532,7 +552,6 @@ fn test_vec_128() {
     run_test(&runtime, data, expected_result);
 }
 
-
 #[test]
 fn test_vec_vec_128() {
     const MODULE_NAME: &str = "vec_vec_128";
@@ -540,6 +559,8 @@ fn test_vec_vec_128() {
 
     sol!(
         #[allow(missing_docs)]
+        function getConstant() external returns (uint128[][]);
+        function getConstantLocal() external returns (uint128[][]);
         function getLiteral() external returns (uint128[][]);
         function getCopiedLocal() external returns (uint128[][]);
         function echo(uint128[][] x) external returns (uint128[][]);
@@ -548,12 +569,27 @@ fn test_vec_vec_128() {
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
 
+    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
+    let expected_result = <sol!((uint128[][],))>::abi_encode_params(&(vec![
+        vec![1u128, 2u128, 3u128],
+        vec![4u128, 5u128, 6u128],
+        vec![7u128, 8u128, 9u128],
+    ],));   
+    run_test(&runtime, data, expected_result);
+
+    let data = getConstantLocalCall::abi_encode(&getConstantLocalCall::new(()));
+    let expected_result = <sol!((uint128[][],))>::abi_encode_params(&(vec![
+        vec![1u128, 2u128, 3u128],
+        vec![4u128, 5u128, 6u128],
+        vec![7u128, 8u128, 9u128],
+    ],));
+    run_test(&runtime, data, expected_result);
     // getLiteral() should return [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
     let data = getLiteralCall::abi_encode(&getLiteralCall::new(()));
     let expected_result = <sol!((uint128[][],))>::abi_encode_params(&(vec![
         vec![1u128, 2u128, 3u128],
         vec![4u128, 5u128, 6u128],
-        vec![7u128, 8u128, 9u128]
+        vec![7u128, 8u128, 9u128],
     ],));
     run_test(&runtime, data, expected_result);
 
@@ -562,7 +598,7 @@ fn test_vec_vec_128() {
     let expected_result = <sol!((uint128[][],))>::abi_encode_params(&(vec![
         vec![1u128, 2u128, 3u128],
         vec![4u128, 5u128, 6u128],
-        vec![7u128, 8u128, 9u128]
+        vec![7u128, 8u128, 9u128],
     ],));
     run_test(&runtime, data, expected_result);
 
@@ -570,13 +606,12 @@ fn test_vec_vec_128() {
     let data = echoCall::abi_encode(&echoCall::new((vec![
         vec![1u128, 2u128, 3u128],
         vec![4u128, 5u128, 6u128],
-        vec![7u128, 8u128, 9u128]
+        vec![7u128, 8u128, 9u128],
     ],)));
     let expected_result = <sol!((uint128[][],))>::abi_encode_params(&(vec![
         vec![1u128, 2u128, 3u128],
         vec![4u128, 5u128, 6u128],
-        vec![7u128, 8u128, 9u128]
+        vec![7u128, 8u128, 9u128],
     ],));
     run_test(&runtime, data, expected_result);
 }
-

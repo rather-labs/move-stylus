@@ -5,10 +5,7 @@ use walrus::{
     ir::{LoadKind, MemArg, StoreKind},
 };
 
-use crate::translation::{
-    intermediate_types::{ISignature},
-    map_bytecode_instruction,
-};
+use crate::translation::{intermediate_types::ISignature, map_bytecode_instruction};
 
 use super::intermediate_types::{IntermediateType, SignatureTokenToIntermediateType};
 
@@ -35,13 +32,13 @@ impl MappedFunction {
             move_definition.acquires_global_resources.is_empty(),
             "Acquiring global resources is not supported yet"
         );
-    
+
         let code = move_definition.code.clone().expect("Function has no code");
-    
+
         let signature = ISignature::from_signatures(move_arguments, move_returns);
         let function_arguments = signature.get_argument_wasm_types();
         let function_returns = signature.get_return_wasm_types();
-    
+
         assert!(
             function_returns.len() <= 1,
             "Multiple return values is not enabled in Stylus VM"
