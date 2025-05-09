@@ -512,6 +512,47 @@ fn test_vec_32() {
 }
 
 #[test]
+fn test_vec_64() {
+    const MODULE_NAME: &str = "vec_64";
+    const SOURCE_PATH: &str = "tests/primitives/vec_64.move";
+
+    sol!(
+        #[allow(missing_docs)]
+        function getConstant() external returns (uint64[]);
+        function getConstantLocal() external returns (uint64[]);
+        function getLiteral() external returns (uint64[]);
+        function getCopiedLocal() external returns (uint64[]);
+        function echo(uint64[] x) external returns (uint64[]);
+    );
+
+    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
+
+    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
+    let expected_result = <sol!((uint64[],))>::abi_encode_params(&(vec![1u64, 2u64, 3u64],));
+    run_test(&runtime, data, expected_result);
+
+    let data = getConstantLocalCall::abi_encode(&getConstantLocalCall::new(()));
+    let expected_result = <sol!((uint64[],))>::abi_encode_params(&(vec![1u64, 2u64, 3u64],));
+    run_test(&runtime, data, expected_result);
+
+    // getLiteral() should return [1, 2, 3]
+    let data = getLiteralCall::abi_encode(&getLiteralCall::new(()));
+    let expected_result = <sol!((uint64[],))>::abi_encode_params(&(vec![1u64, 2u64, 3u64],));
+    run_test(&runtime, data, expected_result);
+
+    // getCopiedLocal() should return [1, 2, 3]
+    let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
+    let expected_result = <sol!((uint64[],))>::abi_encode_params(&(vec![1u64, 2u64, 3u64],));
+    run_test(&runtime, data, expected_result);
+
+    // echo([1, 2, 3]) should return [1, 2, 3]
+    let data = echoCall::abi_encode(&echoCall::new((vec![1u64, 2u64, 3u64],)));
+    let expected_result = <sol!((uint64[],))>::abi_encode_params(&(vec![1u64, 2u64, 3u64],));
+    run_test(&runtime, data, expected_result);
+}
+
+#[test]
 fn test_vec_128() {
     const MODULE_NAME: &str = "vec_128";
     const SOURCE_PATH: &str = "tests/primitives/vec_128.move";
@@ -574,7 +615,7 @@ fn test_vec_vec_128() {
         vec![1u128, 2u128, 3u128],
         vec![4u128, 5u128, 6u128],
         vec![7u128, 8u128, 9u128],
-    ],));   
+    ],));
     run_test(&runtime, data, expected_result);
 
     let data = getConstantLocalCall::abi_encode(&getConstantLocalCall::new(()));

@@ -134,12 +134,12 @@ impl IVector {
             },
         );
 
-        // === Loop to copy elements ===
+        // === Loop  ===
         builder.i32_const(0);
         builder.local_set(index);
 
         builder.loop_(None, |loop_block| {
-            // === Compute address of to copy element ===
+            // === Compute address of copy element ===
             loop_block.local_get(index);
             loop_block.i32_const(data_size);
             loop_block.binop(BinaryOp::I32Mul);
@@ -318,7 +318,6 @@ mod tests {
             setup_wasmtime_module::<i32>(&mut raw_module, vec![], "test_copy_vector");
 
         let result_ptr = entrypoint.call(&mut store, ()).unwrap();
-
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; expected_result_bytes.len()];
         memory
@@ -346,15 +345,17 @@ mod tests {
     #[test]
     fn test_vector_u8() {
         let data = vec![4, 1, 2, 3];
-        let expected_result_bytes = [
+
+        let expected_load_bytes = [
             4u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
         ]
         .concat();
-        test_vector(&data, IntermediateType::IU8, &expected_result_bytes);
-        test_vector_copy(&data, IntermediateType::IU8, &expected_result_bytes);
+
+        test_vector(&data, IntermediateType::IU8, &expected_load_bytes);
+        test_vector_copy(&data, IntermediateType::IU8, &expected_load_bytes);
     }
 
     #[test]
@@ -450,8 +451,18 @@ mod tests {
             4u128.to_le_bytes().as_slice(),
         ]
         .concat();
+
+        let expected_copied_vector = [
+            4u32.to_le_bytes().as_slice(),   
+            20u32.to_le_bytes().as_slice(), 
+            36u32.to_le_bytes().as_slice(), 
+            52u32.to_le_bytes().as_slice(), 
+            68u32.to_le_bytes().as_slice(), 
+        ]
+        .concat();
+
         test_vector(&data, IntermediateType::IU128, &expected_result_bytes);
-        // test_vector_copy(&data, IntermediateType::IU128, &expected_result_bytes);
+        test_vector_copy(&data, IntermediateType::IU128, &expected_copied_vector);
     }
 
     #[test]
@@ -465,7 +476,7 @@ mod tests {
         ]
         .concat();
 
-        let expected_result_bytes = [
+        let expected_load_bytes = [
             4u32.to_le_bytes().as_slice(),
             // Pointers to memory
             20u32.to_le_bytes().as_slice(),
@@ -479,7 +490,20 @@ mod tests {
             U256::from(4u128).to_le_bytes::<32>().as_slice(),
         ]
         .concat();
-        test_vector(&data, IntermediateType::IU256, &expected_result_bytes);
+
+
+        let expected_copy_bytes = [
+            4u32.to_le_bytes().as_slice(),
+            // Pointers to memory
+            20u32.to_le_bytes().as_slice(),
+            52u32.to_le_bytes().as_slice(),
+            84u32.to_le_bytes().as_slice(),
+            116u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+
+        test_vector(&data, IntermediateType::IU256, &expected_load_bytes);
+        test_vector_copy(&data, IntermediateType::IU256, &expected_copy_bytes);
     }
 
     #[test]
@@ -493,7 +517,7 @@ mod tests {
         ]
         .concat();
 
-        let expected_result_bytes = [
+        let expected_load_bytes = [
             4u32.to_le_bytes().as_slice(),
             // Pointers to memory
             20u32.to_le_bytes().as_slice(),
@@ -507,8 +531,19 @@ mod tests {
             U256::from(0x4444).to_be_bytes::<32>().as_slice(),
         ]
         .concat();
-        test_vector(&data, IntermediateType::IAddress, &expected_result_bytes);
-        // test_vector_copy(&data, IntermediateType::IAddress, &expected_result_bytes);
+
+        let expected_copy_bytes = [
+            4u32.to_le_bytes().as_slice(),
+            // Pointers to memory
+            20u32.to_le_bytes().as_slice(),
+            52u32.to_le_bytes().as_slice(),
+            84u32.to_le_bytes().as_slice(),
+            116u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+
+        test_vector(&data, IntermediateType::IAddress, &expected_load_bytes);
+        test_vector_copy(&data, IntermediateType::IAddress, &expected_copy_bytes);
     }
 
     #[test]
@@ -536,7 +571,7 @@ mod tests {
         ]
         .concat();
 
-        let expected_result_bytes = [
+        let expected_load_bytes = [
             2u32.to_le_bytes().as_slice(),
             12u32.to_le_bytes().as_slice(), // pointer to first vector
             32u32.to_le_bytes().as_slice(), // pointer to second vector
@@ -559,11 +594,42 @@ mod tests {
             .concat()
             .as_slice(),
         ]
+        .concat(); // 52 bytes total
+
+        let expected_copy_bytes = [
+            2u32.to_le_bytes().as_slice(), 
+            64u32.to_le_bytes().as_slice(), // pointer to first copied vector: 52 + 4 + 4 + 4
+            84u32.to_le_bytes().as_slice(), // pointer to second copied vector: 52 + 4 + 4 + 4 + 20
+            [
+                4u32.to_le_bytes().as_slice(),
+                1u32.to_le_bytes().as_slice(),
+                2u32.to_le_bytes().as_slice(),
+                3u32.to_le_bytes().as_slice(),
+                4u32.to_le_bytes().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+            [
+                4u32.to_le_bytes().as_slice(),
+                5u32.to_le_bytes().as_slice(),
+                6u32.to_le_bytes().as_slice(),
+                7u32.to_le_bytes().as_slice(),
+                8u32.to_le_bytes().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+        ]
         .concat();
+
         test_vector(
             &data,
             IntermediateType::IVector(Box::new(IntermediateType::IU32)),
-            &expected_result_bytes,
+            &expected_load_bytes,
+        );
+        test_vector_copy(
+            &data,
+            IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+            &expected_copy_bytes,
         );
     }
 
@@ -592,7 +658,7 @@ mod tests {
         ]
         .concat();
 
-        let expected_result_bytes = [
+        let expected_load_bytes = [
             2u32.to_le_bytes().as_slice(),
             12u32.to_le_bytes().as_slice(),  // pointer to first vector
             160u32.to_le_bytes().as_slice(), // pointer to second vector
@@ -609,7 +675,7 @@ mod tests {
                 U256::from(3u128).to_le_bytes::<32>().as_slice(),
                 U256::from(4u128).to_le_bytes::<32>().as_slice(),
             ]
-            .concat()
+            .concat() // 148 bytes
             .as_slice(),
             [
                 4u32.to_le_bytes().as_slice(),
@@ -624,14 +690,47 @@ mod tests {
                 U256::from(7u128).to_le_bytes::<32>().as_slice(),
                 U256::from(8u128).to_le_bytes::<32>().as_slice(),
             ]
+            .concat() // 148 bytes 
+            .as_slice(),
+        ]
+        .concat(); // 308 bytes total
+
+        let expected_copy_bytes = [
+            2u32.to_le_bytes().as_slice(),
+            320u32.to_le_bytes().as_slice(), // pointer to first copied vector: 308 + 4 + 4 + 4
+            340u32.to_le_bytes().as_slice(), // pointer to second copied vector: 308 + 4 + 4 + 4 + 20
+            [
+                4u32.to_le_bytes().as_slice(),
+                // Pointers to memory
+                32u32.to_le_bytes().as_slice(),
+                64u32.to_le_bytes().as_slice(),
+                96u32.to_le_bytes().as_slice(),
+                128u32.to_le_bytes().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+            [
+                4u32.to_le_bytes().as_slice(),
+                // Pointers to memory
+                180u32.to_le_bytes().as_slice(),
+                212u32.to_le_bytes().as_slice(),
+                244u32.to_le_bytes().as_slice(),
+                276u32.to_le_bytes().as_slice(),
+            ]
             .concat()
             .as_slice(),
         ]
         .concat();
+
         test_vector(
             &data,
             IntermediateType::IVector(Box::new(IntermediateType::IU256)),
-            &expected_result_bytes,
+            &expected_load_bytes,
+        );
+        test_vector_copy(
+            &data,
+            IntermediateType::IVector(Box::new(IntermediateType::IU256)),
+            &expected_copy_bytes,
         );
     }
 }
