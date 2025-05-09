@@ -16,7 +16,7 @@ pub mod signer;
 pub mod simple_integers;
 pub mod vector;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum IntermediateType {
     IBool,
     IU8,

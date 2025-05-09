@@ -13,6 +13,7 @@ alloy-sol-types = "1.0.0"
 walrus = "0.23"
 wasmprinter = "0.228"
 wasmparser = "0.228"
+thiserror = "2"
 
 [dev-dependencies]
 alloy = "0.13.0"
