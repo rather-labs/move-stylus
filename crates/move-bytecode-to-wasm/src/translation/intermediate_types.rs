@@ -95,7 +95,7 @@ impl IntermediateType {
                 allocator,
                 memory,
             ),
-            IntermediateType::ISigner => panic!("signer type can't loaded as a constant"),
+            IntermediateType::ISigner => panic!("signer type can't be loaded as a constant"),
             IntermediateType::IVector(inner) => IVector::load_constant_instructions(
                 inner,
                 module_locals,
