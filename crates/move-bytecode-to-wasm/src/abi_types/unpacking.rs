@@ -4,7 +4,6 @@ use crate::translation::intermediate_types::{
     address::IAddress,
     boolean::IBool,
     heap_integers::{IU128, IU256},
-    signer::ISigner,
     simple_integers::{IU16, IU32, IU64, IU8},
     vector::IVector,
     IntermediateType,

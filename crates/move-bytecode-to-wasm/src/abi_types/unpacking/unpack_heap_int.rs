@@ -8,7 +8,6 @@ use crate::{
     translation::intermediate_types::{
         address::IAddress,
         heap_integers::{IU128, IU256},
-        signer::ISigner,
     },
     utils::add_swap_i64_bytes_function,
 };
@@ -176,26 +175,6 @@ impl IAddress {
         block.local_set(reader_pointer);
 
         block.local_get(unpacked_pointer);
-    }
-}
-
-impl ISigner {
-    pub fn add_unpack_instructions(
-        block: &mut InstrSeqBuilder,
-        module: &mut Module,
-        reader_pointer: LocalId,
-        calldata_reader_pointer: LocalId,
-        memory: MemoryId,
-        allocator: FunctionId,
-    ) {
-        IAddress::add_unpack_instructions(
-            block,
-            module,
-            reader_pointer,
-            calldata_reader_pointer,
-            memory,
-            allocator,
-        );
     }
 }
 
