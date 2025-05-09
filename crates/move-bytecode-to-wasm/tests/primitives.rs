@@ -129,43 +129,6 @@ fn test_address() {
     run_test(&runtime, data, expected_result);
 }
 
-#[ignore = "must implement the signer injection on the VM side first"]
-#[test]
-fn test_signer() {
-    const MODULE_NAME: &str = "signer_type";
-    const SOURCE_PATH: &str = "tests/primitives/signer.move";
-
-    sol!(
-        #[allow(missing_docs)]
-        function echo(address x) external returns (address);
-        function echo2(address x, address y) external returns (address);
-    );
-
-    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-    let runtime = RuntimeSandbox::new(&mut translated_package);
-
-    let data = echoCall::abi_encode(&echoCall::new((Address::from_hex(
-        "0x0000000000000000000000000000000000000044",
-    )
-    .unwrap(),)));
-    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
-        "0x0000000000000000000000000000000000000044",
-    )
-    .unwrap(),));
-
-    run_test(&runtime, data, expected_result);
-
-    let data = echo2Call::abi_encode(&echo2Call::new((
-        Address::from_hex("0x0000000000000000000000000000000000000055").unwrap(),
-        Address::from_hex("0x0000000000000000000000000000000000000066").unwrap(),
-    )));
-    let expected_result = <sol!((address, address))>::abi_encode_params(&(
-        Address::from_hex("0x0000000000000000000000000000000000000055").unwrap(),
-        Address::from_hex("0x0000000000000000000000000000000000000066").unwrap(),
-    ));
-    run_test(&runtime, data, expected_result);
-}
-
 #[test]
 fn test_uint_8() {
     const MODULE_NAME: &str = "uint_8";
