@@ -2,7 +2,6 @@ use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
 use move_binary_format::file_format::{Signature, SignatureToken};
-use signer::ISigner;
 use simple_integers::{IU16, IU32, IU64, IU8};
 use vector::IVector;
 use walrus::{
@@ -96,13 +95,7 @@ impl IntermediateType {
                 allocator,
                 memory,
             ),
-            IntermediateType::ISigner => ISigner::load_constant_instructions(
-                module_locals,
-                builder,
-                bytes,
-                allocator,
-                memory,
-            ),
+            IntermediateType::ISigner => panic!("signer type can't loaded as a constant"),
             IntermediateType::IVector(inner) => IVector::load_constant_instructions(
                 inner,
                 module_locals,

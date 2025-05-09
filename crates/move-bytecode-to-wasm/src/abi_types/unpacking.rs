@@ -143,14 +143,6 @@ impl Unpackable for IntermediateType {
                 memory,
                 allocator,
             ),
-            IntermediateType::ISigner => ISigner::add_unpack_instructions(
-                function_builder,
-                module,
-                reader_pointer,
-                calldata_reader_pointer,
-                memory,
-                allocator,
-            ),
             IntermediateType::IVector(inner) => IVector::add_unpack_instructions(
                 inner,
                 function_builder,
@@ -160,6 +152,9 @@ impl Unpackable for IntermediateType {
                 memory,
                 allocator,
             ),
+            // The signer must not be unpacked here, since it can't be part of the calldata. It is
+            // injected directly by the VM into the stack
+            IntermediateType::ISigner => (),
         }
     }
 }
