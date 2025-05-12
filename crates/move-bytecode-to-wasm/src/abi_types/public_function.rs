@@ -1,14 +1,26 @@
-use walrus::{FunctionId, InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
+use walrus::{ir::BinaryOp, FunctionId, InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::translation::{
-    functions::add_unpack_function_return_values_instructions, intermediate_types::ISignature,
+    functions::add_unpack_function_return_values_instructions,
+    intermediate_types::{ISignature, IntermediateType},
 };
 
 use super::{
-    function_encoding::{AbiFunctionSelector, move_signature_to_abi_selector},
+    function_encoding::{move_signature_to_abi_selector, AbiFunctionSelector},
     packing::build_pack_instructions,
     unpacking::build_unpack_instructions,
 };
+
+#[derive(thiserror::Error, Debug)]
+pub enum PublicFunctionValidationError {
+    #[error(r#"error in argument {0} of function "{1}", only one "signer" argument at the beggining is admitted"#)]
+    SignatureArgumentPosition(usize, String),
+
+    #[error(
+        r#"error in argument {0} of function "{1}", complex types can't contain the type "signer""#
+    )]
+    ComplexTypeContainsSigner(usize, String),
+}
 
 /// This struct wraps a Move function interface and its internal WASM representation
 /// in order to expose it to the entrypoint router to be called externally.
@@ -23,6 +35,9 @@ pub struct PublicFunction {
 
 impl PublicFunction {
     pub fn new(function_id: FunctionId, function_name: &str, signature: ISignature) -> Self {
+        Self::check_signature_arguments(function_name, &signature.arguments)
+            .unwrap_or_else(|e| panic!("ABI error: {e}"));
+
         let function_selector = move_signature_to_abi_selector(function_name, &signature.arguments);
 
         Self {
@@ -133,14 +148,62 @@ impl PublicFunction {
         // So it will only reach this point in the case of success
         block.i32_const(0);
     }
+
+    /// This function checks if the arguments of a public functions is valid. A signature is not
+    /// valid in the following cases:
+    ///
+    /// - It contains more than one `signer`: In an EVM context, there is only one signer per transaction.
+    /// - It contains a `signer` argument but it is not the first argument: The Move specification
+    ///   states that, [if a public function contains a `signer` argument, it must be placed as the
+    ///   first argument](https://move-language.github.io/move/signer.html#comparison-to-address).
+    /// - It has any complex type (i.e: vector) that contains a signer type: The signer is
+    ///   injected by the VM only if the first argument of the function is a `signer`.
+    fn check_signature_arguments(
+        function_name: &str,
+        arguments: &[IntermediateType],
+    ) -> Result<(), PublicFunctionValidationError> {
+        for (i, argument) in arguments.iter().enumerate() {
+            match argument {
+                IntermediateType::ISigner => {
+                    if i != 0 {
+                        return Err(PublicFunctionValidationError::SignatureArgumentPosition(
+                            i + 1,
+                            function_name.to_owned(),
+                        ));
+                    }
+                }
+                IntermediateType::IVector(it) if Self::find_signature_type(it) => {
+                    return Err(PublicFunctionValidationError::ComplexTypeContainsSigner(
+                        i + 1,
+                        function_name.to_owned(),
+                    ))
+                }
+                _ => continue,
+            }
+        }
+
+        Ok(())
+    }
+
+    // Recursively checks if a type contains the `signature` type. This is used to look for the
+    // type in complex types such as vector or structs
+    fn find_signature_type(argument: &IntermediateType) -> bool {
+        match argument {
+            IntermediateType::ISigner => true,
+            IntermediateType::IVector(intermediate_type) => {
+                Self::find_signature_type(intermediate_type)
+            }
+            _ => false,
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use alloy::{dyn_abi::SolType, sol};
     use walrus::{
-        FunctionBuilder, MemoryId, ModuleConfig,
         ir::{LoadKind, MemArg},
+        FunctionBuilder, MemoryId, ModuleConfig,
     };
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
@@ -438,5 +501,134 @@ mod tests {
 
         let result = entrypoint.call(&mut store, ()).unwrap();
         assert_eq!(result, -1);
+    }
+
+    // TODO: At the moment we are just checking that this does not fail when tranlsating the
+    // signature to EVM ABI. Once the signer address injection is in place, create a test that
+    // injects a mock address as signer and execute the function
+    #[test]
+    fn public_function_with_signature() {
+        let (mut raw_module, _, _) = build_module();
+
+        let function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32, ValType::I64],
+            &[],
+        );
+
+        let param1 = raw_module.locals.add(ValType::I32);
+        let param2 = raw_module.locals.add(ValType::I32);
+        let param3 = raw_module.locals.add(ValType::I64);
+
+        let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        PublicFunction::new(
+            function,
+            "test_function",
+            ISignature {
+                arguments: vec![
+                    IntermediateType::ISigner,
+                    IntermediateType::IBool,
+                    IntermediateType::IU64,
+                ],
+                returns: vec![],
+            },
+        );
+    }
+
+    #[test]
+    #[should_panic(
+        expected = r#"ABI error: error in argument 2 of function "test_function", only one "signer" argument at the beggining is admitted"#
+    )]
+    fn test_fail_public_function_signature() {
+        let (mut raw_module, _, _) = build_module();
+
+        let function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32, ValType::I64], &[]);
+
+        let param1 = raw_module.locals.add(ValType::I32);
+        let param2 = raw_module.locals.add(ValType::I32);
+        let param3 = raw_module.locals.add(ValType::I64);
+
+        let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        PublicFunction::new(
+            function,
+            "test_function",
+            ISignature {
+                arguments: vec![
+                    IntermediateType::IBool,
+                    IntermediateType::ISigner,
+                    IntermediateType::IU64,
+                ],
+                returns: vec![],
+            },
+        );
+    }
+
+    #[test]
+    #[should_panic(
+        expected = r#"ABI error: error in argument 3 of function "test_function", complex types can't contain the type "signer""#
+    )]
+    fn test_fail_public_function_signature_complex_type() {
+        let (mut raw_module, _, _) = build_module();
+
+        let function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32, ValType::I64], &[]);
+
+        let param1 = raw_module.locals.add(ValType::I32);
+        let param2 = raw_module.locals.add(ValType::I64);
+        let param3 = raw_module.locals.add(ValType::I32);
+
+        let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        PublicFunction::new(
+            function,
+            "test_function",
+            ISignature {
+                arguments: vec![
+                    IntermediateType::IBool,
+                    IntermediateType::IU64,
+                    IntermediateType::IVector(Box::new(IntermediateType::ISigner)),
+                ],
+                returns: vec![],
+            },
+        );
+    }
+
+    #[test]
+    #[should_panic(
+        expected = r#"ABI error: error in argument 3 of function "test_function", complex types can't contain the type "signer""#
+    )]
+    fn test_fail_public_function_signature_complex_type_2() {
+        let (mut raw_module, _, _) = build_module();
+
+        let function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32, ValType::I64], &[]);
+
+        let param1 = raw_module.locals.add(ValType::I32);
+        let param2 = raw_module.locals.add(ValType::I64);
+        let param3 = raw_module.locals.add(ValType::I32);
+
+        let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        PublicFunction::new(
+            function,
+            "test_function",
+            ISignature {
+                arguments: vec![
+                    IntermediateType::IBool,
+                    IntermediateType::IU64,
+                    IntermediateType::IVector(Box::new(IntermediateType::IVector(Box::new(
+                        IntermediateType::ISigner,
+                    )))),
+                ],
+                returns: vec![],
+            },
+        );
     }
 }

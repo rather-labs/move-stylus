@@ -1,12 +1,12 @@
 use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType};
 
 use crate::translation::intermediate_types::{
-    IntermediateType,
     address::IAddress,
     boolean::IBool,
     heap_integers::{IU128, IU256},
-    simple_integers::{IU8, IU16, IU32, IU64},
+    simple_integers::{IU16, IU32, IU64, IU8},
     vector::IVector,
+    IntermediateType,
 };
 
 mod unpack_heap_int;
@@ -151,6 +151,9 @@ impl Unpackable for IntermediateType {
                 memory,
                 allocator,
             ),
+            // The signer must not be unpacked here, since it can't be part of the calldata. It is
+            // injected directly by the VM into the stack
+            IntermediateType::ISigner => (),
         }
     }
 }
