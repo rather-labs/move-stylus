@@ -10,7 +10,7 @@ use ethers::{
     prelude::abigen,
     providers::{Http, Middleware, Provider},
     signers::{LocalWallet, Signer},
-    types::Address,
+    types::{Address, H160},
 };
 use eyre::eyre;
 use std::str::FromStr;
@@ -28,6 +28,7 @@ async fn main() -> eyre::Result<()> {
         r#"[
             function echo(uint128 x) external view returns (uint128)
             function getCopiedLocal() external view returns (uint128)
+            function echoSignerWithInt(uint8 y) public returns (uint8, address)
         ]"#
     );
 
@@ -49,5 +50,7 @@ async fn main() -> eyre::Result<()> {
     let num = example.get_copied_local().call().await;
     println!("Example getCopiedLocal = {:?}", num);
 
+    let num = example.echo_signer_with_int(42).call().await;
+    println!("Example echoSignerWithInt = {:?}", num);
     Ok(())
 }
