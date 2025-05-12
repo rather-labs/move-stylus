@@ -73,6 +73,11 @@ impl RuntimeSandbox {
             .func_wrap("vm_hooks", "storage_flush_cache", |_: i32| {})
             .unwrap();
 
+        // TODO: tx_origin complete this definition
+        linker
+            .func_wrap("vm_hooks", "tx_origin", |_args_ptr: u32| {})
+            .unwrap();
+
         Self {
             engine,
             linker,

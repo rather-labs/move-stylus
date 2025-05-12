@@ -198,6 +198,15 @@ mod tests {
             .func_wrap("vm_hooks", "storage_flush_cache", |_: i32| {})
             .unwrap();
 
+        // TODO: tx_origin complete this definition
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "tx_origin",
+                |_caller: Caller<'_, ReadArgsData>, _args_ptr: u32| {},
+            )
+            .unwrap();
+
         let mut store = Store::new(&engine, data);
         let instance = linker.instantiate(&mut store, &module).unwrap();
 
