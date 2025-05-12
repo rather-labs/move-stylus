@@ -1,12 +1,13 @@
 use walrus::{
-    InstrSeqBuilder, LocalId, MemoryId, Module,
     ir::{LoadKind, MemArg, StoreKind},
+    InstrSeqBuilder, LocalId, MemoryId, Module,
 };
 
 use crate::{
     translation::intermediate_types::{
         address::IAddress,
         heap_integers::{IU128, IU256},
+        signer::ISigner,
     },
     utils::add_swap_i64_bytes_function,
 };
@@ -120,6 +121,18 @@ impl IAddress {
                 },
             );
         }
+    }
+}
+
+impl ISigner {
+    pub fn add_pack_instructions(
+        block: &mut InstrSeqBuilder,
+        module: &mut Module,
+        local: LocalId,
+        writer_pointer: LocalId,
+        memory: MemoryId,
+    ) {
+        IAddress::add_pack_instructions(block, module, local, writer_pointer, memory)
     }
 }
 
@@ -296,6 +309,33 @@ mod tests {
     fn test_pack_address() {
         type SolType = sol!((address,));
         let int_type = IntermediateType::IAddress;
+
+        let expected_result = SolType::abi_encode_params(&(Address::ZERO,));
+        test_uint(int_type.clone(), &expected_result, &expected_result);
+
+        let expected_result = SolType::abi_encode_params(&(Address::from_hex(
+            "0x1234567890abcdef1234567890abcdef12345678",
+        )
+        .unwrap(),));
+        test_uint(int_type.clone(), &expected_result, &expected_result);
+
+        let expected_result = SolType::abi_encode_params(&(Address::from_hex(
+            "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        )
+        .unwrap(),));
+        test_uint(int_type.clone(), &expected_result, &expected_result);
+
+        let expected_result = SolType::abi_encode_params(&(Address::from_hex(
+            "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE",
+        )
+        .unwrap(),));
+        test_uint(int_type.clone(), &expected_result, &expected_result);
+    }
+
+    #[test]
+    fn test_pack_signer() {
+        type SolType = sol!((address,));
+        let int_type = IntermediateType::ISigner;
 
         let expected_result = SolType::abi_encode_params(&(Address::ZERO,));
         test_uint(int_type.clone(), &expected_result, &expected_result);
