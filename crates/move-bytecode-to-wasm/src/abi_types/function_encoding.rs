@@ -22,9 +22,19 @@ pub fn move_signature_to_abi_selector<T: SolName>(
     signature: &[T],
 ) -> AbiFunctionSelector {
     let mut parameter_strings = Vec::new();
-    for signature_token in signature {
+    for (i, signature_token) in signature.iter().enumerate() {
         if let Some(sol_name) = signature_token.sol_name() {
             parameter_strings.push(sol_name);
+        }
+        // This error should never happen. The panic! placed here is just a safeguard. If this code
+        // gets executed means two things:
+        // 1. A check failed in PublicFunction::check_signature_arguments.
+        // 2. A `signer` type was found in a public function signature, but it is not the first
+        //    argument.
+        else if i != 0 {
+            panic!(
+                r#"function signature "{function_name}" can't be represented in Solidity's ABI format"#
+            );
         }
     }
     let parameter_strings = parameter_strings.join(",");
@@ -81,30 +91,6 @@ mod tests {
         );
 
         let signature: &[IntermediateType] = &[
-            IntermediateType::ISigner,
-            IntermediateType::ISigner,
-            IntermediateType::IAddress,
-            IntermediateType::IU64,
-            IntermediateType::ISigner,
-            IntermediateType::IVector(Box::new(IntermediateType::IBool)),
-            IntermediateType::ISigner,
-        ];
-        assert_eq!(
-            move_signature_to_abi_selector("set_owner", signature),
-            selector("setOwner(address,uint64,bool[])")
-        );
-
-        let signature: &[IntermediateType] = &[
-            IntermediateType::IAddress,
-            IntermediateType::IU64,
-            IntermediateType::IVector(Box::new(IntermediateType::ISigner)),
-        ];
-        assert_eq!(
-            move_signature_to_abi_selector("set_owner", signature),
-            selector("setOwner(address,uint64)")
-        );
-
-        let signature: &[IntermediateType] = &[
             IntermediateType::IVector(Box::new(IntermediateType::IU128)),
             IntermediateType::IVector(Box::new(IntermediateType::IBool)),
         ];
@@ -123,5 +109,63 @@ mod tests {
             move_signature_to_abi_selector("test_array", signature),
             selector("testArray(uint128[][],bool[])")
         );
+    }
+
+    #[test]
+    #[should_panic(
+        expected = r#"function signature "test_invalid_signature" can't be represented in Solidity's ABI format"#
+    )]
+    fn test_move_signature_to_abi_selector_invalid_1() {
+        let signature: &[IntermediateType] = &[
+            IntermediateType::IU64,
+            IntermediateType::ISigner,
+            IntermediateType::IAddress,
+            IntermediateType::IU64,
+        ];
+        move_signature_to_abi_selector("test_invalid_signature", signature);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = r#"function signature "test_invalid_signature" can't be represented in Solidity's ABI format"#
+    )]
+    fn test_move_signature_to_abi_selector_invalid_2() {
+        let signature: &[IntermediateType] = &[
+            IntermediateType::ISigner,
+            IntermediateType::IAddress,
+            IntermediateType::IU64,
+            IntermediateType::ISigner,
+            IntermediateType::IVector(Box::new(IntermediateType::IBool)),
+            IntermediateType::ISigner,
+        ];
+        move_signature_to_abi_selector("test_invalid_signature", signature);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = r#"function signature "test_invalid_signature" can't be represented in Solidity's ABI format"#
+    )]
+    fn test_move_signature_to_abi_selector_invalid_3() {
+        let signature: &[IntermediateType] = &[
+            IntermediateType::IAddress,
+            IntermediateType::IU64,
+            IntermediateType::IVector(Box::new(IntermediateType::ISigner)),
+        ];
+        move_signature_to_abi_selector("test_invalid_signature", signature);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = r#"function signature "test_invalid_signature" can't be represented in Solidity's ABI format"#
+    )]
+    fn test_move_signature_to_abi_selector_invalid_4() {
+        let signature: &[IntermediateType] = &[
+            IntermediateType::IAddress,
+            IntermediateType::IU64,
+            IntermediateType::IVector(Box::new(IntermediateType::IVector(Box::new(
+                IntermediateType::ISigner,
+            )))),
+        ];
+        move_signature_to_abi_selector("test_invalid_signature", signature);
     }
 }
