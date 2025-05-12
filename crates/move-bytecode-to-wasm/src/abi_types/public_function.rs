@@ -19,7 +19,7 @@ pub enum PublicFunctionValidationError {
     #[error(
         r#"error in argument {0} of function "{1}", complex types can't contain the type "signer""#
     )]
-    ComplexTypeContainsSignature(usize, String),
+    ComplexTypeContainsSigner(usize, String),
 }
 
 /// This struct wraps a Move function interface and its internal WASM representation
@@ -173,7 +173,7 @@ impl PublicFunction {
                     }
                 }
                 IntermediateType::IVector(it) if Self::find_signature_type(it) => {
-                    return Err(PublicFunctionValidationError::ComplexTypeContainsSignature(
+                    return Err(PublicFunctionValidationError::ComplexTypeContainsSigner(
                         i + 1,
                         function_name.to_owned(),
                     ))
