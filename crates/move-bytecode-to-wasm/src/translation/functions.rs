@@ -1,5 +1,7 @@
 use anyhow::Result;
-use move_binary_format::file_format::{CodeUnit, Constant, FunctionDefinition, Signature};
+use move_binary_format::file_format::{
+    CodeUnit, Constant, FunctionDefinition, Signature, SignatureIndex,
+};
 use walrus::{
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleLocals, ValType,
     ir::{LoadKind, MemArg, StoreKind},
@@ -9,7 +11,7 @@ use crate::translation::{intermediate_types::ISignature, map_bytecode_instructio
 
 use super::intermediate_types::{IntermediateType, SignatureTokenToIntermediateType};
 
-pub struct MappedFunction {
+pub struct MappedFunction<'a> {
     pub id: FunctionId,
     pub name: String,
     pub signature: ISignature,
@@ -17,16 +19,17 @@ pub struct MappedFunction {
     pub move_code_unit: CodeUnit,
     pub local_variables: Vec<LocalId>,
     pub local_variables_type: Vec<IntermediateType>,
+    pub move_module_signatures: &'a [Signature],
 }
 
-impl MappedFunction {
+impl<'a> MappedFunction<'a> {
     pub fn new(
         name: String,
         move_arguments: &Signature,
         move_returns: &Signature,
         move_definition: &FunctionDefinition,
         module: &mut Module,
-        move_module_signatures: &[Signature],
+        move_module_signatures: &'a [Signature],
     ) -> Self {
         assert!(
             move_definition.acquires_global_resources.is_empty(),
@@ -88,6 +91,7 @@ impl MappedFunction {
             move_code_unit: code,
             local_variables,
             local_variables_type,
+            move_module_signatures,
         }
     }
 
@@ -126,6 +130,19 @@ impl MappedFunction {
         }
 
         Ok(())
+    }
+
+    pub fn get_intermediate_type_for_signature_index(
+        &self,
+        signature_index: SignatureIndex,
+    ) -> IntermediateType {
+        let tokens = &self.move_module_signatures[signature_index.0 as usize].0;
+        assert_eq!(
+            tokens.len(),
+            1,
+            "Expected signature to have exactly 1 token for VecPack"
+        );
+        tokens[0].to_intermediate_type()
     }
 }
 

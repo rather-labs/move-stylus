@@ -202,6 +202,65 @@ impl IVector {
         // === Return pointer to copied vector ===
         builder.local_get(dst_local);
     }
+
+    pub fn vec_pack_instructions(
+        inner: &IntermediateType,
+        module_locals: &mut ModuleLocals,
+        builder: &mut InstrSeqBuilder,
+        allocator: FunctionId,
+        memory: MemoryId,
+        num_elements: i32,
+    ) {
+        let data_size = inner.stack_data_size() as i32;
+        let ptr_local = module_locals.add(ValType::I32);
+        let temp_local = module_locals.add(inner.to_wasm_type());
+
+        // Total size = 4 + data_size * num_elements
+        builder.i32_const(4 + data_size * num_elements);
+        builder.call(allocator);
+        builder.local_tee(ptr_local);
+
+        // Write the length at offset 0
+        builder.i32_const(num_elements);
+        builder.store(
+            memory,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+        for i in 0..num_elements {
+            // Pop from stack into local
+            builder.local_set(temp_local);
+
+            // Get the pointer to the memory
+            builder.local_get(ptr_local);
+            builder.i32_const(4 + (num_elements - 1 - i) * data_size);
+            builder.binop(BinaryOp::I32Add);
+
+            // Push back the value from local
+            // inner.copy_loc_instructions(module_locals, builder, allocator, memory, temp_local);
+            builder.local_get(temp_local);
+
+            // Store at computed address
+            builder.store(
+                memory,
+                match data_size {
+                    4 => StoreKind::I32 { atomic: false },
+                    8 => StoreKind::I64 { atomic: false },
+                    _ => panic!("Unsupported element size for vec_pack"),
+                },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+        }
+
+        builder.local_get(ptr_local);
+    }
 }
 
 #[cfg(test)]
@@ -316,6 +375,54 @@ mod tests {
 
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module::<i32>(&mut raw_module, vec![], "test_copy_vector");
+
+        let result_ptr = entrypoint.call(&mut store, ()).unwrap();
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut result_memory_data = vec![0; expected_result_bytes.len()];
+        memory
+            .read(&mut store, result_ptr as usize, &mut result_memory_data)
+            .unwrap();
+
+        assert_eq!(result_memory_data, expected_result_bytes);
+    }
+
+    fn test_vector_pack(
+        elements: &[Vec<u8>],
+        inner_type: IntermediateType,
+        expected_result_bytes: &[u8],
+    ) {
+        let (mut raw_module, allocator, memory_id) = build_module();
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+        let mut builder = function_builder.func_body();
+
+        // Push elements to the stack
+        for element_bytes in elements.iter() {
+            let mut data_iter = element_bytes.clone().into_iter();
+            inner_type.load_constant_instructions(
+                &mut raw_module.locals,
+                &mut builder,
+                &mut data_iter,
+                allocator,
+                memory_id,
+            );
+        }
+
+        IVector::vec_pack_instructions(
+            &inner_type,
+            &mut raw_module.locals,
+            &mut builder,
+            allocator,
+            memory_id,
+            elements.len() as i32,
+        );
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_pack_vector", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32>(&mut raw_module, vec![], "test_pack_vector");
 
         let result_ptr = entrypoint.call(&mut store, ()).unwrap();
         let memory = instance.get_memory(&mut store, "memory").unwrap();
@@ -453,11 +560,11 @@ mod tests {
         .concat();
 
         let expected_copied_vector = [
-            4u32.to_le_bytes().as_slice(),   
-            20u32.to_le_bytes().as_slice(), 
-            36u32.to_le_bytes().as_slice(), 
-            52u32.to_le_bytes().as_slice(), 
-            68u32.to_le_bytes().as_slice(), 
+            4u32.to_le_bytes().as_slice(),
+            20u32.to_le_bytes().as_slice(),
+            36u32.to_le_bytes().as_slice(),
+            52u32.to_le_bytes().as_slice(),
+            68u32.to_le_bytes().as_slice(),
         ]
         .concat();
 
@@ -490,7 +597,6 @@ mod tests {
             U256::from(4u128).to_le_bytes::<32>().as_slice(),
         ]
         .concat();
-
 
         let expected_copy_bytes = [
             4u32.to_le_bytes().as_slice(),
@@ -597,7 +703,7 @@ mod tests {
         .concat(); // 52 bytes total
 
         let expected_copy_bytes = [
-            2u32.to_le_bytes().as_slice(), 
+            2u32.to_le_bytes().as_slice(),
             64u32.to_le_bytes().as_slice(), // pointer to first copied vector: 52 + 4 + 4 + 4
             84u32.to_le_bytes().as_slice(), // pointer to second copied vector: 52 + 4 + 4 + 4 + 20
             [
@@ -690,7 +796,7 @@ mod tests {
                 U256::from(7u128).to_le_bytes::<32>().as_slice(),
                 U256::from(8u128).to_le_bytes::<32>().as_slice(),
             ]
-            .concat() // 148 bytes 
+            .concat() // 148 bytes
             .as_slice(),
         ]
         .concat(); // 308 bytes total
@@ -731,6 +837,141 @@ mod tests {
             &data,
             IntermediateType::IVector(Box::new(IntermediateType::IU256)),
             &expected_copy_bytes,
+        );
+    }
+
+    #[test]
+    fn test_vec_pack_u8() {
+        // Define the elements as explicit bytes (each element is a Vec<u8> of 1 byte)
+        let element_bytes = vec![
+            vec![10], // 10u8
+            vec![20], // 20u8
+            vec![30], // 30u8
+        ];
+
+        // Expected memory layout:
+        // [length (4 bytes)] + [10] + [20] + [30]
+        let expected_result_bytes = vec![
+            3, 0, 0, 0, // length
+            10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0,
+        ];
+
+        test_vector_pack(
+            &element_bytes,
+            IntermediateType::IU8,
+            &expected_result_bytes,
+        );
+    }
+
+    #[test]
+    fn test_vec_pack_u32() {
+        // Define elements as explicit byte vectors (each element is a Vec<u8> of 4 bytes)
+        let element_bytes = vec![
+            vec![10, 0, 0, 0], // 10u32
+            vec![20, 0, 0, 0], // 20u32
+            vec![30, 0, 0, 0], // 30u32
+        ];
+
+        // Manually build the expected packed vector
+        let expected_result_bytes = vec![
+            3, 0, 0, 0, // Vector length (3)
+            10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0,
+        ];
+
+        test_vector_pack(
+            &element_bytes,
+            IntermediateType::IU32,
+            &expected_result_bytes,
+        );
+    }
+
+    #[test]
+    fn test_vec_pack_u128() {
+        // Define the elements as explicit bytes (each u128 is 16 bytes in little-endian)
+        let element_bytes = vec![
+            vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // 1u128
+            vec![2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // 2u128
+            vec![3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // 3u128
+            vec![4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // 4u128
+        ];
+
+        // Expected memory layout:
+        // [length (4 bytes)] + [1 as 16 bytes] + [2 as 16 bytes] + [3 as 16 bytes]
+        let expected_result_bytes = vec![
+            4, 0, 0, 0, // length
+            0, 0, 0, 0, // Pointer to first element
+            16, 0, 0, 0, // Pointer to second element
+            32, 0, 0, 0, // Pointer to third element
+            48, 0, 0, 0, // Pointer to fourth element
+        ];
+
+        test_vector_pack(
+            &element_bytes,
+            IntermediateType::IU128,
+            &expected_result_bytes,
+        );
+    }
+
+    #[test]
+    fn test_vec_pack_u256() {
+        let element_bytes = vec![
+            vec![
+                1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0,
+            ],
+            vec![
+                2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0,
+            ],
+            vec![
+                3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0,
+            ],
+        ];
+
+        // Expected memory layout:
+        let expected_result_bytes = vec![
+            3, 0, 0, 0, // length
+            0, 0, 0, 0, // Pointer to first element
+            32, 0, 0, 0, // Pointer to second element
+            64, 0, 0, 0, // Pointer to third element
+        ];
+
+        test_vector_pack(
+            &element_bytes,
+            IntermediateType::IU256,
+            &expected_result_bytes,
+        );
+    }
+
+    #[test]
+    fn test_vec_pack_vec_u32() {
+        // Define inner vectors as raw bytes (length + elements)
+        let element_bytes = vec![
+            vec![2, 0, 0, 0, 10, 0, 0, 0, 20, 0, 0, 0], // [10, 20]
+            vec![2, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0], // [30, 40]
+            vec![2, 0, 0, 0, 60, 0, 0, 0, 70, 0, 0, 0], // [60, 70]
+        ];
+
+        // // Here the order is reversed because vectors are copied again in the vec_pack_instructions function!
+        // let expected_result_bytes = vec![
+        //     3, 0, 0, 0, // length = 3
+        //     76, 0, 0, 0, // pointer to a copy of [10,20] at 0
+        //     64, 0, 0, 0, // pointer to a copy of [30,40] at 16
+        //     52, 0, 0, 0, // pointer to a copy of [60,70] at 32
+        // ];
+
+        let expected_result_bytes = vec![
+            3, 0, 0, 0, // length = 3
+            0, 0, 0, 0, // pointer to a copy of [10,20] at 0
+            12, 0, 0, 0, // pointer to a copy of [30,40] at 16
+            24, 0, 0, 0, // pointer to a copy of [60,70] at 32
+        ];
+
+        test_vector_pack(
+            &element_bytes,
+            IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+            &expected_result_bytes,
         );
     }
 }

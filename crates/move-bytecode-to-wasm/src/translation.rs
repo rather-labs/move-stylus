@@ -2,12 +2,12 @@ use functions::{
     MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
 };
 use intermediate_types::SignatureTokenToIntermediateType;
+use intermediate_types::vector::IVector;
 use move_binary_format::file_format::{Bytecode, Constant};
 use walrus::{
     FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
     ir::{MemArg, StoreKind},
 };
-
 pub mod functions;
 /// The types in this module represent an intermediate Rust representation of Move types
 /// that is used to generate the WASM code.
@@ -102,6 +102,17 @@ fn map_bytecode_instruction(
                 allocator,
                 memory,
                 mapped_function.local_variables[*local_id as usize],
+            );
+        }
+        Bytecode::VecPack(signature_index, num_elements) => {
+            let inner = mapped_function.get_intermediate_type_for_signature_index(*signature_index);
+            IVector::vec_pack_instructions(
+                &inner,
+                module_locals,
+                builder,
+                allocator,
+                memory,
+                *num_elements as i32,
             );
         }
         Bytecode::Pop => {
