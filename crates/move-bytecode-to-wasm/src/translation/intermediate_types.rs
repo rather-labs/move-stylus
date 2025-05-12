@@ -136,6 +136,8 @@ impl IntermediateType {
                     local,
                 );
             }
+            // `signer` type is not copy
+            IntermediateType::ISigner => (),
         }
     }
 
