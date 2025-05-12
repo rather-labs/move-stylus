@@ -484,6 +484,7 @@ fn test_vec_32() {
         function echo(uint32[] x) external returns (uint32[]);
         function vecFromInt(uint32 x, uint32 y) external returns (uint32[]);
         function vecFromVec(uint32[] x, uint32[] y) external returns (uint32[][]);
+        function vecFromVecAndInt(uint32[] x, uint32 y) external returns (uint32[][]);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -514,7 +515,7 @@ fn test_vec_32() {
 
     // vecFromInt(1, 2) should return [1, 2]
     let data = vecFromIntCall::abi_encode(&vecFromIntCall::new((1u32, 2u32)));
-    let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32],));
+    let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 1u32],));
     run_test(&runtime, data, expected_result);
 
     // vec_from_vec([1, 2, 3], [4, 5, 6]) should return [[1, 2, 3], [4, 5, 6]]
@@ -525,6 +526,14 @@ fn test_vec_32() {
     let expected_result = <sol!((uint32[][],))>::abi_encode_params(&(vec![
         vec![1u32, 2u32, 3u32],
         vec![4u32, 5u32, 6u32],
+    ],));
+    run_test(&runtime, data, expected_result);
+
+    // vecFromVecAndInt([1, 2, 3], 4) should return [[1, 2, 3], [4, 4]]
+    let data = vecFromVecAndIntCall::abi_encode(&vecFromVecAndIntCall::new((vec![1u32, 2u32, 3u32], 4u32)));
+    let expected_result = <sol!((uint32[][],))>::abi_encode_params(&(vec![
+        vec![1u32, 2u32, 3u32],
+        vec![4u32, 4u32],
     ],));
     run_test(&runtime, data, expected_result);
 }
