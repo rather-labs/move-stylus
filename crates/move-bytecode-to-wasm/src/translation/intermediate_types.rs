@@ -102,6 +102,38 @@ impl IntermediateType {
         }
     }
 
+    pub fn copy_loc_instructions(
+        &self,
+        module_locals: &mut ModuleLocals,
+        builder: &mut InstrSeqBuilder,
+        allocator: FunctionId,
+        memory: MemoryId,
+        local: LocalId,
+    ) {
+        match self {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress => {
+                builder.local_get(local);
+            }
+            IntermediateType::IVector(inner) => {
+                IVector::copy_loc_instructions(
+                    inner,
+                    module_locals,
+                    builder,
+                    allocator,
+                    memory,
+                    local,
+                );
+            }
+        }
+    }
+
     pub fn add_load_memory_to_local_instructions(
         &self,
         module_locals: &mut ModuleLocals,
@@ -199,6 +231,7 @@ impl SignatureTokenToIntermediateType for SignatureToken {
             SignatureToken::Vector(token) => {
                 IntermediateType::IVector(Box::new(token.to_intermediate_type()))
             }
+
             _ => panic!("Unsupported signature token: {:?}", self),
         }
     }

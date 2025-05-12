@@ -16,6 +16,7 @@ pub struct MappedFunction {
     pub move_definition: FunctionDefinition,
     pub move_code_unit: CodeUnit,
     pub local_variables: Vec<LocalId>,
+    pub local_variables_type: Vec<IntermediateType>,
 }
 
 impl MappedFunction {
@@ -43,25 +44,41 @@ impl MappedFunction {
             "Multiple return values is not enabled in Stylus VM"
         );
 
-        let mut local_variables: Vec<LocalId> = function_arguments
+        // === Handle argument locals ===
+        let arg_local_ids = function_arguments
             .iter()
             .map(|arg| module.locals.add(*arg))
-            .collect();
+            .collect::<Vec<LocalId>>();
 
+        let arg_intermediate_types = move_arguments
+            .0
+            .iter()
+            .map(|token| token.to_intermediate_type())
+            .collect::<Vec<IntermediateType>>();
+
+        // === Create the function ===
         let function_builder =
             FunctionBuilder::new(&mut module.types, &function_arguments, &function_returns);
 
-        // Building an empty function to get the function id
-        let id = function_builder.finish(local_variables.clone(), &mut module.funcs);
+        let id = function_builder.finish(arg_local_ids.clone(), &mut module.funcs);
 
+        // === Handle declared locals ===
         let move_locals = &code.locals;
-        let mapped_locals = map_signature(&move_module_signatures[move_locals.0 as usize]);
-        let mapped_locals: Vec<LocalId> = mapped_locals
-            .iter()
-            .map(|arg| module.locals.add(*arg))
-            .collect();
+        let signature_tokens = &move_module_signatures[move_locals.0 as usize].0;
 
-        local_variables.extend(mapped_locals);
+        let local_intermediate_types = signature_tokens
+            .iter()
+            .map(|token| token.to_intermediate_type())
+            .collect::<Vec<IntermediateType>>();
+
+        let local_ids = local_intermediate_types
+            .iter()
+            .map(|ty| module.locals.add(ty.to_wasm_type()))
+            .collect::<Vec<LocalId>>();
+
+        // === Combine all locals and types ===
+        let local_variables = [arg_local_ids, local_ids].concat();
+        let local_variables_type = [arg_intermediate_types, local_intermediate_types].concat();
 
         Self {
             id,
@@ -70,6 +87,7 @@ impl MappedFunction {
             move_definition: move_definition.clone(),
             move_code_unit: code,
             local_variables,
+            local_variables_type,
         }
     }
 
