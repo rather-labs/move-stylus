@@ -156,7 +156,7 @@ impl PublicFunction {
     /// - It contains a `signer` argument but it is not the first argument: The Move specification
     ///   states that, [if a public function contains a `signer` argument, it must be placed as the
     ///   first argument](https://move-language.github.io/move/signer.html#comparison-to-address).
-    /// - It can be any complex type (i.e: vector) that contains a signer type: The signer is
+    /// - It has any complex type (i.e: vector) that contains a signer type: The signer is
     ///   injected by the VM only if the first argument of the function is a `signer`.
     fn check_signature_arguments(
         function_name: &str,
