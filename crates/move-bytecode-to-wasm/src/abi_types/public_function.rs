@@ -284,7 +284,6 @@ mod tests {
             .func_wrap("vm_hooks", "storage_flush_cache", |_: i32| Ok(()))
             .unwrap();
 
-        // TODO: tx_origin complete this definition
         linker
             .func_wrap(
                 "vm_hooks",
@@ -304,8 +303,6 @@ mod tests {
                     ];
 
                     mem.write(&mut caller, ptr as usize, test_address).unwrap();
-
-                    println!("Current memory: {:?}", &mem.data(&caller)[..128]);
                 },
             )
             .unwrap();
@@ -495,7 +492,9 @@ mod tests {
         func_body.local_get(param2);
         func_body.binop(BinaryOp::I32Add);
 
-        let returns = vec![IntermediateType::IU8];
+        func_body.local_get(param1);
+
+        let returns = vec![IntermediateType::IU8, IntermediateType::ISigner];
         prepare_function_return(
             &mut raw_module.locals,
             &mut func_body,
@@ -520,8 +519,6 @@ mod tests {
         data = [public_function.get_selector().to_vec(), data].concat();
         let data_len = data.len() as i32;
 
-        println!("DATA LEN: {data_len}");
-
         // Build mock router
         build_mock_router(
             &mut raw_module,
@@ -533,7 +530,10 @@ mod tests {
 
         display_module(&mut raw_module);
 
-        let expected_result = <sol!((uint8,))>::abi_encode_params(&(2,));
+        let expected_result = <sol!((uint8, address))>::abi_encode_params(&(
+            2,
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 3, 5, 7],
+        ));
 
         let (_, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data, expected_result);
