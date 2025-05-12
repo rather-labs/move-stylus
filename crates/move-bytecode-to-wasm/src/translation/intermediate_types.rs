@@ -136,8 +136,10 @@ impl IntermediateType {
                     local,
                 );
             }
-            // `signer` type is not copy
-            IntermediateType::ISigner => (),
+            // `signer` type is not copy, this should never happen
+            IntermediateType::ISigner => {
+                panic!(r#"trying to introduce copy instructions for "signer" type"#)
+            }
         }
     }
 
