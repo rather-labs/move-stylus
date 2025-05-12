@@ -198,12 +198,26 @@ mod tests {
             .func_wrap("vm_hooks", "storage_flush_cache", |_: i32| {})
             .unwrap();
 
-        // TODO: tx_origin complete this definition
         linker
             .func_wrap(
                 "vm_hooks",
                 "tx_origin",
-                |_caller: Caller<'_, ReadArgsData>, _args_ptr: u32| {},
+                move |mut caller: Caller<'_, ReadArgsData>, ptr: u32| {
+                    println!("tx_origin, writing in {ptr}");
+
+                    let mem = match caller.get_module_export(&mem_export) {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    // Write 0x7357 address
+                    let test_address = &[
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 7, 3, 5, 7,
+                    ];
+
+                    mem.write(&mut caller, ptr as usize, test_address).unwrap();
+                },
             )
             .unwrap();
 

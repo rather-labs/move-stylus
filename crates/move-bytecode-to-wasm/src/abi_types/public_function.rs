@@ -289,8 +289,7 @@ mod tests {
                 "vm_hooks",
                 "tx_origin",
                 move |mut caller: Caller<'_, ()>, ptr: u32| {
-                    println!("tx_origin");
-                    println!("mamoery ptr: {}", ptr);
+                    println!("tx_origin, writing in {ptr}");
 
                     let mem = match caller.get_module_export(&mem_export) {
                         Some(Extern::Memory(mem)) => mem,

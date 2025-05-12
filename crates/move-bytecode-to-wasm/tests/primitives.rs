@@ -130,6 +130,49 @@ fn test_address() {
 }
 
 #[test]
+fn test_signer() {
+    const MODULE_NAME: &str = "signer_type";
+    const SOURCE_PATH: &str = "tests/primitives/signer.move";
+
+    sol!(
+        #[allow(missing_docs)]
+        function echo() external returns (address);
+        function echoIdentity() external returns (address);
+        function echoWithInt(uint8 y) external returns (uint8, address);
+    );
+
+    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
+
+    let data = echoCall::abi_encode(&echoCall::new(()));
+    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
+        "0x0000000000000000000000000000000007030507",
+    )
+    .unwrap(),));
+    run_test(&runtime, data, expected_result);
+
+    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
+
+    let data = echoIdentityCall::abi_encode(&echoIdentityCall::new(()));
+    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
+        "0x0000000000000000000000000000000007030507",
+    )
+    .unwrap(),));
+    run_test(&runtime, data, expected_result);
+
+    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
+
+    let data = echoWithIntCall::abi_encode(&echoWithIntCall::new((42,)));
+    let expected_result = <sol!((uint8, address))>::abi_encode_params(&(
+        42,
+        Address::from_hex("0x0000000000000000000000000000000007030507").unwrap(),
+    ));
+    run_test(&runtime, data, expected_result);
+}
+
+#[test]
 fn test_uint_8() {
     const MODULE_NAME: &str = "uint_8";
     const SOURCE_PATH: &str = "tests/primitives/uint_8.move";

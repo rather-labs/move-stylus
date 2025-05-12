@@ -1,3 +1,6 @@
+pub mod constants;
+
+use constants::SIGNER_ADDRESS;
 use walrus::Module;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
 
@@ -46,15 +49,15 @@ impl RuntimeSandbox {
                 "vm_hooks",
                 "write_result",
                 move |mut caller: Caller<'_, ModuleData>,
-                      _return_data_pointer: u32,
-                      _return_data_length: u32| {
+                      return_data_pointer: u32,
+                      return_data_length: u32| {
                     let mem = match caller.get_module_export(&mem_export) {
                         Some(Extern::Memory(mem)) => mem,
                         _ => panic!("failed to find host memory"),
                     };
 
-                    let mut result = vec![0; _return_data_length as usize];
-                    mem.read(&caller, _return_data_pointer as usize, &mut result)
+                    let mut result = vec![0; return_data_length as usize];
+                    mem.read(&caller, return_data_pointer as usize, &mut result)
                         .unwrap();
 
                     let return_data = caller.data_mut();
@@ -73,9 +76,22 @@ impl RuntimeSandbox {
             .func_wrap("vm_hooks", "storage_flush_cache", |_: i32| {})
             .unwrap();
 
-        // TODO: tx_origin complete this definition
         linker
-            .func_wrap("vm_hooks", "tx_origin", |_args_ptr: u32| {})
+            .func_wrap(
+                "vm_hooks",
+                "tx_origin",
+                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
+                    println!("tx_origin, writing in {ptr}");
+
+                    let mem = match caller.get_module_export(&mem_export) {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    mem.write(&mut caller, ptr as usize, &SIGNER_ADDRESS)
+                        .unwrap();
+                },
+            )
             .unwrap();
 
         Self {
