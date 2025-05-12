@@ -40,3 +40,12 @@ pub fn storage_flush_cache(module: &mut Module) -> (FunctionId, ImportId) {
     let storage_flush_cache_type = module.types.add(&[ValType::I32], &[]);
     module.add_import_func("vm_hooks", "storage_flush_cache", storage_flush_cache_type)
 }
+
+/// Gets the top-level sender of the transaction. The semantics are equivalent to that of the
+/// EVM's [`ORIGIN`] opcode.
+///
+/// [`ORIGIN`]: https://www.evm.codes/#32
+pub fn tx_origin(module: &mut Module) -> (FunctionId, ImportId) {
+    let tx_origin = module.types.add(&[ValType::I32], &[]);
+    module.add_import_func("vm_hooks", "tx_origin", tx_origin)
+}

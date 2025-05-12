@@ -1,6 +1,6 @@
 use walrus::{
-    FunctionBuilder, FunctionId, MemoryId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg},
+    FunctionBuilder, FunctionId, MemoryId, Module, ValType,
 };
 
 use crate::{
@@ -22,6 +22,7 @@ pub fn build_entrypoint_router(
     let (read_args_function, _) = host_functions::read_args(module);
     let (write_return_data_function, _) = host_functions::write_result(module);
     let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
+    let (tx_origin_function, _) = host_functions::tx_origin(module);
 
     let args_len = module.locals.add(ValType::I32);
     let selector_variable = module.locals.add(ValType::I32);
@@ -70,6 +71,7 @@ pub fn build_entrypoint_router(
             args_len,
             write_return_data_function,
             storage_flush_cache_function,
+            tx_origin_function,
             allocator_func,
         );
     }

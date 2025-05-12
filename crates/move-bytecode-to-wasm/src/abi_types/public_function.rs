@@ -65,6 +65,7 @@ impl PublicFunction {
         args_len: LocalId,
         write_return_data_function: FunctionId,
         storage_flush_cache_function: FunctionId,
+        tx_origin_function: FunctionId,
         allocator_func: FunctionId,
     ) {
         router_builder.block(None, |block| {
@@ -86,6 +87,14 @@ impl PublicFunction {
             block.i32_const(4);
             block.binop(BinaryOp::I32Sub);
             block.local_set(args_len);
+
+            // If the first argument's type is signer, we inject the tx.origin into the stack as a
+            // first parameter
+            if let Some(t) = self.signature.arguments.first() {
+                if t == &IntermediateType::ISigner {
+                    block.call(tx_origin_function);
+                }
+            }
 
             // Wrap function to pack/unpack parameters
             self.wrap_public_function(module, block, args_pointer, allocator_func);
@@ -297,6 +306,7 @@ mod tests {
         // Build mock router
         let (write_return_data_function, _) = host_functions::write_result(module);
         let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
+        let (tx_origin_function, _) = host_functions::tx_origin(module);
 
         let selector = module.locals.add(ValType::I32);
         let args_pointer = module.locals.add(ValType::I32);
@@ -337,6 +347,7 @@ mod tests {
             args_len,
             write_return_data_function,
             storage_flush_cache_function,
+            tx_origin_function,
             allocator_func,
         );
 
