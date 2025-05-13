@@ -66,6 +66,7 @@ impl PublicFunction {
         write_return_data_function: FunctionId,
         storage_flush_cache_function: FunctionId,
         tx_origin_function: FunctionId,
+        log_txt_function: FunctionId,
         allocator_func: FunctionId,
     ) {
         router_builder.block(None, |block| {
@@ -92,6 +93,13 @@ impl PublicFunction {
                     block.local_tee(signer_pointer);
                     block.call(tx_origin_function);
                     block.local_get(signer_pointer);
+                    #[cfg(debug_assertions)]
+                    {
+                        block.local_get(signer_pointer);
+                        block.i32_const(ISigner::HEAP_SIZE);
+                        block.i32_const(1);
+                        block.call(log_txt_function);
+                    }
                 }
                 _ => {
                     // If there's no signer, reduce args length by 4 bytes to exclude selector,
@@ -336,6 +344,7 @@ mod tests {
         let (write_return_data_function, _) = host_functions::write_result(module);
         let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
         let (tx_origin_function, _) = host_functions::tx_origin(module);
+        let (log_txt_function, _) = host_functions::log_txt(module);
 
         let selector = module.locals.add(ValType::I32);
         let args_pointer = module.locals.add(ValType::I32);
@@ -377,6 +386,7 @@ mod tests {
             write_return_data_function,
             storage_flush_cache_function,
             tx_origin_function,
+            log_txt_function,
             allocator_func,
         );
 

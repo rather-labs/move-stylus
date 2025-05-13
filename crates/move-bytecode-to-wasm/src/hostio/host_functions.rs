@@ -49,3 +49,17 @@ pub fn tx_origin(module: &mut Module) -> (FunctionId, ImportId) {
     let tx_origin = module.types.add(&[ValType::I32], &[]);
     module.add_import_func("vm_hooks", "tx_origin", tx_origin)
 }
+
+/// Gets the top-level sender of the transaction. The semantics are equivalent to that of the
+/// EVM's [`ORIGIN`] opcode.
+///
+/// [`ORIGIN`]: https://www.evm.codes/#32
+pub fn log_txt(module: &mut Module) -> (FunctionId, ImportId) {
+    // let log_txt = module.types.add(&[ValType::I32, ValType::I32], &[]);
+    // module.add_import_func("vm_hooks", "log_txt", log_txt)
+
+    let log_txt = module
+        .types
+        .add(&[ValType::I32, ValType::I32, ValType::I32], &[]);
+    module.add_import_func("vm_hooks", "emit_log", log_txt)
+}

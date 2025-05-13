@@ -59,11 +59,10 @@ async fn main() -> eyre::Result<()> {
     // TODO: To verify functions called with a transaction, we need to support logging functions in
     // the host (https://github.com/OffchainLabs/stylus-sdk-rs/blob/1801df8872638ceb3d7db074e21e605fc6e68350/stylus-sdk/src/hostio.rs#L404-L426)
     // Leave this code here as an example on how to call a function with a tx
-    /*
     use ethers::{
-        types::{TransactionRequest, H160, U256},
-        utils::parse_ether
-    }
+        types::{TransactionRequest, H160},
+        utils::parse_ether,
+    };
 
     let data = example.echo_signer_with_int(42).calldata().unwrap();
     let tx = TransactionRequest::new()
@@ -82,7 +81,6 @@ async fn main() -> eyre::Result<()> {
 
     println!("Sent tx: {tx:?}\n");
     println!("Tx receipt: {receipt:?}");
-    */
 
     Ok(())
 }
