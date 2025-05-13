@@ -2,11 +2,11 @@ use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
 use move_binary_format::file_format::{Signature, SignatureToken};
-use simple_integers::{IU16, IU32, IU64, IU8};
+use simple_integers::{IU8, IU16, IU32, IU64};
 use vector::IVector;
 use walrus::{
-    ir::{LoadKind, MemArg},
     FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
+    ir::{LoadKind, MemArg},
 };
 
 pub mod address;
