@@ -168,7 +168,7 @@ fn add_load_literal_heap_type_to_memory_instructions(
     builder.local_get(pointer);
 }
 
-pub fn get_intermediate_type_for_signature_index(
+fn get_intermediate_type_for_signature_index(
     mapped_function: &MappedFunction,
     signature_index: SignatureIndex,
 ) -> IntermediateType {
