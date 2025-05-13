@@ -50,14 +50,17 @@ pub fn tx_origin(module: &mut Module) -> (FunctionId, ImportId) {
     module.add_import_func("vm_hooks", "tx_origin", tx_origin)
 }
 
-/// Gets the top-level sender of the transaction. The semantics are equivalent to that of the
-/// EVM's [`ORIGIN`] opcode.
+/// Emits an EVM log with the given number of topics and data, the first bytes of which should
+/// be the 32-byte-aligned topic data. The semantics are equivalent to that of the EVM's
+/// [`LOG0`], [`LOG1`], [`LOG2`], [`LOG3`], and [`LOG4`] opcodes based on the number of topics
+/// specified. Requesting more than `4` topics will induce a revert.
 ///
-/// [`ORIGIN`]: https://www.evm.codes/#32
-pub fn log_txt(module: &mut Module) -> (FunctionId, ImportId) {
-    // let log_txt = module.types.add(&[ValType::I32, ValType::I32], &[]);
-    // module.add_import_func("vm_hooks", "log_txt", log_txt)
-
+/// [`LOG0`]: https://www.evm.codes/#a0
+/// [`LOG1`]: https://www.evm.codes/#a1
+/// [`LOG2`]: https://www.evm.codes/#a2
+/// [`LOG3`]: https://www.evm.codes/#a3
+/// [`LOG4`]: https://www.evm.codes/#a4
+pub fn emit_log(module: &mut Module) -> (FunctionId, ImportId) {
     let log_txt = module
         .types
         .add(&[ValType::I32, ValType::I32, ValType::I32], &[]);

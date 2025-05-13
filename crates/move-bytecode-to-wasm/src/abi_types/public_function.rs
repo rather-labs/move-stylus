@@ -66,7 +66,7 @@ impl PublicFunction {
         write_return_data_function: FunctionId,
         storage_flush_cache_function: FunctionId,
         tx_origin_function: FunctionId,
-        log_txt_function: FunctionId,
+        emit_log_function: FunctionId,
         allocator_func: FunctionId,
     ) {
         router_builder.block(None, |block| {
@@ -91,14 +91,22 @@ impl PublicFunction {
                     block.i32_const(ISigner::HEAP_SIZE);
                     block.call(allocator_func);
                     block.local_tee(signer_pointer);
+                    // We add 12 to the pointer returned by the allocator because stylus writes 20
+                    // bytes, and those bytes need to be at the end.
+                    block.i32_const(12);
+                    block.binop(BinaryOp::I32Add);
                     block.call(tx_origin_function);
                     block.local_get(signer_pointer);
+
+                    // If we are building in debug mode, we call `emit_log` to log the signer's
+                    // address. This is useful for debugging in this stage.
+                    // TODO: Remove this when is no longer necessary
                     #[cfg(debug_assertions)]
                     {
                         block.local_get(signer_pointer);
                         block.i32_const(ISigner::HEAP_SIZE);
-                        block.i32_const(1);
-                        block.call(log_txt_function);
+                        block.i32_const(0);
+                        block.call(emit_log_function);
                     }
                 }
                 _ => {
@@ -344,7 +352,7 @@ mod tests {
         let (write_return_data_function, _) = host_functions::write_result(module);
         let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
         let (tx_origin_function, _) = host_functions::tx_origin(module);
-        let (log_txt_function, _) = host_functions::log_txt(module);
+        let (emit_log_function, _) = host_functions::emit_log(module);
 
         let selector = module.locals.add(ValType::I32);
         let args_pointer = module.locals.add(ValType::I32);
@@ -386,7 +394,7 @@ mod tests {
             write_return_data_function,
             storage_flush_cache_function,
             tx_origin_function,
-            log_txt_function,
+            emit_log_function,
             allocator_func,
         );
 
