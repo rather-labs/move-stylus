@@ -10,7 +10,8 @@ use ethers::{
     prelude::abigen,
     providers::{Http, Middleware, Provider},
     signers::{LocalWallet, Signer},
-    types::{Address, H160},
+    types::{Address, TransactionRequest, H160, U256},
+    utils::parse_ether,
 };
 use eyre::eyre;
 use std::str::FromStr;
@@ -28,7 +29,7 @@ async fn main() -> eyre::Result<()> {
         r#"[
             function echo(uint128 x) external view returns (uint128)
             function getCopiedLocal() external view returns (uint128)
-            function echoSignerWithInt(uint8 y) public returns (uint8, address)
+            function echoSignerWithInt(uint8 y) public view returns (uint8, address)
         ]"#
     );
 
@@ -42,7 +43,7 @@ async fn main() -> eyre::Result<()> {
         wallet.clone().with_chain_id(chain_id),
     ));
 
-    let example = Example::new(address, client);
+    let example = Example::new(address, client.clone());
 
     let num = example.echo(123).call().await;
     println!("Example echo = {:?}", num);
@@ -50,7 +51,29 @@ async fn main() -> eyre::Result<()> {
     let num = example.get_copied_local().call().await;
     println!("Example getCopiedLocal = {:?}", num);
 
+    /*
     let num = example.echo_signer_with_int(42).call().await;
     println!("Example echoSignerWithInt = {:?}", num);
+    let num = example.echo_signer_with_int(42).call().await;
+        */
+
+    let data = example.echo_signer_with_int(42).calldata().unwrap();
+    let tx = TransactionRequest::new()
+        .to(H160::from_str(&contract_address).unwrap())
+        .value(parse_ether(0.01)?)
+        .data(data);
+
+    // send it!
+    let pending_tx = client.send_transaction(tx, None).await?;
+
+    // get the mined tx
+    let receipt = pending_tx
+        .await?
+        .ok_or_else(|| eyre::format_err!("tx dropped from mempool"))?;
+    let tx = client.get_transaction(receipt.transaction_hash).await?;
+
+    println!("Sent tx: {tx:?}\n");
+    println!("Tx receipt: {receipt:?}");
+
     Ok(())
 }
