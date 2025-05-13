@@ -154,6 +154,16 @@ impl Unpackable for IntermediateType {
             // The signer must not be unpacked here, since it can't be part of the calldata. It is
             // injected directly by the VM into the stack
             IntermediateType::ISigner => (),
+            IntermediateType::Ref(inner) | IntermediateType::MutRef(inner) => {
+                inner.add_unpack_instructions(
+                    function_builder,
+                    module,
+                    reader_pointer,
+                    calldata_reader_pointer,
+                    memory,
+                    allocator,
+                );
+            }
         }
     }
 }

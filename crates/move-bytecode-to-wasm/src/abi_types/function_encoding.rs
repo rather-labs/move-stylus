@@ -55,6 +55,7 @@ impl SolName for IntermediateType {
             IntermediateType::IU128 => Some(sol_data::Uint::<128>::SOL_NAME.to_string()),
             IntermediateType::IU256 => Some(sol_data::Uint::<256>::SOL_NAME.to_string()),
             IntermediateType::IAddress => Some(sol_data::Address::SOL_NAME.to_string()),
+            IntermediateType::Ref(inner) | IntermediateType::MutRef(inner) => inner.sol_name(),
             IntermediateType::IVector(inner) => inner.sol_name().map(|sol_n| format!("{sol_n}[]")),
             IntermediateType::ISigner => None,
         }

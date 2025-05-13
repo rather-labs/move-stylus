@@ -131,21 +131,13 @@ impl Packable for IntermediateType {
         module: &mut Module,
     ) -> LocalId {
         match self {
-            IntermediateType::IBool
-            | IntermediateType::IU8
-            | IntermediateType::IU16
-            | IntermediateType::IU32
-            | IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::IVector(_)
-            | IntermediateType::ISigner
-            | IntermediateType::IAddress => {
-                let local = module.locals.add(ValType::I32);
+            IntermediateType::IU64 => {
+                let local = module.locals.add(ValType::I64);
                 builder.local_set(local);
                 local
             }
-            IntermediateType::IU64 => {
-                let local = module.locals.add(ValType::I64);
+            _ => {
+                let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
             }
@@ -194,6 +186,16 @@ impl Packable for IntermediateType {
                 memory,
                 alloc_function,
             ),
+            IntermediateType::Ref(inner) | IntermediateType::MutRef(inner) => inner
+                .add_pack_instructions(
+                    builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    memory,
+                    alloc_function,
+                ),
         }
     }
 
@@ -209,6 +211,7 @@ impl Packable for IntermediateType {
             IntermediateType::IAddress => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::ISigner => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::IVector(_) => 32,
+            IntermediateType::Ref(inner) | IntermediateType::MutRef(inner) => inner.encoded_size(),
         }
     }
 }
