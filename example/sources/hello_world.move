@@ -1,5 +1,8 @@
 module 0x01::hello_world;
 
+//  TODO: Add support for native functions
+//  native public fun tx_log(ptr: u32, len: u32);
+
 // Forces the compiler to store literals on locals
 public fun get_literal(): vector<u32> {
   vector[1u32, 2u32, 3u32]

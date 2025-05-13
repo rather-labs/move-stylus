@@ -10,8 +10,7 @@ use ethers::{
     prelude::abigen,
     providers::{Http, Middleware, Provider},
     signers::{LocalWallet, Signer},
-    types::{Address, TransactionRequest, H160, U256},
-    utils::parse_ether,
+    types::Address,
 };
 use eyre::eyre;
 use std::str::FromStr;
@@ -51,11 +50,20 @@ async fn main() -> eyre::Result<()> {
     let num = example.get_copied_local().call().await;
     println!("Example getCopiedLocal = {:?}", num);
 
-    /*
+    // TODO: Common calls do not have a signer, but if we a function with a signer, it returns an
+    // address that is probably things in memory. This could be a security issue and must be taken
+    // care of.
     let num = example.echo_signer_with_int(42).call().await;
     println!("Example echoSignerWithInt = {:?}", num);
-    let num = example.echo_signer_with_int(42).call().await;
-        */
+
+    // TODO: To verify functions called with a transaction, we need to support logging functions in
+    // the host (https://github.com/OffchainLabs/stylus-sdk-rs/blob/1801df8872638ceb3d7db074e21e605fc6e68350/stylus-sdk/src/hostio.rs#L404-L426)
+    // Leave this code here as an example on how to call a function with a tx
+    /*
+    use ethers::{
+        types::{TransactionRequest, H160, U256},
+        utils::parse_ether
+    }
 
     let data = example.echo_signer_with_int(42).calldata().unwrap();
     let tx = TransactionRequest::new()
@@ -74,6 +82,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("Sent tx: {tx:?}\n");
     println!("Tx receipt: {receipt:?}");
+    */
 
     Ok(())
 }
