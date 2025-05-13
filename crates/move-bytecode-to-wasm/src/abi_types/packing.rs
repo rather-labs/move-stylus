@@ -1,13 +1,13 @@
-use alloy_sol_types::{sol_data, SolType};
+use alloy_sol_types::{SolType, sol_data};
 use pack_native_int::{pack_i32_type_instructions, pack_i64_type_instructions};
-use walrus::{ir::BinaryOp, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType};
+use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType, ir::BinaryOp};
 
 use crate::translation::intermediate_types::{
+    IntermediateType,
     address::IAddress,
     heap_integers::{IU128, IU256},
     signer::ISigner,
     vector::IVector,
-    IntermediateType,
 };
 
 mod pack_heap_int;

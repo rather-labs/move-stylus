@@ -9,7 +9,7 @@ use crate::translation::{intermediate_types::ISignature, map_bytecode_instructio
 
 use super::intermediate_types::{IntermediateType, SignatureTokenToIntermediateType};
 
-pub struct MappedFunction {
+pub struct MappedFunction<'a> {
     pub id: FunctionId,
     pub name: String,
     pub signature: ISignature,
@@ -17,16 +17,17 @@ pub struct MappedFunction {
     pub move_code_unit: CodeUnit,
     pub local_variables: Vec<LocalId>,
     pub local_variables_type: Vec<IntermediateType>,
+    pub move_module_signatures: &'a [Signature],
 }
 
-impl MappedFunction {
+impl<'a> MappedFunction<'a> {
     pub fn new(
         name: String,
         move_arguments: &Signature,
         move_returns: &Signature,
         move_definition: &FunctionDefinition,
         module: &mut Module,
-        move_module_signatures: &[Signature],
+        move_module_signatures: &'a [Signature],
     ) -> Self {
         assert!(
             move_definition.acquires_global_resources.is_empty(),
@@ -88,6 +89,7 @@ impl MappedFunction {
             move_code_unit: code,
             local_variables,
             local_variables_type,
+            move_module_signatures,
         }
     }
 
@@ -127,14 +129,6 @@ impl MappedFunction {
 
         Ok(())
     }
-}
-
-pub fn map_signature(signature: &Signature) -> Vec<ValType> {
-    signature
-        .0
-        .iter()
-        .map(|token| token.to_intermediate_type().to_wasm_type())
-        .collect()
 }
 
 /// Adds the instructions to unpack the return values from memory
