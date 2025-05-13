@@ -61,8 +61,8 @@ pub fn tx_origin(module: &mut Module) -> (FunctionId, ImportId) {
 /// [`LOG3`]: https://www.evm.codes/#a3
 /// [`LOG4`]: https://www.evm.codes/#a4
 pub fn emit_log(module: &mut Module) -> (FunctionId, ImportId) {
-    let log_txt = module
+    let emit_log = module
         .types
         .add(&[ValType::I32, ValType::I32, ValType::I32], &[]);
-    module.add_import_func("vm_hooks", "emit_log", log_txt)
+    module.add_import_func("vm_hooks", "emit_log", emit_log)
 }

@@ -10,7 +10,8 @@ use ethers::{
     prelude::abigen,
     providers::{Http, Middleware, Provider},
     signers::{LocalWallet, Signer},
-    types::Address,
+    types::{Address, TransactionRequest, H160},
+    utils::parse_ether,
 };
 use eyre::eyre;
 use std::str::FromStr;
@@ -56,31 +57,20 @@ async fn main() -> eyre::Result<()> {
     let num = example.echo_signer_with_int(42).call().await;
     println!("Example echoSignerWithInt = {:?}", num);
 
-    // TODO: To verify functions called with a transaction, we need to support logging functions in
-    // the host (https://github.com/OffchainLabs/stylus-sdk-rs/blob/1801df8872638ceb3d7db074e21e605fc6e68350/stylus-sdk/src/hostio.rs#L404-L426)
-    // Leave this code here as an example on how to call a function with a tx
-    use ethers::{
-        types::{TransactionRequest, H160},
-        utils::parse_ether,
-    };
-
     let data = example.echo_signer_with_int(42).calldata().unwrap();
     let tx = TransactionRequest::new()
         .to(H160::from_str(&contract_address).unwrap())
         .value(parse_ether(0.01)?)
         .data(data);
 
-    // send it!
     let pending_tx = client.send_transaction(tx, None).await?;
-
-    // get the mined tx
     let receipt = pending_tx
         .await?
         .ok_or_else(|| eyre::format_err!("tx dropped from mempool"))?;
-    let tx = client.get_transaction(receipt.transaction_hash).await?;
-
-    println!("Sent tx: {tx:?}\n");
-    println!("Tx receipt: {receipt:?}");
+    println!(
+        "Example echoSignerWithInt - transaction log data: {:?}",
+        receipt.logs.first().map(|l| &l.data)
+    );
 
     Ok(())
 }
