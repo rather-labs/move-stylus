@@ -6,13 +6,17 @@
 
 use dotenv::dotenv;
 use ethers::{
+    abi::{decode, ParamType},
     middleware::SignerMiddleware,
     prelude::abigen,
     providers::{Http, Middleware, Provider},
     signers::{LocalWallet, Signer},
-    types::{Address, TransactionRequest, H160},
+    types::{
+        transaction::eip2718::TypedTransaction, Address, NameOrAddress, TransactionRequest, H160,
+    },
     utils::parse_ether,
 };
+
 use eyre::eyre;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -39,7 +43,7 @@ async fn main() -> eyre::Result<()> {
     let wallet = LocalWallet::from_str(&priv_key)?;
     let chain_id = provider.get_chainid().await?.as_u64();
     let client = Arc::new(SignerMiddleware::new(
-        provider,
+        provider.clone(),
         wallet.clone().with_chain_id(chain_id),
     ));
 
@@ -51,16 +55,37 @@ async fn main() -> eyre::Result<()> {
     let num = example.get_copied_local().call().await;
     println!("Example getCopiedLocal = {:?}", num);
 
-    // TODO: Common calls do not have a signer, but if we a function with a signer, it returns an
-    // address that is probably things in memory. This could be a security issue and must be taken
-    // care of.
-    let num = example.echo_signer_with_int(42).call().await;
-    println!("Example echoSignerWithInt = {:?}", num);
+    // This simple call will inject the "from" field as asigner
+    let ret = example.echo_signer_with_int(42).call().await;
+    println!("Example echoSignerWithInt = {:?}", ret);
 
+    // Removing the "from" field should return set the signer address as 0x0
+    let data = example.echo_signer_with_int(43).calldata().unwrap();
+    let ret = decode(
+        &[ParamType::Uint(8), ParamType::Address],
+        provider
+            .call_raw(&TypedTransaction::Legacy(TransactionRequest {
+                from: None,
+                to: Some(NameOrAddress::Address(
+                    H160::from_str(&contract_address).unwrap(),
+                )),
+                data: Some(data),
+                ..Default::default()
+            }))
+            .await
+            .unwrap()
+            .as_ref(),
+    )
+    .unwrap();
+    println!("Example echoSignerWithInt = {:?}", ret);
+
+    // A real tx should write in the logs the signer's address
+    // 0x3f1eae7d46d88f08fc2f8ed27fcb2ab183eb2d0e
     let data = example.echo_signer_with_int(42).calldata().unwrap();
+
     let tx = TransactionRequest::new()
         .to(H160::from_str(&contract_address).unwrap())
-        .value(parse_ether(0.01)?)
+        .value(parse_ether(0.1)?)
         .data(data);
 
     let pending_tx = client.send_transaction(tx, None).await?;
