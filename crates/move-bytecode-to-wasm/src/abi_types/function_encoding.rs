@@ -1,5 +1,5 @@
 use alloy_primitives::keccak256;
-use alloy_sol_types::{sol_data, SolType};
+use alloy_sol_types::{SolType, sol_data};
 
 use crate::{translation::intermediate_types::IntermediateType, utils::snake_to_camel};
 

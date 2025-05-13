@@ -1,4 +1,4 @@
-use walrus::{ir::BinaryOp, FunctionId, InstrSeqBuilder, LocalId, Module, ValType};
+use walrus::{FunctionId, InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
 
 use crate::translation::{
     functions::add_unpack_function_return_values_instructions,
@@ -6,7 +6,7 @@ use crate::translation::{
 };
 
 use super::{
-    function_encoding::{move_signature_to_abi_selector, AbiFunctionSelector},
+    function_encoding::{AbiFunctionSelector, move_signature_to_abi_selector},
     packing::build_pack_instructions,
     unpacking::build_unpack_instructions,
 };
@@ -176,7 +176,7 @@ impl PublicFunction {
                     return Err(PublicFunctionValidationError::ComplexTypeContainsSigner(
                         i + 1,
                         function_name.to_owned(),
-                    ))
+                    ));
                 }
                 _ => continue,
             }
@@ -202,8 +202,8 @@ impl PublicFunction {
 mod tests {
     use alloy::{dyn_abi::SolType, sol};
     use walrus::{
-        ir::{LoadKind, MemArg},
         FunctionBuilder, MemoryId, ModuleConfig,
+        ir::{LoadKind, MemArg},
     };
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 

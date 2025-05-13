@@ -1,7 +1,5 @@
 use anyhow::Result;
-use move_binary_format::file_format::{
-    CodeUnit, Constant, FunctionDefinition, Signature, SignatureIndex,
-};
+use move_binary_format::file_format::{CodeUnit, Constant, FunctionDefinition, Signature};
 use walrus::{
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleLocals, ValType,
     ir::{LoadKind, MemArg, StoreKind},
@@ -131,27 +129,6 @@ impl<'a> MappedFunction<'a> {
 
         Ok(())
     }
-
-    pub fn get_intermediate_type_for_signature_index(
-        &self,
-        signature_index: SignatureIndex,
-    ) -> IntermediateType {
-        let tokens = &self.move_module_signatures[signature_index.0 as usize].0;
-        assert_eq!(
-            tokens.len(),
-            1,
-            "Expected signature to have exactly 1 token for VecPack"
-        );
-        tokens[0].to_intermediate_type()
-    }
-}
-
-pub fn map_signature(signature: &Signature) -> Vec<ValType> {
-    signature
-        .0
-        .iter()
-        .map(|token| token.to_intermediate_type().to_wasm_type())
-        .collect()
 }
 
 /// Adds the instructions to unpack the return values from memory

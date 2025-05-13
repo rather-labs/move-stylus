@@ -1,9 +1,9 @@
 use functions::{
     MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
 };
-use intermediate_types::SignatureTokenToIntermediateType;
 use intermediate_types::vector::IVector;
-use move_binary_format::file_format::{Bytecode, Constant};
+use intermediate_types::{IntermediateType, SignatureTokenToIntermediateType};
+use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
 use walrus::{
     FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
     ir::{MemArg, StoreKind},
@@ -105,7 +105,8 @@ fn map_bytecode_instruction(
             );
         }
         Bytecode::VecPack(signature_index, num_elements) => {
-            let inner = mapped_function.get_intermediate_type_for_signature_index(*signature_index);
+            let inner =
+                get_intermediate_type_for_signature_index(mapped_function, *signature_index);
             IVector::vec_pack_instructions(
                 &inner,
                 module_locals,
@@ -165,4 +166,17 @@ fn add_load_literal_heap_type_to_memory_instructions(
     }
 
     builder.local_get(pointer);
+}
+
+pub fn get_intermediate_type_for_signature_index(
+    mapped_function: &MappedFunction,
+    signature_index: SignatureIndex,
+) -> IntermediateType {
+    let tokens = &mapped_function.move_module_signatures[signature_index.0 as usize].0;
+    assert_eq!(
+        tokens.len(),
+        1,
+        "Expected signature to have exactly 1 token for VecPack"
+    );
+    tokens[0].to_intermediate_type()
 }

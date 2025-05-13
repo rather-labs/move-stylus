@@ -530,11 +530,14 @@ fn test_vec_32() {
     run_test(&runtime, data, expected_result);
 
     // vecFromVecAndInt([1, 2, 3], 4) should return [[1, 2, 3], [4, 4]]
-    let data = vecFromVecAndIntCall::abi_encode(&vecFromVecAndIntCall::new((vec![1u32, 2u32, 3u32], 4u32)));
-    let expected_result = <sol!((uint32[][],))>::abi_encode_params(&(vec![
+    let data = vecFromVecAndIntCall::abi_encode(&vecFromVecAndIntCall::new((
         vec![1u32, 2u32, 3u32],
-        vec![4u32, 4u32],
-    ],));
+        4u32,
+    )));
+    let expected_result =
+        <sol!((uint32[][],))>::abi_encode_params(
+            &(vec![vec![1u32, 2u32, 3u32], vec![4u32, 4u32]],),
+        );
     run_test(&runtime, data, expected_result);
 }
 
@@ -591,6 +594,9 @@ fn test_vec_128() {
         function getLiteral() external returns (uint128[]);
         function getCopiedLocal() external returns (uint128[]);
         function echo(uint128[] x) external returns (uint128[]);
+        function vecFromInt(uint128 x, uint128 y) external returns (uint128[]);
+        function vecFromVec(uint128[] x, uint128[] y) external returns (uint128[][]);
+        function vecFromVecAndInt(uint128[] x, uint128 y) external returns (uint128[][]);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -617,6 +623,33 @@ fn test_vec_128() {
     // echo([1, 2, 3]) should return [1, 2, 3]
     let data = echoCall::abi_encode(&echoCall::new((vec![1u128, 2u128, 3u128],)));
     let expected_result = <sol!((uint128[],))>::abi_encode_params(&(vec![1u128, 2u128, 3u128],));
+    run_test(&runtime, data, expected_result);
+
+    // vecFromInt(1, 2) should return [1, 2, 1]
+    let data = vecFromIntCall::abi_encode(&vecFromIntCall::new((1u128, 2u128)));
+    let expected_result = <sol!((uint128[],))>::abi_encode_params(&(vec![1u128, 2u128, 1u128],));
+    run_test(&runtime, data, expected_result);
+
+    // vecFromVec([1, 2, 3], [4, 5, 6]) should return [[1, 2, 3], [4, 5, 6]]
+    let data = vecFromVecCall::abi_encode(&vecFromVecCall::new((
+        vec![1u128, 2u128, 3u128],
+        vec![4u128, 5u128, 6u128],
+    )));
+    let expected_result = <sol!((uint128[][],))>::abi_encode_params(&(vec![
+        vec![1u128, 2u128, 3u128],
+        vec![4u128, 5u128, 6u128],
+    ],));
+    run_test(&runtime, data, expected_result);
+
+    // vecFromVecAndInt([1, 2, 3], 4) should return [[1, 2, 3], [4, 4]]
+    let data = vecFromVecAndIntCall::abi_encode(&vecFromVecAndIntCall::new((
+        vec![1u128, 2u128, 3u128],
+        4u128,
+    )));
+    let expected_result = <sol!((uint128[][],))>::abi_encode_params(&(vec![
+        vec![1u128, 2u128, 3u128],
+        vec![4u128, 4u128],
+    ],));
     run_test(&runtime, data, expected_result);
 }
 

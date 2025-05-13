@@ -1,12 +1,12 @@
 use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType};
 
 use crate::translation::intermediate_types::{
+    IntermediateType,
     address::IAddress,
     boolean::IBool,
     heap_integers::{IU128, IU256},
-    simple_integers::{IU16, IU32, IU64, IU8},
+    simple_integers::{IU8, IU16, IU32, IU64},
     vector::IVector,
-    IntermediateType,
 };
 
 mod unpack_heap_int;
