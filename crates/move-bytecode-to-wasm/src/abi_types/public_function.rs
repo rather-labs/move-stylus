@@ -95,7 +95,7 @@ impl PublicFunction {
                 }
                 _ => {
                     // If there's no signer, reduce args length by 4 bytes to exclude selector,
-                    // otherwise we reuse the 4 bytes selector for the address pointer
+                    // otherwise we reuse the selector's 4 bytes (32 bits) for the signer pointer
                     block.local_get(args_len);
                     block.i32_const(4);
                     block.binop(BinaryOp::I32Sub);
