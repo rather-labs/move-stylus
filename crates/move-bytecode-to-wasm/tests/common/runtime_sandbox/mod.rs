@@ -23,16 +23,19 @@ impl RuntimeSandbox {
         let mut linker = Linker::new(&engine);
 
         let mem_export = module.get_export_index("memory").unwrap();
+        let get_memory = move |caller: &mut Caller<'_, ModuleData>| match caller
+            .get_module_export(&mem_export)
+        {
+            Some(Extern::Memory(mem)) => mem,
+            _ => panic!("failed to find host memory"),
+        };
 
         linker
             .func_wrap(
                 "vm_hooks",
                 "read_args",
                 move |mut caller: Caller<'_, ModuleData>, args_ptr: u32| {
-                    let mem = match caller.get_module_export(&mem_export) {
-                        Some(Extern::Memory(mem)) => mem,
-                        _ => panic!("failed to find host memory"),
-                    };
+                    let mem = get_memory(&mut caller);
 
                     let args_data = caller.data().data.clone();
 
@@ -83,13 +86,27 @@ impl RuntimeSandbox {
                 move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
                     println!("tx_origin, writing in {ptr}");
 
-                    let mem = match caller.get_module_export(&mem_export) {
-                        Some(Extern::Memory(mem)) => mem,
-                        _ => panic!("failed to find host memory"),
-                    };
+                    let mem = get_memory(&mut caller);
 
                     mem.write(&mut caller, ptr as usize, &SIGNER_ADDRESS)
                         .unwrap();
+                },
+            )
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "emit_log",
+                move |mut caller: Caller<'_, ModuleData>, ptr: u32, len: u32, _topic: u32| {
+                    println!("emit_log, reading from {ptr}, length: {len}");
+
+                    let mem = get_memory(&mut caller);
+                    let mut buffer = vec![0; len as usize];
+
+                    mem.read(&mut caller, ptr as usize, &mut buffer).unwrap();
+
+                    println!("read memory: {buffer:?}");
                 },
             )
             .unwrap();

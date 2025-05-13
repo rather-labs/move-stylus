@@ -267,6 +267,11 @@ mod tests {
         let mut linker = Linker::new(&engine);
 
         let mem_export = module.get_export_index("memory").unwrap();
+        let get_memory =
+            move |caller: &mut Caller<'_, ()>| match caller.get_module_export(&mem_export) {
+                Some(Extern::Memory(mem)) => mem,
+                _ => panic!("failed to find host memory"),
+            };
 
         linker
             .func_wrap(
@@ -279,10 +284,7 @@ mod tests {
                     println!("return_data_pointer: {}", return_data_pointer);
                     println!("return_data_length: {}", return_data_length);
 
-                    let mem = match caller.get_module_export(&mem_export) {
-                        Some(Extern::Memory(mem)) => mem,
-                        _ => panic!("failed to find host memory"),
-                    };
+                    let mem = get_memory(&mut caller);
 
                     let mut buffer = vec![0; return_data_length as usize];
                     mem.read(&mut caller, return_data_pointer as usize, &mut buffer)
@@ -307,17 +309,29 @@ mod tests {
                 move |mut caller: Caller<'_, ()>, ptr: u32| {
                     println!("tx_origin, writing in {ptr}");
 
-                    let mem = match caller.get_module_export(&mem_export) {
-                        Some(Extern::Memory(mem)) => mem,
-                        _ => panic!("failed to find host memory"),
-                    };
+                    let mem = get_memory(&mut caller);
 
-                    let test_address = &[
-                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                        0, 0, 0, 7, 3, 5, 7,
-                    ];
+                    let test_address =
+                        &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 3, 5, 7];
 
                     mem.write(&mut caller, ptr as usize, test_address).unwrap();
+                },
+            )
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "emit_log",
+                move |mut caller: Caller<'_, ()>, ptr: u32, len: u32, _topic: u32| {
+                    println!("emit_log, reading from {ptr}, length: {len}");
+
+                    let mem = get_memory(&mut caller);
+                    let mut buffer = vec![0; len as usize];
+
+                    mem.read(&mut caller, ptr as usize, &mut buffer).unwrap();
+
+                    println!("read memory: {buffer:?}");
                 },
             )
             .unwrap();
