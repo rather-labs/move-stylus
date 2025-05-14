@@ -1,7 +1,5 @@
 use anyhow::Result;
-use move_binary_format::file_format::{
-    Bytecode, CodeUnit, Constant, FunctionDefinition, Signature,
-};
+use move_binary_format::file_format::{CodeUnit, Constant, FunctionDefinition, Signature};
 use walrus::{
     ir::{LoadKind, MemArg, StoreKind},
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleLocals, ValType,
@@ -93,6 +91,7 @@ impl<'a> MappedFunction<'a> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn translate_function(
         &self,
         module: &mut Module,
@@ -116,9 +115,9 @@ impl<'a> MappedFunction<'a> {
             .builder_mut()
             .func_body();
 
+        // Maps one to one the stack's values types at the moment of processing an instruction
         let mut types_stack = Vec::new();
 
-        println!("translating function {:?}", self.id);
         for instruction in &self.move_code_unit.code {
             map_bytecode_instruction(
                 instruction,
@@ -127,100 +126,12 @@ impl<'a> MappedFunction<'a> {
                 &mut builder,
                 self,
                 &mut module.locals,
-                &types_stack,
+                functions_arguments,
+                functions_returns,
+                &mut types_stack,
                 allocator,
                 memory,
             );
-
-            self.process_types_stack(
-                &mut types_stack,
-                instruction,
-                constant_pool,
-                functions_arguments,
-                functions_returns,
-            )
-            // TODO: unwrap
-            .unwrap();
-
-            println!("Stack types: {instruction:?} -> {types_stack:?}");
-        }
-
-        Ok(())
-    }
-
-    fn process_types_stack(
-        &self,
-        types_stack: &mut Vec<IntermediateType>,
-        instruction: &Bytecode,
-        constant_pool: &[Constant],
-        functions_arguments: &[Vec<IntermediateType>],
-        functions_returns: &[Vec<IntermediateType>],
-    ) -> Result<(), anyhow::Error> {
-        match instruction {
-            Bytecode::LdConst(global_index) => {
-                if let Some(constant) = constant_pool.get(global_index.0 as usize) {
-                    let constant_type: IntermediateType = (&constant.type_).try_into()?;
-                    types_stack.push(constant_type);
-                } else {
-                    return Err(anyhow::anyhow!(
-                        "unable to find constant with global index: {global_index:?}"
-                    ));
-                }
-            }
-            Bytecode::LdFalse | Bytecode::LdTrue => types_stack.push(IntermediateType::IBool),
-            Bytecode::LdU8(_) => types_stack.push(IntermediateType::IU8),
-            Bytecode::LdU16(_) => types_stack.push(IntermediateType::IU16),
-            Bytecode::LdU32(_) => types_stack.push(IntermediateType::IU32),
-            Bytecode::LdU64(_) => types_stack.push(IntermediateType::IU64),
-            Bytecode::LdU128(_) => types_stack.push(IntermediateType::IU128),
-            Bytecode::LdU256(_) => types_stack.push(IntermediateType::IU256),
-            Bytecode::Call(function_handle_index) => {
-                // First remove from the type stack the types used to call the function
-                if let Some(arguments) = functions_arguments.get(function_handle_index.0 as usize) {
-                    for argument in arguments.iter().rev() {
-                        if let Some(ref arg) = types_stack.pop() {
-                            if arg != argument {
-                                return Err(anyhow::anyhow!(
-                        "function call argument mismatch, expected {argument:?} and found {arg:?}"
-                    ));
-                            }
-                        } else {
-                            return Err(anyhow::anyhow!(
-                        "function call argument error, expected {argument:?} but types stack is empty"
-                    ));
-                        }
-                    }
-                }
-
-                if let Some(return_types) = functions_returns.get(function_handle_index.0 as usize)
-                {
-                    for return_type in return_types {
-                        types_stack.push(return_type.clone());
-                    }
-                } else {
-                    return Err(anyhow::anyhow!(
-                        "unable to find return types for function handle index: {function_handle_index:?}"
-                    ));
-                }
-            }
-            Bytecode::StLoc(_) | Bytecode::Pop => {
-                types_stack.pop();
-            }
-            Bytecode::CopyLoc(local_id) | Bytecode::MoveLoc(local_id) => {
-                if let Some(local_var_type) = self.local_variables_type.get(*local_id as usize) {
-                    types_stack.push(local_var_type.clone());
-                } else {
-                    return Err(anyhow::anyhow!(
-                        "unable to find local variable type: {local_id:?}"
-                    ));
-                }
-            }
-            Bytecode::VecPack(_signature_index, num_elements) => {
-                // TODO: Maybe check that every element is of type _signature_index?
-                types_stack.truncate(types_stack.len() - *num_elements as usize);
-            }
-            Bytecode::Ret => {}
-            _ => panic!("Unsupported instruction: {:?}", instruction),
         }
 
         Ok(())
