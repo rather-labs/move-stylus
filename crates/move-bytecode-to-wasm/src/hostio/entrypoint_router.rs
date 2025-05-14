@@ -1,6 +1,6 @@
 use walrus::{
-    FunctionBuilder, FunctionId, MemoryId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg},
+    FunctionBuilder, FunctionId, MemoryId, Module, ValType,
 };
 
 use crate::{
@@ -22,6 +22,8 @@ pub fn build_entrypoint_router(
     let (read_args_function, _) = host_functions::read_args(module);
     let (write_return_data_function, _) = host_functions::write_result(module);
     let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
+    let (tx_origin_function, _) = host_functions::tx_origin(module);
+    let (emit_log_function, _) = host_functions::emit_log(module);
 
     let args_len = module.locals.add(ValType::I32);
     let selector_variable = module.locals.add(ValType::I32);
@@ -70,6 +72,8 @@ pub fn build_entrypoint_router(
             args_len,
             write_return_data_function,
             storage_flush_cache_function,
+            tx_origin_function,
+            emit_log_function,
             allocator_func,
         );
     }
@@ -160,6 +164,12 @@ mod tests {
         let mut linker = Linker::new(&engine);
 
         let mem_export = module.get_export_index("memory").unwrap();
+        let get_memory = move |caller: &mut Caller<'_, ReadArgsData>| match caller
+            .get_module_export(&mem_export)
+        {
+            Some(Extern::Memory(mem)) => mem,
+            _ => panic!("failed to find host memory"),
+        };
 
         linker
             .func_wrap(
@@ -168,10 +178,7 @@ mod tests {
                 move |mut caller: Caller<'_, ReadArgsData>, args_ptr: u32| {
                     println!("read_args");
 
-                    let mem = match caller.get_module_export(&mem_export) {
-                        Some(Extern::Memory(mem)) => mem,
-                        _ => panic!("failed to find host memory"),
-                    };
+                    let mem = get_memory(&mut caller);
 
                     let args_data = caller.data().data.clone();
                     println!("args_data: {:?}", args_data);
@@ -194,6 +201,41 @@ mod tests {
 
         linker
             .func_wrap("vm_hooks", "storage_flush_cache", |_: i32| {})
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "tx_origin",
+                move |mut caller: Caller<'_, ReadArgsData>, ptr: u32| {
+                    println!("tx_origin, writing in {ptr}");
+
+                    let mem = get_memory(&mut caller);
+
+                    // Write 0x7357 address
+                    let test_address =
+                        &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 3, 5, 7];
+
+                    mem.write(&mut caller, ptr as usize, test_address).unwrap();
+                },
+            )
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "emit_log",
+                move |mut caller: Caller<'_, ReadArgsData>, ptr: u32, len: u32, _topic: u32| {
+                    println!("emit_log, reading from {ptr}, length: {len}");
+
+                    let mem = get_memory(&mut caller);
+                    let mut buffer = vec![0; len as usize];
+
+                    mem.read(&mut caller, ptr as usize, &mut buffer).unwrap();
+
+                    println!("read memory: {buffer:?}");
+                },
+            )
             .unwrap();
 
         let mut store = Store::new(&engine, data);
