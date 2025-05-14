@@ -19,8 +19,6 @@ pub struct MappedFunction<'a> {
     pub move_code_unit: CodeUnit,
     pub local_variables: Vec<LocalId>,
     pub local_variables_type: Vec<IntermediateType>,
-    /// This field maps the types of the values that are currently in the stack
-    pub stack_types: Vec<IntermediateType>,
     pub move_module_signatures: &'a [Signature],
 }
 
@@ -97,17 +95,16 @@ impl<'a> MappedFunction<'a> {
             move_code_unit: code,
             local_variables,
             local_variables_type,
-            stack_types: vec![],
             move_module_signatures,
         }
     }
 
     pub fn translate_function(
-        // TODO: Maybe use interior mutability
         &self,
         module: &mut Module,
         constant_pool: &[Constant],
         function_ids: &[FunctionId],
+        function_returns: &[Vec<IntermediateType>],
         memory: MemoryId,
         allocator: FunctionId,
     ) -> Result<()> {
@@ -124,6 +121,9 @@ impl<'a> MappedFunction<'a> {
             .builder_mut()
             .func_body();
 
+        let mut stack_types = Vec::new();
+
+        println!("translating function {:?}", self.id);
         for instruction in &self.move_code_unit.code {
             map_bytecode_instruction(
                 instruction,
@@ -132,74 +132,83 @@ impl<'a> MappedFunction<'a> {
                 &mut builder,
                 self,
                 &mut module.locals,
+                &stack_types,
                 allocator,
                 memory,
             );
 
-            //self.process_stack_type();
+            self.process_stack_type(
+                &mut stack_types,
+                instruction,
+                constant_pool,
+                function_returns,
+            )
+            // TODO: unwrap
+            .unwrap();
+
+            println!("Stack types: {instruction:?} -> {stack_types:?}");
         }
 
         Ok(())
     }
 
-    fn process_stack_type(&self, instruction: &Bytecode, constant_pool: &[Constant]) {
-        todo!();
+    fn process_stack_type(
+        &self,
+        stack_types: &mut Vec<IntermediateType>,
+        instruction: &Bytecode,
+        constant_pool: &[Constant],
+        function_returns: &[Vec<IntermediateType>],
+    ) -> Result<(), anyhow::Error> {
         match instruction {
-            // Load a fixed constant
             Bytecode::LdConst(global_index) => {
                 if let Some(constant) = constant_pool.get(global_index.0 as usize) {
-                    match constant.type_ {
-                        move_binary_format::file_format::SignatureToken::Bool => todo!(),
-                        move_binary_format::file_format::SignatureToken::U8 => todo!(),
-                        move_binary_format::file_format::SignatureToken::U64 => todo!(),
-                        move_binary_format::file_format::SignatureToken::U128 => todo!(),
-                        move_binary_format::file_format::SignatureToken::Address => todo!(),
-                        move_binary_format::file_format::SignatureToken::Signer => todo!(),
-                        move_binary_format::file_format::SignatureToken::Vector(
-                            signature_token,
-                        ) => todo!(),
-                        move_binary_format::file_format::SignatureToken::Datatype(
-                            datatype_handle_index,
-                        ) => todo!(),
-                        move_binary_format::file_format::SignatureToken::DatatypeInstantiation(
-                            _,
-                        ) => todo!(),
-                        move_binary_format::file_format::SignatureToken::Reference(
-                            signature_token,
-                        ) => todo!(),
-                        move_binary_format::file_format::SignatureToken::MutableReference(
-                            signature_token,
-                        ) => todo!(),
-                        move_binary_format::file_format::SignatureToken::TypeParameter(_) => {
-                            todo!()
-                        }
-                        move_binary_format::file_format::SignatureToken::U16 => todo!(),
-                        move_binary_format::file_format::SignatureToken::U32 => todo!(),
-                        move_binary_format::file_format::SignatureToken::U256 => todo!(),
-                    }
+                    let constant_type: IntermediateType = (&constant.type_).try_into()?;
+                    stack_types.push(constant_type);
+                } else {
+                    return Err(anyhow::anyhow!(
+                        "unable to find constant with global index: {global_index:?}"
+                    ));
                 }
             }
-            // Load literals
-            Bytecode::LdFalse => {}
-            Bytecode::LdTrue => {}
-            Bytecode::LdU8(literal) => {}
-            Bytecode::LdU16(literal) => {}
-            Bytecode::LdU32(literal) => {}
-            Bytecode::LdU64(literal) => {}
-            Bytecode::LdU128(literal) => {}
-            Bytecode::LdU256(literal) => {}
-            // Function calls
-            Bytecode::Call(function_handle_index) => {}
-            // Locals
-            Bytecode::StLoc(local_id) => {}
-            Bytecode::MoveLoc(local_id) => {}
-            Bytecode::CopyLoc(local_id) => {}
-            Bytecode::VecPack(signature_index, num_elements) => {}
-            Bytecode::Pop => {}
+            Bytecode::LdFalse | Bytecode::LdTrue => stack_types.push(IntermediateType::IBool),
+            Bytecode::LdU8(_) => stack_types.push(IntermediateType::IU8),
+            Bytecode::LdU16(_) => stack_types.push(IntermediateType::IU16),
+            Bytecode::LdU32(_) => stack_types.push(IntermediateType::IU32),
+            Bytecode::LdU64(_) => stack_types.push(IntermediateType::IU64),
+            Bytecode::LdU128(_) => stack_types.push(IntermediateType::IU128),
+            Bytecode::LdU256(_) => stack_types.push(IntermediateType::IU256),
+            Bytecode::Call(function_handle_index) => {
+                if let Some(return_types) = function_returns.get(function_handle_index.0 as usize) {
+                    for return_type in return_types {
+                        stack_types.push(return_type.clone());
+                    }
+                } else {
+                    return Err(anyhow::anyhow!(
+                        "unable to find return types for function handle index: {function_handle_index:?}"
+                    ));
+                }
+            }
+            Bytecode::StLoc(_) | Bytecode::Pop => {
+                stack_types.pop();
+            }
+            Bytecode::CopyLoc(local_id) | Bytecode::MoveLoc(local_id) => {
+                if let Some(local_var_type) = self.local_variables_type.get(*local_id as usize) {
+                    stack_types.push(local_var_type.clone());
+                } else {
+                    return Err(anyhow::anyhow!(
+                        "unable to find local variable type: {local_id:?}"
+                    ));
+                }
+            }
+            Bytecode::VecPack(_signature_index, num_elements) => {
+                // TODO: Maybe check that every element is of type _signature_index?
+                stack_types.truncate(stack_types.len() - *num_elements as usize);
+            }
             Bytecode::Ret => {}
-            Bytecode::Add => {}
             _ => panic!("Unsupported instruction: {:?}", instruction),
         }
+
+        Ok(())
     }
 }
 

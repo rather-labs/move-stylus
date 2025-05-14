@@ -16,7 +16,7 @@ pub mod signer;
 pub mod simple_integers;
 pub mod vector;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum IntermediateType {
     IBool,
     IU8,
@@ -248,41 +248,6 @@ impl TryFrom<&SignatureToken> for IntermediateType {
         }
     }
 }
-
-impl TryFrom<SignatureToken> for IntermediateType {
-    // TODO: Change when handling errors better
-    type Error = anyhow::Error;
-
-    fn try_from(value: SignatureToken) -> Result<Self, Self::Error> {
-        IntermediateType::try_from(&value)
-    }
-}
-
-/*
-impl TryInto<IntermediateType> for &SignatureToken {
-    // TODO: Change when handling errors better
-    type Error = anyhow::Error;
-
-    fn try_into(self) -> Result<IntermediateType, Self::Error> {
-        match self {
-            SignatureToken::Bool => Ok(IntermediateType::IBool),
-            SignatureToken::U8 => Ok(IntermediateType::IU8),
-            SignatureToken::U16 => Ok(IntermediateType::IU16),
-            SignatureToken::U32 => Ok(IntermediateType::IU32),
-            SignatureToken::U64 => Ok(IntermediateType::IU64),
-            SignatureToken::U128 => Ok(IntermediateType::IU128),
-            SignatureToken::U256 => Ok(IntermediateType::IU256),
-            SignatureToken::Address => Ok(IntermediateType::IAddress),
-            SignatureToken::Signer => Ok(IntermediateType::ISigner),
-            SignatureToken::Vector(token) => {
-                let itoken = (&(*token)).try_into()?;
-                Ok(IntermediateType::IVector(Box::new(itoken)))
-            }
-
-            _ => Err(anyhow::anyhow!("Unsupported signature token: {self:?}")),
-        }
-    }
-}*/
 
 pub struct ISignature {
     pub arguments: Vec<IntermediateType>,

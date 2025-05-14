@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::Path};
 use abi_types::public_function::PublicFunction;
 use move_binary_format::file_format::Visibility;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
-use translation::functions::MappedFunction;
+use translation::{functions::MappedFunction, intermediate_types::IntermediateType};
 use walrus::Module;
 use wasm_validation::validate_stylus_wasm;
 
@@ -59,6 +59,10 @@ pub fn translate_package(
 
         // All functions are defined empty to get their corresponding Ids
         let mut mapped_functions = Vec::new();
+
+        // Return types of functions in intermediate types. Used to fill the stack type
+        let mut function_returns = Vec::new();
+
         for (function_def, function_handle) in root_compiled_module
             .function_defs
             .iter()
@@ -68,6 +72,15 @@ pub fn translate_package(
                 &root_compiled_module.signatures[function_handle.parameters.0 as usize];
             let move_function_return =
                 &root_compiled_module.signatures[function_handle.return_.0 as usize];
+
+            function_returns.push(
+                move_function_return
+                    .0
+                    .iter()
+                    .map(IntermediateType::try_from)
+                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .unwrap(),
+            );
 
             let function_name =
                 root_compiled_module.identifiers[function_handle.name.0 as usize].to_string();
@@ -90,6 +103,7 @@ pub fn translate_package(
                     &mut module,
                     &root_compiled_module.constant_pool,
                     &function_ids,
+                    &function_returns,
                     memory_id,
                     allocator_func,
                 )

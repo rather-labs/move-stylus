@@ -22,6 +22,7 @@ fn map_bytecode_instruction(
     builder: &mut InstrSeqBuilder,
     mapped_function: &MappedFunction,
     module_locals: &mut ModuleLocals,
+    stack_types: &[IntermediateType],
     allocator: FunctionId,
     memory: MemoryId,
 ) {
@@ -138,9 +139,6 @@ fn map_bytecode_instruction(
                 memory,
                 allocator,
             );
-        }
-        Bytecode::Add => {
-            builder.binop(BinaryOp::I32Add);
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
