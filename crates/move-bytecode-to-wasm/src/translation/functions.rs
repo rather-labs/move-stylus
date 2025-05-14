@@ -1,13 +1,15 @@
 use anyhow::Result;
-use move_binary_format::file_format::{CodeUnit, Constant, FunctionDefinition, Signature};
+use move_binary_format::file_format::{
+    Bytecode, CodeUnit, Constant, FunctionDefinition, Signature,
+};
 use walrus::{
-    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleLocals, ValType,
     ir::{LoadKind, MemArg, StoreKind},
+    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleLocals, ValType,
 };
 
 use crate::translation::{intermediate_types::ISignature, map_bytecode_instruction};
 
-use super::intermediate_types::{IntermediateType, SignatureTokenToIntermediateType};
+use super::intermediate_types::IntermediateType;
 
 pub struct MappedFunction<'a> {
     pub id: FunctionId,
@@ -17,6 +19,8 @@ pub struct MappedFunction<'a> {
     pub move_code_unit: CodeUnit,
     pub local_variables: Vec<LocalId>,
     pub local_variables_type: Vec<IntermediateType>,
+    /// This field maps the types of the values that are currently in the stack
+    pub stack_types: Vec<IntermediateType>,
     pub move_module_signatures: &'a [Signature],
 }
 
@@ -54,8 +58,10 @@ impl<'a> MappedFunction<'a> {
         let arg_intermediate_types = move_arguments
             .0
             .iter()
-            .map(|token| token.to_intermediate_type())
-            .collect::<Vec<IntermediateType>>();
+            .map(|token| token.try_into())
+            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+            // TODO: unwrap
+            .unwrap();
 
         // === Create the function ===
         let function_builder =
@@ -69,8 +75,10 @@ impl<'a> MappedFunction<'a> {
 
         let local_intermediate_types = signature_tokens
             .iter()
-            .map(|token| token.to_intermediate_type())
-            .collect::<Vec<IntermediateType>>();
+            .map(|token| token.try_into())
+            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+            // TODO: unwrap
+            .unwrap();
 
         let local_ids = local_intermediate_types
             .iter()
@@ -89,11 +97,13 @@ impl<'a> MappedFunction<'a> {
             move_code_unit: code,
             local_variables,
             local_variables_type,
+            stack_types: vec![],
             move_module_signatures,
         }
     }
 
     pub fn translate_function(
+        // TODO: Maybe use interior mutability
         &self,
         module: &mut Module,
         constant_pool: &[Constant],
@@ -114,7 +124,7 @@ impl<'a> MappedFunction<'a> {
             .builder_mut()
             .func_body();
 
-        for instruction in self.move_code_unit.code.iter() {
+        for instruction in &self.move_code_unit.code {
             map_bytecode_instruction(
                 instruction,
                 constant_pool,
@@ -125,9 +135,71 @@ impl<'a> MappedFunction<'a> {
                 allocator,
                 memory,
             );
+
+            //self.process_stack_type();
         }
 
         Ok(())
+    }
+
+    fn process_stack_type(&self, instruction: &Bytecode, constant_pool: &[Constant]) {
+        todo!();
+        match instruction {
+            // Load a fixed constant
+            Bytecode::LdConst(global_index) => {
+                if let Some(constant) = constant_pool.get(global_index.0 as usize) {
+                    match constant.type_ {
+                        move_binary_format::file_format::SignatureToken::Bool => todo!(),
+                        move_binary_format::file_format::SignatureToken::U8 => todo!(),
+                        move_binary_format::file_format::SignatureToken::U64 => todo!(),
+                        move_binary_format::file_format::SignatureToken::U128 => todo!(),
+                        move_binary_format::file_format::SignatureToken::Address => todo!(),
+                        move_binary_format::file_format::SignatureToken::Signer => todo!(),
+                        move_binary_format::file_format::SignatureToken::Vector(
+                            signature_token,
+                        ) => todo!(),
+                        move_binary_format::file_format::SignatureToken::Datatype(
+                            datatype_handle_index,
+                        ) => todo!(),
+                        move_binary_format::file_format::SignatureToken::DatatypeInstantiation(
+                            _,
+                        ) => todo!(),
+                        move_binary_format::file_format::SignatureToken::Reference(
+                            signature_token,
+                        ) => todo!(),
+                        move_binary_format::file_format::SignatureToken::MutableReference(
+                            signature_token,
+                        ) => todo!(),
+                        move_binary_format::file_format::SignatureToken::TypeParameter(_) => {
+                            todo!()
+                        }
+                        move_binary_format::file_format::SignatureToken::U16 => todo!(),
+                        move_binary_format::file_format::SignatureToken::U32 => todo!(),
+                        move_binary_format::file_format::SignatureToken::U256 => todo!(),
+                    }
+                }
+            }
+            // Load literals
+            Bytecode::LdFalse => {}
+            Bytecode::LdTrue => {}
+            Bytecode::LdU8(literal) => {}
+            Bytecode::LdU16(literal) => {}
+            Bytecode::LdU32(literal) => {}
+            Bytecode::LdU64(literal) => {}
+            Bytecode::LdU128(literal) => {}
+            Bytecode::LdU256(literal) => {}
+            // Function calls
+            Bytecode::Call(function_handle_index) => {}
+            // Locals
+            Bytecode::StLoc(local_id) => {}
+            Bytecode::MoveLoc(local_id) => {}
+            Bytecode::CopyLoc(local_id) => {}
+            Bytecode::VecPack(signature_index, num_elements) => {}
+            Bytecode::Pop => {}
+            Bytecode::Ret => {}
+            Bytecode::Add => {}
+            _ => panic!("Unsupported instruction: {:?}", instruction),
+        }
     }
 }
 

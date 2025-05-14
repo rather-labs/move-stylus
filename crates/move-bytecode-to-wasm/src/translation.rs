@@ -1,12 +1,13 @@
 use functions::{
-    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
+    add_unpack_function_return_values_instructions, prepare_function_return, MappedFunction,
 };
 use intermediate_types::vector::IVector;
-use intermediate_types::{IntermediateType, SignatureTokenToIntermediateType};
+use intermediate_types::IntermediateType;
 use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
+use walrus::ir::BinaryOp;
 use walrus::{
-    FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
     ir::{MemArg, StoreKind},
+    FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
 };
 pub mod functions;
 /// The types in this module represent an intermediate Rust representation of Move types
@@ -29,10 +30,19 @@ fn map_bytecode_instruction(
         Bytecode::LdConst(global_index) => {
             let constant = &constants[global_index.0 as usize];
             let mut data = constant.data.clone().into_iter();
-            constant
-                .type_
-                .to_intermediate_type()
-                .load_constant_instructions(module_locals, builder, &mut data, allocator, memory);
+            let constant_type = &constant.type_;
+            let constant: IntermediateType = constant_type
+                .try_into()
+                // TODO: unwrap
+                .unwrap();
+
+            constant.load_constant_instructions(
+                module_locals,
+                builder,
+                &mut data,
+                allocator,
+                memory,
+            );
             assert!(
                 data.next().is_none(),
                 "Constant data not consumed: {:?}",
@@ -129,6 +139,9 @@ fn map_bytecode_instruction(
                 allocator,
             );
         }
+        Bytecode::Add => {
+            builder.binop(BinaryOp::I32Add);
+        }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
 }
@@ -178,5 +191,6 @@ fn get_intermediate_type_for_signature_index(
         1,
         "Expected signature to have exactly 1 token for VecPack"
     );
-    tokens[0].to_intermediate_type()
+    // TODO: unwrap
+    (&tokens[0]).try_into().unwrap()
 }

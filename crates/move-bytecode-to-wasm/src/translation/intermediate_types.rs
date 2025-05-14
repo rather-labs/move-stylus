@@ -2,11 +2,11 @@ use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
 use move_binary_format::file_format::{Signature, SignatureToken};
-use simple_integers::{IU8, IU16, IU32, IU64};
+use simple_integers::{IU16, IU32, IU64, IU8};
 use vector::IVector;
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
     ir::{LoadKind, MemArg},
+    FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
 };
 
 pub mod address;
@@ -224,30 +224,65 @@ impl IntermediateType {
     }
 }
 
-pub trait SignatureTokenToIntermediateType {
-    fn to_intermediate_type(&self) -> IntermediateType;
-}
+impl TryFrom<&SignatureToken> for IntermediateType {
+    // TODO: Change when handling errors better
+    type Error = anyhow::Error;
 
-impl SignatureTokenToIntermediateType for SignatureToken {
-    fn to_intermediate_type(&self) -> IntermediateType {
-        match self {
-            SignatureToken::Bool => IntermediateType::IBool,
-            SignatureToken::U8 => IntermediateType::IU8,
-            SignatureToken::U16 => IntermediateType::IU16,
-            SignatureToken::U32 => IntermediateType::IU32,
-            SignatureToken::U64 => IntermediateType::IU64,
-            SignatureToken::U128 => IntermediateType::IU128,
-            SignatureToken::U256 => IntermediateType::IU256,
-            SignatureToken::Address => IntermediateType::IAddress,
-            SignatureToken::Signer => IntermediateType::ISigner,
+    fn try_from(value: &SignatureToken) -> Result<Self, Self::Error> {
+        match value {
+            SignatureToken::Bool => Ok(Self::IBool),
+            SignatureToken::U8 => Ok(Self::IU8),
+            SignatureToken::U16 => Ok(Self::IU16),
+            SignatureToken::U32 => Ok(Self::IU32),
+            SignatureToken::U64 => Ok(Self::IU64),
+            SignatureToken::U128 => Ok(Self::IU128),
+            SignatureToken::U256 => Ok(Self::IU256),
+            SignatureToken::Address => Ok(Self::IAddress),
+            SignatureToken::Signer => Ok(Self::ISigner),
             SignatureToken::Vector(token) => {
-                IntermediateType::IVector(Box::new(token.to_intermediate_type()))
+                let itoken = Self::try_from(token.as_ref())?;
+                Ok(IntermediateType::IVector(Box::new(itoken)))
             }
 
-            _ => panic!("Unsupported signature token: {:?}", self),
+            _ => Err(anyhow::anyhow!("Unsupported signature token: {value:?}")),
         }
     }
 }
+
+impl TryFrom<SignatureToken> for IntermediateType {
+    // TODO: Change when handling errors better
+    type Error = anyhow::Error;
+
+    fn try_from(value: SignatureToken) -> Result<Self, Self::Error> {
+        IntermediateType::try_from(&value)
+    }
+}
+
+/*
+impl TryInto<IntermediateType> for &SignatureToken {
+    // TODO: Change when handling errors better
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<IntermediateType, Self::Error> {
+        match self {
+            SignatureToken::Bool => Ok(IntermediateType::IBool),
+            SignatureToken::U8 => Ok(IntermediateType::IU8),
+            SignatureToken::U16 => Ok(IntermediateType::IU16),
+            SignatureToken::U32 => Ok(IntermediateType::IU32),
+            SignatureToken::U64 => Ok(IntermediateType::IU64),
+            SignatureToken::U128 => Ok(IntermediateType::IU128),
+            SignatureToken::U256 => Ok(IntermediateType::IU256),
+            SignatureToken::Address => Ok(IntermediateType::IAddress),
+            SignatureToken::Signer => Ok(IntermediateType::ISigner),
+            SignatureToken::Vector(token) => {
+                let itoken = (&(*token)).try_into()?;
+                Ok(IntermediateType::IVector(Box::new(itoken)))
+            }
+
+            _ => Err(anyhow::anyhow!("Unsupported signature token: {self:?}")),
+        }
+    }
+}*/
 
 pub struct ISignature {
     pub arguments: Vec<IntermediateType>,
@@ -259,13 +294,18 @@ impl ISignature {
         let arguments = arguments
             .0
             .iter()
-            .map(|token| token.to_intermediate_type())
-            .collect();
+            .map(|token| token.try_into())
+            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+            // TODO: unwrap
+            .unwrap();
+
         let returns = returns
             .0
             .iter()
-            .map(|token| token.to_intermediate_type())
-            .collect();
+            .map(|token| token.try_into())
+            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+            // TODO: unwrap
+            .unwrap();
 
         Self { arguments, returns }
     }
