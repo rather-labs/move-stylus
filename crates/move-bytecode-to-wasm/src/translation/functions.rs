@@ -53,13 +53,7 @@ impl<'a> MappedFunction<'a> {
             .map(|arg| module.locals.add(*arg))
             .collect::<Vec<LocalId>>();
 
-        let arg_intermediate_types = move_arguments
-            .0
-            .iter()
-            .map(|token| token.try_into())
-            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-            // TODO: unwrap
-            .unwrap();
+        let arg_intermediate_types = move_arguments.0.iter().map(IntermediateType::try_from);
 
         // === Create the function ===
         let function_builder =
@@ -71,21 +65,21 @@ impl<'a> MappedFunction<'a> {
         let move_locals = &code.locals;
         let signature_tokens = &move_module_signatures[move_locals.0 as usize].0;
 
-        let local_intermediate_types = signature_tokens
-            .iter()
-            .map(|token| token.try_into())
+        let local_intermediate_types = signature_tokens.iter().map(IntermediateType::try_from);
+
+        let local_ids = local_intermediate_types
+            .clone()
+            .flat_map(|token| token.map(|t| t.to_wasm_type()))
+            .map(|valty| module.locals.add(valty));
+
+        // === Combine all locals and types ===
+        let local_variables = arg_local_ids.into_iter().chain(local_ids).collect();
+
+        let local_variables_type = arg_intermediate_types
+            .chain(local_intermediate_types)
             .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
             // TODO: unwrap
             .unwrap();
-
-        let local_ids = local_intermediate_types
-            .iter()
-            .map(|ty| module.locals.add(ty.to_wasm_type()))
-            .collect::<Vec<LocalId>>();
-
-        // === Combine all locals and types ===
-        let local_variables = [arg_local_ids, local_ids].concat();
-        let local_variables_type = [arg_intermediate_types, local_intermediate_types].concat();
 
         Self {
             id,
@@ -104,7 +98,8 @@ impl<'a> MappedFunction<'a> {
         module: &mut Module,
         constant_pool: &[Constant],
         function_ids: &[FunctionId],
-        function_returns: &[Vec<IntermediateType>],
+        functions_arguments: &[Vec<IntermediateType>],
+        functions_returns: &[Vec<IntermediateType>],
         memory: MemoryId,
         allocator: FunctionId,
     ) -> Result<()> {
@@ -141,7 +136,8 @@ impl<'a> MappedFunction<'a> {
                 &mut types_stack,
                 instruction,
                 constant_pool,
-                function_returns,
+                functions_arguments,
+                functions_returns,
             )
             // TODO: unwrap
             .unwrap();
@@ -157,7 +153,8 @@ impl<'a> MappedFunction<'a> {
         types_stack: &mut Vec<IntermediateType>,
         instruction: &Bytecode,
         constant_pool: &[Constant],
-        function_returns: &[Vec<IntermediateType>],
+        functions_arguments: &[Vec<IntermediateType>],
+        functions_returns: &[Vec<IntermediateType>],
     ) -> Result<(), anyhow::Error> {
         match instruction {
             Bytecode::LdConst(global_index) => {
@@ -178,7 +175,25 @@ impl<'a> MappedFunction<'a> {
             Bytecode::LdU128(_) => types_stack.push(IntermediateType::IU128),
             Bytecode::LdU256(_) => types_stack.push(IntermediateType::IU256),
             Bytecode::Call(function_handle_index) => {
-                if let Some(return_types) = function_returns.get(function_handle_index.0 as usize) {
+                // First remove from the type stack the types used to call the function
+                if let Some(arguments) = functions_arguments.get(function_handle_index.0 as usize) {
+                    for argument in arguments.iter().rev() {
+                        if let Some(ref arg) = types_stack.pop() {
+                            if arg != argument {
+                                return Err(anyhow::anyhow!(
+                        "function call argument mismatch, expected {argument:?} and found {arg:?}"
+                    ));
+                            }
+                        } else {
+                            return Err(anyhow::anyhow!(
+                        "function call argument error, expected {argument:?} but types stack is empty"
+                    ));
+                        }
+                    }
+                }
+
+                if let Some(return_types) = functions_returns.get(function_handle_index.0 as usize)
+                {
                     for return_type in return_types {
                         types_stack.push(return_type.clone());
                     }

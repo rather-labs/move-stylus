@@ -61,7 +61,8 @@ pub fn translate_package(
         let mut mapped_functions = Vec::new();
 
         // Return types of functions in intermediate types. Used to fill the stack type
-        let mut function_returns = Vec::new();
+        let mut functions_returns = Vec::new();
+        let mut functions_arguments = Vec::new();
 
         for (function_def, function_handle) in root_compiled_module
             .function_defs
@@ -70,10 +71,20 @@ pub fn translate_package(
         {
             let move_function_arguments =
                 &root_compiled_module.signatures[function_handle.parameters.0 as usize];
+
+            functions_arguments.push(
+                move_function_arguments
+                    .0
+                    .iter()
+                    .map(IntermediateType::try_from)
+                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .unwrap(),
+            );
+
             let move_function_return =
                 &root_compiled_module.signatures[function_handle.return_.0 as usize];
 
-            function_returns.push(
+            functions_returns.push(
                 move_function_return
                     .0
                     .iter()
@@ -103,7 +114,8 @@ pub fn translate_package(
                     &mut module,
                     &root_compiled_module.constant_pool,
                     &function_ids,
-                    &function_returns,
+                    &functions_arguments,
+                    &functions_returns,
                     memory_id,
                     allocator_func,
                 )
