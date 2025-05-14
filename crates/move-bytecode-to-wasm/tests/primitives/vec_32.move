@@ -43,3 +43,9 @@ public fun echo(x: vector<u32>): vector<u32> {
   x
 }
 
+public fun demo_ref(x: vector<u32>): vector<u32> {
+  let y = &x;
+  *y
+}
+
+

@@ -6,7 +6,7 @@ use simple_integers::{IU8, IU16, IU32, IU64};
 use vector::IVector;
 use walrus::{
     FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
-    ir::{LoadKind, MemArg},
+    ir::{LoadKind, MemArg, StoreKind},
 };
 
 pub mod address;
@@ -234,6 +234,110 @@ impl IntermediateType {
                 let local = module_locals.add(ValType::I64);
                 builder.local_set(local);
                 local
+            }
+        }
+    }
+
+    pub fn add_imm_borrow_loc_instructions(
+        &self,
+        module_locals: &mut ModuleLocals,
+        builder: &mut InstrSeqBuilder,
+        allocator: FunctionId,
+        memory: MemoryId,
+        local: LocalId,
+    ) {
+        match self {
+            // For primitives, we copy the value in memory and return a pointer to it (?)
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64 => {
+                let size = self.stack_data_size() as i32;
+                let ptr = module_locals.add(ValType::I32);
+
+                builder.i32_const(size);
+                builder.call(allocator);
+                builder.local_tee(ptr);
+
+                builder.local_get(local);
+                builder.store(
+                    memory,
+                    match self {
+                        IntermediateType::IU64 => StoreKind::I64 { atomic: false },
+                        _ => StoreKind::I32 { atomic: false },
+                    },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                builder.local_get(ptr); // leave the pointer on the stack as &T
+            }
+
+            // Heap allocated: just forward the existing pointer
+            IntermediateType::IVector(_)
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress => {
+                builder.local_get(local);
+            }
+            IntermediateType::ISigner => {
+                panic!("Cannot ImmBorrowLoc on a signer type");
+            }
+            IntermediateType::Ref(_) | IntermediateType::MutRef(_) => {
+                panic!("Cannot ImmBorrowLoc on a reference type");
+            }
+        }
+    }
+
+    pub fn add_read_ref_instructions(
+        &self,
+        module_locals: &mut ModuleLocals,
+        builder: &mut InstrSeqBuilder,
+        memory: MemoryId,
+    ) {
+        let ptr = module_locals.add(ValType::I32);
+        builder.local_set(ptr);
+
+        match self {
+            IntermediateType::IU64 => {
+                builder.local_get(ptr);
+                builder.load(
+                    memory,
+                    LoadKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+            IntermediateType::IVector(_)
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress => {
+                builder.local_get(ptr);
+            }
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32 => {
+                builder.local_get(ptr);
+                builder.load(
+                    memory,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+            IntermediateType::ISigner => {
+                panic!("Cannot ReadRef on signer type");
+            }
+            IntermediateType::Ref(_) | IntermediateType::MutRef(_) => {
+                panic!("Cannot ReadRef on reference to reference");
             }
         }
     }

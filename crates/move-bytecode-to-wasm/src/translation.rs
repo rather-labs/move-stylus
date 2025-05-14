@@ -116,6 +116,19 @@ fn map_bytecode_instruction(
                 *num_elements as i32,
             );
         }
+        Bytecode::ImmBorrowLoc(local_id) => {
+            let local = mapped_function.local_variables[*local_id as usize];
+            &mapped_function.local_variables_type[*local_id as usize]
+                .add_imm_borrow_loc_instructions(module_locals, builder, allocator, memory, local);
+        }
+        Bytecode::ReadRef => {
+            // &mapped_function.local_variables_type[*local_id as usize].add_read_ref_instructions(
+            //     module_locals,
+            //     builder,
+            //     allocator,
+            //     memory,
+            // );
+        }
         Bytecode::Pop => {
             builder.drop();
         }

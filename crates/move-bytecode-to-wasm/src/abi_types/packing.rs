@@ -131,13 +131,23 @@ impl Packable for IntermediateType {
         module: &mut Module,
     ) -> LocalId {
         match self {
-            IntermediateType::IU64 => {
-                let local = module.locals.add(ValType::I64);
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::ISigner
+            | IntermediateType::IAddress
+            | IntermediateType::IVector(_)
+            | IntermediateType::Ref(_)
+            | IntermediateType::MutRef(_) => {
+                let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
             }
-            _ => {
-                let local = module.locals.add(ValType::I32);
+            IntermediateType::IU64 => {
+                let local = module.locals.add(ValType::I64);
                 builder.local_set(local);
                 local
             }
