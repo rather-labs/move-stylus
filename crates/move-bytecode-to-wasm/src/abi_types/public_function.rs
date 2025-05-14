@@ -2,7 +2,7 @@ use walrus::{FunctionId, InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp
 
 use crate::translation::{
     functions::add_unpack_function_return_values_instructions,
-    intermediate_types::{ISignature, IntermediateType},
+    intermediate_types::{signer::ISigner, ISignature, IntermediateType},
 };
 
 use super::{
@@ -65,6 +65,8 @@ impl PublicFunction {
         args_len: LocalId,
         write_return_data_function: FunctionId,
         storage_flush_cache_function: FunctionId,
+        tx_origin_function: FunctionId,
+        emit_log_function: FunctionId,
         allocator_func: FunctionId,
     ) {
         router_builder.block(None, |block| {
@@ -81,11 +83,41 @@ impl PublicFunction {
             block.binop(BinaryOp::I32Add);
             block.local_set(args_pointer);
 
-            // Reduce args length by 4 bytes to exclude selector
-            block.local_get(args_len);
-            block.i32_const(4);
-            block.binop(BinaryOp::I32Sub);
-            block.local_set(args_len);
+            // If the first argument's type is signer, we inject the tx.origin into the stack as a
+            // first parameter
+            match self.signature.arguments.first() {
+                Some(IntermediateType::ISigner) => {
+                    let signer_pointer = module.locals.add(ValType::I32);
+                    block.i32_const(ISigner::HEAP_SIZE);
+                    block.call(allocator_func);
+                    block.local_tee(signer_pointer);
+                    // We add 12 to the pointer returned by the allocator because stylus writes 20
+                    // bytes, and those bytes need to be at the end.
+                    block.i32_const(12);
+                    block.binop(BinaryOp::I32Add);
+                    block.call(tx_origin_function);
+                    block.local_get(signer_pointer);
+
+                    // If we are building in debug mode, we call `emit_log` to log the signer's
+                    // address. This is useful for debugging in this stage.
+                    // TODO: Remove this when is no longer necessary
+                    #[cfg(debug_assertions)]
+                    {
+                        block.local_get(signer_pointer);
+                        block.i32_const(ISigner::HEAP_SIZE);
+                        block.i32_const(0);
+                        block.call(emit_log_function);
+                    }
+                }
+                _ => {
+                    // If there's no signer, reduce args length by 4 bytes to exclude selector,
+                    // otherwise we reuse the selector's 4 bytes (32 bits) for the signer pointer
+                    block.local_get(args_len);
+                    block.i32_const(4);
+                    block.binop(BinaryOp::I32Sub);
+                    block.local_set(args_len);
+                }
+            }
 
             // Wrap function to pack/unpack parameters
             self.wrap_public_function(module, block, args_pointer, allocator_func);
@@ -235,6 +267,11 @@ mod tests {
         let mut linker = Linker::new(&engine);
 
         let mem_export = module.get_export_index("memory").unwrap();
+        let get_memory =
+            move |caller: &mut Caller<'_, ()>| match caller.get_module_export(&mem_export) {
+                Some(Extern::Memory(mem)) => mem,
+                _ => panic!("failed to find host memory"),
+            };
 
         linker
             .func_wrap(
@@ -247,10 +284,7 @@ mod tests {
                     println!("return_data_pointer: {}", return_data_pointer);
                     println!("return_data_length: {}", return_data_length);
 
-                    let mem = match caller.get_module_export(&mem_export) {
-                        Some(Extern::Memory(mem)) => mem,
-                        _ => panic!("failed to find host memory"),
-                    };
+                    let mem = get_memory(&mut caller);
 
                     let mut buffer = vec![0; return_data_length as usize];
                     mem.read(&mut caller, return_data_pointer as usize, &mut buffer)
@@ -266,6 +300,40 @@ mod tests {
 
         linker
             .func_wrap("vm_hooks", "storage_flush_cache", |_: i32| Ok(()))
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "tx_origin",
+                move |mut caller: Caller<'_, ()>, ptr: u32| {
+                    println!("tx_origin, writing in {ptr}");
+
+                    let mem = get_memory(&mut caller);
+
+                    let test_address =
+                        &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 3, 5, 7];
+
+                    mem.write(&mut caller, ptr as usize, test_address).unwrap();
+                },
+            )
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "emit_log",
+                move |mut caller: Caller<'_, ()>, ptr: u32, len: u32, _topic: u32| {
+                    println!("emit_log, reading from {ptr}, length: {len}");
+
+                    let mem = get_memory(&mut caller);
+                    let mut buffer = vec![0; len as usize];
+
+                    mem.read(&mut caller, ptr as usize, &mut buffer).unwrap();
+
+                    println!("read memory: {buffer:?}");
+                },
+            )
             .unwrap();
 
         let mut store = Store::new(&engine, ());
@@ -297,6 +365,8 @@ mod tests {
         // Build mock router
         let (write_return_data_function, _) = host_functions::write_result(module);
         let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
+        let (tx_origin_function, _) = host_functions::tx_origin(module);
+        let (emit_log_function, _) = host_functions::emit_log(module);
 
         let selector = module.locals.add(ValType::I32);
         let args_pointer = module.locals.add(ValType::I32);
@@ -337,6 +407,8 @@ mod tests {
             args_len,
             write_return_data_function,
             storage_flush_cache_function,
+            tx_origin_function,
+            emit_log_function,
             allocator_func,
         );
 
@@ -424,6 +496,75 @@ mod tests {
 
         let expected_result =
             <sol!((uint32, uint16, uint64))>::abi_encode_params(&(2, 1235, 123456789012346));
+
+        let (_, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data, expected_result);
+
+        let result = entrypoint.call(&mut store, ()).unwrap();
+        assert_eq!(result, 0);
+    }
+
+    #[test]
+    fn test_build_public_function_with_signer() {
+        let (mut raw_module, allocator_func, memory_id) = build_module();
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let param1 = raw_module.locals.add(ValType::I32);
+        let param2 = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        func_body.i32_const(1);
+        func_body.local_get(param2);
+        func_body.binop(BinaryOp::I32Add);
+
+        func_body.local_get(param1);
+
+        let returns = vec![IntermediateType::IU8, IntermediateType::ISigner];
+        prepare_function_return(
+            &mut raw_module.locals,
+            &mut func_body,
+            &returns,
+            memory_id,
+            allocator_func,
+        );
+
+        let function = function_builder.finish(vec![param1, param2], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let public_function = PublicFunction::new(
+            function,
+            "test_function",
+            ISignature {
+                arguments: vec![IntermediateType::ISigner, IntermediateType::IU8],
+                returns,
+            },
+        );
+
+        let mut data = <sol!((uint8,))>::abi_encode_params(&(1,));
+        data = [public_function.get_selector().to_vec(), data].concat();
+        let data_len = data.len() as i32;
+
+        // Build mock router
+        build_mock_router(
+            &mut raw_module,
+            &public_function,
+            data_len,
+            allocator_func,
+            memory_id,
+        );
+
+        display_module(&mut raw_module);
+
+        let expected_result = <sol!((uint8, address))>::abi_encode_params(&(
+            2,
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 3, 5, 7],
+        ));
 
         let (_, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data, expected_result);
