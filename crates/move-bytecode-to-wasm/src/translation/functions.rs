@@ -121,7 +121,7 @@ impl<'a> MappedFunction<'a> {
             .builder_mut()
             .func_body();
 
-        let mut stack_types = Vec::new();
+        let mut types_stack = Vec::new();
 
         println!("translating function {:?}", self.id);
         for instruction in &self.move_code_unit.code {
@@ -132,13 +132,13 @@ impl<'a> MappedFunction<'a> {
                 &mut builder,
                 self,
                 &mut module.locals,
-                &stack_types,
+                &types_stack,
                 allocator,
                 memory,
             );
 
-            self.process_stack_type(
-                &mut stack_types,
+            self.process_types_stack(
+                &mut types_stack,
                 instruction,
                 constant_pool,
                 function_returns,
@@ -146,15 +146,15 @@ impl<'a> MappedFunction<'a> {
             // TODO: unwrap
             .unwrap();
 
-            println!("Stack types: {instruction:?} -> {stack_types:?}");
+            println!("Stack types: {instruction:?} -> {types_stack:?}");
         }
 
         Ok(())
     }
 
-    fn process_stack_type(
+    fn process_types_stack(
         &self,
-        stack_types: &mut Vec<IntermediateType>,
+        types_stack: &mut Vec<IntermediateType>,
         instruction: &Bytecode,
         constant_pool: &[Constant],
         function_returns: &[Vec<IntermediateType>],
@@ -163,24 +163,24 @@ impl<'a> MappedFunction<'a> {
             Bytecode::LdConst(global_index) => {
                 if let Some(constant) = constant_pool.get(global_index.0 as usize) {
                     let constant_type: IntermediateType = (&constant.type_).try_into()?;
-                    stack_types.push(constant_type);
+                    types_stack.push(constant_type);
                 } else {
                     return Err(anyhow::anyhow!(
                         "unable to find constant with global index: {global_index:?}"
                     ));
                 }
             }
-            Bytecode::LdFalse | Bytecode::LdTrue => stack_types.push(IntermediateType::IBool),
-            Bytecode::LdU8(_) => stack_types.push(IntermediateType::IU8),
-            Bytecode::LdU16(_) => stack_types.push(IntermediateType::IU16),
-            Bytecode::LdU32(_) => stack_types.push(IntermediateType::IU32),
-            Bytecode::LdU64(_) => stack_types.push(IntermediateType::IU64),
-            Bytecode::LdU128(_) => stack_types.push(IntermediateType::IU128),
-            Bytecode::LdU256(_) => stack_types.push(IntermediateType::IU256),
+            Bytecode::LdFalse | Bytecode::LdTrue => types_stack.push(IntermediateType::IBool),
+            Bytecode::LdU8(_) => types_stack.push(IntermediateType::IU8),
+            Bytecode::LdU16(_) => types_stack.push(IntermediateType::IU16),
+            Bytecode::LdU32(_) => types_stack.push(IntermediateType::IU32),
+            Bytecode::LdU64(_) => types_stack.push(IntermediateType::IU64),
+            Bytecode::LdU128(_) => types_stack.push(IntermediateType::IU128),
+            Bytecode::LdU256(_) => types_stack.push(IntermediateType::IU256),
             Bytecode::Call(function_handle_index) => {
                 if let Some(return_types) = function_returns.get(function_handle_index.0 as usize) {
                     for return_type in return_types {
-                        stack_types.push(return_type.clone());
+                        types_stack.push(return_type.clone());
                     }
                 } else {
                     return Err(anyhow::anyhow!(
@@ -189,11 +189,11 @@ impl<'a> MappedFunction<'a> {
                 }
             }
             Bytecode::StLoc(_) | Bytecode::Pop => {
-                stack_types.pop();
+                types_stack.pop();
             }
             Bytecode::CopyLoc(local_id) | Bytecode::MoveLoc(local_id) => {
                 if let Some(local_var_type) = self.local_variables_type.get(*local_id as usize) {
-                    stack_types.push(local_var_type.clone());
+                    types_stack.push(local_var_type.clone());
                 } else {
                     return Err(anyhow::anyhow!(
                         "unable to find local variable type: {local_id:?}"
@@ -202,7 +202,7 @@ impl<'a> MappedFunction<'a> {
             }
             Bytecode::VecPack(_signature_index, num_elements) => {
                 // TODO: Maybe check that every element is of type _signature_index?
-                stack_types.truncate(stack_types.len() - *num_elements as usize);
+                types_stack.truncate(types_stack.len() - *num_elements as usize);
             }
             Bytecode::Ret => {}
             _ => panic!("Unsupported instruction: {:?}", instruction),
