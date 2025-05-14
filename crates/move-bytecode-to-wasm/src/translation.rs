@@ -174,6 +174,8 @@ fn map_bytecode_instruction(
 
                 n -= 1;
             }
+
+            types_stack.push(IntermediateType::IVector(Box::new(inner)));
         }
         Bytecode::Pop => {
             builder.drop();
