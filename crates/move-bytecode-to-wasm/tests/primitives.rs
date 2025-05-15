@@ -27,6 +27,8 @@ fn test_bool() {
         function getCopiedLocal() external returns (bool, bool);
         function echo(bool x) external returns (bool);
         function echo2(bool x, bool y) external returns (bool);
+        function notTrue() external returns (bool);
+        function not(bool x) external returns (bool);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -53,6 +55,18 @@ fn test_bool() {
     run_test(&runtime, data, expected_result);
 
     let data = echo2Call::abi_encode(&echo2Call::new((true, false)));
+    let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
+    run_test(&runtime, data, expected_result);
+
+    let data = notTrueCall::abi_encode(&notTrueCall::new(()));
+    let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
+    run_test(&runtime, data, expected_result);
+
+    let data = notCall::abi_encode(&notCall::new((false,)));
+    let expected_result = <sol!((bool,))>::abi_encode_params(&(true,));
+    run_test(&runtime, data, expected_result);
+
+    let data = notCall::abi_encode(&notCall::new((true,)));
     let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
     run_test(&runtime, data, expected_result);
 }

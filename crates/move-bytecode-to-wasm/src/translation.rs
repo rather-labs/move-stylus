@@ -6,6 +6,7 @@ use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::IntermediateType;
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
+use walrus::ir::{BinaryOp, UnaryOp};
 use walrus::{
     ir::{MemArg, StoreKind},
     FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
@@ -223,6 +224,23 @@ fn map_bytecode_instruction(
             }
 
             types_stack.push(sum_type);
+        }
+        Bytecode::Or => {
+            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
+            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
+            builder.binop(BinaryOp::I32Or);
+            types_stack.push(IntermediateType::IBool);
+        }
+        Bytecode::And => {
+            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
+            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
+            builder.binop(BinaryOp::I32And);
+            types_stack.push(IntermediateType::IBool);
+        }
+        Bytecode::Not => {
+            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
+            builder.unop(UnaryOp::I32Eqz);
+            types_stack.push(IntermediateType::IBool);
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
