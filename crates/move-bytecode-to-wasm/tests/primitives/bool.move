@@ -48,3 +48,11 @@ fun identity(x: bool): bool {
 fun identity_2(_x: bool, y: bool): bool {
   y
 }
+
+public fun not_true(): bool {
+  !BOOL_AS_CONST
+}
+
+public fun not(x: bool): bool {
+  !x
+}
