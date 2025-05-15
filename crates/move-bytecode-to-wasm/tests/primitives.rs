@@ -198,6 +198,7 @@ fn test_uint_8() {
         function getCopiedLocal() external returns (uint8, uint8);
         function echo(uint8 x) external returns (uint8);
         function echo2(uint8 x, uint8 y) external returns (uint8);
+        function sum(uint8 x, uint8 y) external returns (uint8);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -227,6 +228,28 @@ fn test_uint_8() {
     let data = echo2Call::abi_encode(&echo2Call::new((111, 222)));
     let expected_result = <sol!((uint8,))>::abi_encode_params(&(222,));
     run_test(&runtime, data, expected_result);
+
+    let data = sumCall::abi_encode(&sumCall::new((42, 42)));
+    let expected_result = <sol!((uint8,))>::abi_encode_params(&(84,));
+    run_test(&runtime, data, expected_result);
+}
+
+#[test]
+#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+fn test_uint_8_overflow() {
+    const MODULE_NAME: &str = "uint_8";
+    const SOURCE_PATH: &str = "tests/primitives/uint_8.move";
+
+    sol!(
+        #[allow(missing_docs)]
+        function sumOverflow(uint8 x) external returns (uint8);
+    );
+
+    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
+
+    let data = sumOverflowCall::abi_encode(&sumOverflowCall::new((42,)));
+    run_test(&runtime, data, vec![]);
 }
 
 #[test]
@@ -241,6 +264,7 @@ fn test_uint_16() {
         function getCopiedLocal() external returns (uint16, uint16);
         function echo(uint16 x) external returns (uint16);
         function echo2(uint16 x, uint16 y) external returns (uint16);
+        function sum(uint16 x, uint16 y) external returns (uint16);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -270,6 +294,28 @@ fn test_uint_16() {
     let data = echo2Call::abi_encode(&echo2Call::new((111, 222)));
     let expected_result = <sol!((uint16,))>::abi_encode_params(&(222,));
     run_test(&runtime, data, expected_result);
+
+    let data = sumCall::abi_encode(&sumCall::new((255, 255)));
+    let expected_result = <sol!((uint16,))>::abi_encode_params(&(510,));
+    run_test(&runtime, data, expected_result);
+}
+
+#[test]
+#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+fn test_uint_16_overflow() {
+    const MODULE_NAME: &str = "uint_16";
+    const SOURCE_PATH: &str = "tests/primitives/uint_16.move";
+
+    sol!(
+        #[allow(missing_docs)]
+        function sumOverflow(uint16 x) external returns (uint16);
+    );
+
+    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
+
+    let data = sumOverflowCall::abi_encode(&sumOverflowCall::new((42,)));
+    run_test(&runtime, data, vec![]);
 }
 
 #[test]
@@ -284,6 +330,7 @@ fn test_uint_32() {
         function getCopiedLocal() external returns (uint32, uint32);
         function echo(uint32 x) external returns (uint32);
         function echo2(uint32 x, uint32 y) external returns (uint32);
+        function sum(uint32 x, uint32 y) external returns (uint32);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -313,6 +360,28 @@ fn test_uint_32() {
     let data = echo2Call::abi_encode(&echo2Call::new((111, 222)));
     let expected_result = <sol!((uint32,))>::abi_encode_params(&(222,));
     run_test(&runtime, data, expected_result);
+
+    let data = sumCall::abi_encode(&sumCall::new((65535, 65535)));
+    let expected_result = <sol!((uint32,))>::abi_encode_params(&(131070,));
+    run_test(&runtime, data, expected_result);
+}
+
+#[test]
+#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+fn test_uint_32_overflow() {
+    const MODULE_NAME: &str = "uint_32";
+    const SOURCE_PATH: &str = "tests/primitives/uint_32.move";
+
+    sol!(
+        #[allow(missing_docs)]
+        function sumOverflow(uint32 x) external returns (uint32);
+    );
+
+    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
+
+    let data = sumOverflowCall::abi_encode(&sumOverflowCall::new((42,)));
+    run_test(&runtime, data, vec![]);
 }
 
 #[test]
@@ -327,6 +396,7 @@ fn test_uint_64() {
         function getCopiedLocal() external returns (uint64, uint64);
         function echo(uint64 x) external returns (uint64);
         function echo2(uint64 x, uint64 y) external returns (uint64);
+        function sum(uint64 x, uint64 y) external returns (uint64);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -356,6 +426,28 @@ fn test_uint_64() {
     let data = echo2Call::abi_encode(&echo2Call::new((111, 222)));
     let expected_result = <sol!((uint64,))>::abi_encode_params(&(222,));
     run_test(&runtime, data, expected_result);
+
+    let data = sumCall::abi_encode(&sumCall::new((4294967295, 4294967295)));
+    let expected_result = <sol!((uint64,))>::abi_encode_params(&(8589934590,));
+    run_test(&runtime, data, expected_result);
+}
+
+#[test]
+#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+fn test_uint_64_overflow() {
+    const MODULE_NAME: &str = "uint_64";
+    const SOURCE_PATH: &str = "tests/primitives/uint_64.move";
+
+    sol!(
+        #[allow(missing_docs)]
+        function sumOverflow(uint64 x) external returns (uint64);
+    );
+
+    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
+
+    let data = sumOverflowCall::abi_encode(&sumOverflowCall::new((42,)));
+    run_test(&runtime, data, vec![]);
 }
 
 #[test]

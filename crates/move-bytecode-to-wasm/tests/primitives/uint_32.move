@@ -23,7 +23,7 @@ public fun get_local(_z: u32): u32 {
 // Forces the compiler to store literals on locals
 public fun get_copied_local(): (u32, u32) {
   let x: u32 = 100;
-  
+
   let y = x; // copy
   let mut z = x; // move
   identity(y);
@@ -47,4 +47,12 @@ fun identity(x: u32): u32 {
 
 fun identity_2(_x: u32, y: u32): u32 {
   y
+}
+
+public fun sum(x: u32, y: u32): u32 {
+    x + y
+}
+
+public fun sum_overflow(x: u32): u32 {
+   4_294_967_295 + x
 }
