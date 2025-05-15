@@ -2,30 +2,6 @@ use walrus::{ir::BinaryOp, InstrSeqBuilder, ValType};
 
 use crate::wasm_helpers::{load_i32_from_bytes_instructions, load_i64_from_bytes_instructions};
 
-macro_rules! impl_add {
-    ($valtype: expr, $add_op: expr, $gt_op: expr, $max_value: expr, $const_op: ident) => {
-        pub fn add(
-            builder: &mut walrus::InstrSeqBuilder,
-            module_locals: &mut walrus::ModuleLocals,
-        ) {
-            let tmp = module_locals.add($valtype);
-            builder.binop($add_op);
-            builder.local_tee(tmp);
-            builder.$const_op($max_value);
-            builder.binop($gt_op);
-            builder.if_else(
-                Some($valtype),
-                |then| {
-                    then.unreachable();
-                },
-                |else_| {
-                    else_.local_get(tmp);
-                },
-            );
-        }
-    };
-}
-
 #[derive(Clone, Copy)]
 pub struct IU8;
 
