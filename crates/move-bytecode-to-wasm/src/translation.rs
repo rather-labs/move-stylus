@@ -6,7 +6,7 @@ use intermediate_types::vector::IVector;
 use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
 use walrus::{
     FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
-    ir::{LoadKind, MemArg, StoreKind},
+    ir::{MemArg, StoreKind},
 };
 pub mod functions;
 /// The types in this module represent an intermediate Rust representation of Move types
@@ -190,7 +190,7 @@ fn map_bytecode_instruction(
             );
 
             // Push the reference to the type into the types stack
-            types_stack.push(IntermediateType::Ref(Box::new(local_type.clone())));
+            types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
         }
 
         Bytecode::ReadRef => {
@@ -199,14 +199,14 @@ fn map_bytecode_instruction(
                 .expect("ReadRef expects a reference on the stack");
 
             match ref_type {
-                IntermediateType::Ref(inner) => {
+                IntermediateType::IRef(inner) => {
                     // Now call directly on the inner type
                     inner.add_read_ref_instructions(builder, memory);
 
                     // And push the inner type into the stack
                     types_stack.push(*inner);
                 }
-                _ => panic!("ReadRef expected a Ref type but got: {:?}", ref_type),
+                _ => panic!("ReadRef expected a IRef type but got: {:?}", ref_type),
             }
         }
 
