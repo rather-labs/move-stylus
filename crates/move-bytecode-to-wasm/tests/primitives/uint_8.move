@@ -53,6 +53,6 @@ public fun sum(x: u8, y: u8): u8 {
     x + y
 }
 
-public fun sum_overflow(x: u8): u8 {
-   255 + x
+public fun cast_u8(x: u16): u8 {
+    x as u8
 }
