@@ -26,6 +26,9 @@ public fun call_ref_u8_internal(x: u8): u8 {
   ref_u8_arg(&x)
 }
 
-public fun call_ref_vec_u8_internal(x: vector<u8>): vector<u8> {
-  ref_vec_u8_arg(&x)
+public fun test_borrow(s: signer) {
+    let s_ref = &s; // ❌ This should fail
 }
+
+
+

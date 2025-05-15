@@ -44,8 +44,11 @@ public fun ref_u8_arg(y: &u8): u8 {
   *y
 }
 
-  // Receives by reference directly
 public fun ref_vec_u8_arg(y: &vector<u8>): vector<u8> {
+  *y
+}
+
+public fun ref_vec_u128_arg(y: &vector<u128>): vector<u128> {
   *y
 }
 
@@ -55,4 +58,8 @@ public fun call_ref_u8_internal(x: u8): u8 {
 
 public fun call_ref_vec_u8_internal(x: vector<u8>): vector<u8> {
   ref_vec_u8_arg(&x)
+}
+
+public fun call_ref_vec_u128_internal(x: vector<u128>): vector<u128> {
+  ref_vec_u128_arg(&x)
 }

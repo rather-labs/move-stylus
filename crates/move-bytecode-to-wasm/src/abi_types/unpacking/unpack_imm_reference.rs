@@ -18,12 +18,17 @@ impl IRef {
     ) {
         match inner {
             // If inner is a heap-producing type, forward the pointer
-            IntermediateType::IVector(_) 
+            IntermediateType::IVector(_)
             | IntermediateType::IAddress
             | IntermediateType::IU128
             | IntermediateType::IU256 => {
                 inner.add_unpack_instructions(
-                    builder, module, reader_pointer, calldata_reader_pointer, memory, allocator,
+                    builder,
+                    module,
+                    reader_pointer,
+                    calldata_reader_pointer,
+                    memory,
+                    allocator,
                 );
             }
             // For immediates, allocate and store
@@ -35,7 +40,12 @@ impl IRef {
                 builder.local_tee(ptr_local);
 
                 inner.add_unpack_instructions(
-                    builder, module, reader_pointer, calldata_reader_pointer, memory, allocator,
+                    builder,
+                    module,
+                    reader_pointer,
+                    calldata_reader_pointer,
+                    memory,
+                    allocator,
                 );
 
                 builder.store(
@@ -45,7 +55,10 @@ impl IRef {
                         8 => StoreKind::I64 { atomic: false },
                         _ => panic!("Unsupported stack_data_size for IRef"),
                     },
-                    MemArg { align: 0, offset: 0 },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
                 );
 
                 builder.local_get(ptr_local);
@@ -53,7 +66,6 @@ impl IRef {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
