@@ -4,6 +4,7 @@ use functions::{
 use intermediate_types::vector::IVector;
 use intermediate_types::{IntermediateType, SignatureTokenToIntermediateType};
 use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
+use walrus::ir::{BinaryOp, UnaryOp};
 use walrus::{
     FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
     ir::{MemArg, StoreKind},
@@ -128,6 +129,15 @@ fn map_bytecode_instruction(
                 memory,
                 allocator,
             );
+        }
+        Bytecode::Or => {
+            builder.binop(BinaryOp::I32Or);
+        }
+        Bytecode::And => {
+            builder.binop(BinaryOp::I32And);
+        }
+        Bytecode::Not => {
+            builder.unop(UnaryOp::I32Eqz);
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
