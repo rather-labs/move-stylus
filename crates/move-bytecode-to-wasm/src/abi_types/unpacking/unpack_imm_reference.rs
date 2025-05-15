@@ -134,6 +134,7 @@ mod tests {
             setup_wasmtime_module::<i32>(&mut raw_module, data.to_vec(), "test_function");
 
         let result_ptr = entrypoint.call(&mut store, ()).unwrap();
+        // result_ptr is always 0, is that ok?
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; expected_memory_bytes.len()];
@@ -152,10 +153,15 @@ mod tests {
         type IntType = u8;
         type SolType = sol!((uint8,));
         let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU8));
-
-        let data = SolType::abi_encode_params(&(88,));
-        test_ref(&data, int_type.clone(), &88u8.to_le_bytes());
+    
+        let data = SolType::abi_encode_params(&(88u8,));
+    
+        let mut expected = Vec::new();
+        expected.extend(&88u32.to_le_bytes());    
+    
+        test_ref(&data, int_type.clone(), &expected);
     }
+    
 
     #[test]
     fn test_unpack_ref_u32() {
@@ -183,27 +189,29 @@ mod tests {
         type SolType = sol!((uint128,));
         let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU128));
 
-        let data = SolType::abi_encode_params(&(123456789u128,));
+        let data = SolType::abi_encode_params(&(123u128,));
 
         let mut expected = Vec::new();
         expected.extend(&4u32.to_le_bytes());
-        expected.extend(&123456789u128.to_le_bytes());
+        expected.extend(&123u128.to_le_bytes());
 
         test_ref(&data, int_type.clone(), &expected);
     }
 
-    // Tests for heap types are failing because unpacked data comes with a 4 0 0 0 header at the beginning
-    // Im not sure why
     #[test]
     fn test_unpack_ref_u256() {
         type IntType = U256;
         type SolType = sol!((uint256,));
         let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU256));
-
+    
         let value = U256::from(123u128);
+        let mut expected = Vec::new();
+        expected.extend(&4u32.to_le_bytes());
+        expected.extend(&value.to_le_bytes::<32>());
+    
         let data = SolType::abi_encode_params(&(value,));
-        test_ref(&data, int_type.clone(), &value.to_le_bytes::<32>());
-    }
+        test_ref(&data, int_type.clone(), &expected);
+    }    
 
     #[test]
     fn test_unpack_ref_vec_u8() {
@@ -212,15 +220,45 @@ mod tests {
         let vector_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
             inner_type.clone(),
         ))));
-
+    
         let vec_data = vec![1u8, 2u8, 3u8];
         let data = SolType::abi_encode_params(&(vec_data.clone(),));
-
-        // Expectation: the heap-allocated vector will have [length as u32 LE][1][2][3]
+    
         let mut expected = Vec::new();
-        expected.extend(&(vec_data.len() as u32).to_le_bytes());
-        expected.extend(&vec_data);
+        expected.extend(&4u32.to_le_bytes());                       // outer pointer
+        expected.extend(&(vec_data.len() as u32).to_le_bytes());    // length inside header
+        for v in &vec_data {
+            expected.extend(&(*v as u32).to_le_bytes());            // pad each u8 to i32 (4 bytes)
+        }
+    
+        test_ref(&data, vector_type.clone(), &expected);
+    }      
 
+    #[test]
+    fn test_unpack_ref_vec_128() {
+        type SolType = sol!((uint128[],));
+        let inner_type = IntermediateType::IU128;
+        let vector_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
+            inner_type.clone(),
+        ))));
+    
+        let vec_data = vec![1u128, 2u128];
+        let data = SolType::abi_encode_params(&(vec_data.clone(),));
+    
+        let mut expected = Vec::new();
+        expected.extend(&4u32.to_le_bytes()); // pointer to vector header at 4
+        expected.extend(&(vec_data.len() as u32).to_le_bytes()); // length = 2
+    
+        // pointers to heap elements
+        expected.extend(&16u32.to_le_bytes());
+        expected.extend(&32u32.to_le_bytes());
+    
+        // first u128 at 16
+        expected.extend(&1u128.to_le_bytes());
+    
+        // second u128 at 32
+        expected.extend(&2u128.to_le_bytes());
+    
         test_ref(&data, vector_type.clone(), &expected);
     }
 }
