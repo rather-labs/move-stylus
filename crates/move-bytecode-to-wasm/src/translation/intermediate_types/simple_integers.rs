@@ -53,7 +53,7 @@ impl IU16 {
         load_i32_from_bytes_instructions(builder, &bytes);
     }
 
-    /// Adds the instructions to add two u8 values.
+    /// Adds the instructions to add two u16 values.
     ///
     /// Along with the addition code to check overflow is added. If the result is greater than
     /// 65535 then the execution is aborted. This check is poosible because interally we are using
@@ -88,7 +88,7 @@ impl IU32 {
         load_i32_from_bytes_instructions(builder, &bytes);
     }
 
-    /// Adds the instructions to add two u8 values.
+    /// Adds the instructions to add two u32 values.
     ///
     /// Along with the addition code to check overflow is added. If the result is greater than
     /// 4_294_967_295 then the execution is aborted. To check the overflow we check that the result
@@ -148,7 +148,7 @@ impl IU64 {
         load_i64_from_bytes_instructions(builder, &bytes);
     }
 
-    /// Adds the instructions to add two u8 values.
+    /// Adds the instructions to add two u64 values.
     ///
     /// Along with the addition code to check overflow is added. If the result is greater than
     /// 18_446_744_073_709_551_615 then the execution is aborted. To check the overflow we check
