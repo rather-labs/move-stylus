@@ -1,8 +1,8 @@
 use functions::{
     add_unpack_function_return_values_instructions, prepare_function_return, MappedFunction,
 };
-use intermediate_types::vector::IVector;
 use intermediate_types::IntermediateType;
+use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
 use walrus::{
     ir::{MemArg, StoreKind},
@@ -190,6 +190,29 @@ fn map_bytecode_instruction(
                 memory,
                 allocator,
             );
+        }
+        Bytecode::Add => {
+            let sum_type = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
+                assert_eq!(
+                    t1, t2,
+                    "types stack error: trying two add two different types {t1:?} {t2:?}"
+                );
+                t1
+            } else {
+                panic!("types stack is empty");
+            };
+
+            match sum_type {
+                IntermediateType::IU8 => IU8::add(builder, module_locals),
+                IntermediateType::IU16 => todo!(),
+                IntermediateType::IU32 => todo!(),
+                IntermediateType::IU64 => todo!(),
+                IntermediateType::IU128 => todo!(),
+                IntermediateType::IU256 => todo!(),
+                t => panic!("type stack error: trying to add two {t:?}"),
+            }
+
+            types_stack.push(sum_type);
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
