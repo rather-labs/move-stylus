@@ -1,13 +1,13 @@
 use anyhow::Result;
 use move_binary_format::file_format::{CodeUnit, Constant, FunctionDefinition, Signature};
 use walrus::{
-    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleLocals, ValType,
     ir::{LoadKind, MemArg, StoreKind},
+    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleLocals, ValType,
 };
 
 use crate::translation::{intermediate_types::ISignature, map_bytecode_instruction};
 
-use super::intermediate_types::{IntermediateType, SignatureTokenToIntermediateType};
+use super::intermediate_types::IntermediateType;
 
 pub struct MappedFunction<'a> {
     pub id: FunctionId,
@@ -51,11 +51,7 @@ impl<'a> MappedFunction<'a> {
             .map(|arg| module.locals.add(*arg))
             .collect::<Vec<LocalId>>();
 
-        let arg_intermediate_types = move_arguments
-            .0
-            .iter()
-            .map(|token| token.to_intermediate_type())
-            .collect::<Vec<IntermediateType>>();
+        let arg_intermediate_types = move_arguments.0.iter().map(IntermediateType::try_from);
 
         // === Create the function ===
         let function_builder =
@@ -67,19 +63,21 @@ impl<'a> MappedFunction<'a> {
         let move_locals = &code.locals;
         let signature_tokens = &move_module_signatures[move_locals.0 as usize].0;
 
-        let local_intermediate_types = signature_tokens
-            .iter()
-            .map(|token| token.to_intermediate_type())
-            .collect::<Vec<IntermediateType>>();
+        let local_intermediate_types = signature_tokens.iter().map(IntermediateType::try_from);
 
         let local_ids = local_intermediate_types
-            .iter()
-            .map(|ty| module.locals.add(ty.to_wasm_type()))
-            .collect::<Vec<LocalId>>();
+            .clone()
+            .flat_map(|token| token.map(|t| t.to_wasm_type()))
+            .map(|valty| module.locals.add(valty));
 
         // === Combine all locals and types ===
-        let local_variables = [arg_local_ids, local_ids].concat();
-        let local_variables_type = [arg_intermediate_types, local_intermediate_types].concat();
+        let local_variables = arg_local_ids.into_iter().chain(local_ids).collect();
+
+        let local_variables_type = arg_intermediate_types
+            .chain(local_intermediate_types)
+            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+            // TODO: unwrap
+            .unwrap();
 
         Self {
             id,
@@ -93,11 +91,14 @@ impl<'a> MappedFunction<'a> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn translate_function(
         &self,
         module: &mut Module,
         constant_pool: &[Constant],
         function_ids: &[FunctionId],
+        functions_arguments: &[Vec<IntermediateType>],
+        functions_returns: &[Vec<IntermediateType>],
         memory: MemoryId,
         allocator: FunctionId,
     ) -> Result<()> {
@@ -114,7 +115,11 @@ impl<'a> MappedFunction<'a> {
             .builder_mut()
             .func_body();
 
-        for instruction in self.move_code_unit.code.iter() {
+        // Maps the types of the values contained in the stack at tme moment of processing an
+        // instruction.
+        let mut types_stack = Vec::new();
+
+        for instruction in &self.move_code_unit.code {
             map_bytecode_instruction(
                 instruction,
                 constant_pool,
@@ -122,6 +127,9 @@ impl<'a> MappedFunction<'a> {
                 &mut builder,
                 self,
                 &mut module.locals,
+                functions_arguments,
+                functions_returns,
+                &mut types_stack,
                 allocator,
                 memory,
             );

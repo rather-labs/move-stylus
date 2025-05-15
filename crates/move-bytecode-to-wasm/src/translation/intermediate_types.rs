@@ -2,11 +2,11 @@ use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
 use move_binary_format::file_format::{Signature, SignatureToken};
-use simple_integers::{IU8, IU16, IU32, IU64};
+use simple_integers::{IU16, IU32, IU64, IU8};
 use vector::IVector;
 use walrus::{
+    ir::{LoadKind, MemArg},
     FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
-    ir::{LoadKind, MemArg, StoreKind},
 };
 
 pub mod address;
@@ -16,7 +16,7 @@ pub mod signer;
 pub mod simple_integers;
 pub mod vector;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum IntermediateType {
     IBool,
     IU8,
@@ -343,24 +343,24 @@ impl IntermediateType {
     }
 }
 
-pub trait SignatureTokenToIntermediateType {
-    fn to_intermediate_type(&self) -> IntermediateType;
-}
+impl TryFrom<&SignatureToken> for IntermediateType {
+    // TODO: Change when handling errors better
+    type Error = anyhow::Error;
 
-impl SignatureTokenToIntermediateType for SignatureToken {
-    fn to_intermediate_type(&self) -> IntermediateType {
-        match self {
-            SignatureToken::Bool => IntermediateType::IBool,
-            SignatureToken::U8 => IntermediateType::IU8,
-            SignatureToken::U16 => IntermediateType::IU16,
-            SignatureToken::U32 => IntermediateType::IU32,
-            SignatureToken::U64 => IntermediateType::IU64,
-            SignatureToken::U128 => IntermediateType::IU128,
-            SignatureToken::U256 => IntermediateType::IU256,
-            SignatureToken::Address => IntermediateType::IAddress,
-            SignatureToken::Signer => IntermediateType::ISigner,
+    fn try_from(value: &SignatureToken) -> Result<Self, Self::Error> {
+        match value {
+            SignatureToken::Bool => Ok(Self::IBool),
+            SignatureToken::U8 => Ok(Self::IU8),
+            SignatureToken::U16 => Ok(Self::IU16),
+            SignatureToken::U32 => Ok(Self::IU32),
+            SignatureToken::U64 => Ok(Self::IU64),
+            SignatureToken::U128 => Ok(Self::IU128),
+            SignatureToken::U256 => Ok(Self::IU256),
+            SignatureToken::Address => Ok(Self::IAddress),
+            SignatureToken::Signer => Ok(Self::ISigner),
             SignatureToken::Vector(token) => {
-                IntermediateType::IVector(Box::new(token.to_intermediate_type()))
+                let itoken = Self::try_from(token.as_ref())?;
+                Ok(IntermediateType::IVector(Box::new(itoken)))
             }
             SignatureToken::Reference(inner) => {
                 IntermediateType::Ref(Box::new(inner.to_intermediate_type()))
@@ -368,7 +368,7 @@ impl SignatureTokenToIntermediateType for SignatureToken {
             SignatureToken::MutableReference(inner) => {
                 IntermediateType::MutRef(Box::new(inner.to_intermediate_type()))
             }
-            _ => panic!("Unsupported signature token: {:?}", self),
+            _ => Err(anyhow::anyhow!("Unsupported signature token: {value:?}")),
         }
     }
 }
@@ -383,13 +383,18 @@ impl ISignature {
         let arguments = arguments
             .0
             .iter()
-            .map(|token| token.to_intermediate_type())
-            .collect();
+            .map(|token| token.try_into())
+            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+            // TODO: unwrap
+            .unwrap();
+
         let returns = returns
             .0
             .iter()
-            .map(|token| token.to_intermediate_type())
-            .collect();
+            .map(|token| token.try_into())
+            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+            // TODO: unwrap
+            .unwrap();
 
         Self { arguments, returns }
     }
