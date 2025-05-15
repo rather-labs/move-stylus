@@ -29,7 +29,6 @@ pub enum IntermediateType {
     ISigner,
     IVector(Box<IntermediateType>),
     Ref(Box<IntermediateType>),
-    MutRef(Box<IntermediateType>),
 }
 
 impl IntermediateType {
@@ -47,8 +46,7 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::Ref(_)
-            | IntermediateType::MutRef(_) => ValType::I32,
+            | IntermediateType::Ref(_) => ValType::I32,
         }
     }
 
@@ -65,8 +63,7 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::Ref(_)
-            | IntermediateType::MutRef(_) => 4,
+            | IntermediateType::Ref(_) => 4,
         }
     }
 
@@ -110,7 +107,7 @@ impl IntermediateType {
                 allocator,
                 memory,
             ),
-            IntermediateType::Ref(_) | IntermediateType::MutRef(_) => {
+            IntermediateType::Ref(_) => {
                 panic!("cannot load a constant for a reference type");
             }
         }
@@ -133,8 +130,7 @@ impl IntermediateType {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
-            | IntermediateType::Ref(_)
-            | IntermediateType::MutRef(_) => {
+            | IntermediateType::Ref(_) => {
                 builder.local_get(local);
             }
             IntermediateType::IVector(inner) => {
@@ -171,8 +167,7 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::Ref(_)
-            | IntermediateType::MutRef(_) => {
+            | IntermediateType::Ref(_) => {
                 let local = module_locals.add(ValType::I32);
 
                 builder.local_get(pointer);
@@ -224,8 +219,7 @@ impl IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IAddress
             | IntermediateType::ISigner
-            | IntermediateType::Ref(_)
-            | IntermediateType::MutRef(_) => {
+            | IntermediateType::Ref(_) => {
                 let local = module_locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -286,7 +280,7 @@ impl IntermediateType {
             IntermediateType::ISigner => {
                 panic!("Cannot ImmBorrowLoc on a signer type");
             }
-            IntermediateType::Ref(_) | IntermediateType::MutRef(_) => {
+            IntermediateType::Ref(_) => {
                 panic!("Cannot ImmBorrowLoc on a reference type");
             }
         }
@@ -350,10 +344,6 @@ impl TryFrom<&SignatureToken> for IntermediateType {
             SignatureToken::Reference(token) => {
                 let itoken = Self::try_from(token.as_ref())?;
                 Ok(IntermediateType::Ref(Box::new(itoken)))
-            }
-            SignatureToken::MutableReference(token) => {
-                let itoken = Self::try_from(token.as_ref())?;
-                Ok(IntermediateType::MutRef(Box::new(itoken)))
             }
             _ => Err(anyhow::anyhow!("Unsupported signature token: {value:?}")),
         }

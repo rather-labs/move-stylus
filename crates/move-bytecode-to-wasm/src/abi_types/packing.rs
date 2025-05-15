@@ -140,8 +140,7 @@ impl Packable for IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IAddress
             | IntermediateType::IVector(_)
-            | IntermediateType::Ref(_)
-            | IntermediateType::MutRef(_) => {
+            | IntermediateType::Ref(_) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -196,7 +195,7 @@ impl Packable for IntermediateType {
                 memory,
                 alloc_function,
             ),
-            IntermediateType::Ref(inner) | IntermediateType::MutRef(inner) => inner
+            IntermediateType::Ref(inner) => inner
                 .add_pack_instructions(
                     builder,
                     module,
@@ -221,7 +220,7 @@ impl Packable for IntermediateType {
             IntermediateType::IAddress => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::ISigner => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::IVector(_) => 32,
-            IntermediateType::Ref(inner) | IntermediateType::MutRef(inner) => inner.encoded_size(),
+            IntermediateType::Ref(inner) => inner.encoded_size(),
         }
     }
 }
