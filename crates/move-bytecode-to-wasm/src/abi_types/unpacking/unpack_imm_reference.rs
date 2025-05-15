@@ -16,40 +16,44 @@ impl IRef {
         memory: MemoryId,
         allocator: FunctionId,
     ) {
-        let ptr_local = module.locals.add(walrus::ValType::I32);
+        match inner {
+            // If inner is a heap-producing type, forward the pointer
+            IntermediateType::IVector(_) 
+            | IntermediateType::IAddress
+            | IntermediateType::IU128
+            | IntermediateType::IU256 => {
+                inner.add_unpack_instructions(
+                    builder, module, reader_pointer, calldata_reader_pointer, memory, allocator,
+                );
+            }
+            // For immediates, allocate and store
+            _ => {
+                let ptr_local = module.locals.add(walrus::ValType::I32);
 
-        // 1. Allocate memory
-        builder.i32_const(inner.stack_data_size() as i32);
-        builder.call(allocator);
-        builder.local_tee(ptr_local);
+                builder.i32_const(inner.stack_data_size() as i32);
+                builder.call(allocator);
+                builder.local_tee(ptr_local);
 
-        // 2. Unpack the inner value (which will push the value)
-        inner.add_unpack_instructions(
-            builder,
-            module,
-            reader_pointer,
-            calldata_reader_pointer,
-            memory,
-            allocator,
-        );
+                inner.add_unpack_instructions(
+                    builder, module, reader_pointer, calldata_reader_pointer, memory, allocator,
+                );
 
-        // 3. Store the inner value at the allocated address
-        builder.store(
-            memory,
-            match inner.stack_data_size() {
-                4 => StoreKind::I32 { atomic: false },
-                8 => StoreKind::I64 { atomic: false },
-                _ => panic!("Unsupported stack_data_size for IRef"),
-            },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
+                builder.store(
+                    memory,
+                    match inner.stack_data_size() {
+                        4 => StoreKind::I32 { atomic: false },
+                        8 => StoreKind::I64 { atomic: false },
+                        _ => panic!("Unsupported stack_data_size for IRef"),
+                    },
+                    MemArg { align: 0, offset: 0 },
+                );
 
-        builder.local_get(ptr_local);
+                builder.local_get(ptr_local);
+            }
+        }
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -153,15 +157,14 @@ mod tests {
         type IntType = u8;
         type SolType = sol!((uint8,));
         let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU8));
-    
+
         let data = SolType::abi_encode_params(&(88u8,));
-    
+
         let mut expected = Vec::new();
-        expected.extend(&88u32.to_le_bytes());    
-    
+        expected.extend(&88u32.to_le_bytes());
+
         test_ref(&data, int_type.clone(), &expected);
     }
-    
 
     #[test]
     fn test_unpack_ref_u32() {
@@ -190,11 +193,7 @@ mod tests {
         let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU128));
 
         let data = SolType::abi_encode_params(&(123u128,));
-
-        let mut expected = Vec::new();
-        expected.extend(&4u32.to_le_bytes());
-        expected.extend(&123u128.to_le_bytes());
-
+        let expected = 123u128.to_le_bytes().to_vec();
         test_ref(&data, int_type.clone(), &expected);
     }
 
@@ -203,15 +202,13 @@ mod tests {
         type IntType = U256;
         type SolType = sol!((uint256,));
         let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU256));
-    
+
         let value = U256::from(123u128);
-        let mut expected = Vec::new();
-        expected.extend(&4u32.to_le_bytes());
-        expected.extend(&value.to_le_bytes::<32>());
-    
+        let expected = value.to_le_bytes::<32>().to_vec();
+
         let data = SolType::abi_encode_params(&(value,));
         test_ref(&data, int_type.clone(), &expected);
-    }    
+    }
 
     #[test]
     fn test_unpack_ref_vec_u8() {
@@ -220,19 +217,18 @@ mod tests {
         let vector_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
             inner_type.clone(),
         ))));
-    
+
         let vec_data = vec![1u8, 2u8, 3u8];
         let data = SolType::abi_encode_params(&(vec_data.clone(),));
-    
+
         let mut expected = Vec::new();
-        expected.extend(&4u32.to_le_bytes());                       // outer pointer
-        expected.extend(&(vec_data.len() as u32).to_le_bytes());    // length inside header
+        expected.extend(&(vec_data.len() as u32).to_le_bytes()); // length inside header
         for v in &vec_data {
-            expected.extend(&(*v as u32).to_le_bytes());            // pad each u8 to i32 (4 bytes)
+            expected.extend(&(*v as u32).to_le_bytes()); // pad each u8 to i32 (4 bytes)
         }
-    
+
         test_ref(&data, vector_type.clone(), &expected);
-    }      
+    }
 
     #[test]
     fn test_unpack_ref_vec_128() {
@@ -241,24 +237,23 @@ mod tests {
         let vector_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
             inner_type.clone(),
         ))));
-    
+
         let vec_data = vec![1u128, 2u128];
         let data = SolType::abi_encode_params(&(vec_data.clone(),));
-    
+
         let mut expected = Vec::new();
-        expected.extend(&4u32.to_le_bytes()); // pointer to vector header at 4
         expected.extend(&(vec_data.len() as u32).to_le_bytes()); // length = 2
-    
+
         // pointers to heap elements
-        expected.extend(&16u32.to_le_bytes());
-        expected.extend(&32u32.to_le_bytes());
-    
+        expected.extend(&12u32.to_le_bytes());
+        expected.extend(&28u32.to_le_bytes());
+
         // first u128 at 16
         expected.extend(&1u128.to_le_bytes());
-    
+
         // second u128 at 32
         expected.extend(&2u128.to_le_bytes());
-    
+
         test_ref(&data, vector_type.clone(), &expected);
     }
 }
