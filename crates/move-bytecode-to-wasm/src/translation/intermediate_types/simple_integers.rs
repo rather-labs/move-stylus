@@ -1,4 +1,4 @@
-use walrus::{ir::BinaryOp, InstrSeqBuilder, ValType};
+use walrus::{InstrSeqBuilder, ValType, ir::BinaryOp};
 
 use crate::wasm_helpers::{load_i32_from_bytes_instructions, load_i64_from_bytes_instructions};
 
