@@ -1,8 +1,8 @@
 use anyhow::Result;
 use move_binary_format::file_format::{CodeUnit, Constant, FunctionDefinition, Signature};
 use walrus::{
-    ir::{LoadKind, MemArg, StoreKind},
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleLocals, ValType,
+    ir::{LoadKind, MemArg, StoreKind},
 };
 
 use crate::translation::{intermediate_types::ISignature, map_bytecode_instruction};
@@ -115,7 +115,7 @@ impl<'a> MappedFunction<'a> {
             .builder_mut()
             .func_body();
 
-        // Maps the types of the values contained in the stack at tme moment of processing an
+        // Maps the types of the values contained in the stack at the moment of processing an
         // instruction.
         let mut types_stack = Vec::new();
 
