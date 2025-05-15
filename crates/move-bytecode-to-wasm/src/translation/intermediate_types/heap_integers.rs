@@ -1,12 +1,15 @@
 use walrus::{
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
     FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
-    ir::{MemArg, StoreKind},
 };
 
 #[derive(Clone, Copy)]
 pub struct IU128;
 
 impl IU128 {
+    /// Heap size (in bytes)
+    pub const HEAP_SIZE: i32 = 16;
+
     pub fn load_constant_instructions(
         module_locals: &mut ModuleLocals,
         builder: &mut InstrSeqBuilder,
@@ -14,7 +17,8 @@ impl IU128 {
         allocator: FunctionId,
         memory: MemoryId,
     ) {
-        let bytes: [u8; 16] = bytes.take(16).collect::<Vec<u8>>().try_into().unwrap();
+        let bytes: [u8; Self::HEAP_SIZE as usize] =
+            bytes.take(16).collect::<Vec<u8>>().try_into().unwrap();
 
         let pointer = module_locals.add(ValType::I32);
 
@@ -42,6 +46,49 @@ impl IU128 {
         }
 
         builder.local_get(pointer);
+    }
+
+    pub fn add(
+        builder: &mut walrus::InstrSeqBuilder,
+        module_locals: &mut walrus::ModuleLocals,
+
+        memory: MemoryId,
+    ) {
+        let tmp = module_locals.add(ValType::I64);
+        let n1_ptr = module_locals.add(ValType::I32);
+        let n2_ptr = module_locals.add(ValType::I32);
+
+        builder.local_set(n1_ptr);
+        builder.local_set(n2_ptr);
+
+        // Proably the type is i32
+        builder.block(None, |block| {
+            let block_id = block.id();
+            block.loop_(None, |loop_| {
+                let loop_id = loop_.id();
+
+                loop_
+                    .local_get(n1_ptr)
+                    .load(
+                        memory,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_get(n2_ptr)
+                    .load(
+                        memory,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .binop(BinaryOp::I64Add);
+            });
+        });
     }
 }
 
