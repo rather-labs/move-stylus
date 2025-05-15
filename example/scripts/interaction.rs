@@ -34,6 +34,7 @@ async fn main() -> eyre::Result<()> {
             function echo(uint128 x) external view returns (uint128)
             function getCopiedLocal() external view returns (uint128)
             function echoSignerWithInt(uint8 y) public view returns (uint8, address)
+            function sum(uint8 x, uint8 y) public view returns (uint8)
         ]"#
     );
 
@@ -58,6 +59,12 @@ async fn main() -> eyre::Result<()> {
     // This simple call will inject the "from" field as asigner
     let ret = example.echo_signer_with_int(42).call().await;
     println!("Example echoSignerWithInt = {:?}", ret);
+
+    let ret = example.sum(42, 42).call().await;
+    println!("Example sum = {:?}", ret);
+
+    let ret = example.sum(200, 200).call().await;
+    println!("Example sum = {:?}", ret);
 
     // Removing the "from" field should return set the signer address as 0x0
     let data = example.echo_signer_with_int(43).calldata().unwrap();

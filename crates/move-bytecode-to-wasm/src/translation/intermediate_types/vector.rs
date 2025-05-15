@@ -338,7 +338,7 @@ mod tests {
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
         let mut builder = function_builder.func_body();
 
-        let mut data_iter = data.to_vec().into_iter();
+        let data_iter = data.to_vec();
         let src_local = raw_module.locals.add(ValType::I32);
 
         // Load the constant vector and store in local
@@ -346,7 +346,7 @@ mod tests {
             &inner_type,
             &mut raw_module.locals,
             &mut builder,
-            &mut data_iter,
+            &mut data_iter.into_iter(),
             allocator,
             memory_id,
         );

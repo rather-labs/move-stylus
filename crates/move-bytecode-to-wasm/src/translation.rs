@@ -1,3 +1,4 @@
+use anyhow::Result;
 use functions::{
     add_unpack_function_return_values_instructions, prepare_function_return, MappedFunction,
 };
@@ -9,6 +10,7 @@ use walrus::{
     ir::{MemArg, StoreKind},
     FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
 };
+
 pub mod functions;
 /// The types in this module represent an intermediate Rust representation of Move types
 /// that is used to generate the WASM code.
@@ -103,16 +105,10 @@ fn map_bytecode_instruction(
         Bytecode::Call(function_handle_index) => {
             // Consume from the types stack the arguments that will be used by the function call
             let arguments = &functions_arguments[function_handle_index.0 as usize];
-            for argument in arguments.iter().rev() {
-                let arg = types_stack.pop().unwrap_or_else(|| {
-                    panic!(
-                    "function call argument error, expected {argument:?} but types stack is empty"
-                )
-                });
-                assert_eq!(
-                    arg, *argument,
-                    "function call argument mismatch, expected {argument:?} and found {arg:?}"
-                );
+            for (i, argument) in arguments.iter().enumerate().rev() {
+                if let Err(e) = pop_types_stack(types_stack, argument) {
+                    panic!("Called function signature arguments mismatch at index {i}: {e}");
+                }
             }
 
             builder.call(function_ids[function_handle_index.0 as usize]);
@@ -132,7 +128,12 @@ fn map_bytecode_instruction(
         // Locals
         Bytecode::StLoc(local_id) => {
             builder.local_set(mapped_function.local_variables[*local_id as usize]);
-            types_stack.pop();
+
+            pop_types_stack(
+                types_stack,
+                &mapped_function.local_variables_type[*local_id as usize],
+            )
+            .unwrap();
         }
         Bytecode::MoveLoc(local_id) => {
             // Values and references are loaded into a new variable
@@ -165,14 +166,7 @@ fn map_bytecode_instruction(
             // Remove the packing values from types stack and check if the types are correct
             let mut n = *num_elements as usize;
             while n > 0 {
-                let ty = types_stack
-                    .pop()
-                    .unwrap_or_else(|| panic!("error unpacking vector: types stack is empty"));
-                assert_eq!(
-                    ty, inner,
-                    "found type {ty:?} unpacking vector of type {inner:?}"
-                );
-
+                pop_types_stack(types_stack, &inner).unwrap();
                 n -= 1;
             }
 
@@ -180,7 +174,9 @@ fn map_bytecode_instruction(
         }
         Bytecode::Pop => {
             builder.drop();
-            types_stack.pop();
+            types_stack
+                .pop()
+                .unwrap_or_else(|| panic!("error dropping from types stack: types stack is empty"));
         }
         // TODO: ensure this is the last instruction in the move code
         Bytecode::Ret => {
@@ -190,6 +186,19 @@ fn map_bytecode_instruction(
                 &mapped_function.signature.returns,
                 memory,
                 allocator,
+            );
+
+            // Remove the return values from types stack and check if the types are correct
+            for (i, return_type) in mapped_function.signature.returns.iter().rev().enumerate() {
+                if let Err(e) = pop_types_stack(types_stack, return_type) {
+                    panic!("Function return type mismatch at index {i}: {e}");
+                }
+            }
+
+            // Stack types should be empty
+            assert!(
+                types_stack.is_empty(),
+                "types stack is not empty after return"
             );
         }
         Bytecode::Add => {
@@ -266,4 +275,20 @@ fn get_intermediate_type_for_signature_index(
     );
     // TODO: unwrap
     (&tokens[0]).try_into().unwrap()
+}
+
+fn pop_types_stack(
+    types_stack: &mut Vec<IntermediateType>,
+    expected_type: &IntermediateType,
+) -> Result<()> {
+    let Some(ty) = types_stack.pop() else {
+        anyhow::bail!(
+            "error popping types stack: expected {expected_type:?} but types stack is empty"
+        );
+    };
+    anyhow::ensure!(
+        ty == *expected_type,
+        "expected {expected_type:?} and found {ty:?}"
+    );
+    Ok(())
 }
