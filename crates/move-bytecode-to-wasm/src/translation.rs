@@ -202,13 +202,21 @@ fn map_bytecode_instruction(
             );
         }
         Bytecode::Or => {
+            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
+            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
             builder.binop(BinaryOp::I32Or);
+            types_stack.push(IntermediateType::IBool);
         }
         Bytecode::And => {
+            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
+            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
             builder.binop(BinaryOp::I32And);
+            types_stack.push(IntermediateType::IBool);
         }
         Bytecode::Not => {
+            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
             builder.unop(UnaryOp::I32Eqz);
+            types_stack.push(IntermediateType::IBool);
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }

@@ -16,47 +16,12 @@ fn test_bool() {
 
     sol!(
         #[allow(missing_docs)]
-        // function andTrue(bool x) external returns (bool);
-        // function and(bool x, bool y) external returns (bool);
-        // function or(bool x, bool y) external returns (bool);
         function notTrue() external returns (bool);
         function not(bool x) external returns (bool);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
-
-    // let data = and_trueCall::abi_encode(&and_trueCall::new((true,)));
-    // let expected_result = <sol!((bool,))>::abi_encode_params(&(true,));
-    // run_test(&runtime, data, expected_result);
-
-    // let data = and_trueCall::abi_encode(&and_trueCall::new((false,)));
-    // let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
-    // run_test(&runtime, data, expected_result);
-
-    // let data = andCall::abi_encode(&andCall::new((true, false)));
-    // let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
-    // run_test(&runtime, data, expected_result);
-
-    // let data = andCall::abi_encode(&andCall::new((true, true)));
-    // let expected_result = <sol!((bool,))>::abi_encode_params(&(true,));
-    // run_test(&runtime, data, expected_result);
-
-    // let data = andCall::abi_encode(&andCall::new((false, false)));
-    // let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
-    // run_test(&runtime, data, expected_result);
-
-    // let data = orCall::abi_encode(&orCall::new((true, false)));
-    // let expected_result = <sol!((bool,))>::abi_encode_params(&(true,));
-    // run_test(&runtime, data, expected_result);
-
-    // let data = orCall::abi_encode(&orCall::new((true, true)));
-    // let expected_result = <sol!((bool,))>::abi_encode_params(&(true,));
-    // run_test(&runtime, data, expected_result);
-
-    // let data = orCall::abi_encode(&orCall::new((false, false)));
-    // let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
-    // run_test(&runtime, data, expected_result);
 
     let data = notTrueCall::abi_encode(&notTrueCall::new(()));
     let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
