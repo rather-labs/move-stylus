@@ -1,8 +1,8 @@
 use anyhow::Result;
 use move_binary_format::file_format::{CodeUnit, Constant, FunctionDefinition, Signature};
 use walrus::{
-    ir::{LoadKind, MemArg, StoreKind},
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleLocals, ValType,
+    ir::{LoadKind, MemArg, StoreKind},
 };
 
 use crate::translation::{intermediate_types::ISignature, map_bytecode_instruction};

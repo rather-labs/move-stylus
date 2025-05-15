@@ -1,12 +1,12 @@
 use functions::{
-    add_unpack_function_return_values_instructions, prepare_function_return, MappedFunction,
+    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
 };
-use intermediate_types::vector::IVector;
 use intermediate_types::IntermediateType;
+use intermediate_types::vector::IVector;
 use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
 use walrus::{
-    ir::{MemArg, StoreKind},
     FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
+    ir::{LoadKind, MemArg, StoreKind},
 };
 pub mod functions;
 /// The types in this module represent an intermediate Rust representation of Move types
@@ -179,17 +179,37 @@ fn map_bytecode_instruction(
         }
         Bytecode::ImmBorrowLoc(local_id) => {
             let local = mapped_function.local_variables[*local_id as usize];
-            &mapped_function.local_variables_type[*local_id as usize]
-                .add_imm_borrow_loc_instructions(module_locals, builder, allocator, memory, local);
+            let local_type = &mapped_function.local_variables_type[*local_id as usize];
+
+            local_type.add_imm_borrow_loc_instructions(
+                module_locals,
+                builder,
+                allocator,
+                memory,
+                local,
+            );
+
+            // Push the reference to the type into the types stack
+            types_stack.push(IntermediateType::Ref(Box::new(local_type.clone())));
         }
+
         Bytecode::ReadRef => {
-            // &mapped_function.local_variables_type[*local_id as usize].add_read_ref_instructions(
-            //     module_locals,
-            //     builder,
-            //     allocator,
-            //     memory,
-            // );
+            let ref_type = types_stack
+                .pop()
+                .expect("ReadRef expects a reference on the stack");
+
+            match ref_type {
+                IntermediateType::Ref(inner) => {
+                    // Now call directly on the inner type
+                    inner.add_read_ref_instructions(builder, memory);
+
+                    // And push the inner type into the stack
+                    types_stack.push(*inner);
+                }
+                _ => panic!("ReadRef expected a Ref type but got: {:?}", ref_type),
+            }
         }
+
         Bytecode::Pop => {
             builder.drop();
             types_stack.pop();

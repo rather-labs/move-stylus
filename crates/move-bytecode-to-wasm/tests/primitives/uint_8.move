@@ -49,10 +49,4 @@ fun identity_2(_x: u8, y: u8): u8 {
   y
 }
 
-public fun demo_ref(x: u8): u8 {
-  let y = &x;
-  *y
-}
-
-
 

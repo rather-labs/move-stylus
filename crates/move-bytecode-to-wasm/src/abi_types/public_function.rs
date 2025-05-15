@@ -2,7 +2,7 @@ use walrus::{FunctionId, InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp
 
 use crate::translation::{
     functions::add_unpack_function_return_values_instructions,
-    intermediate_types::{signer::ISigner, ISignature, IntermediateType},
+    intermediate_types::{ISignature, IntermediateType, signer::ISigner},
 };
 
 use super::{

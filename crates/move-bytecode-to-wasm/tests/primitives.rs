@@ -759,3 +759,61 @@ fn test_vec_vec_128() {
     ],));
     run_test(&runtime, data, expected_result);
 }
+
+#[test]
+fn test_imm_ref() {
+    const MODULE_NAME: &str = "imm_ref";
+    const SOURCE_PATH: &str = "tests/primitives/imm_ref.move";
+
+    sol!(
+        #[allow(missing_docs)]
+        function refU8(uint8 x) external returns (uint8);
+        function refU16(uint16 x) external returns (uint16);
+        function refU32(uint32 x) external returns (uint32);
+        function refU64(uint64 x) external returns (uint64);
+        function refU128(uint128 x) external returns (uint128);
+        function refU256(uint256 x) external returns (uint256);
+        function refVecU8(uint8[] x) external returns (uint8[]);
+        function refVecU64(uint64[] x) external returns (uint64[]);
+        function refVecU256(uint256[] x) external returns (uint256[]);
+    );
+
+    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
+
+    let data = refU8Call::abi_encode(&refU8Call::new((111,)));
+    let expected_result = <sol!((uint8,))>::abi_encode_params(&(111,));
+    run_test(&runtime, data, expected_result);
+
+    let data = refU16Call::abi_encode(&refU16Call::new((111,)));
+    let expected_result = <sol!((uint16,))>::abi_encode_params(&(111,));
+    run_test(&runtime, data, expected_result);
+
+    let data = refU32Call::abi_encode(&refU32Call::new((111,)));
+    let expected_result = <sol!((uint32,))>::abi_encode_params(&(111,));
+    run_test(&runtime, data, expected_result);
+
+    let data = refU64Call::abi_encode(&refU64Call::new((111,)));
+    let expected_result = <sol!((uint64,))>::abi_encode_params(&(111,));
+    run_test(&runtime, data, expected_result);
+
+    let data = refU128Call::abi_encode(&refU128Call::new((111,)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(111,));
+    run_test(&runtime, data, expected_result);
+
+    let data = refU256Call::abi_encode(&refU256Call::new((U256::from(111),)));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(111),));
+    run_test(&runtime, data, expected_result);
+
+    let data = refVecU8Call::abi_encode(&refVecU8Call::new((vec![1u8, 2u8, 3u8],)));
+    let expected_result = <sol!((uint8[],))>::abi_encode_params(&(vec![1u8, 2u8, 3u8],));
+    run_test(&runtime, data, expected_result);
+
+    let data = refVecU64Call::abi_encode(&refVecU64Call::new((vec![1u64, 2u64, 3u64],)));
+    let expected_result = <sol!((uint64[],))>::abi_encode_params(&(vec![1u64, 2u64, 3u64],));
+    run_test(&runtime, data, expected_result);
+
+    let data = refVecU256Call::abi_encode(&refVecU256Call::new((vec![U256::from(111), U256::from(222), U256::from(333)],)));
+    let expected_result = <sol!((uint256[],))>::abi_encode_params(&(vec![U256::from(111), U256::from(222), U256::from(333)],));
+    run_test(&runtime, data, expected_result);
+}

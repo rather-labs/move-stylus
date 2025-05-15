@@ -2,11 +2,11 @@ use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
 use move_binary_format::file_format::{Signature, SignatureToken};
-use simple_integers::{IU16, IU32, IU64, IU8};
+use simple_integers::{IU8, IU16, IU32, IU64};
 use vector::IVector;
 use walrus::{
-    ir::{LoadKind, MemArg},
     FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
+    ir::{LoadKind, MemArg, StoreKind},
 };
 
 pub mod address;
@@ -292,18 +292,22 @@ impl IntermediateType {
         }
     }
 
-    pub fn add_read_ref_instructions(
-        &self,
-        module_locals: &mut ModuleLocals,
-        builder: &mut InstrSeqBuilder,
-        memory: MemoryId,
-    ) {
-        let ptr = module_locals.add(ValType::I32);
-        builder.local_set(ptr);
-
+    pub fn add_read_ref_instructions(&self, builder: &mut InstrSeqBuilder, memory: MemoryId) {
         match self {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32 => {
+                builder.load(
+                    memory,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
             IntermediateType::IU64 => {
-                builder.local_get(ptr);
                 builder.load(
                     memory,
                     LoadKind::I64 { atomic: false },
@@ -317,28 +321,9 @@ impl IntermediateType {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress => {
-                builder.local_get(ptr);
+                // No load needed, pointer is already correct
             }
-            IntermediateType::IBool
-            | IntermediateType::IU8
-            | IntermediateType::IU16
-            | IntermediateType::IU32 => {
-                builder.local_get(ptr);
-                builder.load(
-                    memory,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            }
-            IntermediateType::ISigner => {
-                panic!("Cannot ReadRef on signer type");
-            }
-            IntermediateType::Ref(_) | IntermediateType::MutRef(_) => {
-                panic!("Cannot ReadRef on reference to reference");
-            }
+            _ => panic!("Unsupported ReadRef type: {:?}", self),
         }
     }
 }
@@ -362,11 +347,13 @@ impl TryFrom<&SignatureToken> for IntermediateType {
                 let itoken = Self::try_from(token.as_ref())?;
                 Ok(IntermediateType::IVector(Box::new(itoken)))
             }
-            SignatureToken::Reference(inner) => {
-                IntermediateType::Ref(Box::new(inner.to_intermediate_type()))
+            SignatureToken::Reference(token) => {
+                let itoken = Self::try_from(token.as_ref())?;
+                Ok(IntermediateType::Ref(Box::new(itoken)))
             }
-            SignatureToken::MutableReference(inner) => {
-                IntermediateType::MutRef(Box::new(inner.to_intermediate_type()))
+            SignatureToken::MutableReference(token) => {
+                let itoken = Self::try_from(token.as_ref())?;
+                Ok(IntermediateType::MutRef(Box::new(itoken)))
             }
             _ => Err(anyhow::anyhow!("Unsupported signature token: {value:?}")),
         }
