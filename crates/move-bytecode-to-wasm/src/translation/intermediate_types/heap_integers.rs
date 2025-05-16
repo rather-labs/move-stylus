@@ -40,84 +40,17 @@ fn add(
         .i32_const(0)
         .local_set(overflowed);
 
-    // ===
-    // Read the first 32 bits of the two operands and add them in a 64 bit int
-    // ==
-    // Load a part of the first operand and save it in n1
-    builder
-        // Read the first 32 bits of n1 and put then in a 64 bits integer
-        .local_get(n1_ptr)
-        .local_get(offset)
-        .binop(BinaryOp::I32Add)
-        .load(
-            memory,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .local_tee(n1)
-        .unop(UnaryOp::I64ExtendUI32)
-        // Read the first 32 bits of n2 and put then in a 64 bits integer
-        .local_get(n2_ptr)
-        .local_get(offset)
-        .binop(BinaryOp::I32Add)
-        .load(
-            memory,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .local_tee(n2)
-        .unop(UnaryOp::I64ExtendUI32)
-        // We add the two loaded parts
-        .binop(BinaryOp::I64Add)
-        // And add the rest of the previous operation (if there was none, its the
-        // rest is 0)
-        .local_get(rest)
-        .binop(BinaryOp::I64Add)
-        // Save the result to partial_sum
-        .local_set(partial_sum);
-
-    // Save the lower 32 bits of the result
-    builder
-        .local_get(pointer)
-        .local_get(offset)
-        .binop(BinaryOp::I32Add)
-        .local_get(partial_sum)
-        .unop(UnaryOp::I32WrapI64)
-        .store(
-            memory,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
-
-    // ===
-    // After the addition, the lower 32 bits are the result we are going to store and the higher 32
-    // bits are carried to sum in the next iteration
-    // ==
-    builder
-        .local_get(partial_sum)
-        .i64_const(32)
-        .binop(BinaryOp::I64ShrU)
-        .local_set(rest)
-        .local_get(pointer);
-
-    /*
     builder
         .block(None, |block| {
             let block_id = block.id();
             block.loop_(None, |loop_| {
                 let loop_id = loop_.id();
-
+                // ===
+                // Read the first 32 bits of the two operands and add them in a 64 bit int
+                // ==
+                // Load a part of the first operand and save it in n1
                 loop_
-                    // Load a part of the first operand and save it in n1
+                    // Read the first 32 bits of n1 and put then in a 64 bits integer
                     .local_get(n1_ptr)
                     .local_get(offset)
                     .binop(BinaryOp::I32Add)
@@ -130,7 +63,8 @@ fn add(
                         },
                     )
                     .local_tee(n1)
-                    // Load a part of the second operand and save it in n2
+                    .unop(UnaryOp::I64ExtendUI32)
+                    // Read the first 32 bits of n2 and put then in a 64 bits integer
                     .local_get(n2_ptr)
                     .local_get(offset)
                     .binop(BinaryOp::I32Add)
@@ -143,6 +77,7 @@ fn add(
                         },
                     )
                     .local_tee(n2)
+                    .unop(UnaryOp::I64ExtendUI32)
                     // We add the two loaded parts
                     .binop(BinaryOp::I64Add)
                     // And add the rest of the previous operation (if there was none, its the
@@ -150,17 +85,15 @@ fn add(
                     .local_get(rest)
                     .binop(BinaryOp::I64Add)
                     // Save the result to partial_sum
-                    .local_tee(partial_sum)
-                    // In this instance, the lower 32bits are the result and the higher 32bits are
-                    // the rest (partial_sum >> 32 == rest)
-                    .i64_const(32)
-                    .binop(BinaryOp::I64ShrU)
-                    .local_set(rest)
-                    // Save the partial sum
+                    .local_set(partial_sum);
+
+                // Save the lower 32 bits of the result
+                loop_
                     .local_get(pointer)
                     .local_get(offset)
                     .binop(BinaryOp::I32Add)
                     .local_get(partial_sum)
+                    .unop(UnaryOp::I32WrapI64) // TODO I think this wraps, we need to mask the rest part
                     .store(
                         memory,
                         StoreKind::I32 { atomic: false },
@@ -168,14 +101,26 @@ fn add(
                             align: 0,
                             offset: 0,
                         },
-                    ).local_get(pointer);
-                    /*
-                    // Save if overflowed
-                    .local_get(rest)
+                    );
+
+                // ===
+                // After the addition, the lower 32 bits are the result we are going to store and the higher 32
+                // bits are carried to sum in the next iteration
+                // ==
+                loop_
+                    .local_get(partial_sum)
+                    .i64_const(32)
+                    .binop(BinaryOp::I64ShrU)
+                    .local_tee(rest);
+
+                // Set if there is overflow
+                loop_
                     .i64_const(0)
                     .binop(BinaryOp::I64Ne)
-                    .local_set(overflowed)
-                    // We check if we are the offset is out of bounds
+                    .local_set(overflowed);
+
+                // We check if we are the offset is out of bounds
+                loop_
                     .local_get(offset)
                     .i32_const(type_heap_size - 4)
                     .binop(BinaryOp::I32Eq)
@@ -195,25 +140,10 @@ fn add(
                                 },
                             );
                         },
+                        // Otherwise we make store the result and recalculate the rest
                         |else_| {
-                            // If we overflowed we recalculate the rest
+                            // offset += 4 and process the next part of the integer
                             else_
-                                .local_get(overflowed)
-                                .if_else(
-                                    ValType::I64,
-                                    |then| {
-                                        then.local_get(n1)
-                                            .i64_const(u64::MAX as i64)
-                                            .local_get(n2)
-                                            .binop(BinaryOp::I64Sub)
-                                            .binop(BinaryOp::I64ShrU);
-                                    },
-                                    |else_| {
-                                        else_.i64_const(0);
-                                    },
-                                )
-                                .local_set(rest)
-                                // offset += 8 and process the next part of the integer
                                 .local_get(offset)
                                 .i32_const(4)
                                 .binop(BinaryOp::I32Add)
@@ -224,7 +154,7 @@ fn add(
             });
         })
         // Return the address of the sum
-        .local_get(pointer); */ */
+        .local_get(pointer);
 }
 
 #[derive(Clone, Copy)]
