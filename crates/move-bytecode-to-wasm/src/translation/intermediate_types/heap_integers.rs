@@ -56,7 +56,6 @@ impl IU128 {
     ) {
         let pointer = module_locals.add(ValType::I32);
         let offset = module_locals.add(ValType::I32);
-        // This can contain the sum or the partial_sum, depends if it overflows or not
         let partial_sum = module_locals.add(ValType::I64);
         let rest = module_locals.add(ValType::I64);
         let n1_ptr = module_locals.add(ValType::I32);
@@ -99,7 +98,7 @@ impl IU128 {
                                 offset: 0,
                             },
                         )
-                        .local_set(n1)
+                        .local_tee(n1)
                         // Load a part of the second operand and save it in n2
                         .local_get(n2_ptr)
                         .local_get(offset)
@@ -113,13 +112,11 @@ impl IU128 {
                             },
                         )
                         .local_tee(n2)
-                        .local_get(n1)
                         // We add the two loaded parts
                         .binop(BinaryOp::I64Add)
                         // And add the rest of the previous operation (if there was none, its the
                         // rest is 0)
                         .local_get(rest)
-                        // .binop(BinaryOp::I64Xor)
                         .binop(BinaryOp::I64Add)
                         // Save the result to partial_sum and check if overflow ocurred
                         .local_tee(partial_sum)
@@ -129,7 +126,6 @@ impl IU128 {
                         .local_get(n2)
                         .binop(BinaryOp::I64LtU)
                         .binop(BinaryOp::I32Or)
-                        // If overflow ocurred
                         .if_else(
                             None,
                             |then| {
@@ -145,7 +141,7 @@ impl IU128 {
                                         },
                                         |else_| {
                                             else_
-                                                // We store in ponter + offset
+                                                // We store the partial sum in ponter + offset
                                                 .local_get(pointer)
                                                 .local_get(offset)
                                                 .binop(BinaryOp::I32Add)
@@ -158,8 +154,8 @@ impl IU128 {
                                                         offset: 0,
                                                     },
                                                 )
-                                                .local_get(partial_sum)
                                                 // The rest is the compliment of the the sum
+                                                .local_get(partial_sum)
                                                 .i64_const(-1)
                                                 .binop(BinaryOp::I64Xor)
                                                 .local_set(rest)
@@ -192,6 +188,7 @@ impl IU128 {
                         );
                 });
             })
+            // Return the address of the sum
             .local_get(pointer);
     }
 }
