@@ -260,13 +260,17 @@ mod tests {
 
         let expected = SolType::abi_encode_params(&(vec![1u8, 2u8, 3u8],));
 
-        test_pack( &[
-            3u32.to_le_bytes().as_slice(),
-            1u32.to_le_bytes().as_slice(),
-            2u32.to_le_bytes().as_slice(),
-            3u32.to_le_bytes().as_slice(),
-        ]
-        .concat(), ref_type.clone(), &expected);
+        test_pack(
+            &[
+                3u32.to_le_bytes().as_slice(),
+                1u32.to_le_bytes().as_slice(),
+                2u32.to_le_bytes().as_slice(),
+                3u32.to_le_bytes().as_slice(),
+            ]
+            .concat(),
+            ref_type.clone(),
+            &expected,
+        );
     }
 
     #[test]
@@ -282,14 +286,14 @@ mod tests {
         heap_data.extend(&3u32.to_le_bytes());
 
         // 2. Pointers to heap-allocated u128 values
-        heap_data.extend(&16u32.to_le_bytes()); 
-        heap_data.extend(&32u32.to_le_bytes()); 
-        heap_data.extend(&48u32.to_le_bytes()); 
+        heap_data.extend(&16u32.to_le_bytes());
+        heap_data.extend(&32u32.to_le_bytes());
+        heap_data.extend(&48u32.to_le_bytes());
 
         // 3. Actual values at those pointers (u128 little endian)
-        heap_data.extend(&1u128.to_le_bytes()); 
-        heap_data.extend(&2u128.to_le_bytes()); 
-        heap_data.extend(&3u128.to_le_bytes()); 
+        heap_data.extend(&1u128.to_le_bytes());
+        heap_data.extend(&2u128.to_le_bytes());
+        heap_data.extend(&3u128.to_le_bytes());
 
         // Expected ABI calldata after packing (flat vector encoding)
         let expected_calldata = SolType::abi_encode_params(&(vec![1u128, 2u128, 3u128],));
