@@ -468,36 +468,35 @@ fn test_uint_128() {
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
 
-    /*
-        let data = getConstantCall::abi_encode(&getConstantCall::new(()));
-        let expected_result = <sol!((uint128,))>::abi_encode_params(&(128128,));
-        run_test(&runtime, data, expected_result);
+    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(128128,));
+    run_test(&runtime, data, expected_result);
 
-        let data = getLocalCall::abi_encode(&getLocalCall::new((111,)));
-        let expected_result = <sol!((uint128,))>::abi_encode_params(&(50,));
-        run_test(&runtime, data, expected_result);
+    let data = getLocalCall::abi_encode(&getLocalCall::new((111,)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(50,));
+    run_test(&runtime, data, expected_result);
 
-        let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
-        let expected_result = <sol!((uint128, uint128))>::abi_encode_params(&(100, 111));
-        run_test(&runtime, data, expected_result);
+    let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
+    let expected_result = <sol!((uint128, uint128))>::abi_encode_params(&(100, 111));
+    run_test(&runtime, data, expected_result);
 
-        let data = echoCall::abi_encode(&echoCall::new((222,)));
-        let expected_result = <sol!((uint128,))>::abi_encode_params(&(222,));
-        run_test(&runtime, data, expected_result);
+    let data = echoCall::abi_encode(&echoCall::new((222,)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(222,));
+    run_test(&runtime, data, expected_result);
 
-        // Echo max uint128
-        let data = echoCall::abi_encode(&echoCall::new((u128::MAX,)));
-        let expected_result = <sol!((uint128,))>::abi_encode_params(&(u128::MAX,));
-        run_test(&runtime, data, expected_result);
+    // Echo max uint128
+    let data = echoCall::abi_encode(&echoCall::new((u128::MAX,)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(u128::MAX,));
+    run_test(&runtime, data, expected_result);
 
-        let data = echo2Call::abi_encode(&echo2Call::new((111, 222)));
-        let expected_result = <sol!((uint128,))>::abi_encode_params(&(222,));
-        run_test(&runtime, data, expected_result);
+    let data = echo2Call::abi_encode(&echo2Call::new((111, 222)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(222,));
+    run_test(&runtime, data, expected_result);
 
-        // Test the first 64 bits
-        let data = sumCall::abi_encode(&sumCall::new((1, 1)));
-        let expected_result = <sol!((uint128,))>::abi_encode_params(&(2,));
-        run_test(&runtime, data, expected_result);
+    // Test the first 64 bits
+    let data = sumCall::abi_encode(&sumCall::new((1, 1)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(2,));
+    run_test(&runtime, data, expected_result);
 
     // Test the carry to the second half of 64 bits
     let data = sumCall::abi_encode(&sumCall::new((
@@ -508,7 +507,6 @@ fn test_uint_128() {
     println!("{:?}", 36893488147419103232_u128.to_be_bytes());
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(36893488147419103232,));
     run_test(&runtime, data, expected_result);
-    */
 
     // Test the carry to the second half of 64 bits
     let data = sumCall::abi_encode(&sumCall::new((
@@ -521,7 +519,6 @@ fn test_uint_128() {
     run_test(&runtime, data, expected_result);
 }
 
-/*
 #[test]
 #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
 fn test_uint_128_overflow() {
@@ -539,7 +536,7 @@ fn test_uint_128_overflow() {
     let data = sumOverflowCall::abi_encode(&sumOverflowCall::new((42,)));
     run_test(&runtime, data, vec![]);
 }
-*/
+
 #[test]
 fn test_uint_256() {
     const MODULE_NAME: &str = "uint_256";
@@ -558,7 +555,6 @@ fn test_uint_256() {
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
 
-    /*
     let data = getConstantCall::abi_encode(&getConstantCall::new(()));
     let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(256256),));
     run_test(&runtime, data, expected_result);
@@ -602,7 +598,6 @@ fn test_uint_256() {
             U256::from_str_radix("36893488147419103230", 10).unwrap(),
         ));
     run_test(&runtime, data, expected_result);
-    */
 
     // Test the carry to the third half of 64 bits
     // Operands are 2^128 - 1
@@ -663,7 +658,6 @@ fn test_uint_256() {
     );
     run_test(&runtime, data, expected_result);
 
-    /*
     // Test the carry to the fourth half of 64 bits
     // Operands are 2^192 - 1
     // Expected result is (2^192 - 1) * 2)
@@ -685,7 +679,6 @@ fn test_uint_256() {
     )
     .unwrap(),));
     run_test(&runtime, data, expected_result);
-    */
 }
 
 #[test]

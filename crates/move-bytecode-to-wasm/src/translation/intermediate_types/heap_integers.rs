@@ -14,7 +14,6 @@ fn add(
     let offset = module_locals.add(ValType::I32);
     let overflowed = module_locals.add(ValType::I32);
     let partial_sum = module_locals.add(ValType::I64);
-    let sum = module_locals.add(ValType::I32);
     let rest = module_locals.add(ValType::I64);
     let n1_ptr = module_locals.add(ValType::I32);
     let n2_ptr = module_locals.add(ValType::I32);
