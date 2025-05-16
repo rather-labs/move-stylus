@@ -494,6 +494,12 @@ fn test_uint_128() {
         let expected_result = <sol!((uint128,))>::abi_encode_params(&(222,));
         run_test(&runtime, data, expected_result);
     */
+
+    let data = sumCall::abi_encode(&sumCall::new((1, 1)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(2,));
+    // let expected_result = <sol!((uint128,))>::abi_encode_params(&(2,));
+    run_test(&runtime, data, expected_result);
+
     let data = sumCall::abi_encode(&sumCall::new((
         18_446_744_073_709_551_615,
         18_446_744_073_709_551_615,

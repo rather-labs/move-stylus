@@ -56,7 +56,8 @@ impl IU128 {
     ) {
         let pointer = module_locals.add(ValType::I32);
         let offset = module_locals.add(ValType::I32);
-        // This can contain the sum or the rest, depends if it overflows or not
+        // This can contain the sum or the partial_sum, depends if it overflows or not
+        let partial_sum = module_locals.add(ValType::I64);
         let rest = module_locals.add(ValType::I64);
         let n1_ptr = module_locals.add(ValType::I32);
         let n2_ptr = module_locals.add(ValType::I32);
@@ -72,79 +73,15 @@ impl IU128 {
             .i32_const(Self::HEAP_SIZE)
             .call(allocator)
             .local_set(pointer)
-            // Set the rest to 0
+            // Set the partial_sum and rest to 0
+            .i64_const(0)
+            .local_set(partial_sum)
             .i64_const(0)
             .local_set(rest)
             // Set the offset to 8 (last 64 bits of u128)
             .i32_const(0)
             .local_set(offset);
 
-        /*
-        builder
-            .local_get(pointer)
-            .local_get(offset)
-            .binop(BinaryOp::I32Add)
-            .i64_const(255)
-            .store(
-                memory,
-                StoreKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_get(pointer);
-        */
-
-        /*
-        builder
-            // Load a part of the first operand and save it in n1
-            .local_get(n1_ptr)
-            .local_get(offset)
-            .binop(BinaryOp::I32Add)
-            .load(
-                memory,
-                LoadKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_set(n1)
-            // Load a part of the second operand and save it in n2
-            .local_get(n2_ptr)
-            .local_get(offset)
-            .binop(BinaryOp::I32Add)
-            .load(
-                memory,
-                LoadKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_set(n2)
-            .local_get(n1)
-            .local_get(n2)
-            // We add the two loaded parts
-            .binop(BinaryOp::I64Add)
-            .local_get(rest)
-            .binop(BinaryOp::I64Add)
-            .local_set(rest)
-            .local_get(pointer)
-            .local_get(offset)
-            .binop(BinaryOp::I32Add)
-            .local_get(rest)
-            .store(
-                memory,
-                StoreKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_get(pointer);
-        */
         builder
             .block(None, |block| {
                 let block_id = block.id();
@@ -181,15 +118,17 @@ impl IU128 {
                         .local_get(n1)
                         // We add the two loaded parts
                         .binop(BinaryOp::I64Add)
-                        // And add the rest of the previous operation (if there was none, its the rest is
+                        // And add the partial_sum of the previous operation (if there was none, its the partial_sum is
                         // initialized as 0)
+                        //.i64_const(-1)
                         .local_get(rest)
+                        // .binop(BinaryOp::I64Xor)
                         .binop(BinaryOp::I64Add)
-                        // Save the result to rest and check if overflow ocurred
-                        .local_tee(rest)
+                        // Save the result to partial_sum and check if overflow ocurred
+                        .local_tee(partial_sum)
                         .local_get(n1)
                         .binop(BinaryOp::I64LtU)
-                        .local_get(rest)
+                        .local_get(partial_sum)
                         .local_get(n2)
                         .binop(BinaryOp::I64LtU)
                         .binop(BinaryOp::I32Or)
@@ -197,10 +136,10 @@ impl IU128 {
                         .if_else(
                             None,
                             |then| {
-                                // If we are in overflow and the offset is 0, means the whole
+                                // If we are in overflow and the offset is 16, means the whole
                                 // number overflowed and we are out of space
                                 then.local_get(offset)
-                                    .i32_const(8)
+                                    .i32_const(16)
                                     .binop(BinaryOp::I32Eq)
                                     .if_else(
                                         None,
@@ -208,13 +147,12 @@ impl IU128 {
                                             then.unreachable();
                                         },
                                         |else_| {
-                                            println!("128 - looping!");
                                             else_
                                                 // We store in ponter + offset
                                                 .local_get(pointer)
                                                 .local_get(offset)
                                                 .binop(BinaryOp::I32Add)
-                                                .local_get(rest)
+                                                .local_get(partial_sum)
                                                 .store(
                                                     memory,
                                                     StoreKind::I64 { atomic: false },
@@ -223,6 +161,10 @@ impl IU128 {
                                                         offset: 0,
                                                     },
                                                 )
+                                                .i64_const(0)
+                                                .local_get(partial_sum)
+                                                .binop(BinaryOp::I64Sub)
+                                                .local_set(rest)
                                                 // offset += 8 and process the next part of the integer
                                                 .local_get(offset)
                                                 .i32_const(8)
@@ -232,14 +174,14 @@ impl IU128 {
                                         },
                                     );
                             },
-                            // If we are not in overflow, we just save the rest and return
+                            // If we are not in overflow, we just save the partial_sum and return
                             |else_| {
-                                println!("128 - rest!");
+                                println!("128 - partial_sum!");
                                 else_
                                     .local_get(pointer)
                                     .local_get(offset)
                                     .binop(BinaryOp::I32Add)
-                                    .local_get(rest)
+                                    .local_get(partial_sum)
                                     .store(
                                         memory,
                                         StoreKind::I64 { atomic: false },
