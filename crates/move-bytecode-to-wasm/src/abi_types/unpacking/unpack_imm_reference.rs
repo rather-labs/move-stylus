@@ -81,8 +81,12 @@ mod tests {
     use super::*;
     use crate::memory::setup_module_memory;
     use crate::translation::intermediate_types::IntermediateType;
-    use alloy::primitives::U256;
-    use alloy::{dyn_abi::SolType, sol};
+    use alloy::{
+        dyn_abi::SolType,
+        hex::FromHex,
+        primitives::{Address, U256},
+        sol,
+    };
     use walrus::{FunctionBuilder, ModuleConfig, ValType};
     use wasmtime::{
         Engine, Global, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults,
@@ -276,5 +280,17 @@ mod tests {
         expected.extend(&2u128.to_le_bytes());
 
         test_unpack_ref(&data, vector_type.clone(), &expected);
+    }
+
+    #[test]
+    fn test_unpack_ref_address() {
+        type SolType = sol!((address,));
+        let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IAddress));
+
+        let data = SolType::abi_encode_params(&(Address::from_hex(
+            "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        )
+        .unwrap(),));
+        test_unpack_ref(&data, ref_type.clone(), &data);
     }
 }

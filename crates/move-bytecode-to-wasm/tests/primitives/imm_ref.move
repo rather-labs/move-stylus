@@ -63,3 +63,12 @@ public fun call_ref_vec_u8_internal(x: vector<u8>): vector<u8> {
 public fun call_ref_vec_u128_internal(x: vector<u128>): vector<u128> {
   ref_vec_u128_arg(&x)
 }
+
+// public fun dummy_ref_usage(_s: &signer) {
+//     // Does nothing, but forces a borrow
+// }
+
+// public fun use_signer_ref(s: signer): (u8, signer) {
+//     // dummy_ref_usage(&s);
+//     (42, s)
+// }

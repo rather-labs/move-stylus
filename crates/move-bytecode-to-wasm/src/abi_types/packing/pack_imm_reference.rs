@@ -1,6 +1,7 @@
 use super::Packable;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::imm_reference::IRef;
+use alloy_sol_types::sol_data::Address;
 use walrus::{
     FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
     ir::{LoadKind, MemArg},
@@ -82,8 +83,12 @@ mod tests {
     use super::*;
     use crate::memory::setup_module_memory;
     use crate::translation::intermediate_types::IntermediateType;
-    use alloy::primitives::U256;
-    use alloy::{dyn_abi::SolType, sol};
+    use alloy::{
+        dyn_abi::SolType,
+        hex::FromHex,
+        primitives::{Address, U256},
+        sol,
+    };
     use walrus::{FunctionBuilder, ModuleConfig, ValType};
     use wasmtime::{
         Engine, Global, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults,
@@ -148,7 +153,7 @@ mod tests {
         func_body.local_set(local);
 
         // Allocate calldata (where to write)
-        func_body.i32_const(expected_calldata_bytes.len() as i32);
+        func_body.i32_const(ref_type.encoded_size() as i32);
         func_body.call(allocator);
         func_body.local_tee(writer_pointer);
         func_body.local_set(calldata_reference_pointer);
@@ -224,6 +229,47 @@ mod tests {
     }
 
     #[test]
+    fn test_pack_ref_address() {
+        type SolType = sol!((address,));
+        let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IAddress));
+        let expected = SolType::abi_encode_params(&(Address::from_hex(
+            "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        )
+        .unwrap(),));
+        test_pack(&expected, ref_type.clone(), &expected);
+    }
+
+    #[test]
+    fn test_pack_ref_signer() {
+        type SolType = sol!((address,));
+        let ref_type = IntermediateType::IRef(Box::new(IntermediateType::ISigner));
+
+        let expected_result = SolType::abi_encode_params(&(Address::from_hex(
+            "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        )
+        .unwrap(),));
+        test_pack(&expected_result, ref_type.clone(), &expected_result);
+    }
+
+    #[test]
+    fn test_pack_ref_vec_u8() {
+        type SolType = sol!((uint8[],));
+        let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
+            IntermediateType::IU8,
+        ))));
+
+        let expected = SolType::abi_encode_params(&(vec![1u8, 2u8, 3u8],));
+
+        test_pack( &[
+            3u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+        ]
+        .concat(), ref_type.clone(), &expected);
+    }
+
+    #[test]
     fn test_pack_ref_vec_u128() {
         type SolType = sol!((uint128[],));
         let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
@@ -236,18 +282,75 @@ mod tests {
         heap_data.extend(&3u32.to_le_bytes());
 
         // 2. Pointers to heap-allocated u128 values
-        heap_data.extend(&16u32.to_le_bytes()); // ptr to first value @ 0x10
-        heap_data.extend(&32u32.to_le_bytes()); // ptr to second value @ 0x20
-        heap_data.extend(&48u32.to_le_bytes()); // ptr to third value @ 0x30
+        heap_data.extend(&16u32.to_le_bytes()); 
+        heap_data.extend(&32u32.to_le_bytes()); 
+        heap_data.extend(&48u32.to_le_bytes()); 
 
         // 3. Actual values at those pointers (u128 little endian)
-        heap_data.extend(&1u128.to_le_bytes()); // @ 0x10
-        heap_data.extend(&2u128.to_le_bytes()); // @ 0x20
-        heap_data.extend(&3u128.to_le_bytes()); // @ 0x30
+        heap_data.extend(&1u128.to_le_bytes()); 
+        heap_data.extend(&2u128.to_le_bytes()); 
+        heap_data.extend(&3u128.to_le_bytes()); 
 
         // Expected ABI calldata after packing (flat vector encoding)
         let expected_calldata = SolType::abi_encode_params(&(vec![1u128, 2u128, 3u128],));
 
         test_pack(&heap_data, ref_type.clone(), &expected_calldata);
+    }
+
+    #[test]
+    fn test_pack_ref_vector_vector_u32() {
+        type SolType = sol!((uint32[][],));
+        let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
+            IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+        ))));
+
+        let expected_result = SolType::abi_encode_params(&(vec![vec![1, 2, 3], vec![4, 5, 6]],));
+
+        let data = [
+            2u32.to_le_bytes().as_slice(),
+            12u32.to_le_bytes().as_slice(),
+            28u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
+            5u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+        test_pack(&data, ref_type.clone(), &expected_result);
+    }
+
+    #[test]
+    fn test_pack_ref_vector_vector_u128() {
+        type SolType = sol!((uint128[][],));
+        let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IVector(Box::new(
+            IntermediateType::IVector(Box::new(IntermediateType::IU128)),
+        ))));
+
+        let expected_result = SolType::abi_encode_params(&(vec![vec![1, 2, 3], vec![4, 5, 6]],));
+        let data = [
+            2u32.to_le_bytes().as_slice(),
+            12u32.to_le_bytes().as_slice(),
+            76u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            28u32.to_le_bytes().as_slice(),
+            44u32.to_le_bytes().as_slice(),
+            60u32.to_le_bytes().as_slice(),
+            1u128.to_le_bytes().as_slice(),
+            2u128.to_le_bytes().as_slice(),
+            3u128.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            92u32.to_le_bytes().as_slice(),
+            108u32.to_le_bytes().as_slice(),
+            124u32.to_le_bytes().as_slice(),
+            4u128.to_le_bytes().as_slice(),
+            5u128.to_le_bytes().as_slice(),
+            6u128.to_le_bytes().as_slice(),
+        ]
+        .concat();
+        test_pack(&data, ref_type.clone(), &expected_result);
     }
 }

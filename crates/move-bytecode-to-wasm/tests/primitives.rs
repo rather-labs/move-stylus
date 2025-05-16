@@ -779,6 +779,7 @@ fn test_imm_ref() {
         function callRefVecU8Internal(uint8[] x) external returns (uint8[]);
         function refVecU128Arg(uint128[] y) external returns (uint128[]);
         function callRefVecU128Internal(uint128[] x) external returns (uint128[]);
+        function useSignerRef(address x) external returns (uint8, address);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -844,4 +845,9 @@ fn test_imm_ref() {
     ],)));
     let expected_result = <sol!((uint128[],))>::abi_encode_params(&(vec![1u128, 2u128, 3u128],));
     run_test(&runtime, data, expected_result);
+
+    let test_address = Address::from_hex("0x1234567890abcdef1234567890abcdef12345678").unwrap();
+    let data = useSignerRefCall::abi_encode(&useSignerRefCall::new((test_address,)));
+    let expected_result = <sol!((uint8, address))>::abi_encode_params(&(42, test_address));
+    // run_test(&runtime, data, expected_result);
 }
