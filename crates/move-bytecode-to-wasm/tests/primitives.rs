@@ -493,29 +493,69 @@ fn test_uint_128() {
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(222,));
     run_test(&runtime, data, expected_result);
 
-    // Test the first 64 bits
+    // The following tests test two situations:
+    // 1. What happens when there is carry: we process the sum in chunks of 32 bits, so we use
+    //    numbers in the form 2^(n*32) where n=1,2,3,4.
+    //    If we add two numbers 2^(n*32) - 1, wthe first 32 bits will overflow and we will have to
+    //    take care of the carry.
+    //
+    //    For example
+    //    2^32 - 1 = [0, ..., 0, 0, 255, 255, 255, 255]
+    //
+    // 2. What happens if there is not carry :
+    //    If we add two numbers 2^(n*32), the first 32 bits will of both numbers will be zero, so,
+    //    when we add them there will be no carry at the beginning.
+    //
+    //    For example
+    //    2^32     = [0, ..., 0, 0, 1, 0, 0, 0, 0]
+    //
+    // This tests are repeated for all the 32 bits chunks in the 256bits
+
+    // Test the first 32 bits
     let data = sumCall::abi_encode(&sumCall::new((1, 1)));
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(2,));
     run_test(&runtime, data, expected_result);
 
-    // Test the carry to the second half of 64 bits
-    let data = sumCall::abi_encode(&sumCall::new((
-        18_446_744_073_709_551_616,
-        18_446_744_073_709_551_616,
-    )));
-    println!("{:?}", 18_446_744_073_709_551_616_u128.to_be_bytes());
-    println!("{:?}", 36893488147419103232_u128.to_be_bytes());
+    // Operands are 2^32 - 1
+    // Expected result is (2^32 - 1) * 2
+    let data = sumCall::abi_encode(&sumCall::new((4294967295, 4294967295)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(8589934590,));
+    run_test(&runtime, data, expected_result);
+
+    // Operands are 2^32
+    // Expected result is 2^32 * 2
+    let data = sumCall::abi_encode(&sumCall::new((4294967296, 4294967296)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(8589934592,));
+    run_test(&runtime, data, expected_result);
+
+    // Operands are 2^64 - 1
+    // Expected result is (2^64 - 1) * 2
+    let data = sumCall::abi_encode(&sumCall::new((18446744073709551615, 18446744073709551615)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(36893488147419103230,));
+    run_test(&runtime, data, expected_result);
+
+    // Operands are 2^64
+    // Expected result is (2^64) * 2
+    let data = sumCall::abi_encode(&sumCall::new((18446744073709551616, 18446744073709551616)));
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(36893488147419103232,));
     run_test(&runtime, data, expected_result);
 
-    // Test the carry to the second half of 64 bits
+    // Operands are 2^96 - 1
+    // Expected result is (2^96 - 1) * 2
     let data = sumCall::abi_encode(&sumCall::new((
-        18_446_744_073_709_551_615,
-        18_446_744_073_709_551_615,
+        79228162514264337593543950335,
+        79228162514264337593543950335,
     )));
-    println!("{:?}", 18_446_744_073_709_551_615_u128.to_be_bytes());
-    println!("{:?}", 36893488147419103230_u128.to_be_bytes());
-    let expected_result = <sol!((uint128,))>::abi_encode_params(&(36893488147419103230,));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(158456325028528675187087900670,));
+    run_test(&runtime, data, expected_result);
+
+    // Operands are 2^96
+    // Expected result is 2^96 * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        79228162514264337593543950336,
+        79228162514264337593543950336,
+    )));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(158456325028528675187087900672,));
     run_test(&runtime, data, expected_result);
 }
 
@@ -581,12 +621,58 @@ fn test_uint_256() {
     let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(222),));
     run_test(&runtime, data, expected_result);
 
-    // Test the first 64 bits
+    // The following tests test two situations:
+    // 1. What happens when there is carry: we process the sum in chunks of 32 bits, so we use
+    //    numbers in the form 2^(n*32) where n=1,2,3,4,5,6,7,8.
+    //    If we add two numbers 2^(n*32) - 1, wthe first 32 bits will overflow and we will have to
+    //    take care of the carry.
+    //
+    //    For example
+    //    2^32 - 1 = [0, ..., 0, 0, 255, 255, 255, 255]
+    // 2. What happens if there is not carry :
+    //    If we add two numbers 2^(n*32), the first 32 bits will of both numbers will be zero, so,
+    //    when we add them there will be no carry at the beginning.
+    //
+    //    For example
+    //    2^32     = [0, ..., 0, 0, 1, 0, 0, 0, 0]
+    //
+    // This tests are repeated for all the 32 bits chunks in the 256bits
+
+    println!(
+        "{:?}\n{:?}",
+        U256::from_str_radix("4294967296", 10)
+            .unwrap()
+            .to_be_bytes::<32>(),
+        U256::from_str_radix("4294967296", 10)
+            .unwrap()
+            .to_be_bytes::<32>(),
+    );
+
+    // Test the first 32 bits
     let data = sumCall::abi_encode(&sumCall::new((U256::from(1), U256::from(1))));
     let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(2),));
     run_test(&runtime, data, expected_result);
 
-    // Test the carry to the second half of 64 bits
+    // Operands are 2^32 - 1
+    // Expected result is (2^32 - 1) * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::from_str_radix("4294967295", 10).unwrap(),
+        U256::from_str_radix("4294967295", 10).unwrap(),
+    )));
+    let expected_result =
+        <sol!((uint256,))>::abi_encode_params(&(U256::from_str_radix("8589934590", 10).unwrap(),));
+    run_test(&runtime, data, expected_result);
+
+    // Operands are 2^32
+    // Expected result is 2^32 * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::from_str_radix("4294967296", 10).unwrap(),
+        U256::from_str_radix("4294967296", 10).unwrap(),
+    )));
+    let expected_result =
+        <sol!((uint256,))>::abi_encode_params(&(U256::from_str_radix("8589934592", 10).unwrap(),));
+    run_test(&runtime, data, expected_result);
+
     // Operands are 2^64 - 1
     // Expected result is (2^64 - 1) * 2
     let data = sumCall::abi_encode(&sumCall::new((
@@ -599,7 +685,44 @@ fn test_uint_256() {
         ));
     run_test(&runtime, data, expected_result);
 
-    // Test the carry to the third half of 64 bits
+    // Operands are 2^64
+    // Expected result is (2^64) * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::from_str_radix("18446744073709551616", 10).unwrap(),
+        U256::from_str_radix("18446744073709551616", 10).unwrap(),
+    )));
+    let expected_result =
+        <sol!((uint256,))>::abi_encode_params(&(
+            U256::from_str_radix("36893488147419103232", 10).unwrap(),
+        ));
+    run_test(&runtime, data, expected_result);
+
+    // Operands are 2^96 - 1
+    // Expected result is (2^96 - 1) * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::from_str_radix("79228162514264337593543950335", 10).unwrap(),
+        U256::from_str_radix("79228162514264337593543950335", 10).unwrap(),
+    )));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from_str_radix(
+        "158456325028528675187087900670",
+        10,
+    )
+    .unwrap(),));
+    run_test(&runtime, data, expected_result);
+
+    // Operands are 2^96
+    // Expected result is 2^96 * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::from_str_radix("79228162514264337593543950336", 10).unwrap(),
+        U256::from_str_radix("79228162514264337593543950336", 10).unwrap(),
+    )));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from_str_radix(
+        "158456325028528675187087900672",
+        10,
+    )
+    .unwrap(),));
+    run_test(&runtime, data, expected_result);
+
     // Operands are 2^128 - 1
     // Expected result is (2^128 - 1) * 2
     let data = sumCall::abi_encode(&sumCall::new((
@@ -613,22 +736,6 @@ fn test_uint_256() {
     .unwrap(),));
     run_test(&runtime, data, expected_result);
 
-    println!(
-        "{:?}\n{:?}",
-        U256::from_str_radix("340282366920938463463374607431768211456", 10)
-            .unwrap()
-            .to_be_bytes::<32>(),
-        U256::from_str_radix("340282366920938463463374607431768211456", 10)
-            .unwrap()
-            .to_be_bytes::<32>()
-    );
-    println!(
-        "{:?}",
-        U256::from_str_radix("680564733841876926926749214863536422912", 10)
-            .unwrap()
-            .to_be_bytes::<32>()
-    );
-
     // Test the carry to the third half of 64 bits
     // Operands are 2^128 - 1
     // Expected result is (2^128 - 1) * 2
@@ -641,21 +748,6 @@ fn test_uint_256() {
         10,
     )
     .unwrap(),));
-    println!(
-        "{:?}\n{:?}",
-        U256::from_str_radix("340282366920938463463374607431768211455", 10)
-            .unwrap()
-            .to_be_bytes::<32>(),
-        U256::from_str_radix("340282366920938463463374607431768211455", 10)
-            .unwrap()
-            .to_be_bytes::<32>()
-    );
-    println!(
-        "{:?}",
-        U256::from_str_radix("680564733841876926926749214863536422910", 10)
-            .unwrap()
-            .to_be_bytes::<32>()
-    );
     run_test(&runtime, data, expected_result);
 
     // Test the carry to the fourth half of 64 bits

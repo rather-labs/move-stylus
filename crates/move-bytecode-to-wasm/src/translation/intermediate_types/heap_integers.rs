@@ -92,7 +92,9 @@ fn add(
                     .local_get(offset)
                     .binop(BinaryOp::I32Add)
                     .local_get(partial_sum)
-                    .unop(UnaryOp::I32WrapI64) // TODO I think this wraps, we need to mask the rest part
+                    // TODO I think this wraps, we need to mask the rest part
+                    // to zero so we avoid wrapping
+                    .unop(UnaryOp::I32WrapI64)
                     .store(
                         memory,
                         StoreKind::I32 { atomic: false },
