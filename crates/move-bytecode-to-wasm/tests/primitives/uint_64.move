@@ -56,3 +56,11 @@ public fun sum(x: u64, y: u64): u64 {
 public fun cast_u64_up(x: u32): u64 {
     x as u64
 }
+
+public fun cast_u64_from_u128(x: u128): u64 {
+    x as u64
+}
+
+public fun cast_u64_from_u256(x: u256): u64 {
+    x as u64
+}
