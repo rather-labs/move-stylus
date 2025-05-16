@@ -1,15 +1,15 @@
 use anyhow::Result;
 use functions::{
-    add_unpack_function_return_values_instructions, prepare_function_return, MappedFunction,
+    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
 };
-use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::IntermediateType;
+use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
 use walrus::ir::{BinaryOp, UnaryOp};
 use walrus::{
-    ir::{MemArg, StoreKind},
     FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
+    ir::{MemArg, StoreKind},
 };
 
 pub mod functions;
@@ -201,6 +201,26 @@ fn map_bytecode_instruction(
                 types_stack.is_empty(),
                 "types stack is not empty after return"
             );
+        }
+        Bytecode::CastU8 => {
+            let original_type = types_stack.pop().unwrap();
+            IU8::cast_from(builder, module_locals, original_type);
+            types_stack.push(IntermediateType::IU8);
+        }
+        Bytecode::CastU16 => {
+            let original_type = types_stack.pop().unwrap();
+            IU16::cast_from(builder, module_locals, original_type);
+            types_stack.push(IntermediateType::IU16);
+        }
+        Bytecode::CastU32 => {
+            let original_type = types_stack.pop().unwrap();
+            IU32::cast_from(builder, module_locals, original_type);
+            types_stack.push(IntermediateType::IU32);
+        }
+        Bytecode::CastU64 => {
+            let original_type = types_stack.pop().unwrap();
+            IU64::cast_from(builder, module_locals, original_type);
+            types_stack.push(IntermediateType::IU64);
         }
         Bytecode::Add => {
             let sum_type = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {

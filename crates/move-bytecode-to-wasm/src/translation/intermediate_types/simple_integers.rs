@@ -1,6 +1,11 @@
-use walrus::{ir::BinaryOp, InstrSeqBuilder, ValType};
+use walrus::{
+    InstrSeqBuilder, ValType,
+    ir::{BinaryOp, UnaryOp},
+};
 
 use crate::wasm_helpers::{load_i32_from_bytes_instructions, load_i64_from_bytes_instructions};
+
+use super::IntermediateType;
 
 #[derive(Clone, Copy)]
 pub struct IU8;
@@ -16,14 +21,11 @@ impl IU8 {
         load_i32_from_bytes_instructions(builder, &bytes);
     }
 
-    /// Adds the instructions to add two u8 values.
-    ///
-    /// Along with the addition code to check overflow is added. If the result is greater than 255
-    /// then the execution is aborted This check is poosible because interally we are using
-    /// 32bits integers.
-    pub fn add(builder: &mut walrus::InstrSeqBuilder, module_locals: &mut walrus::ModuleLocals) {
+    fn add_check_overflow_instructions(
+        builder: &mut walrus::InstrSeqBuilder,
+        module_locals: &mut walrus::ModuleLocals,
+    ) {
         let tmp = module_locals.add(walrus::ValType::I32);
-        builder.binop(BinaryOp::I32Add);
         builder.local_tee(tmp);
         builder.i32_const(Self::MAX_VALUE);
         builder.binop(BinaryOp::I32GtU);
@@ -36,6 +38,37 @@ impl IU8 {
                 else_.local_get(tmp);
             },
         );
+    }
+
+    /// Adds the instructions to add two u8 values.
+    ///
+    /// Along with the addition code to check overflow is added. If the result is greater than 255
+    /// then the execution is aborted This check is poosible because interally we are using
+    /// 32bits integers.
+    pub fn add(builder: &mut walrus::InstrSeqBuilder, module_locals: &mut walrus::ModuleLocals) {
+        builder.binop(BinaryOp::I32Add);
+        Self::add_check_overflow_instructions(builder, module_locals);
+    }
+
+    pub fn cast_from(
+        builder: &mut walrus::InstrSeqBuilder,
+        module_locals: &mut walrus::ModuleLocals,
+        original_type: IntermediateType,
+    ) {
+        match original_type {
+            IntermediateType::IU8 => {}
+            IntermediateType::IU16 | IntermediateType::IU32 => {
+                // Just check for overflow and leave the value in the stack again
+                Self::add_check_overflow_instructions(builder, module_locals);
+            }
+            IntermediateType::IU64 => {
+                builder.unop(UnaryOp::I32WrapI64);
+                Self::add_check_overflow_instructions(builder, module_locals);
+            }
+            IntermediateType::IU128 => todo!(),
+            IntermediateType::IU256 => todo!(),
+            t => panic!("type stack error: trying to cast {t:?}"),
+        }
     }
 }
 
@@ -53,14 +86,11 @@ impl IU16 {
         load_i32_from_bytes_instructions(builder, &bytes);
     }
 
-    /// Adds the instructions to add two u16 values.
-    ///
-    /// Along with the addition code to check overflow is added. If the result is greater than
-    /// 65535 then the execution is aborted. This check is poosible because interally we are using
-    /// 32bits integers.
-    pub fn add(builder: &mut walrus::InstrSeqBuilder, module_locals: &mut walrus::ModuleLocals) {
+    fn add_check_overflow_instructions(
+        builder: &mut walrus::InstrSeqBuilder,
+        module_locals: &mut walrus::ModuleLocals,
+    ) {
         let tmp = module_locals.add(walrus::ValType::I32);
-        builder.binop(BinaryOp::I32Add);
         builder.local_tee(tmp);
         builder.i32_const(Self::MAX_VALUE);
         builder.binop(BinaryOp::I32GtU);
@@ -74,12 +104,45 @@ impl IU16 {
             },
         );
     }
+
+    /// Adds the instructions to add two u16 values.
+    ///
+    /// Along with the addition code to check overflow is added. If the result is greater than
+    /// 65535 then the execution is aborted. This check is poosible because interally we are using
+    /// 32bits integers.
+    pub fn add(builder: &mut walrus::InstrSeqBuilder, module_locals: &mut walrus::ModuleLocals) {
+        builder.binop(BinaryOp::I32Add);
+        Self::add_check_overflow_instructions(builder, module_locals);
+    }
+
+    pub fn cast_from(
+        builder: &mut walrus::InstrSeqBuilder,
+        module_locals: &mut walrus::ModuleLocals,
+        original_type: IntermediateType,
+    ) {
+        match original_type {
+            IntermediateType::IU8 | IntermediateType::IU16 => {}
+            IntermediateType::IU32 => {
+                // Just check for overflow and leave the value in the stack again
+                Self::add_check_overflow_instructions(builder, module_locals);
+            }
+            IntermediateType::IU64 => {
+                builder.unop(UnaryOp::I32WrapI64);
+                Self::add_check_overflow_instructions(builder, module_locals);
+            }
+            IntermediateType::IU128 => todo!(),
+            IntermediateType::IU256 => todo!(),
+            t => panic!("type stack error: trying to cast {t:?}"),
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
 pub struct IU32;
 
 impl IU32 {
+    const MAX_VALUE: i64 = u32::MAX as i64;
+
     pub fn load_constant_instructions(
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
@@ -133,6 +196,37 @@ impl IU32 {
                 else_.unreachable();
             },
         );
+    }
+
+    pub fn cast_from(
+        builder: &mut walrus::InstrSeqBuilder,
+        module_locals: &mut walrus::ModuleLocals,
+        original_type: IntermediateType,
+    ) {
+        match original_type {
+            IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {}
+            IntermediateType::IU64 => {
+                // Check first that the i64 fits in an i32
+                let tmp = module_locals.add(walrus::ValType::I64);
+                builder.local_tee(tmp);
+                builder.i64_const(Self::MAX_VALUE);
+                builder.binop(BinaryOp::I64GtU);
+                builder.if_else(
+                    Some(ValType::I64),
+                    |then| {
+                        then.unreachable();
+                    },
+                    |else_| {
+                        else_.local_get(tmp);
+                    },
+                );
+
+                builder.unop(UnaryOp::I32WrapI64);
+            }
+            IntermediateType::IU128 => todo!(),
+            IntermediateType::IU256 => todo!(),
+            t => panic!("type stack error: trying to cast {t:?}"),
+        }
     }
 }
 
@@ -192,5 +286,21 @@ impl IU64 {
                 else_.unreachable();
             },
         );
+    }
+
+    pub fn cast_from(
+        builder: &mut walrus::InstrSeqBuilder,
+        module_locals: &mut walrus::ModuleLocals,
+        original_type: IntermediateType,
+    ) {
+        match original_type {
+            IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
+                builder.unop(UnaryOp::I64ExtendUI32);
+            }
+            IntermediateType::IU64 => {}
+            IntermediateType::IU128 => todo!(),
+            IntermediateType::IU256 => todo!(),
+            t => panic!("type stack error: trying to cast {t:?}"),
+        }
     }
 }

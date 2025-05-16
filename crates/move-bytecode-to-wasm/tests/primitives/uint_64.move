@@ -53,6 +53,6 @@ public fun sum(x: u64, y: u64): u64 {
     x + y
 }
 
-public fun sum_overflow(x: u64): u64 {
-   18_446_744_073_709_551_615 + x
+public fun cast_u64_up(x: u32): u64 {
+    x as u64
 }
