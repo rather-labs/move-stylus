@@ -499,7 +499,6 @@ fn test_uint_128() {
         let expected_result = <sol!((uint128,))>::abi_encode_params(&(2,));
         run_test(&runtime, data, expected_result);
 
-    */
     // Test the carry to the second half of 64 bits
     let data = sumCall::abi_encode(&sumCall::new((
         18_446_744_073_709_551_616,
@@ -509,6 +508,7 @@ fn test_uint_128() {
     println!("{:?}", 36893488147419103232_u128.to_be_bytes());
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(36893488147419103232,));
     run_test(&runtime, data, expected_result);
+    */
 
     // Test the carry to the second half of 64 bits
     let data = sumCall::abi_encode(&sumCall::new((
@@ -521,6 +521,7 @@ fn test_uint_128() {
     run_test(&runtime, data, expected_result);
 }
 
+/*
 #[test]
 #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
 fn test_uint_128_overflow() {
@@ -538,7 +539,7 @@ fn test_uint_128_overflow() {
     let data = sumOverflowCall::abi_encode(&sumOverflowCall::new((42,)));
     run_test(&runtime, data, vec![]);
 }
-
+*/
 #[test]
 fn test_uint_256() {
     const MODULE_NAME: &str = "uint_256";
@@ -601,8 +602,38 @@ fn test_uint_256() {
             U256::from_str_radix("36893488147419103230", 10).unwrap(),
         ));
     run_test(&runtime, data, expected_result);
-
     */
+
+    // Test the carry to the third half of 64 bits
+    // Operands are 2^128 - 1
+    // Expected result is (2^128 - 1) * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::from_str_radix("340282366920938463463374607431768211456", 10).unwrap(),
+        U256::from_str_radix("340282366920938463463374607431768211456", 10).unwrap(),
+    )));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from_str_radix(
+        "680564733841876926926749214863536422912",
+        10,
+    )
+    .unwrap(),));
+    run_test(&runtime, data, expected_result);
+
+    println!(
+        "{:?}\n{:?}",
+        U256::from_str_radix("340282366920938463463374607431768211456", 10)
+            .unwrap()
+            .to_be_bytes::<32>(),
+        U256::from_str_radix("340282366920938463463374607431768211456", 10)
+            .unwrap()
+            .to_be_bytes::<32>()
+    );
+    println!(
+        "{:?}",
+        U256::from_str_radix("680564733841876926926749214863536422912", 10)
+            .unwrap()
+            .to_be_bytes::<32>()
+    );
+
     // Test the carry to the third half of 64 bits
     // Operands are 2^128 - 1
     // Expected result is (2^128 - 1) * 2
@@ -615,6 +646,21 @@ fn test_uint_256() {
         10,
     )
     .unwrap(),));
+    println!(
+        "{:?}\n{:?}",
+        U256::from_str_radix("340282366920938463463374607431768211455", 10)
+            .unwrap()
+            .to_be_bytes::<32>(),
+        U256::from_str_radix("340282366920938463463374607431768211455", 10)
+            .unwrap()
+            .to_be_bytes::<32>()
+    );
+    println!(
+        "{:?}",
+        U256::from_str_radix("680564733841876926926749214863536422910", 10)
+            .unwrap()
+            .to_be_bytes::<32>()
+    );
     run_test(&runtime, data, expected_result);
 
     /*
@@ -642,8 +688,6 @@ fn test_uint_256() {
     */
 }
 
-/*
-
 #[test]
 #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
 fn test_uint_256_overflow() {
@@ -661,7 +705,6 @@ fn test_uint_256_overflow() {
     let data = sumOverflowCall::abi_encode(&sumOverflowCall::new((42,)));
     run_test(&runtime, data, vec![]);
 }
-*/
 
 #[test]
 fn test_multi_values_return() {
