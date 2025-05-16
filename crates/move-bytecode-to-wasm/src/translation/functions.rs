@@ -115,7 +115,7 @@ impl<'a> MappedFunction<'a> {
             .builder_mut()
             .func_body();
 
-        // Maps the types of the values contained in the stack at tme moment of processing an
+        // Maps the types of the values contained in the stack at the moment of processing an
         // instruction.
         let mut types_stack = Vec::new();
 

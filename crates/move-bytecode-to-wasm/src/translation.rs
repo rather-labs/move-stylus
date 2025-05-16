@@ -1,13 +1,17 @@
+use anyhow::Result;
 use functions::{
     MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
 };
 use intermediate_types::IntermediateType;
-use intermediate_types::vector::IVector;
+use intermediate_types::simple_integers::{IU16, IU32, IU64};
+use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
+use walrus::ir::{BinaryOp, UnaryOp};
 use walrus::{
     FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
     ir::{MemArg, StoreKind},
 };
+
 pub mod functions;
 /// The types in this module represent an intermediate Rust representation of Move types
 /// that is used to generate the WASM code.
@@ -102,16 +106,10 @@ fn map_bytecode_instruction(
         Bytecode::Call(function_handle_index) => {
             // Consume from the types stack the arguments that will be used by the function call
             let arguments = &functions_arguments[function_handle_index.0 as usize];
-            for argument in arguments.iter().rev() {
-                let arg = types_stack.pop().unwrap_or_else(|| {
-                    panic!(
-                    "function call argument error, expected {argument:?} but types stack is empty"
-                )
-                });
-                assert_eq!(
-                    arg, *argument,
-                    "function call argument mismatch, expected {argument:?} and found {arg:?}"
-                );
+            for (i, argument) in arguments.iter().enumerate().rev() {
+                if let Err(e) = pop_types_stack(types_stack, argument) {
+                    panic!("Called function signature arguments mismatch at index {i}: {e}");
+                }
             }
 
             builder.call(function_ids[function_handle_index.0 as usize]);
@@ -131,7 +129,12 @@ fn map_bytecode_instruction(
         // Locals
         Bytecode::StLoc(local_id) => {
             builder.local_set(mapped_function.local_variables[*local_id as usize]);
-            types_stack.pop();
+
+            pop_types_stack(
+                types_stack,
+                &mapped_function.local_variables_type[*local_id as usize],
+            )
+            .unwrap();
         }
         Bytecode::MoveLoc(local_id) => {
             // Values and references are loaded into a new variable
@@ -164,14 +167,7 @@ fn map_bytecode_instruction(
             // Remove the packing values from types stack and check if the types are correct
             let mut n = *num_elements as usize;
             while n > 0 {
-                let ty = types_stack
-                    .pop()
-                    .unwrap_or_else(|| panic!("error unpacking vector: types stack is empty"));
-                assert_eq!(
-                    ty, inner,
-                    "found type {ty:?} unpacking vector of type {inner:?}"
-                );
-
+                pop_types_stack(types_stack, &inner).unwrap();
                 n -= 1;
             }
 
@@ -212,7 +208,9 @@ fn map_bytecode_instruction(
 
         Bytecode::Pop => {
             builder.drop();
-            types_stack.pop();
+            types_stack
+                .pop()
+                .unwrap_or_else(|| panic!("error dropping from types stack: types stack is empty"));
         }
         // TODO: ensure this is the last instruction in the move code
         Bytecode::Ret => {
@@ -223,6 +221,79 @@ fn map_bytecode_instruction(
                 memory,
                 allocator,
             );
+
+            // Remove the return values from types stack and check if the types are correct
+            for (i, return_type) in mapped_function.signature.returns.iter().rev().enumerate() {
+                if let Err(e) = pop_types_stack(types_stack, return_type) {
+                    panic!("Function return type mismatch at index {i}: {e}");
+                }
+            }
+
+            // Stack types should be empty
+            assert!(
+                types_stack.is_empty(),
+                "types stack is not empty after return"
+            );
+        }
+        Bytecode::CastU8 => {
+            let original_type = types_stack.pop().unwrap();
+            IU8::cast_from(builder, module_locals, original_type);
+            types_stack.push(IntermediateType::IU8);
+        }
+        Bytecode::CastU16 => {
+            let original_type = types_stack.pop().unwrap();
+            IU16::cast_from(builder, module_locals, original_type);
+            types_stack.push(IntermediateType::IU16);
+        }
+        Bytecode::CastU32 => {
+            let original_type = types_stack.pop().unwrap();
+            IU32::cast_from(builder, module_locals, original_type);
+            types_stack.push(IntermediateType::IU32);
+        }
+        Bytecode::CastU64 => {
+            let original_type = types_stack.pop().unwrap();
+            IU64::cast_from(builder, module_locals, original_type);
+            types_stack.push(IntermediateType::IU64);
+        }
+        Bytecode::Add => {
+            let sum_type = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
+                assert_eq!(
+                    t1, t2,
+                    "types stack error: trying two add two different types {t1:?} {t2:?}"
+                );
+                t1
+            } else {
+                panic!("types stack is empty");
+            };
+
+            match sum_type {
+                IntermediateType::IU8 => IU8::add(builder, module_locals),
+                IntermediateType::IU16 => IU16::add(builder, module_locals),
+                IntermediateType::IU32 => IU32::add(builder, module_locals),
+                IntermediateType::IU64 => IU64::add(builder, module_locals),
+                IntermediateType::IU128 => todo!(),
+                IntermediateType::IU256 => todo!(),
+                t => panic!("type stack error: trying to add two {t:?}"),
+            }
+
+            types_stack.push(sum_type);
+        }
+        Bytecode::Or => {
+            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
+            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
+            builder.binop(BinaryOp::I32Or);
+            types_stack.push(IntermediateType::IBool);
+        }
+        Bytecode::And => {
+            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
+            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
+            builder.binop(BinaryOp::I32And);
+            types_stack.push(IntermediateType::IBool);
+        }
+        Bytecode::Not => {
+            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
+            builder.unop(UnaryOp::I32Eqz);
+            types_stack.push(IntermediateType::IBool);
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
@@ -275,4 +346,20 @@ fn get_intermediate_type_for_signature_index(
     );
     // TODO: unwrap
     (&tokens[0]).try_into().unwrap()
+}
+
+fn pop_types_stack(
+    types_stack: &mut Vec<IntermediateType>,
+    expected_type: &IntermediateType,
+) -> Result<()> {
+    let Some(ty) = types_stack.pop() else {
+        anyhow::bail!(
+            "error popping types stack: expected {expected_type:?} but types stack is empty"
+        );
+    };
+    anyhow::ensure!(
+        ty == *expected_type,
+        "expected {expected_type:?} and found {ty:?}"
+    );
+    Ok(())
 }

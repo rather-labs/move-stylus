@@ -3,6 +3,10 @@ module 0x01::hello_world;
 //  TODO: Add support for native functions
 //  native public fun emit_log(ptr: u32, len: u32, topic: u32);
 
+public fun cast_u8(x: u16): u8 {
+    x as u8
+}
+
 public fun echo(x: u128): u128 {
     x
 }
@@ -12,23 +16,19 @@ public fun echo_signer_with_int(x: signer, y: u8): (u8, signer) {
     (y, x)
 }
 
-
-public fun ref_u8_arg(y: &u8): u8 {
-  *y
+public fun sum8(x: u8, y: u8): u8 {
+    x + y
 }
 
-  // Receives by reference directly
-public fun ref_vec_u8_arg(y: &vector<u8>): vector<u8> {
-  *y
+public fun sum16(x: u16, y: u16): u16 {
+    x + y
 }
 
-public fun call_ref_u8_internal(x: u8): u8 {
-  ref_u8_arg(&x)
+public fun sum32(x: u32, y: u32): u32 {
+    x + y
 }
 
-public fun test_borrow(s: signer) {
-    let s_ref = &s; // ❌ This should fail
+public fun sum64(x: u64, y: u64): u64 {
+    x + y
 }
-
-
 
