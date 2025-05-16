@@ -276,11 +276,9 @@ impl IntermediateType {
             IntermediateType::IVector(_)
             | IntermediateType::IU128
             | IntermediateType::IU256
+            | IntermediateType::ISigner
             | IntermediateType::IAddress => {
                 builder.local_get(local);
-            }
-            IntermediateType::ISigner => {
-                panic!("Cannot ImmBorrowLoc on a signer type");
             }
             IntermediateType::IRef(_) => {
                 panic!("Cannot ImmBorrowLoc on a reference type");
@@ -316,6 +314,7 @@ impl IntermediateType {
             IntermediateType::IVector(_)
             | IntermediateType::IU128
             | IntermediateType::IU256
+            | IntermediateType::ISigner
             | IntermediateType::IAddress => {
                 // No load needed, pointer is already correct
             }

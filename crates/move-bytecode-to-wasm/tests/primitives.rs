@@ -839,7 +839,9 @@ fn test_imm_ref() {
     let expected_result = <sol!((uint128[],))>::abi_encode_params(&(vec![1u128, 2u128, 3u128],));
     run_test(&runtime, data, expected_result);
 
-    let data = callRefVecU128InternalCall::abi_encode(&callRefVecU128InternalCall::new((vec![1u128, 2u128, 3u128],)));
+    let data = callRefVecU128InternalCall::abi_encode(&callRefVecU128InternalCall::new((vec![
+        1u128, 2u128, 3u128,
+    ],)));
     let expected_result = <sol!((uint128[],))>::abi_encode_params(&(vec![1u128, 2u128, 3u128],));
     run_test(&runtime, data, expected_result);
 }

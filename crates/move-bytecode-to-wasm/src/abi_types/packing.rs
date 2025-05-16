@@ -6,11 +6,13 @@ use crate::translation::intermediate_types::{
     IntermediateType,
     address::IAddress,
     heap_integers::{IU128, IU256},
+    imm_reference::IRef,
     signer::ISigner,
     vector::IVector,
 };
 
 mod pack_heap_int;
+mod pack_imm_reference;
 mod pack_native_int;
 mod pack_vector;
 
@@ -195,7 +197,8 @@ impl Packable for IntermediateType {
                 memory,
                 alloc_function,
             ),
-            IntermediateType::IRef(inner) => inner.add_pack_instructions(
+            IntermediateType::IRef(inner) => IRef::add_pack_instructions(
+                inner,
                 builder,
                 module,
                 local,
