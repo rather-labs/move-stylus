@@ -509,9 +509,18 @@ fn test_uint_128() {
     println!("{:?}", 36893488147419103232_u128.to_be_bytes());
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(36893488147419103232,));
     run_test(&runtime, data, expected_result);
+
+    // Test the carry to the second half of 64 bits
+    let data = sumCall::abi_encode(&sumCall::new((
+        18_446_744_073_709_551_615,
+        18_446_744_073_709_551_615,
+    )));
+    println!("{:?}", 18_446_744_073_709_551_615_u128.to_be_bytes());
+    println!("{:?}", 36893488147419103230_u128.to_be_bytes());
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(36893488147419103230,));
+    run_test(&runtime, data, expected_result);
 }
 
-/*
 #[test]
 #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
 fn test_uint_128_overflow() {
@@ -529,7 +538,6 @@ fn test_uint_128_overflow() {
     let data = sumOverflowCall::abi_encode(&sumOverflowCall::new((42,)));
     run_test(&runtime, data, vec![]);
 }
-*/
 
 #[test]
 fn test_uint_256() {
