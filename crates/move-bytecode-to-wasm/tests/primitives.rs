@@ -689,13 +689,13 @@ fn test_uint_256_overflow() {
 
     sol!(
         #[allow(missing_docs)]
-        function sumOverflow(uint128 x) external returns (uint128);
+        function sumOverflow(uint256 x) external returns (uint256);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
 
-    let data = sumOverflowCall::abi_encode(&sumOverflowCall::new((42,)));
+    let data = sumOverflowCall::abi_encode(&sumOverflowCall::new((U256::from(42),)));
     run_test(&runtime, data, vec![]);
 }
 
