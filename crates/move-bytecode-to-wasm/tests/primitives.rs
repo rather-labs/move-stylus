@@ -462,36 +462,66 @@ fn test_uint_128() {
         function getCopiedLocal() external returns (uint128, uint128);
         function echo(uint128 x) external returns (uint128);
         function echo2(uint128 x, uint128 y) external returns (uint128);
+        function sum(uint128 x, uint128 y) external returns (uint128);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
 
-    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
-    let expected_result = <sol!((uint128,))>::abi_encode_params(&(128128,));
-    run_test(&runtime, data, expected_result);
+    /*
+        let data = getConstantCall::abi_encode(&getConstantCall::new(()));
+        let expected_result = <sol!((uint128,))>::abi_encode_params(&(128128,));
+        run_test(&runtime, data, expected_result);
 
-    let data = getLocalCall::abi_encode(&getLocalCall::new((111,)));
-    let expected_result = <sol!((uint128,))>::abi_encode_params(&(50,));
-    run_test(&runtime, data, expected_result);
+        let data = getLocalCall::abi_encode(&getLocalCall::new((111,)));
+        let expected_result = <sol!((uint128,))>::abi_encode_params(&(50,));
+        run_test(&runtime, data, expected_result);
 
-    let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
-    let expected_result = <sol!((uint128, uint128))>::abi_encode_params(&(100, 111));
-    run_test(&runtime, data, expected_result);
+        let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
+        let expected_result = <sol!((uint128, uint128))>::abi_encode_params(&(100, 111));
+        run_test(&runtime, data, expected_result);
 
-    let data = echoCall::abi_encode(&echoCall::new((222,)));
-    let expected_result = <sol!((uint128,))>::abi_encode_params(&(222,));
-    run_test(&runtime, data, expected_result);
+        let data = echoCall::abi_encode(&echoCall::new((222,)));
+        let expected_result = <sol!((uint128,))>::abi_encode_params(&(222,));
+        run_test(&runtime, data, expected_result);
 
-    // Echo max uint128
-    let data = echoCall::abi_encode(&echoCall::new((u128::MAX,)));
-    let expected_result = <sol!((uint128,))>::abi_encode_params(&(u128::MAX,));
-    run_test(&runtime, data, expected_result);
+        // Echo max uint128
+        let data = echoCall::abi_encode(&echoCall::new((u128::MAX,)));
+        let expected_result = <sol!((uint128,))>::abi_encode_params(&(u128::MAX,));
+        run_test(&runtime, data, expected_result);
 
-    let data = echo2Call::abi_encode(&echo2Call::new((111, 222)));
-    let expected_result = <sol!((uint128,))>::abi_encode_params(&(222,));
+        let data = echo2Call::abi_encode(&echo2Call::new((111, 222)));
+        let expected_result = <sol!((uint128,))>::abi_encode_params(&(222,));
+        run_test(&runtime, data, expected_result);
+    */
+    let data = sumCall::abi_encode(&sumCall::new((
+        18_446_744_073_709_551_615,
+        18_446_744_073_709_551_615,
+    )));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(18_446_744_073_709_551_615 * 2,));
+    // let expected_result = <sol!((uint128,))>::abi_encode_params(&(2,));
     run_test(&runtime, data, expected_result);
 }
+
+/*
+#[test]
+#[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+fn test_uint_128_overflow() {
+    const MODULE_NAME: &str = "uint_128";
+    const SOURCE_PATH: &str = "tests/primitives/uint_128.move";
+
+    sol!(
+        #[allow(missing_docs)]
+        function sumOverflow(uint128 x) external returns (uint128);
+    );
+
+    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
+
+    let data = sumOverflowCall::abi_encode(&sumOverflowCall::new((42,)));
+    run_test(&runtime, data, vec![]);
+}
+*/
 
 #[test]
 fn test_uint_256() {

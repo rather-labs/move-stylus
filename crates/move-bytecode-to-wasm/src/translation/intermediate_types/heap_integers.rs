@@ -65,20 +65,86 @@ impl IU128 {
 
         // Allocate memory for the result
         builder
-            .i32_const(Self::HEAP_SIZE)
-            .call(allocator)
-            .local_set(pointer)
             // Save the pointers of the numbers to be added
             .local_set(n1_ptr)
             .local_set(n2_ptr)
+            // Allocate memory for the result
+            .i32_const(Self::HEAP_SIZE)
+            .call(allocator)
+            .local_set(pointer)
             // Set the rest to 0
             .i64_const(0)
             .local_set(rest)
             // Set the offset to 8 (last 64 bits of u128)
-            .i32_const(8)
+            .i32_const(0)
             .local_set(offset);
 
-        // Proably the type is i32
+        /*
+        builder
+            .local_get(pointer)
+            .local_get(offset)
+            .binop(BinaryOp::I32Add)
+            .i64_const(255)
+            .store(
+                memory,
+                StoreKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_get(pointer);
+        */
+
+        /*
+        builder
+            // Load a part of the first operand and save it in n1
+            .local_get(n1_ptr)
+            .local_get(offset)
+            .binop(BinaryOp::I32Add)
+            .load(
+                memory,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_set(n1)
+            // Load a part of the second operand and save it in n2
+            .local_get(n2_ptr)
+            .local_get(offset)
+            .binop(BinaryOp::I32Add)
+            .load(
+                memory,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_set(n2)
+            .local_get(n1)
+            .local_get(n2)
+            // We add the two loaded parts
+            .binop(BinaryOp::I64Add)
+            .local_get(rest)
+            .binop(BinaryOp::I64Add)
+            .local_set(rest)
+            .local_get(pointer)
+            .local_get(offset)
+            .binop(BinaryOp::I32Add)
+            .local_get(rest)
+            .store(
+                memory,
+                StoreKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_get(pointer);
+        */
         builder
             .block(None, |block| {
                 let block_id = block.id();
@@ -86,6 +152,7 @@ impl IU128 {
                     let loop_id = loop_.id();
 
                     loop_
+                        // Load a part of the first operand and save it in n1
                         .local_get(n1_ptr)
                         .local_get(offset)
                         .binop(BinaryOp::I32Add)
@@ -97,7 +164,8 @@ impl IU128 {
                                 offset: 0,
                             },
                         )
-                        .local_tee(n1)
+                        .local_set(n1)
+                        // Load a part of the second operand and save it in n2
                         .local_get(n2_ptr)
                         .local_get(offset)
                         .binop(BinaryOp::I32Add)
@@ -110,12 +178,14 @@ impl IU128 {
                             },
                         )
                         .local_tee(n2)
+                        .local_get(n1)
+                        // We add the two loaded parts
                         .binop(BinaryOp::I64Add)
-                        // Add the rest of the previous operation (if there was none, its the rest is
+                        // And add the rest of the previous operation (if there was none, its the rest is
                         // initialized as 0)
                         .local_get(rest)
                         .binop(BinaryOp::I64Add)
-                        // Check if overflow ocurred
+                        // Save the result to rest and check if overflow ocurred
                         .local_tee(rest)
                         .local_get(n1)
                         .binop(BinaryOp::I64LtU)
@@ -130,22 +200,21 @@ impl IU128 {
                                 // If we are in overflow and the offset is 0, means the whole
                                 // number overflowed and we are out of space
                                 then.local_get(offset)
-                                    .i32_const(0)
+                                    .i32_const(8)
                                     .binop(BinaryOp::I32Eq)
                                     .if_else(
                                         None,
                                         |then| {
                                             then.unreachable();
                                         },
-                                        // Otherwise Set this part of the memory as all 1 (-1 =
-                                        // 0xFFFFFFFFFFFFFFFFF because of two compliment)
                                         |else_| {
+                                            println!("128 - looping!");
                                             else_
-                                                // We store in ponter - offset
+                                                // We store in ponter + offset
                                                 .local_get(pointer)
                                                 .local_get(offset)
-                                                .binop(BinaryOp::I32Sub)
-                                                .i64_const(-1)
+                                                .binop(BinaryOp::I32Add)
+                                                .local_get(rest)
                                                 .store(
                                                     memory,
                                                     StoreKind::I64 { atomic: false },
@@ -154,18 +223,22 @@ impl IU128 {
                                                         offset: 0,
                                                     },
                                                 )
-                                                // offset -= 8 and process the next part of the integer
+                                                // offset += 8 and process the next part of the integer
                                                 .local_get(offset)
                                                 .i32_const(8)
-                                                .binop(BinaryOp::I32Sub)
+                                                .binop(BinaryOp::I32Add)
+                                                .local_set(offset)
                                                 .br(loop_id);
                                         },
                                     );
                             },
                             // If we are not in overflow, we just save the rest and return
                             |else_| {
+                                println!("128 - rest!");
                                 else_
                                     .local_get(pointer)
+                                    .local_get(offset)
+                                    .binop(BinaryOp::I32Add)
                                     .local_get(rest)
                                     .store(
                                         memory,
