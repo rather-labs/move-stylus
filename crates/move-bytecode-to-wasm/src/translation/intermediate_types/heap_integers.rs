@@ -73,12 +73,10 @@ impl IU128 {
             .i32_const(Self::HEAP_SIZE)
             .call(allocator)
             .local_set(pointer)
-            // Set the partial_sum and rest to 0
-            .i64_const(0)
-            .local_set(partial_sum)
+            // Set the rest to 0
             .i64_const(0)
             .local_set(rest)
-            // Set the offset to 8 (last 64 bits of u128)
+            // Set the offset to 0
             .i32_const(0)
             .local_set(offset);
 
@@ -118,9 +116,8 @@ impl IU128 {
                         .local_get(n1)
                         // We add the two loaded parts
                         .binop(BinaryOp::I64Add)
-                        // And add the partial_sum of the previous operation (if there was none, its the partial_sum is
-                        // initialized as 0)
-                        //.i64_const(-1)
+                        // And add the rest of the previous operation (if there was none, its the
+                        // rest is 0)
                         .local_get(rest)
                         // .binop(BinaryOp::I64Xor)
                         .binop(BinaryOp::I64Add)
@@ -161,9 +158,10 @@ impl IU128 {
                                                         offset: 0,
                                                     },
                                                 )
-                                                .i64_const(0)
                                                 .local_get(partial_sum)
-                                                .binop(BinaryOp::I64Sub)
+                                                // The rest is the compliment of the the sum
+                                                .i64_const(-1)
+                                                .binop(BinaryOp::I64Xor)
                                                 .local_set(rest)
                                                 // offset += 8 and process the next part of the integer
                                                 .local_get(offset)
@@ -176,7 +174,6 @@ impl IU128 {
                             },
                             // If we are not in overflow, we just save the partial_sum and return
                             |else_| {
-                                println!("128 - partial_sum!");
                                 else_
                                     .local_get(pointer)
                                     .local_get(offset)
