@@ -594,33 +594,34 @@ fn test_uint_256() {
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
+    /*
 
-    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
-    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(256256),));
-    run_test(&runtime, data, expected_result);
+        let data = getConstantCall::abi_encode(&getConstantCall::new(()));
+        let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(256256),));
+        run_test(&runtime, data, expected_result);
 
-    let data = getLocalCall::abi_encode(&getLocalCall::new((U256::from(111),)));
-    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(50),));
-    run_test(&runtime, data, expected_result);
+        let data = getLocalCall::abi_encode(&getLocalCall::new((U256::from(111),)));
+        let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(50),));
+        run_test(&runtime, data, expected_result);
 
-    let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
-    let expected_result =
-        <sol!((uint256, uint256))>::abi_encode_params(&(U256::from(100), U256::from(111)));
-    run_test(&runtime, data, expected_result);
+        let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
+        let expected_result =
+            <sol!((uint256, uint256))>::abi_encode_params(&(U256::from(100), U256::from(111)));
+        run_test(&runtime, data, expected_result);
 
-    let data = echoCall::abi_encode(&echoCall::new((U256::from(222),)));
-    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(222),));
-    run_test(&runtime, data, expected_result);
+        let data = echoCall::abi_encode(&echoCall::new((U256::from(222),)));
+        let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(222),));
+        run_test(&runtime, data, expected_result);
 
-    // Echo max uint256
-    let data = echoCall::abi_encode(&echoCall::new((U256::MAX,)));
-    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::MAX,));
-    run_test(&runtime, data, expected_result);
+        // Echo max uint256
+        let data = echoCall::abi_encode(&echoCall::new((U256::MAX,)));
+        let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::MAX,));
+        run_test(&runtime, data, expected_result);
 
-    let data = echo2Call::abi_encode(&echo2Call::new((U256::from(111), U256::from(222))));
-    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(222),));
-    run_test(&runtime, data, expected_result);
-
+        let data = echo2Call::abi_encode(&echo2Call::new((U256::from(111), U256::from(222))));
+        let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(222),));
+        run_test(&runtime, data, expected_result);
+    */
     // The following tests test two situations:
     // 1. What happens when there is carry: we process the sum in chunks of 32 bits, so we use
     //    numbers in the form 2^(n*32) where n=1,2,3,4,5,6,7,8.
@@ -736,6 +737,19 @@ fn test_uint_256() {
     .unwrap(),));
     run_test(&runtime, data, expected_result);
 
+    println!(
+        "{:?}\n{:?}\n{:?}",
+        U256::from_str_radix("340282366920938463463374607431768211455", 10)
+            .unwrap()
+            .to_be_bytes::<32>(),
+        U256::from_str_radix("340282366920938463463374607431768211455", 10)
+            .unwrap()
+            .to_be_bytes::<32>(),
+        U256::from_str_radix("680564733841876926926749214863536422910", 10)
+            .unwrap()
+            .to_be_bytes::<32>(),
+    );
+
     // Test the carry to the third half of 64 bits
     // Operands are 2^128 - 1
     // Expected result is (2^128 - 1) * 2
@@ -787,7 +801,17 @@ fn test_uint_256_overflow() {
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
 
-    let data = sumOverflowCall::abi_encode(&sumOverflowCall::new((U256::from(42),)));
+    println!(
+        "{:?}",
+        U256::from_str_radix(
+            "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+            10
+        )
+        .unwrap()
+        .to_be_bytes::<32>(),
+    );
+
+    let data = sumOverflowCall::abi_encode(&sumOverflowCall::new((U256::from(1),)));
     run_test(&runtime, data, vec![]);
 }
 

@@ -2,7 +2,7 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
     FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
 };
-
+/* 32 bit version
 fn add(
     builder: &mut walrus::InstrSeqBuilder,
     module_locals: &mut walrus::ModuleLocals,
@@ -147,6 +147,179 @@ fn add(
                             else_
                                 .local_get(offset)
                                 .i32_const(4)
+                                .binop(BinaryOp::I32Add)
+                                .local_set(offset)
+                                .br(loop_id);
+                        },
+                    );
+            });
+        })
+        // Return the address of the sum
+        .local_get(pointer);
+}*/
+
+fn add(
+    builder: &mut walrus::InstrSeqBuilder,
+    module_locals: &mut walrus::ModuleLocals,
+    memory: MemoryId,
+    allocator: FunctionId,
+    type_heap_size: i32,
+) {
+    let pointer = module_locals.add(ValType::I32);
+    let offset = module_locals.add(ValType::I32);
+    let not_overflowed = module_locals.add(ValType::I32);
+    let partial_sum = module_locals.add(ValType::I64);
+    let rest = module_locals.add(ValType::I64);
+    let n1_ptr = module_locals.add(ValType::I32);
+    let n2_ptr = module_locals.add(ValType::I32);
+    let n1 = module_locals.add(ValType::I64);
+    let n2 = module_locals.add(ValType::I64);
+
+    // Allocate memory for the result
+    builder
+        // Save the pointers of the numbers to be added
+        .local_set(n1_ptr)
+        .local_set(n2_ptr)
+        // Allocate memory for the result
+        .i32_const(type_heap_size)
+        .call(allocator)
+        .local_set(pointer)
+        // Set the rest to 0
+        .i64_const(0)
+        .local_set(rest)
+        // Set the offset to 0
+        .i32_const(0)
+        .local_set(offset)
+        // Set the not_overflowed to true
+        .i32_const(1)
+        .local_set(not_overflowed);
+
+    builder
+        .block(None, |block| {
+            let block_id = block.id();
+            block.loop_(None, |loop_| {
+                let loop_id = loop_.id();
+                // Load a part of the first operand and save it in n1
+                loop_
+                    // Read the first operand
+                    .local_get(n1_ptr)
+                    .local_get(offset)
+                    .binop(BinaryOp::I32Add)
+                    .load(
+                        memory,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_tee(n1)
+                    // Read the second operand
+                    .local_get(n2_ptr)
+                    .local_get(offset)
+                    .binop(BinaryOp::I32Add)
+                    .load(
+                        memory,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_tee(n2)
+                    // We add the two loaded parts
+                    .binop(BinaryOp::I64Add)
+                    // And add the rest of the previous operation (if there was none, its the
+                    // rest is 0)
+                    .local_get(rest)
+                    .binop(BinaryOp::I64Add)
+                    // Save the result to partial_sum
+                    .local_set(partial_sum);
+
+                // Save chunk of 64 bits
+                loop_
+                    .local_get(pointer)
+                    .local_get(offset)
+                    .binop(BinaryOp::I32Add)
+                    .local_get(partial_sum)
+                    .store(
+                        memory,
+                        StoreKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                // Check overflow
+                loop_
+                    // If either n1 or n2 is zero then there can't be an overflow
+                    // (n1 == 0) || (n1 == 0) && (rest == 0)
+                    .local_get(n1)
+                    .i64_const(0)
+                    .binop(BinaryOp::I64Eq)
+                    .local_get(n2)
+                    .i64_const(0)
+                    .binop(BinaryOp::I64Eq)
+                    .binop(BinaryOp::I32Or)
+                    .local_get(rest)
+                    .i64_const(0)
+                    .binop(BinaryOp::I64Eq)
+                    .binop(BinaryOp::I32And);
+
+                // If partial sum is greather than both sumands then it can't be an overflow
+                // (partial_sum > n1) && (partial_sum > n2)
+                loop_
+                    .local_get(partial_sum)
+                    .local_get(n1)
+                    .binop(BinaryOp::I64GtU)
+                    .local_get(partial_sum)
+                    .local_get(n2)
+                    .binop(BinaryOp::I64GtU)
+                    .binop(BinaryOp::I32And);
+
+                // If the following condition is true, there was NO overflow
+                // ((n1 == 0) || (n1 == 0) && (rest == 0)) || ((partial_sum > n1) && (partial_sum > n2))
+                loop_
+                    .binop(BinaryOp::I32Or)
+                    .local_tee(not_overflowed)
+                    .if_else(
+                        None,
+                        |then| {
+                            then.i64_const(0).local_set(rest);
+                        },
+                        |else_| {
+                            else_.i64_const(1).local_set(rest);
+                        },
+                    );
+
+                // We check if we are the offset is out of bounds
+                loop_
+                    .local_get(offset)
+                    .i32_const(type_heap_size - 8)
+                    .binop(BinaryOp::I32Eq)
+                    .if_else(
+                        None,
+                        |then| {
+                            // If we are out of bound we check if overflow ocurred, if that
+                            // happened then we trap
+                            // Check if overflow ocurred
+                            then.local_get(not_overflowed).if_else(
+                                None,
+                                |then| {
+                                    then.br(block_id);
+                                },
+                                |else_| {
+                                    else_.unreachable();
+                                },
+                            );
+                        },
+                        // Otherwise we make store the result and recalculate the rest
+                        |else_| {
+                            // offset += 8 and process the next part of the integer
+                            else_
+                                .local_get(offset)
+                                .i32_const(8)
                                 .binop(BinaryOp::I32Add)
                                 .local_set(offset)
                                 .br(loop_id);
