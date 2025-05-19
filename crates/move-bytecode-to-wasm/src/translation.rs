@@ -117,10 +117,9 @@ fn map_bytecode_instruction(
             add_unpack_function_return_values_instructions(
                 builder,
                 module_locals,
-                &mapped_function.signature.returns,
+                &functions_returns[function_handle_index.0 as usize],
                 memory,
             );
-
             // Insert in the stack types the types returned by the function (if any)
             let return_types = &functions_returns[function_handle_index.0 as usize];
             for return_type in return_types {
@@ -174,6 +173,39 @@ fn map_bytecode_instruction(
 
             types_stack.push(IntermediateType::IVector(Box::new(inner)));
         }
+        Bytecode::ImmBorrowLoc(local_id) => {
+            let local = mapped_function.local_variables[*local_id as usize];
+            let local_type = &mapped_function.local_variables_type[*local_id as usize];
+
+            local_type.add_imm_borrow_loc_instructions(
+                module_locals,
+                builder,
+                allocator,
+                memory,
+                local,
+            );
+
+            // Push the reference to the type into the types stack
+            types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
+        }
+
+        Bytecode::ReadRef => {
+            let ref_type = types_stack
+                .pop()
+                .expect("ReadRef expects a reference on the stack");
+
+            match ref_type {
+                IntermediateType::IRef(inner) => {
+                    // Now call directly on the inner type
+                    inner.add_read_ref_instructions(builder, memory);
+
+                    // And push the inner type into the stack
+                    types_stack.push(*inner);
+                }
+                _ => panic!("ReadRef expected a IRef type but got: {:?}", ref_type),
+            }
+        }
+
         Bytecode::Pop => {
             builder.drop();
             types_stack

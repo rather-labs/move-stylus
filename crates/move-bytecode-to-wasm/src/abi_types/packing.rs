@@ -6,11 +6,13 @@ use crate::translation::intermediate_types::{
     IntermediateType,
     address::IAddress,
     heap_integers::{IU128, IU256},
+    imm_reference::IRef,
     signer::ISigner,
     vector::IVector,
 };
 
 mod pack_heap_int;
+mod pack_imm_reference;
 mod pack_native_int;
 mod pack_vector;
 
@@ -137,9 +139,10 @@ impl Packable for IntermediateType {
             | IntermediateType::IU32
             | IntermediateType::IU128
             | IntermediateType::IU256
-            | IntermediateType::IVector(_)
             | IntermediateType::ISigner
-            | IntermediateType::IAddress => {
+            | IntermediateType::IAddress
+            | IntermediateType::IVector(_)
+            | IntermediateType::IRef(_) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -194,6 +197,16 @@ impl Packable for IntermediateType {
                 memory,
                 alloc_function,
             ),
+            IntermediateType::IRef(inner) => IRef::add_pack_instructions(
+                inner,
+                builder,
+                module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                memory,
+                alloc_function,
+            ),
         }
     }
 
@@ -209,6 +222,7 @@ impl Packable for IntermediateType {
             IntermediateType::IAddress => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::ISigner => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::IVector(_) => 32,
+            IntermediateType::IRef(inner) => inner.encoded_size(),
         }
     }
 }

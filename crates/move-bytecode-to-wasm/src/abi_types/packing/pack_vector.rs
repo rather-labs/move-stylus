@@ -161,7 +161,7 @@ mod tests {
         (linker, instance, store, entrypoint)
     }
 
-    fn test_uint(int_type: impl Packable, data: &[u8], expected_result: &[u8]) {
+    fn test_vec(int_type: impl Packable, data: &[u8], expected_result: &[u8]) {
         let (mut raw_module, alloc_function, memory_id) = build_module();
 
         let mut function_builder =
@@ -219,7 +219,7 @@ mod tests {
         let int_type = IntermediateType::IVector(Box::new(IntermediateType::IU8));
 
         let expected_result = SolType::abi_encode_params(&(vec![1, 2, 3],));
-        test_uint(
+        test_vec(
             int_type.clone(),
             &[
                 3u32.to_le_bytes().as_slice(),
@@ -238,7 +238,7 @@ mod tests {
         let int_type = IntermediateType::IVector(Box::new(IntermediateType::IU16));
 
         let expected_result = SolType::abi_encode_params(&(vec![1, 2, 3],));
-        test_uint(
+        test_vec(
             int_type.clone(),
             &[
                 3u32.to_le_bytes().as_slice(),
@@ -257,7 +257,7 @@ mod tests {
         let int_type = IntermediateType::IVector(Box::new(IntermediateType::IU32));
 
         let expected_result = SolType::abi_encode_params(&(vec![1, 2, 3],));
-        test_uint(
+        test_vec(
             int_type.clone(),
             &[
                 3u32.to_le_bytes().as_slice(),
@@ -276,7 +276,7 @@ mod tests {
         let int_type = IntermediateType::IVector(Box::new(IntermediateType::IU64));
 
         let expected_result = SolType::abi_encode_params(&(vec![1, 2, 3],));
-        test_uint(
+        test_vec(
             int_type.clone(),
             &[
                 3u32.to_le_bytes().as_slice(),
@@ -295,7 +295,7 @@ mod tests {
         let int_type = IntermediateType::IVector(Box::new(IntermediateType::IU128));
 
         let expected_result = SolType::abi_encode_params(&(vec![1, 2, 3],));
-        test_uint(
+        test_vec(
             int_type.clone(),
             &[
                 3u32.to_le_bytes().as_slice(),
@@ -318,7 +318,7 @@ mod tests {
 
         let expected_result =
             SolType::abi_encode_params(&(vec![U256::from(1), U256::from(2), U256::from(3)],));
-        test_uint(
+        test_vec(
             int_type.clone(),
             &[
                 3u32.to_le_bytes().as_slice(),
@@ -344,7 +344,7 @@ mod tests {
             Address::from_hex("0x1234567890abcdef1234567890abcdef12345678").unwrap(),
             Address::from_hex("0x1234567890abcdef1234567890abcdef12345678").unwrap(),
         ],));
-        test_uint(
+        test_vec(
             int_type.clone(),
             &[
                 3u32.to_le_bytes().as_slice(),
@@ -392,7 +392,7 @@ mod tests {
             6u32.to_le_bytes().as_slice(),
         ]
         .concat();
-        test_uint(int_type.clone(), &data, &expected_result);
+        test_vec(int_type.clone(), &data, &expected_result);
     }
 
     #[test]
@@ -423,6 +423,6 @@ mod tests {
             6u128.to_le_bytes().as_slice(),
         ]
         .concat();
-        test_uint(int_type.clone(), &data, &expected_result);
+        test_vec(int_type.clone(), &data, &expected_result);
     }
 }

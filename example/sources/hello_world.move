@@ -11,10 +11,6 @@ public fun echo(x: u128): u128 {
     x
 }
 
-public fun getCopiedLocal(): u128 {
-    let x = 123;
-    x
-}
 
 public fun echo_signer_with_int(x: signer, y: u8): (u8, signer) {
     (y, x)
@@ -36,3 +32,11 @@ public fun sum64(x: u64, y: u64): u64 {
     x + y
 }
 
+public fun dummy_ref_signer(_s: &signer) {
+    // Does nothing, but forces a borrow
+}
+
+public fun use_signer_ref(s: signer): (u8, signer) {
+    dummy_ref_signer(&s);
+    (42, s)
+}

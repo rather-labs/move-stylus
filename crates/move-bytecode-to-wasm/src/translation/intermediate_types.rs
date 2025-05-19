@@ -6,12 +6,13 @@ use simple_integers::{IU8, IU16, IU32, IU64};
 use vector::IVector;
 use walrus::{
     FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
-    ir::{LoadKind, MemArg},
+    ir::{LoadKind, MemArg, StoreKind},
 };
 
 pub mod address;
 pub mod boolean;
 pub mod heap_integers;
+pub mod imm_reference;
 pub mod signer;
 pub mod simple_integers;
 pub mod vector;
@@ -28,6 +29,7 @@ pub enum IntermediateType {
     IAddress,
     ISigner,
     IVector(Box<IntermediateType>),
+    IRef(Box<IntermediateType>),
 }
 
 impl IntermediateType {
@@ -44,7 +46,8 @@ impl IntermediateType {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::ISigner
-            | IntermediateType::IVector(_) => ValType::I32,
+            | IntermediateType::IVector(_)
+            | IntermediateType::IRef(_) => ValType::I32,
         }
     }
 
@@ -60,7 +63,8 @@ impl IntermediateType {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::ISigner
-            | IntermediateType::IVector(_) => 4,
+            | IntermediateType::IVector(_)
+            | IntermediateType::IRef(_) => 4,
         }
     }
 
@@ -104,6 +108,9 @@ impl IntermediateType {
                 allocator,
                 memory,
             ),
+            IntermediateType::IRef(_) => {
+                panic!("cannot load a constant for a reference type");
+            }
         }
     }
 
@@ -123,7 +130,8 @@ impl IntermediateType {
             | IntermediateType::IU64
             | IntermediateType::IU128
             | IntermediateType::IU256
-            | IntermediateType::IAddress => {
+            | IntermediateType::IAddress
+            | IntermediateType::IRef(_) => {
                 builder.local_get(local);
             }
             IntermediateType::IVector(inner) => {
@@ -159,7 +167,8 @@ impl IntermediateType {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::ISigner
-            | IntermediateType::IVector(_) => {
+            | IntermediateType::IVector(_)
+            | IntermediateType::IRef(_) => {
                 let local = module_locals.add(ValType::I32);
 
                 builder.local_get(pointer);
@@ -210,7 +219,8 @@ impl IntermediateType {
             | IntermediateType::IU256
             | IntermediateType::IVector(_)
             | IntermediateType::IAddress
-            | IntermediateType::ISigner => {
+            | IntermediateType::ISigner
+            | IntermediateType::IRef(_) => {
                 let local = module_locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -220,6 +230,94 @@ impl IntermediateType {
                 builder.local_set(local);
                 local
             }
+        }
+    }
+
+    pub fn add_imm_borrow_loc_instructions(
+        &self,
+        module_locals: &mut ModuleLocals,
+        builder: &mut InstrSeqBuilder,
+        allocator: FunctionId,
+        memory: MemoryId,
+        local: LocalId,
+    ) {
+        match self {
+            // For primitives, we copy the value in memory and return a pointer to it 
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64 => {
+                let size = self.stack_data_size() as i32;
+                let ptr = module_locals.add(ValType::I32);
+
+                builder.i32_const(size);
+                builder.call(allocator);
+                builder.local_tee(ptr);
+
+                builder.local_get(local);
+                builder.store(
+                    memory,
+                    match self {
+                        IntermediateType::IU64 => StoreKind::I64 { atomic: false },
+                        _ => StoreKind::I32 { atomic: false },
+                    },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                builder.local_get(ptr); // leave the pointer on the stack as &T
+            }
+
+            // Heap allocated: just forward the existing pointer
+            IntermediateType::IVector(_)
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::ISigner
+            | IntermediateType::IAddress => {
+                builder.local_get(local);
+            }
+            IntermediateType::IRef(_) => {
+                panic!("Cannot ImmBorrowLoc on a reference type");
+            }
+        }
+    }
+
+    pub fn add_read_ref_instructions(&self, builder: &mut InstrSeqBuilder, memory: MemoryId) {
+        match self {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32 => {
+                builder.load(
+                    memory,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+            IntermediateType::IU64 => {
+                builder.load(
+                    memory,
+                    LoadKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+            IntermediateType::IVector(_)
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::ISigner
+            | IntermediateType::IAddress => {
+                // No load needed, pointer is already correct
+            }
+            _ => panic!("Unsupported ReadRef type: {:?}", self),
         }
     }
 }
@@ -243,7 +341,10 @@ impl TryFrom<&SignatureToken> for IntermediateType {
                 let itoken = Self::try_from(token.as_ref())?;
                 Ok(IntermediateType::IVector(Box::new(itoken)))
             }
-
+            SignatureToken::Reference(token) => {
+                let itoken = Self::try_from(token.as_ref())?;
+                Ok(IntermediateType::IRef(Box::new(itoken)))
+            }
             _ => Err(anyhow::anyhow!("Unsupported signature token: {value:?}")),
         }
     }
