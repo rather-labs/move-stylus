@@ -1,6 +1,6 @@
 use walrus::{
     FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
-    ir::{MemArg, StoreKind},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 #[derive(Clone, Copy)]
@@ -43,6 +43,59 @@ impl IU128 {
 
         builder.local_get(pointer);
     }
+
+    pub fn bit_or(
+        builder: &mut InstrSeqBuilder,
+        module_locals: &mut ModuleLocals,
+        allocator: FunctionId,
+        memory: MemoryId,
+    ) {
+        let num_1 = module_locals.add(ValType::I32);
+        let num_2 = module_locals.add(ValType::I32);
+        builder.local_set(num_2);
+        builder.local_set(num_1);
+
+        let pointer = module_locals.add(ValType::I32);
+
+        builder.i32_const(16);
+        builder.call(allocator);
+        builder.local_set(pointer);
+
+        for i in 0..2 {
+            builder.local_get(pointer);
+
+            builder.local_get(num_1);
+            builder.load(
+                memory,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: i * 8,
+                },
+            );
+            builder.local_get(num_2);
+            builder.load(
+                memory,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: i * 8,
+                },
+            );
+
+            builder.binop(BinaryOp::I64Or);
+            builder.store(
+                memory,
+                StoreKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: i * 8,
+                },
+            );
+        }
+
+        builder.local_get(pointer);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -81,6 +134,59 @@ impl IU256 {
             );
 
             offset += 8;
+        }
+
+        builder.local_get(pointer);
+    }
+
+    pub fn bit_or(
+        builder: &mut InstrSeqBuilder,
+        module_locals: &mut ModuleLocals,
+        allocator: FunctionId,
+        memory: MemoryId,
+    ) {
+        let num_1 = module_locals.add(ValType::I32);
+        let num_2 = module_locals.add(ValType::I32);
+        builder.local_set(num_2);
+        builder.local_set(num_1);
+
+        let pointer = module_locals.add(ValType::I32);
+
+        builder.i32_const(32);
+        builder.call(allocator);
+        builder.local_set(pointer);
+
+        for i in 0..4 {
+            builder.local_get(pointer);
+
+            builder.local_get(num_1);
+            builder.load(
+                memory,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: i * 8,
+                },
+            );
+            builder.local_get(num_2);
+            builder.load(
+                memory,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: i * 8,
+                },
+            );
+
+            builder.binop(BinaryOp::I64Or);
+            builder.store(
+                memory,
+                StoreKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: i * 8,
+                },
+            );
         }
 
         builder.local_get(pointer);

@@ -3,6 +3,7 @@ use functions::{
     MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
 };
 use intermediate_types::IntermediateType;
+use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
@@ -261,6 +262,33 @@ fn map_bytecode_instruction(
             pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
             builder.unop(UnaryOp::I32Eqz);
             types_stack.push(IntermediateType::IBool);
+        }
+        Bytecode::BitOr => {
+            let t = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
+                assert_eq!(
+                    t1, t2,
+                    "types stack error: trying two BitOr two different types {t1:?} {t2:?}"
+                );
+                t1
+            } else {
+                panic!("types stack is empty");
+            };
+            match t {
+                IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
+                    builder.binop(BinaryOp::I32Or);
+                }
+                IntermediateType::IU64 => {
+                    builder.binop(BinaryOp::I64Or);
+                }
+                IntermediateType::IU128 => {
+                    IU128::bit_or(builder, module_locals, allocator, memory);
+                }
+                IntermediateType::IU256 => {
+                    IU256::bit_or(builder, module_locals, allocator, memory);
+                }
+                _ => panic!("type stack error: trying to BitOr two {t:?}"),
+            }
+            types_stack.push(t);
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
