@@ -90,3 +90,15 @@ public fun use_signer_ref(s: signer): (u8, signer) {
     dummy_ref_signer(&s); // this throws an error
     (42, s) 
 }
+
+public fun fn_2(): vector<u8> {
+    let v = vector[vector[10u8, 20u8], vector[30u8, 40u8]];
+    let x = v[0];  
+    x
+}
+
+public fun fn_1(): u8 {
+    let v = vector[10u8, 20u8];
+    let x = v[0];  
+    x
+}

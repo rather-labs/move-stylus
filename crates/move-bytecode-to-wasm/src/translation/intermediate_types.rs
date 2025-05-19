@@ -242,7 +242,7 @@ impl IntermediateType {
         local: LocalId,
     ) {
         match self {
-            // For primitives, we copy the value in memory and return a pointer to it 
+            // For primitives, we copy the value in memory and return a pointer to it
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16

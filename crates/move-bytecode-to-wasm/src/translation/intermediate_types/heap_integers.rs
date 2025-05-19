@@ -1,6 +1,6 @@
 use walrus::{
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
     FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 fn add(
