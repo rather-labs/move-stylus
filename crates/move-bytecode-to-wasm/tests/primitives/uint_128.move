@@ -49,6 +49,18 @@ fun identity_2(_x: u128, y: u128): u128 {
   y
 }
 
+public fun cast_u128_up(x: u16): u128 {
+  x as u128
+}
+
+public fun cast_u128_up_u64(x: u64): u128 {
+  x as u128
+}
+
+public fun cast_u128_from_u256(x: u256): u128 {
+  x as u128
+}
+
 public fun sum(x: u128, y: u128): u128 {
     x + y
 }

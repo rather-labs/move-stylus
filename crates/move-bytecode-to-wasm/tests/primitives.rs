@@ -1,3 +1,5 @@
+use std::u128;
+
 use alloy::{
     dyn_abi::SolType,
     hex::FromHex,
@@ -572,6 +574,9 @@ fn test_uint_128() {
         function getCopiedLocal() external returns (uint128, uint128);
         function echo(uint128 x) external returns (uint128);
         function echo2(uint128 x, uint128 y) external returns (uint128);
+        function castU128Up(uint16 x) external returns (uint128);
+        function castU128UpU64(uint64 x) external returns (uint128);
+        function castU128FromU256(uint256 x) external returns (uint128);
         function sum(uint128 x, uint128 y) external returns (uint128);
     );
 
@@ -603,6 +608,21 @@ fn test_uint_128() {
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(222,));
     run_test(&runtime, data, expected_result).unwrap();
 
+    // --- CAST ---
+    let data = castU128UpCall::abi_encode(&castU128UpCall::new((3232,)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(3232,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU128UpU64Call::abi_encode(&castU128UpU64Call::new((128128,)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(128128,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU128FromU256Call::abi_encode(&castU128FromU256Call::new((U256::from(128128),)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(128128,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data =
+        castU128FromU256Call::abi_encode(&castU128FromU256Call::new((U256::MAX + U256::from(1),)));
     // The following tests test two situations:
     // 1. What happens when there is carry: we process the sum in chunks of 32 bits, so we use
     //    numbers in the form 2^(n*32) where n=1,2,3,4.
@@ -688,6 +708,9 @@ fn test_uint_256() {
         function getCopiedLocal() external returns (uint256, uint256);
         function echo(uint256 x) external returns (uint256);
         function echo2(uint256 x, uint256 y) external returns (uint256);
+        function castU256Up(uint16 x) external returns (uint256);
+        function castU256UpU64(uint64 x) external returns (uint256);
+        function castU256UpU128(uint128 x) external returns (uint256);
         function sum(uint256 x, uint256 y) external returns (uint256);
     );
 
@@ -720,6 +743,18 @@ fn test_uint_256() {
     let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(222),));
     run_test(&runtime, data, expected_result).unwrap();
 
+    // --- CAST ---
+    let data = castU256UpCall::abi_encode(&castU256UpCall::new((3232,)));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(3232),));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU256UpU64Call::abi_encode(&castU256UpU64Call::new((128128,)));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(128128),));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU256UpU128Call::abi_encode(&castU256UpU128Call::new((u128::MAX,)));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(u128::MAX),));
+    run_test(&runtime, data, expected_result).unwrap();
     // The following tests test two situations:
     // 1. What happens when there is carry: we process the sum in chunks of 32 bits, so we use
     //    numbers in the form 2^(n*32) where n=1,2,3,4,5,6,7,8.
