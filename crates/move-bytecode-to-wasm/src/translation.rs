@@ -203,6 +203,26 @@ fn map_bytecode_instruction(
                 "types stack is not empty after return"
             );
         }
+        Bytecode::CastU8 => {
+            let original_type = types_stack.pop().unwrap();
+            IU8::cast_from(builder, module_locals, original_type);
+            types_stack.push(IntermediateType::IU8);
+        }
+        Bytecode::CastU16 => {
+            let original_type = types_stack.pop().unwrap();
+            IU16::cast_from(builder, module_locals, original_type);
+            types_stack.push(IntermediateType::IU16);
+        }
+        Bytecode::CastU32 => {
+            let original_type = types_stack.pop().unwrap();
+            IU32::cast_from(builder, module_locals, original_type);
+            types_stack.push(IntermediateType::IU32);
+        }
+        Bytecode::CastU64 => {
+            let original_type = types_stack.pop().unwrap();
+            IU64::cast_from(builder, module_locals, original_type);
+            types_stack.push(IntermediateType::IU64);
+        }
         Bytecode::Add => {
             let sum_type = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
                 assert_eq!(

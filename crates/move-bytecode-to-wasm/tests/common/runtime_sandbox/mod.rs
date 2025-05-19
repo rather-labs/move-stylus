@@ -1,5 +1,6 @@
 pub mod constants;
 
+use anyhow::Result;
 use constants::SIGNER_ADDRESS;
 use walrus::Module;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
@@ -121,7 +122,7 @@ impl RuntimeSandbox {
     /// Crates a temporary runtime sandbox instance and calls the entrypoint with the given data.
     ///
     /// Returns the result of the entrypoint call and the return data.
-    pub fn call_entrypoint(&self, data: Vec<u8>) -> (i32, Vec<u8>) {
+    pub fn call_entrypoint(&self, data: Vec<u8>) -> Result<(i32, Vec<u8>)> {
         let data_len = data.len() as i32;
         let mut store = Store::new(
             &self.engine,
@@ -130,14 +131,14 @@ impl RuntimeSandbox {
                 return_data: vec![],
             },
         );
-        let instance = self.linker.instantiate(&mut store, &self.module).unwrap();
+        let instance = self.linker.instantiate(&mut store, &self.module)?;
 
-        let entrypoint = instance
-            .get_typed_func::<i32, i32>(&mut store, "user_entrypoint")
-            .unwrap();
+        let entrypoint = instance.get_typed_func::<i32, i32>(&mut store, "user_entrypoint")?;
 
-        let result = entrypoint.call(&mut store, data_len).unwrap();
+        let result = entrypoint
+            .call(&mut store, data_len)
+            .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
 
-        (result, store.data().return_data.clone())
+        Ok((result, store.data().return_data.clone()))
     }
 }
