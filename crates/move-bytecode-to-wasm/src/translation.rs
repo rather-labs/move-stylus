@@ -116,10 +116,9 @@ fn map_bytecode_instruction(
             add_unpack_function_return_values_instructions(
                 builder,
                 module_locals,
-                &mapped_function.signature.returns,
+                &functions_returns[function_handle_index.0 as usize],
                 memory,
             );
-
             // Insert in the stack types the types returned by the function (if any)
             let return_types = &functions_returns[function_handle_index.0 as usize];
             for return_type in return_types {
