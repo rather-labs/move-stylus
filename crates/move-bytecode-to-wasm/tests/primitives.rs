@@ -594,34 +594,33 @@ fn test_uint_256() {
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
-    /*
 
-        let data = getConstantCall::abi_encode(&getConstantCall::new(()));
-        let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(256256),));
-        run_test(&runtime, data, expected_result);
+    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(256256),));
+    run_test(&runtime, data, expected_result);
 
-        let data = getLocalCall::abi_encode(&getLocalCall::new((U256::from(111),)));
-        let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(50),));
-        run_test(&runtime, data, expected_result);
+    let data = getLocalCall::abi_encode(&getLocalCall::new((U256::from(111),)));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(50),));
+    run_test(&runtime, data, expected_result);
 
-        let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
-        let expected_result =
-            <sol!((uint256, uint256))>::abi_encode_params(&(U256::from(100), U256::from(111)));
-        run_test(&runtime, data, expected_result);
+    let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
+    let expected_result =
+        <sol!((uint256, uint256))>::abi_encode_params(&(U256::from(100), U256::from(111)));
+    run_test(&runtime, data, expected_result);
 
-        let data = echoCall::abi_encode(&echoCall::new((U256::from(222),)));
-        let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(222),));
-        run_test(&runtime, data, expected_result);
+    let data = echoCall::abi_encode(&echoCall::new((U256::from(222),)));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(222),));
+    run_test(&runtime, data, expected_result);
 
-        // Echo max uint256
-        let data = echoCall::abi_encode(&echoCall::new((U256::MAX,)));
-        let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::MAX,));
-        run_test(&runtime, data, expected_result);
+    // Echo max uint256
+    let data = echoCall::abi_encode(&echoCall::new((U256::MAX,)));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::MAX,));
+    run_test(&runtime, data, expected_result);
 
-        let data = echo2Call::abi_encode(&echo2Call::new((U256::from(111), U256::from(222))));
-        let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(222),));
-        run_test(&runtime, data, expected_result);
-    */
+    let data = echo2Call::abi_encode(&echo2Call::new((U256::from(111), U256::from(222))));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(222),));
+    run_test(&runtime, data, expected_result);
+
     // The following tests test two situations:
     // 1. What happens when there is carry: we process the sum in chunks of 32 bits, so we use
     //    numbers in the form 2^(n*32) where n=1,2,3,4,5,6,7,8.
@@ -630,6 +629,7 @@ fn test_uint_256() {
     //
     //    For example
     //    2^32 - 1 = [0, ..., 0, 0, 255, 255, 255, 255]
+    //
     // 2. What happens if there is not carry :
     //    If we add two numbers 2^(n*32), the first 32 bits will of both numbers will be zero, so,
     //    when we add them there will be no carry at the beginning.
@@ -638,16 +638,6 @@ fn test_uint_256() {
     //    2^32     = [0, ..., 0, 0, 1, 0, 0, 0, 0]
     //
     // This tests are repeated for all the 32 bits chunks in the 256bits
-
-    println!(
-        "{:?}\n{:?}",
-        U256::from_str_radix("4294967296", 10)
-            .unwrap()
-            .to_be_bytes::<32>(),
-        U256::from_str_radix("4294967296", 10)
-            .unwrap()
-            .to_be_bytes::<32>(),
-    );
 
     // Test the first 32 bits
     let data = sumCall::abi_encode(&sumCall::new((U256::from(1), U256::from(1))));
@@ -736,19 +726,6 @@ fn test_uint_256() {
     )
     .unwrap(),));
     run_test(&runtime, data, expected_result);
-
-    println!(
-        "{:?}\n{:?}\n{:?}",
-        U256::from_str_radix("340282366920938463463374607431768211455", 10)
-            .unwrap()
-            .to_be_bytes::<32>(),
-        U256::from_str_radix("340282366920938463463374607431768211455", 10)
-            .unwrap()
-            .to_be_bytes::<32>(),
-        U256::from_str_radix("680564733841876926926749214863536422910", 10)
-            .unwrap()
-            .to_be_bytes::<32>(),
-    );
 
     // Test the carry to the third half of 64 bits
     // Operands are 2^128 - 1
