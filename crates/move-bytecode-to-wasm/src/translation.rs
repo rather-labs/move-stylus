@@ -3,6 +3,7 @@ use functions::{
     MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
 };
 use intermediate_types::IntermediateType;
+use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
@@ -221,6 +222,16 @@ fn map_bytecode_instruction(
             let original_type = types_stack.pop().unwrap();
             IU64::cast_from(builder, module_locals, original_type, memory);
             types_stack.push(IntermediateType::IU64);
+        }
+        Bytecode::CastU128 => {
+            let original_type = types_stack.pop().unwrap();
+            IU128::cast_from(builder, module_locals, original_type, memory, allocator);
+            types_stack.push(IntermediateType::IU128);
+        }
+        Bytecode::CastU256 => {
+            let original_type = types_stack.pop().unwrap();
+            IU256::cast_from(builder, module_locals, original_type, memory, allocator);
+            types_stack.push(IntermediateType::IU256);
         }
         Bytecode::Add => {
             let sum_type = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
