@@ -1,15 +1,16 @@
 use anyhow::Result;
 use functions::{
-    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
+    add_unpack_function_return_values_instructions, prepare_function_return, MappedFunction,
 };
-use intermediate_types::IntermediateType;
+use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
+use intermediate_types::IntermediateType;
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
 use walrus::ir::{BinaryOp, UnaryOp};
 use walrus::{
-    FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
     ir::{MemArg, StoreKind},
+    FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
 };
 
 pub mod functions;
@@ -236,22 +237,22 @@ fn map_bytecode_instruction(
         }
         Bytecode::CastU8 => {
             let original_type = types_stack.pop().unwrap();
-            IU8::cast_from(builder, module_locals, original_type);
+            IU8::cast_from(builder, module_locals, original_type, memory);
             types_stack.push(IntermediateType::IU8);
         }
         Bytecode::CastU16 => {
             let original_type = types_stack.pop().unwrap();
-            IU16::cast_from(builder, module_locals, original_type);
+            IU16::cast_from(builder, module_locals, original_type, memory);
             types_stack.push(IntermediateType::IU16);
         }
         Bytecode::CastU32 => {
             let original_type = types_stack.pop().unwrap();
-            IU32::cast_from(builder, module_locals, original_type);
+            IU32::cast_from(builder, module_locals, original_type, memory);
             types_stack.push(IntermediateType::IU32);
         }
         Bytecode::CastU64 => {
             let original_type = types_stack.pop().unwrap();
-            IU64::cast_from(builder, module_locals, original_type);
+            IU64::cast_from(builder, module_locals, original_type, memory);
             types_stack.push(IntermediateType::IU64);
         }
         Bytecode::Add => {
@@ -270,8 +271,8 @@ fn map_bytecode_instruction(
                 IntermediateType::IU16 => IU16::add(builder, module_locals),
                 IntermediateType::IU32 => IU32::add(builder, module_locals),
                 IntermediateType::IU64 => IU64::add(builder, module_locals),
-                IntermediateType::IU128 => todo!(),
-                IntermediateType::IU256 => todo!(),
+                IntermediateType::IU128 => IU128::add(builder, module_locals, memory, allocator),
+                IntermediateType::IU256 => IU256::add(builder, module_locals, memory, allocator),
                 t => panic!("type stack error: trying to add two {t:?}"),
             }
 

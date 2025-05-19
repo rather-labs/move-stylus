@@ -206,6 +206,8 @@ fn test_uint_8() {
         function echo2(uint8 x, uint8 y) external returns (uint8);
         function sum(uint8 x, uint8 y) external returns (uint8);
         function castU8(uint16 x) external returns (uint8);
+        function castU8FromU128(uint128 x) external returns (uint8);
+        function castU8FromU256(uint256 x) external returns (uint8);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -257,6 +259,28 @@ fn test_uint_8() {
         .expect_err("should fail")
         .to_string()
         .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    let data = castU8FromU128Call::abi_encode(&castU8FromU128Call::new((8u128,)));
+    let expected_result = <sol!((uint8,))>::abi_encode_params(&(8,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU8FromU128Call::abi_encode(&castU8FromU128Call::new((u8::MAX as u128 + 1,)));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    let data = castU8FromU256Call::abi_encode(&castU8FromU256Call::new((U256::from(8),)));
+    let expected_result = <sol!((uint8,))>::abi_encode_params(&(8,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU8FromU256Call::abi_encode(&castU8FromU256Call::new((
+        U256::from(u8::MAX) + U256::from(1),
+    )));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
 }
 
 #[test]
@@ -274,6 +298,8 @@ fn test_uint_16() {
         function sum(uint16 x, uint16 y) external returns (uint16);
         function castU16Down(uint32 x) external returns (uint16);
         function castU16Up(uint8 x) external returns (uint16);
+        function castU16FromU128(uint128 x) external returns (uint16);
+        function castU16FromU256(uint256 x) external returns (uint16);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -329,6 +355,28 @@ fn test_uint_16() {
         .expect_err("should fail")
         .to_string()
         .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    let data = castU16FromU128Call::abi_encode(&castU16FromU128Call::new((1616u128,)));
+    let expected_result = <sol!((uint16,))>::abi_encode_params(&(1616,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU16FromU128Call::abi_encode(&castU16FromU128Call::new((u16::MAX as u128 + 1,)));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    let data = castU16FromU256Call::abi_encode(&castU16FromU256Call::new((U256::from(1616),)));
+    let expected_result = <sol!((uint16,))>::abi_encode_params(&(1616,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU16FromU256Call::abi_encode(&castU16FromU256Call::new((
+        U256::from(u16::MAX) + U256::from(1),
+    )));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
 }
 
 #[test]
@@ -346,6 +394,8 @@ fn test_uint_32() {
         function sum(uint32 x, uint32 y) external returns (uint32);
         function castU32Down(uint64 x) external returns (uint32);
         function castU32Up(uint16 x) external returns (uint32);
+        function castU32FromU128(uint128 x) external returns (uint32);
+        function castU32FromU256(uint256 x) external returns (uint32);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -401,6 +451,28 @@ fn test_uint_32() {
         .expect_err("should fail")
         .to_string()
         .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    let data = castU32FromU128Call::abi_encode(&castU32FromU128Call::new((3232u128,)));
+    let expected_result = <sol!((uint32,))>::abi_encode_params(&(3232,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU32FromU128Call::abi_encode(&castU32FromU128Call::new((u32::MAX as u128 + 1,)));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    let data = castU32FromU256Call::abi_encode(&castU32FromU256Call::new((U256::from(3232),)));
+    let expected_result = <sol!((uint32,))>::abi_encode_params(&(3232,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU32FromU256Call::abi_encode(&castU32FromU256Call::new((
+        U256::from(u32::MAX) + U256::from(1),
+    )));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
 }
 
 #[test]
@@ -416,8 +488,9 @@ fn test_uint_64() {
         function echo(uint64 x) external returns (uint64);
         function echo2(uint64 x, uint64 y) external returns (uint64);
         function sum(uint64 x, uint64 y) external returns (uint64);
-        function castU64Down(uint128 x) external returns (uint64);
         function castU64Up(uint32 x) external returns (uint64);
+        function castU64FromU128(uint128 x) external returns (uint64);
+        function castU64FromU256(uint256 x) external returns (uint64);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -460,19 +533,31 @@ fn test_uint_64() {
         .contains("wasm trap: wasm `unreachable` instruction executed");
 
     // --- CAST ---
-    // let data = castU64DownCall::abi_encode(&castU64DownCall::new((6464,)));
-    // let expected_result = <sol!((uint64,))>::abi_encode_params(&(6464,));
-    // run_test(&runtime, data, expected_result).unwrap();
-
     let data = castU64UpCall::abi_encode(&castU64UpCall::new((250,)));
     let expected_result = <sol!((uint64,))>::abi_encode_params(&(250,));
     run_test(&runtime, data, expected_result).unwrap();
 
-    // let data = castU64DownCall::abi_encode(&castU64DownCall::new((u64::MAX as u128 + 1,)));
-    // run_test(&runtime, data, vec![])
-    //     .expect_err("should fail")
-    //     .to_string()
-    //     .contains("wasm trap: wasm `unreachable` instruction executed");
+    let data = castU64FromU128Call::abi_encode(&castU64FromU128Call::new((6464u128,)));
+    let expected_result = <sol!((uint64,))>::abi_encode_params(&(6464,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU64FromU128Call::abi_encode(&castU64FromU128Call::new((u64::MAX as u128 + 1,)));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    let data = castU64FromU256Call::abi_encode(&castU64FromU256Call::new((U256::from(6464),)));
+    let expected_result = <sol!((uint64,))>::abi_encode_params(&(6464,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU64FromU256Call::abi_encode(&castU64FromU256Call::new((
+        U256::from(u64::MAX) + U256::from(1),
+    )));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
 }
 
 #[test]
@@ -487,6 +572,7 @@ fn test_uint_128() {
         function getCopiedLocal() external returns (uint128, uint128);
         function echo(uint128 x) external returns (uint128);
         function echo2(uint128 x, uint128 y) external returns (uint128);
+        function sum(uint128 x, uint128 y) external returns (uint128);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -516,6 +602,78 @@ fn test_uint_128() {
     let data = echo2Call::abi_encode(&echo2Call::new((111, 222)));
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(222,));
     run_test(&runtime, data, expected_result).unwrap();
+
+    // The following tests test two situations:
+    // 1. What happens when there is carry: we process the sum in chunks of 32 bits, so we use
+    //    numbers in the form 2^(n*32) where n=1,2,3,4.
+    //    If we add two numbers 2^(n*64) - 1, wthe first 64 bits will overflow and we will have to
+    //    take care of the carry.
+    //
+    //    For example
+    //    2^64 - 1 = [0, ..., 0, 0, 255, 255, 255, 255]
+    //
+    // 2. What happens if there is not carry :
+    //    If we add two numbers 2^(n*64), the first 64 bits will of both numbers will be zero, so,
+    //    when we add them there will be no carry at the beginning.
+    //
+    //    For example
+    //    2^64     = [0, ..., 0, 0, 1, 0, 0, 0, 0]
+    //
+    // This tests are repeated for all the 32 bits chunks in the 256bits so we test a big number
+    // that does not overflows
+    //
+    // Test the first 64 bits
+    let data = sumCall::abi_encode(&sumCall::new((1, 1)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(2,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // Operands are 2^32 - 1
+    // Expected result is (2^32 - 1) * 2
+    let data = sumCall::abi_encode(&sumCall::new((4294967295, 4294967295)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(8589934590,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // Operands are 2^32
+    // Expected result is 2^32 * 2
+    let data = sumCall::abi_encode(&sumCall::new((4294967296, 4294967296)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(8589934592,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // Operands are 2^64 - 1
+    // Expected result is (2^64 - 1) * 2
+    let data = sumCall::abi_encode(&sumCall::new((18446744073709551615, 18446744073709551615)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(36893488147419103230,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // Operands are 2^64
+    // Expected result is (2^64) * 2
+    let data = sumCall::abi_encode(&sumCall::new((18446744073709551616, 18446744073709551616)));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(36893488147419103232,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // Operands are 2^96 - 1
+    // Expected result is (2^96 - 1) * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        79228162514264337593543950335,
+        79228162514264337593543950335,
+    )));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(158456325028528675187087900670,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // Operands are 2^96
+    // Expected result is 2^96 * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        79228162514264337593543950336,
+        79228162514264337593543950336,
+    )));
+    let expected_result = <sol!((uint128,))>::abi_encode_params(&(158456325028528675187087900672,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = sumCall::abi_encode(&sumCall::new((u128::MAX, 42)));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
 }
 
 #[test]
@@ -530,6 +688,7 @@ fn test_uint_256() {
         function getCopiedLocal() external returns (uint256, uint256);
         function echo(uint256 x) external returns (uint256);
         function echo2(uint256 x, uint256 y) external returns (uint256);
+        function sum(uint256 x, uint256 y) external returns (uint256);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -560,6 +719,159 @@ fn test_uint_256() {
     let data = echo2Call::abi_encode(&echo2Call::new((U256::from(111), U256::from(222))));
     let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(222),));
     run_test(&runtime, data, expected_result).unwrap();
+
+    // The following tests test two situations:
+    // 1. What happens when there is carry: we process the sum in chunks of 32 bits, so we use
+    //    numbers in the form 2^(n*32) where n=1,2,3,4,5,6,7,8.
+    //    If we add two numbers 2^(n*64) - 1, wthe first 64 bits will overflow and we will have to
+    //    take care of the carry.
+    //
+    //    For example
+    //    2^64 - 1 = [0, ..., 0, 0, 255, 255, 255, 255]
+    //
+    // 2. What happens if there is not carry :
+    //    If we add two numbers 2^(n*64), the first 64 bits will of both numbers will be zero, so,
+    //    when we add them there will be no carry at the beginning.
+    //
+    //    For example
+    //    2^64     = [0, ..., 0, 0, 1, 0, 0, 0, 0]
+    //
+    // This tests are repeated for all the 32 bits chunks in the 256bits so we test a big number
+    // that does not overflows
+
+    // Test the first 64 bits
+    let data = sumCall::abi_encode(&sumCall::new((U256::from(1), U256::from(1))));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(2),));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // Operands are 2^32 - 1
+    // Expected result is (2^32 - 1) * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::from_str_radix("4294967295", 10).unwrap(),
+        U256::from_str_radix("4294967295", 10).unwrap(),
+    )));
+    let expected_result =
+        <sol!((uint256,))>::abi_encode_params(&(U256::from_str_radix("8589934590", 10).unwrap(),));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // Operands are 2^32
+    // Expected result is 2^32 * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::from_str_radix("4294967296", 10).unwrap(),
+        U256::from_str_radix("4294967296", 10).unwrap(),
+    )));
+    let expected_result =
+        <sol!((uint256,))>::abi_encode_params(&(U256::from_str_radix("8589934592", 10).unwrap(),));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // Operands are 2^64 - 1
+    // Expected result is (2^64 - 1) * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::from_str_radix("18446744073709551615", 10).unwrap(),
+        U256::from_str_radix("18446744073709551615", 10).unwrap(),
+    )));
+    let expected_result =
+        <sol!((uint256,))>::abi_encode_params(&(
+            U256::from_str_radix("36893488147419103230", 10).unwrap(),
+        ));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // Operands are 2^64
+    // Expected result is (2^64) * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::from_str_radix("18446744073709551616", 10).unwrap(),
+        U256::from_str_radix("18446744073709551616", 10).unwrap(),
+    )));
+    let expected_result =
+        <sol!((uint256,))>::abi_encode_params(&(
+            U256::from_str_radix("36893488147419103232", 10).unwrap(),
+        ));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // Operands are 2^96 - 1
+    // Expected result is (2^96 - 1) * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::from_str_radix("79228162514264337593543950335", 10).unwrap(),
+        U256::from_str_radix("79228162514264337593543950335", 10).unwrap(),
+    )));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from_str_radix(
+        "158456325028528675187087900670",
+        10,
+    )
+    .unwrap(),));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // Operands are 2^96
+    // Expected result is 2^96 * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::from_str_radix("79228162514264337593543950336", 10).unwrap(),
+        U256::from_str_radix("79228162514264337593543950336", 10).unwrap(),
+    )));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from_str_radix(
+        "158456325028528675187087900672",
+        10,
+    )
+    .unwrap(),));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // Operands are 2^128 - 1
+    // Expected result is (2^128 - 1) * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::from_str_radix("340282366920938463463374607431768211456", 10).unwrap(),
+        U256::from_str_radix("340282366920938463463374607431768211456", 10).unwrap(),
+    )));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from_str_radix(
+        "680564733841876926926749214863536422912",
+        10,
+    )
+    .unwrap(),));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // Test the carry to the third half of 64 bits
+    // Operands are 2^128 - 1
+    // Expected result is (2^128 - 1) * 2
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::from_str_radix("340282366920938463463374607431768211455", 10).unwrap(),
+        U256::from_str_radix("340282366920938463463374607431768211455", 10).unwrap(),
+    )));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from_str_radix(
+        "680564733841876926926749214863536422910",
+        10,
+    )
+    .unwrap(),));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // Test the carry to the fourth half of 64 bits
+    // Operands are 2^192 - 1
+    // Expected result is (2^192 - 1) * 2)
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::from_str_radix(
+            "6277101735386680763835789423207666416102355444464034512895",
+            10,
+        )
+        .unwrap(),
+        U256::from_str_radix(
+            "6277101735386680763835789423207666416102355444464034512895",
+            10,
+        )
+        .unwrap(),
+    )));
+    let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from_str_radix(
+        "12554203470773361527671578846415332832204710888928069025790",
+        10,
+    )
+    .unwrap(),));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::MAX,
+        U256::from_str_radix("42", 10).unwrap(),
+    )));
+
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
 }
 
 #[test]
