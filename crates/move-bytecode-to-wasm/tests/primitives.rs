@@ -496,22 +496,23 @@ fn test_uint_128() {
     // The following tests test two situations:
     // 1. What happens when there is carry: we process the sum in chunks of 32 bits, so we use
     //    numbers in the form 2^(n*32) where n=1,2,3,4.
-    //    If we add two numbers 2^(n*32) - 1, wthe first 32 bits will overflow and we will have to
+    //    If we add two numbers 2^(n*64) - 1, wthe first 64 bits will overflow and we will have to
     //    take care of the carry.
     //
     //    For example
-    //    2^32 - 1 = [0, ..., 0, 0, 255, 255, 255, 255]
+    //    2^64 - 1 = [0, ..., 0, 0, 255, 255, 255, 255]
     //
     // 2. What happens if there is not carry :
-    //    If we add two numbers 2^(n*32), the first 32 bits will of both numbers will be zero, so,
+    //    If we add two numbers 2^(n*64), the first 64 bits will of both numbers will be zero, so,
     //    when we add them there will be no carry at the beginning.
     //
     //    For example
-    //    2^32     = [0, ..., 0, 0, 1, 0, 0, 0, 0]
+    //    2^64     = [0, ..., 0, 0, 1, 0, 0, 0, 0]
     //
-    // This tests are repeated for all the 32 bits chunks in the 256bits
-
-    // Test the first 32 bits
+    // This tests are repeated for all the 32 bits chunks in the 256bits so we test a big number
+    // that does not overflows
+    //
+    // Test the first 64 bits
     let data = sumCall::abi_encode(&sumCall::new((1, 1)));
     let expected_result = <sol!((uint128,))>::abi_encode_params(&(2,));
     run_test(&runtime, data, expected_result);
@@ -567,13 +568,13 @@ fn test_uint_128_overflow() {
 
     sol!(
         #[allow(missing_docs)]
-        function sumOverflow(uint128 x) external returns (uint128);
+        function sum(uint128 x, uint128 y) external returns (uint128);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
 
-    let data = sumOverflowCall::abi_encode(&sumOverflowCall::new((42,)));
+    let data = sumCall::abi_encode(&sumCall::new((u128::MAX, 42)));
     run_test(&runtime, data, vec![]);
 }
 
@@ -624,22 +625,23 @@ fn test_uint_256() {
     // The following tests test two situations:
     // 1. What happens when there is carry: we process the sum in chunks of 32 bits, so we use
     //    numbers in the form 2^(n*32) where n=1,2,3,4,5,6,7,8.
-    //    If we add two numbers 2^(n*32) - 1, wthe first 32 bits will overflow and we will have to
+    //    If we add two numbers 2^(n*64) - 1, wthe first 64 bits will overflow and we will have to
     //    take care of the carry.
     //
     //    For example
-    //    2^32 - 1 = [0, ..., 0, 0, 255, 255, 255, 255]
+    //    2^64 - 1 = [0, ..., 0, 0, 255, 255, 255, 255]
     //
     // 2. What happens if there is not carry :
-    //    If we add two numbers 2^(n*32), the first 32 bits will of both numbers will be zero, so,
+    //    If we add two numbers 2^(n*64), the first 64 bits will of both numbers will be zero, so,
     //    when we add them there will be no carry at the beginning.
     //
     //    For example
-    //    2^32     = [0, ..., 0, 0, 1, 0, 0, 0, 0]
+    //    2^64     = [0, ..., 0, 0, 1, 0, 0, 0, 0]
     //
-    // This tests are repeated for all the 32 bits chunks in the 256bits
+    // This tests are repeated for all the 32 bits chunks in the 256bits so we test a big number
+    // that does not overflows
 
-    // Test the first 32 bits
+    // Test the first 64 bits
     let data = sumCall::abi_encode(&sumCall::new((U256::from(1), U256::from(1))));
     let expected_result = <sol!((uint256,))>::abi_encode_params(&(U256::from(2),));
     run_test(&runtime, data, expected_result);
@@ -772,23 +774,17 @@ fn test_uint_256_overflow() {
 
     sol!(
         #[allow(missing_docs)]
-        function sumOverflow(uint256 x) external returns (uint256);
+        function sum(uint256 x, uint256 y) external returns (uint256);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
 
-    println!(
-        "{:?}",
-        U256::from_str_radix(
-            "115792089237316195423570985008687907853269984665640564039457584007913129639935",
-            10
-        )
-        .unwrap()
-        .to_be_bytes::<32>(),
-    );
+    let data = sumCall::abi_encode(&sumCall::new((
+        U256::MAX,
+        U256::from_str_radix("42", 10).unwrap(),
+    )));
 
-    let data = sumOverflowCall::abi_encode(&sumOverflowCall::new((U256::from(1),)));
     run_test(&runtime, data, vec![]);
 }
 
