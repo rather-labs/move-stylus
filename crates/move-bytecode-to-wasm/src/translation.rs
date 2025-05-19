@@ -204,22 +204,22 @@ fn map_bytecode_instruction(
         }
         Bytecode::CastU8 => {
             let original_type = types_stack.pop().unwrap();
-            IU8::cast_from(builder, module_locals, original_type);
+            IU8::cast_from(builder, module_locals, original_type, memory);
             types_stack.push(IntermediateType::IU8);
         }
         Bytecode::CastU16 => {
             let original_type = types_stack.pop().unwrap();
-            IU16::cast_from(builder, module_locals, original_type);
+            IU16::cast_from(builder, module_locals, original_type, memory);
             types_stack.push(IntermediateType::IU16);
         }
         Bytecode::CastU32 => {
             let original_type = types_stack.pop().unwrap();
-            IU32::cast_from(builder, module_locals, original_type);
+            IU32::cast_from(builder, module_locals, original_type, memory);
             types_stack.push(IntermediateType::IU32);
         }
         Bytecode::CastU64 => {
             let original_type = types_stack.pop().unwrap();
-            IU64::cast_from(builder, module_locals, original_type);
+            IU64::cast_from(builder, module_locals, original_type, memory);
             types_stack.push(IntermediateType::IU64);
         }
         Bytecode::Add => {

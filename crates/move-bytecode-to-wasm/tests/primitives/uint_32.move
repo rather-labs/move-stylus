@@ -60,3 +60,11 @@ public fun cast_u32_down(x: u64): u32 {
 public fun cast_u32_up(x: u16): u32 {
     x as u32
 }
+
+public fun cast_u32_from_u128(x: u128): u32 {
+    x as u32
+}
+
+public fun cast_u32_from_u256(x: u256): u32 {
+    x as u32
+}
