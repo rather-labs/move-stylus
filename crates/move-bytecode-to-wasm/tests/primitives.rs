@@ -206,6 +206,8 @@ fn test_uint_8() {
         function echo2(uint8 x, uint8 y) external returns (uint8);
         function sum(uint8 x, uint8 y) external returns (uint8);
         function castU8(uint16 x) external returns (uint8);
+        function castU8FromU128(uint128 x) external returns (uint8);
+        function castU8FromU256(uint256 x) external returns (uint8);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -257,6 +259,28 @@ fn test_uint_8() {
         .expect_err("should fail")
         .to_string()
         .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    let data = castU8FromU128Call::abi_encode(&castU8FromU128Call::new((8u128,)));
+    let expected_result = <sol!((uint8,))>::abi_encode_params(&(8,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU8FromU128Call::abi_encode(&castU8FromU128Call::new((u8::MAX as u128 + 1,)));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    let data = castU8FromU256Call::abi_encode(&castU8FromU256Call::new((U256::from(8),)));
+    let expected_result = <sol!((uint8,))>::abi_encode_params(&(8,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU8FromU256Call::abi_encode(&castU8FromU256Call::new((
+        U256::from(u8::MAX) + U256::from(1),
+    )));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
 }
 
 #[test]
@@ -274,6 +298,8 @@ fn test_uint_16() {
         function sum(uint16 x, uint16 y) external returns (uint16);
         function castU16Down(uint32 x) external returns (uint16);
         function castU16Up(uint8 x) external returns (uint16);
+        function castU16FromU128(uint128 x) external returns (uint16);
+        function castU16FromU256(uint256 x) external returns (uint16);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -329,6 +355,28 @@ fn test_uint_16() {
         .expect_err("should fail")
         .to_string()
         .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    let data = castU16FromU128Call::abi_encode(&castU16FromU128Call::new((1616u128,)));
+    let expected_result = <sol!((uint16,))>::abi_encode_params(&(1616,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU16FromU128Call::abi_encode(&castU16FromU128Call::new((u16::MAX as u128 + 1,)));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    let data = castU16FromU256Call::abi_encode(&castU16FromU256Call::new((U256::from(1616),)));
+    let expected_result = <sol!((uint16,))>::abi_encode_params(&(1616,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU16FromU256Call::abi_encode(&castU16FromU256Call::new((
+        U256::from(u16::MAX) + U256::from(1),
+    )));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
 }
 
 #[test]
@@ -346,6 +394,8 @@ fn test_uint_32() {
         function sum(uint32 x, uint32 y) external returns (uint32);
         function castU32Down(uint64 x) external returns (uint32);
         function castU32Up(uint16 x) external returns (uint32);
+        function castU32FromU128(uint128 x) external returns (uint32);
+        function castU32FromU256(uint256 x) external returns (uint32);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -401,6 +451,28 @@ fn test_uint_32() {
         .expect_err("should fail")
         .to_string()
         .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    let data = castU32FromU128Call::abi_encode(&castU32FromU128Call::new((3232u128,)));
+    let expected_result = <sol!((uint32,))>::abi_encode_params(&(3232,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU32FromU128Call::abi_encode(&castU32FromU128Call::new((u32::MAX as u128 + 1,)));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    let data = castU32FromU256Call::abi_encode(&castU32FromU256Call::new((U256::from(3232),)));
+    let expected_result = <sol!((uint32,))>::abi_encode_params(&(3232,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU32FromU256Call::abi_encode(&castU32FromU256Call::new((
+        U256::from(u32::MAX) + U256::from(1),
+    )));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
 }
 
 #[test]
@@ -416,8 +488,9 @@ fn test_uint_64() {
         function echo(uint64 x) external returns (uint64);
         function echo2(uint64 x, uint64 y) external returns (uint64);
         function sum(uint64 x, uint64 y) external returns (uint64);
-        function castU64Down(uint128 x) external returns (uint64);
         function castU64Up(uint32 x) external returns (uint64);
+        function castU64FromU128(uint128 x) external returns (uint64);
+        function castU64FromU256(uint256 x) external returns (uint64);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -460,19 +533,31 @@ fn test_uint_64() {
         .contains("wasm trap: wasm `unreachable` instruction executed");
 
     // --- CAST ---
-    // let data = castU64DownCall::abi_encode(&castU64DownCall::new((6464,)));
-    // let expected_result = <sol!((uint64,))>::abi_encode_params(&(6464,));
-    // run_test(&runtime, data, expected_result).unwrap();
-
     let data = castU64UpCall::abi_encode(&castU64UpCall::new((250,)));
     let expected_result = <sol!((uint64,))>::abi_encode_params(&(250,));
     run_test(&runtime, data, expected_result).unwrap();
 
-    // let data = castU64DownCall::abi_encode(&castU64DownCall::new((u64::MAX as u128 + 1,)));
-    // run_test(&runtime, data, vec![])
-    //     .expect_err("should fail")
-    //     .to_string()
-    //     .contains("wasm trap: wasm `unreachable` instruction executed");
+    let data = castU64FromU128Call::abi_encode(&castU64FromU128Call::new((6464u128,)));
+    let expected_result = <sol!((uint64,))>::abi_encode_params(&(6464,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU64FromU128Call::abi_encode(&castU64FromU128Call::new((u64::MAX as u128 + 1,)));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    let data = castU64FromU256Call::abi_encode(&castU64FromU256Call::new((U256::from(6464),)));
+    let expected_result = <sol!((uint64,))>::abi_encode_params(&(6464,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = castU64FromU256Call::abi_encode(&castU64FromU256Call::new((
+        U256::from(u64::MAX) + U256::from(1),
+    )));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
 }
 
 #[test]
