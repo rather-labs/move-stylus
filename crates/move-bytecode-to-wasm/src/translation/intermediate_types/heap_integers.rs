@@ -99,6 +99,7 @@ fn add(
                 loop_
                     // If either n1 and n2 is zero or rest is not zero then there can be an overflow
                     // (n1 != 0) && (n2 != 0) || (rest != 0)
+                    // where rest = overflowed
                     .local_get(n1)
                     .i64_const(0)
                     .binop(BinaryOp::I64Ne)
@@ -127,7 +128,7 @@ fn add(
                     .binop(BinaryOp::I32And)
                     .local_set(overflowed);
 
-                // We check if we are the offset is out of bounds
+                // We check if we are adding the last chunks of the operands
                 loop_
                     .local_get(offset)
                     .i32_const(type_heap_size - 8)
@@ -135,20 +136,20 @@ fn add(
                     .if_else(
                         None,
                         |then| {
-                            // If we are out of bound we check if overflow ocurred, if that
-                            // happened then we trap
-                            // Check if overflow ocurred
+                            // If an overflow happened in the last chunk, means the whole number
+                            // overflowed
                             then.local_get(overflowed).if_else(
                                 None,
                                 |then| {
                                     then.unreachable();
                                 },
+                                // Otherwise we finished the  addition
                                 |else_| {
                                     else_.br(block_id);
                                 },
                             );
                         },
-                        // Otherwise we make store the result and recalculate the rest
+                        // If we are not in the last chunk, we continue the iteration
                         |else_| {
                             // offset += 8 and process the next part of the integer
                             else_
