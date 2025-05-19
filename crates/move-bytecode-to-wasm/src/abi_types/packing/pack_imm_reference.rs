@@ -1,7 +1,6 @@
 use super::Packable;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::imm_reference::IRef;
-use alloy_sol_types::sol_data::Address;
 use walrus::{
     FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
     ir::{LoadKind, MemArg},
@@ -71,7 +70,7 @@ impl IRef {
                     allocator,
                 );
             }
-            IntermediateType::IRef(inner) => {
+            IntermediateType::IRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
         }
@@ -86,7 +85,7 @@ mod tests {
     use alloy::{
         dyn_abi::SolType,
         hex::FromHex,
-        primitives::{Address, U256},
+        primitives::{Address},
         sol,
     };
     use walrus::{FunctionBuilder, ModuleConfig, ValType};

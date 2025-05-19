@@ -69,7 +69,7 @@ impl IRef {
                 builder.local_get(ptr_local);
             }
 
-            IntermediateType::IRef(inner) => {
+            IntermediateType::IRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
         }
@@ -179,7 +179,6 @@ mod tests {
 
     #[test]
     fn test_unpack_ref_u8() {
-        type IntType = u8;
         type SolType = sol!((uint8,));
         let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU8));
 
@@ -193,7 +192,6 @@ mod tests {
 
     #[test]
     fn test_unpack_ref_u32() {
-        type IntType = u32;
         type SolType = sol!((uint32,));
         let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU32));
 
@@ -203,7 +201,6 @@ mod tests {
 
     #[test]
     fn test_unpack_ref_u64() {
-        type IntType = u64;
         type SolType = sol!((uint64,));
         let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU64));
 
@@ -213,7 +210,6 @@ mod tests {
 
     #[test]
     fn test_unpack_ref_u128() {
-        type IntType = u128;
         type SolType = sol!((uint128,));
         let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU128));
 
@@ -224,7 +220,6 @@ mod tests {
 
     #[test]
     fn test_unpack_ref_u256() {
-        type IntType = U256;
         type SolType = sol!((uint256,));
         let int_type = IntermediateType::IRef(Box::new(IntermediateType::IU256));
 
