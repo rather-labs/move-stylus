@@ -23,7 +23,7 @@ public fun get_local(_z: u256): u256 {
 // Forces the compiler to store literals on locals
 public fun get_copied_local(): (u256, u256) {
   let x: u256 = 100;
-  
+
   let y = x; // copy
   let mut z = x; // move
   identity(y);
@@ -59,4 +59,8 @@ public fun cast_u256_up_u64(x: u64): u256 {
 
 public fun cast_u256_up_u128(x: u128): u256 {
   x as u256
+}
+
+public fun sum(x: u256, y: u256): u256 {
+    x + y
 }
