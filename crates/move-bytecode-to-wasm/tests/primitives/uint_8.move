@@ -52,15 +52,3 @@ fun identity_2(_x: u8, y: u8): u8 {
 public fun sum(x: u8, y: u8): u8 {
     x + y
 }
-
-public fun cast_u8(x: u16): u8 {
-    x as u8
-}
-
-public fun cast_u8_from_u128(x: u128): u8 {
-    x as u8
-}
-
-public fun cast_u8_from_u256(x: u256): u8 {
-    x as u8
-}
