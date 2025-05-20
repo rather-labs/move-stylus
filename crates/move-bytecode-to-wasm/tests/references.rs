@@ -16,7 +16,7 @@ fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u
     Ok(())
 }
 
-mod references_bool {
+mod reference_bool {
     use super::*;
 
     sol!(
@@ -52,7 +52,7 @@ mod references_bool {
     }
 }
 
-mod references_uint_8 {
+mod reference_uint_8 {
     use super::*;
 
     sol!(
@@ -88,7 +88,7 @@ mod references_uint_8 {
     }
 }
 
-mod references_uint_16 {
+mod reference_uint_16 {
     use super::*;
 
     sol!(
@@ -124,7 +124,7 @@ mod references_uint_16 {
     }
 }
 
-mod references_uint_32 {
+mod reference_uint_32 {
     use super::*;
 
     sol!(
@@ -160,7 +160,7 @@ mod references_uint_32 {
     }
 }
 
-mod references_uint_64 {
+mod reference_uint_64 {
     use super::*;
 
     sol!(
@@ -196,7 +196,7 @@ mod references_uint_64 {
     }
 }
 
-mod references_uint_128 {
+mod reference_uint_128 {
     use super::*;
 
     sol!(
@@ -232,7 +232,7 @@ mod references_uint_128 {
     }
 }
 
-mod references_uint_256 {
+mod reference_uint_256 {
     use super::*;
 
     sol!(
@@ -268,10 +268,11 @@ mod references_uint_256 {
     }
 }
 
-mod references_address {
+mod reference_address {
     use super::*;
     use alloy::hex::FromHex;
     use alloy::primitives::Address;
+    use alloy::primitives::address;
 
     sol!(
         #[allow(missing_docs)]
@@ -292,10 +293,9 @@ mod references_address {
     }
 
     #[rstest]
-    #[case(derefAddressCall::new((Address::from_hex("0x1234567890abcdef1234567890abcdef12345678").unwrap(),)), Address::from_hex("0x1234567890abcdef1234567890abcdef12345678").unwrap())]
-    #[case(derefAddressRefCall::new((Address::from_hex("0xabcdef1234567890abcdef1234567890abcdef12").unwrap(),)), Address::from_hex("0xabcdef1234567890abcdef1234567890abcdef12").unwrap())]
-    #[case(callDerefAddressRefCall::new((Address::from_hex("0x7890abcdef1234567890abcdef1234567890abcd").unwrap(),)), Address::from_hex("0x7890abcdef1234567890abcdef1234567890abcd").unwrap())]
-    #[case(derefNestedAddressCall::new((Address::from_hex("0x7890abcdef1234567890abcdef1234567890abcd").unwrap(),)), Address::from_hex("0x7890abcdef1234567890abcdef1234567890abcd").unwrap())]
+    #[case(derefAddressCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x1234567890abcdef1234567890abcdef12345678"))]
+    #[case(callDerefAddressRefCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x1234567890abcdef1234567890abcdef12345678"))]
+    #[case(derefNestedAddressCall::new((address!("0x7890abcdef1234567890abcdef1234567890abcd"),)), address!("0x7890abcdef1234567890abcdef1234567890abcd"))]
     fn test_address_immutable_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -306,40 +306,39 @@ mod references_address {
     }
 }
 
-// This one is throwing -100 but dont know why
-// mod references_signer {
-//     use super::*;
-//     use alloy::hex::FromHex;
-//     use alloy::primitives::Address;
+mod reference_signer {
+    use super::*;
+    use alloy::hex::FromHex;
+    use alloy::primitives::Address;
 
-//     sol!(
-//         #[allow(missing_docs)]
-//         function useDummy(address s) external returns (address);  // Returns the signer
-//     );
+    sol!(
+        #[allow(missing_docs)]
+        function useDummy() external returns (address);  // Returns the signer
+    );
 
-//     #[fixture]
-//     #[once]
-//     fn runtime() -> RuntimeSandbox {
-//         const MODULE_NAME: &str = "ref_signer";
-//         const SOURCE_PATH: &str = "tests/references/signer.move";
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "ref_signer";
+        const SOURCE_PATH: &str = "tests/references/signer.move";
 
-//         let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-//         RuntimeSandbox::new(&mut translated_package)
-//     }
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+        RuntimeSandbox::new(&mut translated_package)
+    }
 
-//     #[rstest]
-//     #[case(useDummyCall::new((Address::from_hex("0x7890abcdef1234567890abcdef1234567890abcd").unwrap(),)), Address::from_hex("0x7890abcdef1234567890abcdef1234567890abcd").unwrap())]
-//     fn test_signer_immutable_ref<T: SolCall>(
-//         #[by_ref] runtime: &RuntimeSandbox,
-//         #[case] call_data: T,
-//         #[case] expected_result: Address,
-//     ) {
-//         let expected_result = <sol!((address,))>::abi_encode_params(&(expected_result,));
-//         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
-//     }
-// }
+    #[rstest]
+    #[case(useDummyCall::new(()), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 3, 5, 7])]
+    fn test_signer_immutable_ref<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: [u8; 20],
+    ) {
+        let expected_result = <sol!((address,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
+}
 
-mod references_vec_8 {
+mod reference_vec_8 {
     use super::*;
 
     sol!(
@@ -377,9 +376,22 @@ mod references_vec_8 {
         let expected_result = <sol!((uint8[],))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(getElementVectorCall::new((2,)))]
+    #[case(getElementVectorCall::new((u64::MAX,)))]
+    fn test_vec_8_out_of_bounds<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+    ) {
+        run_test(runtime, call_data.abi_encode(), vec![])
+            .expect_err("should fail")
+            .to_string()
+            .contains("wasm trap: wasm `unreachable` instruction executed");
+    }
 }
 
-mod references_vec_64 {
+mod reference_vec_64 {
     use super::*;
 
     sol!(
@@ -419,7 +431,7 @@ mod references_vec_64 {
     }
 }
 
-mod references_vec_256 {
+mod reference_vec_256 {
     use super::*;
 
     sol!(
@@ -456,5 +468,18 @@ mod references_vec_256 {
     ) {
         let expected_result = <sol!((uint256[],))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
+
+    #[rstest]
+    #[case(getElementVectorCall::new((2,)))]
+    #[case(getElementVectorCall::new((u64::MAX,)))]
+    fn test_vec_256_out_of_bounds<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+    ) {
+        run_test(runtime, call_data.abi_encode(), vec![])
+            .expect_err("should fail")
+            .to_string()
+            .contains("wasm trap: wasm `unreachable` instruction executed");
     }
 }

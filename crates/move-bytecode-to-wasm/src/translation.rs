@@ -10,7 +10,7 @@ use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
 use walrus::ir::{BinaryOp, UnaryOp};
 use walrus::{
     FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
-    ir::{LoadKind, MemArg, StoreKind},
+    ir::{MemArg, StoreKind},
 };
 
 pub mod functions;
@@ -207,7 +207,13 @@ fn map_bytecode_instruction(
             let inner_type =
                 get_intermediate_type_for_signature_index(mapped_function, *signature_index);
 
-            inner_type.add_vec_imm_borrow_instructions(module_locals, builder, allocator, memory);
+            IVector::add_vec_imm_borrow_instructions(
+                &inner_type,
+                module_locals,
+                builder,
+                allocator,
+                memory,
+            );
 
             // Push &T onto the WASM type stack
             types_stack.push(IntermediateType::IRef(Box::new(inner_type)));
