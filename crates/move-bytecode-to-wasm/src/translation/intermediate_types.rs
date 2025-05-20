@@ -2,11 +2,11 @@ use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
 use move_binary_format::file_format::{Signature, SignatureToken};
-use simple_integers::{IU8, IU16, IU32, IU64};
+use simple_integers::{IU16, IU32, IU64, IU8};
 use vector::IVector;
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
     ir::{LoadKind, MemArg, StoreKind},
+    FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
 };
 
 pub mod address;
@@ -242,7 +242,7 @@ impl IntermediateType {
         local: LocalId,
     ) {
         match self {
-            // For primitives, we copy the value in memory and return a pointer to it 
+            // For primitives, we copy the value in memory and return a pointer to it
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
@@ -319,6 +319,30 @@ impl IntermediateType {
             }
             _ => panic!("Unsupported ReadRef type: {:?}", self),
         }
+    }
+}
+
+impl From<&IntermediateType> for ValType {
+    fn from(value: &IntermediateType) -> Self {
+        match value {
+            IntermediateType::IU64 => ValType::I64,
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress
+            | IntermediateType::ISigner
+            | IntermediateType::IVector(_)
+            | IntermediateType::IRef(_) => ValType::I32,
+        }
+    }
+}
+
+impl From<IntermediateType> for ValType {
+    fn from(value: IntermediateType) -> Self {
+        Self::from(&value)
     }
 }
 

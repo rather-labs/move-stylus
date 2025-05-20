@@ -1,22 +1,22 @@
 use anyhow::Result;
-use move_binary_format::file_format::{CodeUnit, Constant, FunctionDefinition, Signature};
+use move_binary_format::file_format::{CodeUnit, FunctionDefinition, Signature};
 use walrus::{
-    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleLocals, ValType,
     ir::{LoadKind, MemArg, StoreKind},
+    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleLocals, ValType,
 };
 
-use crate::translation::{intermediate_types::ISignature, map_bytecode_instruction};
+use crate::translation::intermediate_types::ISignature;
 
 use super::intermediate_types::IntermediateType;
 
 pub struct MappedFunction<'a> {
-    pub id: FunctionId,
     pub name: String,
     pub signature: ISignature,
     pub move_definition: FunctionDefinition,
     pub move_code_unit: CodeUnit,
     pub local_variables: Vec<LocalId>,
     pub local_variables_type: Vec<IntermediateType>,
+    pub arg_local_ids: Vec<LocalId>,
     pub move_module_signatures: &'a [Signature],
 }
 
@@ -53,12 +53,6 @@ impl<'a> MappedFunction<'a> {
 
         let arg_intermediate_types = move_arguments.0.iter().map(IntermediateType::try_from);
 
-        // === Create the function ===
-        let function_builder =
-            FunctionBuilder::new(&mut module.types, &function_arguments, &function_returns);
-
-        let id = function_builder.finish(arg_local_ids.clone(), &mut module.funcs);
-
         // === Handle declared locals ===
         let move_locals = &code.locals;
         let signature_tokens = &move_module_signatures[move_locals.0 as usize].0;
@@ -71,7 +65,7 @@ impl<'a> MappedFunction<'a> {
             .map(|valty| module.locals.add(valty));
 
         // === Combine all locals and types ===
-        let local_variables = arg_local_ids.into_iter().chain(local_ids).collect();
+        let local_variables = arg_local_ids.clone().into_iter().chain(local_ids).collect();
 
         let local_variables_type = arg_intermediate_types
             .chain(local_intermediate_types)
@@ -80,62 +74,15 @@ impl<'a> MappedFunction<'a> {
             .unwrap();
 
         Self {
-            id,
             name,
             signature,
             move_definition: move_definition.clone(),
             move_code_unit: code,
             local_variables,
             local_variables_type,
+            arg_local_ids,
             move_module_signatures,
         }
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn translate_function(
-        &self,
-        module: &mut Module,
-        constant_pool: &[Constant],
-        function_ids: &[FunctionId],
-        functions_arguments: &[Vec<IntermediateType>],
-        functions_returns: &[Vec<IntermediateType>],
-        memory: MemoryId,
-        allocator: FunctionId,
-    ) -> Result<()> {
-        anyhow::ensure!(
-            self.move_code_unit.jump_tables.is_empty(),
-            "Jump tables are not supported yet"
-        );
-
-        let mut builder = module
-            .funcs
-            .get_mut(self.id)
-            .kind
-            .unwrap_local_mut()
-            .builder_mut()
-            .func_body();
-
-        // Maps the types of the values contained in the stack at the moment of processing an
-        // instruction.
-        let mut types_stack = Vec::new();
-
-        for instruction in &self.move_code_unit.code {
-            map_bytecode_instruction(
-                instruction,
-                constant_pool,
-                function_ids,
-                &mut builder,
-                self,
-                &mut module.locals,
-                functions_arguments,
-                functions_returns,
-                &mut types_stack,
-                allocator,
-                memory,
-            );
-        }
-
-        Ok(())
     }
 }
 

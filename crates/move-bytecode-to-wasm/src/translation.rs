@@ -1,33 +1,86 @@
 use anyhow::Result;
 use functions::{
-    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
+    add_unpack_function_return_values_instructions, prepare_function_return, MappedFunction,
 };
-use intermediate_types::IntermediateType;
 use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
+use intermediate_types::IntermediateType;
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
-use walrus::ir::{BinaryOp, UnaryOp};
+use table::FunctionTable;
+use walrus::ir::{BinaryOp, Block, UnaryOp};
 use walrus::{
-    FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
     ir::{MemArg, StoreKind},
+    FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
 };
+use walrus::{FunctionBuilder, Module};
 
 pub mod functions;
 /// The types in this module represent an intermediate Rust representation of Move types
 /// that is used to generate the WASM code.
 pub mod intermediate_types;
+pub mod table;
+
+#[allow(clippy::too_many_arguments)]
+pub fn translate_function(
+    module: &mut Module,
+    index: usize,
+    constant_pool: &[Constant],
+    functions_arguments: &[Vec<IntermediateType>],
+    functions_returns: &[Vec<IntermediateType>],
+    function_table: &FunctionTable,
+    memory: MemoryId,
+    allocator: FunctionId,
+) -> Result<FunctionId> {
+    let entry = function_table
+        .get(index)
+        .ok_or(anyhow::anyhow!("index {index} not found in function table"))?;
+
+    anyhow::ensure!(
+        entry.function.move_code_unit.jump_tables.is_empty(),
+        "Jump tables are not supported yet"
+    );
+
+    // Maps the types of the values contained in the stack at the moment of processing an
+    // instruction.
+    let mut types_stack = Vec::new();
+    let mut function = FunctionBuilder::new(&mut module.types, &entry.params, &entry.results);
+    let mut builder = function.dangling_instr_seq(entry.type_id);
+
+    for instruction in &entry.function.move_code_unit.code {
+        map_bytecode_instruction(
+            instruction,
+            constant_pool,
+            &mut builder,
+            &entry.function,
+            &mut module.locals,
+            functions_arguments,
+            functions_returns,
+            function_table,
+            &mut types_stack,
+            allocator,
+            memory,
+        );
+    }
+
+    let func_body_id = builder.id();
+    function.func_body().instr(Block { seq: func_body_id });
+
+    let function_id = function.finish(entry.function.arg_local_ids.clone(), &mut module.funcs);
+
+    Ok(function_id)
+}
 
 #[allow(clippy::too_many_arguments)]
 fn map_bytecode_instruction(
     instruction: &Bytecode,
     constants: &[Constant],
-    function_ids: &[FunctionId],
     builder: &mut InstrSeqBuilder,
     mapped_function: &MappedFunction,
     module_locals: &mut ModuleLocals,
     functions_arguments: &[Vec<IntermediateType>],
     functions_returns: &[Vec<IntermediateType>],
+    function_table: &FunctionTable,
     types_stack: &mut Vec<IntermediateType>,
     allocator: FunctionId,
     memory: MemoryId,
@@ -113,7 +166,14 @@ fn map_bytecode_instruction(
                 }
             }
 
-            builder.call(function_ids[function_handle_index.0 as usize]);
+            let f = function_table
+                .get_by_function_handle_index(&function_handle_index)
+                .expect("function with index {function_handle_index:?} not found un table");
+
+            builder
+                .i32_const(f.index)
+                .call_indirect(f.type_id, function_table.get_table_id());
+
             add_unpack_function_return_values_instructions(
                 builder,
                 module_locals,
