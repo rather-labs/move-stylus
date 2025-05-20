@@ -192,7 +192,7 @@ fn map_bytecode_instruction(
             // Pop index and vector reference from type stack
             let index_type = types_stack.pop().unwrap(); // u64
             let ref_vec_type = types_stack.pop().unwrap(); // &vector<T>
-        
+
             // Ensure the popped value is a reference to a vector
             if let IntermediateType::IRef(inner) = ref_vec_type {
                 if let IntermediateType::IVector(_) = &*inner {
@@ -203,31 +203,66 @@ fn map_bytecode_instruction(
             } else {
                 panic!("Expected a reference type");
             }
-        
+
             // Resolve the type of the vector element and its size
             let inner_type =
                 get_intermediate_type_for_signature_index(mapped_function, *signature_index);
-            let element_size = inner_type.stack_data_size() as i32;
-        
-            // Allocate locals for index and element address
-            let index_local = module_locals.add(ValType::I32);
+            let inner_size = inner_type.stack_data_size() as i32;
+
+            let index_i64 = module_locals.add(ValType::I64); // referenced element index
+            builder.local_set(index_i64); // index is on top of stack (as i64)
+
+            // Trap if index > u32::MAX
+            builder.block(None, |block| {
+                block
+                    .local_get(index_i64)
+                    .i64_const(0xFFFF_FFFF)
+                    .binop(BinaryOp::I64LeU);
+                block.br_if(block.id());
+                block.unreachable();
+            });
+
+            //  Cast index to i32
+            let index_i32 = module_locals.add(ValType::I32);
+            builder
+                .local_get(index_i64)
+                .unop(UnaryOp::I32WrapI64)
+                .local_set(index_i32);
+
+            // Set vector base address
+            let vector_address = module_locals.add(ValType::I32);
+            builder.local_set(vector_address);
+
+            // Trap if index >= length
+            builder.block(None, |block| {
+                block
+                    .local_get(vector_address)
+                    .load(
+                        memory,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_get(index_i32)
+                    .binop(BinaryOp::I32GtU);
+                block.br_if(block.id());
+                block.unreachable();
+            });
+
+            // Compute element
             let element_local = module_locals.add(ValType::I32);
-        
-            // Convert the top-of-stack index (i64) to i32 and store
-            builder.unop(UnaryOp::I32WrapI64);
-            builder.local_set(index_local);
-        
-            // Compute address of v[index]: base_ptr + 4 + index * element_size
-            builder.i32_const(4);
-            builder.binop(BinaryOp::I32Add); // base_ptr + 4
-        
-            builder.local_get(index_local);          // index
-            builder.i32_const(element_size);
-            builder.binop(BinaryOp::I32Mul);         // offset = index * size
-        
-            builder.binop(BinaryOp::I32Add);         // base_ptr + 4 + offset
-            builder.local_set(element_local);        // store address
-        
+            builder
+                .local_get(vector_address)
+                .i32_const(4)
+                .binop(BinaryOp::I32Add)
+                .local_get(index_i32)
+                .i32_const(inner_size)
+                .binop(BinaryOp::I32Mul)
+                .binop(BinaryOp::I32Add)
+                .local_set(element_local);
+
             match inner_type {
                 // For primitives, allocate memory, copy value there, and return pointer
                 IntermediateType::IBool
@@ -236,7 +271,7 @@ fn map_bytecode_instruction(
                 | IntermediateType::IU32
                 | IntermediateType::IU64 => {
                     let ptr = module_locals.add(ValType::I32);
-        
+
                     let (load_kind, store_kind) = match inner_type {
                         IntermediateType::IU64 => (
                             LoadKind::I64 { atomic: false },
@@ -247,45 +282,56 @@ fn map_bytecode_instruction(
                             StoreKind::I32 { atomic: false },
                         ),
                     };
-        
-                    builder.i32_const(element_size);
-                    builder.call(allocator);
-                    builder.local_tee(ptr);
-        
-                    builder.local_get(element_local);
-                    builder.load(
-                        memory,
-                        load_kind,
-                        MemArg { align: 0, offset: 0 },
-                    );
-        
-                    builder.store(
-                        memory,
-                        store_kind,
-                        MemArg { align: 0, offset: 0 },
-                    );
-        
+
+                    builder.i32_const(inner_size).call(allocator).local_tee(ptr);
+
+                    builder
+                        .local_get(element_local)
+                        .load(
+                            memory,
+                            load_kind,
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .store(
+                            memory,
+                            store_kind,
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
+
                     builder.local_get(ptr); // leave pointer to copied value on stack
                 }
-        
+
                 // Heap types — just return the computed element pointer directly
                 IntermediateType::IVector(_)
                 | IntermediateType::IU128
                 | IntermediateType::IU256
                 | IntermediateType::ISigner
                 | IntermediateType::IAddress => {
-                    builder.local_get(element_local); // return pointer
+                    builder.local_get(element_local).load(
+                        memory,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
                 }
-        
+
                 IntermediateType::IRef(_) => {
                     panic!("Cannot VecImmBorrow an existing reference type");
                 }
             }
-        
+
             // Push &T onto the WASM type stack
             types_stack.push(IntermediateType::IRef(Box::new(inner_type)));
         }
-        
+
         Bytecode::ReadRef => {
             let ref_type = types_stack
                 .pop()
