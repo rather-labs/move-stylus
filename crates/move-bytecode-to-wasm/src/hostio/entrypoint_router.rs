@@ -1,6 +1,6 @@
 use walrus::{
-    FunctionBuilder, FunctionId, MemoryId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg},
+    FunctionBuilder, FunctionId, MemoryId, Module, ValType,
 };
 
 use crate::{
@@ -112,38 +112,27 @@ mod tests {
         (module, allocator_func, memory_id)
     }
 
-    fn add_noop_function(module: &mut Module) -> PublicFunction {
+    fn add_noop_function<'a>(module: &mut Module, signature: &'a ISignature) -> PublicFunction<'a> {
         // Noop function
         let mut noop_builder = FunctionBuilder::new(&mut module.types, &[], &[]);
         noop_builder.func_body();
 
         let noop = noop_builder.finish(vec![], &mut module.funcs);
 
-        PublicFunction::new(
-            noop,
-            "noop",
-            ISignature {
-                arguments: vec![],
-                returns: vec![],
-            },
-        )
+        PublicFunction::new(noop, "noop", signature)
     }
 
-    fn add_noop_2_function(module: &mut Module) -> PublicFunction {
+    fn add_noop_2_function<'a>(
+        module: &mut Module,
+        signature: &'a ISignature,
+    ) -> PublicFunction<'a> {
         // Noop function
         let mut noop_builder = FunctionBuilder::new(&mut module.types, &[], &[]);
         noop_builder.func_body();
 
         let noop = noop_builder.finish(vec![], &mut module.funcs);
 
-        PublicFunction::new(
-            noop,
-            "noop_2",
-            ISignature {
-                arguments: vec![],
-                returns: vec![],
-            },
-        )
+        PublicFunction::new(noop, "noop_2", signature)
     }
 
     struct ReadArgsData {
@@ -251,9 +240,12 @@ mod tests {
     #[test]
     fn test_build_entrypoint_router_noop() {
         let (mut raw_module, allocator_func, memory_id) = build_module();
-
-        let noop = add_noop_function(&mut raw_module);
-        let noop_2 = add_noop_2_function(&mut raw_module);
+        let signature = ISignature {
+            arguments: vec![],
+            returns: vec![],
+        };
+        let noop = add_noop_function(&mut raw_module, &signature);
+        let noop_2 = add_noop_2_function(&mut raw_module, &signature);
 
         let noop_selector_data = noop.get_selector().to_vec();
         let noop_2_selector_data = noop_2.get_selector().to_vec();
@@ -286,9 +278,12 @@ mod tests {
     #[should_panic(expected = "unreachable")]
     fn test_build_entrypoint_router_no_data() {
         let (mut raw_module, allocator_func, memory_id) = build_module();
-
-        let noop = add_noop_function(&mut raw_module);
-        let noop_2 = add_noop_2_function(&mut raw_module);
+        let signature = ISignature {
+            arguments: vec![],
+            returns: vec![],
+        };
+        let noop = add_noop_function(&mut raw_module, &signature);
+        let noop_2 = add_noop_2_function(&mut raw_module, &signature);
 
         build_entrypoint_router(&mut raw_module, allocator_func, memory_id, &[noop, noop_2]);
         display_module(&mut raw_module);
@@ -305,9 +300,12 @@ mod tests {
     #[test]
     fn test_build_entrypoint_router_no_match() {
         let (mut raw_module, allocator_func, memory_id) = build_module();
-
-        let noop = add_noop_function(&mut raw_module);
-        let noop_2 = add_noop_2_function(&mut raw_module);
+        let signature = ISignature {
+            arguments: vec![],
+            returns: vec![],
+        };
+        let noop = add_noop_function(&mut raw_module, &signature);
+        let noop_2 = add_noop_2_function(&mut raw_module, &signature);
 
         build_entrypoint_router(&mut raw_module, allocator_func, memory_id, &[noop, noop_2]);
         display_module(&mut raw_module);

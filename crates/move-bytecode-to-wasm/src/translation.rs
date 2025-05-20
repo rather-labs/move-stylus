@@ -167,7 +167,7 @@ fn map_bytecode_instruction(
             }
 
             let f = function_table
-                .get_by_function_handle_index(&function_handle_index)
+                .get_by_function_handle_index(function_handle_index)
                 .expect("function with index {function_handle_index:?} not found un table");
 
             builder

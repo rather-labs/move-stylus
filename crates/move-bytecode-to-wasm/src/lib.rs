@@ -7,7 +7,7 @@ use translation::{
     functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
     translate_function,
 };
-use walrus::{ElementKind, Module, RefType, ValType};
+use walrus::{Module, RefType, ValType};
 use wasm_validation::validate_stylus_wasm;
 
 mod abi_types;

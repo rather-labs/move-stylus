@@ -19,10 +19,9 @@ pub struct TableEntry<'a> {
 }
 
 pub struct FunctionTable<'a> {
+    /// WASM table id
     table_id: TableId,
     entries: Vec<TableEntry<'a>>,
-
-    table_filled: bool,
 }
 
 impl<'a> FunctionTable<'a> {
@@ -30,7 +29,6 @@ impl<'a> FunctionTable<'a> {
         Self {
             table_id: wasm_table_id,
             entries: Vec::new(),
-            table_filled: false,
         }
     }
 
