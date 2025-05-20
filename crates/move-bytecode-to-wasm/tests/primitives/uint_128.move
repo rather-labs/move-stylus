@@ -52,4 +52,3 @@ fun identity_2(_x: u128, y: u128): u128 {
 public fun sum(x: u128, y: u128): u128 {
     x + y
 }
-

@@ -3,6 +3,8 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
+use super::IntermediateType;
+
 fn add(
     builder: &mut walrus::InstrSeqBuilder,
     module_locals: &mut walrus::ModuleLocals,
@@ -214,6 +216,116 @@ impl IU128 {
         builder.local_get(pointer);
     }
 
+    pub fn cast_from(
+        builder: &mut walrus::InstrSeqBuilder,
+        module_locals: &mut walrus::ModuleLocals,
+        original_type: IntermediateType,
+        memory: MemoryId,
+        allocator: FunctionId,
+    ) {
+        match original_type {
+            IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
+                let value_local = module_locals.add(ValType::I32);
+                builder.local_set(value_local);
+
+                let pointer = module_locals.add(ValType::I32);
+
+                builder.i32_const(16);
+                builder.call(allocator);
+                builder.local_tee(pointer);
+
+                builder.local_get(value_local);
+                builder.store(
+                    memory,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                builder.local_get(pointer);
+            }
+            IntermediateType::IU64 => {
+                let value_local = module_locals.add(ValType::I64);
+                builder.local_set(value_local);
+
+                let pointer = module_locals.add(ValType::I32);
+
+                builder.i32_const(16);
+                builder.call(allocator);
+                builder.local_tee(pointer);
+
+                builder.local_get(value_local);
+                builder.store(
+                    memory,
+                    StoreKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                builder.local_get(pointer);
+            }
+            IntermediateType::IU128 => {}
+            IntermediateType::IU256 => {
+                let original_pointer = module_locals.add(ValType::I32);
+                builder.local_set(original_pointer);
+
+                let pointer = module_locals.add(ValType::I32);
+
+                builder.i32_const(16);
+                builder.call(allocator);
+                builder.local_set(pointer);
+
+                for i in 0..2 {
+                    builder.local_get(pointer);
+                    builder.local_get(original_pointer);
+                    builder.load(
+                        memory,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: i * 8,
+                        },
+                    );
+                    builder.store(
+                        memory,
+                        StoreKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: i * 8,
+                        },
+                    );
+                }
+
+                // Ensure the rest bytes are zero, otherwise it would have overflowed
+                for i in 0..2 {
+                    builder.block(None, |inner_block| {
+                        let inner_block_id = inner_block.id();
+
+                        inner_block.local_get(pointer);
+                        inner_block.load(
+                            memory,
+                            LoadKind::I64 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 16 + i * 8,
+                            },
+                        );
+                        inner_block.i64_const(0);
+                        inner_block.binop(BinaryOp::I64Eq);
+                        inner_block.br_if(inner_block_id);
+                        inner_block.unreachable();
+                    });
+                }
+                builder.local_get(pointer);
+            }
+            t => panic!("type stack error: trying to cast {t:?}"),
+        }
+    }
+
     pub fn add(
         builder: &mut walrus::InstrSeqBuilder,
         module_locals: &mut walrus::ModuleLocals,
@@ -270,6 +382,96 @@ impl IU256 {
         }
 
         builder.local_get(pointer);
+    }
+
+    pub fn cast_from(
+        builder: &mut walrus::InstrSeqBuilder,
+        module_locals: &mut walrus::ModuleLocals,
+        original_type: IntermediateType,
+        memory: MemoryId,
+        allocator: FunctionId,
+    ) {
+        match original_type {
+            IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
+                let value_local = module_locals.add(ValType::I32);
+                builder.local_set(value_local);
+
+                let pointer = module_locals.add(ValType::I32);
+
+                builder.i32_const(32);
+                builder.call(allocator);
+                builder.local_tee(pointer);
+
+                builder.local_get(value_local);
+                builder.store(
+                    memory,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                builder.local_get(pointer);
+            }
+            IntermediateType::IU64 => {
+                let value_local = module_locals.add(ValType::I64);
+                builder.local_set(value_local);
+
+                let pointer = module_locals.add(ValType::I32);
+
+                builder.i32_const(32);
+                builder.call(allocator);
+                builder.local_tee(pointer);
+
+                builder.local_get(value_local);
+                builder.store(
+                    memory,
+                    StoreKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                builder.local_get(pointer);
+            }
+            IntermediateType::IU128 => {
+                let original_pointer = module_locals.add(ValType::I32);
+                builder.local_set(original_pointer);
+
+                let pointer = module_locals.add(ValType::I32);
+
+                builder.i32_const(32);
+                builder.call(allocator);
+                builder.local_set(pointer);
+
+                for i in 0..2 {
+                    builder.local_get(pointer);
+                    builder.local_get(original_pointer);
+                    builder.load(
+                        memory,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: i * 8,
+                        },
+                    );
+                    builder.store(
+                        memory,
+                        StoreKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: i * 8,
+                        },
+                    );
+                }
+
+                builder.local_get(pointer);
+            }
+            IntermediateType::IU256 => {}
+            t => panic!("type stack error: trying to cast {t:?}"),
+        }
     }
 
     pub fn add(
