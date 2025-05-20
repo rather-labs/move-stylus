@@ -25,6 +25,8 @@ mod uint_8 {
     sol!(
         #[allow(missing_docs)]
         function or(uint8 x, uint8 y) external returns (uint8);
+        function xor(uint8 x, uint8 y) external returns (uint8);
+        function and(uint8 x, uint8 y) external returns (uint8);
     );
 
     #[fixture]
@@ -53,6 +55,42 @@ mod uint_8 {
         let expected_result = <sol!((uint8,))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(xorCall::new((250, 250)), 0)]
+    #[case(xorCall::new((250, 50)), 200)]
+    #[case(xorCall::new((250, 0)), 250)]
+    #[case(xorCall::new((15, 240)), 255)]
+    #[case(xorCall::new((240, 15)), 255)]
+    #[case(xorCall::new((u8::MAX, u8::MAX)), 0)]
+    #[case(xorCall::new((0, 0)), 0)]
+    #[case(xorCall::new((u8::MAX, 0)), u8::MAX)]
+    fn test_uint_8_xor<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u8,
+    ) {
+        let expected_result = <sol!((uint8,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
+
+    #[rstest]
+    #[case(andCall::new((250, 250)), 250)]
+    #[case(andCall::new((250, 50)), 50)]
+    #[case(andCall::new((250, 0)), 0)]
+    #[case(andCall::new((15, 240)), 0)]
+    #[case(andCall::new((240, 15)), 0)]
+    #[case(andCall::new((u8::MAX, u8::MAX)), u8::MAX)]
+    #[case(andCall::new((0, 0)), 0)]
+    #[case(andCall::new((u8::MAX, 0)), 0)]
+    fn test_uint_8_and<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u8,
+    ) {
+        let expected_result = <sol!((uint8,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
 }
 
 mod uint_16 {
@@ -61,6 +99,8 @@ mod uint_16 {
     sol!(
         #[allow(missing_docs)]
         function or(uint16 x, uint16 y) external returns (uint16);
+        function xor(uint16 x, uint16 y) external returns (uint16);
+        function and(uint16 x, uint16 y) external returns (uint16);
     );
 
     #[fixture]
@@ -89,6 +129,40 @@ mod uint_16 {
         let expected_result = <sol!((uint16,))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(xorCall::new((1616, 1616)), 0)]
+    #[case(xorCall::new((1616, u8::MAX as u16 + 1)), u8::MAX as u16 + 1 + 1616)]
+    #[case(xorCall::new((1616, 0)), 1616)]
+    #[case(xorCall::new((u8::MAX as u16, u16::MAX - (u8::MAX as u16))), u16::MAX)]
+    #[case(xorCall::new((u16::MAX - (u8::MAX as u16), u8::MAX as u16)), u16::MAX)]
+    #[case(xorCall::new((0, 0)), 0)]
+    #[case(xorCall::new((u16::MAX, u16::MAX)), 0)]
+    fn test_uint_16_xor<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u16,
+    ) {
+        let expected_result = <sol!((uint16,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
+
+    #[rstest]
+    #[case(andCall::new((1616, 1616)), 1616)]
+    #[case(andCall::new((1616, u8::MAX as u16 + 1)), 0)]
+    #[case(andCall::new((1616, 0)), 0)]
+    #[case(andCall::new((u8::MAX as u16, u16::MAX - (u8::MAX as u16))), 0)]
+    #[case(andCall::new((u16::MAX - (u8::MAX as u16), u8::MAX as u16)), 0)]
+    #[case(andCall::new((0, 0)), 0)]
+    #[case(andCall::new((u16::MAX, u16::MAX)), u16::MAX)]
+    fn test_uint_16_and<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u16,
+    ) {
+        let expected_result = <sol!((uint16,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
 }
 
 mod uint_32 {
@@ -97,6 +171,8 @@ mod uint_32 {
     sol!(
         #[allow(missing_docs)]
         function or(uint32 x, uint32 y) external returns (uint32);
+        function xor(uint32 x, uint32 y) external returns (uint32);
+        function and(uint32 x, uint32 y) external returns (uint32);
     );
 
     #[fixture]
@@ -126,6 +202,40 @@ mod uint_32 {
         let expected_result = <sol!((uint32,))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(xorCall::new((3232, 3232)), 0)]
+    #[case(xorCall::new((3232, u16::MAX as u32 + 1)), u16::MAX as u32 + 1 + 3232)]
+    #[case(xorCall::new((3232, 0)), 3232)]
+    #[case(xorCall::new((u16::MAX as u32, u32::MAX - (u16::MAX as u32))), u32::MAX)]
+    #[case(xorCall::new((u32::MAX - (u16::MAX as u32), u16::MAX as u32)), u32::MAX)]
+    #[case(xorCall::new((0, 0)), 0)]
+    #[case(xorCall::new((u32::MAX, u32::MAX)), 0)]
+    fn test_uint_32_xor<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u32,
+    ) {
+        let expected_result = <sol!((uint32,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
+
+    #[rstest]
+    #[case(andCall::new((3232, 3232)), 3232)]
+    #[case(andCall::new((3232, u16::MAX as u32 + 1)), 0)]
+    #[case(andCall::new((3232, 0)), 0)]
+    #[case(andCall::new((u16::MAX as u32, u32::MAX - (u16::MAX as u32))), 0)]
+    #[case(andCall::new((u32::MAX - (u16::MAX as u32), u16::MAX as u32)), 0)]
+    #[case(andCall::new((0, 0)), 0)]
+    #[case(andCall::new((u32::MAX, u32::MAX)), u32::MAX)]
+    fn test_uint_32_and<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u32,
+    ) {
+        let expected_result = <sol!((uint32,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
 }
 
 mod uint_64 {
@@ -134,6 +244,8 @@ mod uint_64 {
     sol!(
         #[allow(missing_docs)]
         function or(uint64 x, uint64 y) external returns (uint64);
+        function xor(uint64 x, uint64 y) external returns (uint64);
+        function and(uint64 x, uint64 y) external returns (uint64);
     );
 
     #[fixture]
@@ -162,6 +274,40 @@ mod uint_64 {
         let expected_result = <sol!((uint64,))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(xorCall::new((6464, 6464)), 0)]
+    #[case(xorCall::new((6464, u32::MAX as u64 + 1)), u32::MAX as u64 + 1 + 6464)]
+    #[case(xorCall::new((6464, 0)), 6464)]
+    #[case(xorCall::new((u32::MAX as u64, u64::MAX - (u32::MAX as u64))), u64::MAX)]
+    #[case(xorCall::new((u64::MAX - (u32::MAX as u64), u32::MAX as u64)), u64::MAX)]
+    #[case(xorCall::new((0, 0)), 0)]
+    #[case(xorCall::new((u64::MAX, u64::MAX)), 0)]
+    fn test_uint_64_xor<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u64,
+    ) {
+        let expected_result = <sol!((uint64,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
+
+    #[rstest]
+    #[case(andCall::new((6464, 6464)), 6464)]
+    #[case(andCall::new((6464, u32::MAX as u64 + 1)), 0)]
+    #[case(andCall::new((6464, 0)), 0)]
+    #[case(andCall::new((u32::MAX as u64, u64::MAX - (u32::MAX as u64))), 0)]
+    #[case(andCall::new((u64::MAX - (u32::MAX as u64), u32::MAX as u64)), 0)]
+    #[case(andCall::new((0, 0)), 0)]
+    #[case(andCall::new((u64::MAX, u64::MAX)), u64::MAX)]
+    fn test_uint_64_and<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u64,
+    ) {
+        let expected_result = <sol!((uint64,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
 }
 
 mod uint_128 {
@@ -170,6 +316,8 @@ mod uint_128 {
     sol!(
         #[allow(missing_docs)]
         function or(uint128 x, uint128 y) external returns (uint128);
+        function xor(uint128 x, uint128 y) external returns (uint128);
+        function and(uint128 x, uint128 y) external returns (uint128);
     );
 
     #[fixture]
@@ -198,6 +346,40 @@ mod uint_128 {
         let expected_result = <sol!((uint128,))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(xorCall::new((128128, 128128)), 0)]
+    #[case(xorCall::new((128128, u64::MAX as u128 + 1)), u64::MAX as u128 + 1 + 128128)]
+    #[case(xorCall::new((128128, 0)), 128128)]
+    #[case(xorCall::new((u64::MAX as u128, u128::MAX - (u64::MAX as u128))), u128::MAX)]
+    #[case(xorCall::new((u128::MAX - (u64::MAX as u128), u64::MAX as u128)), u128::MAX)]
+    #[case(xorCall::new((0, 0)), 0)]
+    #[case(xorCall::new((u128::MAX, u128::MAX)), 0)]
+    fn test_uint_128_xor<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u128,
+    ) {
+        let expected_result = <sol!((uint128,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
+
+    #[rstest]
+    #[case(andCall::new((128128, 128128)), 128128)]
+    #[case(andCall::new((128128, u64::MAX as u128 + 1)), 0)]
+    #[case(andCall::new((128128, 0)), 0)]
+    #[case(andCall::new((u64::MAX as u128, u128::MAX - (u64::MAX as u128))), 0)]
+    #[case(andCall::new((u128::MAX - (u64::MAX as u128), u64::MAX as u128)), 0)]
+    #[case(andCall::new((0, 0)), 0)]
+    #[case(andCall::new((u128::MAX, u128::MAX)), u128::MAX)]
+    fn test_uint_128_and<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u128,
+    ) {
+        let expected_result = <sol!((uint128,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
 }
 
 mod uint_256 {
@@ -206,6 +388,8 @@ mod uint_256 {
     sol!(
         #[allow(missing_docs)]
         function or(uint256 x, uint256 y) external returns (uint256);
+        function xor(uint256 x, uint256 y) external returns (uint256);
+        function and(uint256 x, uint256 y) external returns (uint256);
     );
 
     #[fixture]
@@ -227,6 +411,40 @@ mod uint_256 {
     #[case(orCall::new((U256::from(0), U256::from(0))), U256::from(0))]
     #[case(orCall::new((U256::MAX, U256::MAX)), U256::MAX)]
     fn test_uint_256_or<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: U256,
+    ) {
+        let expected_result = <sol!((uint256,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
+
+    #[rstest]
+    #[case(xorCall::new((U256::from(256256), U256::from(256256))), U256::from(0))]
+    #[case(xorCall::new((U256::from(256256), U256::from(u128::MAX) + U256::from(1))), U256::from(u128::MAX) + U256::from(1) + U256::from(256256))]
+    #[case(xorCall::new((U256::from(256256), U256::from(0))), U256::from(256256))]
+    #[case(xorCall::new((U256::from(u128::MAX), U256::MAX - (U256::from(u128::MAX)))), U256::MAX)]
+    #[case(xorCall::new((U256::MAX - (U256::from(u128::MAX)), U256::from(u128::MAX))), U256::MAX)]
+    #[case(xorCall::new((U256::from(0), U256::from(0))), U256::from(0))]
+    #[case(xorCall::new((U256::MAX, U256::MAX)), U256::from(0))]
+    fn test_uint_256_xor<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: U256,
+    ) {
+        let expected_result = <sol!((uint256,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
+
+    #[rstest]
+    #[case(andCall::new((U256::from(256256), U256::from(256256))), U256::from(256256))]
+    #[case(andCall::new((U256::from(256256), U256::from(u128::MAX) + U256::from(1))), U256::from(0))]
+    #[case(andCall::new((U256::from(256256), U256::from(0))), U256::from(0))]
+    #[case(andCall::new((U256::from(u128::MAX), U256::MAX - (U256::from(u128::MAX)))), U256::from(0))]
+    #[case(andCall::new((U256::MAX - (U256::from(u128::MAX)), U256::from(u128::MAX))), U256::from(0))]
+    #[case(andCall::new((U256::from(0), U256::from(0))), U256::from(0))]
+    #[case(andCall::new((U256::MAX, U256::MAX)), U256::MAX)]
+    fn test_uint_256_and<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: U256,
