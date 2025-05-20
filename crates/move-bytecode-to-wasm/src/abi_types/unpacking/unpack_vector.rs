@@ -308,7 +308,6 @@ mod tests {
 
         let result = entrypoint.call(&mut store, ()).unwrap();
         assert_eq!(result, data.len() as i32);
-
         let global_next_free_memory_pointer = global_next_free_memory_pointer
             .get(&mut store)
             .i32()

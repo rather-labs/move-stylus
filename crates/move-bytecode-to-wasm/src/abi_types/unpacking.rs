@@ -5,11 +5,13 @@ use crate::translation::intermediate_types::{
     address::IAddress,
     boolean::IBool,
     heap_integers::{IU128, IU256},
+    imm_reference::IRef,
     simple_integers::{IU8, IU16, IU32, IU64},
     vector::IVector,
 };
 
 mod unpack_heap_int;
+mod unpack_imm_reference;
 mod unpack_native_int;
 mod unpack_vector;
 
@@ -154,6 +156,15 @@ impl Unpackable for IntermediateType {
             // The signer must not be unpacked here, since it can't be part of the calldata. It is
             // injected directly by the VM into the stack
             IntermediateType::ISigner => (),
+            IntermediateType::IRef(inner) => IRef::add_unpack_instructions(
+                inner,
+                function_builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                memory,
+                allocator,
+            ),
         }
     }
 }

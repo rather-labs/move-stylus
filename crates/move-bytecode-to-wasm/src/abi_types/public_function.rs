@@ -2,7 +2,7 @@ use walrus::{FunctionId, InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp
 
 use crate::translation::{
     functions::add_unpack_function_return_values_instructions,
-    intermediate_types::{signer::ISigner, ISignature, IntermediateType},
+    intermediate_types::{ISignature, IntermediateType, signer::ISigner},
 };
 
 use super::{
@@ -87,27 +87,22 @@ impl PublicFunction {
             // first parameter
             match self.signature.arguments.first() {
                 Some(IntermediateType::ISigner) => {
-                    let signer_pointer = module.locals.add(ValType::I32);
-                    block.i32_const(ISigner::HEAP_SIZE);
-                    block.call(allocator_func);
-                    block.local_tee(signer_pointer);
-                    // We add 12 to the pointer returned by the allocator because stylus writes 20
-                    // bytes, and those bytes need to be at the end.
-                    block.i32_const(12);
-                    block.binop(BinaryOp::I32Add);
-                    block.call(tx_origin_function);
-                    block.local_get(signer_pointer);
-
-                    // If we are building in debug mode, we call `emit_log` to log the signer's
-                    // address. This is useful for debugging in this stage.
-                    // TODO: Remove this when is no longer necessary
-                    #[cfg(debug_assertions)]
-                    {
-                        block.local_get(signer_pointer);
-                        block.i32_const(ISigner::HEAP_SIZE);
-                        block.i32_const(0);
-                        block.call(emit_log_function);
-                    }
+                    self.handle_signer(
+                        block,
+                        module,
+                        allocator_func,
+                        tx_origin_function,
+                        emit_log_function,
+                    );
+                }
+                Some(IntermediateType::IRef(inner)) if **inner == IntermediateType::ISigner => {
+                    self.handle_signer(
+                        block,
+                        module,
+                        allocator_func,
+                        tx_origin_function,
+                        emit_log_function,
+                    );
                 }
                 _ => {
                     // If there's no signer, reduce args length by 4 bytes to exclude selector,
@@ -226,6 +221,37 @@ impl PublicFunction {
                 Self::find_signature_type(intermediate_type)
             }
             _ => false,
+        }
+    }
+
+    fn handle_signer(
+        &self,
+        block: &mut InstrSeqBuilder,
+        module: &mut Module,
+        allocator_func: FunctionId,
+        tx_origin_function: FunctionId,
+        #[cfg(debug_assertions)] emit_log_function: FunctionId,
+    ) {
+        let signer_pointer = module.locals.add(ValType::I32);
+        block.i32_const(ISigner::HEAP_SIZE);
+        block.call(allocator_func);
+        block.local_tee(signer_pointer);
+        // We add 12 to the pointer returned by the allocator because stylus writes 20
+        // bytes, and those bytes need to be at the end.
+        block.i32_const(12);
+        block.binop(BinaryOp::I32Add);
+        block.call(tx_origin_function);
+        block.local_get(signer_pointer);
+
+        // If we are building in debug mode, we call `emit_log` to log the signer's
+        // address. This is useful for debugging in this stage.
+        // TODO: Remove this when is no longer necessary
+        #[cfg(debug_assertions)]
+        {
+            block.local_get(signer_pointer);
+            block.i32_const(ISigner::HEAP_SIZE);
+            block.i32_const(0);
+            block.call(emit_log_function);
         }
     }
 }

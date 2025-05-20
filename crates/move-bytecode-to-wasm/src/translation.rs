@@ -117,10 +117,9 @@ fn map_bytecode_instruction(
             add_unpack_function_return_values_instructions(
                 builder,
                 module_locals,
-                &mapped_function.signature.returns,
+                &functions_returns[function_handle_index.0 as usize],
                 memory,
             );
-
             // Insert in the stack types the types returned by the function (if any)
             let return_types = &functions_returns[function_handle_index.0 as usize];
             for return_type in return_types {
@@ -174,6 +173,39 @@ fn map_bytecode_instruction(
 
             types_stack.push(IntermediateType::IVector(Box::new(inner)));
         }
+        Bytecode::ImmBorrowLoc(local_id) => {
+            let local = mapped_function.local_variables[*local_id as usize];
+            let local_type = &mapped_function.local_variables_type[*local_id as usize];
+
+            local_type.add_imm_borrow_loc_instructions(
+                module_locals,
+                builder,
+                allocator,
+                memory,
+                local,
+            );
+
+            // Push the reference to the type into the types stack
+            types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
+        }
+
+        Bytecode::ReadRef => {
+            let ref_type = types_stack
+                .pop()
+                .expect("ReadRef expects a reference on the stack");
+
+            match ref_type {
+                IntermediateType::IRef(inner) => {
+                    // Now call directly on the inner type
+                    inner.add_read_ref_instructions(builder, memory);
+
+                    // And push the inner type into the stack
+                    types_stack.push(*inner);
+                }
+                _ => panic!("ReadRef expected a IRef type but got: {:?}", ref_type),
+            }
+        }
+
         Bytecode::Pop => {
             builder.drop();
             types_stack
@@ -223,6 +255,16 @@ fn map_bytecode_instruction(
             IU64::cast_from(builder, module_locals, original_type, memory);
             types_stack.push(IntermediateType::IU64);
         }
+        Bytecode::CastU128 => {
+            let original_type = types_stack.pop().unwrap();
+            IU128::cast_from(builder, module_locals, original_type, memory, allocator);
+            types_stack.push(IntermediateType::IU128);
+        }
+        Bytecode::CastU256 => {
+            let original_type = types_stack.pop().unwrap();
+            IU256::cast_from(builder, module_locals, original_type, memory, allocator);
+            types_stack.push(IntermediateType::IU256);
+        }
         Bytecode::Add => {
             let sum_type = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
                 assert_eq!(
@@ -239,8 +281,8 @@ fn map_bytecode_instruction(
                 IntermediateType::IU16 => IU16::add(builder, module_locals),
                 IntermediateType::IU32 => IU32::add(builder, module_locals),
                 IntermediateType::IU64 => IU64::add(builder, module_locals),
-                IntermediateType::IU128 => todo!(),
-                IntermediateType::IU256 => todo!(),
+                IntermediateType::IU128 => IU128::add(builder, module_locals, memory, allocator),
+                IntermediateType::IU256 => IU256::add(builder, module_locals, memory, allocator),
                 t => panic!("type stack error: trying to add two {t:?}"),
             }
 
