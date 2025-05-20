@@ -11,3 +11,9 @@ public fun fn_2(): vector<u8> {
     let x = v[0];  
     x
 }
+
+public fun get_element(index: u64): vector<u8> {
+    let v = vector[10u8, 20u8];
+    let x = v[index];  
+    vector[x]
+}
