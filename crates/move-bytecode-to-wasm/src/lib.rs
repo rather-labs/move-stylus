@@ -7,7 +7,7 @@ use translation::{
     functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
     translate_function,
 };
-use walrus::{Module, RefType, ValType};
+use walrus::{ElementKind, Module, RefType, ValType};
 use wasm_validation::validate_stylus_wasm;
 
 mod abi_types;
@@ -109,10 +109,17 @@ pub fn translate_package(
                 &root_compiled_module.signatures,
             );
 
-            function_table.add(&mut module, mapped_function, wasm_arguments, wasm_returns, function_def.function);
+            function_table.add(
+                &mut module,
+                mapped_function,
+                wasm_arguments,
+                wasm_returns,
+                function_def.function,
+            );
         }
 
         let mut public_functions = Vec::new();
+        let mut function_ids = Vec::new();
         let mut index = 0;
         while index < function_table.len() {
             let function_id = translate_function(
@@ -124,22 +131,33 @@ pub fn translate_package(
                 &function_table,
                 memory_id,
                 allocator_func,
-            ).unwrap()
+            )
+            .unwrap();
 
-            let mapped_function = &function_table.get(index).unwrap().function;
+            let entry = function_table.get(index).unwrap();
+            let mapped_function = &entry.function;
 
             if mapped_function.move_definition.visibility == Visibility::Public {
                 public_functions.push(PublicFunction::new(
                     function_id,
                     &mapped_function.name,
-                    mapped_function.signature,
+                    &mapped_function.signature,
                 ));
             }
+
+            function_ids.push(function_id);
 
             index += 1;
         }
 
         hostio::build_entrypoint_router(&mut module, allocator_func, memory_id, &public_functions);
+
+        // Fill the WASM table with the function ids
+        for (index, function_id) in function_ids.into_iter().enumerate() {
+            function_table
+                .add_to_wasm_table(&mut module, index, function_id)
+                .expect("there was an error adding the module's functions to the function table");
+        }
 
         validate_stylus_wasm(&mut module).unwrap();
 

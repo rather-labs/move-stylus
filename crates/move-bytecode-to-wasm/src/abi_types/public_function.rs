@@ -1,12 +1,12 @@
-use walrus::{FunctionId, InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
+use walrus::{ir::BinaryOp, FunctionId, InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::translation::{
     functions::add_unpack_function_return_values_instructions,
-    intermediate_types::{ISignature, IntermediateType, signer::ISigner},
+    intermediate_types::{signer::ISigner, ISignature, IntermediateType},
 };
 
 use super::{
-    function_encoding::{AbiFunctionSelector, move_signature_to_abi_selector},
+    function_encoding::{move_signature_to_abi_selector, AbiFunctionSelector},
     packing::build_pack_instructions,
     unpacking::build_unpack_instructions,
 };
@@ -27,14 +27,14 @@ pub enum PublicFunctionValidationError {
 ///
 /// It allows functions to be executed as contracts calls, by unpacking the arguments using `read_args` from the host,
 /// injecting these arguments in the functions and packing the return values using `write_result` host function.
-pub struct PublicFunction {
+pub struct PublicFunction<'a> {
     function_id: FunctionId,
     function_selector: AbiFunctionSelector,
-    signature: ISignature,
+    signature: &'a ISignature,
 }
 
-impl PublicFunction {
-    pub fn new(function_id: FunctionId, function_name: &str, signature: ISignature) -> Self {
+impl<'a> PublicFunction<'a> {
+    pub fn new(function_id: FunctionId, function_name: &str, signature: &'a ISignature) -> Self {
         Self::check_signature_arguments(function_name, &signature.arguments)
             .unwrap_or_else(|e| panic!("ABI error: {e}"));
 
@@ -260,8 +260,8 @@ impl PublicFunction {
 mod tests {
     use alloy::{dyn_abi::SolType, sol};
     use walrus::{
-        FunctionBuilder, MemoryId, ModuleConfig,
         ir::{LoadKind, MemArg},
+        FunctionBuilder, MemoryId, ModuleConfig,
     };
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
@@ -494,7 +494,7 @@ mod tests {
         let public_function = PublicFunction::new(
             function,
             "test_function",
-            ISignature {
+            &ISignature {
                 arguments: vec![
                     IntermediateType::IBool,
                     IntermediateType::IU16,
