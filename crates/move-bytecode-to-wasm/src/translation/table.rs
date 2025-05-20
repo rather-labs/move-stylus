@@ -51,6 +51,9 @@ impl<'a> FunctionTable<'a> {
             function_handle_index,
             added_to_wasm_table: false,
         });
+
+        let table = module.tables.get_mut(self.table_id);
+        table.initial = self.entries.len() as u64;
     }
 
     pub fn add_to_wasm_table(

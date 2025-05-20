@@ -63,8 +63,7 @@ pub fn translate_function(
         );
     }
 
-    let func_body_id = builder.id();
-    function.func_body().instr(Block { seq: func_body_id });
+    *function.func_body().instrs_mut() = builder.instrs().to_vec();
 
     let function_id = function.finish(entry.function.arg_local_ids.clone(), &mut module.funcs);
 
