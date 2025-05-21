@@ -1,6 +1,6 @@
 use walrus::{
-    FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
     ir::{MemArg, StoreKind},
+    FunctionId, InstrSeqBuilder, MemoryId, Module, ValType,
 };
 
 #[derive(Clone, Copy)]
@@ -8,7 +8,7 @@ pub struct IAddress;
 
 impl IAddress {
     pub fn load_constant_instructions(
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
         allocator: FunctionId,
@@ -19,7 +19,7 @@ impl IAddress {
         // Ensure the first 12 bytes are 0. Abi encoding restricts the address to be 20 bytes
         assert!(bytes[0..12].iter().all(|b| *b == 0));
 
-        let pointer = module_locals.add(ValType::I32);
+        let pointer = module.locals.add(ValType::I32);
 
         builder.i32_const(bytes.len() as i32);
         builder.call(allocator);

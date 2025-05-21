@@ -1,7 +1,7 @@
-use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType, ir::BinaryOp};
+use walrus::{ir::BinaryOp, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType};
 
-use super::{Packable, pack_native_int::pack_i32_type_instructions};
-use crate::translation::intermediate_types::{IntermediateType, vector::IVector};
+use super::{pack_native_int::pack_i32_type_instructions, Packable};
+use crate::translation::intermediate_types::{vector::IVector, IntermediateType};
 
 impl IVector {
     #[allow(clippy::too_many_arguments)]
@@ -18,12 +18,8 @@ impl IVector {
         let data_pointer = module.locals.add(ValType::I32);
         let inner_data_reference = module.locals.add(ValType::I32);
 
-        let length = IntermediateType::IU32.add_load_memory_to_local_instructions(
-            &mut module.locals,
-            block,
-            local,
-            memory,
-        );
+        let length = IntermediateType::IU32
+            .add_load_memory_to_local_instructions(module, block, local, memory);
 
         // Allocate memory for the packed value, this will be allocate at the end of calldata
         block.local_get(length);
@@ -70,12 +66,8 @@ impl IVector {
         block.loop_(None, |loop_block| {
             let loop_block_id = loop_block.id();
 
-            let inner_local = inner.add_load_memory_to_local_instructions(
-                &mut module.locals,
-                loop_block,
-                local,
-                memory,
-            );
+            let inner_local =
+                inner.add_load_memory_to_local_instructions(module, loop_block, local, memory);
 
             inner.add_pack_instructions(
                 loop_block,

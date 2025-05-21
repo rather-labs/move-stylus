@@ -1,6 +1,6 @@
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
+    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
 };
 
 use super::IntermediateType;
@@ -11,7 +11,7 @@ pub struct IVector;
 impl IVector {
     pub fn load_constant_instructions(
         inner: &IntermediateType,
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
         allocator: FunctionId,
@@ -25,7 +25,7 @@ impl IVector {
         // Vec len as i32 + data size * vec len
         let needed_bytes = 4 + data_size * (vec_len as usize);
 
-        let pointer = module_locals.add(ValType::I32);
+        let pointer = module.locals.add(ValType::I32);
 
         builder.i32_const(needed_bytes as i32);
         builder.call(allocator);
@@ -47,7 +47,7 @@ impl IVector {
         builder.local_get(pointer);
         while (store_offset as usize) < needed_bytes {
             // Load the inner type
-            inner.load_constant_instructions(module_locals, builder, bytes, allocator, memory);
+            inner.load_constant_instructions(module, builder, bytes, allocator, memory);
 
             if data_size == 4 {
                 // Store i32
@@ -88,18 +88,18 @@ impl IVector {
 
     pub fn copy_loc_instructions(
         inner: &IntermediateType,
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         builder: &mut InstrSeqBuilder,
         allocator: FunctionId,
         memory: MemoryId,
         src_local: LocalId,
     ) {
         // === Local declarations ===
-        let dst_local = module_locals.add(ValType::I32);
-        let temp_local = module_locals.add(inner.to_wasm_type());
+        let dst_local = module.locals.add(ValType::I32);
+        let temp_local = module.locals.add(inner.to_wasm_type());
 
-        let index = module_locals.add(ValType::I32);
-        let len = module_locals.add(ValType::I32);
+        let index = module.locals.add(ValType::I32);
+        let len = module.locals.add(ValType::I32);
 
         let data_size = inner.stack_data_size() as i32;
 
@@ -172,7 +172,7 @@ impl IVector {
             loop_block.binop(BinaryOp::I32Add);
 
             // === Copy element recursively ===
-            inner.copy_loc_instructions(module_locals, loop_block, allocator, memory, temp_local);
+            inner.copy_loc_instructions(module, loop_block, allocator, memory, temp_local);
 
             // === Store result from stack into memory ===
             loop_block.store(
@@ -205,15 +205,15 @@ impl IVector {
 
     pub fn vec_pack_instructions(
         inner: &IntermediateType,
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         builder: &mut InstrSeqBuilder,
         allocator: FunctionId,
         memory: MemoryId,
         num_elements: i32,
     ) {
         let data_size = inner.stack_data_size() as i32;
-        let ptr_local = module_locals.add(ValType::I32);
-        let temp_local = module_locals.add(inner.to_wasm_type());
+        let ptr_local = module.locals.add(ValType::I32);
+        let temp_local = module.locals.add(inner.to_wasm_type());
 
         // Total size = 4 + data_size * num_elements
         builder.i32_const(4 + data_size * num_elements);
@@ -256,13 +256,12 @@ impl IVector {
 
     pub fn add_vec_imm_borrow_instructions(
         inner: &IntermediateType,
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        allocator: FunctionId,
         memory: MemoryId,
     ) {
         let size = inner.stack_data_size() as i32;
-        let index_i64 = module_locals.add(ValType::I64); // referenced element index
+        let index_i64 = module.locals.add(ValType::I64); // referenced element index
         builder.local_set(index_i64); // index is on top of stack (as i64)
 
         // Trap if index > u32::MAX
@@ -276,14 +275,14 @@ impl IVector {
         });
 
         //  Cast index to i32
-        let index_i32 = module_locals.add(ValType::I32);
+        let index_i32 = module.locals.add(ValType::I32);
         builder
             .local_get(index_i64)
             .unop(UnaryOp::I32WrapI64)
             .local_set(index_i32);
 
         // Set vector base address
-        let vector_address = module_locals.add(ValType::I32);
+        let vector_address = module.locals.add(ValType::I32);
         builder.local_set(vector_address);
 
         // Trap if index >= length
@@ -398,7 +397,7 @@ mod tests {
         let data = data.to_vec();
         IVector::load_constant_instructions(
             &inner_type,
-            &mut raw_module.locals,
+            &mut raw_module,
             &mut builder,
             &mut data.into_iter(),
             allocator,
@@ -435,7 +434,7 @@ mod tests {
         // Load the constant vector and store in local
         IVector::load_constant_instructions(
             &inner_type,
-            &mut raw_module.locals,
+            &mut raw_module,
             &mut builder,
             &mut data_iter.into_iter(),
             allocator,
@@ -446,7 +445,7 @@ mod tests {
         // Copy the vector and return the new pointer
         IVector::copy_loc_instructions(
             &inner_type,
-            &mut raw_module.locals,
+            &mut raw_module,
             &mut builder,
             allocator,
             memory_id,
@@ -484,7 +483,7 @@ mod tests {
         for element_bytes in elements.iter() {
             let mut data_iter = element_bytes.clone().into_iter();
             inner_type.load_constant_instructions(
-                &mut raw_module.locals,
+                &mut raw_module,
                 &mut builder,
                 &mut data_iter,
                 allocator,
@@ -494,7 +493,7 @@ mod tests {
 
         IVector::vec_pack_instructions(
             &inner_type,
-            &mut raw_module.locals,
+            &mut raw_module,
             &mut builder,
             allocator,
             memory_id,

@@ -1,6 +1,6 @@
 use walrus::{
-    InstrSeqBuilder, MemoryId, ValType,
     ir::{BinaryOp, LoadKind, MemArg, UnaryOp},
+    InstrSeqBuilder, MemoryId, ValType,
 };
 
 use crate::wasm_helpers::{load_i32_from_bytes_instructions, load_i64_from_bytes_instructions};
@@ -23,9 +23,9 @@ impl IU8 {
 
     fn add_check_overflow_instructions(
         builder: &mut walrus::InstrSeqBuilder,
-        module_locals: &mut walrus::ModuleLocals,
+        module: &mut walrus::Module,
     ) {
-        let tmp = module_locals.add(walrus::ValType::I32);
+        let tmp = module.locals.add(walrus::ValType::I32);
         builder.local_tee(tmp);
         builder.i32_const(Self::MAX_VALUE);
         builder.binop(BinaryOp::I32GtU);
@@ -45,14 +45,14 @@ impl IU8 {
     /// Along with the addition code to check overflow is added. If the result is greater than 255
     /// then the execution is aborted This check is poosible because interally we are using
     /// 32bits integers.
-    pub fn add(builder: &mut walrus::InstrSeqBuilder, module_locals: &mut walrus::ModuleLocals) {
+    pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
         builder.binop(BinaryOp::I32Add);
-        Self::add_check_overflow_instructions(builder, module_locals);
+        Self::add_check_overflow_instructions(builder, module);
     }
 
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
-        module_locals: &mut walrus::ModuleLocals,
+        module: &mut walrus::Module,
         original_type: IntermediateType,
         memory: MemoryId,
     ) {
@@ -60,19 +60,19 @@ impl IU8 {
             IntermediateType::IU8 => {}
             IntermediateType::IU16 | IntermediateType::IU32 => {
                 // Just check for overflow and leave the value in the stack again
-                Self::add_check_overflow_instructions(builder, module_locals);
+                Self::add_check_overflow_instructions(builder, module);
             }
             IntermediateType::IU64 => {
                 builder.unop(UnaryOp::I32WrapI64);
-                Self::add_check_overflow_instructions(builder, module_locals);
+                Self::add_check_overflow_instructions(builder, module);
             }
             IntermediateType::IU128 => {
-                downcast_u128_to_u32(builder, module_locals, memory);
-                Self::add_check_overflow_instructions(builder, module_locals);
+                downcast_u128_to_u32(builder, module, memory);
+                Self::add_check_overflow_instructions(builder, module);
             }
             IntermediateType::IU256 => {
-                downcast_u256_to_u32(builder, module_locals, memory);
-                Self::add_check_overflow_instructions(builder, module_locals);
+                downcast_u256_to_u32(builder, module, memory);
+                Self::add_check_overflow_instructions(builder, module);
             }
             t => panic!("type stack error: trying to cast {t:?}"),
         }
@@ -95,9 +95,9 @@ impl IU16 {
 
     fn add_check_overflow_instructions(
         builder: &mut walrus::InstrSeqBuilder,
-        module_locals: &mut walrus::ModuleLocals,
+        module: &mut walrus::Module,
     ) {
-        let tmp = module_locals.add(walrus::ValType::I32);
+        let tmp = module.locals.add(walrus::ValType::I32);
         builder.local_tee(tmp);
         builder.i32_const(Self::MAX_VALUE);
         builder.binop(BinaryOp::I32GtU);
@@ -117,14 +117,14 @@ impl IU16 {
     /// Along with the addition code to check overflow is added. If the result is greater than
     /// 65535 then the execution is aborted. This check is poosible because interally we are using
     /// 32bits integers.
-    pub fn add(builder: &mut walrus::InstrSeqBuilder, module_locals: &mut walrus::ModuleLocals) {
+    pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
         builder.binop(BinaryOp::I32Add);
-        Self::add_check_overflow_instructions(builder, module_locals);
+        Self::add_check_overflow_instructions(builder, module);
     }
 
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
-        module_locals: &mut walrus::ModuleLocals,
+        module: &mut walrus::Module,
         original_type: IntermediateType,
         memory: MemoryId,
     ) {
@@ -132,19 +132,19 @@ impl IU16 {
             IntermediateType::IU8 | IntermediateType::IU16 => {}
             IntermediateType::IU32 => {
                 // Just check for overflow and leave the value in the stack again
-                Self::add_check_overflow_instructions(builder, module_locals);
+                Self::add_check_overflow_instructions(builder, module);
             }
             IntermediateType::IU64 => {
                 builder.unop(UnaryOp::I32WrapI64);
-                Self::add_check_overflow_instructions(builder, module_locals);
+                Self::add_check_overflow_instructions(builder, module);
             }
             IntermediateType::IU128 => {
-                downcast_u128_to_u32(builder, module_locals, memory);
-                Self::add_check_overflow_instructions(builder, module_locals);
+                downcast_u128_to_u32(builder, module, memory);
+                Self::add_check_overflow_instructions(builder, module);
             }
             IntermediateType::IU256 => {
-                downcast_u256_to_u32(builder, module_locals, memory);
-                Self::add_check_overflow_instructions(builder, module_locals);
+                downcast_u256_to_u32(builder, module, memory);
+                Self::add_check_overflow_instructions(builder, module);
             }
             t => panic!("type stack error: trying to cast {t:?}"),
         }
@@ -175,10 +175,10 @@ impl IU32 {
     /// NOTE: We use two temporal local variables to do the checks (n1, n2). If a program contains
     /// a lot of additions we will add two local variables per addition. We can optimize this by
     /// tracking and reuse the same ones used in the first addition found.
-    pub fn add(builder: &mut walrus::InstrSeqBuilder, module_locals: &mut walrus::ModuleLocals) {
-        let res = module_locals.add(ValType::I32);
-        let n1 = module_locals.add(ValType::I32);
-        let n2 = module_locals.add(ValType::I32);
+    pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let res = module.locals.add(ValType::I32);
+        let n1 = module.locals.add(ValType::I32);
+        let n2 = module.locals.add(ValType::I32);
 
         // Set the two opends to local variables and reinsert them to the stack to operate them
         builder.local_set(n1);
@@ -214,7 +214,7 @@ impl IU32 {
 
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
-        module_locals: &mut walrus::ModuleLocals,
+        module: &mut walrus::Module,
         original_type: IntermediateType,
         memory: MemoryId,
     ) {
@@ -222,7 +222,7 @@ impl IU32 {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {}
             IntermediateType::IU64 => {
                 // Check first that the i64 fits in an i32
-                let tmp = module_locals.add(walrus::ValType::I64);
+                let tmp = module.locals.add(walrus::ValType::I64);
                 builder.local_tee(tmp);
                 builder.i64_const(Self::MAX_VALUE);
                 builder.binop(BinaryOp::I64GtU);
@@ -239,10 +239,10 @@ impl IU32 {
                 builder.unop(UnaryOp::I32WrapI64);
             }
             IntermediateType::IU128 => {
-                downcast_u128_to_u32(builder, module_locals, memory);
+                downcast_u128_to_u32(builder, module, memory);
             }
             IntermediateType::IU256 => {
-                downcast_u256_to_u32(builder, module_locals, memory);
+                downcast_u256_to_u32(builder, module, memory);
             }
             t => panic!("type stack error: trying to cast {t:?}"),
         }
@@ -271,10 +271,10 @@ impl IU64 {
     /// NOTE: We use two temporal local variables to do the checks (n1, n2). If a program contains
     /// a lot of additions we will add two local variables per addition. We can optimize this by
     /// tracking and reuse the same ones used in the first addition found.
-    pub fn add(builder: &mut walrus::InstrSeqBuilder, module_locals: &mut walrus::ModuleLocals) {
-        let res = module_locals.add(ValType::I64);
-        let n1 = module_locals.add(ValType::I64);
-        let n2 = module_locals.add(ValType::I64);
+    pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let res = module.locals.add(ValType::I64);
+        let n1 = module.locals.add(ValType::I64);
+        let n2 = module.locals.add(ValType::I64);
 
         // Set the two opends to local variables and reinsert them to the stack to operate them
         builder.local_set(n1);
@@ -309,7 +309,7 @@ impl IU64 {
 
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
-        module_locals: &mut walrus::ModuleLocals,
+        module: &mut walrus::Module,
         original_type: IntermediateType,
         memory: MemoryId,
     ) {
@@ -319,7 +319,7 @@ impl IU64 {
             }
             IntermediateType::IU64 => {}
             IntermediateType::IU128 => {
-                let reader_pointer = module_locals.add(ValType::I32);
+                let reader_pointer = module.locals.add(ValType::I32);
                 builder.local_tee(reader_pointer);
                 builder.load(
                     memory,
@@ -350,7 +350,7 @@ impl IU64 {
                 });
             }
             IntermediateType::IU256 => {
-                let reader_pointer = module_locals.add(ValType::I32);
+                let reader_pointer = module.locals.add(ValType::I32);
                 builder.local_tee(reader_pointer);
                 builder.load(
                     memory,
@@ -389,10 +389,10 @@ impl IU64 {
 
 fn downcast_u128_to_u32(
     builder: &mut walrus::InstrSeqBuilder,
-    module_locals: &mut walrus::ModuleLocals,
+    module: &mut walrus::Module,
     memory: MemoryId,
 ) {
-    let reader_pointer = module_locals.add(ValType::I32);
+    let reader_pointer = module.locals.add(ValType::I32);
     builder.local_tee(reader_pointer);
     builder.load(
         memory,
@@ -427,10 +427,10 @@ fn downcast_u128_to_u32(
 
 fn downcast_u256_to_u32(
     builder: &mut walrus::InstrSeqBuilder,
-    module_locals: &mut walrus::ModuleLocals,
+    module: &mut walrus::Module,
     memory: MemoryId,
 ) {
-    let reader_pointer = module_locals.add(ValType::I32);
+    let reader_pointer = module.locals.add(ValType::I32);
     builder.local_tee(reader_pointer);
     builder.load(
         memory,

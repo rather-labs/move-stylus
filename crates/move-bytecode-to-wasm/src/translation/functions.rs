@@ -2,7 +2,7 @@ use anyhow::Result;
 use move_binary_format::file_format::{CodeUnit, FunctionDefinition, Signature};
 use walrus::{
     ir::{LoadKind, MemArg, StoreKind},
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ModuleLocals, ValType,
+    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
 };
 
 use crate::translation::intermediate_types::ISignature;
@@ -91,7 +91,7 @@ impl<'a> MappedFunction<'a> {
 /// The returns values are read from memory and pushed to the stack
 pub fn add_unpack_function_return_values_instructions(
     builder: &mut InstrSeqBuilder,
-    module_locals: &mut ModuleLocals,
+    module: &mut Module,
     returns: &[IntermediateType],
     memory: MemoryId,
 ) {
@@ -99,7 +99,7 @@ pub fn add_unpack_function_return_values_instructions(
         return;
     }
 
-    let pointer = module_locals.add(ValType::I32);
+    let pointer = module.locals.add(ValType::I32);
     builder.local_set(pointer);
 
     let mut offset = 0;
@@ -129,7 +129,7 @@ pub fn add_unpack_function_return_values_instructions(
 /// This is necessary because the Stylus VM does not support multiple return values
 /// Values are written to memory and a pointer to the first value is returned
 pub fn prepare_function_return(
-    module_locals: &mut ModuleLocals,
+    module: &mut Module,
     builder: &mut InstrSeqBuilder,
     returns: &[IntermediateType],
     memory: MemoryId,
@@ -139,13 +139,13 @@ pub fn prepare_function_return(
         let mut locals = Vec::new();
         let mut total_size = 0;
         for return_ty in returns.iter().rev() {
-            let local = return_ty.add_stack_to_local_instructions(module_locals, builder);
+            let local = return_ty.add_stack_to_local_instructions(module, builder);
             locals.push(local);
             total_size += return_ty.stack_data_size();
         }
         locals.reverse();
 
-        let pointer = module_locals.add(ValType::I32);
+        let pointer = module.locals.add(ValType::I32);
 
         builder.i32_const(total_size as i32);
         builder.call(allocator);

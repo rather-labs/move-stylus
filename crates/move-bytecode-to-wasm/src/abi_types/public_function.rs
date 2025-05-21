@@ -158,7 +158,7 @@ impl<'a> PublicFunction<'a> {
         block.call(self.function_id);
         add_unpack_function_return_values_instructions(
             block,
-            &mut module.locals,
+            module,
             &self.signature.returns,
             memory_id,
         );
@@ -481,7 +481,7 @@ mod tests {
             IntermediateType::IU64,
         ];
         prepare_function_return(
-            &mut raw_module.locals,
+            &mut raw_module,
             &mut func_body,
             &returns,
             memory_id,
@@ -550,7 +550,7 @@ mod tests {
 
         let returns = vec![IntermediateType::IU8, IntermediateType::ISigner];
         prepare_function_return(
-            &mut raw_module.locals,
+            &mut raw_module,
             &mut func_body,
             &returns,
             memory_id,
