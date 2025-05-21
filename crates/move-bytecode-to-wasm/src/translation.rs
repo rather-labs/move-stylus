@@ -189,20 +189,13 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
         }
         Bytecode::VecImmBorrow(signature_index) => {
-            // Pop index and vector reference from type stack
-            types_stack.pop().unwrap(); // u64
-            let ref_vec_type = types_stack.pop().unwrap(); // &vector<T>
-
-            // Ensure the popped value is a reference to a vector
-            if let IntermediateType::IRef(inner) = ref_vec_type {
-                if let IntermediateType::IVector(_) = &*inner {
-                    // valid
-                } else {
-                    panic!("Expected a reference to a vector type");
-                }
-            } else {
-                panic!("Expected a reference type");
-            }
+           
+            match (types_stack.pop(), types_stack.pop()) {
+                (Some(IntermediateType::IU64), Some(IntermediateType::IRef(inner)))
+                    if matches!(*inner, IntermediateType::IVector(_)) => (),
+                (Some(t1), Some(t2)) => panic!("Expected IU64 and &vector<_>, got {t1:?} and {t2:?}"),
+                _ => panic!("Type stack underflow"),
+            }            
 
             let inner_type =
                 get_intermediate_type_for_signature_index(mapped_function, *signature_index);
