@@ -1,6 +1,6 @@
 use walrus::{
     FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 use super::IntermediateType;
@@ -252,6 +252,97 @@ impl IVector {
         }
 
         builder.local_get(ptr_local);
+    }
+
+    pub fn add_vec_imm_borrow_instructions(
+        inner: &IntermediateType,
+        module_locals: &mut ModuleLocals,
+        builder: &mut InstrSeqBuilder,
+        allocator: FunctionId,
+        memory: MemoryId,
+    ) {
+        let size = inner.stack_data_size() as i32;
+        let index_i64 = module_locals.add(ValType::I64); // referenced element index
+        builder.local_set(index_i64); // index is on top of stack (as i64)
+
+        // Trap if index > u32::MAX
+        builder.block(None, |block| {
+            block
+                .local_get(index_i64)
+                .i64_const(0xFFFF_FFFF)
+                .binop(BinaryOp::I64LeU);
+            block.br_if(block.id());
+            block.unreachable();
+        });
+
+        //  Cast index to i32
+        let index_i32 = module_locals.add(ValType::I32);
+        builder
+            .local_get(index_i64)
+            .unop(UnaryOp::I32WrapI64)
+            .local_set(index_i32);
+
+        // Set vector base address
+        let vector_address = module_locals.add(ValType::I32);
+        builder.local_set(vector_address);
+
+        // Trap if index >= length
+        builder.block(None, |block| {
+            block
+                .local_get(vector_address)
+                .load(
+                    memory,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .local_get(index_i32)
+                .binop(BinaryOp::I32GtU);
+            block.br_if(block.id());
+            block.unreachable();
+        });
+
+        // Compute element
+        builder
+            .local_get(vector_address)
+            .i32_const(4)
+            .binop(BinaryOp::I32Add)
+            .local_get(index_i32)
+            .i32_const(size)
+            .binop(BinaryOp::I32Mul)
+            .binop(BinaryOp::I32Add);
+
+        match inner {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64 => {
+                // pointer to value
+            }
+
+            IntermediateType::IVector(_)
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::ISigner
+            | IntermediateType::IAddress => {
+                // load pointer to value
+                builder.load(
+                    memory,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+
+            IntermediateType::IRef(_) => {
+                panic!("Cannot VecImmBorrow an existing reference type");
+            }
+        }
     }
 }
 

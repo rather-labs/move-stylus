@@ -1,6 +1,6 @@
 use walrus::{
-    ir::{BinaryOp, LoadKind, MemArg, UnaryOp},
     InstrSeqBuilder, MemoryId, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, UnaryOp},
 };
 
 use crate::wasm_helpers::{load_i32_from_bytes_instructions, load_i64_from_bytes_instructions};
