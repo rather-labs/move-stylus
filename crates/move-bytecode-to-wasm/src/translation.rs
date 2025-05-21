@@ -45,7 +45,7 @@ pub fn translate_function(
     // instruction.
     let mut types_stack = Vec::new();
     let mut function = FunctionBuilder::new(&mut module.types, &entry.params, &entry.results);
-    let mut builder = function.dangling_instr_seq(entry.type_id);
+    let mut builder = function.func_body();
 
     for instruction in &entry.function.move_code_unit.code {
         map_bytecode_instruction(
@@ -63,7 +63,6 @@ pub fn translate_function(
         );
     }
 
-    *function.func_body().instrs_mut() = builder.instrs().to_vec();
     let function_id = function.finish(entry.function.arg_local_ids.clone(), &mut module.funcs);
 
     Ok(function_id)
