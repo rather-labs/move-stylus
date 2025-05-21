@@ -70,7 +70,7 @@ impl IRef {
                     allocator,
                 );
             }
-            IntermediateType::IRef(_) => {
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
         }

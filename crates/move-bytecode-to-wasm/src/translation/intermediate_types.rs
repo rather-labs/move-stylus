@@ -13,6 +13,7 @@ pub mod address;
 pub mod boolean;
 pub mod heap_integers;
 pub mod imm_reference;
+pub mod mut_reference;
 pub mod signer;
 pub mod simple_integers;
 pub mod vector;
@@ -30,6 +31,7 @@ pub enum IntermediateType {
     ISigner,
     IVector(Box<IntermediateType>),
     IRef(Box<IntermediateType>),
+    IMutRef(Box<IntermediateType>),
 }
 
 impl IntermediateType {
@@ -47,7 +49,8 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => ValType::I32,
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => ValType::I32,
         }
     }
 
@@ -64,7 +67,8 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => 4,
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => 4,
         }
     }
 
@@ -108,7 +112,7 @@ impl IntermediateType {
                 allocator,
                 memory,
             ),
-            IntermediateType::IRef(_) => {
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("cannot load a constant for a reference type");
             }
         }
@@ -131,7 +135,8 @@ impl IntermediateType {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
-            | IntermediateType::IRef(_) => {
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => {
                 builder.local_get(local);
             }
             IntermediateType::IVector(inner) => {
@@ -168,7 +173,8 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => {
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => {
                 let local = module_locals.add(ValType::I32);
 
                 builder.local_get(pointer);
@@ -220,7 +226,8 @@ impl IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IAddress
             | IntermediateType::ISigner
-            | IntermediateType::IRef(_) => {
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => {
                 let local = module_locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -279,7 +286,7 @@ impl IntermediateType {
             | IntermediateType::IAddress => {
                 builder.local_get(local);
             }
-            IntermediateType::IRef(_) => {
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Cannot ImmBorrowLoc on a reference type");
             }
         }
@@ -344,6 +351,10 @@ impl TryFrom<&SignatureToken> for IntermediateType {
             SignatureToken::Reference(token) => {
                 let itoken = Self::try_from(token.as_ref())?;
                 Ok(IntermediateType::IRef(Box::new(itoken)))
+            }
+            SignatureToken::MutableReference(token) => {
+                let itoken = Self::try_from(token.as_ref())?;
+                Ok(IntermediateType::IMutRef(Box::new(itoken)))
             }
             _ => Err(anyhow::anyhow!("Unsupported signature token: {value:?}")),
         }
