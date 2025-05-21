@@ -1,19 +1,9 @@
 module 0x01::hello_world;
 
-public fun fn_1(): u8 {
-    let v = vector[10u8, 20u8];
-    let x = v[0];  
-    x
+public fun vec_len(x: vector<u32>): u64 {
+  x.length()
 }
 
-public fun fn_2(): vector<u8> {
-    let v = vector[vector[10u8, 20u8], vector[30u8, 40u8]];
-    let x = v[0];  
-    x
-}
-
-public fun get_element(index: u64): vector<u8> {
-    let v = vector[10u8, 20u8];
-    let x = v[index];  
-    vector[x]
+public fun vec_len_2(x: vector<vector<u128>>): u64 {
+  x.length()
 }
