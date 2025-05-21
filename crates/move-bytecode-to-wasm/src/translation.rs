@@ -191,10 +191,7 @@ fn map_bytecode_instruction(
         Bytecode::VecImmBorrow(signature_index) => {
             match (types_stack.pop(), types_stack.pop()) {
                 (Some(IntermediateType::IU64), Some(IntermediateType::IRef(inner)))
-                    if matches!(*inner, IntermediateType::IVector(_)) =>
-                {
-                    ()
-                }
+                    if matches!(*inner, IntermediateType::IVector(_)) => {}
                 (Some(t1), Some(t2)) => {
                     panic!("Expected IU64 and &vector<_>, got {t1:?} and {t2:?}")
                 }
@@ -215,7 +212,7 @@ fn map_bytecode_instruction(
             // Push &T onto the WASM type stack
             types_stack.push(IntermediateType::IRef(Box::new(inner_type)));
         }
-        
+
         Bytecode::VecLen(signature_index) => {
             let expected_elem_type =
                 get_intermediate_type_for_signature_index(mapped_function, *signature_index);
