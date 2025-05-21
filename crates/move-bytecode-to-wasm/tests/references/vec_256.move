@@ -19,6 +19,7 @@ public fun dummy(_v: &vector<u256>) {
 
 public fun call_dummy(v: vector<u256>) {
     dummy(&v);
+}
 
 public fun vec_from_element(index: u64): vector<u256> {
     let v = vector[10u256, 20u256];
