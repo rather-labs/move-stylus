@@ -43,23 +43,23 @@ pub struct CompilationContext<'a> {
     pub allocator: FunctionId,
 }
 
-pub fn translate_single_module(package: &CompiledPackage, module_name: &str) -> Module {
+pub fn translate_single_module(package: CompiledPackage, module_name: &str) -> Module {
     let mut modules = translate_package(package, Some(module_name.to_string()));
     modules.remove(module_name).expect("Module not compiled")
 }
 
 pub fn translate_package(
-    package: &CompiledPackage,
+    package: CompiledPackage,
     module_name: Option<String>,
 ) -> HashMap<String, Module> {
-    let root_compiled_units: Vec<&CompiledUnitWithSource> = if let Some(module_name) = module_name {
+    let root_compiled_units: Vec<CompiledUnitWithSource> = if let Some(module_name) = module_name {
         package
             .root_compiled_units
-            .iter()
+            .into_iter()
             .filter(move |unit| unit.unit.name.to_string() == module_name)
             .collect()
     } else {
-        package.root_compiled_units.iter().collect()
+        package.root_compiled_units.into_iter().collect()
     };
 
     assert!(
@@ -70,7 +70,7 @@ pub fn translate_package(
     let mut modules = HashMap::new();
     for root_compiled_module in root_compiled_units {
         let module_name = root_compiled_module.unit.name.to_string();
-        let root_compiled_module = &root_compiled_module.unit.module;
+        let root_compiled_module = root_compiled_module.unit.module;
 
         assert!(
             root_compiled_module.struct_defs.is_empty(),
@@ -94,7 +94,7 @@ pub fn translate_package(
 
         for (function_def, function_handle) in root_compiled_module
             .function_defs
-            .iter()
+            .into_iter()
             .zip(root_compiled_module.function_handles.iter())
         {
             let move_function_arguments =
@@ -124,6 +124,7 @@ pub fn translate_package(
             let function_name =
                 root_compiled_module.identifiers[function_handle.name.0 as usize].to_string();
 
+            let function_handle_index = function_def.function;
             let mapped_function = MappedFunction::new(
                 function_name,
                 move_function_arguments,
@@ -133,7 +134,7 @@ pub fn translate_package(
                 &root_compiled_module.signatures,
             );
 
-            function_table.add(&mut module, mapped_function, function_def.function);
+            function_table.add(&mut module, mapped_function, function_handle_index);
         }
 
         let compilation_ctx = CompilationContext {
@@ -184,7 +185,7 @@ pub fn translate_package(
     modules
 }
 
-pub fn translate_package_cli(package: &CompiledPackage, rerooted_path: &Path) {
+pub fn translate_package_cli(package: CompiledPackage, rerooted_path: &Path) {
     let build_directory = rerooted_path.join("build/wasm");
     // Create the build directory if it doesn't exist
     std::fs::create_dir_all(&build_directory).unwrap();

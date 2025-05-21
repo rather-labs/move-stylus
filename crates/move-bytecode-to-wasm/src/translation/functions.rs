@@ -25,7 +25,7 @@ impl<'a> MappedFunction<'a> {
         name: String,
         move_arguments: &Signature,
         move_returns: &Signature,
-        move_definition: &FunctionDefinition,
+        move_definition: FunctionDefinition,
         module: &mut Module,
         move_module_signatures: &'a [Signature],
     ) -> Self {
@@ -76,7 +76,7 @@ impl<'a> MappedFunction<'a> {
         Self {
             name,
             signature,
-            move_definition: move_definition.clone(),
+            move_definition,
             move_code_unit: code,
             local_variables,
             local_variables_type,
