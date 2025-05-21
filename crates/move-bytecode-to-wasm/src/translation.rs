@@ -8,7 +8,7 @@ use intermediate_types::IntermediateType;
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
 use table::FunctionTable;
-use walrus::ir::{BinaryOp, UnaryOp};
+use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{
     ir::{MemArg, StoreKind},
     FunctionId, InstrSeqBuilder, MemoryId, ValType,
@@ -250,6 +250,39 @@ fn map_bytecode_instruction(
 
             // Push &T onto the WASM type stack
             types_stack.push(IntermediateType::IRef(Box::new(inner_type)));
+        }
+
+        Bytecode::VecLen(signature_index) => {
+            let expected_elem_type =
+                get_intermediate_type_for_signature_index(mapped_function, *signature_index);
+
+            let expected_type = IntermediateType::IVector(Box::new(expected_elem_type.clone()));
+
+            match types_stack.pop() {
+                Some(IntermediateType::IRef(actual_type)) => {
+                    if *actual_type != expected_type {
+                        panic!(
+                            "Type mismatch: expected &vector<{:?}> but got &{:?}",
+                            expected_elem_type, actual_type
+                        );
+                    }
+                }
+                Some(t) => panic!("Expected &vector<_>, got {:?}", t),
+                None => panic!("Type stack underflow"),
+            }
+
+            builder
+                .load(
+                    memory,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .unop(UnaryOp::I64ExtendUI32);
+
+            types_stack.push(IntermediateType::IU64);
         }
 
         Bytecode::ReadRef => {
