@@ -82,12 +82,7 @@ mod tests {
     use super::*;
     use crate::memory::setup_module_memory;
     use crate::translation::intermediate_types::IntermediateType;
-    use alloy::{
-        dyn_abi::SolType,
-        hex::FromHex,
-        primitives::{Address},
-        sol,
-    };
+    use alloy::{dyn_abi::SolType, hex::FromHex, primitives::Address, sol};
     use walrus::{FunctionBuilder, ModuleConfig, ValType};
     use wasmtime::{
         Engine, Global, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults,

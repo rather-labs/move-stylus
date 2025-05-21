@@ -245,6 +245,29 @@ fn map_bytecode_instruction(
             // Push the reference to the type into the types stack
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
         }
+        Bytecode::VecImmBorrow(signature_index) => {
+           
+            match (types_stack.pop(), types_stack.pop()) {
+                (Some(IntermediateType::IU64), Some(IntermediateType::IRef(inner)))
+                    if matches!(*inner, IntermediateType::IVector(_)) => (),
+                (Some(t1), Some(t2)) => panic!("Expected IU64 and &vector<_>, got {t1:?} and {t2:?}"),
+                _ => panic!("Type stack underflow"),
+            }            
+
+            let inner_type =
+                get_intermediate_type_for_signature_index(mapped_function, *signature_index);
+
+            IVector::add_vec_imm_borrow_instructions(
+                &inner_type,
+                module_locals,
+                builder,
+                allocator,
+                memory,
+            );
+
+            // Push &T onto the WASM type stack
+            types_stack.push(IntermediateType::IRef(Box::new(inner_type)));
+        }
 
         Bytecode::ReadRef => {
             let ref_type = types_stack
@@ -427,7 +450,6 @@ fn get_intermediate_type_for_signature_index(
         1,
         "Expected signature to have exactly 1 token for VecPack"
     );
-    // TODO: unwrap
     (&tokens[0]).try_into().unwrap()
 }
 
