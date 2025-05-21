@@ -1,12 +1,15 @@
 use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
+use move_binary_format::file_format::Constant;
 use move_binary_format::file_format::Visibility;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
 use translation::{
     functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
     translate_function,
 };
+use walrus::FunctionId;
+use walrus::MemoryId;
 use walrus::{Module, RefType};
 use wasm_validation::validate_stylus_wasm;
 
@@ -18,6 +21,27 @@ mod translation;
 mod utils;
 mod wasm_helpers;
 mod wasm_validation;
+
+/// Compilation context
+///
+/// Functions are processed in order. To access function information (i.e: arguments or return
+/// arguments we must know the index of it)
+pub struct CompilationContext<'a> {
+    /// Move's connstant pool
+    pub constants: &'a [Constant],
+
+    /// Module's functions arguments.
+    pub functions_arguments: &'a [Vec<IntermediateType>],
+
+    /// Module's functions Returns.
+    pub functions_returns: &'a [Vec<IntermediateType>],
+
+    /// WASM memory id
+    pub memory_id: MemoryId,
+
+    /// Allocator function id
+    pub allocator: FunctionId,
+}
 
 pub fn translate_single_module(package: &CompiledPackage, module_name: &str) -> Module {
     let mut modules = translate_package(package, Some(module_name.to_string()));
@@ -112,21 +136,20 @@ pub fn translate_package(
             function_table.add(&mut module, mapped_function, function_def.function);
         }
 
+        let compilation_ctx = CompilationContext {
+            constants: &root_compiled_module.constant_pool,
+            functions_arguments: &functions_arguments,
+            functions_returns: &functions_returns,
+            memory_id,
+            allocator: allocator_func,
+        };
+
         let mut public_functions = Vec::new();
         let mut function_ids = Vec::new();
         let mut index = 0;
         while index < function_table.len() {
-            let function_id = translate_function(
-                &mut module,
-                index,
-                &root_compiled_module.constant_pool,
-                &functions_arguments,
-                &functions_returns,
-                &function_table,
-                memory_id,
-                allocator_func,
-            )
-            .unwrap();
+            let function_id =
+                translate_function(&mut module, index, &compilation_ctx, &function_table).unwrap();
 
             let entry = function_table.get(index).unwrap();
             let mapped_function = &entry.function;

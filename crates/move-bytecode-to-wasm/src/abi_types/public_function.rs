@@ -270,6 +270,7 @@ mod tests {
         memory::setup_module_memory,
         translation::{functions::prepare_function_return, intermediate_types::IntermediateType},
         utils::display_module,
+        CompilationContext,
     };
 
     use super::*;
@@ -448,7 +449,15 @@ mod tests {
 
     #[test]
     fn test_build_public_function() {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator, memory_id) = build_module();
+
+        let compilation_ctx = CompilationContext {
+            constants: &[],
+            functions_arguments: &[],
+            functions_returns: &[],
+            memory_id,
+            allocator,
+        };
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -480,13 +489,7 @@ mod tests {
             IntermediateType::IU16,
             IntermediateType::IU64,
         ];
-        prepare_function_return(
-            &mut raw_module,
-            &mut func_body,
-            &returns,
-            memory_id,
-            allocator_func,
-        );
+        prepare_function_return(&mut raw_module, &mut func_body, &returns, &compilation_ctx);
 
         let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
@@ -511,7 +514,7 @@ mod tests {
             &mut raw_module,
             &public_function,
             data_len,
-            allocator_func,
+            allocator,
             memory_id,
         );
 
@@ -529,7 +532,14 @@ mod tests {
 
     #[test]
     fn test_build_public_function_with_signer() {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator, memory_id) = build_module();
+        let compilation_ctx = CompilationContext {
+            constants: &[],
+            functions_arguments: &[],
+            functions_returns: &[],
+            memory_id,
+            allocator,
+        };
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -549,13 +559,7 @@ mod tests {
         func_body.local_get(param1);
 
         let returns = vec![IntermediateType::IU8, IntermediateType::ISigner];
-        prepare_function_return(
-            &mut raw_module,
-            &mut func_body,
-            &returns,
-            memory_id,
-            allocator_func,
-        );
+        prepare_function_return(&mut raw_module, &mut func_body, &returns, &compilation_ctx);
 
         let function = function_builder.finish(vec![param1, param2], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
@@ -575,7 +579,7 @@ mod tests {
             &mut raw_module,
             &public_function,
             data_len,
-            allocator_func,
+            allocator,
             memory_id,
         );
 

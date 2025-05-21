@@ -2,10 +2,10 @@ use anyhow::Result;
 use move_binary_format::file_format::{CodeUnit, FunctionDefinition, Signature};
 use walrus::{
     ir::{LoadKind, MemArg, StoreKind},
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
 };
 
-use crate::translation::intermediate_types::ISignature;
+use crate::{translation::intermediate_types::ISignature, CompilationContext};
 
 use super::intermediate_types::IntermediateType;
 
@@ -61,7 +61,7 @@ impl<'a> MappedFunction<'a> {
 
         let local_ids = local_intermediate_types
             .clone()
-            .flat_map(|token| token.map(|t| t.to_wasm_type()))
+            .flat_map(|token| token.map(ValType::from))
             .map(|valty| module.locals.add(valty));
 
         // === Combine all locals and types ===
@@ -132,8 +132,7 @@ pub fn prepare_function_return(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     returns: &[IntermediateType],
-    memory: MemoryId,
-    allocator: FunctionId,
+    compilation_ctx: &CompilationContext,
 ) {
     if !returns.is_empty() {
         let mut locals = Vec::new();
@@ -148,7 +147,7 @@ pub fn prepare_function_return(
         let pointer = module.locals.add(ValType::I32);
 
         builder.i32_const(total_size as i32);
-        builder.call(allocator);
+        builder.call(compilation_ctx.allocator);
         builder.local_set(pointer);
 
         let mut offset = 0;
@@ -157,13 +156,13 @@ pub fn prepare_function_return(
             builder.local_get(*local);
             if return_ty.stack_data_size() == 4 {
                 builder.store(
-                    memory,
+                    compilation_ctx.memory_id,
                     StoreKind::I32 { atomic: false },
                     MemArg { align: 0, offset },
                 );
             } else if return_ty.stack_data_size() == 8 {
                 builder.store(
-                    memory,
+                    compilation_ctx.memory_id,
                     StoreKind::I64 { atomic: false },
                     MemArg { align: 0, offset },
                 );

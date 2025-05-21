@@ -1,7 +1,9 @@
 use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
 };
+
+use crate::CompilationContext;
 
 use super::IntermediateType;
 
@@ -14,8 +16,7 @@ impl IVector {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
-        allocator: FunctionId,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
     ) {
         // First byte is the length of the vector
         let vec_len = bytes.next().unwrap();
@@ -28,13 +29,13 @@ impl IVector {
         let pointer = module.locals.add(ValType::I32);
 
         builder.i32_const(needed_bytes as i32);
-        builder.call(allocator);
+        builder.call(compilation_ctx.allocator);
         builder.local_tee(pointer);
 
         // Store length
         builder.i32_const(vec_len as i32);
         builder.store(
-            memory,
+            compilation_ctx.memory_id,
             StoreKind::I32 { atomic: false },
             MemArg {
                 align: 0,
@@ -47,12 +48,12 @@ impl IVector {
         builder.local_get(pointer);
         while (store_offset as usize) < needed_bytes {
             // Load the inner type
-            inner.load_constant_instructions(module, builder, bytes, allocator, memory);
+            inner.load_constant_instructions(module, builder, bytes, compilation_ctx);
 
             if data_size == 4 {
                 // Store i32
                 builder.store(
-                    memory,
+                    compilation_ctx.memory_id,
                     StoreKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
@@ -64,7 +65,7 @@ impl IVector {
             } else if data_size == 8 {
                 // Store i64
                 builder.store(
-                    memory,
+                    compilation_ctx.memory_id,
                     StoreKind::I64 { atomic: false },
                     MemArg {
                         align: 0,
@@ -90,13 +91,12 @@ impl IVector {
         inner: &IntermediateType,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        allocator: FunctionId,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
         src_local: LocalId,
     ) {
         // === Local declarations ===
         let dst_local = module.locals.add(ValType::I32);
-        let temp_local = module.locals.add(inner.to_wasm_type());
+        let temp_local = module.locals.add(inner.into());
 
         let index = module.locals.add(ValType::I32);
         let len = module.locals.add(ValType::I32);
@@ -106,7 +106,7 @@ impl IVector {
         // === Read vector length ===
         builder.local_get(src_local);
         builder.load(
-            memory,
+            compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
             MemArg {
                 align: 0,
@@ -120,13 +120,13 @@ impl IVector {
         builder.binop(BinaryOp::I32Mul);
         builder.i32_const(4); // +4 for length prefix
         builder.binop(BinaryOp::I32Add);
-        builder.call(allocator);
+        builder.call(compilation_ctx.allocator);
         builder.local_tee(dst_local);
 
         // === Write length at beginning of new memory ===
         builder.local_get(len);
         builder.store(
-            memory,
+            compilation_ctx.memory_id,
             StoreKind::I32 { atomic: false },
             MemArg {
                 align: 0,
@@ -150,7 +150,7 @@ impl IVector {
 
             // === Load element into local ===
             loop_block.load(
-                memory,
+                compilation_ctx.memory_id,
                 match inner {
                     IntermediateType::IU64 => LoadKind::I64 { atomic: false },
                     _ => LoadKind::I32 { atomic: false },
@@ -172,11 +172,11 @@ impl IVector {
             loop_block.binop(BinaryOp::I32Add);
 
             // === Copy element recursively ===
-            inner.copy_loc_instructions(module, loop_block, allocator, memory, temp_local);
+            inner.copy_loc_instructions(module, loop_block, compilation_ctx, temp_local);
 
             // === Store result from stack into memory ===
             loop_block.store(
-                memory,
+                compilation_ctx.memory_id,
                 match inner {
                     IntermediateType::IU64 => StoreKind::I64 { atomic: false },
                     _ => StoreKind::I32 { atomic: false },
@@ -207,23 +207,22 @@ impl IVector {
         inner: &IntermediateType,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        allocator: FunctionId,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
         num_elements: i32,
     ) {
         let data_size = inner.stack_data_size() as i32;
         let ptr_local = module.locals.add(ValType::I32);
-        let temp_local = module.locals.add(inner.to_wasm_type());
+        let temp_local = module.locals.add(inner.into());
 
         // Total size = 4 + data_size * num_elements
         builder.i32_const(4 + data_size * num_elements);
-        builder.call(allocator);
+        builder.call(compilation_ctx.allocator);
         builder.local_tee(ptr_local);
 
         // Write the length at offset 0
         builder.i32_const(num_elements);
         builder.store(
-            memory,
+            compilation_ctx.memory_id,
             StoreKind::I32 { atomic: false },
             MemArg {
                 align: 0,
@@ -238,7 +237,7 @@ impl IVector {
 
             // Store at computed address
             builder.store(
-                memory,
+                compilation_ctx.memory_id,
                 match data_size {
                     4 => StoreKind::I32 { atomic: false },
                     8 => StoreKind::I64 { atomic: false },
@@ -389,6 +388,14 @@ mod tests {
     fn test_vector(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id) = build_module();
 
+        let compilation_ctx = CompilationContext {
+            constants: &[],
+            functions_arguments: &[],
+            functions_returns: &[],
+            memory_id,
+            allocator,
+        };
+
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
@@ -400,8 +407,7 @@ mod tests {
             &mut raw_module,
             &mut builder,
             &mut data.into_iter(),
-            allocator,
-            memory_id,
+            &compilation_ctx,
         );
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
@@ -424,6 +430,14 @@ mod tests {
     fn test_vector_copy(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id) = build_module();
 
+        let compilation_ctx = CompilationContext {
+            constants: &[],
+            functions_arguments: &[],
+            functions_returns: &[],
+            memory_id,
+            allocator,
+        };
+
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
         let mut builder = function_builder.func_body();
@@ -437,8 +451,7 @@ mod tests {
             &mut raw_module,
             &mut builder,
             &mut data_iter.into_iter(),
-            allocator,
-            memory_id,
+            &compilation_ctx,
         );
         builder.local_set(src_local);
 
@@ -447,8 +460,7 @@ mod tests {
             &inner_type,
             &mut raw_module,
             &mut builder,
-            allocator,
-            memory_id,
+            &compilation_ctx,
             src_local,
         );
 
@@ -475,6 +487,14 @@ mod tests {
     ) {
         let (mut raw_module, allocator, memory_id) = build_module();
 
+        let compilation_ctx = CompilationContext {
+            constants: &vec![],
+            functions_arguments: &vec![],
+            functions_returns: &vec![],
+            memory_id,
+            allocator,
+        };
+
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
         let mut builder = function_builder.func_body();
@@ -486,8 +506,7 @@ mod tests {
                 &mut raw_module,
                 &mut builder,
                 &mut data_iter,
-                allocator,
-                memory_id,
+                &compilation_ctx,
             );
         }
 
@@ -495,8 +514,7 @@ mod tests {
             &inner_type,
             &mut raw_module,
             &mut builder,
-            allocator,
-            memory_id,
+            &compilation_ctx,
             elements.len() as i32,
         );
 
