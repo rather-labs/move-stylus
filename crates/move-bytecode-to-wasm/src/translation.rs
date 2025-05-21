@@ -246,20 +246,21 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
         }
         Bytecode::VecImmBorrow(signature_index) => {
-           
             match (types_stack.pop(), types_stack.pop()) {
                 (Some(IntermediateType::IU64), Some(IntermediateType::IRef(inner)))
-                    if matches!(*inner, IntermediateType::IVector(_)) => (),
-                (Some(t1), Some(t2)) => panic!("Expected IU64 and &vector<_>, got {t1:?} and {t2:?}"),
+                    if matches!(*inner, IntermediateType::IVector(_)) => {}
+                (Some(t1), Some(t2)) => {
+                    panic!("Expected IU64 and &vector<_>, got {t1:?} and {t2:?}")
+                }
                 _ => panic!("Type stack underflow"),
-            }            
+            }
 
             let inner_type =
                 get_intermediate_type_for_signature_index(mapped_function, *signature_index);
 
             IVector::add_vec_imm_borrow_instructions(
                 &inner_type,
-                module_locals,
+                &mut module.locals,
                 builder,
                 allocator,
                 memory,
