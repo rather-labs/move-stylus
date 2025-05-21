@@ -1,9 +1,9 @@
 use super::Unpackable;
-use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::imm_reference::IRef;
+use crate::translation::intermediate_types::IntermediateType;
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module,
     ir::{MemArg, StoreKind},
+    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module,
 };
 
 impl IRef {
@@ -159,7 +159,7 @@ mod tests {
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        let (_, instance, mut store, entrypoint, global_next_free_memory_pointer) =
+        let (_, instance, mut store, entrypoint, _) =
             setup_wasmtime_module::<i32>(&mut raw_module, data.to_vec(), "test_function");
 
         let result_ptr = entrypoint.call(&mut store, ()).unwrap();

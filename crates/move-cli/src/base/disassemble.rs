@@ -86,7 +86,7 @@ impl Disassemble {
             }
         }
 
-        translate_package_cli(&package, &rerooted_path);
+        translate_package_cli(package, &rerooted_path);
         Ok(())
     }
 }

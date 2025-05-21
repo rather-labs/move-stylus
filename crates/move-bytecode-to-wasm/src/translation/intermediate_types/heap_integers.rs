@@ -1,15 +1,16 @@
 use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
-    FunctionId, InstrSeqBuilder, MemoryId, Module, ValType,
+    InstrSeqBuilder, Module, ValType,
 };
+
+use crate::CompilationContext;
 
 use super::IntermediateType;
 
 fn add(
     builder: &mut walrus::InstrSeqBuilder,
     module: &mut walrus::Module,
-    memory: MemoryId,
-    allocator: FunctionId,
+    compilation_ctx: &CompilationContext,
     type_heap_size: i32,
 ) {
     let pointer = module.locals.add(ValType::I32);
@@ -28,7 +29,7 @@ fn add(
         .local_set(n2_ptr)
         // Allocate memory for the result
         .i32_const(type_heap_size)
-        .call(allocator)
+        .call(compilation_ctx.allocator)
         .local_set(pointer)
         // Set the offset to 0
         .i32_const(0)
@@ -49,7 +50,7 @@ fn add(
                     .local_get(offset)
                     .binop(BinaryOp::I32Add)
                     .load(
-                        memory,
+                        compilation_ctx.memory_id,
                         LoadKind::I64 { atomic: false },
                         MemArg {
                             align: 0,
@@ -62,7 +63,7 @@ fn add(
                     .local_get(offset)
                     .binop(BinaryOp::I32Add)
                     .load(
-                        memory,
+                        compilation_ctx.memory_id,
                         LoadKind::I64 { atomic: false },
                         MemArg {
                             align: 0,
@@ -89,7 +90,7 @@ fn add(
                     .binop(BinaryOp::I32Add)
                     .local_get(partial_sum)
                     .store(
-                        memory,
+                        compilation_ctx.memory_id,
                         StoreKind::I64 { atomic: false },
                         MemArg {
                             align: 0,
@@ -171,8 +172,7 @@ fn add(
 fn compare_heap_integers_bitwise(
     builder: &mut walrus::InstrSeqBuilder,
     module: &mut walrus::Module,
-    memory: MemoryId,
-    allocator: FunctionId,
+    compilation_ctx: &CompilationContext,
     heap_size: i32,
     comparator: BinaryOp,
 ) {
@@ -184,7 +184,7 @@ fn compare_heap_integers_bitwise(
 
     builder
         .i32_const(heap_size)
-        .call(allocator)
+        .call(compilation_ctx.allocator)
         .local_set(pointer);
 
     let pages = heap_size as u32 / 8;
@@ -194,7 +194,7 @@ fn compare_heap_integers_bitwise(
         builder
             .local_get(num_1)
             .load(
-                memory,
+                compilation_ctx.memory_id,
                 LoadKind::I64 { atomic: false },
                 MemArg {
                     align: 0,
@@ -203,7 +203,7 @@ fn compare_heap_integers_bitwise(
             )
             .local_get(num_2)
             .load(
-                memory,
+                compilation_ctx.memory_id,
                 LoadKind::I64 { atomic: false },
                 MemArg {
                     align: 0,
@@ -212,7 +212,7 @@ fn compare_heap_integers_bitwise(
             );
 
         builder.binop(comparator).store(
-            memory,
+            compilation_ctx.memory_id,
             StoreKind::I64 { atomic: false },
             MemArg {
                 align: 0,
@@ -235,8 +235,7 @@ impl IU128 {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
-        allocator: FunctionId,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
     ) {
         let bytes: [u8; Self::HEAP_SIZE as usize] = bytes
             .take(Self::HEAP_SIZE as usize)
@@ -247,7 +246,7 @@ impl IU128 {
         let pointer = module.locals.add(ValType::I32);
 
         builder.i32_const(bytes.len() as i32);
-        builder.call(allocator);
+        builder.call(compilation_ctx.allocator);
         builder.local_set(pointer);
 
         let mut offset = 0;
@@ -258,7 +257,7 @@ impl IU128 {
                 bytes[offset..offset + 8].try_into().unwrap(),
             ));
             builder.store(
-                memory,
+                compilation_ctx.memory_id,
                 StoreKind::I64 { atomic: false },
                 MemArg {
                     align: 0,
@@ -275,14 +274,12 @@ impl IU128 {
     pub fn bit_or(
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
-        allocator: FunctionId,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
     ) {
         compare_heap_integers_bitwise(
             builder,
             module,
-            memory,
-            allocator,
+            compilation_ctx,
             Self::HEAP_SIZE,
             BinaryOp::I64Or,
         );
@@ -291,14 +288,12 @@ impl IU128 {
     pub fn bit_and(
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
-        allocator: FunctionId,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
     ) {
         compare_heap_integers_bitwise(
             builder,
             module,
-            memory,
-            allocator,
+            compilation_ctx,
             Self::HEAP_SIZE,
             BinaryOp::I64And,
         );
@@ -307,14 +302,12 @@ impl IU128 {
     pub fn bit_xor(
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
-        allocator: FunctionId,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
     ) {
         compare_heap_integers_bitwise(
             builder,
             module,
-            memory,
-            allocator,
+            compilation_ctx,
             Self::HEAP_SIZE,
             BinaryOp::I64Xor,
         );
@@ -324,8 +317,7 @@ impl IU128 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         original_type: IntermediateType,
-        memory: MemoryId,
-        allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
@@ -335,12 +327,12 @@ impl IU128 {
                 let pointer = module.locals.add(ValType::I32);
 
                 builder.i32_const(16);
-                builder.call(allocator);
+                builder.call(compilation_ctx.allocator);
                 builder.local_tee(pointer);
 
                 builder.local_get(value_local);
                 builder.store(
-                    memory,
+                    compilation_ctx.memory_id,
                     StoreKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
@@ -357,12 +349,12 @@ impl IU128 {
                 let pointer = module.locals.add(ValType::I32);
 
                 builder.i32_const(16);
-                builder.call(allocator);
+                builder.call(compilation_ctx.allocator);
                 builder.local_tee(pointer);
 
                 builder.local_get(value_local);
                 builder.store(
-                    memory,
+                    compilation_ctx.memory_id,
                     StoreKind::I64 { atomic: false },
                     MemArg {
                         align: 0,
@@ -380,14 +372,14 @@ impl IU128 {
                 let pointer = module.locals.add(ValType::I32);
 
                 builder.i32_const(16);
-                builder.call(allocator);
+                builder.call(compilation_ctx.allocator);
                 builder.local_set(pointer);
 
                 for i in 0..2 {
                     builder.local_get(pointer);
                     builder.local_get(original_pointer);
                     builder.load(
-                        memory,
+                        compilation_ctx.memory_id,
                         LoadKind::I64 { atomic: false },
                         MemArg {
                             align: 0,
@@ -395,7 +387,7 @@ impl IU128 {
                         },
                     );
                     builder.store(
-                        memory,
+                        compilation_ctx.memory_id,
                         StoreKind::I64 { atomic: false },
                         MemArg {
                             align: 0,
@@ -411,7 +403,7 @@ impl IU128 {
 
                         inner_block.local_get(pointer);
                         inner_block.load(
-                            memory,
+                            compilation_ctx.memory_id,
                             LoadKind::I64 { atomic: false },
                             MemArg {
                                 align: 0,
@@ -433,10 +425,9 @@ impl IU128 {
     pub fn add(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
-        memory: MemoryId,
-        allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
-        add(builder, module, memory, allocator, Self::HEAP_SIZE);
+        add(builder, module, compilation_ctx, Self::HEAP_SIZE);
     }
 }
 
@@ -451,8 +442,7 @@ impl IU256 {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
-        allocator: FunctionId,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
     ) {
         let bytes: [u8; Self::HEAP_SIZE as usize] = bytes
             .take(Self::HEAP_SIZE as usize)
@@ -463,7 +453,7 @@ impl IU256 {
         let pointer = module.locals.add(ValType::I32);
 
         builder.i32_const(bytes.len() as i32);
-        builder.call(allocator);
+        builder.call(compilation_ctx.allocator);
         builder.local_set(pointer);
 
         let mut offset = 0;
@@ -474,7 +464,7 @@ impl IU256 {
                 bytes[offset..offset + 8].try_into().unwrap(),
             ));
             builder.store(
-                memory,
+                compilation_ctx.memory_id,
                 StoreKind::I64 { atomic: false },
                 MemArg {
                     align: 0,
@@ -491,14 +481,12 @@ impl IU256 {
     pub fn bit_or(
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
-        allocator: FunctionId,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
     ) {
         compare_heap_integers_bitwise(
             builder,
             module,
-            memory,
-            allocator,
+            compilation_ctx,
             Self::HEAP_SIZE,
             BinaryOp::I64Or,
         );
@@ -507,14 +495,12 @@ impl IU256 {
     pub fn bit_and(
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
-        allocator: FunctionId,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
     ) {
         compare_heap_integers_bitwise(
             builder,
             module,
-            memory,
-            allocator,
+            compilation_ctx,
             Self::HEAP_SIZE,
             BinaryOp::I64And,
         );
@@ -523,14 +509,12 @@ impl IU256 {
     pub fn bit_xor(
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
-        allocator: FunctionId,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
     ) {
         compare_heap_integers_bitwise(
             builder,
             module,
-            memory,
-            allocator,
+            compilation_ctx,
             Self::HEAP_SIZE,
             BinaryOp::I64Xor,
         );
@@ -540,8 +524,7 @@ impl IU256 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         original_type: IntermediateType,
-        memory: MemoryId,
-        allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
@@ -551,12 +534,12 @@ impl IU256 {
                 let pointer = module.locals.add(ValType::I32);
 
                 builder.i32_const(32);
-                builder.call(allocator);
+                builder.call(compilation_ctx.allocator);
                 builder.local_tee(pointer);
 
                 builder.local_get(value_local);
                 builder.store(
-                    memory,
+                    compilation_ctx.memory_id,
                     StoreKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
@@ -573,12 +556,12 @@ impl IU256 {
                 let pointer = module.locals.add(ValType::I32);
 
                 builder.i32_const(32);
-                builder.call(allocator);
+                builder.call(compilation_ctx.allocator);
                 builder.local_tee(pointer);
 
                 builder.local_get(value_local);
                 builder.store(
-                    memory,
+                    compilation_ctx.memory_id,
                     StoreKind::I64 { atomic: false },
                     MemArg {
                         align: 0,
@@ -595,14 +578,14 @@ impl IU256 {
                 let pointer = module.locals.add(ValType::I32);
 
                 builder.i32_const(32);
-                builder.call(allocator);
+                builder.call(compilation_ctx.allocator);
                 builder.local_set(pointer);
 
                 for i in 0..2 {
                     builder.local_get(pointer);
                     builder.local_get(original_pointer);
                     builder.load(
-                        memory,
+                        compilation_ctx.memory_id,
                         LoadKind::I64 { atomic: false },
                         MemArg {
                             align: 0,
@@ -610,7 +593,7 @@ impl IU256 {
                         },
                     );
                     builder.store(
-                        memory,
+                        compilation_ctx.memory_id,
                         StoreKind::I64 { atomic: false },
                         MemArg {
                             align: 0,
@@ -629,9 +612,8 @@ impl IU256 {
     pub fn add(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
-        memory: MemoryId,
-        allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
-        add(builder, module, memory, allocator, Self::HEAP_SIZE);
+        add(builder, module, compilation_ctx, Self::HEAP_SIZE);
     }
 }

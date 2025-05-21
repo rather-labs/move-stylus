@@ -6,14 +6,16 @@ use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::IntermediateType;
 use intermediate_types::{simple_integers::IU8, vector::IVector};
-use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
+use move_binary_format::file_format::{Bytecode, SignatureIndex};
 use table::FunctionTable;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{
     ir::{MemArg, StoreKind},
-    FunctionId, InstrSeqBuilder, MemoryId, ValType,
+    FunctionId, InstrSeqBuilder, ValType,
 };
 use walrus::{FunctionBuilder, Module};
+
+use crate::CompilationContext;
 
 pub mod functions;
 /// The types in this module represent an intermediate Rust representation of Move types
@@ -21,16 +23,11 @@ pub mod functions;
 pub mod intermediate_types;
 pub mod table;
 
-#[allow(clippy::too_many_arguments)]
 pub fn translate_function(
     module: &mut Module,
     index: usize,
-    constant_pool: &[Constant],
-    functions_arguments: &[Vec<IntermediateType>],
-    functions_returns: &[Vec<IntermediateType>],
+    compilation_ctx: &CompilationContext,
     function_table: &FunctionTable,
-    memory: MemoryId,
-    allocator: FunctionId,
 ) -> Result<FunctionId> {
     let entry = function_table
         .get(index)
@@ -50,16 +47,12 @@ pub fn translate_function(
     for instruction in &entry.function.move_code_unit.code {
         map_bytecode_instruction(
             instruction,
-            constant_pool,
+            compilation_ctx,
             &mut builder,
             &entry.function,
             module,
-            functions_arguments,
-            functions_returns,
             function_table,
             &mut types_stack,
-            allocator,
-            memory,
         );
     }
 
@@ -71,21 +64,17 @@ pub fn translate_function(
 #[allow(clippy::too_many_arguments)]
 fn map_bytecode_instruction(
     instruction: &Bytecode,
-    constants: &[Constant],
+    compilation_ctx: &CompilationContext,
     builder: &mut InstrSeqBuilder,
     mapped_function: &MappedFunction,
     module: &mut Module,
-    functions_arguments: &[Vec<IntermediateType>],
-    functions_returns: &[Vec<IntermediateType>],
     function_table: &FunctionTable,
     types_stack: &mut Vec<IntermediateType>,
-    allocator: FunctionId,
-    memory: MemoryId,
 ) {
     match instruction {
         // Load a fixed constant
         Bytecode::LdConst(global_index) => {
-            let constant = &constants[global_index.0 as usize];
+            let constant = &compilation_ctx.constants[global_index.0 as usize];
             let mut data = constant.data.clone().into_iter();
             let constant_type = &constant.type_;
             let constant_type: IntermediateType = constant_type
@@ -93,7 +82,12 @@ fn map_bytecode_instruction(
                 // TODO: unwrap
                 .unwrap();
 
-            constant_type.load_constant_instructions(module, builder, &mut data, allocator, memory);
+            constant_type.load_constant_instructions(
+                module,
+                builder,
+                &mut data,
+                compilation_ctx,
+            );
 
             types_stack.push(constant_type);
             assert!(
@@ -131,8 +125,7 @@ fn map_bytecode_instruction(
             add_load_literal_heap_type_to_memory_instructions(
                 module,
                 builder,
-                memory,
-                allocator,
+                compilation_ctx,
                 &literal.to_le_bytes(),
             );
             types_stack.push(IntermediateType::IU128);
@@ -141,8 +134,7 @@ fn map_bytecode_instruction(
             add_load_literal_heap_type_to_memory_instructions(
                 module,
                 builder,
-                memory,
-                allocator,
+                compilation_ctx,
                 &literal.to_le_bytes(),
             );
             types_stack.push(IntermediateType::IU256);
@@ -150,7 +142,8 @@ fn map_bytecode_instruction(
         // Function calls
         Bytecode::Call(function_handle_index) => {
             // Consume from the types stack the arguments that will be used by the function call
-            let arguments = &functions_arguments[function_handle_index.0 as usize];
+            let arguments =
+                &compilation_ctx.functions_arguments[function_handle_index.0 as usize];
             for (i, argument) in arguments.iter().enumerate().rev() {
                 if let Err(e) = pop_types_stack(types_stack, argument) {
                     panic!("Called function signature arguments mismatch at index {i}: {e}");
@@ -168,11 +161,12 @@ fn map_bytecode_instruction(
             add_unpack_function_return_values_instructions(
                 builder,
                 module,
-                &functions_returns[function_handle_index.0 as usize],
-                memory,
+                &compilation_ctx.functions_returns[function_handle_index.0 as usize],
+                compilation_ctx.memory_id,
             );
             // Insert in the stack types the types returned by the function (if any)
-            let return_types = &functions_returns[function_handle_index.0 as usize];
+            let return_types =
+                &compilation_ctx.functions_returns[function_handle_index.0 as usize];
             for return_type in return_types {
                 types_stack.push(return_type.clone());
             }
@@ -197,8 +191,7 @@ fn map_bytecode_instruction(
             mapped_function.local_variables_type[*local_id as usize].copy_loc_instructions(
                 module,
                 builder,
-                allocator,
-                memory,
+                compilation_ctx,
                 mapped_function.local_variables[*local_id as usize],
             );
             types_stack.push(mapped_function.local_variables_type[*local_id as usize].clone());
@@ -210,8 +203,7 @@ fn map_bytecode_instruction(
                 &inner,
                 module,
                 builder,
-                allocator,
-                memory,
+                compilation_ctx,
                 *num_elements as i32,
             );
 
@@ -228,7 +220,7 @@ fn map_bytecode_instruction(
             let local = mapped_function.local_variables[*local_id as usize];
             let local_type = &mapped_function.local_variables_type[*local_id as usize];
 
-            local_type.add_imm_borrow_loc_instructions(module, builder, allocator, memory, local);
+            local_type.add_imm_borrow_loc_instructions(module, builder, compilation_ctx, local);
 
             // Push the reference to the type into the types stack
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
@@ -246,7 +238,12 @@ fn map_bytecode_instruction(
             let inner_type =
                 get_intermediate_type_for_signature_index(mapped_function, *signature_index);
 
-            IVector::add_vec_imm_borrow_instructions(&inner_type, module, builder, memory);
+            IVector::add_vec_imm_borrow_instructions(
+                &inner_type,
+                module,
+                builder,
+                compilation_ctx.memory_id,
+            );
 
             // Push &T onto the WASM type stack
             types_stack.push(IntermediateType::IRef(Box::new(inner_type)));
@@ -273,7 +270,7 @@ fn map_bytecode_instruction(
 
             builder
                 .load(
-                    memory,
+                    compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
@@ -293,7 +290,7 @@ fn map_bytecode_instruction(
             match ref_type {
                 IntermediateType::IRef(inner) => {
                     // Now call directly on the inner type
-                    inner.add_read_ref_instructions(builder, memory);
+                    inner.add_read_ref_instructions(builder, compilation_ctx.memory_id);
 
                     // And push the inner type into the stack
                     types_stack.push(*inner);
@@ -314,8 +311,7 @@ fn map_bytecode_instruction(
                 module,
                 builder,
                 &mapped_function.signature.returns,
-                memory,
-                allocator,
+                compilation_ctx,
             );
 
             // Remove the return values from types stack and check if the types are correct
@@ -333,32 +329,52 @@ fn map_bytecode_instruction(
         }
         Bytecode::CastU8 => {
             let original_type = types_stack.pop().unwrap();
-            IU8::cast_from(builder, module, original_type, memory);
+            IU8::cast_from(
+                builder,
+                module,
+                original_type,
+                compilation_ctx.memory_id,
+            );
             types_stack.push(IntermediateType::IU8);
         }
         Bytecode::CastU16 => {
             let original_type = types_stack.pop().unwrap();
-            IU16::cast_from(builder, module, original_type, memory);
+            IU16::cast_from(
+                builder,
+                module,
+                original_type,
+                compilation_ctx.memory_id,
+            );
             types_stack.push(IntermediateType::IU16);
         }
         Bytecode::CastU32 => {
             let original_type = types_stack.pop().unwrap();
-            IU32::cast_from(builder, module, original_type, memory);
+            IU32::cast_from(
+                builder,
+                module,
+                original_type,
+                compilation_ctx.memory_id,
+            );
             types_stack.push(IntermediateType::IU32);
         }
         Bytecode::CastU64 => {
             let original_type = types_stack.pop().unwrap();
-            IU64::cast_from(builder, module, original_type, memory);
+            IU64::cast_from(
+                builder,
+                module,
+                original_type,
+                compilation_ctx.memory_id,
+            );
             types_stack.push(IntermediateType::IU64);
         }
         Bytecode::CastU128 => {
             let original_type = types_stack.pop().unwrap();
-            IU128::cast_from(builder, module, original_type, memory, allocator);
+            IU128::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU128);
         }
         Bytecode::CastU256 => {
             let original_type = types_stack.pop().unwrap();
-            IU256::cast_from(builder, module, original_type, memory, allocator);
+            IU256::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU256);
         }
         Bytecode::Add => {
@@ -377,8 +393,8 @@ fn map_bytecode_instruction(
                 IntermediateType::IU16 => IU16::add(builder, module),
                 IntermediateType::IU32 => IU32::add(builder, module),
                 IntermediateType::IU64 => IU64::add(builder, module),
-                IntermediateType::IU128 => IU128::add(builder, module, memory, allocator),
-                IntermediateType::IU256 => IU256::add(builder, module, memory, allocator),
+                IntermediateType::IU128 => IU128::add(builder, module, compilation_ctx),
+                IntermediateType::IU256 => IU256::add(builder, module, compilation_ctx),
                 t => panic!("type stack error: trying to add two {t:?}"),
             }
 
@@ -419,10 +435,10 @@ fn map_bytecode_instruction(
                     builder.binop(BinaryOp::I64Or);
                 }
                 IntermediateType::IU128 => {
-                    IU128::bit_or(builder, module, allocator, memory);
+                    IU128::bit_or(builder, module, compilation_ctx);
                 }
                 IntermediateType::IU256 => {
-                    IU256::bit_or(builder, module, allocator, memory);
+                    IU256::bit_or(builder, module, compilation_ctx);
                 }
                 _ => panic!("type stack error: trying to BitOr two {t:?}"),
             }
@@ -446,10 +462,10 @@ fn map_bytecode_instruction(
                     builder.binop(BinaryOp::I64And);
                 }
                 IntermediateType::IU128 => {
-                    IU128::bit_and(builder, module, allocator, memory);
+                    IU128::bit_and(builder, module, compilation_ctx);
                 }
                 IntermediateType::IU256 => {
-                    IU256::bit_and(builder, module, allocator, memory);
+                    IU256::bit_and(builder, module, compilation_ctx);
                 }
                 _ => panic!("type stack error: trying to BitOr two {t:?}"),
             }
@@ -473,10 +489,10 @@ fn map_bytecode_instruction(
                     builder.binop(BinaryOp::I64Xor);
                 }
                 IntermediateType::IU128 => {
-                    IU128::bit_xor(builder, module, allocator, memory);
+                    IU128::bit_xor(builder, module, compilation_ctx);
                 }
                 IntermediateType::IU256 => {
-                    IU256::bit_xor(builder, module, allocator, memory);
+                    IU256::bit_xor(builder, module, compilation_ctx);
                 }
                 _ => panic!("type stack error: trying to BitOr two {t:?}"),
             }
@@ -489,14 +505,13 @@ fn map_bytecode_instruction(
 fn add_load_literal_heap_type_to_memory_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
-    memory: MemoryId,
-    allocator: FunctionId,
+    compilation_ctx: &CompilationContext,
     bytes: &[u8],
 ) {
     let pointer = module.locals.add(ValType::I32);
 
     builder.i32_const(bytes.len() as i32);
-    builder.call(allocator);
+    builder.call(compilation_ctx.allocator);
     builder.local_set(pointer);
 
     let mut offset = 0;
@@ -507,7 +522,7 @@ fn add_load_literal_heap_type_to_memory_instructions(
             bytes[offset..offset + 8].try_into().unwrap(),
         ));
         builder.store(
-            memory,
+            compilation_ctx.memory_id,
             StoreKind::I64 { atomic: false },
             MemArg {
                 align: 0,

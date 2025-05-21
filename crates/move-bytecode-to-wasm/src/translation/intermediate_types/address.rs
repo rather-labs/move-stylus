@@ -1,7 +1,9 @@
 use walrus::{
     ir::{MemArg, StoreKind},
-    FunctionId, InstrSeqBuilder, MemoryId, Module, ValType,
+    InstrSeqBuilder, Module, ValType,
 };
+
+use crate::CompilationContext;
 
 #[derive(Clone, Copy)]
 pub struct IAddress;
@@ -11,8 +13,7 @@ impl IAddress {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
-        allocator: FunctionId,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
     ) {
         let bytes: [u8; 32] = bytes.take(32).collect::<Vec<u8>>().try_into().unwrap();
 
@@ -22,7 +23,7 @@ impl IAddress {
         let pointer = module.locals.add(ValType::I32);
 
         builder.i32_const(bytes.len() as i32);
-        builder.call(allocator);
+        builder.call(compilation_ctx.allocator);
         builder.local_set(pointer);
 
         let mut offset = 0;
@@ -33,7 +34,7 @@ impl IAddress {
                 bytes[offset..offset + 8].try_into().unwrap(),
             ));
             builder.store(
-                memory,
+                compilation_ctx.memory_id,
                 StoreKind::I64 { atomic: false },
                 MemArg {
                     align: 0,

@@ -29,7 +29,7 @@ impl Build {
             &mut std::io::stdout(),
             &mut std::io::stdin().lock(),
         )?;
-        translate_package_cli(&compiled, &rerooted_path);
+        translate_package_cli(compiled, &rerooted_path);
         Ok(())
     }
 }

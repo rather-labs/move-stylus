@@ -6,8 +6,10 @@ use simple_integers::{IU16, IU32, IU64, IU8};
 use vector::IVector;
 use walrus::{
     ir::{LoadKind, MemArg, StoreKind},
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
 };
+
+use crate::CompilationContext;
 
 pub mod address;
 pub mod boolean;
@@ -33,24 +35,6 @@ pub enum IntermediateType {
 }
 
 impl IntermediateType {
-    /// Returns the wasm type that represents the intermediate type
-    /// For heap or reference types, it references a pointer to memory
-    pub fn to_wasm_type(&self) -> ValType {
-        match self {
-            IntermediateType::IU64 => ValType::I64,
-            IntermediateType::IBool
-            | IntermediateType::IU8
-            | IntermediateType::IU16
-            | IntermediateType::IU32
-            | IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::IAddress
-            | IntermediateType::ISigner
-            | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => ValType::I32,
-        }
-    }
-
     /// Returns the size in bytes, that this type needs in memory to be stored
     pub fn stack_data_size(&self) -> u32 {
         match self {
@@ -77,8 +61,7 @@ impl IntermediateType {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
-        allocator: FunctionId,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
     ) {
         match self {
             IntermediateType::IBool => IBool::load_constant_instructions(builder, bytes),
@@ -87,17 +70,21 @@ impl IntermediateType {
             IntermediateType::IU32 => IU32::load_constant_instructions(builder, bytes),
             IntermediateType::IU64 => IU64::load_constant_instructions(builder, bytes),
             IntermediateType::IU128 => {
-                IU128::load_constant_instructions(module, builder, bytes, allocator, memory)
+                IU128::load_constant_instructions(module, builder, bytes, compilation_ctx)
             }
             IntermediateType::IU256 => {
-                IU256::load_constant_instructions(module, builder, bytes, allocator, memory)
+                IU256::load_constant_instructions(module, builder, bytes, compilation_ctx)
             }
             IntermediateType::IAddress => {
-                IAddress::load_constant_instructions(module, builder, bytes, allocator, memory)
+                IAddress::load_constant_instructions(module, builder, bytes, compilation_ctx)
             }
             IntermediateType::ISigner => panic!("signer type can't be loaded as a constant"),
             IntermediateType::IVector(inner) => IVector::load_constant_instructions(
-                inner, module, builder, bytes, allocator, memory,
+                inner,
+                module,
+                builder,
+                bytes,
+                compilation_ctx,
             ),
             IntermediateType::IRef(_) => {
                 panic!("cannot load a constant for a reference type");
@@ -109,8 +96,7 @@ impl IntermediateType {
         &self,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        allocator: FunctionId,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
         local: LocalId,
     ) {
         match self {
@@ -126,7 +112,7 @@ impl IntermediateType {
                 builder.local_get(local);
             }
             IntermediateType::IVector(inner) => {
-                IVector::copy_loc_instructions(inner, module, builder, allocator, memory, local);
+                IVector::copy_loc_instructions(inner, module, builder, compilation_ctx, local);
             }
             // `signer` type is not copy, this should never happen
             IntermediateType::ISigner => {
@@ -221,8 +207,7 @@ impl IntermediateType {
         &self,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        allocator: FunctionId,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
         local: LocalId,
     ) {
         match self {
@@ -236,12 +221,12 @@ impl IntermediateType {
                 let ptr = module.locals.add(ValType::I32);
 
                 builder.i32_const(size);
-                builder.call(allocator);
+                builder.call(compilation_ctx.allocator);
                 builder.local_tee(ptr);
 
                 builder.local_get(local);
                 builder.store(
-                    memory,
+                    compilation_ctx.memory_id,
                     match self {
                         IntermediateType::IU64 => StoreKind::I64 { atomic: false },
                         _ => StoreKind::I32 { atomic: false },
@@ -397,6 +382,6 @@ impl ISignature {
     }
 
     pub fn get_argument_wasm_types(&self) -> Vec<ValType> {
-        self.arguments.iter().map(|t| t.to_wasm_type()).collect()
+        self.arguments.iter().map(ValType::from).collect()
     }
 }
