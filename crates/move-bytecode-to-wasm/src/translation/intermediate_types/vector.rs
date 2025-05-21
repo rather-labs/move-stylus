@@ -488,9 +488,9 @@ mod tests {
         let (mut raw_module, allocator, memory_id) = build_module();
 
         let compilation_ctx = CompilationContext {
-            constants: &vec![],
-            functions_arguments: &vec![],
-            functions_returns: &vec![],
+            constants: &[],
+            functions_arguments: &[],
+            functions_returns: &[],
             memory_id,
             allocator,
         };
