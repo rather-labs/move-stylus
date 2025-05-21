@@ -328,6 +328,87 @@ fn map_bytecode_instruction(
             builder.unop(UnaryOp::I32Eqz);
             types_stack.push(IntermediateType::IBool);
         }
+        Bytecode::BitOr => {
+            let t = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
+                assert_eq!(
+                    t1, t2,
+                    "types stack error: trying two BitOr two different types {t1:?} {t2:?}"
+                );
+                t1
+            } else {
+                panic!("types stack is empty");
+            };
+            match t {
+                IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
+                    builder.binop(BinaryOp::I32Or);
+                }
+                IntermediateType::IU64 => {
+                    builder.binop(BinaryOp::I64Or);
+                }
+                IntermediateType::IU128 => {
+                    IU128::bit_or(builder, module_locals, allocator, memory);
+                }
+                IntermediateType::IU256 => {
+                    IU256::bit_or(builder, module_locals, allocator, memory);
+                }
+                _ => panic!("type stack error: trying to BitOr two {t:?}"),
+            }
+            types_stack.push(t);
+        }
+        Bytecode::BitAnd => {
+            let t = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
+                assert_eq!(
+                    t1, t2,
+                    "types stack error: trying two BitOr two different types {t1:?} {t2:?}"
+                );
+                t1
+            } else {
+                panic!("types stack is empty");
+            };
+            match t {
+                IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
+                    builder.binop(BinaryOp::I32And);
+                }
+                IntermediateType::IU64 => {
+                    builder.binop(BinaryOp::I64And);
+                }
+                IntermediateType::IU128 => {
+                    IU128::bit_and(builder, module_locals, allocator, memory);
+                }
+                IntermediateType::IU256 => {
+                    IU256::bit_and(builder, module_locals, allocator, memory);
+                }
+                _ => panic!("type stack error: trying to BitOr two {t:?}"),
+            }
+            types_stack.push(t);
+        }
+        Bytecode::Xor => {
+            let t = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
+                assert_eq!(
+                    t1, t2,
+                    "types stack error: trying two BitOr two different types {t1:?} {t2:?}"
+                );
+                t1
+            } else {
+                panic!("types stack is empty");
+            };
+            match t {
+                IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
+                    builder.binop(BinaryOp::I32Xor);
+                }
+                IntermediateType::IU64 => {
+                    builder.binop(BinaryOp::I64Xor);
+                }
+                IntermediateType::IU128 => {
+                    IU128::bit_xor(builder, module_locals, allocator, memory);
+                }
+                IntermediateType::IU256 => {
+                    IU256::bit_xor(builder, module_locals, allocator, memory);
+                }
+                _ => panic!("type stack error: trying to BitOr two {t:?}"),
+            }
+            types_stack.push(t);
+        }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
 }
