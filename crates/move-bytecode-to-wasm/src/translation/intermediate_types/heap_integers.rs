@@ -1,25 +1,25 @@
 use walrus::{
-    FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
+    FunctionId, InstrSeqBuilder, MemoryId, Module, ValType,
 };
 
 use super::IntermediateType;
 
 fn add(
     builder: &mut walrus::InstrSeqBuilder,
-    module_locals: &mut walrus::ModuleLocals,
+    module: &mut walrus::Module,
     memory: MemoryId,
     allocator: FunctionId,
     type_heap_size: i32,
 ) {
-    let pointer = module_locals.add(ValType::I32);
-    let offset = module_locals.add(ValType::I32);
-    let overflowed = module_locals.add(ValType::I32);
-    let partial_sum = module_locals.add(ValType::I64);
-    let n1_ptr = module_locals.add(ValType::I32);
-    let n2_ptr = module_locals.add(ValType::I32);
-    let n1 = module_locals.add(ValType::I64);
-    let n2 = module_locals.add(ValType::I64);
+    let pointer = module.locals.add(ValType::I32);
+    let offset = module.locals.add(ValType::I32);
+    let overflowed = module.locals.add(ValType::I32);
+    let partial_sum = module.locals.add(ValType::I64);
+    let n1_ptr = module.locals.add(ValType::I32);
+    let n2_ptr = module.locals.add(ValType::I32);
+    let n1 = module.locals.add(ValType::I64);
+    let n2 = module.locals.add(ValType::I64);
 
     // Allocate memory for the result
     builder
@@ -170,17 +170,17 @@ fn add(
 
 fn compare_heap_integers_bitwise(
     builder: &mut walrus::InstrSeqBuilder,
-    module_locals: &mut walrus::ModuleLocals,
+    module: &mut walrus::Module,
     memory: MemoryId,
     allocator: FunctionId,
     heap_size: i32,
     comparator: BinaryOp,
 ) {
-    let num_1 = module_locals.add(ValType::I32);
-    let num_2 = module_locals.add(ValType::I32);
+    let num_1 = module.locals.add(ValType::I32);
+    let num_2 = module.locals.add(ValType::I32);
     builder.local_set(num_2).local_set(num_1);
 
-    let pointer = module_locals.add(ValType::I32);
+    let pointer = module.locals.add(ValType::I32);
 
     builder
         .i32_const(heap_size)
@@ -232,7 +232,7 @@ impl IU128 {
     pub const HEAP_SIZE: i32 = 16;
 
     pub fn load_constant_instructions(
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
         allocator: FunctionId,
@@ -244,7 +244,7 @@ impl IU128 {
             .try_into()
             .unwrap();
 
-        let pointer = module_locals.add(ValType::I32);
+        let pointer = module.locals.add(ValType::I32);
 
         builder.i32_const(bytes.len() as i32);
         builder.call(allocator);
@@ -274,13 +274,13 @@ impl IU128 {
 
     pub fn bit_or(
         builder: &mut InstrSeqBuilder,
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         allocator: FunctionId,
         memory: MemoryId,
     ) {
         compare_heap_integers_bitwise(
             builder,
-            module_locals,
+            module,
             memory,
             allocator,
             Self::HEAP_SIZE,
@@ -290,13 +290,13 @@ impl IU128 {
 
     pub fn bit_and(
         builder: &mut InstrSeqBuilder,
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         allocator: FunctionId,
         memory: MemoryId,
     ) {
         compare_heap_integers_bitwise(
             builder,
-            module_locals,
+            module,
             memory,
             allocator,
             Self::HEAP_SIZE,
@@ -306,13 +306,13 @@ impl IU128 {
 
     pub fn bit_xor(
         builder: &mut InstrSeqBuilder,
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         allocator: FunctionId,
         memory: MemoryId,
     ) {
         compare_heap_integers_bitwise(
             builder,
-            module_locals,
+            module,
             memory,
             allocator,
             Self::HEAP_SIZE,
@@ -322,17 +322,17 @@ impl IU128 {
 
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
-        module_locals: &mut walrus::ModuleLocals,
+        module: &mut walrus::Module,
         original_type: IntermediateType,
         memory: MemoryId,
         allocator: FunctionId,
     ) {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
-                let value_local = module_locals.add(ValType::I32);
+                let value_local = module.locals.add(ValType::I32);
                 builder.local_set(value_local);
 
-                let pointer = module_locals.add(ValType::I32);
+                let pointer = module.locals.add(ValType::I32);
 
                 builder.i32_const(16);
                 builder.call(allocator);
@@ -351,10 +351,10 @@ impl IU128 {
                 builder.local_get(pointer);
             }
             IntermediateType::IU64 => {
-                let value_local = module_locals.add(ValType::I64);
+                let value_local = module.locals.add(ValType::I64);
                 builder.local_set(value_local);
 
-                let pointer = module_locals.add(ValType::I32);
+                let pointer = module.locals.add(ValType::I32);
 
                 builder.i32_const(16);
                 builder.call(allocator);
@@ -374,10 +374,10 @@ impl IU128 {
             }
             IntermediateType::IU128 => {}
             IntermediateType::IU256 => {
-                let original_pointer = module_locals.add(ValType::I32);
+                let original_pointer = module.locals.add(ValType::I32);
                 builder.local_set(original_pointer);
 
-                let pointer = module_locals.add(ValType::I32);
+                let pointer = module.locals.add(ValType::I32);
 
                 builder.i32_const(16);
                 builder.call(allocator);
@@ -432,11 +432,11 @@ impl IU128 {
 
     pub fn add(
         builder: &mut walrus::InstrSeqBuilder,
-        module_locals: &mut walrus::ModuleLocals,
+        module: &mut walrus::Module,
         memory: MemoryId,
         allocator: FunctionId,
     ) {
-        add(builder, module_locals, memory, allocator, Self::HEAP_SIZE);
+        add(builder, module, memory, allocator, Self::HEAP_SIZE);
     }
 }
 
@@ -448,7 +448,7 @@ impl IU256 {
     pub const HEAP_SIZE: i32 = 32;
 
     pub fn load_constant_instructions(
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
         allocator: FunctionId,
@@ -460,7 +460,7 @@ impl IU256 {
             .try_into()
             .unwrap();
 
-        let pointer = module_locals.add(ValType::I32);
+        let pointer = module.locals.add(ValType::I32);
 
         builder.i32_const(bytes.len() as i32);
         builder.call(allocator);
@@ -490,13 +490,13 @@ impl IU256 {
 
     pub fn bit_or(
         builder: &mut InstrSeqBuilder,
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         allocator: FunctionId,
         memory: MemoryId,
     ) {
         compare_heap_integers_bitwise(
             builder,
-            module_locals,
+            module,
             memory,
             allocator,
             Self::HEAP_SIZE,
@@ -506,13 +506,13 @@ impl IU256 {
 
     pub fn bit_and(
         builder: &mut InstrSeqBuilder,
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         allocator: FunctionId,
         memory: MemoryId,
     ) {
         compare_heap_integers_bitwise(
             builder,
-            module_locals,
+            module,
             memory,
             allocator,
             Self::HEAP_SIZE,
@@ -522,13 +522,13 @@ impl IU256 {
 
     pub fn bit_xor(
         builder: &mut InstrSeqBuilder,
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         allocator: FunctionId,
         memory: MemoryId,
     ) {
         compare_heap_integers_bitwise(
             builder,
-            module_locals,
+            module,
             memory,
             allocator,
             Self::HEAP_SIZE,
@@ -538,17 +538,17 @@ impl IU256 {
 
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
-        module_locals: &mut walrus::ModuleLocals,
+        module: &mut walrus::Module,
         original_type: IntermediateType,
         memory: MemoryId,
         allocator: FunctionId,
     ) {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
-                let value_local = module_locals.add(ValType::I32);
+                let value_local = module.locals.add(ValType::I32);
                 builder.local_set(value_local);
 
-                let pointer = module_locals.add(ValType::I32);
+                let pointer = module.locals.add(ValType::I32);
 
                 builder.i32_const(32);
                 builder.call(allocator);
@@ -567,10 +567,10 @@ impl IU256 {
                 builder.local_get(pointer);
             }
             IntermediateType::IU64 => {
-                let value_local = module_locals.add(ValType::I64);
+                let value_local = module.locals.add(ValType::I64);
                 builder.local_set(value_local);
 
-                let pointer = module_locals.add(ValType::I32);
+                let pointer = module.locals.add(ValType::I32);
 
                 builder.i32_const(32);
                 builder.call(allocator);
@@ -589,10 +589,10 @@ impl IU256 {
                 builder.local_get(pointer);
             }
             IntermediateType::IU128 => {
-                let original_pointer = module_locals.add(ValType::I32);
+                let original_pointer = module.locals.add(ValType::I32);
                 builder.local_set(original_pointer);
 
-                let pointer = module_locals.add(ValType::I32);
+                let pointer = module.locals.add(ValType::I32);
 
                 builder.i32_const(32);
                 builder.call(allocator);
@@ -628,10 +628,10 @@ impl IU256 {
 
     pub fn add(
         builder: &mut walrus::InstrSeqBuilder,
-        module_locals: &mut walrus::ModuleLocals,
+        module: &mut walrus::Module,
         memory: MemoryId,
         allocator: FunctionId,
     ) {
-        add(builder, module_locals, memory, allocator, Self::HEAP_SIZE);
+        add(builder, module, memory, allocator, Self::HEAP_SIZE);
     }
 }

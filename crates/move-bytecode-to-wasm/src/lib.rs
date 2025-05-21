@@ -3,8 +3,11 @@ use std::{collections::HashMap, path::Path};
 use abi_types::public_function::PublicFunction;
 use move_binary_format::file_format::Visibility;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
-use translation::{functions::MappedFunction, intermediate_types::IntermediateType};
-use walrus::Module;
+use translation::{
+    functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
+    translate_function,
+};
+use walrus::{Module, RefType};
 use wasm_validation::validate_stylus_wasm;
 
 mod abi_types;
@@ -57,12 +60,13 @@ pub fn translate_package(
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
 
-        // All functions are defined empty to get their corresponding Ids
-        let mut mapped_functions = Vec::new();
-
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
         let mut functions_arguments = Vec::new();
+
+        // Function table
+        let function_table_id = module.tables.add_local(false, 0, None, RefType::Funcref);
+        let mut function_table = FunctionTable::new(function_table_id);
 
         for (function_def, function_handle) in root_compiled_module
             .function_defs
@@ -96,41 +100,58 @@ pub fn translate_package(
             let function_name =
                 root_compiled_module.identifiers[function_handle.name.0 as usize].to_string();
 
-            mapped_functions.push(MappedFunction::new(
+            let mapped_function = MappedFunction::new(
                 function_name,
                 move_function_arguments,
                 move_function_return,
                 function_def,
                 &mut module,
                 &root_compiled_module.signatures,
-            ));
+            );
+
+            function_table.add(&mut module, mapped_function, function_def.function);
         }
 
         let mut public_functions = Vec::new();
-        let function_ids = mapped_functions.iter().map(|f| f.id).collect::<Vec<_>>();
-        for mapped_function in mapped_functions {
-            mapped_function
-                .translate_function(
-                    &mut module,
-                    &root_compiled_module.constant_pool,
-                    &function_ids,
-                    &functions_arguments,
-                    &functions_returns,
-                    memory_id,
-                    allocator_func,
-                )
-                .unwrap();
+        let mut function_ids = Vec::new();
+        let mut index = 0;
+        while index < function_table.len() {
+            let function_id = translate_function(
+                &mut module,
+                index,
+                &root_compiled_module.constant_pool,
+                &functions_arguments,
+                &functions_returns,
+                &function_table,
+                memory_id,
+                allocator_func,
+            )
+            .unwrap();
+
+            let entry = function_table.get(index).unwrap();
+            let mapped_function = &entry.function;
 
             if mapped_function.move_definition.visibility == Visibility::Public {
                 public_functions.push(PublicFunction::new(
-                    mapped_function.id,
+                    function_id,
                     &mapped_function.name,
-                    mapped_function.signature,
+                    &mapped_function.signature,
                 ));
             }
+
+            function_ids.push(function_id);
+
+            index += 1;
         }
 
         hostio::build_entrypoint_router(&mut module, allocator_func, memory_id, &public_functions);
+
+        // Fill the WASM table with the function ids
+        for (index, function_id) in function_ids.into_iter().enumerate() {
+            function_table
+                .add_to_wasm_table(&mut module, index, function_id)
+                .expect("there was an error adding the module's functions to the function table");
+        }
 
         validate_stylus_wasm(&mut module).unwrap();
 

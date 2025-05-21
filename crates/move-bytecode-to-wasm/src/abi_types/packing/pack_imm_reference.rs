@@ -1,12 +1,13 @@
 use super::Packable;
-use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::imm_reference::IRef;
+use crate::translation::intermediate_types::IntermediateType;
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
     ir::{LoadKind, MemArg},
+    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
 };
 
 impl IRef {
+    #[allow(clippy::too_many_arguments)]
     pub fn add_pack_instructions(
         inner: &IntermediateType,
         builder: &mut InstrSeqBuilder,

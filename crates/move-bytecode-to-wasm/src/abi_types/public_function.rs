@@ -1,12 +1,12 @@
-use walrus::{FunctionId, InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
+use walrus::{ir::BinaryOp, FunctionId, InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::translation::{
     functions::add_unpack_function_return_values_instructions,
-    intermediate_types::{ISignature, IntermediateType, signer::ISigner},
+    intermediate_types::{signer::ISigner, ISignature, IntermediateType},
 };
 
 use super::{
-    function_encoding::{AbiFunctionSelector, move_signature_to_abi_selector},
+    function_encoding::{move_signature_to_abi_selector, AbiFunctionSelector},
     packing::build_pack_instructions,
     unpacking::build_unpack_instructions,
 };
@@ -27,14 +27,14 @@ pub enum PublicFunctionValidationError {
 ///
 /// It allows functions to be executed as contracts calls, by unpacking the arguments using `read_args` from the host,
 /// injecting these arguments in the functions and packing the return values using `write_result` host function.
-pub struct PublicFunction {
+pub struct PublicFunction<'a> {
     function_id: FunctionId,
     function_selector: AbiFunctionSelector,
-    signature: ISignature,
+    signature: &'a ISignature,
 }
 
-impl PublicFunction {
-    pub fn new(function_id: FunctionId, function_name: &str, signature: ISignature) -> Self {
+impl<'a> PublicFunction<'a> {
+    pub fn new(function_id: FunctionId, function_name: &str, signature: &'a ISignature) -> Self {
         Self::check_signature_arguments(function_name, &signature.arguments)
             .unwrap_or_else(|e| panic!("ABI error: {e}"));
 
@@ -158,7 +158,7 @@ impl PublicFunction {
         block.call(self.function_id);
         add_unpack_function_return_values_instructions(
             block,
-            &mut module.locals,
+            module,
             &self.signature.returns,
             memory_id,
         );
@@ -260,8 +260,8 @@ impl PublicFunction {
 mod tests {
     use alloy::{dyn_abi::SolType, sol};
     use walrus::{
-        FunctionBuilder, MemoryId, ModuleConfig,
         ir::{LoadKind, MemArg},
+        FunctionBuilder, MemoryId, ModuleConfig,
     };
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
@@ -481,7 +481,7 @@ mod tests {
             IntermediateType::IU64,
         ];
         prepare_function_return(
-            &mut raw_module.locals,
+            &mut raw_module,
             &mut func_body,
             &returns,
             memory_id,
@@ -491,18 +491,15 @@ mod tests {
         let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        let public_function = PublicFunction::new(
-            function,
-            "test_function",
-            ISignature {
-                arguments: vec![
-                    IntermediateType::IBool,
-                    IntermediateType::IU16,
-                    IntermediateType::IU64,
-                ],
-                returns,
-            },
-        );
+        let signature = ISignature {
+            arguments: vec![
+                IntermediateType::IBool,
+                IntermediateType::IU16,
+                IntermediateType::IU64,
+            ],
+            returns,
+        };
+        let public_function = PublicFunction::new(function, "test_function", &signature);
 
         let mut data =
             <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
@@ -553,7 +550,7 @@ mod tests {
 
         let returns = vec![IntermediateType::IU8, IntermediateType::ISigner];
         prepare_function_return(
-            &mut raw_module.locals,
+            &mut raw_module,
             &mut func_body,
             &returns,
             memory_id,
@@ -563,14 +560,11 @@ mod tests {
         let function = function_builder.finish(vec![param1, param2], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        let public_function = PublicFunction::new(
-            function,
-            "test_function",
-            ISignature {
-                arguments: vec![IntermediateType::ISigner, IntermediateType::IU8],
-                returns,
-            },
-        );
+        let signature = ISignature {
+            arguments: vec![IntermediateType::ISigner, IntermediateType::IU8],
+            returns,
+        };
+        let public_function = PublicFunction::new(function, "test_function", &signature);
 
         let mut data = <sol!((uint8,))>::abi_encode_params(&(1,));
         data = [public_function.get_selector().to_vec(), data].concat();
@@ -633,18 +627,15 @@ mod tests {
         let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        let public_function = PublicFunction::new(
-            function,
-            "test_function",
-            ISignature {
-                arguments: vec![
-                    IntermediateType::IU32,
-                    IntermediateType::IU32,
-                    IntermediateType::IU64,
-                ],
-                returns: vec![IntermediateType::IU32],
-            },
-        );
+        let signature = ISignature {
+            arguments: vec![
+                IntermediateType::IU32,
+                IntermediateType::IU32,
+                IntermediateType::IU64,
+            ],
+            returns: vec![IntermediateType::IU32],
+        };
+        let public_function = PublicFunction::new(function, "test_function", &signature);
 
         let mut data =
             <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
@@ -690,18 +681,15 @@ mod tests {
         let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        PublicFunction::new(
-            function,
-            "test_function",
-            ISignature {
-                arguments: vec![
-                    IntermediateType::ISigner,
-                    IntermediateType::IBool,
-                    IntermediateType::IU64,
-                ],
-                returns: vec![],
-            },
-        );
+        let signature = ISignature {
+            arguments: vec![
+                IntermediateType::ISigner,
+                IntermediateType::IBool,
+                IntermediateType::IU64,
+            ],
+            returns: vec![],
+        };
+        PublicFunction::new(function, "test_function", &signature);
     }
 
     #[test]
@@ -721,18 +709,15 @@ mod tests {
         let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        PublicFunction::new(
-            function,
-            "test_function",
-            ISignature {
-                arguments: vec![
-                    IntermediateType::IBool,
-                    IntermediateType::ISigner,
-                    IntermediateType::IU64,
-                ],
-                returns: vec![],
-            },
-        );
+        let signature = ISignature {
+            arguments: vec![
+                IntermediateType::IBool,
+                IntermediateType::ISigner,
+                IntermediateType::IU64,
+            ],
+            returns: vec![],
+        };
+        PublicFunction::new(function, "test_function", &signature);
     }
 
     #[test]
@@ -752,18 +737,15 @@ mod tests {
         let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        PublicFunction::new(
-            function,
-            "test_function",
-            ISignature {
-                arguments: vec![
-                    IntermediateType::IBool,
-                    IntermediateType::IU64,
-                    IntermediateType::IVector(Box::new(IntermediateType::ISigner)),
-                ],
-                returns: vec![],
-            },
-        );
+        let signature = ISignature {
+            arguments: vec![
+                IntermediateType::IBool,
+                IntermediateType::IU64,
+                IntermediateType::IVector(Box::new(IntermediateType::ISigner)),
+            ],
+            returns: vec![],
+        };
+        PublicFunction::new(function, "test_function", &signature);
     }
 
     #[test]
@@ -783,19 +765,16 @@ mod tests {
         let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        PublicFunction::new(
-            function,
-            "test_function",
-            ISignature {
-                arguments: vec![
-                    IntermediateType::IBool,
-                    IntermediateType::IU64,
-                    IntermediateType::IVector(Box::new(IntermediateType::IVector(Box::new(
-                        IntermediateType::ISigner,
-                    )))),
-                ],
-                returns: vec![],
-            },
-        );
+        let signature = ISignature {
+            arguments: vec![
+                IntermediateType::IBool,
+                IntermediateType::IU64,
+                IntermediateType::IVector(Box::new(IntermediateType::IVector(Box::new(
+                    IntermediateType::ISigner,
+                )))),
+            ],
+            returns: vec![],
+        };
+        PublicFunction::new(function, "test_function", &signature);
     }
 }

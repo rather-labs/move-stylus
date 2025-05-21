@@ -2,11 +2,11 @@ use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
 use move_binary_format::file_format::{Signature, SignatureToken};
-use simple_integers::{IU8, IU16, IU32, IU64};
+use simple_integers::{IU16, IU32, IU64, IU8};
 use vector::IVector;
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, ModuleLocals, ValType,
     ir::{LoadKind, MemArg, StoreKind},
+    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
 };
 
 pub mod address;
@@ -74,7 +74,7 @@ impl IntermediateType {
     /// For heap and reference types, the actual value is stored in memory and a pointer is returned
     pub fn load_constant_instructions(
         &self,
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
         allocator: FunctionId,
@@ -87,26 +87,17 @@ impl IntermediateType {
             IntermediateType::IU32 => IU32::load_constant_instructions(builder, bytes),
             IntermediateType::IU64 => IU64::load_constant_instructions(builder, bytes),
             IntermediateType::IU128 => {
-                IU128::load_constant_instructions(module_locals, builder, bytes, allocator, memory)
+                IU128::load_constant_instructions(module, builder, bytes, allocator, memory)
             }
             IntermediateType::IU256 => {
-                IU256::load_constant_instructions(module_locals, builder, bytes, allocator, memory)
+                IU256::load_constant_instructions(module, builder, bytes, allocator, memory)
             }
-            IntermediateType::IAddress => IAddress::load_constant_instructions(
-                module_locals,
-                builder,
-                bytes,
-                allocator,
-                memory,
-            ),
+            IntermediateType::IAddress => {
+                IAddress::load_constant_instructions(module, builder, bytes, allocator, memory)
+            }
             IntermediateType::ISigner => panic!("signer type can't be loaded as a constant"),
             IntermediateType::IVector(inner) => IVector::load_constant_instructions(
-                inner,
-                module_locals,
-                builder,
-                bytes,
-                allocator,
-                memory,
+                inner, module, builder, bytes, allocator, memory,
             ),
             IntermediateType::IRef(_) => {
                 panic!("cannot load a constant for a reference type");
@@ -116,7 +107,7 @@ impl IntermediateType {
 
     pub fn copy_loc_instructions(
         &self,
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         builder: &mut InstrSeqBuilder,
         allocator: FunctionId,
         memory: MemoryId,
@@ -135,14 +126,7 @@ impl IntermediateType {
                 builder.local_get(local);
             }
             IntermediateType::IVector(inner) => {
-                IVector::copy_loc_instructions(
-                    inner,
-                    module_locals,
-                    builder,
-                    allocator,
-                    memory,
-                    local,
-                );
+                IVector::copy_loc_instructions(inner, module, builder, allocator, memory, local);
             }
             // `signer` type is not copy, this should never happen
             IntermediateType::ISigner => {
@@ -153,7 +137,7 @@ impl IntermediateType {
 
     pub fn add_load_memory_to_local_instructions(
         &self,
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         builder: &mut InstrSeqBuilder,
         pointer: LocalId,
         memory: MemoryId,
@@ -169,7 +153,7 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_) => {
-                let local = module_locals.add(ValType::I32);
+                let local = module.locals.add(ValType::I32);
 
                 builder.local_get(pointer);
                 builder.load(
@@ -185,7 +169,7 @@ impl IntermediateType {
                 local
             }
             IntermediateType::IU64 => {
-                let local = module_locals.add(ValType::I64);
+                let local = module.locals.add(ValType::I64);
 
                 builder.local_get(pointer);
                 builder.load(
@@ -207,7 +191,7 @@ impl IntermediateType {
     /// Pops the next value from the stack and stores it in the a variable
     pub fn add_stack_to_local_instructions(
         &self,
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         builder: &mut InstrSeqBuilder,
     ) -> LocalId {
         match self {
@@ -221,12 +205,12 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IRef(_) => {
-                let local = module_locals.add(ValType::I32);
+                let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
             }
             IntermediateType::IU64 => {
-                let local = module_locals.add(ValType::I64);
+                let local = module.locals.add(ValType::I64);
                 builder.local_set(local);
                 local
             }
@@ -235,7 +219,7 @@ impl IntermediateType {
 
     pub fn add_imm_borrow_loc_instructions(
         &self,
-        module_locals: &mut ModuleLocals,
+        module: &mut Module,
         builder: &mut InstrSeqBuilder,
         allocator: FunctionId,
         memory: MemoryId,
@@ -249,7 +233,7 @@ impl IntermediateType {
             | IntermediateType::IU32
             | IntermediateType::IU64 => {
                 let size = self.stack_data_size() as i32;
-                let ptr = module_locals.add(ValType::I32);
+                let ptr = module.locals.add(ValType::I32);
 
                 builder.i32_const(size);
                 builder.call(allocator);
@@ -319,6 +303,30 @@ impl IntermediateType {
             }
             _ => panic!("Unsupported ReadRef type: {:?}", self),
         }
+    }
+}
+
+impl From<&IntermediateType> for ValType {
+    fn from(value: &IntermediateType) -> Self {
+        match value {
+            IntermediateType::IU64 => ValType::I64,
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress
+            | IntermediateType::ISigner
+            | IntermediateType::IVector(_)
+            | IntermediateType::IRef(_) => ValType::I32,
+        }
+    }
+}
+
+impl From<IntermediateType> for ValType {
+    fn from(value: IntermediateType) -> Self {
+        Self::from(&value)
     }
 }
 
