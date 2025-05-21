@@ -420,10 +420,10 @@ fn map_bytecode_instruction(
                     builder.binop(BinaryOp::I64Or);
                 }
                 IntermediateType::IU128 => {
-                    IU128::bit_or(builder, module_locals, allocator, memory);
+                    IU128::bit_or(builder, &mut module.locals, allocator, memory);
                 }
                 IntermediateType::IU256 => {
-                    IU256::bit_or(builder, module_locals, allocator, memory);
+                    IU256::bit_or(builder, &mut module.locals, allocator, memory);
                 }
                 _ => panic!("type stack error: trying to BitOr two {t:?}"),
             }
@@ -447,10 +447,10 @@ fn map_bytecode_instruction(
                     builder.binop(BinaryOp::I64And);
                 }
                 IntermediateType::IU128 => {
-                    IU128::bit_and(builder, module_locals, allocator, memory);
+                    IU128::bit_and(builder, &mut module.locals, allocator, memory);
                 }
                 IntermediateType::IU256 => {
-                    IU256::bit_and(builder, module_locals, allocator, memory);
+                    IU256::bit_and(builder, &mut module.locals, allocator, memory);
                 }
                 _ => panic!("type stack error: trying to BitOr two {t:?}"),
             }
@@ -474,10 +474,10 @@ fn map_bytecode_instruction(
                     builder.binop(BinaryOp::I64Xor);
                 }
                 IntermediateType::IU128 => {
-                    IU128::bit_xor(builder, module_locals, allocator, memory);
+                    IU128::bit_xor(builder, &mut module.locals, allocator, memory);
                 }
                 IntermediateType::IU256 => {
-                    IU256::bit_xor(builder, module_locals, allocator, memory);
+                    IU256::bit_xor(builder, &mut module.locals, allocator, memory);
                 }
                 _ => panic!("type stack error: trying to BitOr two {t:?}"),
             }
