@@ -7,7 +7,7 @@ use translation::{
     functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
     translate_function,
 };
-use walrus::{Module, RefType, ValType};
+use walrus::{Module, RefType};
 use wasm_validation::validate_stylus_wasm;
 
 mod abi_types;
@@ -76,26 +76,26 @@ pub fn translate_package(
             let move_function_arguments =
                 &root_compiled_module.signatures[function_handle.parameters.0 as usize];
 
-            let arguments = move_function_arguments
-                .0
-                .iter()
-                .map(IntermediateType::try_from)
-                .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-                .unwrap();
-            let wasm_arguments: Vec<ValType> = arguments.iter().map(ValType::from).collect();
-            functions_arguments.push(arguments);
+            functions_arguments.push(
+                move_function_arguments
+                    .0
+                    .iter()
+                    .map(IntermediateType::try_from)
+                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .unwrap(),
+            );
 
             let move_function_return =
                 &root_compiled_module.signatures[function_handle.return_.0 as usize];
 
-            let returns = move_function_return
-                .0
-                .iter()
-                .map(IntermediateType::try_from)
-                .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-                .unwrap();
-            let wasm_returns: Vec<ValType> = returns.iter().map(ValType::from).collect();
-            functions_returns.push(returns);
+            functions_returns.push(
+                move_function_return
+                    .0
+                    .iter()
+                    .map(IntermediateType::try_from)
+                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .unwrap(),
+            );
 
             let function_name =
                 root_compiled_module.identifiers[function_handle.name.0 as usize].to_string();
@@ -109,13 +109,7 @@ pub fn translate_package(
                 &root_compiled_module.signatures,
             );
 
-            function_table.add(
-                &mut module,
-                mapped_function,
-                wasm_arguments,
-                wasm_returns,
-                function_def.function,
-            );
+            function_table.add(&mut module, mapped_function, function_def.function);
         }
 
         let mut public_functions = Vec::new();
@@ -159,7 +153,7 @@ pub fn translate_package(
                 .expect("there was an error adding the module's functions to the function table");
         }
 
-        // validate_stylus_wasm(&mut module).unwrap();
+        validate_stylus_wasm(&mut module).unwrap();
 
         modules.insert(module_name, module);
     }

@@ -36,10 +36,16 @@ impl<'a> FunctionTable<'a> {
         &mut self,
         module: &mut Module,
         function: MappedFunction<'a>,
-        params: Vec<ValType>,
-        results: Vec<ValType>,
         function_handle_index: FunctionHandleIndex,
     ) {
+        let params: Vec<ValType> = function
+            .signature
+            .arguments
+            .iter()
+            .map(ValType::from)
+            .collect();
+
+        let results = function.signature.get_return_wasm_types();
         let type_id = module.types.add(&params, &results);
         let index = self.entries.len() as i32;
         self.entries.push(TableEntry {
