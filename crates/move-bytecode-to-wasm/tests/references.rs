@@ -308,8 +308,6 @@ mod reference_address {
 
 mod reference_signer {
     use super::*;
-    use alloy::hex::FromHex;
-    use alloy::primitives::Address;
 
     sol!(
         #[allow(missing_docs)]

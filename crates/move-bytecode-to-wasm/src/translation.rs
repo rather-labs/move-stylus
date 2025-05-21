@@ -7,7 +7,7 @@ use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, Constant, SignatureIndex};
-use walrus::ir::{BinaryOp, UnaryOp};
+use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{
     FunctionId, InstrSeqBuilder, MemoryId, ModuleLocals, ValType,
     ir::{MemArg, StoreKind},
@@ -191,10 +191,7 @@ fn map_bytecode_instruction(
         Bytecode::VecImmBorrow(signature_index) => {
             match (types_stack.pop(), types_stack.pop()) {
                 (Some(IntermediateType::IU64), Some(IntermediateType::IRef(inner)))
-                    if matches!(*inner, IntermediateType::IVector(_)) =>
-                {
-                    ()
-                }
+                    if matches!(*inner, IntermediateType::IVector(_)) => {}
                 (Some(t1), Some(t2)) => {
                     panic!("Expected IU64 and &vector<_>, got {t1:?} and {t2:?}")
                 }
@@ -214,6 +211,39 @@ fn map_bytecode_instruction(
 
             // Push &T onto the WASM type stack
             types_stack.push(IntermediateType::IRef(Box::new(inner_type)));
+        }
+
+        Bytecode::VecLen(signature_index) => {
+            let expected_elem_type =
+                get_intermediate_type_for_signature_index(mapped_function, *signature_index);
+
+            let expected_type = IntermediateType::IVector(Box::new(expected_elem_type.clone()));
+
+            match types_stack.pop() {
+                Some(IntermediateType::IRef(actual_type)) => {
+                    if *actual_type != expected_type {
+                        panic!(
+                            "Type mismatch: expected &vector<{:?}> but got &{:?}",
+                            expected_elem_type, actual_type
+                        );
+                    }
+                }
+                Some(t) => panic!("Expected &vector<_>, got {:?}", t),
+                None => panic!("Type stack underflow"),
+            }
+
+            builder
+                .load(
+                    memory,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .unop(UnaryOp::I64ExtendUI32);
+
+            types_stack.push(IntermediateType::IU64);
         }
 
         Bytecode::ReadRef => {

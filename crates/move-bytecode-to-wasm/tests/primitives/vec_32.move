@@ -48,4 +48,8 @@ public fun ref(x: vector<u32>): vector<u32> {
   *y
 }
 
+public fun vec_len(x: vector<u32>): u64 {
+  x.length()
+}
+
 
