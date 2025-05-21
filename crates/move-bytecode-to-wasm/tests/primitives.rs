@@ -823,6 +823,7 @@ fn test_vec_32() {
         function vecFromInt(uint32 x, uint32 y) external returns (uint32[]);
         function vecFromVec(uint32[] x, uint32[] y) external returns (uint32[][]);
         function vecFromVecAndInt(uint32[] x, uint32 y) external returns (uint32[][]);
+        function vecLen(uint32[] x) external returns (uint64);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -876,6 +877,10 @@ fn test_vec_32() {
         <sol!((uint32[][],))>::abi_encode_params(
             &(vec![vec![1u32, 2u32, 3u32], vec![4u32, 4u32]],),
         );
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecLenCall::abi_encode(&vecLenCall::new((vec![1u32, 2u32, 3u32],)));
+    let expected_result = <sol!((uint64,))>::abi_encode_params(&(3u64,));
     run_test(&runtime, data, expected_result).unwrap();
 }
 
@@ -1003,6 +1008,7 @@ fn test_vec_vec_128() {
         function getLiteral() external returns (uint128[][]);
         function getCopiedLocal() external returns (uint128[][]);
         function echo(uint128[][] x) external returns (uint128[][]);
+        function vecLen(uint128[][] x) external returns (uint64);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -1052,5 +1058,13 @@ fn test_vec_vec_128() {
         vec![4u128, 5u128, 6u128],
         vec![7u128, 8u128, 9u128],
     ],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecLenCall::abi_encode(&vecLenCall::new((vec![
+        vec![1u128, 2u128, 3u128],
+        vec![4u128, 5u128, 6u128],
+        vec![7u128, 8u128, 9u128],
+    ],)));
+    let expected_result = <sol!((uint64,))>::abi_encode_params(&(3u64,));
     run_test(&runtime, data, expected_result).unwrap();
 }
