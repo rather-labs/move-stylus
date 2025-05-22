@@ -329,7 +329,7 @@ pub fn check_overflow_u8_u16(module: &mut Module) -> FunctionId {
 
 /// Downcast u64 number to u32
 ///
-/// If the number is greater than u64::MAX it traps
+/// If the number is greater than u32::MAX it traps
 pub fn downcast_u64_to_u32(module: &mut walrus::Module) -> FunctionId {
     // first argument: u64 number
     // returns: casted u32 number
