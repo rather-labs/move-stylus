@@ -266,7 +266,7 @@ impl IU128 {
         compilation_ctx: &CompilationContext,
     ) {
         let add_function_id =
-            RuntimeFunction::HeapIntSum.link_and_get_id(module, Some(compilation_ctx));
+            RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
         builder.i32_const(Self::HEAP_SIZE).call(add_function_id);
     }
 }
@@ -455,7 +455,7 @@ impl IU256 {
         compilation_ctx: &CompilationContext,
     ) {
         let add_function_id =
-            RuntimeFunction::HeapIntSum.link_and_get_id(module, Some(compilation_ctx));
+            RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
         builder.i32_const(Self::HEAP_SIZE).call(add_function_id);
     }
 }

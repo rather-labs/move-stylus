@@ -39,7 +39,7 @@ impl RuntimeFunction {
     /// it just resunts the id.
     ///
     /// This funciton is idempotent.
-    pub fn link_and_get_id(
+    pub fn get(
         &self,
         module: &mut Module,
         compilation_ctx: Option<&CompilationContext>,
@@ -63,7 +63,7 @@ impl RuntimeFunction {
                 // Swap
                 (Self::SwapI32Bytes, _) => swap::swap_i32_bytes_function(module),
                 (Self::SwapI64Bytes, _) => {
-                    let swap_i32_f = Self::SwapI32Bytes.link_and_get_id(module, compilation_ctx);
+                    let swap_i32_f = Self::SwapI32Bytes.get(module, compilation_ctx);
                     swap::swap_i64_bytes_function(module, swap_i32_f)
                 }
                 _ => panic!(

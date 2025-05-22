@@ -34,7 +34,7 @@ impl IU8 {
     /// then the execution is aborted This check is poosible because interally we are using
     /// 32bits integers.
     pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.link_and_get_id(module, None);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
         builder
             .binop(BinaryOp::I32Add)
             .i32_const(Self::MAX_VALUE)
@@ -58,14 +58,14 @@ impl IU8 {
             }
             IntermediateType::IU128 => {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .link_and_get_id(module, Some(compilation_ctx));
+                    .get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
             }
             IntermediateType::IU256 => {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .link_and_get_id(module, Some(compilation_ctx));
+                    .get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
@@ -73,7 +73,7 @@ impl IU8 {
             t => panic!("type stack error: trying to cast {t:?}"),
         }
 
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.link_and_get_id(module, None);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
         builder.i32_const(Self::MAX_VALUE).call(check_overflow_f);
     }
 }
@@ -98,7 +98,7 @@ impl IU16 {
     /// 65535 then the execution is aborted. This check is poosible because interally we are using
     /// 32bits integers.
     pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.link_and_get_id(module, None);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
         builder
             .binop(BinaryOp::I32Add)
             .i32_const(Self::MAX_VALUE)
@@ -122,14 +122,14 @@ impl IU16 {
             }
             IntermediateType::IU128 => {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .link_and_get_id(module, Some(compilation_ctx));
+                    .get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
             }
             IntermediateType::IU256 => {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .link_and_get_id(module, Some(compilation_ctx));
+                    .get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
@@ -137,7 +137,7 @@ impl IU16 {
             t => panic!("type stack error: trying to cast {t:?}"),
         }
 
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.link_and_get_id(module, None);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
         builder.i32_const(Self::MAX_VALUE).call(check_overflow_f);
     }
 }
@@ -157,7 +157,7 @@ impl IU32 {
     }
 
     pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let add_function_id = RuntimeFunction::AddU32.link_and_get_id(module, None);
+        let add_function_id = RuntimeFunction::AddU32.get(module, None);
         builder.call(add_function_id);
     }
 
@@ -171,19 +171,19 @@ impl IU32 {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {}
             IntermediateType::IU64 => {
                 let downcast_u64_to_u32_f =
-                    RuntimeFunction::DowncastU64ToU32.link_and_get_id(module, None);
+                    RuntimeFunction::DowncastU64ToU32.get(module, None);
                 builder.call(downcast_u64_to_u32_f);
             }
             IntermediateType::IU128 => {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .link_and_get_id(module, Some(compilation_ctx));
+                    .get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
             }
             IntermediateType::IU256 => {
                 let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .link_and_get_id(module, Some(compilation_ctx));
+                    .get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
@@ -206,7 +206,7 @@ impl IU64 {
     }
 
     pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let add_function_id = RuntimeFunction::AddU64.link_and_get_id(module, None);
+        let add_function_id = RuntimeFunction::AddU64.get(module, None);
         builder.call(add_function_id);
     }
 
@@ -223,14 +223,14 @@ impl IU64 {
             IntermediateType::IU64 => {}
             IntermediateType::IU128 => {
                 let downcast_u128_u256_to_u64_f = RuntimeFunction::DowncastU128U256ToU64
-                    .link_and_get_id(module, Some(compilation_ctx));
+                    .get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u64_f);
             }
             IntermediateType::IU256 => {
                 let downcast_u128_u256_to_u64_f = RuntimeFunction::DowncastU128U256ToU64
-                    .link_and_get_id(module, Some(compilation_ctx));
+                    .get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u64_f);
