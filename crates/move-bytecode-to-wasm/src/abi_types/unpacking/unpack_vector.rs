@@ -1,11 +1,11 @@
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
 };
 
 use crate::{
-    translation::intermediate_types::{IntermediateType, vector::IVector},
-    utils::add_swap_i32_bytes_function,
+    runtime::RuntimeFunction,
+    translation::intermediate_types::{vector::IVector, IntermediateType},
 };
 
 use super::Unpackable;
@@ -21,7 +21,7 @@ impl IVector {
         allocator: FunctionId,
     ) {
         // Big-endian to Little-endian
-        let swap_i32_bytes_function = add_swap_i32_bytes_function(module);
+        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.link_and_get_id(module, None);
 
         let data_reader_pointer = module.locals.add(ValType::I32);
 

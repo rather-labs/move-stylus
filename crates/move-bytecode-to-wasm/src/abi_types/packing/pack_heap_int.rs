@@ -1,15 +1,15 @@
 use walrus::{
-    InstrSeqBuilder, LocalId, MemoryId, Module,
     ir::{LoadKind, MemArg, StoreKind},
+    InstrSeqBuilder, LocalId, MemoryId, Module,
 };
 
 use crate::{
+    runtime::RuntimeFunction,
     translation::intermediate_types::{
         address::IAddress,
         heap_integers::{IU128, IU256},
         signer::ISigner,
     },
-    utils::add_swap_i64_bytes_function,
 };
 
 impl IU128 {
@@ -21,7 +21,7 @@ impl IU128 {
         memory: MemoryId,
     ) {
         // Little-endian to Big-endian
-        let swap_i64_bytes_function = add_swap_i64_bytes_function(module);
+        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.link_and_get_id(module, None);
 
         for i in 0..2 {
             block.local_get(writer_pointer);
@@ -61,7 +61,7 @@ impl IU256 {
         memory: MemoryId,
     ) {
         // Little-endian to Big-endian
-        let swap_i64_bytes_function = add_swap_i64_bytes_function(module);
+        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.link_and_get_id(module, None);
 
         for i in 0..4 {
             block.local_get(writer_pointer);

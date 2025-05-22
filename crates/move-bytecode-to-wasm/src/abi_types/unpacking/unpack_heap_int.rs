@@ -1,15 +1,15 @@
-use alloy_sol_types::{SolType, sol_data};
+use alloy_sol_types::{sol_data, SolType};
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
 };
 
 use crate::{
+    runtime::RuntimeFunction,
     translation::intermediate_types::{
         address::IAddress,
         heap_integers::{IU128, IU256},
     },
-    utils::add_swap_i64_bytes_function,
 };
 
 impl IU128 {
@@ -25,7 +25,7 @@ impl IU128 {
             sol_data::Uint::<128>::ENCODED_SIZE.expect("U128 should have a fixed size");
 
         // Big-endian to Little-endian
-        let swap_i64_bytes_function = add_swap_i64_bytes_function(module);
+        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.link_and_get_id(module, None);
 
         block.i32_const(16);
         block.call(allocator);
@@ -83,7 +83,7 @@ impl IU256 {
             sol_data::Uint::<256>::ENCODED_SIZE.expect("U256 should have a fixed size");
 
         // Big-endian to Little-endian
-        let swap_i64_bytes_function = add_swap_i64_bytes_function(module);
+        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.link_and_get_id(module, None);
 
         block.i32_const(32);
         block.call(allocator);

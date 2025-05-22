@@ -1,9 +1,9 @@
 use walrus::{
-    InstrSeqBuilder, LocalId, MemoryId, Module,
     ir::{MemArg, StoreKind},
+    InstrSeqBuilder, LocalId, MemoryId, Module,
 };
 
-use crate::utils::{add_swap_i32_bytes_function, add_swap_i64_bytes_function};
+use crate::runtime::RuntimeFunction;
 
 pub fn pack_i32_type_instructions(
     block: &mut InstrSeqBuilder,
@@ -18,7 +18,7 @@ pub fn pack_i32_type_instructions(
     block.local_get(local);
 
     // Little-endian to Big-endian
-    let swap_i32_bytes_function = add_swap_i32_bytes_function(module);
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.link_and_get_id(module, None);
     block.call(swap_i32_bytes_function);
 
     block.store(
@@ -45,7 +45,7 @@ pub fn pack_i64_type_instructions(
     block.local_get(local);
 
     // Little-endian to Big-endian
-    let swap_i64_bytes_function = add_swap_i64_bytes_function(module);
+    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.link_and_get_id(module, None);
     block.call(swap_i64_bytes_function);
 
     block.store(

@@ -1,15 +1,15 @@
-use alloy_sol_types::{SolType, sol_data};
+use alloy_sol_types::{sol_data, SolType};
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module,
     ir::{BinaryOp, LoadKind, MemArg},
+    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module,
 };
 
 use crate::{
+    runtime::RuntimeFunction,
     translation::intermediate_types::{
         boolean::IBool,
-        simple_integers::{IU8, IU16, IU32, IU64},
+        simple_integers::{IU16, IU32, IU64, IU8},
     },
-    utils::{add_swap_i32_bytes_function, add_swap_i64_bytes_function},
 };
 
 impl IBool {
@@ -104,7 +104,7 @@ pub fn unpack_i32_type_instructions(
         },
     );
     // Big-endian to Little-endian
-    let swap_i32_bytes_function = add_swap_i32_bytes_function(module);
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.link_and_get_id(module, None);
     block.call(swap_i32_bytes_function);
 
     // increment reader pointer
@@ -133,7 +133,7 @@ pub fn unpack_i64_type_instructions(
         },
     );
     // Big-endian to Little-endian
-    let swap_i64_bytes_function = add_swap_i64_bytes_function(module);
+    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.link_and_get_id(module, None);
     block.call(swap_i64_bytes_function);
 
     // increment reader pointer
