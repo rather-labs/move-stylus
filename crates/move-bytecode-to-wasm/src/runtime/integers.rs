@@ -9,6 +9,10 @@ use super::RuntimeFunction;
 
 /// This function implements the addition with overflow check for heap integers (u128 and u256)
 pub fn heap_integers_add(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+    // first argument: pointer to the first number
+    // second argument: pointer to the second argument
+    // third argument: how many bytes the number occupies in heap
+    // returns: pointer to the result
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32, ValType::I32],
@@ -187,6 +191,9 @@ pub fn heap_integers_add(module: &mut Module, compilation_ctx: &CompilationConte
 /// is strictly greater than the two operands. Because we are using i32 integer, if the
 /// addition overflow, WASM wraps around the result.
 pub fn add_u32(module: &mut Module) -> FunctionId {
+    // first argument: u32 number to add
+    // second argument: u32 number to add
+    // returns: addition of the arguments
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
@@ -236,6 +243,9 @@ pub fn add_u32(module: &mut Module) -> FunctionId {
 /// that the result is strictly greater than the two operands. Because we are using i64
 /// integer, if the addition overflow, WASM wraps around the result.
 pub fn add_u64(module: &mut Module) -> FunctionId {
+    // first argument: u64 number to add
+    // second argument: u64 number to add
+    // returns: addition of the arguments
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I64, ValType::I64],
@@ -285,7 +295,9 @@ pub fn add_u64(module: &mut Module) -> FunctionId {
 ///
 /// If the number overflowed it traps, otherwise it leaves the number in the stack
 pub fn check_overflow_u8_u16(module: &mut Module) -> FunctionId {
-    // the number to check and the max number admitted by the quantity of bits to check overflow
+    // first argument: the number to check
+    // second argument: the max number admitted by the quantity of bits to check overflow
+    // returns: the checked number
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
@@ -319,6 +331,8 @@ pub fn check_overflow_u8_u16(module: &mut Module) -> FunctionId {
 ///
 /// If the number is greater than u64::MAX it traps
 pub fn downcast_u64_to_u32(module: &mut walrus::Module) -> FunctionId {
+    // first argument: u64 number
+    // returns: casted u32 number
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I64], &[ValType::I32]);
     let mut builder = function
         .name(RuntimeFunction::DowncastU64ToU32.name().to_owned())
