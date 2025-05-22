@@ -8,11 +8,14 @@ use crate::{translation::intermediate_types::simple_integers::IU32, CompilationC
 use super::RuntimeFunction;
 
 /// This function implements the addition with overflow check for heap integers (u128 and u256)
+///
+/// # Arguments:
+///    - pointer to the first number
+///    - pointer to the second argument
+///    - how many bytes the number occupies in heap
+/// # Returns:
+///    - pointer to the result
 pub fn heap_integers_add(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
-    // first argument: pointer to the first number
-    // second argument: pointer to the second argument
-    // third argument: how many bytes the number occupies in heap
-    // returns: pointer to the result
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32, ValType::I32],
@@ -190,10 +193,13 @@ pub fn heap_integers_add(module: &mut Module, compilation_ctx: &CompilationConte
 /// 4_294_967_295 then the execution is aborted. To check the overflow we check that the result
 /// is strictly greater than the two operands. Because we are using i32 integer, if the
 /// addition overflow, WASM wraps around the result.
+///
+/// # Arguments:
+///    - first u32 number to add
+///    - second u32 number to add
+/// # Returns:
+///    - addition of the arguments
 pub fn add_u32(module: &mut Module) -> FunctionId {
-    // first argument: u32 number to add
-    // second argument: u32 number to add
-    // returns: addition of the arguments
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
@@ -242,10 +248,13 @@ pub fn add_u32(module: &mut Module) -> FunctionId {
 /// 18_446_744_073_709_551_615 then the execution is aborted. To check the overflow we check
 /// that the result is strictly greater than the two operands. Because we are using i64
 /// integer, if the addition overflow, WASM wraps around the result.
+///
+/// # Arguments:
+///    - first u64 number to add
+///    - second u64 number to add
+/// # Returns:
+///    - addition of the arguments
 pub fn add_u64(module: &mut Module) -> FunctionId {
-    // first argument: u64 number to add
-    // second argument: u64 number to add
-    // returns: addition of the arguments
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I64, ValType::I64],
@@ -294,10 +303,13 @@ pub fn add_u64(module: &mut Module) -> FunctionId {
 /// Checks if an u8 or u16 number overflowed.
 ///
 /// If the number overflowed it traps, otherwise it leaves the number in the stack
+///
+/// # Arguments:
+///    - number to be checked
+///    - the max number admitted by the number to check's type
+/// # Returns:
+///    - the numeber passed as argument
 pub fn check_overflow_u8_u16(module: &mut Module) -> FunctionId {
-    // first argument: the number to check
-    // second argument: the max number admitted by the quantity of bits to check overflow
-    // returns: the checked number
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
@@ -330,9 +342,12 @@ pub fn check_overflow_u8_u16(module: &mut Module) -> FunctionId {
 /// Downcast u64 number to u32
 ///
 /// If the number is greater than u32::MAX it traps
+///
+/// # Arguments:
+///    - u64 number
+/// # Returns:
+///    - u64 number casted as u32
 pub fn downcast_u64_to_u32(module: &mut walrus::Module) -> FunctionId {
-    // first argument: u64 number
-    // returns: casted u32 number
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I64], &[ValType::I32]);
     let mut builder = function
         .name(RuntimeFunction::DowncastU64ToU32.name().to_owned())
@@ -360,12 +375,16 @@ pub fn downcast_u64_to_u32(module: &mut walrus::Module) -> FunctionId {
 /// Downcast u128 or u256 number to u32
 ///
 /// If the number is greater than u32::MAX it traps
+///
+/// # Arguments:
+///    - pointer to the number to downcast
+///    - the number of bytes that the number occupies in heap
+/// # Returns:
+///    - downcasted u128 or u256 number to u32
 pub fn downcast_u128_u256_to_u32(
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
 ) -> FunctionId {
-    // first argument: pointer to the number
-    // second argument: the number of bytes that the number occupies in heap
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
@@ -441,12 +460,16 @@ pub fn downcast_u128_u256_to_u32(
 /// Downcast u128 or u256 number to u64
 ///
 /// If the number is greater than u64::MAX it traps
+///
+/// # Arguments:
+///    - pointer to the number to downcast
+///    - the number of bytes that the number occupies in heap
+/// # Returns:
+///    - downcasted u128 or u256 number to u64
 pub fn downcast_u128_u256_to_u64(
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
 ) -> FunctionId {
-    // first argument: pointer to the number
-    // second argument: the number of bytes that the number occupies in heap
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
