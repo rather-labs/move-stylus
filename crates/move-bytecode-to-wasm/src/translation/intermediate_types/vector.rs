@@ -1,6 +1,6 @@
 use walrus::{
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 use crate::CompilationContext;
@@ -96,7 +96,7 @@ impl IVector {
     ) {
         // === Local declarations ===
         let dst_local = module.locals.add(ValType::I32);
-        let temp_local = module.locals.add(inner.into());
+        let temp_local = module.locals.add(ValType::I32);
 
         let index = module.locals.add(ValType::I32);
         let len = module.locals.add(ValType::I32);
@@ -148,18 +148,27 @@ impl IVector {
             loop_block.local_get(src_local);
             loop_block.binop(BinaryOp::I32Add);
 
-            // === Load element into local ===
-            loop_block.load(
-                compilation_ctx.memory_id,
-                match inner {
-                    IntermediateType::IU64 => LoadKind::I64 { atomic: false },
-                    _ => LoadKind::I32 { atomic: false },
-                },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
+            match inner {
+                IntermediateType::IBool
+                | IntermediateType::IU8
+                | IntermediateType::IU16
+                | IntermediateType::IU32
+                | IntermediateType::IU64 => {
+                    // Dont load the element, the copy_loc_instructions expects an address!
+                }
+                _ => {
+                    // For heap, load the element (which is a pointer) into local
+                    loop_block.load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                }
+            }
+
             loop_block.local_set(temp_local);
 
             // === Compute destination address of element ===

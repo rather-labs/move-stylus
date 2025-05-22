@@ -1,7 +1,7 @@
-use walrus::{ir::BinaryOp, FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType};
+use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType, ir::BinaryOp};
 
-use super::{pack_native_int::pack_i32_type_instructions, Packable};
-use crate::translation::intermediate_types::{vector::IVector, IntermediateType};
+use super::{Packable, pack_native_int::pack_i32_type_instructions};
+use crate::translation::intermediate_types::{IntermediateType, vector::IVector};
 
 impl IVector {
     #[allow(clippy::too_many_arguments)]

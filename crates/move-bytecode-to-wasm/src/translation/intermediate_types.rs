@@ -2,11 +2,11 @@ use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
 use move_binary_format::file_format::{Signature, SignatureToken};
-use simple_integers::{IU16, IU32, IU64, IU8};
+use simple_integers::{IU8, IU16, IU32, IU64};
 use vector::IVector;
 use walrus::{
-    ir::{LoadKind, MemArg, StoreKind},
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    ir::{LoadKind, MemArg, StoreKind},
 };
 
 use crate::CompilationContext;
@@ -79,19 +79,102 @@ impl IntermediateType {
                 IAddress::load_constant_instructions(module, builder, bytes, compilation_ctx)
             }
             IntermediateType::ISigner => panic!("signer type can't be loaded as a constant"),
-            IntermediateType::IVector(inner) => IVector::load_constant_instructions(
-                inner,
-                module,
-                builder,
-                bytes,
-                compilation_ctx,
-            ),
+            IntermediateType::IVector(inner) => {
+                IVector::load_constant_instructions(inner, module, builder, bytes, compilation_ctx)
+            }
             IntermediateType::IRef(_) => {
                 panic!("cannot load a constant for a reference type");
             }
         }
     }
 
+    pub fn set_loc_instructions(
+        &self,
+        module: &mut Module,
+        builder: &mut InstrSeqBuilder,
+        compilation_ctx: &CompilationContext,
+        local: LocalId,
+    ) {
+        match self {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64 => {
+                let (valtype, storekind) = match self {
+                    IntermediateType::IU64 => (ValType::I64, StoreKind::I64 { atomic: false }),
+                    _ => (ValType::I32, StoreKind::I32 { atomic: false }),
+                };
+                // The value is on top of the stack. We store it in an aux variable
+                let value = module.locals.add(valtype);
+                builder.local_set(value);
+
+                // The local will actually hold a pointer to the value, which is stored in memory
+                builder
+                    .i32_const(self.stack_data_size() as i32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(local)
+                    .local_get(value)
+                    .store(
+                        compilation_ctx.memory_id,
+                        storekind,
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            }
+            IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress
+            | IntermediateType::ISigner
+            | IntermediateType::IVector(_)
+            | IntermediateType::IRef(_) => {
+                // The address is on top of the stack. We store it in the local variable directly.
+                builder.local_set(local);
+            }
+        }
+    }
+
+    pub fn move_loc_instructions(
+        &self,
+        module: &mut Module,
+        builder: &mut InstrSeqBuilder,
+        compilation_ctx: &CompilationContext,
+        local: LocalId,
+    ) {
+        match self {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64 => {
+                // The local holds a pointer to the value, which is stored in memory
+                // The value is loaded into the stack
+                builder.local_get(local);
+                builder.load(
+                    compilation_ctx.memory_id,
+                    match self {
+                        IntermediateType::IU64 => LoadKind::I64 { atomic: false },
+                        _ => LoadKind::I32 { atomic: false },
+                    },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+            IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress
+            | IntermediateType::ISigner
+            | IntermediateType::IVector(_)
+            | IntermediateType::IRef(_) => {
+                // For heap types we just forward the pointer
+                builder.local_get(local);
+            }
+        }
+    }
     pub fn copy_loc_instructions(
         &self,
         module: &mut Module,
@@ -104,8 +187,21 @@ impl IntermediateType {
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32
-            | IntermediateType::IU64
-            | IntermediateType::IU128
+            | IntermediateType::IU64 => {
+                builder.local_get(local);
+                builder.load(
+                    compilation_ctx.memory_id,
+                    match self {
+                        IntermediateType::IU64 => LoadKind::I64 { atomic: false },
+                        _ => LoadKind::I32 { atomic: false },
+                    },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+            IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::IRef(_) => {

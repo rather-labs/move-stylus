@@ -1,5 +1,5 @@
 use move_binary_format::file_format::FunctionHandleIndex;
-use walrus::{ir::Value, ConstExpr, ElementKind, FunctionId, Module, TableId, TypeId, ValType};
+use walrus::{ConstExpr, ElementKind, FunctionId, Module, TableId, TypeId, ValType, ir::Value};
 
 use super::functions::MappedFunction;
 

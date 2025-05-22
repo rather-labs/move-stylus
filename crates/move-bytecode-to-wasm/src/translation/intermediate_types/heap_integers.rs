@@ -1,6 +1,6 @@
 use walrus::{
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
     InstrSeqBuilder, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 use crate::CompilationContext;
