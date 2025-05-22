@@ -1,6 +1,6 @@
 use walrus::{
-    ir::{BinaryOp, UnaryOp},
     FunctionBuilder, FunctionId, Module, ValType,
+    ir::{BinaryOp, UnaryOp},
 };
 
 use super::RuntimeFunction;

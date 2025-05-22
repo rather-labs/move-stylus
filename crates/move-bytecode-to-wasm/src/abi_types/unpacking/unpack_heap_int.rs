@@ -1,7 +1,7 @@
-use alloy_sol_types::{sol_data, SolType};
+use alloy_sol_types::{SolType, sol_data};
 use walrus::{
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
     FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use crate::{

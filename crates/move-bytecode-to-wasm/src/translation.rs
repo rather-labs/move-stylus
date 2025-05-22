@@ -1,19 +1,19 @@
 use anyhow::Result;
 use functions::{
-    add_unpack_function_return_values_instructions, prepare_function_return, MappedFunction,
+    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
 };
+use intermediate_types::IntermediateType;
 use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
-use intermediate_types::IntermediateType;
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
 use table::FunctionTable;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
-use walrus::{
-    ir::{MemArg, StoreKind},
-    FunctionId, InstrSeqBuilder, ValType,
-};
 use walrus::{FunctionBuilder, Module};
+use walrus::{
+    FunctionId, InstrSeqBuilder, ValType,
+    ir::{MemArg, StoreKind},
+};
 
 use crate::CompilationContext;
 

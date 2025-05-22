@@ -1,17 +1,17 @@
 use walrus::{
-    ir::{BinaryOp, UnaryOp},
     InstrSeqBuilder,
+    ir::{BinaryOp, UnaryOp},
 };
 
 use crate::{
+    CompilationContext,
     runtime::RuntimeFunction,
     wasm_helpers::{load_i32_from_bytes_instructions, load_i64_from_bytes_instructions},
-    CompilationContext,
 };
 
 use super::{
-    heap_integers::{IU128, IU256},
     IntermediateType,
+    heap_integers::{IU128, IU256},
 };
 
 #[derive(Clone, Copy)]
@@ -57,15 +57,15 @@ impl IU8 {
                 builder.unop(UnaryOp::I32WrapI64);
             }
             IntermediateType::IU128 => {
-                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u32_f =
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
             }
             IntermediateType::IU256 => {
-                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u32_f =
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
@@ -121,15 +121,15 @@ impl IU16 {
                 builder.unop(UnaryOp::I32WrapI64);
             }
             IntermediateType::IU128 => {
-                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u32_f =
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
             }
             IntermediateType::IU256 => {
-                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u32_f =
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
@@ -170,20 +170,19 @@ impl IU32 {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {}
             IntermediateType::IU64 => {
-                let downcast_u64_to_u32_f =
-                    RuntimeFunction::DowncastU64ToU32.get(module, None);
+                let downcast_u64_to_u32_f = RuntimeFunction::DowncastU64ToU32.get(module, None);
                 builder.call(downcast_u64_to_u32_f);
             }
             IntermediateType::IU128 => {
-                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u32_f =
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
             }
             IntermediateType::IU256 => {
-                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u32_f =
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
@@ -222,15 +221,15 @@ impl IU64 {
             }
             IntermediateType::IU64 => {}
             IntermediateType::IU128 => {
-                let downcast_u128_u256_to_u64_f = RuntimeFunction::DowncastU128U256ToU64
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u64_f =
+                    RuntimeFunction::DowncastU128U256ToU64.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u64_f);
             }
             IntermediateType::IU256 => {
-                let downcast_u128_u256_to_u64_f = RuntimeFunction::DowncastU128U256ToU64
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u64_f =
+                    RuntimeFunction::DowncastU128U256ToU64.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u64_f);
