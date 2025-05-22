@@ -541,3 +541,81 @@ pub fn downcast_u128_u256_to_u64(
 
     function.finish(vec![reader_pointer, heap_size], &mut module.funcs)
 }
+
+/// Substracts two u8, u16 or u32 numbers.
+///
+/// # Arguments:
+///    - first number to substract
+///    - second number to substract
+/// # Returns:
+///    - substracted number
+pub fn sub_u32(module: &mut Module) -> FunctionId {
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function
+        .name(RuntimeFunction::SubU32.name().to_owned())
+        .func_body();
+
+    let n1 = module.locals.add(ValType::I32);
+    let n2 = module.locals.add(ValType::I32);
+
+    // If n1 < n2 means the substraction will underflow, so we trap, otherwise we return the
+    // substraction
+    builder
+        .local_get(n1)
+        .local_get(n2)
+        .binop(BinaryOp::I32LtU)
+        .if_else(
+            ValType::I32,
+            |then| {
+                then.unreachable();
+            },
+            |else_| {
+                else_.local_get(n1).local_get(n2).binop(BinaryOp::I32Sub);
+            },
+        );
+
+    function.finish(vec![n1, n2], &mut module.funcs)
+}
+
+/// Substracts two u64 numbers.
+///
+/// # Arguments:
+///    - first number to substract
+///    - second number to substract
+/// # Returns:
+///    - substracted number
+pub fn sub_u64(module: &mut Module) -> FunctionId {
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I64, ValType::I64],
+        &[ValType::I64],
+    );
+    let mut builder = function
+        .name(RuntimeFunction::SubU32.name().to_owned())
+        .func_body();
+
+    let n1 = module.locals.add(ValType::I64);
+    let n2 = module.locals.add(ValType::I64);
+
+    // If n1 < n2 means the substraction will underflow, so we trap, otherwise we return the
+    // substraction
+    builder
+        .local_get(n1)
+        .local_get(n2)
+        .binop(BinaryOp::I64LtU)
+        .if_else(
+            ValType::I64,
+            |then| {
+                then.unreachable();
+            },
+            |else_| {
+                else_.local_get(n1).local_get(n2).binop(BinaryOp::I64Sub);
+            },
+        );
+
+    function.finish(vec![n1, n2], &mut module.funcs)
+}

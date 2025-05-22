@@ -41,6 +41,14 @@ impl IU8 {
             .call(check_overflow_f);
     }
 
+    /// Adds the instructions to substract two u8 values.
+    ///
+    /// If the substraction is less than 0, then it traps
+    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let sub_u32_f = RuntimeFunction::SubU32.get(module, None);
+        builder.call(sub_u32_f);
+    }
+
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
@@ -57,15 +65,15 @@ impl IU8 {
                 builder.unop(UnaryOp::I32WrapI64);
             }
             IntermediateType::IU128 => {
-                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u32_f =
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
             }
             IntermediateType::IU256 => {
-                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u32_f =
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
@@ -105,6 +113,14 @@ impl IU16 {
             .call(check_overflow_f);
     }
 
+    /// Adds the instructions to substract two u16 values.
+    ///
+    /// If the substraction is less than 0, then it traps
+    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let sub_u32_f = RuntimeFunction::SubU32.get(module, None);
+        builder.call(sub_u32_f);
+    }
+
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
@@ -121,15 +137,15 @@ impl IU16 {
                 builder.unop(UnaryOp::I32WrapI64);
             }
             IntermediateType::IU128 => {
-                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u32_f =
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
             }
             IntermediateType::IU256 => {
-                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u32_f =
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
@@ -161,6 +177,14 @@ impl IU32 {
         builder.call(add_function_id);
     }
 
+    /// Adds the instructions to substract two u32 values.
+    ///
+    /// If the substraction is less than 0, then it traps
+    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let sub_u32_f = RuntimeFunction::SubU32.get(module, None);
+        builder.call(sub_u32_f);
+    }
+
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
@@ -170,20 +194,19 @@ impl IU32 {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {}
             IntermediateType::IU64 => {
-                let downcast_u64_to_u32_f =
-                    RuntimeFunction::DowncastU64ToU32.get(module, None);
+                let downcast_u64_to_u32_f = RuntimeFunction::DowncastU64ToU32.get(module, None);
                 builder.call(downcast_u64_to_u32_f);
             }
             IntermediateType::IU128 => {
-                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u32_f =
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
             }
             IntermediateType::IU256 => {
-                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u32_f =
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
@@ -210,6 +233,14 @@ impl IU64 {
         builder.call(add_function_id);
     }
 
+    /// Adds the instructions to substract two u8 values.
+    ///
+    /// If the substraction is less than 0, then it traps
+    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let sub_u64_f = RuntimeFunction::SubU64.get(module, None);
+        builder.call(sub_u64_f);
+    }
+
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
@@ -222,15 +253,15 @@ impl IU64 {
             }
             IntermediateType::IU64 => {}
             IntermediateType::IU128 => {
-                let downcast_u128_u256_to_u64_f = RuntimeFunction::DowncastU128U256ToU64
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u64_f =
+                    RuntimeFunction::DowncastU128U256ToU64.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u64_f);
             }
             IntermediateType::IU256 => {
-                let downcast_u128_u256_to_u64_f = RuntimeFunction::DowncastU128U256ToU64
-                    .get(module, Some(compilation_ctx));
+                let downcast_u128_u256_to_u64_f =
+                    RuntimeFunction::DowncastU128U256ToU64.get(module, Some(compilation_ctx));
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u64_f);

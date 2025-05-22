@@ -205,6 +205,7 @@ fn test_uint_8() {
         function echo(uint8 x) external returns (uint8);
         function echo2(uint8 x, uint8 y) external returns (uint8);
         function sum(uint8 x, uint8 y) external returns (uint8);
+        function sub(uint8 x, uint8 y) external returns (uint8);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -245,6 +246,17 @@ fn test_uint_8() {
         .expect_err("should fail")
         .to_string()
         .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    // --- SUB ---
+    let data = subCall::abi_encode(&subCall::new((84, 42)));
+    let expected_result = <sol!((uint8,))>::abi_encode_params(&(42,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = subCall::abi_encode(&subCall::new((42, 84)));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
 }
 
 #[test]
@@ -260,6 +272,7 @@ fn test_uint_16() {
         function echo(uint16 x) external returns (uint16);
         function echo2(uint16 x, uint16 y) external returns (uint16);
         function sum(uint16 x, uint16 y) external returns (uint16);
+        function sub(uint16 x, uint16 y) external returns (uint16);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -300,6 +313,17 @@ fn test_uint_16() {
         .expect_err("should fail")
         .to_string()
         .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    // --- SUB ---
+    let data = subCall::abi_encode(&subCall::new((510, 255)));
+    let expected_result = <sol!((uint16,))>::abi_encode_params(&(255,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = subCall::abi_encode(&subCall::new((255, 510)));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
 }
 
 #[test]
@@ -315,6 +339,7 @@ fn test_uint_32() {
         function echo(uint32 x) external returns (uint32);
         function echo2(uint32 x, uint32 y) external returns (uint32);
         function sum(uint32 x, uint32 y) external returns (uint32);
+        function sub(uint32 x, uint32 y) external returns (uint32);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -355,6 +380,17 @@ fn test_uint_32() {
         .expect_err("should fail")
         .to_string()
         .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    // --- SUB ---
+    let data = subCall::abi_encode(&subCall::new((131070, 65535)));
+    let expected_result = <sol!((uint32,))>::abi_encode_params(&(65535,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = subCall::abi_encode(&subCall::new((65535, 131070)));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
 }
 
 #[test]
@@ -370,6 +406,7 @@ fn test_uint_64() {
         function echo(uint64 x) external returns (uint64);
         function echo2(uint64 x, uint64 y) external returns (uint64);
         function sum(uint64 x, uint64 y) external returns (uint64);
+        function sub(uint64 x, uint64 y) external returns (uint64);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -406,6 +443,17 @@ fn test_uint_64() {
     run_test(&runtime, data, expected_result).unwrap();
 
     let data = sumCall::abi_encode(&sumCall::new((u64::MAX, 1)));
+    run_test(&runtime, data, vec![])
+        .expect_err("should fail")
+        .to_string()
+        .contains("wasm trap: wasm `unreachable` instruction executed");
+
+    // --- SUB ---
+    let data = subCall::abi_encode(&subCall::new((8589934590, 4294967295)));
+    let expected_result = <sol!((uint64,))>::abi_encode_params(&(4294967295,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = subCall::abi_encode(&subCall::new((4294967295, 8589934590)));
     run_test(&runtime, data, vec![])
         .expect_err("should fail")
         .to_string()
