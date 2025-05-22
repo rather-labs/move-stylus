@@ -337,7 +337,7 @@ fn map_bytecode_instruction(
         }
         Bytecode::CastU64 => {
             let original_type = types_stack.pop().unwrap();
-            IU64::cast_from(builder, module, original_type, compilation_ctx.memory_id);
+            IU64::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU64);
         }
         Bytecode::CastU128 => {

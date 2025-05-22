@@ -178,7 +178,7 @@ pub fn translate_package(
                 .expect("there was an error adding the module's functions to the function table");
         }
 
-        // validate_stylus_wasm(&mut module).unwrap();
+        validate_stylus_wasm(&mut module).unwrap();
 
         modules.insert(module_name, module);
     }
