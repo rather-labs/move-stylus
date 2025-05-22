@@ -11,6 +11,7 @@ pub enum RuntimeFunction {
     AddU32,
     AddU64,
     CheckOverflowU8U16,
+    DowncastU128U256ToU32,
 }
 
 impl RuntimeFunction {
@@ -20,6 +21,7 @@ impl RuntimeFunction {
             RuntimeFunction::AddU32 => "add_u32",
             RuntimeFunction::AddU64 => "add_u64",
             RuntimeFunction::CheckOverflowU8U16 => "check_overflow_u8_u16",
+            RuntimeFunction::DowncastU128U256ToU32 => "downcast_u128_u256_to_u32",
         }
     }
 
@@ -42,6 +44,9 @@ impl RuntimeFunction {
                 (RuntimeFunction::AddU32, _) => integers::add_u32(module),
                 (RuntimeFunction::AddU64, _) => integers::add_u64(module),
                 (RuntimeFunction::CheckOverflowU8U16, _) => integers::check_overflow_u8_u16(module),
+                (RuntimeFunction::DowncastU128U256ToU32, Some(ctx)) => {
+                    integers::downcast_u128_u256_to_u32(module, ctx)
+                }
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,
                     self.name()

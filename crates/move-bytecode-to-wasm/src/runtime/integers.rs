@@ -314,3 +314,84 @@ pub fn check_overflow_u8_u16(module: &mut Module) -> FunctionId {
 
     function.finish(vec![n, max], &mut module.funcs)
 }
+
+/// Downcast u128 or u256 numbert to u32
+///
+/// If the number is greater than u32::MAX it traps
+pub fn downcast_u128_u256_to_u32(
+    module: &mut walrus::Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    // first argument: pointer to the number
+    // second argument: the number of bytes that the number occupies in heap
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function
+        .name(RuntimeFunction::DowncastU128U256ToU32.name().to_owned())
+        .func_body();
+
+    let reader_pointer = module.locals.add(ValType::I32);
+    let heap_size = module.locals.add(ValType::I32);
+    let offset = module.locals.add(ValType::I32);
+
+    builder.local_get(reader_pointer).load(
+        compilation_ctx.memory_id,
+        LoadKind::I32 { atomic: false },
+        MemArg {
+            align: 0,
+            offset: 0,
+        },
+    );
+
+    // Ensure the rest bytes are zero, otherwise would have overflowed
+    builder.block(None, |inner_block| {
+        let inner_block_id = inner_block.id();
+
+        inner_block.i32_const(4).local_set(offset);
+
+        inner_block.loop_(None, |loop_| {
+            let loop_id = loop_.id();
+
+            loop_
+                // reader_pointer += offset
+                .local_get(reader_pointer)
+                .local_get(offset)
+                .binop(BinaryOp::I32Add)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .i32_const(0)
+                .binop(BinaryOp::I32Eq)
+                .if_else(
+                    None,
+                    |then| {
+                        // If we checked all the heap for zeroes we exit
+                        then.local_get(heap_size)
+                            .local_get(offset)
+                            .binop(BinaryOp::I32Eq)
+                            .br_if(inner_block_id);
+
+                        // Otherwise we add 4 to the offset and loop
+                        then.i32_const(4)
+                            .local_get(offset)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(offset)
+                            .br(loop_id);
+                    },
+                    |else_| {
+                        else_.unreachable();
+                    },
+                );
+        });
+    });
+
+    function.finish(vec![reader_pointer, heap_size], &mut module.funcs)
+}

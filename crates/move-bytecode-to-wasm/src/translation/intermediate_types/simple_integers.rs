@@ -6,9 +6,13 @@ use walrus::{
 use crate::{
     runtime::RuntimeFunction,
     wasm_helpers::{load_i32_from_bytes_instructions, load_i64_from_bytes_instructions},
+    CompilationContext,
 };
 
-use super::IntermediateType;
+use super::{
+    heap_integers::{IU128, IU256},
+    IntermediateType,
+};
 
 #[derive(Clone, Copy)]
 pub struct IU8;
@@ -41,7 +45,7 @@ impl IU8 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         original_type: IntermediateType,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
     ) {
         match original_type {
             IntermediateType::IU8 => {
@@ -53,10 +57,18 @@ impl IU8 {
                 builder.unop(UnaryOp::I32WrapI64);
             }
             IntermediateType::IU128 => {
-                downcast_u128_to_u32(builder, module, memory);
+                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
+                    .link_and_get_id(module, Some(compilation_ctx));
+                builder
+                    .i32_const(IU128::HEAP_SIZE)
+                    .call(downcast_u128_u256_to_u32_f);
             }
             IntermediateType::IU256 => {
-                downcast_u256_to_u32(builder, module, memory);
+                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
+                    .link_and_get_id(module, Some(compilation_ctx));
+                builder
+                    .i32_const(IU256::HEAP_SIZE)
+                    .call(downcast_u128_u256_to_u32_f);
             }
             t => panic!("type stack error: trying to cast {t:?}"),
         }
@@ -97,7 +109,7 @@ impl IU16 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         original_type: IntermediateType,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
     ) {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 => {
@@ -109,10 +121,18 @@ impl IU16 {
                 builder.unop(UnaryOp::I32WrapI64);
             }
             IntermediateType::IU128 => {
-                downcast_u128_to_u32(builder, module, memory);
+                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
+                    .link_and_get_id(module, Some(compilation_ctx));
+                builder
+                    .i32_const(IU128::HEAP_SIZE)
+                    .call(downcast_u128_u256_to_u32_f);
             }
             IntermediateType::IU256 => {
-                downcast_u256_to_u32(builder, module, memory);
+                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
+                    .link_and_get_id(module, Some(compilation_ctx));
+                builder
+                    .i32_const(IU256::HEAP_SIZE)
+                    .call(downcast_u128_u256_to_u32_f);
             }
             t => panic!("type stack error: trying to cast {t:?}"),
         }
@@ -145,7 +165,7 @@ impl IU32 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         original_type: IntermediateType,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
     ) {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {}
@@ -168,10 +188,18 @@ impl IU32 {
                 builder.unop(UnaryOp::I32WrapI64);
             }
             IntermediateType::IU128 => {
-                downcast_u128_to_u32(builder, module, memory);
+                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
+                    .link_and_get_id(module, Some(compilation_ctx));
+                builder
+                    .i32_const(IU128::HEAP_SIZE)
+                    .call(downcast_u128_u256_to_u32_f);
             }
             IntermediateType::IU256 => {
-                downcast_u256_to_u32(builder, module, memory);
+                let downcast_u128_u256_to_u32_f = RuntimeFunction::DowncastU128U256ToU32
+                    .link_and_get_id(module, Some(compilation_ctx));
+                builder
+                    .i32_const(IU256::HEAP_SIZE)
+                    .call(downcast_u128_u256_to_u32_f);
             }
             t => panic!("type stack error: trying to cast {t:?}"),
         }
@@ -272,81 +300,5 @@ impl IU64 {
             }
             t => panic!("type stack error: trying to cast {t:?}"),
         }
-    }
-}
-
-fn downcast_u128_to_u32(
-    builder: &mut walrus::InstrSeqBuilder,
-    module: &mut walrus::Module,
-    memory: MemoryId,
-) {
-    let reader_pointer = module.locals.add(ValType::I32);
-    builder.local_tee(reader_pointer);
-    builder.load(
-        memory,
-        LoadKind::I32 { atomic: false },
-        MemArg {
-            align: 0,
-            offset: 0,
-        },
-    );
-
-    // Ensure the rest bytes are zero, otherwise would have overflowed
-    for i in 0..3 {
-        builder.block(None, |inner_block| {
-            let inner_block_id = inner_block.id();
-
-            inner_block.local_get(reader_pointer);
-            inner_block.load(
-                memory,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 4 + i * 4,
-                },
-            );
-            inner_block.i32_const(0);
-            inner_block.binop(BinaryOp::I32Eq);
-            inner_block.br_if(inner_block_id);
-            inner_block.unreachable();
-        });
-    }
-}
-
-fn downcast_u256_to_u32(
-    builder: &mut walrus::InstrSeqBuilder,
-    module: &mut walrus::Module,
-    memory: MemoryId,
-) {
-    let reader_pointer = module.locals.add(ValType::I32);
-    builder.local_tee(reader_pointer);
-    builder.load(
-        memory,
-        LoadKind::I32 { atomic: false },
-        MemArg {
-            align: 0,
-            offset: 0,
-        },
-    );
-
-    // Ensure the rest bytes are zero, otherwise would have overflowed
-    for i in 0..7 {
-        builder.block(None, |inner_block| {
-            let inner_block_id = inner_block.id();
-
-            inner_block.local_get(reader_pointer);
-            inner_block.load(
-                memory,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 4 + i * 4,
-                },
-            );
-            inner_block.i32_const(0);
-            inner_block.binop(BinaryOp::I32Eq);
-            inner_block.br_if(inner_block_id);
-            inner_block.unreachable();
-        });
     }
 }
