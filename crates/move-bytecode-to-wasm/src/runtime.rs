@@ -10,6 +10,7 @@ pub enum RuntimeFunction {
     HeapIntSum,
     AddU32,
     AddU64,
+    CheckOverflowU8U16,
 }
 
 impl RuntimeFunction {
@@ -18,6 +19,7 @@ impl RuntimeFunction {
             RuntimeFunction::HeapIntSum => "heap_integer_add",
             RuntimeFunction::AddU32 => "add_u32",
             RuntimeFunction::AddU64 => "add_u64",
+            RuntimeFunction::CheckOverflowU8U16 => "check_overflow_u8_u16",
         }
     }
 
@@ -39,6 +41,7 @@ impl RuntimeFunction {
                 }
                 (RuntimeFunction::AddU32, _) => integers::add_u32(module),
                 (RuntimeFunction::AddU64, _) => integers::add_u64(module),
+                (RuntimeFunction::CheckOverflowU8U16, _) => integers::check_overflow_u8_u16(module),
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,
                     self.name()

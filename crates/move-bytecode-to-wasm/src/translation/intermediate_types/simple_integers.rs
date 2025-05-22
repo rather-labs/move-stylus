@@ -24,33 +24,17 @@ impl IU8 {
         load_i32_from_bytes_instructions(builder, &bytes);
     }
 
-    fn add_check_overflow_instructions(
-        builder: &mut walrus::InstrSeqBuilder,
-        module: &mut walrus::Module,
-    ) {
-        let tmp = module.locals.add(walrus::ValType::I32);
-        builder.local_tee(tmp);
-        builder.i32_const(Self::MAX_VALUE);
-        builder.binop(BinaryOp::I32GtU);
-        builder.if_else(
-            Some(ValType::I32),
-            |then| {
-                then.unreachable();
-            },
-            |else_| {
-                else_.local_get(tmp);
-            },
-        );
-    }
-
     /// Adds the instructions to add two u8 values.
     ///
     /// Along with the addition code to check overflow is added. If the result is greater than 255
     /// then the execution is aborted This check is poosible because interally we are using
     /// 32bits integers.
     pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        builder.binop(BinaryOp::I32Add);
-        Self::add_check_overflow_instructions(builder, module);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.link_and_get_id(module, None);
+        builder
+            .binop(BinaryOp::I32Add)
+            .i32_const(Self::MAX_VALUE)
+            .call(check_overflow_f);
     }
 
     pub fn cast_from(
@@ -60,25 +44,25 @@ impl IU8 {
         memory: MemoryId,
     ) {
         match original_type {
-            IntermediateType::IU8 => {}
-            IntermediateType::IU16 | IntermediateType::IU32 => {
-                // Just check for overflow and leave the value in the stack again
-                Self::add_check_overflow_instructions(builder, module);
+            IntermediateType::IU8 => {
+                return;
             }
+            // Just check for overflow and leave the value in the stack again
+            IntermediateType::IU16 | IntermediateType::IU32 => {}
             IntermediateType::IU64 => {
                 builder.unop(UnaryOp::I32WrapI64);
-                Self::add_check_overflow_instructions(builder, module);
             }
             IntermediateType::IU128 => {
                 downcast_u128_to_u32(builder, module, memory);
-                Self::add_check_overflow_instructions(builder, module);
             }
             IntermediateType::IU256 => {
                 downcast_u256_to_u32(builder, module, memory);
-                Self::add_check_overflow_instructions(builder, module);
             }
             t => panic!("type stack error: trying to cast {t:?}"),
         }
+
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.link_and_get_id(module, None);
+        builder.i32_const(Self::MAX_VALUE).call(check_overflow_f);
     }
 }
 
@@ -96,33 +80,17 @@ impl IU16 {
         load_i32_from_bytes_instructions(builder, &bytes);
     }
 
-    fn add_check_overflow_instructions(
-        builder: &mut walrus::InstrSeqBuilder,
-        module: &mut walrus::Module,
-    ) {
-        let tmp = module.locals.add(walrus::ValType::I32);
-        builder.local_tee(tmp);
-        builder.i32_const(Self::MAX_VALUE);
-        builder.binop(BinaryOp::I32GtU);
-        builder.if_else(
-            Some(ValType::I32),
-            |then| {
-                then.unreachable();
-            },
-            |else_| {
-                else_.local_get(tmp);
-            },
-        );
-    }
-
     /// Adds the instructions to add two u16 values.
     ///
     /// Along with the addition code to check overflow is added. If the result is greater than
     /// 65535 then the execution is aborted. This check is poosible because interally we are using
     /// 32bits integers.
     pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        builder.binop(BinaryOp::I32Add);
-        Self::add_check_overflow_instructions(builder, module);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.link_and_get_id(module, None);
+        builder
+            .binop(BinaryOp::I32Add)
+            .i32_const(Self::MAX_VALUE)
+            .call(check_overflow_f);
     }
 
     pub fn cast_from(
@@ -132,25 +100,25 @@ impl IU16 {
         memory: MemoryId,
     ) {
         match original_type {
-            IntermediateType::IU8 | IntermediateType::IU16 => {}
-            IntermediateType::IU32 => {
-                // Just check for overflow and leave the value in the stack again
-                Self::add_check_overflow_instructions(builder, module);
+            IntermediateType::IU8 | IntermediateType::IU16 => {
+                return;
             }
+            // Just check for overflow and leave the value in the stack again
+            IntermediateType::IU32 => {}
             IntermediateType::IU64 => {
                 builder.unop(UnaryOp::I32WrapI64);
-                Self::add_check_overflow_instructions(builder, module);
             }
             IntermediateType::IU128 => {
                 downcast_u128_to_u32(builder, module, memory);
-                Self::add_check_overflow_instructions(builder, module);
             }
             IntermediateType::IU256 => {
                 downcast_u256_to_u32(builder, module, memory);
-                Self::add_check_overflow_instructions(builder, module);
             }
             t => panic!("type stack error: trying to cast {t:?}"),
         }
+
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.link_and_get_id(module, None);
+        builder.i32_const(Self::MAX_VALUE).call(check_overflow_f);
     }
 }
 

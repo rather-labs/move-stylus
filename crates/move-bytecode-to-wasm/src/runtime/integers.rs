@@ -280,3 +280,37 @@ pub fn add_u64(module: &mut Module) -> FunctionId {
 
     function.finish(vec![n1, n2], &mut module.funcs)
 }
+
+/// Checks if an u8 or u16 number overflowed.
+///
+/// If the number overflowed it traps, otherwise it leaves the number in the stack
+pub fn check_overflow_u8_u16(module: &mut Module) -> FunctionId {
+    // the number to check and the max number admitted by the quantity of bits to check overflow
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function
+        .name(RuntimeFunction::CheckOverflowU8U16.name().to_owned())
+        .func_body();
+
+    let n = module.locals.add(ValType::I32);
+    let max = module.locals.add(ValType::I32);
+
+    builder
+        .local_get(n)
+        .local_get(max)
+        .binop(BinaryOp::I32GtU)
+        .if_else(
+            Some(ValType::I32),
+            |then| {
+                then.unreachable();
+            },
+            |else_| {
+                else_.local_get(n);
+            },
+        );
+
+    function.finish(vec![n, max], &mut module.funcs)
+}
