@@ -4,8 +4,8 @@ use walrus::{
 };
 
 use crate::{
+    runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, vector::IVector},
-    utils::add_swap_i32_bytes_function,
 };
 
 use super::Unpackable;
@@ -21,7 +21,7 @@ impl IVector {
         allocator: FunctionId,
     ) {
         // Big-endian to Little-endian
-        let swap_i32_bytes_function = add_swap_i32_bytes_function(module);
+        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
 
         let data_reader_pointer = module.locals.add(ValType::I32);
 

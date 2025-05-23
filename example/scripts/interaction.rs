@@ -6,13 +6,13 @@
 
 use dotenv::dotenv;
 use ethers::{
-    abi::{decode, ParamType},
+    abi::{ParamType, decode},
     middleware::SignerMiddleware,
     prelude::abigen,
     providers::{Http, Middleware, Provider},
     signers::{LocalWallet, Signer},
     types::{
-        transaction::eip2718::TypedTransaction, Address, NameOrAddress, TransactionRequest, H160,
+        Address, H160, NameOrAddress, TransactionRequest, transaction::eip2718::TypedTransaction,
     },
     utils::parse_ether,
 };

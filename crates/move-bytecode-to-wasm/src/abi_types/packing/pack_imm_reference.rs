@@ -1,9 +1,9 @@
 use super::Packable;
-use crate::translation::intermediate_types::imm_reference::IRef;
 use crate::translation::intermediate_types::IntermediateType;
+use crate::translation::intermediate_types::imm_reference::IRef;
 use walrus::{
-    ir::{LoadKind, MemArg},
     FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    ir::{LoadKind, MemArg},
 };
 
 impl IRef {

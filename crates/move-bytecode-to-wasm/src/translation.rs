@@ -1,19 +1,19 @@
 use anyhow::Result;
 use functions::{
-    add_unpack_function_return_values_instructions, prepare_function_return, MappedFunction,
+    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
 };
+use intermediate_types::IntermediateType;
 use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
-use intermediate_types::IntermediateType;
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
 use table::FunctionTable;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
-use walrus::{
-    ir::{MemArg, StoreKind},
-    FunctionId, InstrSeqBuilder, ValType,
-};
 use walrus::{FunctionBuilder, Module};
+use walrus::{
+    FunctionId, InstrSeqBuilder, ValType,
+    ir::{MemArg, StoreKind},
+};
 
 use crate::CompilationContext;
 
@@ -82,12 +82,7 @@ fn map_bytecode_instruction(
                 // TODO: unwrap
                 .unwrap();
 
-            constant_type.load_constant_instructions(
-                module,
-                builder,
-                &mut data,
-                compilation_ctx,
-            );
+            constant_type.load_constant_instructions(module, builder, &mut data, compilation_ctx);
 
             types_stack.push(constant_type);
             assert!(
@@ -142,8 +137,7 @@ fn map_bytecode_instruction(
         // Function calls
         Bytecode::Call(function_handle_index) => {
             // Consume from the types stack the arguments that will be used by the function call
-            let arguments =
-                &compilation_ctx.functions_arguments[function_handle_index.0 as usize];
+            let arguments = &compilation_ctx.functions_arguments[function_handle_index.0 as usize];
             for (i, argument) in arguments.iter().enumerate().rev() {
                 if let Err(e) = pop_types_stack(types_stack, argument) {
                     panic!("Called function signature arguments mismatch at index {i}: {e}");
@@ -165,8 +159,7 @@ fn map_bytecode_instruction(
                 compilation_ctx.memory_id,
             );
             // Insert in the stack types the types returned by the function (if any)
-            let return_types =
-                &compilation_ctx.functions_returns[function_handle_index.0 as usize];
+            let return_types = &compilation_ctx.functions_returns[function_handle_index.0 as usize];
             for return_type in return_types {
                 types_stack.push(return_type.clone());
             }
@@ -329,42 +322,22 @@ fn map_bytecode_instruction(
         }
         Bytecode::CastU8 => {
             let original_type = types_stack.pop().unwrap();
-            IU8::cast_from(
-                builder,
-                module,
-                original_type,
-                compilation_ctx.memory_id,
-            );
+            IU8::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU8);
         }
         Bytecode::CastU16 => {
             let original_type = types_stack.pop().unwrap();
-            IU16::cast_from(
-                builder,
-                module,
-                original_type,
-                compilation_ctx.memory_id,
-            );
+            IU16::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU16);
         }
         Bytecode::CastU32 => {
             let original_type = types_stack.pop().unwrap();
-            IU32::cast_from(
-                builder,
-                module,
-                original_type,
-                compilation_ctx.memory_id,
-            );
+            IU32::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU32);
         }
         Bytecode::CastU64 => {
             let original_type = types_stack.pop().unwrap();
-            IU64::cast_from(
-                builder,
-                module,
-                original_type,
-                compilation_ctx.memory_id,
-            );
+            IU64::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU64);
         }
         Bytecode::CastU128 => {
