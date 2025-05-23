@@ -1,11 +1,11 @@
 use walrus::{
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
     FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use crate::{
     runtime::RuntimeFunction,
-    translation::intermediate_types::{vector::IVector, IntermediateType},
+    translation::intermediate_types::{IntermediateType, vector::IVector},
 };
 
 use super::Unpackable;

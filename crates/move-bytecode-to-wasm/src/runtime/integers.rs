@@ -1,9 +1,9 @@
 use walrus::{
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
     FunctionBuilder, FunctionId, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
-use crate::{translation::intermediate_types::simple_integers::IU32, CompilationContext};
+use crate::{CompilationContext, translation::intermediate_types::simple_integers::IU32};
 
 use super::RuntimeFunction;
 

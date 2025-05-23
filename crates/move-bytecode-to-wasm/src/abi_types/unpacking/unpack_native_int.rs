@@ -1,14 +1,14 @@
-use alloy_sol_types::{sol_data, SolType};
+use alloy_sol_types::{SolType, sol_data};
 use walrus::{
-    ir::{BinaryOp, LoadKind, MemArg},
     FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module,
+    ir::{BinaryOp, LoadKind, MemArg},
 };
 
 use crate::{
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         boolean::IBool,
-        simple_integers::{IU16, IU32, IU64, IU8},
+        simple_integers::{IU8, IU16, IU32, IU64},
     },
 };
 

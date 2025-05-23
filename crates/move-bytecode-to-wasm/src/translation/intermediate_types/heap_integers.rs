@@ -1,9 +1,9 @@
 use walrus::{
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
     InstrSeqBuilder, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use crate::{runtime::RuntimeFunction, CompilationContext};
+use crate::{CompilationContext, runtime::RuntimeFunction};
 
 use super::IntermediateType;
 
@@ -265,8 +265,7 @@ impl IU128 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
     ) {
-        let add_function_id =
-            RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
+        let add_function_id = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
         builder.i32_const(Self::HEAP_SIZE).call(add_function_id);
     }
 }
@@ -454,8 +453,7 @@ impl IU256 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
     ) {
-        let add_function_id =
-            RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
+        let add_function_id = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
         builder.i32_const(Self::HEAP_SIZE).call(add_function_id);
     }
 }

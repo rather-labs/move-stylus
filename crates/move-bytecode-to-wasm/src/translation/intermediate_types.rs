@@ -2,11 +2,11 @@ use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
 use move_binary_format::file_format::{Signature, SignatureToken};
-use simple_integers::{IU16, IU32, IU64, IU8};
+use simple_integers::{IU8, IU16, IU32, IU64};
 use vector::IVector;
 use walrus::{
-    ir::{LoadKind, MemArg, StoreKind},
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    ir::{LoadKind, MemArg, StoreKind},
 };
 
 use crate::CompilationContext;
@@ -79,13 +79,9 @@ impl IntermediateType {
                 IAddress::load_constant_instructions(module, builder, bytes, compilation_ctx)
             }
             IntermediateType::ISigner => panic!("signer type can't be loaded as a constant"),
-            IntermediateType::IVector(inner) => IVector::load_constant_instructions(
-                inner,
-                module,
-                builder,
-                bytes,
-                compilation_ctx,
-            ),
+            IntermediateType::IVector(inner) => {
+                IVector::load_constant_instructions(inner, module, builder, bytes, compilation_ctx)
+            }
             IntermediateType::IRef(_) => {
                 panic!("cannot load a constant for a reference type");
             }
