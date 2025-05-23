@@ -481,7 +481,7 @@ fn map_bytecode_instruction(
                 IntermediateType::IU64 => IU64::bit_shift_left(builder, module),
                 IntermediateType::IU128 => todo!(),
                 IntermediateType::IU256 => todo!(),
-                t => panic!("type stack error: trying to add two {t:?}"),
+                t => panic!("type stack error: invalid type for Shl: {t:?}"),
             }
             types_stack.push(t);
         }
@@ -495,7 +495,7 @@ fn map_bytecode_instruction(
                 IntermediateType::IU64 => IU64::bit_shift_right(builder, module),
                 IntermediateType::IU128 => todo!(),
                 IntermediateType::IU256 => todo!(),
-                t => panic!("type stack error: trying to add two {t:?}"),
+                t => panic!("type stack error: invalid type for Shr: {t:?}"),
             }
             types_stack.push(t);
         }
