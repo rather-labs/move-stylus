@@ -168,20 +168,20 @@ fn map_bytecode_instruction(
         Bytecode::StLoc(local_id) => {
             let local = mapped_function.local_variables[*local_id as usize];
             let local_type = &mapped_function.local_variables_type[*local_id as usize];
-            local_type.set_loc_instructions(module, builder, compilation_ctx, local);
+            local_type.store_local_instructions(module, builder, compilation_ctx, local);
             pop_types_stack(types_stack, local_type).unwrap();
         }
         Bytecode::MoveLoc(local_id) => {
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
             let local = mapped_function.local_variables[*local_id as usize];
             let local_type = mapped_function.local_variables_type[*local_id as usize].clone();
-            local_type.move_loc_instructions(module, builder, compilation_ctx, local);
+            local_type.move_local_instructions(module, builder, compilation_ctx, local);
             types_stack.push(local_type);
         }
         Bytecode::CopyLoc(local_id) => {
             let local = mapped_function.local_variables[*local_id as usize];
             let local_type = mapped_function.local_variables_type[*local_id as usize].clone();
-            local_type.copy_loc_instructions(module, builder, compilation_ctx, local);
+            local_type.copy_local_instructions(module, builder, compilation_ctx, local);
             types_stack.push(local_type);
         }
         Bytecode::VecPack(signature_index, num_elements) => {
@@ -208,7 +208,7 @@ fn map_bytecode_instruction(
             let local = mapped_function.local_variables[*local_id as usize];
             let local_type = &mapped_function.local_variables_type[*local_id as usize];
 
-            local_type.add_imm_borrow_loc_instructions(module, builder, compilation_ctx, local);
+            local_type.add_borrow_local_instructions(module, builder, compilation_ctx, local);
 
             // Push the reference to the type into the types stack
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));

@@ -88,7 +88,7 @@ impl IntermediateType {
         }
     }
 
-    pub fn set_loc_instructions(
+    pub fn store_local_instructions(
         &self,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
@@ -136,7 +136,7 @@ impl IntermediateType {
         }
     }
 
-    pub fn move_loc_instructions(
+    pub fn move_local_instructions(
         &self,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
@@ -175,7 +175,7 @@ impl IntermediateType {
             }
         }
     }
-    pub fn copy_loc_instructions(
+    pub fn copy_local_instructions(
         &self,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
@@ -208,7 +208,7 @@ impl IntermediateType {
                 builder.local_get(local);
             }
             IntermediateType::IVector(inner) => {
-                IVector::copy_loc_instructions(inner, module, builder, compilation_ctx, local);
+                IVector::copy_local_instructions(inner, module, builder, compilation_ctx, local);
             }
             // `signer` type is not copy, this should never happen
             IntermediateType::ISigner => {
@@ -299,7 +299,7 @@ impl IntermediateType {
         }
     }
 
-    pub fn add_imm_borrow_loc_instructions(
+    pub fn add_borrow_local_instructions(
         &self,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
