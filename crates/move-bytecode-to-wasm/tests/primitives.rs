@@ -8,7 +8,6 @@ use alloy::{
 };
 use anyhow::Result;
 use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
-use rstest::fixture;
 
 mod common;
 
@@ -23,23 +22,21 @@ fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u
     Ok(())
 }
 
-#[fixture]
-fn runtime(
-    #[default("")] source_path: &'static str,
-    #[default("")] module_name: &'static str,
-) -> RuntimeSandbox {
-    let mut translated_package = translate_test_package(source_path, module_name);
-    RuntimeSandbox::new(&mut translated_package)
-}
-
 mod bool_type {
     use alloy::sol_types::SolValue;
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
 
     use super::*;
 
     const MODULE_NAME: &str = "bool_type";
     const SOURCE_PATH: &str = "tests/primitives/bool.move";
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+        RuntimeSandbox::new(&mut translated_package)
+    }
 
     sol!(
         #[allow(missing_docs)]
@@ -63,9 +60,7 @@ mod bool_type {
     #[case(notCall::new((false,)), (true,))]
     #[case(notCall::new((true,)), (false,))]
     fn test_bool<T: SolCall, V: SolValue>(
-        #[by_ref]
-        #[with(SOURCE_PATH, MODULE_NAME)]
-        runtime: &RuntimeSandbox,
+        #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
     ) where
@@ -82,12 +77,19 @@ mod bool_type {
 
 mod address_type {
     use alloy::{primitives::address, sol_types::SolValue};
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
 
     use super::*;
 
     const MODULE_NAME: &str = "address_type";
     const SOURCE_PATH: &str = "tests/primitives/address.move";
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+        RuntimeSandbox::new(&mut translated_package)
+    }
 
     sol!(
         #[allow(missing_docs)]
@@ -127,9 +129,7 @@ mod address_type {
         ( address!("0x0000000000000000000000000000000000000066"),)
     )]
     fn test_address<T: SolCall, V: SolValue>(
-        #[by_ref]
-        #[with(SOURCE_PATH, MODULE_NAME)]
-        runtime: &RuntimeSandbox,
+        #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
     ) where
@@ -146,7 +146,7 @@ mod address_type {
 
 mod signer_type {
     use alloy::{primitives::address, sol_types::SolValue};
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
 
     use super::*;
 
@@ -160,6 +160,13 @@ mod signer_type {
     const MODULE_NAME: &str = "signer_type";
     const SOURCE_PATH: &str = "tests/primitives/signer.move";
 
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
     #[rstest]
     #[case(echoCall::new(()), (address!("0x0000000000000000000000000000000007030507"),))]
     #[case(
@@ -171,9 +178,7 @@ mod signer_type {
         (42, address!("0x0000000000000000000000000000000007030507"))
     )]
     fn test_signer<T: SolCall, V: SolValue>(
-        #[by_ref]
-        #[with(SOURCE_PATH, MODULE_NAME)]
-        runtime: &RuntimeSandbox,
+        #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
     ) where
@@ -199,12 +204,19 @@ mod signer_type {
 
 mod uint_8 {
     use alloy::sol_types::SolValue;
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
 
     use super::*;
 
     const MODULE_NAME: &str = "uint_8";
     const SOURCE_PATH: &str = "tests/primitives/uint_8.move";
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+        RuntimeSandbox::new(&mut translated_package)
+    }
 
     sol!(
         #[allow(missing_docs)]
@@ -231,9 +243,7 @@ mod uint_8 {
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
     #[case(subCall::new((42, 84)), ((),))]
     fn test_uint_8<T: SolCall, V: SolValue>(
-        #[by_ref]
-        #[with(SOURCE_PATH, MODULE_NAME)]
-        runtime: &RuntimeSandbox,
+        #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
     ) where
@@ -250,12 +260,19 @@ mod uint_8 {
 
 mod uint_16 {
     use alloy::sol_types::SolValue;
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
 
     use super::*;
 
     const MODULE_NAME: &str = "uint_16";
     const SOURCE_PATH: &str = "tests/primitives/uint_16.move";
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+        RuntimeSandbox::new(&mut translated_package)
+    }
 
     sol!(
         #[allow(missing_docs)]
@@ -282,9 +299,7 @@ mod uint_16 {
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
     #[case(subCall::new((255, 510)), ((),))]
     fn test_uint_16<T: SolCall, V: SolValue>(
-        #[by_ref]
-        #[with(SOURCE_PATH, MODULE_NAME)]
-        runtime: &RuntimeSandbox,
+        #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
     ) where
@@ -301,12 +316,19 @@ mod uint_16 {
 
 mod uint_32 {
     use alloy::sol_types::SolValue;
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
 
     use super::*;
 
     const MODULE_NAME: &str = "uint_32";
     const SOURCE_PATH: &str = "tests/primitives/uint_32.move";
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+        RuntimeSandbox::new(&mut translated_package)
+    }
 
     sol!(
         #[allow(missing_docs)]
@@ -333,9 +355,7 @@ mod uint_32 {
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
     #[case(subCall::new((65535, 131070)), ((),))]
     fn test_uint_32<T: SolCall, V: SolValue>(
-        #[by_ref]
-        #[with(SOURCE_PATH, MODULE_NAME)]
-        runtime: &RuntimeSandbox,
+        #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
     ) where
@@ -352,12 +372,19 @@ mod uint_32 {
 
 mod uint_64 {
     use alloy::sol_types::SolValue;
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
 
     use super::*;
 
     const MODULE_NAME: &str = "uint_64";
     const SOURCE_PATH: &str = "tests/primitives/uint_64.move";
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+        RuntimeSandbox::new(&mut translated_package)
+    }
 
     sol!(
         #[allow(missing_docs)]
@@ -384,9 +411,7 @@ mod uint_64 {
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
     #[case(subCall::new((4294967295, 8589934590)), ())]
     fn test_uint_64<T: SolCall, V: SolValue>(
-        #[by_ref]
-        #[with(SOURCE_PATH, MODULE_NAME)]
-        runtime: &RuntimeSandbox,
+        #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
     ) where
@@ -403,12 +428,19 @@ mod uint_64 {
 
 mod uint_128 {
     use alloy::sol_types::SolValue;
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
 
     use super::*;
 
     const MODULE_NAME: &str = "uint_128";
     const SOURCE_PATH: &str = "tests/primitives/uint_128.move";
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+        RuntimeSandbox::new(&mut translated_package)
+    }
 
     sol!(
         #[allow(missing_docs)]
@@ -428,9 +460,7 @@ mod uint_128 {
     #[case(echoCall::new((u128::MAX,)), (u128::MAX,))]
     #[case(echo2Call::new((111, 222)), (222,))]
     fn test_uint_128<T: SolCall, V: SolValue>(
-        #[by_ref]
-        #[with(SOURCE_PATH, MODULE_NAME)]
-        runtime: &RuntimeSandbox,
+        #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
     ) where
@@ -473,9 +503,7 @@ mod uint_128 {
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
     #[case(sumCall::new((u128::MAX, 42)), ((),))]
     fn test_uint_128_sum<T: SolCall, V: SolValue>(
-        #[by_ref]
-        #[with(SOURCE_PATH, MODULE_NAME)]
-        runtime: &RuntimeSandbox,
+        #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
     ) where
@@ -492,12 +520,19 @@ mod uint_128 {
 
 mod uint_256 {
     use alloy::sol_types::SolValue;
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
 
     use super::*;
 
     const MODULE_NAME: &str = "uint_256";
     const SOURCE_PATH: &str = "tests/primitives/uint_256.move";
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+        RuntimeSandbox::new(&mut translated_package)
+    }
 
     sol!(
         #[allow(missing_docs)]
@@ -517,9 +552,7 @@ mod uint_256 {
     #[case(echoCall::new((U256::MAX,)), (U256::MAX,))]
     #[case(echo2Call::new((U256::from(111),U256::from(222))), (U256::from(222),))]
     fn test_uint_256<T: SolCall, V: SolValue>(
-        #[by_ref]
-        #[with(SOURCE_PATH, MODULE_NAME)]
-        runtime: &RuntimeSandbox,
+        #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
     ) where
@@ -619,9 +652,7 @@ mod uint_256 {
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
     #[case(sumCall::new((U256::MAX, U256::from(42))), ((),))]
     fn test_uint_256_sum<T: SolCall, V: SolValue>(
-        #[by_ref]
-        #[with(SOURCE_PATH, MODULE_NAME)]
-        runtime: &RuntimeSandbox,
+        #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
     ) where
