@@ -11,7 +11,7 @@ use table::FunctionTable;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{FunctionBuilder, Module};
 use walrus::{
-    FunctionId, InstrSeqBuilder, ValType,
+    FunctionId, InstrSeqBuilder, ValType, LocalId,
     ir::{MemArg, StoreKind},
 };
 
@@ -43,6 +43,17 @@ pub fn translate_function(
     let mut types_stack = Vec::new();
     let mut function = FunctionBuilder::new(&mut module.types, &entry.params, &entry.results);
     let mut builder = function.func_body();
+
+    // Normalize function arguments to be heap-based
+    for (arg_type, arg_local) in entry
+        .function
+        .signature
+        .arguments
+        .iter()
+        .zip(entry.function.arg_local_ids.iter())
+    {
+        normalize_argument_into_heap(arg_type, &mut builder, module, compilation_ctx, *arg_local);
+    }
 
     for instruction in &entry.function.move_code_unit.code {
         map_bytecode_instruction(
@@ -532,3 +543,51 @@ fn pop_types_stack(
     );
     Ok(())
 }
+
+pub fn normalize_argument_into_heap(
+    ty: &IntermediateType,
+    builder: &mut InstrSeqBuilder,
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    local: LocalId,
+) {
+    match ty {
+        IntermediateType::IBool
+        | IntermediateType::IU8
+        | IntermediateType::IU16
+        | IntermediateType::IU32
+        | IntermediateType::IU64 => {
+            let tmp = module.locals.add(match ty {
+                IntermediateType::IU64 => ValType::I64,
+                _ => ValType::I32,
+            });
+
+            // Save the original value to temp
+            builder.local_get(local);
+            builder.local_set(tmp);
+
+            // Allocate heap memory
+            builder.i32_const(ty.stack_data_size() as i32);
+            builder.call(compilation_ctx.allocator);
+            builder.local_tee(local);
+
+            // Store the value in heap
+            builder.local_get(tmp);
+            builder.store(
+                compilation_ctx.memory_id,
+                match ty {
+                    IntermediateType::IU64 => StoreKind::I64 { atomic: false },
+                    _ => StoreKind::I32 { atomic: false },
+                },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+        }
+        _ => {
+            // Already a pointer — no action needed
+        }
+    }
+}
+
