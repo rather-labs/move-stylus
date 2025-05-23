@@ -52,3 +52,7 @@ fun identity_2(_x: u64, y: u64): u64 {
 public fun sum(x: u64, y: u64): u64 {
     x + y
 }
+
+public fun sub(x: u64, y: u64): u64 {
+    x - y
+}

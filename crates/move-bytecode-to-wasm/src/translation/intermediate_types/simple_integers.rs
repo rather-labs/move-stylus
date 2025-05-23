@@ -41,6 +41,14 @@ impl IU8 {
             .call(check_overflow_f);
     }
 
+    /// Adds the instructions to substract two u8 values.
+    ///
+    /// If the substraction is less than 0, then it traps
+    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let sub_u32_f = RuntimeFunction::SubU32.get(module, None);
+        builder.call(sub_u32_f);
+    }
+
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
@@ -123,6 +131,14 @@ impl IU16 {
             .call(check_overflow_f);
     }
 
+    /// Adds the instructions to substract two u16 values.
+    ///
+    /// If the substraction is less than 0, then it traps
+    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let sub_u32_f = RuntimeFunction::SubU32.get(module, None);
+        builder.call(sub_u32_f);
+    }
+
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
@@ -197,6 +213,14 @@ impl IU32 {
         builder.call(add_function_id);
     }
 
+    /// Adds the instructions to substract two u32 values.
+    ///
+    /// If the substraction is less than 0, then it traps
+    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let sub_u32_f = RuntimeFunction::SubU32.get(module, None);
+        builder.call(sub_u32_f);
+    }
+
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
@@ -259,6 +283,14 @@ impl IU64 {
     pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
         let add_function_id = RuntimeFunction::AddU64.get(module, None);
         builder.call(add_function_id);
+    }
+
+    /// Adds the instructions to substract two u8 values.
+    ///
+    /// If the substraction is less than 0, then it traps
+    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let sub_u64_f = RuntimeFunction::SubU64.get(module, None);
+        builder.call(sub_u64_f);
     }
 
     pub fn cast_from(

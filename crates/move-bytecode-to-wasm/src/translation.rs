@@ -61,7 +61,6 @@ pub fn translate_function(
     Ok(function_id)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn map_bytecode_instruction(
     instruction: &Bytecode,
     compilation_ctx: &CompilationContext,
@@ -372,6 +371,29 @@ fn map_bytecode_instruction(
             }
 
             types_stack.push(sum_type);
+        }
+        Bytecode::Sub => {
+            let sub_type = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
+                assert_eq!(
+                    t1, t2,
+                    "types stack error: trying two substract two different types {t1:?} {t2:?}"
+                );
+                t1
+            } else {
+                panic!("types stack is empty");
+            };
+
+            match sub_type {
+                IntermediateType::IU8 => IU8::sub(builder, module),
+                IntermediateType::IU16 => IU16::sub(builder, module),
+                IntermediateType::IU32 => IU32::sub(builder, module),
+                IntermediateType::IU64 => IU64::sub(builder, module),
+                IntermediateType::IU128 => todo!(),
+                IntermediateType::IU256 => todo!(),
+                t => panic!("type stack error: trying to substract two {t:?}"),
+            }
+
+            types_stack.push(sub_type);
         }
         Bytecode::Or => {
             pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
