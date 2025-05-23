@@ -1,5 +1,6 @@
+use anyhow::Result;
 use move_binary_format::file_format::FunctionHandleIndex;
-use walrus::{ir::Value, ConstExpr, ElementKind, FunctionId, Module, TableId, TypeId, ValType};
+use walrus::{ConstExpr, ElementKind, FunctionId, Module, TableId, TypeId, ValType, ir::Value};
 
 use super::functions::MappedFunction;
 
@@ -105,15 +106,15 @@ impl<'a> FunctionTable<'a> {
     pub fn len(&self) -> usize {
         self.entries.len()
     }
-}
 
-impl Drop for FunctionTable<'_> {
-    fn drop(&mut self) {
+    pub fn ensure_all_functions_added(&self) -> Result<()> {
         if let Some(entry) = self.entries.iter().find(|e| !e.added_to_wasm_table) {
-            panic!(
+            anyhow::bail!(
                 "function {} was not added to the functions table",
                 entry.function.name
             );
         }
+
+        Ok(())
     }
 }

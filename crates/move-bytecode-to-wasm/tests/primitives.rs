@@ -1,3 +1,4 @@
+use alloy::dyn_abi::abi::TokenSeq;
 use alloy::{
     dyn_abi::SolType,
     hex::FromHex,
@@ -21,10 +22,11 @@ fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u
     Ok(())
 }
 
-#[test]
-fn test_bool() {
-    const MODULE_NAME: &str = "bool_type";
-    const SOURCE_PATH: &str = "tests/primitives/bool.move";
+mod bool_type {
+    use alloy::sol_types::SolValue;
+    use rstest::{fixture, rstest};
+
+    use super::*;
 
     sol!(
         #[allow(missing_docs)]
@@ -37,50 +39,47 @@ fn test_bool() {
         function not(bool x) external returns (bool);
     );
 
-    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-    let runtime = RuntimeSandbox::new(&mut translated_package);
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "bool_type";
+        const SOURCE_PATH: &str = "tests/primitives/bool.move";
 
-    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
-    let expected_result = <sol!((bool,))>::abi_encode_params(&(true,));
-    run_test(&runtime, data, expected_result).unwrap();
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+        RuntimeSandbox::new(&mut translated_package)
+    }
 
-    let data = getLocalCall::abi_encode(&getLocalCall::new((true,)));
-    let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
-    run_test(&runtime, data, expected_result).unwrap();
-
-    let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
-    let expected_result = <sol!((bool, bool))>::abi_encode_params(&(true, false));
-    run_test(&runtime, data, expected_result).unwrap();
-
-    let data = echoCall::abi_encode(&echoCall::new((true,)));
-    let expected_result = <sol!((bool,))>::abi_encode_params(&(true,));
-    run_test(&runtime, data, expected_result).unwrap();
-
-    let data = echoCall::abi_encode(&echoCall::new((false,)));
-    let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
-    run_test(&runtime, data, expected_result).unwrap();
-
-    let data = echo2Call::abi_encode(&echo2Call::new((true, false)));
-    let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
-    run_test(&runtime, data, expected_result).unwrap();
-
-    let data = notTrueCall::abi_encode(&notTrueCall::new(()));
-    let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
-    run_test(&runtime, data, expected_result).unwrap();
-
-    let data = notCall::abi_encode(&notCall::new((false,)));
-    let expected_result = <sol!((bool,))>::abi_encode_params(&(true,));
-    run_test(&runtime, data, expected_result).unwrap();
-
-    let data = notCall::abi_encode(&notCall::new((true,)));
-    let expected_result = <sol!((bool,))>::abi_encode_params(&(false,));
-    run_test(&runtime, data, expected_result).unwrap();
+    #[rstest]
+    #[case(getConstantCall::new(()), (true,))]
+    #[case(getLocalCall::new((true,)), (false,))]
+    #[case(getCopiedLocalCall::new(()), (true, false))]
+    #[case(echoCall::new((true,)), (true,))]
+    #[case(echoCall::new((false,)), (false,))]
+    #[case(echo2Call::new((true, false)), (false,))]
+    #[case(notTrueCall::new(()), (false,))]
+    #[case(notCall::new((false,)), (true,))]
+    #[case(notCall::new((true,)), (false,))]
+    fn test_bool<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode_params(),
+        )
+        .unwrap();
+    }
 }
 
-#[test]
-fn test_address() {
-    const MODULE_NAME: &str = "address_type";
-    const SOURCE_PATH: &str = "tests/primitives/address.move";
+mod address_type {
+    use alloy::{primitives::address, sol_types::SolValue};
+    use rstest::{fixture, rstest};
+
+    use super::*;
 
     sol!(
         #[allow(missing_docs)]
@@ -91,68 +90,65 @@ fn test_address() {
         function echo2(address x, address y) external returns (address);
     );
 
-    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-    let runtime = RuntimeSandbox::new(&mut translated_package);
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "address_type";
+        const SOURCE_PATH: &str = "tests/primitives/address.move";
 
-    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
-    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
-        "0x0000000000000000000000000000000000000001",
-    )
-    .unwrap(),));
-    run_test(&runtime, data, expected_result).unwrap();
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+        RuntimeSandbox::new(&mut translated_package)
+    }
 
-    let data = getLocalCall::abi_encode(&getLocalCall::new((Address::from_hex(
-        "0x0000000000000000000000000000000000000022",
-    )
-    .unwrap(),)));
-    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
-        "0x0000000000000000000000000000000000000011",
-    )
-    .unwrap(),));
-    run_test(&runtime, data, expected_result).unwrap();
-
-    let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
-    let expected_result = <sol!((address, address))>::abi_encode_params(&(
-        Address::from_hex("0x0000000000000000000000000000000000000001").unwrap(),
-        Address::from_hex("0x0000000000000000000000000000000000000022").unwrap(),
-    ));
-    run_test(&runtime, data, expected_result).unwrap();
-
-    let data = echoCall::abi_encode(&echoCall::new((Address::from_hex(
-        "0x0000000000000000000000000000000000000033",
-    )
-    .unwrap(),)));
-    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
-        "0x0000000000000000000000000000000000000033",
-    )
-    .unwrap(),));
-    run_test(&runtime, data, expected_result).unwrap();
-
-    let data = echoCall::abi_encode(&echoCall::new((Address::from_hex(
-        "0x0000000000000000000000000000000000000044",
-    )
-    .unwrap(),)));
-    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
-        "0x0000000000000000000000000000000000000044",
-    )
-    .unwrap(),));
-    run_test(&runtime, data, expected_result).unwrap();
-
-    let data = echo2Call::abi_encode(&echo2Call::new((
-        Address::from_hex("0x0000000000000000000000000000000000000055").unwrap(),
-        Address::from_hex("0x0000000000000000000000000000000000000066").unwrap(),
-    )));
-    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
-        "0x0000000000000000000000000000000000000066",
-    )
-    .unwrap(),));
-    run_test(&runtime, data, expected_result).unwrap();
+    #[rstest]
+    #[case(getConstantCall::new(()), (address!("0x0000000000000000000000000000000000000001"),))]
+    #[case(
+        getLocalCall::new((address!("0x0000000000000000000000000000000000000022"),)),
+        (address!("0x0000000000000000000000000000000000000011"),)
+    )]
+    #[case(
+        getCopiedLocalCall::new(()),
+        (
+            address!("0x0000000000000000000000000000000000000001"),
+            address!("0x0000000000000000000000000000000000000022")
+        )
+    )]
+    #[case(
+        echoCall::new((address!("0x0000000000000000000000000000000000000033"),)),
+        (address!("0x0000000000000000000000000000000000000033"),)
+    )]
+    #[case(
+        echoCall::new((address!("0x0000000000000000000000000000000000000044"),)),
+        (address!("0x0000000000000000000000000000000000000044"),)
+    )]
+    #[case(
+        echo2Call::new((
+            address!("0x0000000000000000000000000000000000000055"),
+            address!("0x0000000000000000000000000000000000000066"),
+        )),
+        ( address!("0x0000000000000000000000000000000000000066"),)
+    )]
+    fn test_address<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode_params(),
+        )
+        .unwrap();
+    }
 }
 
-#[test]
-fn test_signer() {
-    const MODULE_NAME: &str = "signer_type";
-    const SOURCE_PATH: &str = "tests/primitives/signer.move";
+mod signer_type {
+    use alloy::{primitives::address, sol_types::SolValue};
+    use rstest::{fixture, rstest};
+
+    use super::*;
 
     sol!(
         #[allow(missing_docs)]
@@ -161,35 +157,50 @@ fn test_signer() {
         function echoWithInt(uint8 y) external returns (uint8, address);
     );
 
-    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-    let runtime = RuntimeSandbox::new(&mut translated_package);
+    const MODULE_NAME: &str = "signer_type";
 
-    let data = echoCall::abi_encode(&echoCall::new(()));
-    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
-        "0x0000000000000000000000000000000007030507",
-    )
-    .unwrap(),));
-    run_test(&runtime, data, expected_result).unwrap();
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const SOURCE_PATH: &str = "tests/primitives/signer.move";
 
-    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-    let runtime = RuntimeSandbox::new(&mut translated_package);
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+        RuntimeSandbox::new(&mut translated_package)
+    }
 
-    let data = echoIdentityCall::abi_encode(&echoIdentityCall::new(()));
-    let expected_result = <sol!((address,))>::abi_encode_params(&(Address::from_hex(
-        "0x0000000000000000000000000000000007030507",
-    )
-    .unwrap(),));
-    run_test(&runtime, data, expected_result).unwrap();
+    #[rstest]
+    #[case(echoCall::new(()), (address!("0x0000000000000000000000000000000007030507"),))]
+    #[case(
+        echoIdentityCall::new(()),
+        (address!("0x0000000000000000000000000000000007030507"),)
+    )]
+    #[case(
+        echoWithIntCall::new((42,)),
+        (42, address!("0x0000000000000000000000000000000007030507"))
+    )]
+    fn test_signer<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode_params(),
+        )
+        .unwrap();
+    }
 
-    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-    let runtime = RuntimeSandbox::new(&mut translated_package);
-
-    let data = echoWithIntCall::abi_encode(&echoWithIntCall::new((42,)));
-    let expected_result = <sol!((uint8, address))>::abi_encode_params(&(
-        42,
-        Address::from_hex("0x0000000000000000000000000000000007030507").unwrap(),
-    ));
-    run_test(&runtime, data, expected_result).unwrap();
+    #[rstest]
+    #[should_panic(expected = "only one \"signer\" argument at the beginning is admitted")]
+    #[case("tests/primitives/signer_invalid_dup_signer.move")]
+    #[should_panic(expected = "complex types can't contain the type \"signer\"")]
+    #[case("tests/primitives/signer_invalid_nested_signer.move")]
+    fn test_signer_invalid(#[case] path: &str) {
+        translate_test_package(path, MODULE_NAME);
+    }
 }
 
 #[test]
