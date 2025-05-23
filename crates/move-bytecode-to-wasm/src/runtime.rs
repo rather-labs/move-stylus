@@ -15,6 +15,8 @@ pub enum RuntimeFunction {
     DowncastU64ToU32,
     DowncastU128U256ToU32,
     DowncastU128U256ToU64,
+    SubU32,
+    SubU64,
     // Swap bytes
     SwapI32Bytes,
     SwapI64Bytes,
@@ -23,15 +25,19 @@ pub enum RuntimeFunction {
 impl RuntimeFunction {
     pub fn name(&self) -> &'static str {
         match self {
-            RuntimeFunction::HeapIntSum => "heap_integer_add",
-            RuntimeFunction::AddU32 => "add_u32",
-            RuntimeFunction::AddU64 => "add_u64",
-            RuntimeFunction::CheckOverflowU8U16 => "check_overflow_u8_u16",
-            RuntimeFunction::DowncastU64ToU32 => "downcast_u64_to_u32",
-            RuntimeFunction::DowncastU128U256ToU32 => "downcast_u128_u256_to_u32",
-            RuntimeFunction::DowncastU128U256ToU64 => "downcast_u128_u256_to_u64",
-            RuntimeFunction::SwapI32Bytes => "swap_i32_bytes",
-            RuntimeFunction::SwapI64Bytes => "swap_i64_bytes",
+            // Integer operations
+            Self::HeapIntSum => "heap_integer_add",
+            Self::AddU32 => "add_u32",
+            Self::AddU64 => "add_u64",
+            Self::CheckOverflowU8U16 => "check_overflow_u8_u16",
+            Self::DowncastU64ToU32 => "downcast_u64_to_u32",
+            Self::DowncastU128U256ToU32 => "downcast_u128_u256_to_u32",
+            Self::DowncastU128U256ToU64 => "downcast_u128_u256_to_u64",
+            Self::SubU32 => "sub_u32",
+            Self::SubU64 => "sub_u64",
+            // Swap bytes
+            Self::SwapI32Bytes => "swap_i32_bytes",
+            Self::SwapI64Bytes => "swap_i64_bytes",
         }
     }
 
@@ -60,6 +66,8 @@ impl RuntimeFunction {
                 (Self::DowncastU128U256ToU64, Some(ctx)) => {
                     integers::downcast_u128_u256_to_u64(module, ctx)
                 }
+                (Self::SubU32, _) => integers::sub_u32(module),
+                (Self::SubU64, _) => integers::sub_u64(module),
                 // Swap
                 (Self::SwapI32Bytes, _) => swap::swap_i32_bytes_function(module),
                 (Self::SwapI64Bytes, _) => {
