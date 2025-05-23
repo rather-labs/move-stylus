@@ -317,22 +317,22 @@ fn map_bytecode_instruction(
         }
         Bytecode::CastU8 => {
             let original_type = types_stack.pop().unwrap();
-            IU8::cast_from(builder, module, original_type, compilation_ctx.memory_id);
+            IU8::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU8);
         }
         Bytecode::CastU16 => {
             let original_type = types_stack.pop().unwrap();
-            IU16::cast_from(builder, module, original_type, compilation_ctx.memory_id);
+            IU16::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU16);
         }
         Bytecode::CastU32 => {
             let original_type = types_stack.pop().unwrap();
-            IU32::cast_from(builder, module, original_type, compilation_ctx.memory_id);
+            IU32::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU32);
         }
         Bytecode::CastU64 => {
             let original_type = types_stack.pop().unwrap();
-            IU64::cast_from(builder, module, original_type, compilation_ctx.memory_id);
+            IU64::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU64);
         }
         Bytecode::CastU128 => {
