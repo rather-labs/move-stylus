@@ -165,7 +165,7 @@ impl IU16 {
         builder.i32_const(15).call(check_overflow_f);
 
         builder.binop(BinaryOp::I32Shl);
-        // Mask the bytes outside the u8 range
+        // Mask the bytes outside the u16 range
         builder.i32_const(0xFFFF).binop(BinaryOp::I32And);
     }
 
