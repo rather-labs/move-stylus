@@ -13,7 +13,7 @@ use super::{
 
 #[derive(thiserror::Error, Debug)]
 pub enum PublicFunctionValidationError {
-    #[error(r#"error in argument {0} of function "{1}", only one "signer" argument at the beggining is admitted"#)]
+    #[error(r#"error in argument {0} of function "{1}", only one "signer" argument at the beginning is admitted"#)]
     SignatureArgumentPosition(usize, String),
 
     #[error(
@@ -698,7 +698,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = r#"ABI error: error in argument 2 of function "test_function", only one "signer" argument at the beggining is admitted"#
+        expected = r#"ABI error: error in argument 2 of function "test_function", only one "signer" argument at the beginning is admitted"#
     )]
     fn test_fail_public_function_signature() {
         let (mut raw_module, _, _) = build_module();

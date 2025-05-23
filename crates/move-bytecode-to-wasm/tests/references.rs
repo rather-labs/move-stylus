@@ -270,7 +270,6 @@ mod reference_uint_256 {
 
 mod reference_address {
     use super::*;
-    use alloy::hex::FromHex;
     use alloy::primitives::Address;
     use alloy::primitives::address;
 
