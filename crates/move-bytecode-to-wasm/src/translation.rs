@@ -11,7 +11,7 @@ use table::FunctionTable;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{FunctionBuilder, Module};
 use walrus::{
-    FunctionId, InstrSeqBuilder, ValType, LocalId,
+    FunctionId, InstrSeqBuilder, LocalId, ValType,
     ir::{MemArg, StoreKind},
 };
 
@@ -590,4 +590,3 @@ pub fn normalize_argument_into_heap(
         }
     }
 }
-

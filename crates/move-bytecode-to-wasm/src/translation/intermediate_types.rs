@@ -312,32 +312,8 @@ impl IntermediateType {
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32
-            | IntermediateType::IU64 => {
-                let size = self.stack_data_size() as i32;
-                let ptr = module.locals.add(ValType::I32);
-
-                builder.i32_const(size);
-                builder.call(compilation_ctx.allocator);
-                builder.local_tee(ptr);
-
-                builder.local_get(local);
-                builder.store(
-                    compilation_ctx.memory_id,
-                    match self {
-                        IntermediateType::IU64 => StoreKind::I64 { atomic: false },
-                        _ => StoreKind::I32 { atomic: false },
-                    },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-
-                builder.local_get(ptr); // leave the pointer on the stack as &T
-            }
-
-            // Heap allocated: just forward the existing pointer
-            IntermediateType::IVector(_)
+            | IntermediateType::IU64
+            | IntermediateType::IVector(_)
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::ISigner
