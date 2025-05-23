@@ -268,6 +268,15 @@ impl IU128 {
         let add_function_id = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
         builder.i32_const(Self::HEAP_SIZE).call(add_function_id);
     }
+
+    pub fn sub(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+    ) {
+        let sub_function_id = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx));
+        builder.i32_const(Self::HEAP_SIZE).call(sub_function_id);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -455,5 +464,14 @@ impl IU256 {
     ) {
         let add_function_id = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
         builder.i32_const(Self::HEAP_SIZE).call(add_function_id);
+    }
+
+    pub fn sub(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+    ) {
+        let sub_function_id = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx));
+        builder.i32_const(Self::HEAP_SIZE).call(sub_function_id);
     }
 }

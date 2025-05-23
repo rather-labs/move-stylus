@@ -17,6 +17,7 @@ pub enum RuntimeFunction {
     DowncastU128U256ToU64,
     SubU32,
     SubU64,
+    HeapIntSub,
     // Swap bytes
     SwapI32Bytes,
     SwapI64Bytes,
@@ -35,6 +36,7 @@ impl RuntimeFunction {
             Self::DowncastU128U256ToU64 => "downcast_u128_u256_to_u64",
             Self::SubU32 => "sub_u32",
             Self::SubU64 => "sub_u64",
+            Self::HeapIntSub => "heap_integer_sub",
             // Swap bytes
             Self::SwapI32Bytes => "swap_i32_bytes",
             Self::SwapI64Bytes => "swap_i64_bytes",
@@ -68,6 +70,7 @@ impl RuntimeFunction {
                 }
                 (Self::SubU32, _) => integers::sub_u32(module),
                 (Self::SubU64, _) => integers::sub_u64(module),
+                (Self::HeapIntSub, Some(ctx)) => integers::heap_integers_sub(module, ctx),
                 // Swap
                 (Self::SwapI32Bytes, _) => swap::swap_i32_bytes_function(module),
                 (Self::SwapI64Bytes, _) => {

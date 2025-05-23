@@ -17,7 +17,10 @@ fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u
         result == 0,
         "Function returned non-zero exit code: {result}"
     );
-    anyhow::ensure!(return_data == expected_result, "return data mismatch");
+    anyhow::ensure!(
+        return_data == expected_result,
+        "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
+    );
 
     Ok(())
 }
@@ -450,6 +453,7 @@ mod uint_128 {
         function echo(uint128 x) external returns (uint128);
         function echo2(uint128 x, uint128 y) external returns (uint128);
         function sum(uint128 x, uint128 y) external returns (uint128);
+        function sub(uint128 x, uint128 y) external returns (uint128);
     );
 
     #[rstest]
@@ -490,7 +494,7 @@ mod uint_128 {
     //    For example
     //    2^64     = [0, ..., 0, 0, 1, 0, 0, 0, 0]
     //
-    // This tests are repeated for all the 32 bits chunks in the 256bits so we test a big number
+    // This tests are repeated for all the 32 bits chunks in the 128bits so we test a big number
     // that does not overflows
     #[rstest]
     #[case(sumCall::new((1,1)), (2,))]
@@ -503,6 +507,31 @@ mod uint_128 {
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
     #[case(sumCall::new((u128::MAX, 42)), ((),))]
     fn test_uint_128_sum<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode_params(),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(subCall::new((2,1)), (1,))]
+    #[case(subCall::new((8589934590, 4294967295)), (4294967295_u128,))]
+    #[case(subCall::new((8589934592, 4294967296)), (4294967296_u128,))]
+    #[case(subCall::new((36893488147419103230, 18446744073709551615)), (18446744073709551615_u128,))]
+    #[case(subCall::new((36893488147419103232, 18446744073709551616)), (18446744073709551616_u128,))]
+    #[case(subCall::new((158456325028528675187087900670, 79228162514264337593543950335)), (79228162514264337593543950335_u128,))]
+    #[case(subCall::new((158456325028528675187087900672, 79228162514264337593543950336)), (79228162514264337593543950336_u128,))]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(subCall::new((1, 2)), ((),))]
+    fn test_uint_128_sub<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
