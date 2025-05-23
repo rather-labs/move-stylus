@@ -1,6 +1,6 @@
 use walrus::{
-    ir::{MemArg, StoreKind},
     InstrSeqBuilder, LocalId, MemoryId, Module,
+    ir::{MemArg, StoreKind},
 };
 
 use crate::runtime::RuntimeFunction;

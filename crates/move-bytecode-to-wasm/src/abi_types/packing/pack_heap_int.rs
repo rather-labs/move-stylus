@@ -1,6 +1,6 @@
 use walrus::{
-    ir::{LoadKind, MemArg, StoreKind},
     InstrSeqBuilder, LocalId, MemoryId, Module,
+    ir::{LoadKind, MemArg, StoreKind},
 };
 
 use crate::{

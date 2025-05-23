@@ -1,11 +1,11 @@
 use anyhow::Result;
 use move_binary_format::file_format::{CodeUnit, FunctionDefinition, Signature};
 use walrus::{
-    ir::{LoadKind, MemArg, StoreKind},
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    ir::{LoadKind, MemArg, StoreKind},
 };
 
-use crate::{translation::intermediate_types::ISignature, CompilationContext};
+use crate::{CompilationContext, translation::intermediate_types::ISignature};
 
 use super::intermediate_types::IntermediateType;
 

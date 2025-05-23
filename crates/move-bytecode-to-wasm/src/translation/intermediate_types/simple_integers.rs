@@ -1,17 +1,17 @@
 use walrus::{
-    ir::{BinaryOp, UnaryOp},
     InstrSeqBuilder,
+    ir::{BinaryOp, UnaryOp},
 };
 
 use crate::{
+    CompilationContext,
     runtime::RuntimeFunction,
     wasm_helpers::{load_i32_from_bytes_instructions, load_i64_from_bytes_instructions},
-    CompilationContext,
 };
 
 use super::{
-    heap_integers::{IU128, IU256},
     IntermediateType,
+    heap_integers::{IU128, IU256},
 };
 
 #[derive(Clone, Copy)]
