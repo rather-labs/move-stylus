@@ -471,6 +471,34 @@ fn map_bytecode_instruction(
             }
             types_stack.push(t);
         }
+        Bytecode::Shl => {
+            pop_types_stack(types_stack, &IntermediateType::IU8).unwrap();
+            let t = types_stack.pop().unwrap();
+            match t {
+                IntermediateType::IU8 => IU8::bit_shift_left(builder, module),
+                IntermediateType::IU16 => IU16::bit_shift_left(builder, module),
+                IntermediateType::IU32 => IU32::bit_shift_left(builder, module),
+                IntermediateType::IU64 => IU64::bit_shift_left(builder, module),
+                IntermediateType::IU128 => todo!(),
+                IntermediateType::IU256 => todo!(),
+                t => panic!("type stack error: trying to add two {t:?}"),
+            }
+            types_stack.push(t);
+        }
+        Bytecode::Shr => {
+            pop_types_stack(types_stack, &IntermediateType::IU8).unwrap();
+            let t = types_stack.pop().unwrap();
+            match t {
+                IntermediateType::IU8 => IU8::bit_shift_right(builder, module),
+                IntermediateType::IU16 => IU16::bit_shift_right(builder, module),
+                IntermediateType::IU32 => IU32::bit_shift_right(builder, module),
+                IntermediateType::IU64 => IU64::bit_shift_right(builder, module),
+                IntermediateType::IU128 => todo!(),
+                IntermediateType::IU256 => todo!(),
+                t => panic!("type stack error: trying to add two {t:?}"),
+            }
+            types_stack.push(t);
+        }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
 }

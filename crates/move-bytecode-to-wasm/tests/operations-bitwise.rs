@@ -27,6 +27,8 @@ mod uint_8 {
         function or(uint8 x, uint8 y) external returns (uint8);
         function xor(uint8 x, uint8 y) external returns (uint8);
         function and(uint8 x, uint8 y) external returns (uint8);
+        function shiftLeft(uint8 x, uint8 slots) external returns (uint8);
+        function shiftRight(uint8 x, uint8 slots) external returns (uint8);
     );
 
     #[fixture]
@@ -91,6 +93,34 @@ mod uint_8 {
         let expected_result = <sol!((uint8,))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(shiftLeftCall::new((255, 7)), 255 << 7)]
+    #[case(shiftLeftCall::new((255, 1)), 255 << 1)]
+    #[case(shiftLeftCall::new((254, 7)), 254 << 7)]
+    #[case(shiftLeftCall::new((250, 0)), 250)]
+    #[case(shiftLeftCall::new((250, 4)), 250 << 4)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftLeftCall::new((240, 8)), 0)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftLeftCall::new((240, 10)), 0)]
+    #[case(shiftRightCall::new((255, 7)), 255 >> 7)]
+    #[case(shiftRightCall::new((255, 1)), 255 >> 1)]
+    #[case(shiftRightCall::new((254, 7)), 254 >> 7)]
+    #[case(shiftRightCall::new((250, 0)), 250)]
+    #[case(shiftRightCall::new((250, 4)), 250 >> 4)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftRightCall::new((240, 8)), 0)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftRightCall::new((240, 10)), 0)]
+    fn test_uint_8_shift<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u8,
+    ) {
+        let expected_result = <sol!((uint8,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
 }
 
 mod uint_16 {
@@ -101,6 +131,8 @@ mod uint_16 {
         function or(uint16 x, uint16 y) external returns (uint16);
         function xor(uint16 x, uint16 y) external returns (uint16);
         function and(uint16 x, uint16 y) external returns (uint16);
+        function shiftLeft(uint16 x, uint8 slots) external returns (uint16);
+        function shiftRight(uint16 x, uint8 slots) external returns (uint16);
     );
 
     #[fixture]
@@ -163,6 +195,34 @@ mod uint_16 {
         let expected_result = <sol!((uint16,))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(shiftLeftCall::new((1616, 7)), 1616 << 7)]
+    #[case(shiftLeftCall::new((1616, 1)), 1616 << 1)]
+    #[case(shiftLeftCall::new((1615, 7)), 1615 << 7)]
+    #[case(shiftLeftCall::new((1610, 0)), 1610)]
+    #[case(shiftLeftCall::new((1610, 4)), 1610 << 4)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftLeftCall::new((1600, 16)), 0)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftLeftCall::new((1600, 30)), 0)]
+    #[case(shiftRightCall::new((1616, 7)), 1616 >> 7)]
+    #[case(shiftRightCall::new((1616, 1)), 1616 >> 1)]
+    #[case(shiftRightCall::new((1615, 7)), 1615 >> 7)]
+    #[case(shiftRightCall::new((1610, 0)), 1610)]
+    #[case(shiftRightCall::new((1610, 4)), 1610 >> 4)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftRightCall::new((1600, 16)), 0)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftRightCall::new((1600, 30)), 0)]
+    fn test_uint_16_shift<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u16,
+    ) {
+        let expected_result = <sol!((uint16,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
 }
 
 mod uint_32 {
@@ -173,6 +233,8 @@ mod uint_32 {
         function or(uint32 x, uint32 y) external returns (uint32);
         function xor(uint32 x, uint32 y) external returns (uint32);
         function and(uint32 x, uint32 y) external returns (uint32);
+        function shiftLeft(uint32 x, uint8 slots) external returns (uint32);
+        function shiftRight(uint32 x, uint8 slots) external returns (uint32);
     );
 
     #[fixture]
@@ -236,6 +298,34 @@ mod uint_32 {
         let expected_result = <sol!((uint32,))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(shiftLeftCall::new((3232, 7)), 3232 << 7)]
+    #[case(shiftLeftCall::new((3232, 1)), 3232 << 1)]
+    #[case(shiftLeftCall::new((3231, 7)), 3231 << 7)]
+    #[case(shiftLeftCall::new((3226, 0)), 3226)]
+    #[case(shiftLeftCall::new((3226, 4)), 3226 << 4)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftLeftCall::new((3200, 32)), 0)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftLeftCall::new((3200, 50)), 0)]
+    #[case(shiftRightCall::new((3232, 7)), 3232 >> 7)]
+    #[case(shiftRightCall::new((3232, 1)), 3232 >> 1)]
+    #[case(shiftRightCall::new((3231, 7)), 3231 >> 7)]
+    #[case(shiftRightCall::new((3226, 0)), 3226)]
+    #[case(shiftRightCall::new((3226, 4)), 3226 >> 4)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftRightCall::new((3200, 32)), 0)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftRightCall::new((3200, 50)), 0)]
+    fn test_uint_32_shift<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u32,
+    ) {
+        let expected_result = <sol!((uint32,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
 }
 
 mod uint_64 {
@@ -246,6 +336,8 @@ mod uint_64 {
         function or(uint64 x, uint64 y) external returns (uint64);
         function xor(uint64 x, uint64 y) external returns (uint64);
         function and(uint64 x, uint64 y) external returns (uint64);
+        function shiftLeft(uint64 x, uint8 slots) external returns (uint64);
+        function shiftRight(uint64 x, uint8 slots) external returns (uint64);
     );
 
     #[fixture]
@@ -301,6 +393,34 @@ mod uint_64 {
     #[case(andCall::new((0, 0)), 0)]
     #[case(andCall::new((u64::MAX, u64::MAX)), u64::MAX)]
     fn test_uint_64_and<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u64,
+    ) {
+        let expected_result = <sol!((uint64,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
+
+    #[rstest]
+    #[case(shiftLeftCall::new((6464, 7)), 6464 << 7)]
+    #[case(shiftLeftCall::new((6464, 1)), 6464 << 1)]
+    #[case(shiftLeftCall::new((6463, 7)), 6463 << 7)]
+    #[case(shiftLeftCall::new((6458, 0)), 6458)]
+    #[case(shiftLeftCall::new((6458, 4)), 6458 << 4)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftLeftCall::new((6400, 64)), 0)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftLeftCall::new((6400, 100)), 0)]
+    #[case(shiftRightCall::new((6464, 7)), 6464 >> 7)]
+    #[case(shiftRightCall::new((6464, 1)), 6464 >> 1)]
+    #[case(shiftRightCall::new((6463, 7)), 6463 >> 7)]
+    #[case(shiftRightCall::new((6458, 0)), 6458)]
+    #[case(shiftRightCall::new((6458, 4)), 6458 >> 4)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftRightCall::new((6400, 64)), 0)]
+    #[should_panic(expected = "wasm `unreachable` instruction executed")]
+    #[case(shiftRightCall::new((6400, 100)), 0)]
+    fn test_uint_64_shift<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: u64,

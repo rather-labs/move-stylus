@@ -76,6 +76,24 @@ impl IU8 {
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
         builder.i32_const(Self::MAX_VALUE).call(check_overflow_f);
     }
+
+    pub fn bit_shift_left(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 8
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(7).call(check_overflow_f);
+
+        builder.binop(BinaryOp::I32Shl);
+        // Mask the bytes outside the u8 range
+        builder.i32_const(0xFF).binop(BinaryOp::I32And);
+    }
+
+    pub fn bit_shift_right(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 8
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(7).call(check_overflow_f);
+
+        builder.binop(BinaryOp::I32ShrU);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -140,6 +158,24 @@ impl IU16 {
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
         builder.i32_const(Self::MAX_VALUE).call(check_overflow_f);
     }
+
+    pub fn bit_shift_left(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 16
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(15).call(check_overflow_f);
+
+        builder.binop(BinaryOp::I32Shl);
+        // Mask the bytes outside the u8 range
+        builder.i32_const(0xFFFF).binop(BinaryOp::I32And);
+    }
+
+    pub fn bit_shift_right(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 16
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(15).call(check_overflow_f);
+
+        builder.binop(BinaryOp::I32ShrU);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -190,6 +226,22 @@ impl IU32 {
             t => panic!("type stack error: trying to cast {t:?}"),
         }
     }
+
+    pub fn bit_shift_left(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 32
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(31).call(check_overflow_f);
+
+        builder.binop(BinaryOp::I32Shl);
+    }
+
+    pub fn bit_shift_right(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 32
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(31).call(check_overflow_f);
+
+        builder.binop(BinaryOp::I32ShrU);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -236,5 +288,23 @@ impl IU64 {
             }
             t => panic!("type stack error: trying to cast {t:?}"),
         }
+    }
+
+    pub fn bit_shift_left(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 64
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(63).call(check_overflow_f);
+
+        builder.unop(UnaryOp::I64ExtendUI32);
+        builder.binop(BinaryOp::I64Shl);
+    }
+
+    pub fn bit_shift_right(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 64
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(63).call(check_overflow_f);
+
+        builder.unop(UnaryOp::I64ExtendUI32);
+        builder.binop(BinaryOp::I64ShrU);
     }
 }
