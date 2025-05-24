@@ -648,6 +648,7 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
     let pointer = module.locals.add(ValType::I32);
     let offset = module.locals.add(ValType::I32);
     let borrow = module.locals.add(ValType::I64);
+    let sum = module.locals.add(ValType::I64);
     let partial_sub = module.locals.add(ValType::I64);
     let n1 = module.locals.add(ValType::I64);
     let n2 = module.locals.add(ValType::I64);
@@ -734,13 +735,24 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
                     );
 
                 // Calculate new borrow
-                // if n1 - borrow > n2 => new borrow
+                // If n1 - borrow < n1 == n1 < n2 + borrow => new borrow
+                // We also need to check that n2 + borrow did not overflow, if that's the case then
+                // there is a new borrow
                 loop_
-                    .local_get(n1)
+                    // sum = n2 + borrow
+                    .local_get(n2)
                     .local_get(borrow)
-                    .binop(BinaryOp::I64Sub)
+                    .binop(BinaryOp::I64Add)
+                    .local_set(sum)
+                    // n1 < n2 + borrow
+                    .local_get(n1)
+                    .local_get(sum)
+                    .binop(BinaryOp::I64LtU)
+                    // sum < n2
+                    .local_get(sum)
                     .local_get(n2)
                     .binop(BinaryOp::I64LtU)
+                    .binop(BinaryOp::I32Or)
                     .unop(UnaryOp::I64ExtendUI32)
                     .local_set(borrow);
 
@@ -765,134 +777,6 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
                 else_.local_get(pointer);
             },
         );
-
-    /*
-    // Allocate memory for the result
-    builder
-        // allocate memory for the result
-        .local_get(type_heap_size)
-        .call(compilation_ctx.allocator)
-        .local_set(pointer)
-        // Set the offset to 0
-        .i32_const(0)
-        .local_set(offset)
-        // Set underflowed to false
-        .i32_const(0)
-        .local_set(underflowed);
-
-    builder
-        .block(None, |block| {
-            let block_id = block.id();
-            block.loop_(None, |loop_| {
-                let loop_id = loop_.id();
-                // Load a part of the first operand and save it in n1
-                loop_
-                    // Read the first operand
-                    .local_get(n1_ptr)
-                    .local_get(offset)
-                    .binop(BinaryOp::I32Add)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I64 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_tee(n1)
-                    // Read the second operand
-                    .local_get(n2_ptr)
-                    .local_get(offset)
-                    .binop(BinaryOp::I32Add)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I64 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_tee(n2)
-                    // We substract the two loaded parts
-                    .binop(BinaryOp::I64Sub)
-                    // And substract the carry (we use the underflowed flag, since the carry is
-                    // always 1)
-                    .local_get(underflowed)
-                    .unop(UnaryOp::I64ExtendUI32)
-                    .binop(BinaryOp::I64Sub)
-                    // Save the result to partial_sum
-                    .local_set(partial_sub);
-
-                // Save chunk of 64 bits
-                loop_
-                    .local_get(pointer)
-                    .local_get(offset)
-                    .binop(BinaryOp::I32Add)
-                    .local_get(partial_sub)
-                    .store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I64 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-
-                // [0, 0, 0, 0, 0, 0, 0, 0,                 | 0,     0,   0,   0,   0,   0,   0,   1]
-                // [255, 255, 255, 255, 255, 255, 255, 255, | 255, 255, 255, 255, 255, 255, 255, 255]
-
-                // Check underflow
-                // if (a < b + carry) then there was underflow
-                loop_
-                    .local_get(n2)
-                    .local_get(underflowed)
-                    .unop(UnaryOp::I64ExtendUI32)
-                    .binop(BinaryOp::I64Add)
-                    .local_get(n1)
-                    .binop(BinaryOp::I64LtU)
-                    // .local_get(underflowed)
-                    // .binop(BinaryOp::I32Or)
-                    .local_set(underflowed);
-
-                // We check if we are adding the last chunks of the operands
-                loop_
-                    .local_get(offset)
-                    .local_get(type_heap_size)
-                    .i32_const(8)
-                    .binop(BinaryOp::I32Sub)
-                    .binop(BinaryOp::I32Eq)
-                    .if_else(
-                        None,
-                        |then| {
-                            // If an overflow happened in the last chunk, means the whole number
-                            // underflowed
-                            then.local_get(underflowed).if_else(
-                                None,
-                                |then| {
-                                    then.unreachable();
-                                },
-                                // Otherwise we finished the  addition
-                                |else_| {
-                                    else_.br(block_id);
-                                },
-                            );
-                        },
-                        // If we are not in the last chunk, we continue the iteration
-                        |else_| {
-                            // offset += 8 and process the next part of the integer
-                            else_
-                                .local_get(offset)
-                                .i32_const(8)
-                                .binop(BinaryOp::I32Add)
-                                .local_set(offset)
-                                .br(loop_id);
-                        },
-                    );
-            });
-        })
-        // Return the address of the sum
-        .local_get(pointer);
-        */
 
     function.finish(vec![n1_ptr, n2_ptr, type_heap_size], &mut module.funcs)
 }
