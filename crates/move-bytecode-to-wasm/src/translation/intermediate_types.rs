@@ -6,7 +6,7 @@ use simple_integers::{IU8, IU16, IU32, IU64};
 use vector::IVector;
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
-    ir::{LoadKind, MemArg, StoreKind},
+    ir::{LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 use crate::CompilationContext;
@@ -99,38 +99,56 @@ impl IntermediateType {
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
-            | IntermediateType::IU32
-            | IntermediateType::IU64 => {
-                let (valtype, storekind) = match self {
-                    IntermediateType::IU64 => (ValType::I64, StoreKind::I64 { atomic: false }),
-                    _ => (ValType::I32, StoreKind::I32 { atomic: false }),
-                };
-                // The value is on top of the stack. We store it in an aux variable
-                let value = module.locals.add(valtype);
-                builder.local_set(value);
+            | IntermediateType::IU32 => {
+                let tmp = module.locals.add(ValType::I32);
+                builder.local_set(tmp);
 
-                // The local will actually hold a pointer to the value, which is stored in memory
+                // i32 pointer
+                let pointer_tmp = module.locals.add(ValType::I32);
                 builder
                     .i32_const(self.stack_data_size() as i32)
                     .call(compilation_ctx.allocator)
-                    .local_tee(local)
-                    .local_get(value)
-                    .store(
-                        compilation_ctx.memory_id,
-                        storekind,
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
+                    .local_tee(local);
+
+                // Store value into heap
+                builder.local_get(tmp).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
             }
+            IntermediateType::IU64 => {
+                let tmp = module.locals.add(ValType::I64);
+                builder.local_set(tmp);
+                let pointer_tmp = module.locals.add(ValType::I32);
+                builder
+                    .i32_const(8 as i32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(pointer_tmp)
+                    .unop(UnaryOp::I64ExtendUI32) // Extend the i32 address into i64
+                    .local_set(local);
+
+                // Store value into heap at pointer
+                builder.local_get(pointer_tmp).local_get(tmp).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+
             IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_) => {
-                // The address is on top of the stack. We store it in the local variable directly.
+                // For heap/pointer types just store the address
                 builder.local_set(local);
             }
         }
@@ -147,17 +165,22 @@ impl IntermediateType {
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
-            | IntermediateType::IU32
-            | IntermediateType::IU64 => {
+            | IntermediateType::IU32 => {
                 // The local holds a pointer to the value, which is stored in memory
                 // The value is loaded into the stack
-                builder.local_get(local);
-                builder.load(
+                builder.local_get(local).load(
                     compilation_ctx.memory_id,
-                    match self {
-                        IntermediateType::IU64 => LoadKind::I64 { atomic: false },
-                        _ => LoadKind::I32 { atomic: false },
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
                     },
+                );
+            }
+            IntermediateType::IU64 => {
+                builder.local_get(local).unop(UnaryOp::I32WrapI64).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I64 { atomic: false },
                     MemArg {
                         align: 0,
                         offset: 0,
@@ -186,15 +209,23 @@ impl IntermediateType {
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
-            | IntermediateType::IU32
-            | IntermediateType::IU64 => {
-                builder.local_get(local);
-                builder.load(
+            | IntermediateType::IU32 => {
+                builder.local_get(local).load(
                     compilation_ctx.memory_id,
-                    match self {
-                        IntermediateType::IU64 => LoadKind::I64 { atomic: false },
-                        _ => LoadKind::I32 { atomic: false },
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
                     },
+                );
+            }
+            IntermediateType::IU64 => {
+                builder
+                    .local_get(local)
+                    .unop(UnaryOp::I32WrapI64)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I64 { atomic: false },
                     MemArg {
                         align: 0,
                         offset: 0,
@@ -210,7 +241,6 @@ impl IntermediateType {
             IntermediateType::IVector(inner) => {
                 IVector::copy_local_instructions(inner, module, builder, compilation_ctx, local);
             }
-            // `signer` type is not copy, this should never happen
             IntermediateType::ISigner => {
                 panic!(r#"trying to introduce copy instructions for "signer" type"#)
             }
@@ -307,18 +337,20 @@ impl IntermediateType {
         local: LocalId,
     ) {
         match self {
-            // For primitives, we copy the value in memory and return a pointer to it
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32
-            | IntermediateType::IU64
             | IntermediateType::IVector(_)
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::ISigner
             | IntermediateType::IAddress => {
                 builder.local_get(local);
+            }
+            IntermediateType::IU64 => {
+                builder.local_get(local);
+                builder.unop(UnaryOp::I32WrapI64);
             }
             IntermediateType::IRef(_) => {
                 panic!("Cannot ImmBorrowLoc on a reference type");

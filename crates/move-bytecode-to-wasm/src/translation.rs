@@ -555,12 +555,8 @@ pub fn normalize_argument_into_heap(
         IntermediateType::IBool
         | IntermediateType::IU8
         | IntermediateType::IU16
-        | IntermediateType::IU32
-        | IntermediateType::IU64 => {
-            let tmp = module.locals.add(match ty {
-                IntermediateType::IU64 => ValType::I64,
-                _ => ValType::I32,
-            });
+        | IntermediateType::IU32 => {
+            let tmp = module.locals.add(ValType::I32);
 
             // Save the original value to temp
             builder.local_get(local);
@@ -575,16 +571,43 @@ pub fn normalize_argument_into_heap(
             builder.local_get(tmp);
             builder.store(
                 compilation_ctx.memory_id,
-                match ty {
-                    IntermediateType::IU64 => StoreKind::I64 { atomic: false },
-                    _ => StoreKind::I32 { atomic: false },
-                },
+                StoreKind::I32 { atomic: false },
                 MemArg {
                     align: 0,
                     offset: 0,
                 },
             );
         }
+
+        IntermediateType::IU64 => {
+            let tmp = module.locals.add(ValType::I64);
+            let pointer = module.locals.add(ValType::I32);
+
+            // Save the original value to temp
+            builder.local_get(local);
+            builder.local_set(tmp);
+
+            // Allocate heap memory
+            builder.i32_const(ty.stack_data_size() as i32);
+            builder.call(compilation_ctx.allocator);
+            builder.local_tee(pointer);
+
+            // Store the value in heap
+            builder.local_get(tmp);
+            builder.store(
+                compilation_ctx.memory_id,
+                StoreKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+            builder
+                .local_get(pointer)
+                .unop(UnaryOp::I64ExtendUI32)
+                .local_set(local);
+        }
+
         _ => {
             // Already a pointer — no action needed
         }
