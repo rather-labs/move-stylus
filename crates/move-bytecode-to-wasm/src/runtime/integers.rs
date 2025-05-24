@@ -647,8 +647,8 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
     // Locals
     let pointer = module.locals.add(ValType::I32);
     let offset = module.locals.add(ValType::I32);
-    let overflowed = module.locals.add(ValType::I32);
-    let partial_sum = module.locals.add(ValType::I64);
+    let underflowed = module.locals.add(ValType::I32);
+    let partial_sub = module.locals.add(ValType::I64);
     let n1 = module.locals.add(ValType::I64);
     let n2 = module.locals.add(ValType::I64);
 
@@ -661,9 +661,9 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
         // Set the offset to 0
         .i32_const(0)
         .local_set(offset)
-        // Set the overflowed to false
+        // Set underflowed to false
         .i32_const(0)
-        .local_set(overflowed);
+        .local_set(underflowed);
 
     builder
         .block(None, |block| {
@@ -685,10 +685,6 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
                         },
                     )
                     .local_tee(n1)
-                    .local_get(overflowed)
-                    .unop(UnaryOp::I64ExtendUI32)
-                    .binop(BinaryOp::I64Add)
-                    .local_tee(n1)
                     // Read the second operand
                     .local_get(n2_ptr)
                     .local_get(offset)
@@ -704,15 +700,20 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
                     .local_tee(n2)
                     // We substract the two loaded parts
                     .binop(BinaryOp::I64Sub)
+                    // And substract the carry (we use the underflowed flag, since the carry is
+                    // always 1)
+                    .local_get(underflowed)
+                    .unop(UnaryOp::I64ExtendUI32)
+                    .binop(BinaryOp::I64Sub)
                     // Save the result to partial_sum
-                    .local_set(partial_sum);
+                    .local_set(partial_sub);
 
                 // Save chunk of 64 bits
                 loop_
                     .local_get(pointer)
                     .local_get(offset)
                     .binop(BinaryOp::I32Add)
-                    .local_get(partial_sum)
+                    .local_get(partial_sub)
                     .store(
                         compilation_ctx.memory_id,
                         StoreKind::I64 { atomic: false },
@@ -722,14 +723,21 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
                         },
                     );
 
+                // [0, 0, 0, 0, 0, 0, 0, 0,                 | 0,     0,   0,   0,   0,   0,   0,   1]
+                // [255, 255, 255, 255, 255, 255, 255, 255, | 255, 255, 255, 255, 255, 255, 255, 255]
+
                 // Check underflow
+                // if (a < b + carry) then there was underflow
                 loop_
                     .local_get(n1)
                     .local_get(n2)
+                    .local_get(underflowed)
+                    .unop(UnaryOp::I64ExtendUI32)
+                    .binop(BinaryOp::I64Add)
                     .binop(BinaryOp::I64LtU)
-                    .local_get(overflowed)
-                    .binop(BinaryOp::I32Or)
-                    .local_set(overflowed);
+                    // .local_get(underflowed)
+                    // .binop(BinaryOp::I32Or)
+                    .local_set(underflowed);
 
                 // We check if we are adding the last chunks of the operands
                 loop_
@@ -742,12 +750,11 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
                         None,
                         |then| {
                             // If an overflow happened in the last chunk, means the whole number
-                            // overflowed
-                            then.local_get(overflowed).if_else(
+                            // underflowed
+                            then.local_get(underflowed).if_else(
                                 None,
                                 |then| {
-                                    // then.unreachable();
-                                    then.br(block_id);
+                                    then.unreachable();
                                 },
                                 // Otherwise we finished the  addition
                                 |else_| {

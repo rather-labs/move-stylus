@@ -12,7 +12,15 @@ use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
 mod common;
 
 fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
+    println!(
+        "n1: {:?}\nn2: {:?}\n",
+        &call_data[call_data.len() - 48..call_data.len() - 32],
+        &call_data[call_data.len() - 16..call_data.len()],
+    );
     let (result, return_data) = runtime.call_entrypoint(call_data)?;
+
+    println!("returned:{return_data:?}\nexpected:{expected_result:?}");
+
     anyhow::ensure!(
         result == 0,
         "Function returned non-zero exit code: {result}"
@@ -531,6 +539,14 @@ mod uint_128 {
     #[case(subCall::new((158456325028528675187087900672, 79228162514264337593543950336)), (79228162514264337593543950336_u128,))]
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
     #[case(subCall::new((1, 2)), ((),))]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(subCall::new((4294967296, 8589934592)), ((),))]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(subCall::new((18446744073709551616, 36893488147419103232)), ((),))]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(subCall::new((79228162514264337593543950336, 158456325028528675187087900672)), ((),))]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(subCall::new((1, u128::MAX)), ((),))]
     fn test_uint_128_sub<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
