@@ -647,14 +647,128 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
     // Locals
     let pointer = module.locals.add(ValType::I32);
     let offset = module.locals.add(ValType::I32);
-    let underflowed = module.locals.add(ValType::I32);
+    let borrow = module.locals.add(ValType::I64);
     let partial_sub = module.locals.add(ValType::I64);
     let n1 = module.locals.add(ValType::I64);
     let n2 = module.locals.add(ValType::I64);
 
+    builder
+        // allocate memory for the result
+        .local_get(type_heap_size)
+        .call(compilation_ctx.allocator)
+        .local_set(pointer)
+        // Set borrow to 0
+        .i64_const(0)
+        .local_set(borrow)
+        // Set offset to 0
+        .i32_const(0)
+        .local_set(offset);
+
+    builder
+        .block(None, |block| {
+            let block_id = block.id();
+
+            block.loop_(None, |loop_| {
+                let loop_id = loop_.id();
+
+                // Break the loop of we processed all the chunks
+                loop_
+                    .local_get(offset)
+                    .local_get(type_heap_size)
+                    .binop(BinaryOp::I32Eq)
+                    .br_if(block_id);
+
+                // Load n1
+                loop_
+                    .local_get(n1_ptr)
+                    .local_get(offset)
+                    .binop(BinaryOp::I32Add)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(n1);
+
+                // Load n2
+                loop_
+                    .local_get(n2_ptr)
+                    .local_get(offset)
+                    .binop(BinaryOp::I32Add)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(n2);
+
+                // partual_sub = a - b - borrow
+                loop_
+                    .local_get(n1)
+                    .local_get(n2)
+                    .binop(BinaryOp::I64Sub)
+                    .local_tee(partial_sub)
+                    .local_get(borrow)
+                    .binop(BinaryOp::I64Sub)
+                    .local_set(partial_sub);
+
+                // Save chunk of 64 bits
+                loop_
+                    .local_get(pointer)
+                    .local_get(offset)
+                    .binop(BinaryOp::I32Add)
+                    .local_get(partial_sub)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                // Calculate new borrow
+                loop_
+                    .local_get(n1)
+                    .local_get(n2)
+                    .local_get(borrow)
+                    .binop(BinaryOp::I64Add)
+                    .binop(BinaryOp::I64LtU)
+                    .unop(UnaryOp::I64ExtendUI32)
+                    .local_set(borrow);
+
+                // offset += 8 and process the next part of the integer
+                loop_
+                    .local_get(offset)
+                    .i32_const(8)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(offset)
+                    .br(loop_id);
+            });
+        })
+        .local_get(borrow)
+        .i64_const(0)
+        .binop(BinaryOp::I64Ne)
+        .if_else(
+            ValType::I32,
+            |then| {
+                then.unreachable();
+            },
+            |else_| {
+                else_.local_get(pointer);
+            },
+        );
+
+    /*
     // Allocate memory for the result
     builder
-        // Allocate memory for the result
+        // allocate memory for the result
         .local_get(type_heap_size)
         .call(compilation_ctx.allocator)
         .local_set(pointer)
@@ -729,11 +843,11 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
                 // Check underflow
                 // if (a < b + carry) then there was underflow
                 loop_
-                    .local_get(n1)
                     .local_get(n2)
                     .local_get(underflowed)
                     .unop(UnaryOp::I64ExtendUI32)
                     .binop(BinaryOp::I64Add)
+                    .local_get(n1)
                     .binop(BinaryOp::I64LtU)
                     // .local_get(underflowed)
                     // .binop(BinaryOp::I32Or)
@@ -777,6 +891,7 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
         })
         // Return the address of the sum
         .local_get(pointer);
+        */
 
     function.finish(vec![n1_ptr, n2_ptr, type_heap_size], &mut module.funcs)
 }
