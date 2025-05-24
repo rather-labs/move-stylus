@@ -755,6 +755,30 @@ mod uint_256 {
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
     #[case(subCall::new((U256::from(79228162514264337593543950336_u128), U256::from(158456325028528675187087900672_u128))), ((),))]
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(
+        subCall::new((
+           U256::from_str_radix("340282366920938463463374607431768211456", 10).unwrap(),
+           U256::from_str_radix("680564733841876926926749214863536422912", 10).unwrap(),
+        )),
+        ((),)
+    )]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(
+        subCall::new((
+           U256::from_str_radix("340282366920938463463374607431768211455", 10).unwrap(),
+           U256::from_str_radix("680564733841876926926749214863536422910", 10).unwrap(),
+        )),
+        ((),)
+    )]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(
+        subCall::new((
+           U256::from_str_radix("6277101735386680763835789423207666416102355444464034512895", 10).unwrap(),
+           U256::from_str_radix("12554203470773361527671578846415332832204710888928069025790", 10).unwrap(),
+        )),
+        ((),)
+    )]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
     #[case(subCall::new((U256::from(1), U256::from(u128::MAX))), ((),))]
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
     #[case(subCall::new((U256::from(1), U256::MAX)), ((),))]
