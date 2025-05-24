@@ -708,14 +708,14 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
                     )
                     .local_set(n2);
 
-                // partual_sub = a - b - borrow
+                // partual_sub = a - borrow - b
                 loop_
                     .local_get(n1)
+                    .local_get(borrow)
+                    .binop(BinaryOp::I64Sub)
                     .local_get(n2)
                     .binop(BinaryOp::I64Sub)
                     .local_tee(partial_sub)
-                    .local_get(borrow)
-                    .binop(BinaryOp::I64Sub)
                     .local_set(partial_sub);
 
                 // Save chunk of 64 bits
@@ -734,11 +734,12 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
                     );
 
                 // Calculate new borrow
+                // if n1 - borrow > n2 => new borrow
                 loop_
                     .local_get(n1)
-                    .local_get(n2)
                     .local_get(borrow)
-                    .binop(BinaryOp::I64Add)
+                    .binop(BinaryOp::I64Sub)
+                    .local_get(n2)
                     .binop(BinaryOp::I64LtU)
                     .unop(UnaryOp::I64ExtendUI32)
                     .local_set(borrow);
@@ -753,8 +754,8 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
             });
         })
         .local_get(borrow)
-        .i64_const(0)
-        .binop(BinaryOp::I64Ne)
+        .i64_const(1)
+        .binop(BinaryOp::I64Eq)
         .if_else(
             ValType::I32,
             |then| {
