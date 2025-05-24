@@ -12,14 +12,7 @@ use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
 mod common;
 
 fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
-    println!(
-        "n1: {:?}\nn2: {:?}\n",
-        &call_data[call_data.len() - 48..call_data.len() - 32],
-        &call_data[call_data.len() - 16..call_data.len()],
-    );
     let (result, return_data) = runtime.call_entrypoint(call_data)?;
-
-    println!("returned:{return_data:?}\nexpected:{expected_result:?}");
 
     anyhow::ensure!(
         result == 0,
@@ -710,32 +703,6 @@ mod uint_256 {
             expected_result.abi_encode_params(),
         )
         .unwrap();
-    }
-
-    fn run_test(
-        runtime: &RuntimeSandbox,
-        call_data: Vec<u8>,
-        expected_result: Vec<u8>,
-    ) -> Result<()> {
-        println!(
-            "n1: {:?}\nn2: {:?}\n",
-            &call_data[call_data.len() - 64..call_data.len() - 32],
-            &call_data[call_data.len() - 32..call_data.len()],
-        );
-        let (result, return_data) = runtime.call_entrypoint(call_data)?;
-
-        println!("returned:{return_data:?}\nexpected:{expected_result:?}");
-
-        anyhow::ensure!(
-            result == 0,
-            "Function returned non-zero exit code: {result}"
-        );
-        anyhow::ensure!(
-            return_data == expected_result,
-            "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
-        );
-
-        Ok(())
     }
 
     #[rstest]

@@ -620,7 +620,7 @@ pub fn sub_u64(module: &mut Module) -> FunctionId {
     function.finish(vec![n1, n2], &mut module.funcs)
 }
 
-/// This function implements the addition with overflow check for heap integers (u128 and u256)
+/// This function implements the substraction with borrow check for heap integers (u128 and u256)
 ///
 /// # Arguments:
 ///    - pointer to the first number
@@ -709,7 +709,7 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
                     )
                     .local_set(n2);
 
-                // partual_sub = a - borrow - b
+                // partial_sub = n1 - borrow - n2 = n1 - (borrow + n2)
                 loop_
                     .local_get(n1)
                     .local_get(borrow)
@@ -735,9 +735,19 @@ pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationConte
                     );
 
                 // Calculate new borrow
-                // If n1 - borrow < n1 == n1 < n2 + borrow => new borrow
-                // We also need to check that n2 + borrow did not overflow, if that's the case then
+                // If n1 - borrow < n2 == n1 < n2 + borrow => new borrow
+                // We also need to check that n2 + borrow did not overflow: if that's the case then
                 // there is a new borrow
+                // For example:
+                // n2      = 0xFFFFFFFFFFFFFFFF  (max u64)
+                // borrow  = 0x1
+                // sum     = n2 + borrow = 0     (wraps around)
+                //
+                // But n2 + borrow is the total substracted from n1, so, if the sum overflows,
+                // means we need one bit more to represent the substraction, so, we borrow.
+                //
+                // So, to check if we borrow, we check that
+                // (n1 < n2 + borrow) || (n2 + borrow < n2)
                 loop_
                     // sum = n2 + borrow
                     .local_get(n2)
