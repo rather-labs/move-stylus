@@ -4,6 +4,7 @@ use crate::CompilationContext;
 
 mod integers;
 mod swap;
+mod test_tools;
 
 #[derive(PartialEq)]
 pub enum RuntimeFunction {
@@ -57,9 +58,9 @@ impl RuntimeFunction {
         } else {
             match (self, compilation_ctx) {
                 // Integers
-                (Self::HeapIntSum, Some(ctx)) => integers::heap_integers_add(module, ctx),
-                (Self::AddU32, _) => integers::add_u32(module),
-                (Self::AddU64, _) => integers::add_u64(module),
+                (Self::HeapIntSum, Some(ctx)) => integers::add::heap_integers_add(module, ctx),
+                (Self::AddU32, _) => integers::add::add_u32(module),
+                (Self::AddU64, _) => integers::add::add_u64(module),
                 (Self::CheckOverflowU8U16, _) => integers::check_overflow_u8_u16(module),
                 (Self::DowncastU64ToU32, _) => integers::downcast_u64_to_u32(module),
                 (Self::DowncastU128U256ToU32, Some(ctx)) => {
@@ -68,9 +69,9 @@ impl RuntimeFunction {
                 (Self::DowncastU128U256ToU64, Some(ctx)) => {
                     integers::downcast_u128_u256_to_u64(module, ctx)
                 }
-                (Self::SubU32, _) => integers::sub_u32(module),
-                (Self::SubU64, _) => integers::sub_u64(module),
-                (Self::HeapIntSub, Some(ctx)) => integers::heap_integers_sub(module, ctx),
+                (Self::SubU32, _) => integers::sub::sub_u32(module),
+                (Self::SubU64, _) => integers::sub::sub_u64(module),
+                (Self::HeapIntSub, Some(ctx)) => integers::sub::heap_integers_sub(module, ctx),
                 // Swap
                 (Self::SwapI32Bytes, _) => swap::swap_i32_bytes_function(module),
                 (Self::SwapI64Bytes, _) => {
