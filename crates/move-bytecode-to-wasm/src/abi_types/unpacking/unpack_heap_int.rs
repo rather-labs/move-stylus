@@ -180,12 +180,8 @@ impl IAddress {
 
 #[cfg(test)]
 mod tests {
-    use alloy::{
-        dyn_abi::SolType,
-        hex::FromHex,
-        primitives::{Address, U256},
-        sol,
-    };
+    use alloy_primitives::{Address, U256, address};
+    use alloy_sol_types::{SolType, sol};
     use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
     use wasmtime::{
         Engine, Global, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults,
@@ -342,22 +338,16 @@ mod tests {
         let data = SolType::abi_encode_params(&(Address::ZERO,));
         test_uint(&data, int_type.clone(), &data);
 
-        let data = SolType::abi_encode_params(&(Address::from_hex(
-            "0x1234567890abcdef1234567890abcdef12345678",
-        )
-        .unwrap(),));
+        let data =
+            SolType::abi_encode_params(&(address!("0x1234567890abcdef1234567890abcdef12345678"),));
         test_uint(&data, int_type.clone(), &data);
 
-        let data = SolType::abi_encode_params(&(Address::from_hex(
-            "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-        )
-        .unwrap(),));
+        let data =
+            SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"),));
         test_uint(&data, int_type.clone(), &data);
 
-        let data = SolType::abi_encode_params(&(Address::from_hex(
-            "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE",
-        )
-        .unwrap(),));
+        let data =
+            SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE"),));
         test_uint(&data, int_type.clone(), &data);
     }
 }

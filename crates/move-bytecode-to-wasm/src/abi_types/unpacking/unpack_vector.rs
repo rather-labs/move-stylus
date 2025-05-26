@@ -216,12 +216,8 @@ impl IVector {
 
 #[cfg(test)]
 mod tests {
-    use alloy::{
-        dyn_abi::SolType,
-        hex::FromHex,
-        primitives::{Address, U256},
-        sol,
-    };
+    use alloy_primitives::{U256, address};
+    use alloy_sol_types::{SolType, sol};
     use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
     use wasmtime::{
         Engine, Global, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults,
@@ -444,9 +440,9 @@ mod tests {
         let int_type = IntermediateType::IVector(Box::new(IntermediateType::IAddress));
 
         let data = SolType::abi_encode_params(&(vec![
-            Address::from_hex("0x1234567890abcdef1234567890abcdef12345678").unwrap(),
-            Address::from_hex("0x1234567890abcdef1234567890abcdef12345678").unwrap(),
-            Address::from_hex("0x1234567890abcdef1234567890abcdef12345678").unwrap(),
+            address!("0x1234567890abcdef1234567890abcdef12345678"),
+            address!("0x1234567890abcdef1234567890abcdef12345678"),
+            address!("0x1234567890abcdef1234567890abcdef12345678"),
         ],));
         let expected_result_bytes = [
             3u32.to_le_bytes().as_slice(),
@@ -454,17 +450,11 @@ mod tests {
             ((data.len() + 48) as u32).to_le_bytes().as_slice(),
             ((data.len() + 80) as u32).to_le_bytes().as_slice(),
             &[0; 12],
-            Address::from_hex("0x1234567890abcdef1234567890abcdef12345678")
-                .unwrap()
-                .as_slice(),
+            address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
             &[0; 12],
-            Address::from_hex("0x1234567890abcdef1234567890abcdef12345678")
-                .unwrap()
-                .as_slice(),
+            address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
             &[0; 12],
-            Address::from_hex("0x1234567890abcdef1234567890abcdef12345678")
-                .unwrap()
-                .as_slice(),
+            address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
         ]
         .concat();
         test_uint(&data, int_type, &expected_result_bytes);

@@ -508,7 +508,7 @@ pub fn heap_int_shift_right(
 
 #[cfg(test)]
 mod tests {
-    use alloy::primitives::U256;
+    use alloy_primitives::U256;
     use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig};
     use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc};
 

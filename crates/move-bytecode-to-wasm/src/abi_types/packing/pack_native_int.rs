@@ -61,7 +61,7 @@ pub fn pack_i64_type_instructions(
 
 #[cfg(test)]
 mod tests {
-    use alloy::{dyn_abi::SolType, sol};
+    use alloy_sol_types::{SolType, sol};
     use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
     use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults};
 
