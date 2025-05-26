@@ -3,12 +3,15 @@ use walrus::{FunctionId, Module};
 use crate::CompilationContext;
 
 mod integers;
+mod integers_bitwise;
 mod swap;
 
 #[derive(PartialEq)]
 pub enum RuntimeFunction {
     // Integer operations
     HeapIntSum,
+    HeapIntShiftLeft,
+    HeapIntShiftRight,
     AddU32,
     AddU64,
     CheckOverflowU8U16,
@@ -35,6 +38,9 @@ impl RuntimeFunction {
             Self::DowncastU128U256ToU64 => "downcast_u128_u256_to_u64",
             Self::SubU32 => "sub_u32",
             Self::SubU64 => "sub_u64",
+            // Bitwise
+            Self::HeapIntShiftLeft => "heap_integer_shift_left",
+            Self::HeapIntShiftRight => "heap_integer_shift_right",
             // Swap bytes
             Self::SwapI32Bytes => "swap_i32_bytes",
             Self::SwapI64Bytes => "swap_i64_bytes",
@@ -73,6 +79,13 @@ impl RuntimeFunction {
                 (Self::SwapI64Bytes, _) => {
                     let swap_i32_f = Self::SwapI32Bytes.get(module, compilation_ctx);
                     swap::swap_i64_bytes_function(module, swap_i32_f)
+                }
+                // Bitwise
+                (Self::HeapIntShiftLeft, Some(ctx)) => {
+                    integers_bitwise::heap_int_shift_left(module, ctx)
+                }
+                (Self::HeapIntShiftRight, Some(ctx)) => {
+                    integers_bitwise::heap_int_shift_right(module, ctx)
                 }
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,
