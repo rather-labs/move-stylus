@@ -56,3 +56,7 @@ public fun sum(x: u16, y: u16): u16 {
 public fun sub(x: u16, y: u16): u16 {
     x - y
 }
+
+public fun div(x: u16, y: u16): u16 {
+    x / y
+}

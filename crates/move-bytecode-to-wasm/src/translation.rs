@@ -395,6 +395,25 @@ fn map_bytecode_instruction(
 
             types_stack.push(sub_type);
         }
+        Bytecode::Div => {
+            let [t1, t2] = pop_n_from_stack(types_stack);
+            assert_eq!(
+                t1, t2,
+                "types stack error: trying two divide two different types {t1:?} {t2:?}"
+            );
+
+            match t1 {
+                IntermediateType::IU8 => IU8::div(builder),
+                IntermediateType::IU16 => IU16::div(builder),
+                IntermediateType::IU32 => IU32::div(builder),
+                IntermediateType::IU64 => IU64::div(builder),
+                IntermediateType::IU128 => todo!(),
+                IntermediateType::IU256 => todo!(),
+                t => panic!("type stack error: trying to divide two {t:?}"),
+            }
+
+            types_stack.push(t1);
+        }
         Bytecode::Or => {
             pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
             pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
@@ -586,4 +605,19 @@ fn pop_types_stack(
         "expected {expected_type:?} and found {ty:?}"
     );
     Ok(())
+}
+
+fn pop_n_from_stack<const N: usize>(
+    types_stack: &mut Vec<IntermediateType>,
+) -> [IntermediateType; N] {
+    let mut res = [const { IntermediateType::IU8 }; N];
+    (0..N).for_each(|i| {
+        if let Some(t) = types_stack.pop() {
+            res[i] = t;
+        } else {
+            panic!("expected {N} elements in types stack");
+        }
+    });
+
+    res
 }
