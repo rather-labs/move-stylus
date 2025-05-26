@@ -388,8 +388,8 @@ fn map_bytecode_instruction(
                 IntermediateType::IU16 => IU16::sub(builder, module),
                 IntermediateType::IU32 => IU32::sub(builder, module),
                 IntermediateType::IU64 => IU64::sub(builder, module),
-                IntermediateType::IU128 => todo!(),
-                IntermediateType::IU256 => todo!(),
+                IntermediateType::IU128 => IU128::sub(builder, module, compilation_ctx),
+                IntermediateType::IU256 => IU256::sub(builder, module, compilation_ctx),
                 t => panic!("type stack error: trying to substract two {t:?}"),
             }
 

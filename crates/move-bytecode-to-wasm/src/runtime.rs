@@ -20,6 +20,7 @@ pub enum RuntimeFunction {
     DowncastU128U256ToU64,
     SubU32,
     SubU64,
+    HeapIntSub,
     // Swap bytes
     SwapI32Bytes,
     SwapI64Bytes,
@@ -30,6 +31,7 @@ impl RuntimeFunction {
         match self {
             // Integer operations
             Self::HeapIntSum => "heap_integer_add",
+            Self::HeapIntSub => "heap_integer_sub",
             Self::AddU32 => "add_u32",
             Self::AddU64 => "add_u64",
             Self::CheckOverflowU8U16 => "check_overflow_u8_u16",
@@ -62,6 +64,7 @@ impl RuntimeFunction {
             match (self, compilation_ctx) {
                 // Integers
                 (Self::HeapIntSum, Some(ctx)) => integers::heap_integers_add(module, ctx),
+                (Self::HeapIntSub, Some(ctx)) => integers::heap_integers_sub(module, ctx),
                 (Self::AddU32, _) => integers::add_u32(module),
                 (Self::AddU64, _) => integers::add_u64(module),
                 (Self::CheckOverflowU8U16, _) => integers::check_overflow_u8_u16(module),

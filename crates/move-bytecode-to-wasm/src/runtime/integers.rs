@@ -619,3 +619,174 @@ pub fn sub_u64(module: &mut Module) -> FunctionId {
 
     function.finish(vec![n1, n2], &mut module.funcs)
 }
+
+/// This function implements the substraction with borrow check for heap integers (u128 and u256)
+///
+/// # Arguments:
+///    - pointer to the first number
+///    - pointer to the second argument
+///    - how many bytes the number occupies in heap
+/// # Returns:
+///    - pointer to the result
+pub fn heap_integers_sub(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+
+    let mut builder = function
+        .name(RuntimeFunction::HeapIntSub.name().to_owned())
+        .func_body();
+
+    // Function arguments
+    let n1_ptr = module.locals.add(ValType::I32);
+    let n2_ptr = module.locals.add(ValType::I32);
+    let type_heap_size = module.locals.add(ValType::I32);
+
+    // Locals
+    let pointer = module.locals.add(ValType::I32);
+    let offset = module.locals.add(ValType::I32);
+    let borrow = module.locals.add(ValType::I64);
+    let sum = module.locals.add(ValType::I64);
+    let partial_sub = module.locals.add(ValType::I64);
+    let n1 = module.locals.add(ValType::I64);
+    let n2 = module.locals.add(ValType::I64);
+
+    builder
+        // allocate memory for the result
+        .local_get(type_heap_size)
+        .call(compilation_ctx.allocator)
+        .local_set(pointer)
+        // Set borrow to 0
+        .i64_const(0)
+        .local_set(borrow)
+        // Set offset to 0
+        .i32_const(0)
+        .local_set(offset);
+
+    builder
+        .block(None, |block| {
+            let block_id = block.id();
+
+            block.loop_(None, |loop_| {
+                let loop_id = loop_.id();
+
+                // Break the loop of we processed all the chunks
+                loop_
+                    .local_get(offset)
+                    .local_get(type_heap_size)
+                    .binop(BinaryOp::I32Eq)
+                    .br_if(block_id);
+
+                // Load n1
+                loop_
+                    .local_get(n1_ptr)
+                    .local_get(offset)
+                    .binop(BinaryOp::I32Add)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(n1);
+
+                // Load n2
+                loop_
+                    .local_get(n2_ptr)
+                    .local_get(offset)
+                    .binop(BinaryOp::I32Add)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(n2);
+
+                // partial_sub = n1 - borrow - n2 = n1 - (borrow + n2)
+                loop_
+                    .local_get(n1)
+                    .local_get(borrow)
+                    .binop(BinaryOp::I64Sub)
+                    .local_get(n2)
+                    .binop(BinaryOp::I64Sub)
+                    .local_tee(partial_sub)
+                    .local_set(partial_sub);
+
+                // Save chunk of 64 bits
+                loop_
+                    .local_get(pointer)
+                    .local_get(offset)
+                    .binop(BinaryOp::I32Add)
+                    .local_get(partial_sub)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                // Calculate new borrow
+                // If n1 - borrow < n2 == n1 < n2 + borrow => new borrow
+                // We also need to check that n2 + borrow did not overflow: if that's the case then
+                // there is a new borrow
+                // For example:
+                // n2      = 0xFFFFFFFFFFFFFFFF  (max u64)
+                // borrow  = 0x1
+                // sum     = n2 + borrow = 0     (wraps around)
+                //
+                // But n2 + borrow is the total substracted from n1, so, if the sum overflows,
+                // means we need one bit more to represent the substraction, so, we borrow.
+                //
+                // So, to check if we borrow, we check that
+                // (n1 < n2 + borrow) || (n2 + borrow < n2)
+                loop_
+                    // sum = n2 + borrow
+                    .local_get(n2)
+                    .local_get(borrow)
+                    .binop(BinaryOp::I64Add)
+                    .local_set(sum)
+                    // n1 < n2 + borrow
+                    .local_get(n1)
+                    .local_get(sum)
+                    .binop(BinaryOp::I64LtU)
+                    // sum < n2
+                    .local_get(sum)
+                    .local_get(n2)
+                    .binop(BinaryOp::I64LtU)
+                    .binop(BinaryOp::I32Or)
+                    .unop(UnaryOp::I64ExtendUI32)
+                    .local_set(borrow);
+
+                // offset += 8 and process the next part of the integer
+                loop_
+                    .local_get(offset)
+                    .i32_const(8)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(offset)
+                    .br(loop_id);
+            });
+        })
+        .local_get(borrow)
+        .i64_const(1)
+        .binop(BinaryOp::I64Eq)
+        .if_else(
+            ValType::I32,
+            |then| {
+                then.unreachable();
+            },
+            |else_| {
+                else_.local_get(pointer);
+            },
+        );
+
+    function.finish(vec![n1_ptr, n2_ptr, type_heap_size], &mut module.funcs)
+}
