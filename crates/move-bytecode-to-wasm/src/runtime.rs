@@ -3,6 +3,7 @@ use walrus::{FunctionId, Module};
 use crate::CompilationContext;
 
 mod integers;
+mod integers_add;
 mod swap;
 
 #[derive(PartialEq)]
@@ -57,9 +58,9 @@ impl RuntimeFunction {
         } else {
             match (self, compilation_ctx) {
                 // Integers
-                (Self::HeapIntSum, Some(ctx)) => integers::heap_integers_add(module, ctx),
-                (Self::AddU32, _) => integers::add_u32(module),
-                (Self::AddU64, _) => integers::add_u64(module),
+                (Self::HeapIntSum, Some(ctx)) => integers_add::heap_integers_add(module, ctx),
+                (Self::AddU32, _) => integers_add::add_u32(module),
+                (Self::AddU64, _) => integers_add::add_u64(module),
                 (Self::CheckOverflowU8U16, _) => integers::check_overflow_u8_u16(module),
                 (Self::DowncastU64ToU32, _) => integers::downcast_u64_to_u32(module),
                 (Self::DowncastU128U256ToU32, Some(ctx)) => {
