@@ -31,7 +31,7 @@ impl IU8 {
     /// Adds the instructions to add two u8 values.
     ///
     /// Along with the addition code to check overflow is added. If the result is greater than 255
-    /// then the execution is aborted This check is poosible because interally we are using
+    /// then the execution is aborted This check is posible because interally we are using
     /// 32bits integers.
     pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
@@ -54,6 +54,19 @@ impl IU8 {
     /// If the dividend is 0, then it traps
     pub fn div(builder: &mut walrus::InstrSeqBuilder) {
         builder.binop(BinaryOp::I32DivU);
+    }
+
+    /// Adds the instructions to multiply two u8 values.
+    ///
+    /// Along with the multiplication code to check overflow is added. If the result is greater
+    /// than 255 then the execution is aborted. This check is posible because interally we are
+    /// using 32bits integers.
+    pub fn mul(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder
+            .binop(BinaryOp::I32Mul)
+            .i32_const(Self::MAX_VALUE)
+            .call(check_overflow_f);
     }
 
     pub fn cast_from(
@@ -128,7 +141,7 @@ impl IU16 {
     /// Adds the instructions to add two u16 values.
     ///
     /// Along with the addition code to check overflow is added. If the result is greater than
-    /// 65535 then the execution is aborted. This check is poosible because interally we are using
+    /// 65535 then the execution is aborted. This check is posible because interally we are using
     /// 32bits integers.
     pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
@@ -151,6 +164,19 @@ impl IU16 {
     /// If the dividend is 0, then it traps
     pub fn div(builder: &mut walrus::InstrSeqBuilder) {
         builder.binop(BinaryOp::I32DivU);
+    }
+
+    /// Adds the instructions to multiply two u16 values.
+    ///
+    /// Along with the multiplication code to check overflow is added. If the result is greater
+    /// than 65535 then the execution is aborted. This check is posible because interally we are
+    /// using 32bits integers.
+    pub fn mul(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder
+            .binop(BinaryOp::I32Mul)
+            .i32_const(Self::MAX_VALUE)
+            .call(check_overflow_f);
     }
 
     pub fn cast_from(
@@ -240,6 +266,19 @@ impl IU32 {
     /// If the dividend is 0, then it traps
     pub fn div(builder: &mut walrus::InstrSeqBuilder) {
         builder.binop(BinaryOp::I32DivU);
+    }
+
+    /// Adds the instructions to multiply two u16 values.
+    ///
+    /// Along with the multiplication code to check overflow is added. If the result is greater
+    /// than 65535 then the execution is aborted. This check is posible because interally we are
+    /// using 32bits integers.
+    pub fn mul(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder
+            .binop(BinaryOp::I32Mul)
+            .i32_const(Self::MAX_VALUE)
+            .call(check_overflow_f);
     }
 
     pub fn cast_from(
