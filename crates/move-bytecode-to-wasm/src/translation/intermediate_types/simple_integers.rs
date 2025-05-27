@@ -169,7 +169,7 @@ impl IU16 {
     /// Adds the instructions to multiply two u16 values.
     ///
     /// Along with the multiplication code to check overflow is added. If the result is greater
-    /// than 65535 then the execution is aborted. This check is posible because interally we are
+    /// than u16::MAX then the execution is aborted. This check is posible because interally we are
     /// using 32bits integers.
     pub fn mul(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
@@ -268,17 +268,14 @@ impl IU32 {
         builder.binop(BinaryOp::I32DivU);
     }
 
-    /// Adds the instructions to multiply two u16 values.
+    /// Adds the instructions to multiply two u32 values.
     ///
     /// Along with the multiplication code to check overflow is added. If the result is greater
-    /// than 65535 then the execution is aborted. This check is posible because interally we are
+    /// than u32::MAX then the execution is aborted. This check is posible because interally we are
     /// using 32bits integers.
     pub fn mul(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
-        builder
-            .binop(BinaryOp::I32Mul)
-            .i32_const(Self::MAX_VALUE)
-            .call(check_overflow_f);
+        let mul_f = RuntimeFunction::MulU32.get(module, None);
+        builder.call(mul_f);
     }
 
     pub fn cast_from(
@@ -358,6 +355,16 @@ impl IU64 {
     /// If the dividend is 0, then it traps
     pub fn div(builder: &mut walrus::InstrSeqBuilder) {
         builder.binop(BinaryOp::I64DivU);
+    }
+
+    /// Adds the instructions to multiply two u64 values.
+    ///
+    /// Along with the multiplication code to check overflow is added. If the result is greater
+    /// than u64::MAX then the execution is aborted. This check is posible because interally we are
+    /// using 64bits integers.
+    pub fn mul(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let mul_f = RuntimeFunction::MulU64.get(module, None);
+        builder.call(mul_f);
     }
 
     pub fn cast_from(

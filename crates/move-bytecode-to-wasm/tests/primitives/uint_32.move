@@ -60,3 +60,7 @@ public fun sub(x: u32, y: u32): u32 {
 public fun div(x: u32, y: u32): u32 {
     x / y
 }
+
+public fun mul(x: u32, y: u32): u32 {
+    x * y
+}
