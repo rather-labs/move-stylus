@@ -508,57 +508,24 @@ pub fn heap_int_shift_right(
 
 #[cfg(test)]
 mod tests {
+    use super::super::test_tools::{build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
-    use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig};
-    use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc};
-
-    use crate::memory::setup_module_memory;
+    use rstest::rstest;
+    use walrus::FunctionBuilder;
 
     use super::*;
 
-    fn build_module() -> (Module, FunctionId, MemoryId) {
-        let config = ModuleConfig::new();
-        let mut module = Module::with_config(config);
-        let (allocator_func, memory_id) = setup_module_memory(&mut module);
-
-        (module, allocator_func, memory_id)
-    }
-
-    fn setup_wasmtime_module(
-        module: &mut Module,
-        initial_memory_data: Vec<u8>,
-        function_name: &str,
-    ) -> (Instance, Store<()>, TypedFunc<(i32, i32), i32>) {
-        let engine = Engine::default();
-        let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
-
-        let linker = Linker::new(&engine);
-
-        let mut store = Store::new(&engine, ());
-        let instance = linker.instantiate(&mut store, &module).unwrap();
-
-        let entrypoint = instance
-            .get_typed_func::<(i32, i32), i32>(&mut store, function_name)
-            .unwrap();
-
-        let memory = instance.get_memory(&mut store, "memory").unwrap();
-        memory.write(&mut store, 0, &initial_memory_data).unwrap();
-        // Print current memory
-        let memory_data = memory.data(&mut store);
-        println!(
-            "Current memory: {:?}",
-            memory_data.iter().take(64).collect::<Vec<_>>()
-        );
-
-        (instance, store, entrypoint)
-    }
-
-    fn test_shift_left(
-        shift_amount: i32,
-        type_heap_size: i32,
-        data: Vec<u8>,
-        expected_data: Vec<u8>,
-    ) {
+    #[rstest]
+    #[case(128128u128, 10, 128128u128 << 10)]
+    #[case(128128u128, 110, 128128u128 << 110)]
+    #[case(u128::MAX, 110, u128::MAX << 110)]
+    #[case(u128::MAX, 127, u128::MAX << 127)]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(u128::MAX, 128, 0)]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(u128::MAX, 180, 0)]
+    fn test_u128_shift_left(#[case] n: u128, #[case] shift_amount: i32, #[case] expected: u128) {
+        const TYPE_HEAP_SIZE: i32 = 16;
         let (mut raw_module, allocator_func, memory_id) = build_module();
 
         let mut function_builder = FunctionBuilder::new(
@@ -568,19 +535,16 @@ mod tests {
         );
 
         let shift_amount_local = raw_module.locals.add(ValType::I32);
-        let type_heap_size_local = raw_module.locals.add(ValType::I32);
 
         let mut func_body = function_builder.func_body();
 
         // allocate memory for the source integer
-        func_body
-            .local_get(type_heap_size_local)
-            .call(allocator_func);
+        func_body.i32_const(TYPE_HEAP_SIZE).call(allocator_func);
 
         // Shift left amount
         func_body.local_get(shift_amount_local);
         // Heap size
-        func_body.local_get(type_heap_size_local);
+        func_body.i32_const(TYPE_HEAP_SIZE);
 
         let shift_left_f = heap_int_shift_left(
             &mut raw_module,
@@ -595,110 +559,38 @@ mod tests {
         // Shift left
         func_body.call(shift_left_f);
 
-        let function = function_builder.finish(
-            vec![shift_amount_local, type_heap_size_local],
-            &mut raw_module.funcs,
-        );
+        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
         // display_module(&mut raw_module);
 
+        let data = [n.to_le_bytes()].concat();
         let (instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
 
         let pointer = entrypoint
-            .call(&mut store, (shift_amount, type_heap_size))
+            .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
-        let mut result_memory_data = vec![0; expected_data.len()];
+        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
         memory
             .read(&mut store, pointer as usize, &mut result_memory_data)
             .unwrap();
-        assert_eq!(result_memory_data, expected_data);
+        assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
     }
 
-    #[test]
-    fn test_u128_shift_left() {
-        test_shift_left(
-            10,
-            16,
-            128128u128.to_le_bytes().to_vec(),
-            (128128u128 << 10).to_le_bytes().to_vec(),
-        );
-
-        test_shift_left(
-            110,
-            16,
-            128128u128.to_le_bytes().to_vec(),
-            (128128u128 << 110).to_le_bytes().to_vec(),
-        );
-
-        test_shift_left(
-            110,
-            16,
-            u128::MAX.to_le_bytes().to_vec(),
-            (u128::MAX << 110).to_le_bytes().to_vec(),
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    fn test_u128_shift_left_overflow() {
-        test_shift_left(128, 16, 128128u128.to_le_bytes().to_vec(), vec![0; 16]);
-    }
-
-    #[test]
-    fn test_u256_shift_left() {
-        test_shift_left(
-            10,
-            32,
-            U256::from(256256u128).to_le_bytes::<32>().to_vec(),
-            (U256::from(256256u128 << 10)).to_le_bytes::<32>().to_vec(),
-        );
-
-        test_shift_left(
-            110,
-            32,
-            U256::from(256256u128).to_le_bytes::<32>().to_vec(),
-            (U256::from(256256u128 << 110)).to_le_bytes::<32>().to_vec(),
-        );
-
-        test_shift_left(
-            150,
-            32,
-            U256::from(256256u128).to_le_bytes::<32>().to_vec(),
-            U256::from(256256u128)
-                .wrapping_shl(150)
-                .to_le_bytes::<32>()
-                .to_vec(),
-        );
-
-        test_shift_left(
-            230,
-            32,
-            U256::MAX.to_le_bytes::<32>().to_vec(),
-            U256::MAX.wrapping_shl(230).to_le_bytes::<32>().to_vec(),
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    fn test_u256_shift_left_overflow() {
-        test_shift_left(
-            256,
-            32,
-            U256::from(256256u128).to_le_bytes::<32>().to_vec(),
-            vec![0; 32],
-        );
-    }
-
-    fn test_shift_right(
-        shift_amount: i32,
-        type_heap_size: i32,
-        data: Vec<u8>,
-        expected_data: Vec<u8>,
-    ) {
+    #[rstest]
+    #[case(U256::from(128128u128), 10, U256::from(128128u128 << 10))]
+    #[case(U256::MAX, 50, U256::MAX << 50)]
+    #[case(U256::MAX, 110, U256::MAX << 110)]
+    #[case(U256::MAX, 160, U256::MAX << 160)]
+    #[case(U256::MAX, 180, U256::MAX << 180)]
+    #[case(U256::MAX, 255, U256::MAX << 255)]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(U256::MAX, 256, U256::ZERO)]
+    fn test_u256_shift_left(#[case] n: U256, #[case] shift_amount: i32, #[case] expected: U256) {
+        const TYPE_HEAP_SIZE: i32 = 32;
         let (mut raw_module, allocator_func, memory_id) = build_module();
 
         let mut function_builder = FunctionBuilder::new(
@@ -708,19 +600,81 @@ mod tests {
         );
 
         let shift_amount_local = raw_module.locals.add(ValType::I32);
-        let type_heap_size_local = raw_module.locals.add(ValType::I32);
 
         let mut func_body = function_builder.func_body();
 
         // allocate memory for the source integer
-        func_body
-            .local_get(type_heap_size_local)
-            .call(allocator_func);
+        func_body.i32_const(TYPE_HEAP_SIZE).call(allocator_func);
 
         // Shift left amount
         func_body.local_get(shift_amount_local);
         // Heap size
-        func_body.local_get(type_heap_size_local);
+        func_body.i32_const(TYPE_HEAP_SIZE);
+
+        let shift_left_f = heap_int_shift_left(
+            &mut raw_module,
+            &CompilationContext {
+                memory_id,
+                allocator: allocator_func,
+                functions_arguments: &[],
+                functions_returns: &[],
+                constants: &[],
+            },
+        );
+        // Shift left
+        func_body.call(shift_left_f);
+
+        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        // display_module(&mut raw_module);
+
+        let data = [n.to_le_bytes::<32>()].concat();
+        let (instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
+
+        let pointer = entrypoint
+            .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
+            .unwrap();
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+        memory
+            .read(&mut store, pointer as usize, &mut result_memory_data)
+            .unwrap();
+        assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
+    }
+
+    #[rstest]
+    #[case(128128u128, 10, 128128u128 >> 10)]
+    #[case(128128u128, 110, 128128u128 >> 110)]
+    #[case(u128::MAX, 110, u128::MAX >> 110)]
+    #[case(u128::MAX, 127, u128::MAX >> 127)]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(u128::MAX, 128, 0)]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(u128::MAX, 180, 0)]
+    fn test_u128_shift_right(#[case] n: u128, #[case] shift_amount: i32, #[case] expected: u128) {
+        const TYPE_HEAP_SIZE: i32 = 16;
+        let (mut raw_module, allocator_func, memory_id) = build_module();
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let shift_amount_local = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // allocate memory for the source integer
+        func_body.i32_const(TYPE_HEAP_SIZE).call(allocator_func);
+
+        // Shift left amount
+        func_body.local_get(shift_amount_local);
+        // Heap size
+        func_body.i32_const(TYPE_HEAP_SIZE);
 
         let shift_right_f = heap_int_shift_right(
             &mut raw_module,
@@ -735,101 +689,89 @@ mod tests {
         // Shift right
         func_body.call(shift_right_f);
 
-        let function = function_builder.finish(
-            vec![shift_amount_local, type_heap_size_local],
-            &mut raw_module.funcs,
-        );
+        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
         // display_module(&mut raw_module);
 
+        let data = [n.to_le_bytes()].concat();
         let (instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
 
         let pointer = entrypoint
-            .call(&mut store, (shift_amount, type_heap_size))
+            .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
-        let mut result_memory_data = vec![0; expected_data.len()];
+        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
         memory
             .read(&mut store, pointer as usize, &mut result_memory_data)
             .unwrap();
-        assert_eq!(result_memory_data, expected_data);
+        assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
     }
 
-    #[test]
-    fn test_u128_shift_right() {
-        test_shift_right(
-            10,
-            16,
-            128128u128.to_le_bytes().to_vec(),
-            (128128u128 >> 10).to_le_bytes().to_vec(),
+    #[rstest]
+    #[case(U256::from(128128u128), 10, U256::from(128128u128 >> 10))]
+    #[case(U256::MAX, 50, U256::MAX >> 50)]
+    #[case(U256::MAX, 110, U256::MAX >> 110)]
+    #[case(U256::MAX, 160, U256::MAX >> 160)]
+    #[case(U256::MAX, 180, U256::MAX >> 180)]
+    #[case(U256::MAX, 255, U256::MAX >> 255)]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(U256::MAX, 256, U256::ZERO)]
+    fn test_u256_shift_right(#[case] n: U256, #[case] shift_amount: i32, #[case] expected: U256) {
+        const TYPE_HEAP_SIZE: i32 = 32;
+        let (mut raw_module, allocator_func, memory_id) = build_module();
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
         );
 
-        test_shift_right(
-            110,
-            16,
-            128128u128.to_le_bytes().to_vec(),
-            (128128u128 >> 110).to_le_bytes().to_vec(),
-        );
+        let shift_amount_local = raw_module.locals.add(ValType::I32);
 
-        test_shift_right(
-            110,
-            16,
-            u128::MAX.to_le_bytes().to_vec(),
-            (u128::MAX >> 110).to_le_bytes().to_vec(),
-        );
-    }
+        let mut func_body = function_builder.func_body();
 
-    #[test]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    fn test_u128_shift_right_overflow() {
-        test_shift_right(128, 16, 128128u128.to_le_bytes().to_vec(), vec![0; 16]);
-    }
+        // allocate memory for the source integer
+        func_body.i32_const(TYPE_HEAP_SIZE).call(allocator_func);
 
-    #[test]
-    fn test_u256_shift_right() {
-        test_shift_right(
-            10,
-            32,
-            U256::from(128128u128).to_le_bytes::<32>().to_vec(),
-            (U256::from(128128u128 >> 10)).to_le_bytes::<32>().to_vec(),
-        );
+        // Shift left amount
+        func_body.local_get(shift_amount_local);
+        // Heap size
+        func_body.i32_const(TYPE_HEAP_SIZE);
 
-        test_shift_right(
-            110,
-            32,
-            U256::from(128128u128).to_le_bytes::<32>().to_vec(),
-            (U256::from(128128u128 >> 110)).to_le_bytes::<32>().to_vec(),
+        let shift_right_f = heap_int_shift_right(
+            &mut raw_module,
+            &CompilationContext {
+                memory_id,
+                allocator: allocator_func,
+                functions_arguments: &[],
+                functions_returns: &[],
+                constants: &[],
+            },
         );
+        // Shift right
+        func_body.call(shift_right_f);
 
-        test_shift_right(
-            150,
-            32,
-            U256::from(128128u128).to_le_bytes::<32>().to_vec(),
-            U256::from(128128u128)
-                .wrapping_shr(150)
-                .to_le_bytes::<32>()
-                .to_vec(),
-        );
+        let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
 
-        test_shift_right(
-            230,
-            32,
-            U256::MAX.to_le_bytes::<32>().to_vec(),
-            U256::MAX.wrapping_shr(230).to_le_bytes::<32>().to_vec(),
-        );
-    }
+        // display_module(&mut raw_module);
 
-    #[test]
-    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
-    fn test_u256_shift_right_overflow() {
-        test_shift_right(
-            256,
-            32,
-            U256::from(128128u128).to_le_bytes::<32>().to_vec(),
-            vec![0; 32],
-        );
+        let data = [n.to_le_bytes::<32>()].concat();
+        let (instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
+
+        let pointer = entrypoint
+            .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
+            .unwrap();
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+        memory
+            .read(&mut store, pointer as usize, &mut result_memory_data)
+            .unwrap();
+        assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
     }
 }
