@@ -5,17 +5,17 @@ use super::RuntimeFunction;
 /// Multiply two u32 numbers.
 ///
 /// Along with the addition code to check overflow is added. If the result is greater than
-/// 4_294_967_295 then the execution is aborted. To check the overflow:
+/// u32::MAX then the execution is aborted. To check the overflow:
 /// Given n1 >= 0, n2 > 0
-/// n1 * n2 > max <=> n1 > max / n2
+/// n1 * n2 > u32::MAX <=> n1 > u32::MAX / n2
 ///
-/// So there will be an overflow if n2 != 0 && n1 > max / n2 where max = 4_294_967_295
+/// So there will be an overflow if n2 != 0 && n1 > 32::MAX / n2
 ///
 /// # Arguments:
-///    - first u32 number to add
-///    - second u32 number to add
+///    - first u32 number to multiply
+///    - second u32 number to multiply
 /// # Returns:
-///    - addition of the arguments
+///    - multiplication of the arguments
 pub fn mul_u32(module: &mut Module) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -62,18 +62,20 @@ pub fn mul_u32(module: &mut Module) -> FunctionId {
     function.finish(vec![n1, n2], &mut module.funcs)
 }
 
-/// Adds two u64 numbers.
+/// Multiply two u64 numbers.
 ///
 /// Along with the addition code to check overflow is added. If the result is greater than
-/// 18_446_744_073_709_551_615 then the execution is aborted. To check the overflow we check
-/// that the result is strictly greater than the two operands. Because we are using i64
-/// integer, if the addition overflow, WASM wraps around the result.
+/// u64::MAX then the execution is aborted. To check the overflow:
+/// Given n1 >= 0, n2 > 0
+/// n1 * n2 > u64::MAX <=> n1 > u64::MAX / n2
+///
+/// So there will be an overflow if n2 != 0 && n1 > u64::MAX / n2
 ///
 /// # Arguments:
-///    - first u64 number to add
-///    - second u64 number to add
+///    - first u64 number to multiply
+///    - second u64 number to multiply
 /// # Returns:
-///    - addition of the arguments
+///    - multiplication of the arguments
 pub fn mul_u64(module: &mut Module) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
