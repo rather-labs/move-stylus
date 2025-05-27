@@ -553,6 +553,7 @@ mod tests {
                 allocator: allocator_func,
                 functions_arguments: &[],
                 functions_returns: &[],
+                module_signatures: &[],
                 constants: &[],
             },
         );
@@ -618,6 +619,7 @@ mod tests {
                 allocator: allocator_func,
                 functions_arguments: &[],
                 functions_returns: &[],
+                module_signatures: &[],
                 constants: &[],
             },
         );
@@ -683,6 +685,7 @@ mod tests {
                 allocator: allocator_func,
                 functions_arguments: &[],
                 functions_returns: &[],
+                module_signatures: &[],
                 constants: &[],
             },
         );
@@ -748,6 +751,7 @@ mod tests {
                 allocator: allocator_func,
                 functions_arguments: &[],
                 functions_returns: &[],
+                module_signatures: &[],
                 constants: &[],
             },
         );
