@@ -20,68 +20,76 @@ pub struct MappedFunction<'a> {
     pub move_module_signatures: &'a [Signature],
 }
 
+//@ Do we need to pass the whole move_module_signatures to each mapped function?
 impl<'a> MappedFunction<'a> {
     pub fn new(
         name: String,
-        move_arguments: &Signature,
-        move_returns: &Signature,
-        move_definition: FunctionDefinition,
+        move_args: &Signature,
+        move_rets: &Signature,
+        move_def: FunctionDefinition,
         module: &mut Module,
-        move_module_signatures: &'a [Signature],
+        sig_pool: &'a [Signature],
     ) -> Self {
         assert!(
-            move_definition.acquires_global_resources.is_empty(),
+            move_def.acquires_global_resources.is_empty(),
             "Acquiring global resources is not supported yet"
         );
 
-        let code = move_definition.code.clone().expect("Function has no code");
+        let code = move_def.code.clone().expect("Function has no code");
 
-        let signature = ISignature::from_signatures(move_arguments, move_returns);
-        let function_arguments = signature.get_argument_wasm_types();
-        let function_returns = signature.get_return_wasm_types();
+        let signature = ISignature::from_signatures(move_args, move_rets);
+        let wasm_arg_types = signature.get_argument_wasm_types();
+        let wasm_ret_types = signature.get_return_wasm_types();
 
         assert!(
-            function_returns.len() <= 1,
-            "Multiple return values is not enabled in Stylus VM"
+            wasm_ret_types.len() <= 1,
+            "Multiple return values not supported"
         );
 
-        // === Handle argument locals ===
-        let arg_local_ids = function_arguments
+        // WASM locals for arguments
+        let wasm_arg_locals: Vec<LocalId> = wasm_arg_types
             .iter()
-            .map(|arg| module.locals.add(*arg))
-            .collect::<Vec<LocalId>>();
+            .map(|ty| module.locals.add(*ty))
+            .collect();
 
-        let arg_intermediate_types = move_arguments.0.iter().map(IntermediateType::try_from);
+        let ir_arg_types = move_args.0.iter().map(IntermediateType::try_from);
 
-        // === Handle declared locals ===
-        let move_locals = &code.locals;
-        let signature_tokens = &move_module_signatures[move_locals.0 as usize].0;
+        // Declared locals
+        let ir_declared_locals_types = sig_pool[code.locals.0 as usize]
+            .0
+            .iter()
+            .map(IntermediateType::try_from);
 
-        let local_intermediate_types = signature_tokens.iter().map(IntermediateType::try_from);
-
-        let local_ids = local_intermediate_types
+        let wasm_declared_locals = ir_declared_locals_types
             .clone()
-            .flat_map(|token| token.map(ValType::from))
-            .map(|valty| module.locals.add(valty));
+            .map(|ty| match ty {
+                Ok(IntermediateType::IU64) => ValType::I32, // to store pointer instead of i64
+                Ok(ref other) => ValType::from(other),
+                Err(_) => ValType::I32,
+            })
+            .map(|val| module.locals.add(val));
 
-        // === Combine all locals and types ===
-        let local_variables = arg_local_ids.clone().into_iter().chain(local_ids).collect();
+        // Combine all
+        let local_variables = wasm_arg_locals
+            .clone()
+            .into_iter()
+            .chain(wasm_declared_locals)
+            .collect();
 
-        let local_variables_type = arg_intermediate_types
-            .chain(local_intermediate_types)
-            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-            // TODO: unwrap
-            .unwrap();
+        let local_variables_type = ir_arg_types
+            .chain(ir_declared_locals_types)
+            .collect::<Result<Vec<_>, _>>()
+            .expect("Failed to parse types");
 
         Self {
             name,
             signature,
-            move_definition,
+            move_definition: move_def,
             move_code_unit: code,
             local_variables,
             local_variables_type,
-            arg_local_ids,
-            move_module_signatures,
+            arg_local_ids: wasm_arg_locals,
+            move_module_signatures: sig_pool,
         }
     }
 }
