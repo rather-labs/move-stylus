@@ -217,6 +217,7 @@ mod uint_8 {
         function echo2(uint8 x, uint8 y) external returns (uint8);
         function sum(uint8 x, uint8 y) external returns (uint8);
         function sub(uint8 x, uint8 y) external returns (uint8);
+        function div(uint8 x, uint8 y) external returns (uint8);
     );
 
     #[rstest]
@@ -246,6 +247,34 @@ mod uint_8 {
         )
         .unwrap();
     }
+
+    #[rstest]
+    #[case(100, 10, 10)]
+    #[case(0, 5, 0)]
+    #[case(42, 42, 1)]
+    #[case(3, 7, 0)]
+    #[case(u8::MAX, 1, u8::MAX as i32)]
+    #[case(u8::MAX, u8::MAX, 1)]
+    #[case(u8::MAX, 2, (u8::MAX / 2) as i32)]
+    #[case(128, 64, 2)]
+    #[case(127, 3, 42)]
+    #[case(1, u8::MAX, 0)]
+    #[case(0, u8::MAX, 0)]
+    #[should_panic(expected = "wasm trap: integer divide by zero")]
+    #[case(10, 0, 0)]
+    fn test_uint_8_div(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] dividend: u8,
+        #[case] divisor: u8,
+        #[case] expected_result: i32,
+    ) {
+        run_test(
+            runtime,
+            divCall::new((dividend, divisor)).abi_encode(),
+            <(&i32,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
 }
 
 mod uint_16 {
@@ -270,6 +299,7 @@ mod uint_16 {
         function echo2(uint16 x, uint16 y) external returns (uint16);
         function sum(uint16 x, uint16 y) external returns (uint16);
         function sub(uint16 x, uint16 y) external returns (uint16);
+        function div(uint16 x, uint16 y) external returns (uint16);
     );
 
     #[rstest]
@@ -299,6 +329,34 @@ mod uint_16 {
         )
         .unwrap();
     }
+
+    #[rstest]
+    #[case(100, 10, 10)]
+    #[case(0, 5, 0)]
+    #[case(42, 42, 1)]
+    #[case(3, 7, 0)]
+    #[case(u16::MAX, 1, u16::MAX)]
+    #[case(u16::MAX, u16::MAX, 1)]
+    #[case(u16::MAX, 2, u16::MAX / 2)]
+    #[case(128, 64, 2)]
+    #[case(127, 3, 42)]
+    #[case(1, u16::MAX, 0)]
+    #[case(0, u16::MAX, 0)]
+    #[should_panic(expected = "wasm trap: integer divide by zero")]
+    #[case(10, 0, 0)]
+    fn test_uint_16_div(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] dividend: u16,
+        #[case] divisor: u16,
+        #[case] expected_result: u16,
+    ) {
+        run_test(
+            runtime,
+            divCall::new((dividend, divisor)).abi_encode(),
+            <(&u16,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
 }
 
 mod uint_32 {
@@ -323,6 +381,7 @@ mod uint_32 {
         function echo2(uint32 x, uint32 y) external returns (uint32);
         function sum(uint32 x, uint32 y) external returns (uint32);
         function sub(uint32 x, uint32 y) external returns (uint32);
+        function div(uint32 x, uint32 y) external returns (uint32);
     );
 
     #[rstest]
@@ -352,6 +411,34 @@ mod uint_32 {
         )
         .unwrap();
     }
+
+    #[rstest]
+    #[case(100, 10, 10)]
+    #[case(0, 5, 0)]
+    #[case(42, 42, 1)]
+    #[case(3, 7, 0)]
+    #[case(u32::MAX, 1, u32::MAX)]
+    #[case(u32::MAX, u32::MAX, 1)]
+    #[case(u32::MAX, 2, u32::MAX / 2)]
+    #[case(128, 64, 2)]
+    #[case(127, 3, 42)]
+    #[case(1, u32::MAX, 0)]
+    #[case(0, u32::MAX, 0)]
+    #[should_panic(expected = "wasm trap: integer divide by zero")]
+    #[case(10, 0, 0)]
+    fn test_uint_32_div(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] dividend: u32,
+        #[case] divisor: u32,
+        #[case] expected_result: u32,
+    ) {
+        run_test(
+            runtime,
+            divCall::new((dividend, divisor)).abi_encode(),
+            <(&u32,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
 }
 
 mod uint_64 {
@@ -376,6 +463,7 @@ mod uint_64 {
         function echo2(uint64 x, uint64 y) external returns (uint64);
         function sum(uint64 x, uint64 y) external returns (uint64);
         function sub(uint64 x, uint64 y) external returns (uint64);
+        function div(uint64 x, uint64 y) external returns (uint64);
     );
 
     #[rstest]
@@ -402,6 +490,34 @@ mod uint_64 {
             runtime,
             call_data.abi_encode(),
             expected_result.abi_encode_params(),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(100, 10, 10)]
+    #[case(0, 5, 0)]
+    #[case(42, 42, 1)]
+    #[case(3, 7, 0)]
+    #[case(u64::MAX, 1, u64::MAX)]
+    #[case(u64::MAX, u64::MAX, 1)]
+    #[case(u64::MAX, 2, u64::MAX / 2)]
+    #[case(128, 64, 2)]
+    #[case(127, 3, 42)]
+    #[case(1, u64::MAX, 0)]
+    #[case(0, u64::MAX, 0)]
+    #[should_panic(expected = "wasm trap: integer divide by zero")]
+    #[case(10, 0, 0)]
+    fn test_uint_64_div(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] dividend: u64,
+        #[case] divisor: u64,
+        #[case] expected_result: u64,
+    ) {
+        run_test(
+            runtime,
+            divCall::new((dividend, divisor)).abi_encode(),
+            <(&u64,)>::abi_encode_params(&(&expected_result,)),
         )
         .unwrap();
     }

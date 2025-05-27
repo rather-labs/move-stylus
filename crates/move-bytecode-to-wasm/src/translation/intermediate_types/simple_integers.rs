@@ -49,6 +49,13 @@ impl IU8 {
         builder.call(sub_u32_f);
     }
 
+    /// Adds the instructions to divide two u8 values.
+    ///
+    /// If the dividend is 0, then it traps
+    pub fn div(builder: &mut walrus::InstrSeqBuilder) {
+        builder.binop(BinaryOp::I32DivU);
+    }
+
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
@@ -139,6 +146,13 @@ impl IU16 {
         builder.call(sub_u32_f);
     }
 
+    /// Adds the instructions to divide two u16 values.
+    ///
+    /// If the dividend is 0, then it traps
+    pub fn div(builder: &mut walrus::InstrSeqBuilder) {
+        builder.binop(BinaryOp::I32DivU);
+    }
+
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
@@ -221,6 +235,13 @@ impl IU32 {
         builder.call(sub_u32_f);
     }
 
+    /// Adds the instructions to divide two u32 values.
+    ///
+    /// If the dividend is 0, then it traps
+    pub fn div(builder: &mut walrus::InstrSeqBuilder) {
+        builder.binop(BinaryOp::I32DivU);
+    }
+
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
@@ -291,6 +312,13 @@ impl IU64 {
     pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
         let sub_u64_f = RuntimeFunction::SubU64.get(module, None);
         builder.call(sub_u64_f);
+    }
+
+    /// Adds the instructions to divide two u64 values.
+    ///
+    /// If the dividend is 0, then it traps
+    pub fn div(builder: &mut walrus::InstrSeqBuilder) {
+        builder.binop(BinaryOp::I64DivU);
     }
 
     pub fn cast_from(
