@@ -509,8 +509,8 @@ fn map_bytecode_instruction(
                 IntermediateType::IU16 => IU16::bit_shift_left(builder, module),
                 IntermediateType::IU32 => IU32::bit_shift_left(builder, module),
                 IntermediateType::IU64 => IU64::bit_shift_left(builder, module),
-                IntermediateType::IU128 => todo!(),
-                IntermediateType::IU256 => todo!(),
+                IntermediateType::IU128 => IU128::bit_shift_left(builder, module, compilation_ctx),
+                IntermediateType::IU256 => IU256::bit_shift_left(builder, module, compilation_ctx),
                 t => panic!("type stack error: invalid type for Shl: {t:?}"),
             }
             types_stack.push(t);
@@ -523,8 +523,8 @@ fn map_bytecode_instruction(
                 IntermediateType::IU16 => IU16::bit_shift_right(builder, module),
                 IntermediateType::IU32 => IU32::bit_shift_right(builder, module),
                 IntermediateType::IU64 => IU64::bit_shift_right(builder, module),
-                IntermediateType::IU128 => todo!(),
-                IntermediateType::IU256 => todo!(),
+                IntermediateType::IU128 => IU128::bit_shift_right(builder, module, compilation_ctx),
+                IntermediateType::IU256 => IU256::bit_shift_right(builder, module, compilation_ctx),
                 t => panic!("type stack error: invalid type for Shr: {t:?}"),
             }
             types_stack.push(t);

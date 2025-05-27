@@ -357,7 +357,7 @@ impl IVector {
 
 #[cfg(test)]
 mod tests {
-    use alloy::primitives::U256;
+    use alloy_primitives::U256;
     use walrus::{FunctionBuilder, FunctionId, MemoryId, Module, ModuleConfig, ValType};
     use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults};
 

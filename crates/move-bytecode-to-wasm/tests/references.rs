@@ -1,4 +1,5 @@
-use alloy::{dyn_abi::SolType, primitives::U256, sol, sol_types::SolCall};
+use alloy_primitives::U256;
+use alloy_sol_types::{SolCall, SolType, sol};
 use anyhow::Result;
 use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
 use rstest::{fixture, rstest};
@@ -270,8 +271,7 @@ mod reference_uint_256 {
 
 mod reference_address {
     use super::*;
-    use alloy::primitives::Address;
-    use alloy::primitives::address;
+    use alloy_primitives::{Address, address};
 
     sol!(
         #[allow(missing_docs)]

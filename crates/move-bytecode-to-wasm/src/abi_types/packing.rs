@@ -229,7 +229,8 @@ impl Packable for IntermediateType {
 
 #[cfg(test)]
 mod tests {
-    use alloy::{dyn_abi::SolType, primitives::U256, sol};
+    use alloy_primitives::U256;
+    use alloy_sol_types::sol;
     use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
     use wasmtime::{
         Caller, Engine, Extern, IntoFunc, Linker, Module as WasmModule, Store, TypedFunc,

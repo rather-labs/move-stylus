@@ -258,7 +258,7 @@ impl<'a> PublicFunction<'a> {
 
 #[cfg(test)]
 mod tests {
-    use alloy::{dyn_abi::SolType, sol};
+    use alloy_sol_types::{SolType, sol};
     use walrus::{
         FunctionBuilder, MemoryId, ModuleConfig,
         ir::{LoadKind, MemArg},

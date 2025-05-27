@@ -259,7 +259,7 @@ pub fn sub_u64(module: &mut Module) -> FunctionId {
 #[cfg(test)]
 mod tests {
     use crate::runtime::test_tools::{build_module, setup_wasmtime_module};
-    use alloy::primitives::U256;
+    use alloy_primitives::U256;
     use rstest::rstest;
     use walrus::FunctionBuilder;
 

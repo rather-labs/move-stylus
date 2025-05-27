@@ -147,7 +147,7 @@ pub fn unpack_i64_type_instructions(
 mod tests {
     use std::fmt::Debug;
 
-    use alloy::{dyn_abi::SolType, sol};
+    use alloy_sol_types::sol;
     use walrus::{FunctionBuilder, FunctionId, ModuleConfig, ValType};
     use wasmtime::{Engine, Linker, Module as WasmModule, Store, TypedFunc, WasmResults};
 
