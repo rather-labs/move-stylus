@@ -171,7 +171,7 @@ impl Unpackable for IntermediateType {
 
 #[cfg(test)]
 mod tests {
-    use alloy::{dyn_abi::SolType, sol};
+    use alloy_sol_types::{SolType, sol};
     use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
     use wasmtime::{Engine, IntoFunc, Linker, Module as WasmModule, Store, TypedFunc, WasmParams};
 

@@ -83,7 +83,8 @@ mod tests {
     use super::*;
     use crate::memory::setup_module_memory;
     use crate::translation::intermediate_types::IntermediateType;
-    use alloy::{dyn_abi::SolType, hex::FromHex, primitives::Address, sol};
+    use alloy_primitives::address;
+    use alloy_sol_types::{SolType, sol};
     use walrus::{FunctionBuilder, ModuleConfig, ValType};
     use wasmtime::{
         Engine, Global, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults,
@@ -227,10 +228,8 @@ mod tests {
     fn test_pack_ref_address() {
         type SolType = sol!((address,));
         let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IAddress));
-        let expected = SolType::abi_encode_params(&(Address::from_hex(
-            "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-        )
-        .unwrap(),));
+        let expected =
+            SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"),));
         test_pack(&expected, ref_type.clone(), &expected);
     }
 
@@ -239,10 +238,8 @@ mod tests {
         type SolType = sol!((address,));
         let ref_type = IntermediateType::IRef(Box::new(IntermediateType::ISigner));
 
-        let expected_result = SolType::abi_encode_params(&(Address::from_hex(
-            "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
-        )
-        .unwrap(),));
+        let expected_result =
+            SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"),));
         test_pack(&expected_result, ref_type.clone(), &expected_result);
     }
 

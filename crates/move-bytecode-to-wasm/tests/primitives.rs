@@ -1,13 +1,8 @@
-use alloy::dyn_abi::abi::TokenSeq;
-use alloy::{
-    dyn_abi::SolType,
-    hex::FromHex,
-    primitives::{Address, U256},
-    sol,
-    sol_types::SolCall,
-};
+use alloy_primitives::{U256, address};
+use alloy_sol_types::{SolCall, SolType, SolValue, abi::TokenSeq, sol};
 use anyhow::Result;
 use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
+use rstest::{fixture, rstest};
 
 mod common;
 
@@ -27,9 +22,6 @@ fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u
 }
 
 mod bool_type {
-    use alloy::sol_types::SolValue;
-    use rstest::{fixture, rstest};
-
     use super::*;
 
     const MODULE_NAME: &str = "bool_type";
@@ -80,10 +72,8 @@ mod bool_type {
 }
 
 mod address_type {
-    use alloy::{primitives::address, sol_types::SolValue};
-    use rstest::{fixture, rstest};
-
     use super::*;
+    use alloy_primitives::address;
 
     const MODULE_NAME: &str = "address_type";
     const SOURCE_PATH: &str = "tests/primitives/address.move";
@@ -149,8 +139,7 @@ mod address_type {
 }
 
 mod signer_type {
-    use alloy::{primitives::address, sol_types::SolValue};
-    use rstest::{fixture, rstest};
+    use alloy_primitives::address;
 
     use super::*;
 
@@ -207,9 +196,6 @@ mod signer_type {
 }
 
 mod uint_8 {
-    use alloy::sol_types::SolValue;
-    use rstest::{fixture, rstest};
-
     use super::*;
 
     const MODULE_NAME: &str = "uint_8";
@@ -292,9 +278,6 @@ mod uint_8 {
 }
 
 mod uint_16 {
-    use alloy::sol_types::SolValue;
-    use rstest::{fixture, rstest};
-
     use super::*;
 
     const MODULE_NAME: &str = "uint_16";
@@ -377,9 +360,6 @@ mod uint_16 {
 }
 
 mod uint_32 {
-    use alloy::sol_types::SolValue;
-    use rstest::{fixture, rstest};
-
     use super::*;
 
     const MODULE_NAME: &str = "uint_32";
@@ -462,9 +442,6 @@ mod uint_32 {
 }
 
 mod uint_64 {
-    use alloy::sol_types::SolValue;
-    use rstest::{fixture, rstest};
-
     use super::*;
 
     const MODULE_NAME: &str = "uint_64";
@@ -547,9 +524,6 @@ mod uint_64 {
 }
 
 mod uint_128 {
-    use alloy::sol_types::SolValue;
-    use rstest::{fixture, rstest};
-
     use super::*;
 
     const MODULE_NAME: &str = "uint_128";
@@ -673,9 +647,6 @@ mod uint_128 {
 }
 
 mod uint_256 {
-    use alloy::sol_types::SolValue;
-    use rstest::{fixture, rstest};
-
     use super::*;
 
     const MODULE_NAME: &str = "uint_256";
@@ -912,7 +883,7 @@ fn test_multi_values_return() {
         3232,
         88,
         true,
-        Address::from_hex("0x0000000000000000000000000000000000000001").unwrap(),
+        address!("0x0000000000000000000000000000000000000001"),
         vec![10, 20, 30],
         vec![100, 200, 300],
     ));
@@ -931,7 +902,7 @@ fn test_multi_values_return() {
     ))>::abi_encode_params(&(
         vec![100, 200, 300],
         vec![10, 20, 30],
-        Address::from_hex("0x0000000000000000000000000000000000000001").unwrap(),
+        address!("0x0000000000000000000000000000000000000001"),
         true,
         88,
         3232,
@@ -956,7 +927,7 @@ fn test_multi_values_return() {
         3232,
         88,
         true,
-        Address::from_hex("0x0000000000000000000000000000000000000001").unwrap(),
+        address!("0x0000000000000000000000000000000000000001"),
         vec![10, 20, 30],
         vec![100, 200, 300],
     ));
