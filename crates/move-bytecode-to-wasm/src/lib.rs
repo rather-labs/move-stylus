@@ -148,25 +148,25 @@ pub fn translate_package(
 
         let mut public_functions = Vec::new();
         let mut function_ids = Vec::new();
-        let mut index = 0;
-        while index < function_table.len() {
-            let function_id =
-                translate_function(&mut module, index, &compilation_ctx, &function_table).unwrap();
 
+        for index in 0..function_table.len() {
+            let function_id =
+                translate_function(&mut module, index, &compilation_ctx, &mut function_table)
+                    .unwrap();
+            function_ids.push(function_id);
+        }
+
+        for (index, function_id) in function_ids.iter().enumerate() {
             let entry = function_table.get(index).unwrap();
             let mapped_function = &entry.function;
 
             if mapped_function.move_definition.visibility == Visibility::Public {
                 public_functions.push(PublicFunction::new(
-                    function_id,
+                    *function_id,
                     &mapped_function.name,
                     &mapped_function.signature,
                 ));
             }
-
-            function_ids.push(function_id);
-
-            index += 1;
         }
 
         hostio::build_entrypoint_router(&mut module, allocator_func, memory_id, &public_functions);

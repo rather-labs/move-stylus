@@ -96,7 +96,7 @@ impl IVector {
     ) {
         // === Local declarations ===
         let dst_local = module.locals.add(ValType::I32);
-        let temp_local = module.locals.add(inner.into());
+        let temp_local = module.locals.add(ValType::I32);
 
         let index = module.locals.add(ValType::I32);
         let len = module.locals.add(ValType::I32);
@@ -156,10 +156,10 @@ impl IVector {
                     // Dont load the element, the copy_local_instructions expects an address!
                 }
                 IntermediateType::IU64 => {
-                    loop_block.unop(UnaryOp::I64ExtendUI32);
+                    // loop_block.unop(UnaryOp::I64ExtendUI32);
                 }
                 _ => {
-                    // For heap, load the element (which is a pointer) into local
+                    // For heap, load the element (which is a pointer)
                     loop_block.load(
                         compilation_ctx.memory_id,
                         LoadKind::I32 { atomic: false },

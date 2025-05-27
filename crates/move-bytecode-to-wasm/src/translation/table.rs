@@ -89,6 +89,10 @@ impl<'a> FunctionTable<'a> {
         self.entries.get(index)
     }
 
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut TableEntry<'a>> {
+        self.entries.get_mut(index)
+    }
+
     pub fn get_by_function_handle_index(
         &self,
         function_handle_index: &FunctionHandleIndex,

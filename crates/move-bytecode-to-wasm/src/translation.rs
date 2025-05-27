@@ -27,10 +27,10 @@ pub fn translate_function(
     module: &mut Module,
     index: usize,
     compilation_ctx: &CompilationContext,
-    function_table: &FunctionTable,
+    function_table: &mut FunctionTable,
 ) -> Result<FunctionId> {
     let entry = function_table
-        .get(index)
+        .get_mut(index)
         .ok_or(anyhow::anyhow!("index {index} not found in function table"))?;
 
     anyhow::ensure!(
@@ -38,24 +38,31 @@ pub fn translate_function(
         "Jump tables are not supported yet"
     );
 
-    // Maps the types of the values contained in the stack at the moment of processing an
-    // instruction.
-    let mut types_stack = Vec::new();
+    let ir_arg_types = entry.function.signature.arguments.clone();
+    let wasm_arg_local_ids = entry.function.arg_local_ids.clone();
+
     let mut function = FunctionBuilder::new(&mut module.types, &entry.params, &entry.results);
     let mut builder = function.func_body();
 
-    // Normalize function arguments to be heap-based
-    for (arg_type, arg_local) in entry
-        .function
-        .signature
-        .arguments
-        .iter()
-        .zip(entry.function.arg_local_ids.iter())
-    {
-        normalize_argument_into_heap(arg_type, &mut builder, module, compilation_ctx, *arg_local);
+    for (ir_arg_type, wasm_arg_local_id) in ir_arg_types.iter().zip(wasm_arg_local_ids.iter()) {
+        normalize_argument_into_heap(
+            ir_arg_type,
+            &mut builder,
+            module,
+            compilation_ctx,
+            *wasm_arg_local_id,
+            &mut entry.function,
+        );
     }
 
-    for instruction in &entry.function.move_code_unit.code {
+    let entry = function_table
+        .get(index)
+        .ok_or(anyhow::anyhow!("index {index} not found in function table"))?;
+
+    let code = entry.function.move_code_unit.code.clone();
+    let mut types_stack = Vec::new();
+
+    for instruction in &code {
         map_bytecode_instruction(
             instruction,
             compilation_ctx,
@@ -67,8 +74,7 @@ pub fn translate_function(
         );
     }
 
-    let function_id = function.finish(entry.function.arg_local_ids.clone(), &mut module.funcs);
-
+    let function_id = function.finish(wasm_arg_local_ids, &mut module.funcs);
     Ok(function_id)
 }
 
@@ -88,10 +94,7 @@ fn map_bytecode_instruction(
             let constant = &compilation_ctx.constants[global_index.0 as usize];
             let mut data = constant.data.clone().into_iter();
             let constant_type = &constant.type_;
-            let constant_type: IntermediateType = constant_type
-                .try_into()
-                // TODO: unwrap
-                .unwrap();
+            let constant_type: IntermediateType = constant_type.try_into().unwrap();
 
             constant_type.load_constant_instructions(module, builder, &mut data, compilation_ctx);
 
@@ -186,7 +189,7 @@ fn map_bytecode_instruction(
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
             let local = mapped_function.local_variables[*local_id as usize];
             let local_type = mapped_function.local_variables_type[*local_id as usize].clone();
-            local_type.move_local_instructions(module, builder, compilation_ctx, local);
+            local_type.move_local_instructions(builder, compilation_ctx, local);
             types_stack.push(local_type);
         }
         Bytecode::CopyLoc(local_id) => {
@@ -218,8 +221,7 @@ fn map_bytecode_instruction(
         Bytecode::ImmBorrowLoc(local_id) => {
             let local = mapped_function.local_variables[*local_id as usize];
             let local_type = &mapped_function.local_variables_type[*local_id as usize];
-
-            local_type.add_borrow_local_instructions(module, builder, compilation_ctx, local);
+            local_type.add_borrow_local_instructions(builder, local);
 
             // Push the reference to the type into the types stack
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
@@ -550,24 +552,61 @@ pub fn normalize_argument_into_heap(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     local: LocalId,
+    mapped_function: &mut MappedFunction,
 ) {
     match ty {
-        IntermediateType::IBool
-        | IntermediateType::IU8
-        | IntermediateType::IU16
-        | IntermediateType::IU32 => {
-            let tmp = module.locals.add(ValType::I32);
+        IntermediateType::IU64 => {
+            let tmp = module.locals.add(ValType::I64);
+            let pointer = module.locals.add(ValType::I32);
 
-            // Save the original value to temp
+            // Save original value
             builder.local_get(local);
             builder.local_set(tmp);
 
             // Allocate heap memory
             builder.i32_const(ty.stack_data_size() as i32);
             builder.call(compilation_ctx.allocator);
+            builder.local_tee(pointer);
+
+            // Store value
+            builder.local_get(tmp);
+            builder.store(
+                compilation_ctx.memory_id,
+                StoreKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+
+            // Replace the original local with the new pointer
+            if let Some(index) = mapped_function
+                .local_variables
+                .iter()
+                .position(|&id| id == local)
+            {
+                mapped_function.local_variables[index] = pointer;
+            } else {
+                panic!(
+                    "Couldn't find original local {:?} in mapped_function",
+                    local
+                );
+            }
+        }
+
+        IntermediateType::IBool
+        | IntermediateType::IU8
+        | IntermediateType::IU16
+        | IntermediateType::IU32 => {
+            let tmp = module.locals.add(ValType::I32);
+
+            builder.local_get(local);
+            builder.local_set(tmp);
+
+            builder.i32_const(ty.stack_data_size() as i32);
+            builder.call(compilation_ctx.allocator);
             builder.local_tee(local);
 
-            // Store the value in heap
             builder.local_get(tmp);
             builder.store(
                 compilation_ctx.memory_id,
@@ -579,37 +618,8 @@ pub fn normalize_argument_into_heap(
             );
         }
 
-        IntermediateType::IU64 => {
-            let tmp = module.locals.add(ValType::I64);
-            let pointer = module.locals.add(ValType::I32);
-
-            // Save the original value to temp
-            builder.local_get(local);
-            builder.local_set(tmp);
-
-            // Allocate heap memory
-            builder.i32_const(ty.stack_data_size() as i32);
-            builder.call(compilation_ctx.allocator);
-            builder.local_tee(pointer);
-
-            // Store the value in heap
-            builder.local_get(tmp);
-            builder.store(
-                compilation_ctx.memory_id,
-                StoreKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-            builder
-                .local_get(pointer)
-                .unop(UnaryOp::I64ExtendUI32)
-                .local_set(local);
-        }
-
         _ => {
-            // Already a pointer — no action needed
+            // Already a pointer
         }
     }
 }
