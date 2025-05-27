@@ -87,7 +87,7 @@ impl IVector {
         );
     }
 
-    pub fn copy_loc_instructions(
+    pub fn copy_local_instructions(
         inner: &IntermediateType,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
@@ -96,7 +96,7 @@ impl IVector {
     ) {
         // === Local declarations ===
         let dst_local = module.locals.add(ValType::I32);
-        let temp_local = module.locals.add(inner.into());
+        let temp_local = module.locals.add(ValType::I32);
 
         let index = module.locals.add(ValType::I32);
         let len = module.locals.add(ValType::I32);
@@ -148,18 +148,29 @@ impl IVector {
             loop_block.local_get(src_local);
             loop_block.binop(BinaryOp::I32Add);
 
-            // === Load element into local ===
-            loop_block.load(
-                compilation_ctx.memory_id,
-                match inner {
-                    IntermediateType::IU64 => LoadKind::I64 { atomic: false },
-                    _ => LoadKind::I32 { atomic: false },
-                },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
+            match inner {
+                IntermediateType::IBool
+                | IntermediateType::IU8
+                | IntermediateType::IU16
+                | IntermediateType::IU32 => {
+                    // Dont load the element, the copy_local_instructions expects an address!
+                }
+                IntermediateType::IU64 => {
+                    // loop_block.unop(UnaryOp::I64ExtendUI32);
+                }
+                _ => {
+                    // For heap, load the element (which is a pointer)
+                    loop_block.load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                }
+            }
+
             loop_block.local_set(temp_local);
 
             // === Compute destination address of element ===
@@ -172,7 +183,7 @@ impl IVector {
             loop_block.binop(BinaryOp::I32Add);
 
             // === Copy element recursively ===
-            inner.copy_loc_instructions(module, loop_block, compilation_ctx, temp_local);
+            inner.copy_local_instructions(module, loop_block, compilation_ctx, temp_local);
 
             // === Store result from stack into memory ===
             loop_block.store(
@@ -456,7 +467,7 @@ mod tests {
         builder.local_set(src_local);
 
         // Copy the vector and return the new pointer
-        IVector::copy_loc_instructions(
+        IVector::copy_local_instructions(
             &inner_type,
             &mut raw_module,
             &mut builder,
