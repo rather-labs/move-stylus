@@ -125,7 +125,7 @@ pub fn translate_package(
             );
 
             let code_locals = &root_compiled_module.signatures
-                [function_def.code.clone().unwrap().locals.0 as usize];
+                [function_def.code.as_ref().unwrap().locals.0 as usize];
 
             let function_name =
                 root_compiled_module.identifiers[function_handle.name.0 as usize].to_string();
@@ -135,7 +135,7 @@ pub fn translate_package(
                 function_name,
                 move_function_arguments,
                 move_function_return,
-                &code_locals,
+                code_locals,
                 function_def,
                 &mut module,
             );

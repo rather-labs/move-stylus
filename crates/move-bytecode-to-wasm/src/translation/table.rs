@@ -1,5 +1,5 @@
 use anyhow::Result;
-use move_binary_format::file_format::FunctionHandleIndex;
+use move_binary_format::file_format::{CodeUnit, FunctionHandleIndex};
 use walrus::{ConstExpr, ElementKind, FunctionId, Module, TableId, TypeId, ValType, ir::Value};
 
 use super::functions::MappedFunction;
@@ -17,6 +17,12 @@ pub struct TableEntry {
     /// method, on some entry resulting in some functions not present in the table, if that happens
     /// we are going to be able to call the function present in this entry.
     added_to_wasm_table: bool,
+}
+
+impl TableEntry {
+    pub fn get_move_code_unit(&self) -> Option<&CodeUnit> {
+        self.function.function_definition.code.as_ref()
+    }
 }
 
 pub struct FunctionTable {

@@ -34,7 +34,7 @@ pub fn translate_function(
         .ok_or(anyhow::anyhow!("index {index} not found in function table"))?;
 
     anyhow::ensure!(
-        entry.function.function_definition.code.is_some(),
+        entry.get_move_code_unit().unwrap().jump_tables.is_empty(),
         "Jump tables are not supported yet"
     );
 
@@ -49,7 +49,7 @@ pub fn translate_function(
         .get(index)
         .ok_or(anyhow::anyhow!("index {index} not found in function table"))?;
 
-    let code = &entry.function.function_definition.code.as_ref().unwrap().code;
+    let code = &entry.get_move_code_unit().unwrap().code;
 
     let mut types_stack = Vec::new();
 
