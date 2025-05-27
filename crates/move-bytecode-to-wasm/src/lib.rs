@@ -178,6 +178,7 @@ pub fn translate_package(
                 .expect("there was an error adding the module's functions to the function table");
         }
 
+        function_table.ensure_all_functions_added().unwrap();
         validate_stylus_wasm(&mut module).unwrap();
 
         modules.insert(module_name, module);

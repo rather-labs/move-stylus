@@ -41,6 +41,14 @@ impl IU8 {
             .call(check_overflow_f);
     }
 
+    /// Adds the instructions to substract two u8 values.
+    ///
+    /// If the substraction is less than 0, then it traps
+    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let sub_u32_f = RuntimeFunction::SubU32.get(module, None);
+        builder.call(sub_u32_f);
+    }
+
     pub fn cast_from(
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
@@ -76,6 +84,24 @@ impl IU8 {
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
         builder.i32_const(Self::MAX_VALUE).call(check_overflow_f);
     }
+
+    pub fn bit_shift_left(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 8
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(7).call(check_overflow_f);
+
+        builder.binop(BinaryOp::I32Shl);
+        // Mask the bytes outside the u8 range
+        builder.i32_const(0xFF).binop(BinaryOp::I32And);
+    }
+
+    pub fn bit_shift_right(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 8
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(7).call(check_overflow_f);
+
+        builder.binop(BinaryOp::I32ShrU);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -103,6 +129,14 @@ impl IU16 {
             .binop(BinaryOp::I32Add)
             .i32_const(Self::MAX_VALUE)
             .call(check_overflow_f);
+    }
+
+    /// Adds the instructions to substract two u16 values.
+    ///
+    /// If the substraction is less than 0, then it traps
+    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let sub_u32_f = RuntimeFunction::SubU32.get(module, None);
+        builder.call(sub_u32_f);
     }
 
     pub fn cast_from(
@@ -140,6 +174,24 @@ impl IU16 {
         let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
         builder.i32_const(Self::MAX_VALUE).call(check_overflow_f);
     }
+
+    pub fn bit_shift_left(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 16
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(15).call(check_overflow_f);
+
+        builder.binop(BinaryOp::I32Shl);
+        // Mask the bytes outside the u16 range
+        builder.i32_const(0xFFFF).binop(BinaryOp::I32And);
+    }
+
+    pub fn bit_shift_right(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 16
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(15).call(check_overflow_f);
+
+        builder.binop(BinaryOp::I32ShrU);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -159,6 +211,14 @@ impl IU32 {
     pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
         let add_function_id = RuntimeFunction::AddU32.get(module, None);
         builder.call(add_function_id);
+    }
+
+    /// Adds the instructions to substract two u32 values.
+    ///
+    /// If the substraction is less than 0, then it traps
+    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let sub_u32_f = RuntimeFunction::SubU32.get(module, None);
+        builder.call(sub_u32_f);
     }
 
     pub fn cast_from(
@@ -190,6 +250,22 @@ impl IU32 {
             t => panic!("type stack error: trying to cast {t:?}"),
         }
     }
+
+    pub fn bit_shift_left(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 32
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(31).call(check_overflow_f);
+
+        builder.binop(BinaryOp::I32Shl);
+    }
+
+    pub fn bit_shift_right(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 32
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(31).call(check_overflow_f);
+
+        builder.binop(BinaryOp::I32ShrU);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -207,6 +283,14 @@ impl IU64 {
     pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
         let add_function_id = RuntimeFunction::AddU64.get(module, None);
         builder.call(add_function_id);
+    }
+
+    /// Adds the instructions to substract two u8 values.
+    ///
+    /// If the substraction is less than 0, then it traps
+    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        let sub_u64_f = RuntimeFunction::SubU64.get(module, None);
+        builder.call(sub_u64_f);
     }
 
     pub fn cast_from(
@@ -236,5 +320,23 @@ impl IU64 {
             }
             t => panic!("type stack error: trying to cast {t:?}"),
         }
+    }
+
+    pub fn bit_shift_left(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 64
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(63).call(check_overflow_f);
+
+        builder.unop(UnaryOp::I64ExtendUI32);
+        builder.binop(BinaryOp::I64Shl);
+    }
+
+    pub fn bit_shift_right(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+        // This operation aborts if the shift amount is greater or equal than 64
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        builder.i32_const(63).call(check_overflow_f);
+
+        builder.unop(UnaryOp::I64ExtendUI32);
+        builder.binop(BinaryOp::I64ShrU);
     }
 }
