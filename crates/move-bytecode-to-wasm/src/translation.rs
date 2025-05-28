@@ -87,8 +87,10 @@ fn map_bytecode_instruction(
     function_table: &FunctionTable,
     types_stack: &mut Vec<IntermediateType>,
 ) {
+    let mut mut_ref_locals_stack = Vec::new();
+
     match instruction {
-        // Load a fixed constant
+        // Load constant
         Bytecode::LdConst(global_index) => {
             let constant = &compilation_ctx.constants[global_index.0 as usize];
             let mut data = constant.data.clone().into_iter();
@@ -176,7 +178,7 @@ fn map_bytecode_instruction(
                 types_stack.push(return_type.clone());
             }
         }
-        // Locals
+        // Locals instructions
         Bytecode::StLoc(local_id) => {
             let local = mapped_function.local_variables[*local_id as usize];
             let local_type = &mapped_function.local_variables_type[*local_id as usize];
@@ -196,6 +198,15 @@ fn map_bytecode_instruction(
             local_type.copy_local_instructions(module, builder, compilation_ctx, local);
             types_stack.push(local_type);
         }
+        Bytecode::ImmBorrowLoc(local_id) => {
+            let local = mapped_function.local_variables[*local_id as usize];
+            let local_type = &mapped_function.local_variables_type[*local_id as usize];
+            local_type.add_borrow_local_instructions(builder, local);
+
+            // Push the reference to the type into the types stack
+            types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
+        }
+        // Vector instructions
         Bytecode::VecPack(signature_index, num_elements) => {
             let inner =
                 get_intermediate_type_for_signature_index(mapped_function, *signature_index);
@@ -215,14 +226,6 @@ fn map_bytecode_instruction(
             }
 
             types_stack.push(IntermediateType::IVector(Box::new(inner)));
-        }
-        Bytecode::ImmBorrowLoc(local_id) => {
-            let local = mapped_function.local_variables[*local_id as usize];
-            let local_type = &mapped_function.local_variables_type[*local_id as usize];
-            local_type.add_borrow_local_instructions(builder, local);
-
-            // Push the reference to the type into the types stack
-            types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
         }
         Bytecode::VecImmBorrow(signature_index) => {
             match (types_stack.pop(), types_stack.pop()) {
@@ -343,6 +346,7 @@ fn map_bytecode_instruction(
                 "types stack is not empty after return"
             );
         }
+        // Cast instructions
         Bytecode::CastU8 => {
             let original_type = types_stack.pop().unwrap();
             IU8::cast_from(builder, module, original_type, compilation_ctx);
@@ -373,6 +377,7 @@ fn map_bytecode_instruction(
             IU256::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU256);
         }
+        // Arithmetic instructions
         Bytecode::Add => {
             let sum_type = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
                 assert_eq!(
@@ -438,6 +443,7 @@ fn map_bytecode_instruction(
 
             types_stack.push(t1);
         }
+        // Logical instructions
         Bytecode::Or => {
             pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
             pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
@@ -536,6 +542,7 @@ fn map_bytecode_instruction(
             }
             types_stack.push(t);
         }
+        // Shift instructions
         Bytecode::Shl => {
             pop_types_stack(types_stack, &IntermediateType::IU8).unwrap();
             let t = types_stack.pop().unwrap();
