@@ -122,7 +122,7 @@ impl IntermediateType {
                 let tmp = module.locals.add(ValType::I64);
                 builder.local_set(tmp);
                 builder
-                    .i32_const(8 as i32)
+                    .i32_const(8)
                     .call(compilation_ctx.allocator)
                     .local_tee(local);
 

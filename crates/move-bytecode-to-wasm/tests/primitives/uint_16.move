@@ -60,3 +60,11 @@ public fun sub(x: u16, y: u16): u16 {
 public fun div(x: u16, y: u16): u16 {
     x / y
 }
+
+public fun mul(x: u16, y: u16): u16 {
+    x * y
+}
+
+public fun mod_(x: u16, y: u16): u16 {
+    x % y
+}

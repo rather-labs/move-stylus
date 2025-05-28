@@ -1,5 +1,4 @@
-use anyhow::Result;
-use move_binary_format::file_format::{CodeUnit, FunctionDefinition, Signature};
+use move_binary_format::file_format::{FunctionDefinition, Signature};
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
     ir::{LoadKind, MemArg, StoreKind},
@@ -9,33 +8,28 @@ use crate::{CompilationContext, translation::intermediate_types::ISignature};
 
 use super::intermediate_types::IntermediateType;
 
-pub struct MappedFunction<'a> {
+pub struct MappedFunction {
     pub name: String,
     pub signature: ISignature,
-    pub move_definition: FunctionDefinition,
-    pub move_code_unit: CodeUnit,
-    pub local_variables: Vec<LocalId>,
-    pub local_variables_type: Vec<IntermediateType>,
-    pub arg_local_ids: Vec<LocalId>,
-    pub move_module_signatures: &'a [Signature],
+    pub function_definition: FunctionDefinition,
+    pub function_locals: Vec<LocalId>,
+    pub function_locals_ir: Vec<IntermediateType>,
+    pub arg_locals: Vec<LocalId>,
 }
 
-//@ Do we need to pass the whole move_module_signatures to each mapped function?
-impl<'a> MappedFunction<'a> {
+impl MappedFunction {
     pub fn new(
         name: String,
         move_args: &Signature,
         move_rets: &Signature,
+        move_locals: &Signature,
         move_def: FunctionDefinition,
         module: &mut Module,
-        sig_pool: &'a [Signature],
     ) -> Self {
         assert!(
             move_def.acquires_global_resources.is_empty(),
             "Acquiring global resources is not supported yet"
         );
-
-        let code = move_def.code.clone().expect("Function has no code");
 
         let signature = ISignature::from_signatures(move_args, move_rets);
         let wasm_arg_types = signature.get_argument_wasm_types();
@@ -55,10 +49,7 @@ impl<'a> MappedFunction<'a> {
         let ir_arg_types = move_args.0.iter().map(IntermediateType::try_from);
 
         // Declared locals
-        let ir_declared_locals_types = sig_pool[code.locals.0 as usize]
-            .0
-            .iter()
-            .map(IntermediateType::try_from);
+        let ir_declared_locals_types = move_locals.0.iter().map(IntermediateType::try_from);
 
         let wasm_declared_locals = ir_declared_locals_types
             .clone()
@@ -84,12 +75,102 @@ impl<'a> MappedFunction<'a> {
         Self {
             name,
             signature,
-            move_definition: move_def,
-            move_code_unit: code,
-            local_variables,
-            local_variables_type,
-            arg_local_ids: wasm_arg_locals,
-            move_module_signatures: sig_pool,
+            function_definition: move_def,
+            function_locals: local_variables,
+            function_locals_ir: local_variables_type,
+            arg_locals: wasm_arg_locals,
+        }
+    }
+
+    /// Converts value-based function arguments into heap-allocated pointers.
+    ///
+    /// For each value-type argument (like u64, u32, etc.), this stores the value in linear memory
+    /// and updates the local to hold a pointer to that memory instead. This allows treating all
+    /// arguments as pointers in later code.
+    pub fn convert_args_to_heap(
+        &mut self,
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+    ) {
+        // Store the changes we need to make
+        let mut updates = Vec::new();
+
+        // Iterate over the mapped function arguments
+        for (local, ty) in self
+            .function_locals
+            .iter()
+            .zip(self.signature.arguments.iter())
+        {
+            match ty {
+                IntermediateType::IU64 => {
+                    let tmp = module.locals.add(ValType::I64);
+                    let pointer = module.locals.add(ValType::I32);
+
+                    // Save original value
+                    builder.local_get(*local);
+                    builder.local_set(tmp);
+
+                    // Allocate heap memory
+                    builder.i32_const(ty.stack_data_size() as i32);
+                    builder.call(compilation_ctx.allocator);
+                    builder.local_tee(pointer);
+
+                    // Store value
+                    builder.local_get(tmp);
+                    builder.store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                    // Store the update for later
+                    if let Some(index) = self.function_locals.iter().position(|&id| id == *local) {
+                        updates.push((index, pointer));
+                    } else {
+                        panic!(
+                            "Couldn't find original local {:?} in mapped_function",
+                            local
+                        );
+                    }
+                }
+
+                IntermediateType::IBool
+                | IntermediateType::IU8
+                | IntermediateType::IU16
+                | IntermediateType::IU32 => {
+                    let tmp = module.locals.add(ValType::I32);
+
+                    builder.local_get(*local);
+                    builder.local_set(tmp);
+
+                    builder.i32_const(ty.stack_data_size() as i32);
+                    builder.call(compilation_ctx.allocator);
+                    builder.local_tee(*local);
+
+                    builder.local_get(tmp);
+                    builder.store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                }
+
+                _ => {
+                    // Already a pointer
+                }
+            }
+        }
+
+        // Apply local replacement after the iteration
+        for (index, pointer) in updates {
+            self.function_locals[index] = pointer;
         }
     }
 }

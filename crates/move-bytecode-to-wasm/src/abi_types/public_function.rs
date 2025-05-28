@@ -455,6 +455,7 @@ mod tests {
             constants: &[],
             functions_arguments: &[],
             functions_returns: &[],
+            module_signatures: &[],
             memory_id,
             allocator,
         };
@@ -537,6 +538,7 @@ mod tests {
             constants: &[],
             functions_arguments: &[],
             functions_returns: &[],
+            module_signatures: &[],
             memory_id,
             allocator,
         };

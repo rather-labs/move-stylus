@@ -218,6 +218,8 @@ mod uint_8 {
         function sum(uint8 x, uint8 y) external returns (uint8);
         function sub(uint8 x, uint8 y) external returns (uint8);
         function div(uint8 x, uint8 y) external returns (uint8);
+        function mul(uint8 x, uint8 y) external returns (uint8);
+        function mod(uint8 x, uint8 y) external returns (uint8);
     );
 
     #[rstest]
@@ -275,6 +277,57 @@ mod uint_8 {
         )
         .unwrap();
     }
+
+    #[rstest]
+    #[case(0, 5, 0)]
+    #[case(5, 10, 5)]
+    #[case(10, 3, 1)]
+    #[case(u8::MAX, 1, 0)]
+    #[case(u8::MAX, 2, 1)]
+    #[case(u8::MAX, u8::MAX, 0)]
+    #[case(u8::MAX, u8::MAX - 1, 1)]
+    #[should_panic(expected = "wasm trap: integer divide by zero")]
+    #[case(10, 0, 0)]
+    fn test_uint_8_mod(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] dividend: u8,
+        #[case] divisor: u8,
+        #[case] expected_result: i32,
+    ) {
+        run_test(
+            runtime,
+            modCall::new((dividend, divisor)).abi_encode(),
+            <(&i32,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(0, u8::MAX, 0)]
+    #[case(u8::MAX, 0, 0)]
+    #[case(1, u8::MAX, u8::MAX as i32)]
+    #[case(u8::MAX, 1, u8::MAX as i32)]
+    #[case(127, 2, 254)]
+    #[case(21, 4, 84)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(u8::MAX, 2, -1)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(16, 16, -1)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(17, 17, -1)]
+    fn test_uint_8_mul(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] n1: u8,
+        #[case] n2: u8,
+        #[case] expected_result: i32,
+    ) {
+        run_test(
+            runtime,
+            mulCall::new((n1, n2)).abi_encode(),
+            <(&i32,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
 }
 
 mod uint_16 {
@@ -300,6 +353,8 @@ mod uint_16 {
         function sum(uint16 x, uint16 y) external returns (uint16);
         function sub(uint16 x, uint16 y) external returns (uint16);
         function div(uint16 x, uint16 y) external returns (uint16);
+        function mul(uint16 x, uint16 y) external returns (uint16);
+        function mod(uint16 x, uint16 y) external returns (uint16);
     );
 
     #[rstest]
@@ -357,6 +412,56 @@ mod uint_16 {
         )
         .unwrap();
     }
+
+    #[rstest]
+    #[case(0, 5, 0)]
+    #[case(5, 10, 5)]
+    #[case(10, 3, 1)]
+    #[case(u16::MAX, 1, 0)]
+    #[case(u16::MAX, u8::MAX as u16 + 1, u8::MAX as u16)]
+    #[case(u16::MAX, u16::MAX - 1, 1)]
+    #[should_panic(expected = "wasm trap: integer divide by zero")]
+    #[case(10, 0, 0)]
+    fn test_uint_16_mod(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] dividend: u16,
+        #[case] divisor: u16,
+        #[case] expected_result: u16,
+    ) {
+        run_test(
+            runtime,
+            modCall::new((dividend, divisor)).abi_encode(),
+            <(&u16,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(0, u16::MAX, 0)]
+    #[case(u16::MAX, 0, 0)]
+    #[case(1, u16::MAX, u16::MAX)]
+    #[case(u16::MAX, 1, u16::MAX)]
+    #[case(32767, 2, 65534)]
+    #[case(21, 4, 84)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(u16::MAX, 2, 0)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(256, 256, 0)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(256, 257, 0)]
+    fn test_uint_16_mul(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] n1: u16,
+        #[case] n2: u16,
+        #[case] expected_result: u16,
+    ) {
+        run_test(
+            runtime,
+            mulCall::new((n1, n2)).abi_encode(),
+            <(&u16,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
 }
 
 mod uint_32 {
@@ -382,6 +487,8 @@ mod uint_32 {
         function sum(uint32 x, uint32 y) external returns (uint32);
         function sub(uint32 x, uint32 y) external returns (uint32);
         function div(uint32 x, uint32 y) external returns (uint32);
+        function mul(uint32 x, uint32 y) external returns (uint32);
+        function mod(uint32 x, uint32 y) external returns (uint32);
     );
 
     #[rstest]
@@ -439,6 +546,54 @@ mod uint_32 {
         )
         .unwrap();
     }
+
+    #[rstest]
+    #[case(0, 5, 0)]
+    #[case(5, 10, 5)]
+    #[case(10, 3, 1)]
+    #[case(u32::MAX, 1, 0)]
+    #[case(u32::MAX, u16::MAX as u32  + 1, u16::MAX as u32)]
+    #[case(u32::MAX, u32::MAX - 1, 1)]
+    #[should_panic(expected = "wasm trap: integer divide by zero")]
+    #[case(10, 0, 0)]
+    fn test_uint_32_mod(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] dividend: u32,
+        #[case] divisor: u32,
+        #[case] expected_result: u32,
+    ) {
+        run_test(
+            runtime,
+            modCall::new((dividend, divisor)).abi_encode(),
+            <(&u32,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(0, u32::MAX, 0)]
+    #[case(u32::MAX, 0, 0)]
+    #[case(1, u32::MAX, u32::MAX)]
+    #[case(u32::MAX, 1, u32::MAX)]
+    #[case(u32::MAX / 2, 2, u32::MAX - 1)]
+    #[case(21, 4, 84)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(u32::MAX, 2, 0)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(u16::MAX as u32 + 1, u16::MAX as u32 + 1, 0)]
+    fn test_uint_32_mul(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] n1: u32,
+        #[case] n2: u32,
+        #[case] expected_result: u32,
+    ) {
+        run_test(
+            runtime,
+            mulCall::new((n1, n2)).abi_encode(),
+            <(&u32,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
 }
 
 mod uint_64 {
@@ -464,6 +619,8 @@ mod uint_64 {
         function sum(uint64 x, uint64 y) external returns (uint64);
         function sub(uint64 x, uint64 y) external returns (uint64);
         function div(uint64 x, uint64 y) external returns (uint64);
+        function mul(uint64 x, uint64 y) external returns (uint64);
+        function mod(uint64 x, uint64 y) external returns (uint64);
     );
 
     #[rstest]
@@ -517,6 +674,54 @@ mod uint_64 {
         run_test(
             runtime,
             divCall::new((dividend, divisor)).abi_encode(),
+            <(&u64,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(0, 5, 0)]
+    #[case(5, 10, 5)]
+    #[case(10, 3, 1)]
+    #[case(u64::MAX, 1, 0)]
+    #[case(u64::MAX, u32::MAX as u64 + 1, u32::MAX as u64)]
+    #[case(u64::MAX, u64::MAX - 1, 1)]
+    #[should_panic(expected = "wasm trap: integer divide by zero")]
+    #[case(10, 0, 0)]
+    fn test_uint_32_mod(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] dividend: u64,
+        #[case] divisor: u64,
+        #[case] expected_result: u64,
+    ) {
+        run_test(
+            runtime,
+            modCall::new((dividend, divisor)).abi_encode(),
+            <(&u64,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(0, u64::MAX, 0)]
+    #[case(u64::MAX, 0, 0)]
+    #[case(1, u64::MAX, u64::MAX)]
+    #[case(u64::MAX, 1, u64::MAX)]
+    #[case(u64::MAX / 2, 2, u64::MAX - 1)]
+    #[case(21, 4, 84)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(u64::MAX, 2, 0)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(u32::MAX as u64 + 1, u32::MAX as u64 + 1, 0)]
+    fn test_uint_64_mul(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] n1: u64,
+        #[case] n2: u64,
+        #[case] expected_result: u64,
+    ) {
+        run_test(
+            runtime,
+            mulCall::new((n1, n2)).abi_encode(),
             <(&u64,)>::abi_encode_params(&(&expected_result,)),
         )
         .unwrap();
