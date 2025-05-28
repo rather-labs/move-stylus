@@ -18,11 +18,11 @@ use walrus::{
 use crate::CompilationContext;
 
 pub mod functions;
-/// The types in this module represent an intermediate Rust representation of Move types
-/// that is used to generate the WASM code.
 pub mod intermediate_types;
 pub mod table;
 
+// The `translate_function` function takes a mapped function from the table, normalizes the arguments into heap,
+// and translates each instruction from the move code unit into WASM instructions.
 pub fn translate_function(
     module: &mut Module,
     index: usize,
@@ -96,7 +96,6 @@ fn map_bytecode_instruction(
             let constant_type: IntermediateType = constant_type.try_into().unwrap();
 
             constant_type.load_constant_instructions(module, builder, &mut data, compilation_ctx);
-
             types_stack.push(constant_type);
             assert!(
                 data.next().is_none(),
@@ -288,7 +287,7 @@ fn map_bytecode_instruction(
                 .expect("ReadRef expects a reference on the stack");
 
             match ref_type {
-                IntermediateType::IRef(inner) => {
+                IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
                     // Now call directly on the inner type
                     inner.add_read_ref_instructions(builder, compilation_ctx.memory_id);
 
@@ -298,6 +297,23 @@ fn map_bytecode_instruction(
                 _ => panic!("ReadRef expected a IRef type but got: {:?}", ref_type),
             }
         }
+
+        Bytecode::WriteRef => match (types_stack.pop(), types_stack.pop()) {
+            (Some(IntermediateType::IMutRef(inner)), Some(value_type)) => {
+                if *inner == value_type {
+                    inner.add_write_ref_instructions(module, builder, compilation_ctx);
+                } else {
+                    panic!(
+                        "WriteRef type mismatch: expected value of type {:?}, got {:?}",
+                        inner, value_type
+                    );
+                }
+            }
+            (Some(other), Some(_)) => {
+                panic!("WriteRef expected a mutable reference, got {:?}", other);
+            }
+            _ => panic!("Type stack underflow on WriteRef"),
+        },
 
         Bytecode::Pop => {
             builder.drop();

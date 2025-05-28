@@ -18,3 +18,12 @@ public fun deref_nested_bool(x: bool): bool {
     let z = &*y;
     *z
 }
+
+public fun deref_mut_arg(x: &mut bool ): bool {
+ *x
+}
+
+public fun write_mut_ref(x: &mut bool ): bool {
+ *x = false;
+ *x
+}

@@ -12,8 +12,8 @@ use crate::translation::intermediate_types::{
 };
 
 mod pack_heap_int;
-mod pack_references;
 mod pack_native_int;
+mod pack_references;
 mod pack_vector;
 
 pub trait Packable {
@@ -198,16 +198,18 @@ impl Packable for IntermediateType {
                 memory,
                 alloc_function,
             ),
-            IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => IRef::add_pack_instructions(
-                inner,
-                builder,
-                module,
-                local,
-                writer_pointer,
-                calldata_reference_pointer,
-                memory,
-                alloc_function,
-            ),
+            IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+                IRef::add_pack_instructions(
+                    inner,
+                    builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    memory,
+                    alloc_function,
+                )
+            }
         }
     }
 
@@ -223,7 +225,9 @@ impl Packable for IntermediateType {
             IntermediateType::IAddress => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::ISigner => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::IVector(_) => 32,
-            IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => inner.encoded_size(),
+            IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+                inner.encoded_size()
+            }
         }
     }
 }

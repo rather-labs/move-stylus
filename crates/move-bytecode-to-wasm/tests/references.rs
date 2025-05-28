@@ -8,6 +8,8 @@ mod common;
 
 fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
     let (result, return_data) = runtime.call_entrypoint(call_data)?;
+    println!("result: {result}");
+    println!("return_data: {:?}", return_data);
     anyhow::ensure!(
         result == 0,
         "Function returned non-zero exit code: {result}"
@@ -26,6 +28,8 @@ mod reference_bool {
         function derefBoolRef(bool x) external returns (bool);
         function callDerefBoolRef(bool x) external returns (bool);
         function derefNestedBool(bool x) external returns (bool);
+        function derefMutArg(bool x) external returns (bool);
+        function writeMutRef(bool x) external returns (bool);
     );
 
     #[fixture]
@@ -51,6 +55,18 @@ mod reference_bool {
         let expected_result = <sol!((bool,))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(derefMutArgCall::new((false,)), false)]
+    #[case(writeMutRefCall::new((true,)), false)]
+    fn test_bool_mutable_ref<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: bool,
+    ) {
+        let expected_result = <sol!((bool,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
 }
 
 mod reference_uint_8 {
@@ -62,6 +78,8 @@ mod reference_uint_8 {
         function derefU8Ref(uint8 x) external returns (uint8);
         function callDerefU8Ref(uint8 x) external returns (uint8);
         function derefNestedU8(uint8 x) external returns (uint8);
+        function derefMutArg(uint8 x) external returns (uint8);
+        function writeMutRef(uint8 x) external returns (uint8);
     );
 
     #[fixture]
@@ -87,6 +105,18 @@ mod reference_uint_8 {
         let expected_result = <sol!((uint8,))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(derefMutArgCall::new((250,)), 250)]
+    #[case(writeMutRefCall::new((0,)), 1)]
+    fn test_uint_8_mutable_ref<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u8,
+    ) {
+        let expected_result = <sol!((uint8,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
 }
 
 mod reference_uint_16 {
@@ -98,6 +128,8 @@ mod reference_uint_16 {
         function derefU16Ref(uint16 x) external returns (uint16);
         function callDerefU16Ref(uint16 x) external returns (uint16);
         function derefNestedU16(uint16 x) external returns (uint16);
+        function derefMutArg(uint16 x) external returns (uint16);
+        function writeMutRef(uint16 x) external returns (uint16);
     );
 
     #[fixture]
@@ -116,6 +148,18 @@ mod reference_uint_16 {
     #[case(callDerefU16RefCall::new((1,)), 1)]
     #[case(derefNestedU16Call::new((7,)), 7)]
     fn test_uint_16_immutable_ref<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u16,
+    ) {
+        let expected_result = <sol!((uint16,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
+
+    #[rstest]
+    #[case(derefMutArgCall::new((250u16,)), 250u16)]
+    #[case(writeMutRefCall::new((0u16,)), 1u16)]
+    fn test_uint_16_mutable_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: u16,
@@ -170,6 +214,8 @@ mod reference_uint_64 {
         function derefU64Ref(uint64 x) external returns (uint64);
         function callDerefU64Ref(uint64 x) external returns (uint64);
         function derefNestedU64(uint64 x) external returns (uint64);
+        function derefMutArg(uint64 x) external returns (uint64);
+        function writeMutRef(uint64 x) external returns (uint64);
     );
 
     #[fixture]
@@ -195,6 +241,18 @@ mod reference_uint_64 {
         let expected_result = <sol!((uint64,))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(derefMutArgCall::new((250u64,)), 250u64)]
+    #[case(writeMutRefCall::new((0u64,)), 1u64)]
+    fn test_uint_64_mutable_ref<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u64,
+    ) {
+        let expected_result = <sol!((uint64,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
 }
 
 mod reference_uint_128 {
@@ -206,6 +264,8 @@ mod reference_uint_128 {
         function derefU128Ref(uint128 x) external returns (uint128);
         function callDerefU128Ref(uint128 x) external returns (uint128);
         function derefNestedU128(uint128 x) external returns (uint128);
+        function derefMutArg(uint128 x) external returns (uint128);
+        function writeMutRef(uint128 x) external returns (uint128);
     );
 
     #[fixture]
@@ -231,6 +291,18 @@ mod reference_uint_128 {
         let expected_result = <sol!((uint128,))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(derefMutArgCall::new((250u128,)), 250u128)]
+    #[case(writeMutRefCall::new((0u128,)), 128u128)]
+    fn test_uint_128_mutable_ref<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u128,
+    ) {
+        let expected_result = <sol!((uint128,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
 }
 
 mod reference_uint_256 {
@@ -242,6 +314,8 @@ mod reference_uint_256 {
         function derefU256Ref(uint256 x) external returns (uint256);
         function callDerefU256Ref(uint256 x) external returns (uint256);
         function derefNestedU256(uint256 x) external returns (uint256);
+        function derefMutArg(uint256 x) external returns (uint256);
+        function writeMutRef(uint256 x) external returns (uint256);
     );
 
     #[fixture]
@@ -267,6 +341,18 @@ mod reference_uint_256 {
         let expected_result = <sol!((uint256,))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(derefMutArgCall::new((U256::from(250),)), U256::from(250))]
+    #[case(writeMutRefCall::new((U256::from(0),)), U256::from(1))]
+    fn test_uint_256_mutable_ref<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: U256,
+    ) {
+        let expected_result = <sol!((uint256,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
 }
 
 mod reference_address {
@@ -279,6 +365,8 @@ mod reference_address {
         function derefAddressRef(address x) external returns (address);
         function callDerefAddressRef(address x) external returns (address);
         function derefNestedAddress(address x) external returns (address);
+        function derefMutArg(address x) external returns (address);
+        function writeMutRef(address x) external returns (address);
     );
 
     #[fixture]
@@ -296,6 +384,18 @@ mod reference_address {
     #[case(callDerefAddressRefCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x1234567890abcdef1234567890abcdef12345678"))]
     #[case(derefNestedAddressCall::new((address!("0x7890abcdef1234567890abcdef1234567890abcd"),)), address!("0x7890abcdef1234567890abcdef1234567890abcd"))]
     fn test_address_immutable_ref<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: Address,
+    ) {
+        let expected_result = <sol!((address,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
+
+    #[rstest]
+    #[case(derefMutArgCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x1234567890abcdef1234567890abcdef12345678"))]
+    #[case(writeMutRefCall::new((address!("0x7890abcdef1234567890abcdef1234567890abcd"),)), address!("0x7890abcdef1234567890abcdef1234567890abcd"))]
+    fn test_address_mutable_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: Address,

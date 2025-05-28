@@ -6,7 +6,7 @@ use simple_integers::{IU8, IU16, IU32, IU64};
 use vector::IVector;
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
-    ir::{LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use crate::CompilationContext;
@@ -193,7 +193,7 @@ impl IntermediateType {
         }
     }
 
-    // Copies a value from the local variable to the stack. 
+    // Copies a value from the local variable to the stack.
     // For heap types a pointer to memory is pushed.
     // For vectors, a deep copy is created, recursively copying each element.
     pub fn copy_local_instructions(
@@ -381,6 +381,102 @@ impl IntermediateType {
                 // No load needed, pointer is already correct
             }
             _ => panic!("Unsupported ReadRef type: {:?}", self),
+        }
+    }
+
+    pub fn add_write_ref_instructions(
+        &self,
+        module: &mut Module,
+        builder: &mut InstrSeqBuilder,
+        compilation_ctx: &CompilationContext,
+    ) {
+        match self {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32 => {
+                let value = module.locals.add(ValType::I32);
+                let ref_pointer = module.locals.add(ValType::I32);
+                builder
+                    .local_set(ref_pointer)
+                    .local_set(value)
+                    .local_get(ref_pointer)
+                    .local_get(value)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            }
+            IntermediateType::IU64 => {
+                let value = module.locals.add(ValType::I64);
+                let ref_pointer = module.locals.add(ValType::I32);
+                builder
+                    .local_set(ref_pointer)
+                    .local_set(value)
+                    .local_get(ref_pointer)
+                    .local_get(value)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            }
+            IntermediateType::IU128 | IntermediateType::IU256 | IntermediateType::IAddress => {
+                let value_pointer = module.locals.add(ValType::I32);
+                let ref_pointer = module.locals.add(ValType::I32);
+                let size = self.stack_data_size();
+
+                // Pop the reference and value pointers from the stack
+                builder.local_set(ref_pointer).local_set(value_pointer);
+
+                // Copy memory in 8-byte chunks
+                for offset in (0..size).step_by(8) {
+                    // Compute ref_pointer + offset
+                    builder
+                        .local_get(ref_pointer)
+                        .i32_const(offset as i32)
+                        .binop(BinaryOp::I32Add);
+
+                    // Load 8 bytes from value_pointer + offset
+                    builder
+                        .local_get(value_pointer)
+                        .i32_const(offset as i32)
+                        .binop(BinaryOp::I32Add)
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I64 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
+
+                    // Store the value at the target address
+                    builder.store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                }
+            }
+
+            IntermediateType::IVector(_) => {
+                panic!("This type is not yet supported for WriteRef: {:?}", self);
+            }
+            IntermediateType::ISigner => {
+                panic!("This type cannot be mutated: {:?}", self);
+            }
+            _ => unreachable!(),
         }
     }
 }

@@ -18,3 +18,13 @@ public fun deref_nested_u256(x: u256): u256 {
     let z = &*y;
     *z
 }
+
+public fun deref_mut_arg(x: &mut u256 ): u256 {
+ *x
+}
+
+public fun write_mut_ref(x: &mut u256 ): u256 {
+ *x = 1;
+ *x
+}
+
