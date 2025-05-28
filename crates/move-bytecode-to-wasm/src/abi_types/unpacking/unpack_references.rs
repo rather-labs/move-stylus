@@ -69,7 +69,7 @@ impl IRef {
                 builder.local_get(ptr_local);
             }
 
-            IntermediateType::IRef(_) => {
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
         }

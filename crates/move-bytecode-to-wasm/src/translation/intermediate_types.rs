@@ -32,6 +32,7 @@ pub enum IntermediateType {
     ISigner,
     IVector(Box<IntermediateType>),
     IRef(Box<IntermediateType>),
+    IMutRef(Box<IntermediateType>),
 }
 
 impl IntermediateType {
@@ -48,7 +49,8 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => 4,
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => 4,
         }
     }
 
@@ -82,7 +84,7 @@ impl IntermediateType {
             IntermediateType::IVector(inner) => {
                 IVector::load_constant_instructions(inner, module, builder, bytes, compilation_ctx)
             }
-            IntermediateType::IRef(_) => {
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("cannot load a constant for a reference type");
             }
         }
@@ -139,13 +141,15 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => {
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => {
                 // For heap/pointer types just store the address
                 builder.local_set(local);
             }
         }
     }
 
+    // Pushes the value of the local variable to the stack. For heap types it is a pointer to memory.
     pub fn move_local_instructions(
         &self,
         builder: &mut InstrSeqBuilder,
@@ -181,12 +185,17 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => {
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => {
                 // For heap types we just forward the pointer
                 builder.local_get(local);
             }
         }
     }
+
+    // Copies a value from the local variable to the stack. 
+    // For heap types a pointer to memory is pushed.
+    // For vectors, a deep copy is created, recursively copying each element.
     pub fn copy_local_instructions(
         &self,
         module: &mut Module,
@@ -221,7 +230,8 @@ impl IntermediateType {
             IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
-            | IntermediateType::IRef(_) => {
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => {
                 builder.local_get(local);
             }
             IntermediateType::IVector(inner) => {
@@ -233,6 +243,7 @@ impl IntermediateType {
         }
     }
 
+    // Im not quite sure about this one. Should ref and mut ref be considered as valid types to load from memory?
     pub fn add_load_memory_to_local_instructions(
         &self,
         module: &mut Module,
@@ -250,7 +261,8 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => {
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => {
                 let local = module.locals.add(ValType::I32);
 
                 builder.local_get(pointer);
@@ -302,7 +314,8 @@ impl IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IAddress
             | IntermediateType::ISigner
-            | IntermediateType::IRef(_) => {
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -329,7 +342,7 @@ impl IntermediateType {
             | IntermediateType::IVector(_) => {
                 builder.local_get(local);
             }
-            IntermediateType::IRef(_) => {
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Cannot ImmBorrowLoc on a reference type");
             }
         }
@@ -385,7 +398,8 @@ impl From<&IntermediateType> for ValType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => ValType::I32,
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => ValType::I32,
         }
     }
 }
@@ -418,6 +432,10 @@ impl TryFrom<&SignatureToken> for IntermediateType {
             SignatureToken::Reference(token) => {
                 let itoken = Self::try_from(token.as_ref())?;
                 Ok(IntermediateType::IRef(Box::new(itoken)))
+            }
+            SignatureToken::MutableReference(token) => {
+                let itoken = Self::try_from(token.as_ref())?;
+                Ok(IntermediateType::IMutRef(Box::new(itoken)))
             }
             _ => Err(anyhow::anyhow!("Unsupported signature token: {value:?}")),
         }

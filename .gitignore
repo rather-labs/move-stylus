@@ -1,5 +1,5 @@
 target
-example/build
+example
 nitro-devnode
 
 .env

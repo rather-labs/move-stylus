@@ -348,7 +348,7 @@ impl IVector {
                 );
             }
 
-            IntermediateType::IRef(_) => {
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Cannot VecImmBorrow an existing reference type");
             }
         }

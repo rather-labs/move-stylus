@@ -11,7 +11,7 @@ use crate::translation::intermediate_types::{
 };
 
 mod unpack_heap_int;
-mod unpack_imm_reference;
+mod unpack_references;
 mod unpack_native_int;
 mod unpack_vector;
 
@@ -156,7 +156,7 @@ impl Unpackable for IntermediateType {
             // The signer must not be unpacked here, since it can't be part of the calldata. It is
             // injected directly by the VM into the stack
             IntermediateType::ISigner => (),
-            IntermediateType::IRef(inner) => IRef::add_unpack_instructions(
+            IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => IRef::add_unpack_instructions(
                 inner,
                 function_builder,
                 module,
