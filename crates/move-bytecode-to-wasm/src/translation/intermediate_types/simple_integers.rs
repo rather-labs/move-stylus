@@ -56,6 +56,13 @@ impl IU8 {
         builder.binop(BinaryOp::I32DivU);
     }
 
+    /// Adds the instructions to calculate the remainder between two u8 values.
+    ///
+    /// If the dividend is 0, then it traps
+    pub fn remainder(builder: &mut walrus::InstrSeqBuilder) {
+        builder.binop(BinaryOp::I32RemU);
+    }
+
     /// Adds the instructions to multiply two u8 values.
     ///
     /// Along with the multiplication code to check overflow is added. If the result is greater
@@ -166,6 +173,13 @@ impl IU16 {
         builder.binop(BinaryOp::I32DivU);
     }
 
+    /// Adds the instructions to calculate the remainder between two u16 values.
+    ///
+    /// If the dividend is 0, then it traps
+    pub fn remainder(builder: &mut walrus::InstrSeqBuilder) {
+        builder.binop(BinaryOp::I32RemU);
+    }
+
     /// Adds the instructions to multiply two u16 values.
     ///
     /// Along with the multiplication code to check overflow is added. If the result is greater
@@ -268,6 +282,13 @@ impl IU32 {
         builder.binop(BinaryOp::I32DivU);
     }
 
+    /// Adds the instructions to calculate the remainder between two u32 values.
+    ///
+    /// If the dividend is 0, then it traps
+    pub fn remainder(builder: &mut walrus::InstrSeqBuilder) {
+        builder.binop(BinaryOp::I32RemU);
+    }
+
     /// Adds the instructions to multiply two u32 values.
     ///
     /// Along with the multiplication code to check overflow is added. If the result is greater
@@ -355,6 +376,13 @@ impl IU64 {
     /// If the dividend is 0, then it traps
     pub fn div(builder: &mut walrus::InstrSeqBuilder) {
         builder.binop(BinaryOp::I64DivU);
+    }
+
+    /// Adds the instructions to calculate the remainder between two u64 values.
+    ///
+    /// If the dividend is 0, then it traps
+    pub fn remainder(builder: &mut walrus::InstrSeqBuilder) {
+        builder.binop(BinaryOp::I64RemU);
     }
 
     /// Adds the instructions to multiply two u64 values.

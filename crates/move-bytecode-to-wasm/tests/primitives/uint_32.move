@@ -64,3 +64,7 @@ public fun div(x: u32, y: u32): u32 {
 public fun mul(x: u32, y: u32): u32 {
     x * y
 }
+
+public fun mod_(x: u32, y: u32): u32 {
+    x % y
+}

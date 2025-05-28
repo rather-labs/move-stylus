@@ -429,6 +429,25 @@ fn map_bytecode_instruction(
 
             types_stack.push(t1);
         }
+        Bytecode::Mod => {
+            let [t1, t2] = pop_n_from_stack(types_stack);
+            assert_eq!(
+                t1, t2,
+                "types stack error: trying to mod two different types {t1:?} {t2:?}"
+            );
+
+            match t1 {
+                IntermediateType::IU8 => IU8::remainder(builder),
+                IntermediateType::IU16 => IU16::remainder(builder),
+                IntermediateType::IU32 => IU32::remainder(builder),
+                IntermediateType::IU64 => IU64::remainder(builder),
+                IntermediateType::IU128 => todo!(),
+                IntermediateType::IU256 => todo!(),
+                t => panic!("type stack error: trying to mod two {t:?}"),
+            }
+
+            types_stack.push(t1);
+        }
         Bytecode::Or => {
             pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
             pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
