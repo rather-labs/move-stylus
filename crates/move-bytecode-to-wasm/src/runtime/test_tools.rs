@@ -1,7 +1,7 @@
 //! This module contains aux functions used in unit tests in this module
 #![cfg(test)]
 
-use walrus::{FunctionId, MemoryId, Module, ModuleConfig};
+use walrus::{FunctionId, MemoryId, Module, ModuleConfig, ValType};
 use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc};
 
 use crate::memory::setup_module_memory;
@@ -9,6 +9,10 @@ use crate::memory::setup_module_memory;
 pub fn build_module() -> (Module, FunctionId, MemoryId) {
     let config = ModuleConfig::new();
     let mut module = Module::with_config(config);
+
+    let func_ty = module.types.add(&[ValType::I32], &[]);
+    module.add_import_func("", "print_i32", func_ty);
+
     let (allocator_func, memory_id) = setup_module_memory(&mut module);
 
     (module, allocator_func, memory_id)
@@ -26,7 +30,11 @@ where
     let engine = Engine::default();
     let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
 
-    let linker = Linker::new(&engine);
+    let mut linker = Linker::new(&engine);
+
+    linker
+        .func_wrap("", "print_i32", |param: i32| println!("-- i32 --> {param}"))
+        .unwrap();
 
     let mut store = Store::new(&engine, ());
     let instance = linker.instantiate(&mut store, &module).unwrap();
@@ -37,6 +45,7 @@ where
 
     let memory = instance.get_memory(&mut store, "memory").unwrap();
     memory.write(&mut store, 0, &initial_memory_data).unwrap();
+
     // Print current memory
     let memory_data = memory.data(&mut store);
     println!(

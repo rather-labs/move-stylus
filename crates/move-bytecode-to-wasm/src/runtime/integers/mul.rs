@@ -55,6 +55,11 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
         .name(RuntimeFunction::HeapIntMul.name().to_owned())
         .func_body();
 
+    let print = module
+        .imports
+        .get_func("", "print_i32")
+        .expect("log function not found");
+
     let a_ptr = module.locals.add(ValType::I32);
     let b_ptr = module.locals.add(ValType::I32);
     let type_heap_size = module.locals.add(ValType::I32);
@@ -80,20 +85,7 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
         .local_set(pointer)
         // Set we are processing the first row
         .i32_const(0)
-        .local_set(row)
-        // Set to zero partial results
-        .i64_const(0)
-        .local_set(partial_sum_res)
-        .i64_const(0)
-        .local_set(partial_mul_res)
-        .i64_const(0)
-        .local_set(carry_sum)
-        .i64_const(0)
-        .local_set(carry_mul)
-        .i32_const(0)
-        .local_set(a_offset)
-        .i32_const(0)
-        .local_set(b_offset);
+        .local_set(row);
 
     builder
         .block(None, |outer_block| {
@@ -104,10 +96,25 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
 
                 outer_loop
                     // If the offset is the same as the type_heap_size, we break the loop
+                    //.local_get(b_offset)
+                    //.call(print)
                     .local_get(b_offset)
                     .local_get(type_heap_size)
                     .binop(BinaryOp::I32Eq)
                     .br_if(outer_block_id);
+
+                // Set to zero partial results
+                outer_loop
+                    .i32_const(0)
+                    .local_set(a_offset)
+                    .i64_const(0)
+                    .local_set(partial_sum_res)
+                    .i64_const(0)
+                    .local_set(partial_mul_res)
+                    .i64_const(0)
+                    .local_set(carry_sum)
+                    .i64_const(0)
+                    .local_set(carry_mul);
 
                 // Load the first part
                 outer_loop
@@ -131,9 +138,14 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                         // (b_n) and a moving part of a (a1, a2, ..., a_n)
                         inner_block.loop_(None, |loop_| {
                             let loop_id = loop_.id();
+                            loop_.local_get(a_offset).call(print);
+
                             loop_
-                                // If the offset is the same as the type_heap_size, we break the loop
+                                // If a_offset + b_offset = type_heap_size means we need to break
+                                // the inner loop
                                 .local_get(a_offset)
+                                .local_get(b_offset)
+                                .binop(BinaryOp::I32Add)
                                 .local_get(type_heap_size)
                                 .binop(BinaryOp::I32Eq)
                                 .br_if(inner_block_id);
@@ -182,11 +194,22 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                             // a_offset) and add the partial_mul_res.
                             // After this addition we calculate if there is a carry for the ADDITION, and save
                             // it to use it in the addition of the next chunk.
+                            //
+                            // The chunk is always shifted by the b offset
+                            //    a4 a3 a2 a1
+                            // x  b4 b3 b2 b1
+                            //    -----------
+                            //    c4 c3 c2 c1     b_offset = 0
+                            // +  d3 d2 d1 0      b_offset = 4
+                            //    e2 e1 0  0      b_offset = 8
+                            //    f1 0  0  0      b_offset = 12
 
                             // First we load the part of res we need to add
                             loop_
-                                .local_get(pointer)
                                 .local_get(a_offset)
+                                .local_get(b_offset)
+                                .binop(BinaryOp::I32Add)
+                                .local_get(pointer)
                                 .binop(BinaryOp::I32Add)
                                 .load(
                                     compilation_ctx.memory_id,
@@ -204,8 +227,10 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                                 .binop(BinaryOp::I64Add)
                                 .local_set(partial_sum_res)
                                 // After the additions we save it in res
-                                .local_get(pointer)
                                 .local_get(a_offset)
+                                .local_get(b_offset)
+                                .binop(BinaryOp::I32Add)
+                                .local_get(pointer)
                                 .binop(BinaryOp::I32Add)
                                 // We use only the lower 32 bits of the partial sum res
                                 .local_get(partial_sum_res)
@@ -235,6 +260,7 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                                 .br(loop_id);
                         });
                     });
+
                 // b_offset += 4
                 outer_loop
                     .i32_const(4)
@@ -381,7 +407,9 @@ mod tests {
     #[case(1, 1, 1)]
     #[case(5, 5, 25)]
     #[case(u64::MAX as u128, 2, u64::MAX as u128 * 2)]
-    #[case(u64::MAX as u128 + 1, 2, (u64::MAX as u128 + 1) * 2)]
+    #[case(u64::MAX as u128, 2, u64::MAX as u128 * 2)]
+    #[case(2, u64::MAX as u128, u64::MAX as u128 * 2)]
+    #[case(2, u64::MAX as u128 + 1, (u64::MAX as u128 + 1) * 2)]
     fn test_heap_mul_u128(#[case] n1: u128, #[case] n2: u128, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
         let (mut raw_module, allocator_func, memory_id) = build_module();
