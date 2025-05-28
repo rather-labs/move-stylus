@@ -1,12 +1,12 @@
 use anyhow::Result;
-use move_binary_format::file_format::FunctionHandleIndex;
+use move_binary_format::file_format::{CodeUnit, FunctionHandleIndex};
 use walrus::{ConstExpr, ElementKind, FunctionId, Module, TableId, TypeId, ValType, ir::Value};
 
 use super::functions::MappedFunction;
 
-pub struct TableEntry<'a> {
+pub struct TableEntry {
     pub index: i32,
-    pub function: MappedFunction<'a>,
+    pub function: MappedFunction,
     pub function_handle_index: FunctionHandleIndex,
     pub type_id: TypeId,
     pub params: Vec<ValType>,
@@ -19,13 +19,19 @@ pub struct TableEntry<'a> {
     added_to_wasm_table: bool,
 }
 
-pub struct FunctionTable<'a> {
-    /// WASM table id
-    table_id: TableId,
-    entries: Vec<TableEntry<'a>>,
+impl TableEntry {
+    pub fn get_move_code_unit(&self) -> Option<&CodeUnit> {
+        self.function.function_definition.code.as_ref()
+    }
 }
 
-impl<'a> FunctionTable<'a> {
+pub struct FunctionTable {
+    /// WASM table id
+    table_id: TableId,
+    entries: Vec<TableEntry>,
+}
+
+impl FunctionTable {
     pub fn new(wasm_table_id: TableId) -> Self {
         Self {
             table_id: wasm_table_id,
@@ -36,7 +42,7 @@ impl<'a> FunctionTable<'a> {
     pub fn add(
         &mut self,
         module: &mut Module,
-        function: MappedFunction<'a>,
+        function: MappedFunction,
         function_handle_index: FunctionHandleIndex,
     ) {
         let params: Vec<ValType> = function
@@ -86,18 +92,18 @@ impl<'a> FunctionTable<'a> {
         Ok(())
     }
 
-    pub fn get(&self, index: usize) -> Option<&TableEntry<'a>> {
+    pub fn get(&self, index: usize) -> Option<&TableEntry> {
         self.entries.get(index)
     }
 
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut TableEntry<'a>> {
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut TableEntry> {
         self.entries.get_mut(index)
     }
 
     pub fn get_by_function_handle_index(
         &self,
         function_handle_index: &FunctionHandleIndex,
-    ) -> Option<&TableEntry<'a>> {
+    ) -> Option<&TableEntry> {
         self.entries
             .iter()
             .find(|e| e.function_handle_index == *function_handle_index)

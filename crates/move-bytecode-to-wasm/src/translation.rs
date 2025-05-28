@@ -11,7 +11,7 @@ use table::FunctionTable;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{FunctionBuilder, Module};
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, ValType,
+    FunctionId, InstrSeqBuilder, ValType,
     ir::{MemArg, StoreKind},
 };
 
@@ -34,35 +34,26 @@ pub fn translate_function(
         .ok_or(anyhow::anyhow!("index {index} not found in function table"))?;
 
     anyhow::ensure!(
-        entry.function.move_code_unit.jump_tables.is_empty(),
+        entry.get_move_code_unit().unwrap().jump_tables.is_empty(),
         "Jump tables are not supported yet"
     );
-
-    let ir_arg_types = entry.function.signature.arguments.clone();
-    let wasm_arg_local_ids = entry.function.arg_local_ids.clone();
 
     let mut function = FunctionBuilder::new(&mut module.types, &entry.params, &entry.results);
     let mut builder = function.func_body();
 
-    for (ir_arg_type, wasm_arg_local_id) in ir_arg_types.iter().zip(wasm_arg_local_ids.iter()) {
-        normalize_argument_into_heap(
-            ir_arg_type,
-            &mut builder,
-            module,
-            compilation_ctx,
-            *wasm_arg_local_id,
-            &mut entry.function,
-        );
-    }
+    entry
+        .function
+        .convert_args_to_heap(&mut builder, module, compilation_ctx);
 
     let entry = function_table
         .get(index)
         .ok_or(anyhow::anyhow!("index {index} not found in function table"))?;
 
-    let code = entry.function.move_code_unit.code.clone();
+    let code = &entry.get_move_code_unit().unwrap().code;
+
     let mut types_stack = Vec::new();
 
-    for instruction in &code {
+    for instruction in code {
         map_bytecode_instruction(
             instruction,
             compilation_ctx,
@@ -74,7 +65,7 @@ pub fn translate_function(
         );
     }
 
-    let function_id = function.finish(wasm_arg_local_ids, &mut module.funcs);
+    let function_id = function.finish(entry.function.arg_locals.clone(), &mut module.funcs);
     Ok(function_id)
 }
 
@@ -179,27 +170,26 @@ fn map_bytecode_instruction(
         }
         // Locals
         Bytecode::StLoc(local_id) => {
-            let local = mapped_function.local_variables[*local_id as usize];
-            let local_type = &mapped_function.local_variables_type[*local_id as usize];
+            let local = mapped_function.function_locals[*local_id as usize];
+            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
             local_type.store_local_instructions(module, builder, compilation_ctx, local);
             pop_types_stack(types_stack, local_type).unwrap();
         }
         Bytecode::MoveLoc(local_id) => {
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
-            let local = mapped_function.local_variables[*local_id as usize];
-            let local_type = mapped_function.local_variables_type[*local_id as usize].clone();
+            let local = mapped_function.function_locals[*local_id as usize];
+            let local_type = mapped_function.function_locals_ir[*local_id as usize].clone();
             local_type.move_local_instructions(builder, compilation_ctx, local);
             types_stack.push(local_type);
         }
         Bytecode::CopyLoc(local_id) => {
-            let local = mapped_function.local_variables[*local_id as usize];
-            let local_type = mapped_function.local_variables_type[*local_id as usize].clone();
+            let local = mapped_function.function_locals[*local_id as usize];
+            let local_type = mapped_function.function_locals_ir[*local_id as usize].clone();
             local_type.copy_local_instructions(module, builder, compilation_ctx, local);
             types_stack.push(local_type);
         }
         Bytecode::VecPack(signature_index, num_elements) => {
-            let inner =
-                get_intermediate_type_for_signature_index(mapped_function, *signature_index);
+            let inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
             IVector::vec_pack_instructions(
                 &inner,
                 module,
@@ -218,8 +208,8 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IVector(Box::new(inner)));
         }
         Bytecode::ImmBorrowLoc(local_id) => {
-            let local = mapped_function.local_variables[*local_id as usize];
-            let local_type = &mapped_function.local_variables_type[*local_id as usize];
+            let local = mapped_function.function_locals[*local_id as usize];
+            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
             local_type.add_borrow_local_instructions(builder, local);
 
             // Push the reference to the type into the types stack
@@ -235,32 +225,30 @@ fn map_bytecode_instruction(
                 _ => panic!("Type stack underflow"),
             }
 
-            let inner_type =
-                get_intermediate_type_for_signature_index(mapped_function, *signature_index);
+            let inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
             IVector::add_vec_imm_borrow_instructions(
-                &inner_type,
+                &inner,
                 module,
                 builder,
                 compilation_ctx.memory_id,
             );
 
             // Push &T onto the WASM type stack
-            types_stack.push(IntermediateType::IRef(Box::new(inner_type)));
+            types_stack.push(IntermediateType::IRef(Box::new(inner)));
         }
 
         Bytecode::VecLen(signature_index) => {
-            let expected_elem_type =
-                get_intermediate_type_for_signature_index(mapped_function, *signature_index);
+            let elem_ir_type = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
-            let expected_type = IntermediateType::IVector(Box::new(expected_elem_type.clone()));
+            let ir_type = IntermediateType::IVector(Box::new(elem_ir_type.clone()));
 
             match types_stack.pop() {
                 Some(IntermediateType::IRef(actual_type)) => {
-                    if *actual_type != expected_type {
+                    if *actual_type != ir_type {
                         panic!(
                             "Type mismatch: expected &vector<{:?}> but got &{:?}",
-                            expected_elem_type, actual_type
+                            elem_ir_type, actual_type
                         );
                     }
                 }
@@ -605,17 +593,13 @@ fn add_load_literal_heap_type_to_memory_instructions(
     builder.local_get(pointer);
 }
 
-fn get_intermediate_type_for_signature_index(
-    mapped_function: &MappedFunction,
+// Gets the IntermediateType for a given signature index
+fn get_ir_for_signature_index(
+    compilation_ctx: &CompilationContext,
     signature_index: SignatureIndex,
 ) -> IntermediateType {
-    let tokens = &mapped_function.move_module_signatures[signature_index.0 as usize].0;
-    assert_eq!(
-        tokens.len(),
-        1,
-        "Expected signature to have exactly 1 token for VecPack"
-    );
-    (&tokens[0]).try_into().unwrap()
+    let signature_token = &compilation_ctx.module_signatures[signature_index.0 as usize].0;
+    (&signature_token[0]).try_into().unwrap()
 }
 
 fn pop_types_stack(
@@ -648,82 +632,4 @@ fn pop_n_from_stack<const N: usize>(
     });
 
     res
-}
-
-pub fn normalize_argument_into_heap(
-    ty: &IntermediateType,
-    builder: &mut InstrSeqBuilder,
-    module: &mut Module,
-    compilation_ctx: &CompilationContext,
-    local: LocalId,
-    mapped_function: &mut MappedFunction,
-) {
-    match ty {
-        IntermediateType::IU64 => {
-            let tmp = module.locals.add(ValType::I64);
-            let pointer = module.locals.add(ValType::I32);
-
-            // Save original value
-            builder.local_get(local);
-            builder.local_set(tmp);
-
-            // Allocate heap memory
-            builder.i32_const(ty.stack_data_size() as i32);
-            builder.call(compilation_ctx.allocator);
-            builder.local_tee(pointer);
-
-            // Store value
-            builder.local_get(tmp);
-            builder.store(
-                compilation_ctx.memory_id,
-                StoreKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-
-            // Replace the original local with the new pointer
-            if let Some(index) = mapped_function
-                .local_variables
-                .iter()
-                .position(|&id| id == local)
-            {
-                mapped_function.local_variables[index] = pointer;
-            } else {
-                panic!(
-                    "Couldn't find original local {:?} in mapped_function",
-                    local
-                );
-            }
-        }
-
-        IntermediateType::IBool
-        | IntermediateType::IU8
-        | IntermediateType::IU16
-        | IntermediateType::IU32 => {
-            let tmp = module.locals.add(ValType::I32);
-
-            builder.local_get(local);
-            builder.local_set(tmp);
-
-            builder.i32_const(ty.stack_data_size() as i32);
-            builder.call(compilation_ctx.allocator);
-            builder.local_tee(local);
-
-            builder.local_get(tmp);
-            builder.store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-        }
-
-        _ => {
-            // Already a pointer
-        }
-    }
 }
