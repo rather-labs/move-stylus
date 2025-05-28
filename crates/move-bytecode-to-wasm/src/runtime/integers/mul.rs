@@ -96,8 +96,6 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
 
                 outer_loop
                     // If the offset is the same as the type_heap_size, we break the loop
-                    //.local_get(b_offset)
-                    //.call(print)
                     .local_get(b_offset)
                     .local_get(type_heap_size)
                     .binop(BinaryOp::I32Eq)
@@ -141,14 +139,35 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                             loop_.local_get(a_offset).call(print);
 
                             loop_
-                                // If a_offset + b_offset = type_heap_size means we need to break
-                                // the inner loop
+                                // If a_offset + b_offset = type_heap_size
                                 .local_get(a_offset)
                                 .local_get(b_offset)
                                 .binop(BinaryOp::I32Add)
                                 .local_get(type_heap_size)
                                 .binop(BinaryOp::I32Eq)
-                                .br_if(inner_block_id);
+                                .if_else(
+                                    None,
+                                    |then| {
+                                        // If there is carry in the sum, means we overflowed so we
+                                        // trap
+                                        // Otherwise we exit the inner loop and continue the
+                                        // multiplication
+                                        then.local_get(carry_sum)
+                                            .i64_const(0)
+                                            .binop(BinaryOp::I64Ne)
+                                            .if_else(
+                                                None,
+                                                |then| {
+                                                    then.unreachable();
+                                                },
+                                                |else_| {
+                                                    else_.br(inner_block_id);
+                                                },
+                                            );
+                                    },
+                                    |_| {},
+                                );
+                            //.br_if(inner_block_id);
 
                             // Read the first operand
                             loop_
@@ -195,7 +214,7 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                             // After this addition we calculate if there is a carry for the ADDITION, and save
                             // it to use it in the addition of the next chunk.
                             //
-                            // The chunk is always shifted by the b offset
+                            // The chunk from the partial response to add is always shifted by the b offset
                             //    a4 a3 a2 a1
                             // x  b4 b3 b2 b1
                             //    -----------
