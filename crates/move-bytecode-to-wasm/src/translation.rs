@@ -11,7 +11,7 @@ use table::FunctionTable;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{FunctionBuilder, Module};
 use walrus::{
-    FunctionId, InstrSeqBuilder, ValType,
+    FunctionId, InstrSeqBuilder, LocalId, ValType,
     ir::{MemArg, StoreKind},
 };
 
@@ -52,6 +52,9 @@ pub fn translate_function(
     let code = &entry.get_move_code_unit().unwrap().code;
 
     let mut types_stack = Vec::new();
+    // @TODO: this var is used to track the last local pushed to the stack. Used for WriteRef.
+    // Check if theres any other instruction that preceeds WriteRef! So far copyloc, moveloc.
+    let mut last_local_id: Option<LocalId> = None;
 
     for instruction in code {
         map_bytecode_instruction(
@@ -62,6 +65,7 @@ pub fn translate_function(
             module,
             function_table,
             &mut types_stack,
+            &mut last_local_id,
         );
     }
 
@@ -77,6 +81,7 @@ fn map_bytecode_instruction(
     module: &mut Module,
     function_table: &FunctionTable,
     types_stack: &mut Vec<IntermediateType>,
+    last_local_id: &mut Option<LocalId>,
 ) {
     match instruction {
         // Load constant
@@ -180,12 +185,14 @@ fn map_bytecode_instruction(
             let local_type = mapped_function.function_locals_ir[*local_id as usize].clone();
             local_type.move_local_instructions(builder, compilation_ctx, local);
             types_stack.push(local_type);
+            *last_local_id = Some(local); 
         }
         Bytecode::CopyLoc(local_id) => {
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = mapped_function.function_locals_ir[*local_id as usize].clone();
             local_type.copy_local_instructions(module, builder, compilation_ctx, local);
             types_stack.push(local_type);
+            *last_local_id = Some(local);
         }
         Bytecode::ImmBorrowLoc(local_id) => {
             let local = mapped_function.function_locals[*local_id as usize];
@@ -237,7 +244,6 @@ fn map_bytecode_instruction(
             // Push &T onto the WASM type stack
             types_stack.push(IntermediateType::IRef(Box::new(inner)));
         }
-
         Bytecode::VecLen(signature_index) => {
             let elem_ir_type = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
@@ -269,7 +275,6 @@ fn map_bytecode_instruction(
 
             types_stack.push(IntermediateType::IU64);
         }
-
         Bytecode::ReadRef => {
             let ref_type = types_stack
                 .pop()
@@ -289,7 +294,12 @@ fn map_bytecode_instruction(
         Bytecode::WriteRef => match (types_stack.pop(), types_stack.pop()) {
             (Some(IntermediateType::IMutRef(inner)), Some(value_type)) => {
                 if *inner == value_type {
-                    inner.add_write_ref_instructions(module, builder, compilation_ctx);
+                    inner.add_write_ref_instructions(
+                        module,
+                        builder,
+                        compilation_ctx,
+                        *last_local_id,
+                    );
                 } else {
                     panic!(
                         "WriteRef type mismatch: expected value of type {:?}, got {:?}",
@@ -301,7 +311,7 @@ fn map_bytecode_instruction(
                 panic!("WriteRef expected a mutable reference, got {:?}", other);
             }
             _ => panic!("Type stack underflow on WriteRef"),
-        }
+        },
         Bytecode::Pop => {
             builder.drop();
             types_stack

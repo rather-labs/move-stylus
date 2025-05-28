@@ -389,6 +389,7 @@ impl IntermediateType {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
+        local: Option<LocalId>,
     ) {
         match self {
             IntermediateType::IBool
@@ -469,9 +470,12 @@ impl IntermediateType {
                     );
                 }
             }
-
             IntermediateType::IVector(_) => {
-                panic!("This type is not yet supported for WriteRef: {:?}", self);
+                if let Some(id) = local {
+                    builder.drop().local_set(id);
+                } else {
+                    panic!("Local id missing in WriteRef instruction for IMutRef(IVector(_))");
+                }
             }
             IntermediateType::ISigner => {
                 panic!("This type cannot be mutated: {:?}", self);

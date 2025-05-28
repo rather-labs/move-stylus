@@ -40,3 +40,9 @@ public fun miscellaneous(): vector<u256> {
     let y = x[1];
     vector[y, v[1][1]]
 }
+
+
+public fun write_mut_ref(x: &mut vector<u256> ): vector<u256> {
+ *x = vector<u256>[1, 2, 3];
+ *x
+}

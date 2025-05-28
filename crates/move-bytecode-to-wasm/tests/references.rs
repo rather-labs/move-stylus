@@ -8,8 +8,6 @@ mod common;
 
 fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
     let (result, return_data) = runtime.call_entrypoint(call_data)?;
-    println!("result: {result}");
-    println!("return_data: {:?}", return_data);
     anyhow::ensure!(
         result == 0,
         "Function returned non-zero exit code: {result}"
@@ -446,6 +444,7 @@ mod reference_vec_8 {
         function vecFromElement(uint64 index) external returns (uint8[]);
         function getElementVector(uint64 index) external returns (uint8[]);
         function miscellaneous() external returns (uint8[]);
+        function writeMutRef(uint8[] x) external returns (uint8[]);
     );
 
     #[fixture]
@@ -486,6 +485,17 @@ mod reference_vec_8 {
             .to_string()
             .contains("wasm trap: wasm `unreachable` instruction executed");
     }
+
+    #[rstest]
+    #[case(writeMutRefCall::new((vec![3, 2, 1],)), vec![1, 2, 3])]
+    fn test_vec_8_mutable_ref<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: Vec<u8>,
+    ) { 
+        let expected_result = <sol!((uint8[],))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
 }
 
 mod reference_vec_64 {
@@ -499,6 +509,7 @@ mod reference_vec_64 {
         function vecFromElement(uint64 index) external returns (uint64[]);
         function getElementVector(uint64 index) external returns (uint64[]);
         function miscellaneous() external returns (uint64[]);
+        function writeMutRef(uint64[] x) external returns (uint64[]);
     );
 
     #[fixture]
@@ -526,6 +537,17 @@ mod reference_vec_64 {
         let expected_result = <sol!((uint64[],))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(writeMutRefCall::new((vec![3, 2, 1],)), vec![1, 2, 3])]
+    fn test_vec_64_mutable_ref<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: Vec<u64>,
+    ) {
+        let expected_result = <sol!((uint64[],))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
 }
 
 mod reference_vec_256 {
@@ -539,6 +561,7 @@ mod reference_vec_256 {
         function vecFromElement(uint64 index) external returns (uint256[]);
         function getElementVector(uint64 index) external returns (uint256[]);
         function miscellaneous() external returns (uint256[]);
+        function writeMutRef(uint256[] x) external returns (uint256[]);
     );
 
     #[fixture]
@@ -578,5 +601,16 @@ mod reference_vec_256 {
             .expect_err("should fail")
             .to_string()
             .contains("wasm trap: wasm `unreachable` instruction executed");
+    }
+
+    #[rstest]
+    #[case(writeMutRefCall::new((vec![U256::from(3), U256::from(2), U256::from(1)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
+    fn test_vec_256_mutable_ref<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: Vec<U256>,
+    ) { 
+        let expected_result = <sol!((uint256[],))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
