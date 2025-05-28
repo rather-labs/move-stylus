@@ -126,76 +126,94 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
 
                 // Read the first operand
                 loop_
-                        .local_get(a_ptr)
-                        .local_get(a_offset)
-                        .binop(BinaryOp::I32Add)
-                        .load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        )
-                        .unop(UnaryOp::I64ExtendUI32)
-                        .local_tee(a)
-                        .local_get(b)
-                        // a_n * b_m + carry_mul
-                        .binop(BinaryOp::I64Mul)
-                        .local_get(carry_mul)
-                        .binop(BinaryOp::I64Add)
-                        .local_tee(partial_mul_res)
-                        // We set the carry as the higher 32 bits of the multiplication
-                        // carry = (partial_mul_res >> 32)
-                        .i64_const(32)
-                        .binop(BinaryOp::I64ShrU)
-                        .local_set(carry_mul)
-                        .local_get(partial_mul_res)
-                        // And we set the partial_mul_res as the lower 32 bits of the multiplication
-                        .i64_const(0x00000000FFFFFFFF)
-                        .binop(BinaryOp::I64And)
-                        // And save that part to the corresponding part in res
-                        // First we load the part contained in res
-                        .local_get(pointer)
-                        .local_get(a_offset)
-                        .binop(BinaryOp::I32Add)
-                        .load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        )
-                        .unop(UnaryOp::I64ExtendUI32)
-                        .binop(BinaryOp::I64Add)
-                        .local_get(carry_sum)
-                        .binop(BinaryOp::I64Add)
-                        .local_set(partial_sum_res)
-                        // And save that part to the corresponding part in res
-                        .local_get(pointer)
-                        .local_get(a_offset)
-                        .binop(BinaryOp::I32Add)
-                        // We use only the lower 32 bits of the partial sum res
-                        .local_get(partial_sum_res)
-                        .i64_const(0x00000000FFFFFFFF)
-                        .binop(BinaryOp::I64And)
-                        .unop(UnaryOp::I32WrapI64)
-                        .store(
-                            compilation_ctx.memory_id,
-                            StoreKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        )
-                        // Set the carry for the next sum
-                        .local_get(partial_sum_res)
-                        .i64_const(32)
-                        .binop(BinaryOp::I64ShrU)
-                        .local_set(carry_sum)
-                        // a_offset += 4
-                        .i32_const(4)
+                    .local_get(a_ptr)
+                    .local_get(a_offset)
+                    .binop(BinaryOp::I32Add)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .unop(UnaryOp::I64ExtendUI32)
+                    .local_tee(a)
+                    .local_get(b)
+                    // a_n * b_m + carry_mul
+                    .binop(BinaryOp::I64Mul)
+                    .local_get(carry_mul)
+                    .binop(BinaryOp::I64Add)
+                    .local_tee(partial_mul_res);
+
+                // We set the carry_mul as the higher 32 bits of the multiplication
+                // carry = (partial_mul_res >> 32)
+                loop_
+                    .i64_const(32)
+                    .binop(BinaryOp::I64ShrU)
+                    .local_set(carry_mul)
+                    .local_get(partial_mul_res)
+                    // And we leave in the stack the lower 32 bits of the multiplication
+                    // we will add this later
+                    .i64_const(0x00000000FFFFFFFF)
+                    .binop(BinaryOp::I64And);
+
+                // After calculating the partial multiplication and saving it in partial_mul_res we
+                // have the following:
+                // partial_mul_res = lower 32 bits of the multiplication
+                // carry_mul       = higher 32 bits of the multiplication
+                //
+                // Now we need to add that partial multilication result to the result. In order to
+                // do so, we need to load the corresponding part of the res we are processing (the
+                // a_offset) and add the partial_mul_res.
+                // After this addition we calculate if there is a carry for the ADDITION, and save
+                // it to use it in the addition of the next chunk.
+
+                // First we load the part of res we need to add
+                loop_
+                    .local_get(pointer)
+                    .local_get(a_offset)
+                    .binop(BinaryOp::I32Add)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .unop(UnaryOp::I64ExtendUI32)
+                    // We add the lower 32 bits of the partial multiplication left in the stack
+                    .binop(BinaryOp::I64Add)
+                    // And add the carry of the previous addition, if any
+                    .local_get(carry_sum)
+                    .binop(BinaryOp::I64Add)
+                    .local_set(partial_sum_res)
+                    // After the additions we save it in res
+                    .local_get(pointer)
+                    .local_get(a_offset)
+                    .binop(BinaryOp::I32Add)
+                    // We use only the lower 32 bits of the partial sum res
+                    .local_get(partial_sum_res)
+                    .i64_const(0x00000000FFFFFFFF)
+                    .binop(BinaryOp::I64And)
+                    .unop(UnaryOp::I32WrapI64)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    // Set the carry for the next sum
+                    .local_get(partial_sum_res)
+                    .i64_const(32)
+                    .binop(BinaryOp::I64ShrU)
+                    .local_set(carry_sum);
+
+                // a_offset += 4
+                loop_.i32_const(4)
                         .local_get(a_offset)
                         .binop(BinaryOp::I32Add)
                         .local_set(a_offset)
