@@ -1,8 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
-use move_binary_format::file_format::Constant;
-use move_binary_format::file_format::Visibility;
+use move_binary_format::file_format::{Constant, Signature, Visibility};
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
 use translation::{
     functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
@@ -36,6 +35,9 @@ pub struct CompilationContext<'a> {
 
     /// Module's functions Returns.
     pub functions_returns: &'a [Vec<IntermediateType>],
+
+    /// Module's signatures
+    pub module_signatures: &'a [Signature],
 
     /// WASM memory id
     pub memory_id: MemoryId,
@@ -122,6 +124,9 @@ pub fn translate_package(
                     .unwrap(),
             );
 
+            let code_locals = &root_compiled_module.signatures
+                [function_def.code.as_ref().unwrap().locals.0 as usize];
+
             let function_name =
                 root_compiled_module.identifiers[function_handle.name.0 as usize].to_string();
 
@@ -130,9 +135,9 @@ pub fn translate_package(
                 function_name,
                 move_function_arguments,
                 move_function_return,
+                code_locals,
                 function_def,
                 &mut module,
-                &root_compiled_module.signatures,
             );
 
             function_table.add(&mut module, mapped_function, function_handle_index);
@@ -142,6 +147,7 @@ pub fn translate_package(
             constants: &root_compiled_module.constant_pool,
             functions_arguments: &functions_arguments,
             functions_returns: &functions_returns,
+            module_signatures: &root_compiled_module.signatures,
             memory_id,
             allocator: allocator_func,
         };
@@ -160,7 +166,7 @@ pub fn translate_package(
             let entry = function_table.get(index).unwrap();
             let mapped_function = &entry.function;
 
-            if mapped_function.move_definition.visibility == Visibility::Public {
+            if mapped_function.function_definition.visibility == Visibility::Public {
                 public_functions.push(PublicFunction::new(
                     *function_id,
                     &mapped_function.name,
