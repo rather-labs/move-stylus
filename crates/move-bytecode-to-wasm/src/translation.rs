@@ -403,7 +403,7 @@ fn map_bytecode_instruction(
                 IntermediateType::IU16 => IU16::mul(builder, module),
                 IntermediateType::IU32 => IU32::mul(builder, module),
                 IntermediateType::IU64 => IU64::mul(builder, module),
-                IntermediateType::IU128 => todo!(),
+                IntermediateType::IU128 => IU128::mul(builder, module, compilation_ctx),
                 IntermediateType::IU256 => todo!(),
                 t => panic!("type stack error: trying to multiply two {t:?}"),
             }

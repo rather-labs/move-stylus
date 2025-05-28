@@ -301,6 +301,15 @@ impl IU128 {
         let sub_function_id = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx));
         builder.i32_const(Self::HEAP_SIZE).call(sub_function_id);
     }
+
+    pub fn mul(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+    ) {
+        let mul_function_id = RuntimeFunction::HeapIntMul.get(module, Some(compilation_ctx));
+        builder.i32_const(Self::HEAP_SIZE).call(mul_function_id);
+    }
 }
 
 #[derive(Clone, Copy)]
