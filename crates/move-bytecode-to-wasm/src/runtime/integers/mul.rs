@@ -154,7 +154,6 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                         // And we set the partial_mul_res as the lower 32 bits of the multiplication
                         .i64_const(0x00000000FFFFFFFF)
                         .binop(BinaryOp::I64And)
-                        /*
                         // And save that part to the corresponding part in res
                         // First we load the part contained in res
                         .local_get(pointer)
@@ -170,7 +169,6 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                         )
                         .unop(UnaryOp::I64ExtendUI32)
                         .binop(BinaryOp::I64Add)
-                        */
                         .local_get(carry_sum)
                         .binop(BinaryOp::I64Add)
                         .local_set(partial_sum_res)
@@ -359,6 +357,11 @@ mod tests {
         let n2_ptr = raw_module.locals.add(ValType::I32);
 
         let mut func_body = function_builder.func_body();
+
+        // Mock args allocation
+        func_body.i32_const(TYPE_HEAP_SIZE * 2);
+        func_body.call(allocator_func);
+        func_body.drop();
 
         // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
         func_body
