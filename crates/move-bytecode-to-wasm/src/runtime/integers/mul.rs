@@ -55,21 +55,6 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
         .name(RuntimeFunction::HeapIntMul.name().to_owned())
         .func_body();
 
-    let print = module
-        .imports
-        .get_func("", "print_i32")
-        .expect("log function not found");
-
-    let print_i64 = module
-        .imports
-        .get_func("", "print_i64")
-        .expect("print_i64 function not found");
-
-    let print_separator = module
-        .imports
-        .get_func("", "print_separator")
-        .expect("print_separator function not found");
-
     let a_ptr = module.locals.add(ValType::I32);
     let b_ptr = module.locals.add(ValType::I32);
     let type_heap_size = module.locals.add(ValType::I32);
@@ -79,7 +64,6 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
     let a = module.locals.add(ValType::I64);
     let b = module.locals.add(ValType::I64);
     // The row we are currently processing
-    let row = module.locals.add(ValType::I32);
     let a_offset = module.locals.add(ValType::I32);
     let b_offset = module.locals.add(ValType::I32);
     let carry_mul = module.locals.add(ValType::I64);
@@ -92,10 +76,7 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
         // Allocate memory for the result
         .local_get(type_heap_size)
         .call(compilation_ctx.allocator)
-        .local_set(pointer)
-        // Set we are processing the first row
-        .i32_const(0)
-        .local_set(row);
+        .local_set(pointer);
 
     builder
         .block(None, |outer_block| {
@@ -148,7 +129,6 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                         inner_block.loop_(None, |loop_| {
                             let loop_id = loop_.id();
 
-                            loop_.local_get(carry_sum).call(print_i64);
                             loop_
                                 // If a_offset + b_offset = type_heap_size, means we processed the
                                 // last chunk of digits
@@ -277,15 +257,10 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                                 )
                                 // Set the carry for the next sum
                                 .local_get(partial_sum_res)
-                                .call(print_i64)
-                                .local_get(partial_sum_res)
                                 .i64_const(32)
                                 .binop(BinaryOp::I64ShrU)
-                                .local_set(carry_sum)
-                                .local_get(carry_sum)
-                                .call(print_i64);
+                                .local_set(carry_sum);
 
-                            loop_.call(print_separator);
                             // a_offset += 4
                             loop_
                                 .i32_const(4)
@@ -518,11 +493,8 @@ mod tests {
             .read(&mut store, pointer as usize, &mut result_memory_data)
             .unwrap();
 
-        println!("Result: {result_memory_data:?} from pointer: {pointer}");
-
         let mut buff = vec![0; TYPE_HEAP_SIZE as usize * 3];
         memory.read(&mut store, 0, &mut buff).unwrap();
-        println!("resultant memory {buff:?}");
 
         assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
     }
@@ -645,11 +617,8 @@ mod tests {
             .read(&mut store, pointer as usize, &mut result_memory_data)
             .unwrap();
 
-        println!("Result: {result_memory_data:?} from pointer: {pointer}");
-
         let mut buff = vec![0; TYPE_HEAP_SIZE as usize * 3];
         memory.read(&mut store, 0, &mut buff).unwrap();
-        println!("resultant memory {buff:?}");
 
         assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
     }

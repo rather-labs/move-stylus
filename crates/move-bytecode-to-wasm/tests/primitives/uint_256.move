@@ -56,3 +56,7 @@ public fun sum(x: u256, y: u256): u256 {
 public fun sub(x: u256, y: u256): u256 {
     x - y
 }
+
+public fun mul(x: u256, y: u256): u256 {
+    x * y
+}
