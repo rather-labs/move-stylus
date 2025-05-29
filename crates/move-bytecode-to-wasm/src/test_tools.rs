@@ -16,7 +16,7 @@ pub fn setup_wasmtime_module<T>(
     module: &mut Module,
     initial_memory_data: Vec<u8>,
     function_name: &str,
-) -> (Instance, Store<()>, TypedFunc<(T, T), T>)
+) -> (Linker<()>, Instance, Store<()>, TypedFunc<(T, T), T>)
 where
     T: wasmtime::WasmParams + wasmtime::WasmResults,
     (T, T): wasmtime::WasmParams,
@@ -42,5 +42,5 @@ where
         memory_data.iter().take(64).collect::<Vec<_>>()
     );
 
-    (instance, store, entrypoint)
+    (linker, instance, store, entrypoint)
 }

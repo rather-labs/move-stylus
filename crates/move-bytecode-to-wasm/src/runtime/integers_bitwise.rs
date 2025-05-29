@@ -566,7 +566,7 @@ mod tests {
         // display_module(&mut raw_module);
 
         let data = [n.to_le_bytes()].concat();
-        let (instance, mut store, entrypoint) =
+        let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
 
         let pointer = entrypoint
@@ -632,7 +632,7 @@ mod tests {
         // display_module(&mut raw_module);
 
         let data = [n.to_le_bytes::<32>()].concat();
-        let (instance, mut store, entrypoint) =
+        let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
 
         let pointer = entrypoint
@@ -698,7 +698,7 @@ mod tests {
         // display_module(&mut raw_module);
 
         let data = [n.to_le_bytes()].concat();
-        let (instance, mut store, entrypoint) =
+        let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
 
         let pointer = entrypoint
@@ -764,7 +764,7 @@ mod tests {
         // display_module(&mut raw_module);
 
         let data = [n.to_le_bytes::<32>()].concat();
-        let (instance, mut store, entrypoint) =
+        let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
 
         let pointer = entrypoint

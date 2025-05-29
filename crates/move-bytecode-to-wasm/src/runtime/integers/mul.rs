@@ -159,15 +159,12 @@ mod tests {
         func_body.local_get(n1_l).local_get(n2_l);
 
         let add_u32_f = mul_u32(&mut raw_module);
-        // Shift left
         func_body.call(add_u32_f);
 
         let function = function_builder.finish(vec![n1_l, n2_l], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        // display_module(&mut raw_module);
-
-        let (_, mut store, entrypoint) =
+        let (_, _, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, vec![], "test_function");
 
         let result = entrypoint.call(&mut store, (n1, n2)).unwrap();
@@ -213,7 +210,7 @@ mod tests {
 
         // display_module(&mut raw_module);
 
-        let (_, mut store, entrypoint) =
+        let (_, _, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, vec![], "test_function");
 
         let result = entrypoint.call(&mut store, (n1, n2)).unwrap();

@@ -359,7 +359,7 @@ mod tests {
         // display_module(&mut raw_module);
 
         let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
-        let (instance, mut store, entrypoint) =
+        let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
 
         let pointer = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
@@ -462,7 +462,7 @@ mod tests {
         // display_module(&mut raw_module);
 
         let data = [n1.to_le_bytes::<32>(), n2.to_le_bytes::<32>()].concat();
-        let (instance, mut store, entrypoint) =
+        let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
 
         let pointer = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
@@ -509,7 +509,7 @@ mod tests {
 
         // display_module(&mut raw_module);
 
-        let (_, mut store, entrypoint) =
+        let (_, _, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, vec![], "test_function");
 
         let result = entrypoint.call(&mut store, (n1, n2)).unwrap();
@@ -553,7 +553,7 @@ mod tests {
 
         // display_module(&mut raw_module);
 
-        let (_, mut store, entrypoint) =
+        let (_, _, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, vec![], "test_function");
 
         let result = entrypoint.call(&mut store, (n1, n2)).unwrap();
