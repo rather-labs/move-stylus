@@ -150,7 +150,8 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
 
                             loop_.local_get(carry_sum).call(print_i64);
                             loop_
-                                // If a_offset + b_offset = type_heap_size
+                                // If a_offset + b_offset = type_heap_size, means we processed the
+                                // last chunk of digits
                                 .local_get(a_offset)
                                 .local_get(b_offset)
                                 .binop(BinaryOp::I32Add)
@@ -159,12 +160,11 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                                 .if_else(
                                     None,
                                     |then| {
-                                        // then.local_get(carry_sum).call(print_i64);
-                                        // If there is carry in the sum, means we overflowed so we
+                                        // If there is carry in the multiplication, means we overflowed so we
                                         // trap
                                         // Otherwise we exit the inner loop and continue the
                                         // multiplication
-                                        then.local_get(carry_sum)
+                                        then.local_get(carry_mul)
                                             .i64_const(0)
                                             .binop(BinaryOp::I64Ne)
                                             .if_else(
@@ -455,6 +455,12 @@ mod tests {
     )]
     #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
     #[case(u128::MAX, 2, 0)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(u128::MAX, 5, 0)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(u128::MAX, u64::MAX as u128, 0)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(u64::MAX as u128 * 2, u64::MAX as u128 * 2, 0)]
     fn test_heap_mul_u128(#[case] n1: u128, #[case] n2: u128, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
         let (mut raw_module, allocator_func, memory_id) = build_module();
