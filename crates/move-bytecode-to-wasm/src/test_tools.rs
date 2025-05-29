@@ -30,8 +30,8 @@ where
 
     let engine = linker.engine();
 
-    let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
-    let mut store = Store::new(&engine, ());
+    let module = WasmModule::from_binary(engine, &module.emit_wasm()).unwrap();
+    let mut store = Store::new(engine, ());
     let instance = linker.instantiate(&mut store, &module).unwrap();
 
     let entrypoint = instance

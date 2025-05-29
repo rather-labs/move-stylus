@@ -260,7 +260,7 @@ impl<'a> PublicFunction<'a> {
 mod tests {
     use alloy_sol_types::{SolType, sol};
     use walrus::{
-        FunctionBuilder, MemoryId, ModuleConfig,
+        FunctionBuilder, MemoryId,
         ir::{LoadKind, MemArg},
     };
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
@@ -268,20 +268,12 @@ mod tests {
     use crate::{
         CompilationContext,
         hostio::host_functions,
-        memory::setup_module_memory,
+        test_tools::build_module,
         translation::{functions::prepare_function_return, intermediate_types::IntermediateType},
         utils::display_module,
     };
 
     use super::*;
-
-    fn build_module() -> (Module, FunctionId, MemoryId) {
-        let config = ModuleConfig::new();
-        let mut module = Module::with_config(config);
-        let (allocator_func, memory_id) = setup_module_memory(&mut module);
-
-        (module, allocator_func, memory_id)
-    }
 
     fn setup_wasmtime_module(
         module: &mut Module,
