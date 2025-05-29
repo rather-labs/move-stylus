@@ -124,7 +124,7 @@ pub fn mul_u64(module: &mut Module) -> FunctionId {
 
 #[cfg(test)]
 mod tests {
-    use crate::runtime::test_tools::{build_module, setup_wasmtime_module};
+    use crate::test_tools::{build_module, setup_wasmtime_module};
     use rstest::rstest;
     use walrus::FunctionBuilder;
 

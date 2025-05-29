@@ -1,6 +1,4 @@
 //! This module contains aux functions used in unit tests in this module
-#![cfg(test)]
-
 use walrus::{FunctionId, MemoryId, Module, ModuleConfig};
 use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc};
 

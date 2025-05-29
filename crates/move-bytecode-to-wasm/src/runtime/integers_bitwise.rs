@@ -508,7 +508,7 @@ pub fn heap_int_shift_right(
 
 #[cfg(test)]
 mod tests {
-    use super::super::test_tools::{build_module, setup_wasmtime_module};
+    use crate::test_tools::{build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use rstest::rstest;
     use walrus::FunctionBuilder;
