@@ -567,7 +567,7 @@ mod tests {
 
         let data = [n.to_le_bytes()].concat();
         let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
         let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
@@ -633,7 +633,7 @@ mod tests {
 
         let data = [n.to_le_bytes::<32>()].concat();
         let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
         let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
@@ -699,7 +699,7 @@ mod tests {
 
         let data = [n.to_le_bytes()].concat();
         let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
         let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
@@ -765,7 +765,7 @@ mod tests {
 
         let data = [n.to_le_bytes::<32>()].concat();
         let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
         let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))

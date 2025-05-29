@@ -129,7 +129,7 @@ mod tests {
         raw_module.exports.add("test_function", function);
 
         let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
         let result_ptr: i32 = entrypoint.call(&mut store, ()).unwrap();
 

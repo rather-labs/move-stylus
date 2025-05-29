@@ -165,7 +165,7 @@ mod tests {
         raw_module.exports.add("test_function", function);
 
         let (_, _, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function");
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
 
         let result: i32 = entrypoint.call(&mut store, (n1, n2)).unwrap();
 
@@ -211,7 +211,7 @@ mod tests {
         // display_module(&mut raw_module);
 
         let (_, _, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function");
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
 
         let result: i64 = entrypoint.call(&mut store, (n1, n2)).unwrap();
 

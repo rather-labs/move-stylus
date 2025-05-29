@@ -16,16 +16,21 @@ pub fn setup_wasmtime_module<T, U>(
     module: &mut Module,
     initial_memory_data: Vec<u8>,
     function_name: &str,
+    linker: Option<Linker<()>>,
 ) -> (Linker<()>, Instance, Store<()>, TypedFunc<T, U>)
 where
     U: wasmtime::WasmResults,
     T: wasmtime::WasmParams,
 {
-    let engine = Engine::default();
+    let linker = if let Some(linker) = linker {
+        linker
+    } else {
+        Linker::new(&Engine::default())
+    };
+
+    let engine = linker.engine();
+
     let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
-
-    let linker = Linker::new(&engine);
-
     let mut store = Store::new(&engine, ());
     let instance = linker.instantiate(&mut store, &module).unwrap();
 
