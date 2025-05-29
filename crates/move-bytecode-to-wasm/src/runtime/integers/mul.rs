@@ -60,6 +60,16 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
         .get_func("", "print_i32")
         .expect("log function not found");
 
+    let print_i64 = module
+        .imports
+        .get_func("", "print_i64")
+        .expect("print_i64 function not found");
+
+    let print_separator = module
+        .imports
+        .get_func("", "print_separator")
+        .expect("print_separator function not found");
+
     let a_ptr = module.locals.add(ValType::I32);
     let b_ptr = module.locals.add(ValType::I32);
     let type_heap_size = module.locals.add(ValType::I32);
@@ -114,6 +124,7 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                     .i64_const(0)
                     .local_set(carry_mul);
 
+                // outer_loop.call(print_separator);
                 // Load the first part
                 outer_loop
                     // Read the second operand
@@ -136,8 +147,8 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                         // (b_n) and a moving part of a (a1, a2, ..., a_n)
                         inner_block.loop_(None, |loop_| {
                             let loop_id = loop_.id();
-                            loop_.local_get(a_offset).call(print);
 
+                            loop_.local_get(carry_sum).call(print_i64);
                             loop_
                                 // If a_offset + b_offset = type_heap_size
                                 .local_get(a_offset)
@@ -148,6 +159,7 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                                 .if_else(
                                     None,
                                     |then| {
+                                        // then.local_get(carry_sum).call(print_i64);
                                         // If there is carry in the sum, means we overflowed so we
                                         // trap
                                         // Otherwise we exit the inner loop and continue the
@@ -167,7 +179,6 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                                     },
                                     |_| {},
                                 );
-                            //.br_if(inner_block_id);
 
                             // Read the first operand
                             loop_
@@ -266,10 +277,15 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                                 )
                                 // Set the carry for the next sum
                                 .local_get(partial_sum_res)
+                                .call(print_i64)
+                                .local_get(partial_sum_res)
                                 .i64_const(32)
                                 .binop(BinaryOp::I64ShrU)
-                                .local_set(carry_sum);
+                                .local_set(carry_sum)
+                                .local_get(carry_sum)
+                                .call(print_i64);
 
+                            loop_.call(print_separator);
                             // a_offset += 4
                             loop_
                                 .i32_const(4)
@@ -423,12 +439,22 @@ mod tests {
 
     #[rstest]
     #[case(2, 2, 4)]
+    #[case(0, 2, 0)]
+    #[case(2, 0, 0)]
     #[case(1, 1, 1)]
     #[case(5, 5, 25)]
     #[case(u64::MAX as u128, 2, u64::MAX as u128 * 2)]
     #[case(u64::MAX as u128, 2, u64::MAX as u128 * 2)]
     #[case(2, u64::MAX as u128, u64::MAX as u128 * 2)]
     #[case(2, u64::MAX as u128 + 1, (u64::MAX as u128 + 1) * 2)]
+    #[case(u64::MAX as u128, u64::MAX as u128, u64::MAX as u128 * u64::MAX as u128)]
+    #[case::t_2pow63_x_2pow63(
+        9_223_372_036_854_775_808,
+        9_223_372_036_854_775_808,
+        85_070_591_730_234_615_865_843_651_857_942_052_864
+    )]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(u128::MAX, 2, 0)]
     fn test_heap_mul_u128(#[case] n1: u128, #[case] n2: u128, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
         let (mut raw_module, allocator_func, memory_id) = build_module();

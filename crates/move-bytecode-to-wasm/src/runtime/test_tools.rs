@@ -13,6 +13,12 @@ pub fn build_module() -> (Module, FunctionId, MemoryId) {
     let func_ty = module.types.add(&[ValType::I32], &[]);
     module.add_import_func("", "print_i32", func_ty);
 
+    let func_ty = module.types.add(&[ValType::I64], &[]);
+    module.add_import_func("", "print_i64", func_ty);
+
+    let func_ty = module.types.add(&[], &[]);
+    module.add_import_func("", "print_separator", func_ty);
+
     let (allocator_func, memory_id) = setup_module_memory(&mut module);
 
     (module, allocator_func, memory_id)
@@ -34,6 +40,16 @@ where
 
     linker
         .func_wrap("", "print_i32", |param: i32| println!("-- i32 --> {param}"))
+        .unwrap();
+
+    linker
+        .func_wrap("", "print_i64", |param: i64| println!("-- i64 --> {param}"))
+        .unwrap();
+
+    linker
+        .func_wrap("", "print_separator", || {
+            println!("----------------------------")
+        })
         .unwrap();
 
     let mut store = Store::new(&engine, ());
