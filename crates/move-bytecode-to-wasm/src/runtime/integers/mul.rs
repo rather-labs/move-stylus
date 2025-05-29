@@ -432,6 +432,7 @@ pub fn mul_u64(module: &mut Module) -> FunctionId {
 #[cfg(test)]
 mod tests {
     use crate::runtime::test_tools::{build_module, setup_wasmtime_module};
+    use alloy_primitives::U256;
     use rstest::rstest;
     use walrus::FunctionBuilder;
 
@@ -443,7 +444,6 @@ mod tests {
     #[case(2, 0, 0)]
     #[case(1, 1, 1)]
     #[case(5, 5, 25)]
-    #[case(u64::MAX as u128, 2, u64::MAX as u128 * 2)]
     #[case(u64::MAX as u128, 2, u64::MAX as u128 * 2)]
     #[case(2, u64::MAX as u128, u64::MAX as u128 * 2)]
     #[case(2, u64::MAX as u128 + 1, (u64::MAX as u128 + 1) * 2)]
@@ -525,6 +525,133 @@ mod tests {
         println!("resultant memory {buff:?}");
 
         assert_eq!(result_memory_data, expected.to_le_bytes().to_vec());
+    }
+
+    #[rstest]
+    #[case(U256::from(2), U256::from(2), U256::from(4))]
+    #[case(U256::from(0), U256::from(2), U256::from(0))]
+    #[case(U256::from(2), U256::from(0), U256::from(0))]
+    #[case(U256::from(1), U256::from(1), U256::from(1))]
+    #[case(U256::from(5), U256::from(5), U256::from(25))]
+    #[case(U256::from(u64::MAX), U256::from(2), U256::from(u64::MAX as u128 * 2))]
+    #[case(U256::from(2), U256::from(u64::MAX), U256::from(u64::MAX as u128 * 2))]
+    #[case(
+        U256::from(2),
+        U256::from(u64::MAX as u128 + 1),
+        U256::from((u64::MAX as u128 + 1) * 2)
+    )]
+    #[case(
+        U256::from(u64::MAX),
+        U256::from(u64::MAX),
+        U256::from(u64::MAX as u128 * u64::MAX as u128)
+    )]
+    #[case::t_2pow63_x_2pow63(
+        U256::from(9_223_372_036_854_775_808_u128),
+        U256::from(9_223_372_036_854_775_808_u128),
+        U256::from(85_070_591_730_234_615_865_843_651_857_942_052_864_u128)
+    )]
+    #[case(
+        U256::from(u128::MAX),
+        U256::from(2),
+        U256::from(u128::MAX) * U256::from(2)
+    )]
+    #[case(
+        U256::from(u128::MAX),
+        U256::from(5),
+        U256::from(u128::MAX) * U256::from(5)
+    )]
+    #[case(
+        U256::from(u128::MAX),
+        U256::from(u128::MAX),
+        U256::from(u128::MAX) * U256::from(u128::MAX)
+    )]
+    #[case(
+        U256::from(u64::MAX as u128 * 2),
+        U256::from(u64::MAX as u128 * 2),
+        U256::from(u64::MAX as u128 * 2) * U256::from(u64::MAX as u128 * 2),
+    )]
+    #[case(
+        U256::from(2),
+        U256::from(u128::MAX) + U256::from(1),
+        (U256::from(u128::MAX) + U256::from(1)) * U256::from(2)
+    )]
+    // asd
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(U256::MAX, U256::from(2), U256::from(0))]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(U256::MAX, U256::from(5), U256::from(0))]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(U256::MAX, U256::MAX, U256::from(0))]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(
+        U256::from(u128::MAX) * U256::from(2),
+        U256::from(u128::MAX) * U256::from(2),
+        U256::from(0),
+    )]
+    fn test_heap_mul_u256(#[case] n1: U256, #[case] n2: U256, #[case] expected: U256) {
+        const TYPE_HEAP_SIZE: i32 = 32;
+        let (mut raw_module, allocator_func, memory_id) = build_module();
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // Mock args allocation
+        func_body.i32_const(TYPE_HEAP_SIZE * 2);
+        func_body.call(allocator_func);
+        func_body.drop();
+
+        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
+        func_body
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(TYPE_HEAP_SIZE);
+
+        let heap_integers_add_f = heap_integers_mul(
+            &mut raw_module,
+            &CompilationContext {
+                memory_id,
+                allocator: allocator_func,
+                functions_arguments: &[],
+                functions_returns: &[],
+                module_signatures: &[],
+                constants: &[],
+            },
+        );
+        // Shift left
+        func_body.call(heap_integers_add_f);
+
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        // display_module(&mut raw_module);
+
+        let data = [n1.to_le_bytes::<32>(), n2.to_le_bytes::<32>()].concat();
+        let (instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
+
+        let pointer = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+        memory
+            .read(&mut store, pointer as usize, &mut result_memory_data)
+            .unwrap();
+
+        println!("Result: {result_memory_data:?} from pointer: {pointer}");
+
+        let mut buff = vec![0; TYPE_HEAP_SIZE as usize * 3];
+        memory.read(&mut store, 0, &mut buff).unwrap();
+        println!("resultant memory {buff:?}");
+
+        assert_eq!(result_memory_data, expected.to_le_bytes::<32>().to_vec());
     }
 
     #[rstest]
