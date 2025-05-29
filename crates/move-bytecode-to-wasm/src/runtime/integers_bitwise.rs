@@ -569,7 +569,7 @@ mod tests {
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
 
-        let pointer = entrypoint
+        let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
@@ -635,7 +635,7 @@ mod tests {
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
 
-        let pointer = entrypoint
+        let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
@@ -701,7 +701,7 @@ mod tests {
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
 
-        let pointer = entrypoint
+        let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
@@ -767,7 +767,7 @@ mod tests {
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
 
-        let pointer = entrypoint
+        let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 

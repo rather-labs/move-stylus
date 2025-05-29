@@ -12,14 +12,14 @@ pub fn build_module() -> (Module, FunctionId, MemoryId) {
     (module, allocator_func, memory_id)
 }
 
-pub fn setup_wasmtime_module<T>(
+pub fn setup_wasmtime_module<T, U>(
     module: &mut Module,
     initial_memory_data: Vec<u8>,
     function_name: &str,
-) -> (Linker<()>, Instance, Store<()>, TypedFunc<(T, T), T>)
+) -> (Linker<()>, Instance, Store<()>, TypedFunc<T, U>)
 where
-    T: wasmtime::WasmParams + wasmtime::WasmResults,
-    (T, T): wasmtime::WasmParams,
+    U: wasmtime::WasmResults,
+    T: wasmtime::WasmParams,
 {
     let engine = Engine::default();
     let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
@@ -30,7 +30,7 @@ where
     let instance = linker.instantiate(&mut store, &module).unwrap();
 
     let entrypoint = instance
-        .get_typed_func::<(T, T), T>(&mut store, function_name)
+        .get_typed_func::<T, U>(&mut store, function_name)
         .unwrap();
 
     let memory = instance.get_memory(&mut store, "memory").unwrap();
