@@ -46,7 +46,7 @@ impl RuntimeFunction {
             Self::SubU64 => "sub_u64",
             Self::MulU32 => "mul_u32",
             Self::MulU64 => "mul_u64",
-            Self::HeapIntMul => "heap_integer_Mul",
+            Self::HeapIntMul => "heap_integer_mul",
             // Bitwise
             Self::HeapIntShiftLeft => "heap_integer_shift_left",
             Self::HeapIntShiftRight => "heap_integer_shift_right",

@@ -43,8 +43,8 @@ use super::RuntimeFunction;
 ///    f1 0  0  0
 ///
 /// This means that we can optimize the carry detection and the overall performance of the
-/// algorithm
-///
+/// algorithm. Also in terms of space, we just need to allocate the space for the result, since the
+/// sums are done in site, using the result space for intermediate results
 pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -105,7 +105,6 @@ pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationConte
                     .i64_const(0)
                     .local_set(carry_mul);
 
-                // outer_loop.call(print_separator);
                 // Load the first part
                 outer_loop
                     // Read the second operand
