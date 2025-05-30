@@ -210,7 +210,7 @@ fn map_bytecode_instruction(
         Bytecode::ImmBorrowLoc(local_id) => {
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = &mapped_function.function_locals_ir[*local_id as usize];
-            local_type.add_borrow_local_instructions(builder, local);
+            local_type.add_borrow_local_instructions(builder, compilation_ctx, local);
 
             // Push the reference to the type into the types stack
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));

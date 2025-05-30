@@ -104,32 +104,42 @@ impl MappedFunction {
         {
             match ty {
                 IntermediateType::IU64 => {
-                    let tmp = module.locals.add(ValType::I64);
-                    let pointer = module.locals.add(ValType::I32);
+                    let val = module.locals.add(ValType::I64);
+                    let val_ptr = module.locals.add(ValType::I32);
+                    let outer_ptr = module.locals.add(ValType::I32);
 
-                    // Save original value
                     builder.local_get(*local);
-                    builder.local_set(tmp);
+                    builder.local_set(val);
 
-                    // Allocate heap memory
-                    builder.i32_const(ty.stack_data_size() as i32);
-                    builder.call(compilation_ctx.allocator);
-                    builder.local_tee(pointer);
-
-                    // Store value
-                    builder.local_get(tmp);
-                    builder.store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I64 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
+                    builder
+                        .i32_const(4 as i32)
+                        .call(compilation_ctx.allocator)
+                        .local_tee(outer_ptr)
+                        .i32_const(8 as i32)
+                        .call(compilation_ctx.allocator)
+                        .local_tee(val_ptr)
+                        .store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_get(val_ptr)
+                        .local_get(val)
+                        .store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I64 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
 
                     // Store the update for later
                     if let Some(index) = self.function_locals.iter().position(|&id| id == *local) {
-                        updates.push((index, pointer));
+                        updates.push((index, outer_ptr));
                     } else {
                         panic!(
                             "Couldn't find original local {:?} in mapped_function",
@@ -142,33 +152,65 @@ impl MappedFunction {
                 | IntermediateType::IU8
                 | IntermediateType::IU16
                 | IntermediateType::IU32 => {
-                    let tmp = module.locals.add(ValType::I32);
+                    let val = module.locals.add(ValType::I32);
+                    let val_ptr = module.locals.add(ValType::I32);
 
                     builder.local_get(*local);
-                    builder.local_set(tmp);
+                    builder.local_set(val);
 
-                    builder.i32_const(ty.stack_data_size() as i32);
-                    builder.call(compilation_ctx.allocator);
-                    builder.local_tee(*local);
-
-                    builder.local_get(tmp);
-                    builder.store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
+                    builder
+                        .i32_const(4 as i32)
+                        .call(compilation_ctx.allocator)
+                        .local_tee(*local)
+                        .i32_const(ty.stack_data_size() as i32)
+                        .call(compilation_ctx.allocator)
+                        .local_tee(val_ptr)
+                        .store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_get(val_ptr)
+                        .local_get(val)
+                        .store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
                 }
+                IntermediateType::IU128
+                | IntermediateType::IU256
+                | IntermediateType::IAddress
+                | IntermediateType::ISigner
+                | IntermediateType::IRef(_)
+                | IntermediateType::IVector(_) => {
+                    let inner_pointer = module.locals.add(ValType::I32);
+                    builder.local_get(*local).local_set(inner_pointer);
 
-                _ => {
-                    // Already a pointer
+                    builder
+                        .i32_const(4)
+                        .call(compilation_ctx.allocator)
+                        .local_tee(*local)
+                        .local_get(inner_pointer)
+                        .store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
                 }
             }
         }
 
-        // Apply local replacement after the iteration
+        // Apply local replacement for i64 after the iteration
         for (index, pointer) in updates {
             self.function_locals[index] = pointer;
         }
