@@ -40,6 +40,7 @@ where
 
     let memory = instance.get_memory(&mut store, "memory").unwrap();
     memory.write(&mut store, 0, &initial_memory_data).unwrap();
+
     // Print current memory
     let memory_data = memory.data(&mut store);
     println!(

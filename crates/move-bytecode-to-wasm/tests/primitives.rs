@@ -750,6 +750,7 @@ mod uint_128 {
         function echo2(uint128 x, uint128 y) external returns (uint128);
         function sum(uint128 x, uint128 y) external returns (uint128);
         function sub(uint128 x, uint128 y) external returns (uint128);
+        function mul(uint128 x, uint128 y) external returns (uint128);
     );
 
     #[rstest]
@@ -849,6 +850,43 @@ mod uint_128 {
         )
         .unwrap();
     }
+
+    #[rstest]
+    #[case(2, 2, 4)]
+    #[case(0, 2, 0)]
+    #[case(2, 0, 0)]
+    #[case(1, 1, 1)]
+    #[case(5, 5, 25)]
+    #[case(u64::MAX as u128, 2, u64::MAX as u128 * 2)]
+    #[case(2, u64::MAX as u128, u64::MAX as u128 * 2)]
+    #[case(2, u64::MAX as u128 + 1, (u64::MAX as u128 + 1) * 2)]
+    #[case(u64::MAX as u128, u64::MAX as u128, u64::MAX as u128 * u64::MAX as u128)]
+    #[case::t_2pow63_x_2pow63(
+        9_223_372_036_854_775_808,
+        9_223_372_036_854_775_808,
+        85_070_591_730_234_615_865_843_651_857_942_052_864
+    )]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(u128::MAX, 2, 0)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(u128::MAX, 5, 0)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(u128::MAX, u64::MAX as u128, 0)]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(u64::MAX as u128 * 2, u64::MAX as u128 * 2, 0)]
+    fn test_uint_128_mul(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] n1: u128,
+        #[case] n2: u128,
+        #[case] expected_result: u128,
+    ) {
+        run_test(
+            runtime,
+            mulCall::new((n1, n2)).abi_encode(),
+            <(&u128,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
 }
 
 mod uint_256 {
@@ -873,6 +911,7 @@ mod uint_256 {
         function echo2(uint256 x, uint256 y) external returns (uint256);
         function sum(uint256 x, uint256 y) external returns (uint256);
         function sub(uint256 x, uint256 y) external returns (uint256);
+        function mul(uint256 x, uint256 y) external returns (uint256);
     );
 
     #[rstest]
@@ -1052,6 +1091,81 @@ mod uint_256 {
             runtime,
             call_data.abi_encode(),
             expected_result.abi_encode_params(),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(U256::from(2), U256::from(2), U256::from(4))]
+    #[case(U256::from(0), U256::from(2), U256::from(0))]
+    #[case(U256::from(2), U256::from(0), U256::from(0))]
+    #[case(U256::from(1), U256::from(1), U256::from(1))]
+    #[case(U256::from(5), U256::from(5), U256::from(25))]
+    #[case(U256::from(u64::MAX), U256::from(2), U256::from(u64::MAX as u128 * 2))]
+    #[case(U256::from(2), U256::from(u64::MAX), U256::from(u64::MAX as u128 * 2))]
+    #[case(
+        U256::from(2),
+        U256::from(u64::MAX as u128 + 1),
+        U256::from((u64::MAX as u128 + 1) * 2)
+    )]
+    #[case(
+        U256::from(u64::MAX),
+        U256::from(u64::MAX),
+        U256::from(u64::MAX as u128 * u64::MAX as u128)
+    )]
+    #[case::t_2pow63_x_2pow63(
+        U256::from(9_223_372_036_854_775_808_u128),
+        U256::from(9_223_372_036_854_775_808_u128),
+        U256::from(85_070_591_730_234_615_865_843_651_857_942_052_864_u128)
+    )]
+    #[case(
+        U256::from(u128::MAX),
+        U256::from(2),
+        U256::from(u128::MAX) * U256::from(2)
+    )]
+    #[case(
+        U256::from(u128::MAX),
+        U256::from(5),
+        U256::from(u128::MAX) * U256::from(5)
+    )]
+    #[case(
+        U256::from(u128::MAX),
+        U256::from(u128::MAX),
+        U256::from(u128::MAX) * U256::from(u128::MAX)
+    )]
+    #[case(
+        U256::from(u64::MAX as u128 * 2),
+        U256::from(u64::MAX as u128 * 2),
+        U256::from(u64::MAX as u128 * 2) * U256::from(u64::MAX as u128 * 2),
+    )]
+    #[case(
+        U256::from(2),
+        U256::from(u128::MAX) + U256::from(1),
+        (U256::from(u128::MAX) + U256::from(1)) * U256::from(2)
+    )]
+    // asd
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(U256::MAX, U256::from(2), U256::from(0))]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(U256::MAX, U256::from(5), U256::from(0))]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(U256::MAX, U256::MAX, U256::from(0))]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    #[case(
+        U256::from(u128::MAX) * U256::from(2),
+        U256::from(u128::MAX) * U256::from(2),
+        U256::from(0),
+    )]
+    fn test_uint_256_mul(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] n1: U256,
+        #[case] n2: U256,
+        #[case] expected_result: U256,
+    ) {
+        run_test(
+            runtime,
+            mulCall::new((n1, n2)).abi_encode(),
+            <(&U256,)>::abi_encode_params(&(&expected_result,)),
         )
         .unwrap();
     }
