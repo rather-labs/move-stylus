@@ -88,7 +88,7 @@ mod tests {
     use walrus::{FunctionBuilder, ValType};
 
     fn test_unpack_ref(data: &[u8], ref_type: IntermediateType, expected_memory_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id) = build_module();
+        let (mut raw_module, allocator, memory_id) = build_module(None);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);

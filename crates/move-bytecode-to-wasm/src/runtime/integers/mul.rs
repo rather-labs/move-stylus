@@ -142,7 +142,7 @@ mod tests {
     #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
     #[case(2, u32::MAX as i32, -1)]
     fn test_add_u32(#[case] n1: i32, #[case] n2: i32, #[case] expected: i32) {
-        let (mut raw_module, _, _) = build_module();
+        let (mut raw_module, _, _) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -185,7 +185,7 @@ mod tests {
     #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
     #[case(2, u64::MAX as i64, -1)]
     fn test_mul_u64(#[case] n1: i64, #[case] n2: i64, #[case] expected: i64) {
-        let (mut raw_module, _, _) = build_module();
+        let (mut raw_module, _, _) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,

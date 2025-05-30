@@ -4,10 +4,10 @@ use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc}
 
 use crate::memory::setup_module_memory;
 
-pub fn build_module() -> (Module, FunctionId, MemoryId) {
+pub fn build_module(initial_memory_offset: Option<i32>) -> (Module, FunctionId, MemoryId) {
     let config = ModuleConfig::new();
     let mut module = Module::with_config(config);
-    let (allocator_func, memory_id) = setup_module_memory(&mut module);
+    let (allocator_func, memory_id) = setup_module_memory(&mut module, initial_memory_offset);
 
     (module, allocator_func, memory_id)
 }

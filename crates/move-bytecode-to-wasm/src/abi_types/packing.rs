@@ -268,7 +268,7 @@ mod tests {
 
     #[test]
     fn test_build_pack_instructions() {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
 
         let validator_func_type = raw_module.types.add(&[ValType::I32, ValType::I32], &[]);
         let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);
@@ -329,7 +329,8 @@ mod tests {
 
     #[test]
     fn test_build_pack_instructions_memory_offset() {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        // Memory offset starts at 100
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(100));
 
         let validator_func_type = raw_module.types.add(&[ValType::I32, ValType::I32], &[]);
         let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);
@@ -341,11 +342,6 @@ mod tests {
         let args_pointer = raw_module.locals.add(ValType::I32);
 
         let mut func_body = function_builder.func_body();
-
-        // Allocate some memory just to increase the offset
-        func_body.i32_const(100);
-        func_body.call(allocator_func);
-        func_body.drop();
 
         // Load arguments to stack
         func_body.i32_const(1);
@@ -420,7 +416,7 @@ mod tests {
         .concat();
         let data_len = data.len() as i32;
 
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(data_len));
 
         let validator_func_type = raw_module.types.add(&[ValType::I32, ValType::I32], &[]);
         let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);
@@ -432,11 +428,6 @@ mod tests {
         let args_pointer = raw_module.locals.add(ValType::I32);
 
         let mut func_body = function_builder.func_body();
-
-        // allocate memory to match the expected data length
-        func_body.i32_const(data_len);
-        func_body.call(allocator_func);
-        func_body.drop();
 
         // Load arguments to stack
         func_body.i32_const(1234);
