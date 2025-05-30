@@ -152,10 +152,10 @@ fn check_if_a_less_than_b(module: &mut Module, compilation_ctx: &CompilationCont
         .expect("print_separator function not found");
 
     builder
-        //.local_get(type_heap_size)
-        //. i32_const(8)
-        // .binop(BinaryOp::I32Sub)
-        .i32_const(0)
+        .local_get(type_heap_size)
+        .i32_const(8)
+        .binop(BinaryOp::I32Sub)
+        // .i32_const(0)
         .local_set(offset);
 
     builder
@@ -170,8 +170,8 @@ fn check_if_a_less_than_b(module: &mut Module, compilation_ctx: &CompilationCont
                 // If we processed the chunks we exit the loop
                 loop_
                     .local_get(offset)
-                    .local_get(type_heap_size)
-                    .binop(BinaryOp::I32Eq)
+                    .i32_const(0)
+                    .binop(BinaryOp::I32LtS)
                     .if_else(
                         None,
                         |then| {
@@ -229,7 +229,7 @@ fn check_if_a_less_than_b(module: &mut Module, compilation_ctx: &CompilationCont
                             // offset -= 8
                             then.local_get(offset)
                                 .i32_const(8)
-                                .binop(BinaryOp::I32Add)
+                                .binop(BinaryOp::I32Sub)
                                 .local_set(offset)
                                 .br(loop_id);
                         },
