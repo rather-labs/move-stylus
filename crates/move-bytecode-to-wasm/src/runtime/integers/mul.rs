@@ -405,7 +405,7 @@ pub fn mul_u64(module: &mut Module) -> FunctionId {
 
 #[cfg(test)]
 mod tests {
-    use crate::runtime::test_tools::{build_module, setup_wasmtime_module};
+    use crate::test_tools::{build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use rstest::rstest;
     use walrus::FunctionBuilder;
@@ -481,10 +481,10 @@ mod tests {
         // display_module(&mut raw_module);
 
         let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
-        let (instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
-        let pointer = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
+        let pointer: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
@@ -605,10 +605,10 @@ mod tests {
         // display_module(&mut raw_module);
 
         let data = [n1.to_le_bytes::<32>(), n2.to_le_bytes::<32>()].concat();
-        let (instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
-        let pointer = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
+        let pointer: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
@@ -651,18 +651,15 @@ mod tests {
         func_body.local_get(n1_l).local_get(n2_l);
 
         let add_u32_f = mul_u32(&mut raw_module);
-        // Shift left
         func_body.call(add_u32_f);
 
         let function = function_builder.finish(vec![n1_l, n2_l], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        // display_module(&mut raw_module);
+        let (_, _, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
 
-        let (_, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function");
-
-        let result = entrypoint.call(&mut store, (n1, n2)).unwrap();
+        let result: i32 = entrypoint.call(&mut store, (n1, n2)).unwrap();
 
         assert_eq!(expected, result);
     }
@@ -697,18 +694,15 @@ mod tests {
         func_body.local_get(n1_l).local_get(n2_l);
 
         let add_u64_f = mul_u64(&mut raw_module);
-        // Shift left
         func_body.call(add_u64_f);
 
         let function = function_builder.finish(vec![n1_l, n2_l], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        // display_module(&mut raw_module);
+        let (_, _, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, vec![], "test_function", None);
 
-        let (_, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, vec![], "test_function");
-
-        let result = entrypoint.call(&mut store, (n1, n2)).unwrap();
+        let result: i64 = entrypoint.call(&mut store, (n1, n2)).unwrap();
 
         assert_eq!(expected, result);
     }

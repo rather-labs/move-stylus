@@ -108,46 +108,13 @@ impl IVector {
 mod tests {
     use alloy_primitives::{U256, address};
     use alloy_sol_types::{SolType, sol};
-    use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
-    use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults};
+    use walrus::{FunctionBuilder, ValType};
 
     use crate::{
-        abi_types::packing::Packable, memory::setup_module_memory,
+        abi_types::packing::Packable,
+        test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
-
-    use super::*;
-
-    fn build_module() -> (Module, FunctionId, MemoryId) {
-        let config = ModuleConfig::new();
-        let mut module = Module::with_config(config);
-        let (allocator_func, memory_id) = setup_module_memory(&mut module);
-
-        (module, allocator_func, memory_id)
-    }
-
-    fn setup_wasmtime_module<R: WasmResults>(
-        module: &mut Module,
-        function_name: &str,
-        initial_memory_data: Vec<u8>,
-    ) -> (Linker<()>, Instance, Store<()>, TypedFunc<(), R>) {
-        let engine = Engine::default();
-        let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
-
-        let linker = Linker::new(&engine);
-
-        let mut store = Store::new(&engine, ());
-        let instance = linker.instantiate(&mut store, &module).unwrap();
-
-        let entrypoint = instance
-            .get_typed_func::<(), R>(&mut store, function_name)
-            .unwrap();
-
-        let memory = instance.get_memory(&mut store, "memory").unwrap();
-        memory.write(&mut store, 0, &initial_memory_data).unwrap();
-
-        (linker, instance, store, entrypoint)
-    }
 
     fn test_vec(int_type: impl Packable, data: &[u8], expected_result: &[u8]) {
         let (mut raw_module, alloc_function, memory_id) = build_module();
@@ -188,10 +155,10 @@ mod tests {
         raw_module.exports.add("test_function", function);
 
         let (_, instance, mut store, entrypoint) =
-            setup_wasmtime_module::<i32>(&mut raw_module, "test_function", data.to_vec());
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
         // the return is the pointer to the packed value
-        let result = entrypoint.call(&mut store, ()).unwrap();
+        let result: i32 = entrypoint.call(&mut store, ()).unwrap();
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; expected_result.len()];

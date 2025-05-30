@@ -231,54 +231,39 @@ impl Packable for IntermediateType {
 mod tests {
     use alloy_primitives::U256;
     use alloy_sol_types::sol;
-    use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
-    use wasmtime::{
-        Caller, Engine, Extern, IntoFunc, Linker, Module as WasmModule, Store, TypedFunc,
-        WasmParams,
-    };
+    use walrus::{FunctionBuilder, ValType};
+    use wasmtime::{Caller, Engine, Extern, Linker};
 
-    use crate::{memory::setup_module_memory, utils::display_module};
+    use crate::{
+        test_tools::{build_module, setup_wasmtime_module},
+        utils::display_module,
+    };
 
     use super::*;
 
-    fn build_module() -> (Module, FunctionId, MemoryId) {
-        let config = ModuleConfig::new();
-        let mut module = Module::with_config(config);
-        let (allocator_func, memory_id) = setup_module_memory(&mut module);
+    fn get_validator(
+        pointer_addr: u32,
+        data_len: i32,
+        data: Vec<u8>,
+    ) -> impl Fn(Caller<()>, u32, u32) {
+        move |mut caller: Caller<()>, pointer: u32, length: u32| {
+            println!("validator: {}, {}", pointer, length);
 
-        (module, allocator_func, memory_id)
-    }
+            assert_eq!(pointer, pointer_addr);
+            assert_eq!(length, data_len as u32);
 
-    fn setup_wasmtime_module<A: WasmParams, V>(
-        module: &mut Module,
-        initial_memory_data: Vec<u8>,
-        function_name: &str,
-        validator_func: impl IntoFunc<(), V, ()>,
-    ) -> (Linker<()>, Store<()>, TypedFunc<A, ()>) {
-        let engine = Engine::default();
-        let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
+            let memory = caller.get_export("memory").unwrap();
+            let memory = match memory {
+                Extern::Memory(memory) => memory,
+                _ => panic!("memory not found"),
+            };
 
-        let mut linker = Linker::new(&engine);
-
-        linker.func_wrap("", "validator", validator_func).unwrap();
-
-        let mut store = Store::new(&engine, ());
-        let instance = linker.instantiate(&mut store, &module).unwrap();
-
-        let entrypoint = instance
-            .get_typed_func::<A, ()>(&mut store, function_name)
-            .unwrap();
-
-        let memory = instance.get_memory(&mut store, "memory").unwrap();
-        memory.write(&mut store, 0, &initial_memory_data).unwrap();
-        // Print current memory
-        let memory_data = memory.data(&mut store);
-        println!(
-            "Current memory: {:?}",
-            memory_data.iter().take(64).collect::<Vec<_>>()
-        );
-
-        (linker, store, entrypoint)
+            let mut buffer = vec![0; length as usize];
+            memory
+                .read(&mut caller, pointer as usize, &mut buffer)
+                .unwrap();
+            assert_eq!(buffer, data);
+        }
     }
 
     #[test]
@@ -325,28 +310,18 @@ mod tests {
             <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
         println!("data: {:?}", data);
         let data_len = data.len() as i32;
-        let (_, mut store, entrypoint) = setup_wasmtime_module::<(i32, i32), _>(
+
+        // Define validator function
+        let mut linker = Linker::new(&Engine::default());
+        linker
+            .func_wrap("", "validator", get_validator(0, data_len, data))
+            .unwrap();
+
+        let (_, _, mut store, entrypoint) = setup_wasmtime_module::<(i32, i32), ()>(
             &mut raw_module,
             vec![],
             "test_function",
-            move |mut caller: Caller<()>, pointer: u32, length: u32| {
-                println!("validator: {}, {}", pointer, length);
-
-                assert_eq!(pointer, 0);
-                assert_eq!(length, data_len as u32);
-
-                let memory = caller.get_export("memory").unwrap();
-                let memory = match memory {
-                    Extern::Memory(memory) => memory,
-                    _ => panic!("memory not found"),
-                };
-
-                let mut buffer = vec![0; length as usize];
-                memory
-                    .read(&mut caller, pointer as usize, &mut buffer)
-                    .unwrap();
-                assert_eq!(buffer, data);
-            },
+            Some(linker),
         );
 
         entrypoint.call(&mut store, (0, data_len)).unwrap();
@@ -402,27 +377,17 @@ mod tests {
         println!("data: {:?}", data);
         let data_len = data.len() as i32;
 
-        let (_, mut store, entrypoint) = setup_wasmtime_module::<(i32, i32), _>(
+        // Define validator function
+        let mut linker = Linker::new(&Engine::default());
+        linker
+            .func_wrap("", "validator", get_validator(100, data_len, data))
+            .unwrap();
+
+        let (_, _, mut store, entrypoint) = setup_wasmtime_module::<(i32, i32), ()>(
             &mut raw_module,
             vec![],
             "test_function",
-            move |mut caller: Caller<()>, pointer: u32, length: u32| {
-                println!("validator: {}, {}", pointer, length);
-                assert_eq!(pointer, 100);
-                assert_eq!(length, data_len as u32);
-
-                let memory = caller.get_export("memory").unwrap();
-                let memory = match memory {
-                    Extern::Memory(memory) => memory,
-                    _ => panic!("memory not found"),
-                };
-
-                let mut buffer = vec![0; length as usize];
-                memory
-                    .read(&mut caller, pointer as usize, &mut buffer)
-                    .unwrap();
-                assert_eq!(buffer, data);
-            },
+            Some(linker),
         );
 
         entrypoint.call(&mut store, (0, data_len)).unwrap();
@@ -506,28 +471,26 @@ mod tests {
             U256::from(123456789012345u128),
         ));
         println!("expected_data: {:?}", expected_data);
-        let (_, mut store, entrypoint) = setup_wasmtime_module::<(i32, i32), _>(
+
+        // Define validator function
+        let mut linker = Linker::new(&Engine::default());
+        linker
+            .func_wrap(
+                "",
+                "validator",
+                get_validator(
+                    data_len as u32,
+                    expected_data.len() as i32,
+                    expected_data.clone(),
+                ),
+            )
+            .unwrap();
+
+        let (_, _, mut store, entrypoint) = setup_wasmtime_module::<(i32, i32), ()>(
             &mut raw_module,
             data.to_vec(),
             "test_function",
-            move |mut caller: Caller<()>, pointer: u32, length: u32| {
-                println!("validator: {}, {}", pointer, length);
-
-                assert_eq!(pointer, data_len as u32);
-                assert_eq!(length, expected_data.len() as u32);
-
-                let memory = caller.get_export("memory").unwrap();
-                let memory = match memory {
-                    Extern::Memory(memory) => memory,
-                    _ => panic!("memory not found"),
-                };
-
-                let mut buffer = vec![0; length as usize];
-                memory
-                    .read(&mut caller, pointer as usize, &mut buffer)
-                    .unwrap();
-                assert_eq!(buffer, expected_data);
-            },
+            Some(linker),
         );
 
         entrypoint.call(&mut store, (0, data_len)).unwrap();

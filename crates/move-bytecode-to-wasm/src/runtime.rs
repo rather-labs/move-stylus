@@ -5,7 +5,6 @@ use crate::CompilationContext;
 mod integers;
 mod integers_bitwise;
 mod swap;
-mod test_tools;
 
 #[derive(PartialEq)]
 pub enum RuntimeFunction {
