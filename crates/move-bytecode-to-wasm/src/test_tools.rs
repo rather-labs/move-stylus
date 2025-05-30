@@ -7,6 +7,7 @@ use crate::memory::setup_module_memory;
 pub fn build_module() -> (Module, FunctionId, MemoryId) {
     let config = ModuleConfig::new();
     let mut module = Module::with_config(config);
+
     let (allocator_func, memory_id) = setup_module_memory(&mut module);
 
     (module, allocator_func, memory_id)
@@ -40,6 +41,7 @@ where
 
     let memory = instance.get_memory(&mut store, "memory").unwrap();
     memory.write(&mut store, 0, &initial_memory_data).unwrap();
+
     // Print current memory
     let memory_data = memory.data(&mut store);
     println!(
