@@ -3,7 +3,6 @@ use walrus::{FunctionId, Module};
 use crate::CompilationContext;
 
 mod integers;
-mod integers_bitwise;
 mod swap;
 
 #[derive(PartialEq)]
@@ -94,10 +93,10 @@ impl RuntimeFunction {
                 }
                 // Bitwise
                 (Self::HeapIntShiftLeft, Some(ctx)) => {
-                    integers_bitwise::heap_int_shift_left(module, ctx)
+                    integers::bitwise::heap_int_shift_left(module, ctx)
                 }
                 (Self::HeapIntShiftRight, Some(ctx)) => {
-                    integers_bitwise::heap_int_shift_right(module, ctx)
+                    integers::bitwise::heap_int_shift_right(module, ctx)
                 }
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,

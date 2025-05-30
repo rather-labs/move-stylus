@@ -526,7 +526,7 @@ mod tests {
     #[case(u128::MAX, 180, 0)]
     fn test_u128_shift_left(#[case] n: u128, #[case] shift_amount: i32, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -538,9 +538,8 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // allocate memory for the source integer
-        func_body.i32_const(TYPE_HEAP_SIZE).call(allocator_func);
-
+        // Number to shift pointer
+        func_body.i32_const(0);
         // Shift left amount
         func_body.local_get(shift_amount_local);
         // Heap size
@@ -592,7 +591,7 @@ mod tests {
     #[case(U256::MAX, 256, U256::ZERO)]
     fn test_u256_shift_left(#[case] n: U256, #[case] shift_amount: i32, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -604,9 +603,8 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // allocate memory for the source integer
-        func_body.i32_const(TYPE_HEAP_SIZE).call(allocator_func);
-
+        // Number to shift pointer
+        func_body.i32_const(0);
         // Shift left amount
         func_body.local_get(shift_amount_local);
         // Heap size
@@ -658,7 +656,7 @@ mod tests {
     #[case(u128::MAX, 180, 0)]
     fn test_u128_shift_right(#[case] n: u128, #[case] shift_amount: i32, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -670,9 +668,8 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // allocate memory for the source integer
-        func_body.i32_const(TYPE_HEAP_SIZE).call(allocator_func);
-
+        // Number to shift pointer
+        func_body.i32_const(0);
         // Shift left amount
         func_body.local_get(shift_amount_local);
         // Heap size
@@ -694,8 +691,6 @@ mod tests {
 
         let function = function_builder.finish(vec![shift_amount_local], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
-
-        // display_module(&mut raw_module);
 
         let data = [n.to_le_bytes()].concat();
         let (_, instance, mut store, entrypoint) =
@@ -724,7 +719,7 @@ mod tests {
     #[case(U256::MAX, 256, U256::ZERO)]
     fn test_u256_shift_right(#[case] n: U256, #[case] shift_amount: i32, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -736,9 +731,8 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // allocate memory for the source integer
-        func_body.i32_const(TYPE_HEAP_SIZE).call(allocator_func);
-
+        // Number to shift pointer
+        func_body.i32_const(0);
         // Shift left amount
         func_body.local_get(shift_amount_local);
         // Heap size

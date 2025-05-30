@@ -14,7 +14,7 @@ pub fn new_module_with_host() -> (Module, FunctionId, MemoryId) {
     let config = ModuleConfig::new();
     let mut module = Module::with_config(config);
 
-    let (allocator_function_id, memory_id) = setup_module_memory(&mut module);
+    let (allocator_function_id, memory_id) = setup_module_memory(&mut module, None);
     host_functions::add_pay_for_memory_grow(&mut module);
 
     (module, allocator_function_id, memory_id)

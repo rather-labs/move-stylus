@@ -165,7 +165,7 @@ mod tests {
         expected_result: T,
         result_type: ValType,
     ) {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(&mut raw_module.types, &[], &[result_type]);
 

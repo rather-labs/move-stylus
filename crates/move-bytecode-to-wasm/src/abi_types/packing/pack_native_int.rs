@@ -76,7 +76,7 @@ mod tests {
     }
 
     fn test_uint(int_type: impl Packable, literal: Int, expected_result: &[u8]) {
-        let (mut raw_module, alloc_function, memory_id) = build_module();
+        let (mut raw_module, alloc_function, memory_id) = build_module(None);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);

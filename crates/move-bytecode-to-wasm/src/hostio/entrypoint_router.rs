@@ -230,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_build_entrypoint_router_noop() {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
         let signature = ISignature {
             arguments: vec![],
             returns: vec![],
@@ -268,7 +268,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "unreachable")]
     fn test_build_entrypoint_router_no_data() {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
         let signature = ISignature {
             arguments: vec![],
             returns: vec![],
@@ -290,7 +290,7 @@ mod tests {
 
     #[test]
     fn test_build_entrypoint_router_no_match() {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
         let signature = ISignature {
             arguments: vec![],
             returns: vec![],

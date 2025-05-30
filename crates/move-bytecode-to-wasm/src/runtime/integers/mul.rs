@@ -439,7 +439,7 @@ mod tests {
     #[case(u64::MAX as u128 * 2, u64::MAX as u128 * 2, 0)]
     fn test_heap_mul_u128(#[case] n1: u128, #[case] n2: u128, #[case] expected: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -451,11 +451,6 @@ mod tests {
         let n2_ptr = raw_module.locals.add(ValType::I32);
 
         let mut func_body = function_builder.func_body();
-
-        // Mock args allocation
-        func_body.i32_const(TYPE_HEAP_SIZE * 2);
-        func_body.call(allocator_func);
-        func_body.drop();
 
         // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
         func_body
@@ -562,7 +557,7 @@ mod tests {
     )]
     fn test_heap_mul_u256(#[case] n1: U256, #[case] n2: U256, #[case] expected: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -574,11 +569,6 @@ mod tests {
         let n2_ptr = raw_module.locals.add(ValType::I32);
 
         let mut func_body = function_builder.func_body();
-
-        // Mock args allocation
-        func_body.i32_const(TYPE_HEAP_SIZE * 2);
-        func_body.call(allocator_func);
-        func_body.drop();
 
         // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
         func_body
@@ -635,7 +625,7 @@ mod tests {
     #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
     #[case(2, u32::MAX as i32, -1)]
     fn test_add_u32(#[case] n1: i32, #[case] n2: i32, #[case] expected: i32) {
-        let (mut raw_module, _, _) = build_module();
+        let (mut raw_module, _, _) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -678,7 +668,7 @@ mod tests {
     #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
     #[case(2, u64::MAX as i64, -1)]
     fn test_mul_u64(#[case] n1: i64, #[case] n2: i64, #[case] expected: i64) {
-        let (mut raw_module, _, _) = build_module();
+        let (mut raw_module, _, _) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,

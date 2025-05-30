@@ -364,7 +364,7 @@ mod tests {
     use super::*;
 
     fn test_vector(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id) = build_module();
+        let (mut raw_module, allocator, memory_id) = build_module(None);
 
         let compilation_ctx = CompilationContext {
             constants: &[],
@@ -407,7 +407,7 @@ mod tests {
     }
 
     fn test_vector_copy(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id) = build_module();
+        let (mut raw_module, allocator, memory_id) = build_module(None);
 
         let compilation_ctx = CompilationContext {
             constants: &[],
@@ -465,7 +465,7 @@ mod tests {
         inner_type: IntermediateType,
         expected_result_bytes: &[u8],
     ) {
-        let (mut raw_module, allocator, memory_id) = build_module();
+        let (mut raw_module, allocator, memory_id) = build_module(None);
 
         let compilation_ctx = CompilationContext {
             constants: &[],

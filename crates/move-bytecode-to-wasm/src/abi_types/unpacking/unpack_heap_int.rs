@@ -191,7 +191,7 @@ mod tests {
     };
 
     fn test_uint(data: &[u8], int_type: IntermediateType, expected_result_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id) = build_module();
+        let (mut raw_module, allocator, memory_id) = build_module(Some(data.len() as i32));
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -201,11 +201,6 @@ mod tests {
         let mut func_body = function_builder.func_body();
         func_body.i32_const(0);
         func_body.local_set(args_pointer);
-
-        // Mock args allocation
-        func_body.i32_const(data.len() as i32);
-        func_body.call(allocator);
-        func_body.drop();
 
         // Args data should already be stored in memory
         int_type.add_unpack_instructions(

@@ -441,7 +441,7 @@ mod tests {
 
     #[test]
     fn test_build_public_function() {
-        let (mut raw_module, allocator, memory_id) = build_module();
+        let (mut raw_module, allocator, memory_id) = build_module(None);
 
         let compilation_ctx = CompilationContext {
             constants: &[],
@@ -525,7 +525,7 @@ mod tests {
 
     #[test]
     fn test_build_public_function_with_signer() {
-        let (mut raw_module, allocator, memory_id) = build_module();
+        let (mut raw_module, allocator, memory_id) = build_module(None);
         let compilation_ctx = CompilationContext {
             constants: &[],
             functions_arguments: &[],
@@ -593,7 +593,7 @@ mod tests {
 
     #[test]
     fn test_build_entrypoint_router_no_match() {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -664,7 +664,7 @@ mod tests {
     // injects a mock address as signer and execute the function
     #[test]
     fn public_function_with_signature() {
-        let (mut raw_module, _, _) = build_module();
+        let (mut raw_module, _, _) = build_module(None);
 
         let function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -695,7 +695,7 @@ mod tests {
         expected = r#"ABI error: error in argument 2 of function "test_function", only one "signer" argument at the beginning is admitted"#
     )]
     fn test_fail_public_function_signature() {
-        let (mut raw_module, _, _) = build_module();
+        let (mut raw_module, _, _) = build_module(None);
 
         let function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32, ValType::I64], &[]);
@@ -723,7 +723,7 @@ mod tests {
         expected = r#"ABI error: error in argument 3 of function "test_function", complex types can't contain the type "signer""#
     )]
     fn test_fail_public_function_signature_complex_type() {
-        let (mut raw_module, _, _) = build_module();
+        let (mut raw_module, _, _) = build_module(None);
 
         let function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32, ValType::I64], &[]);
@@ -751,7 +751,7 @@ mod tests {
         expected = r#"ABI error: error in argument 3 of function "test_function", complex types can't contain the type "signer""#
     )]
     fn test_fail_public_function_signature_complex_type_2() {
-        let (mut raw_module, _, _) = build_module();
+        let (mut raw_module, _, _) = build_module(None);
 
         let function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32, ValType::I64], &[]);

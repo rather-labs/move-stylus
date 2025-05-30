@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn test_build_unpack_instructions() {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
 
         let validator_func_type = raw_module
             .types
@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn test_build_unpack_instructions_reversed() {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
 
         let validator_func_type = raw_module
             .types
@@ -313,7 +313,7 @@ mod tests {
 
     #[test]
     fn test_build_unpack_instructions_offset_memory() {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
 
         let validator_func_type = raw_module
             .types
