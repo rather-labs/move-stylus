@@ -7,44 +7,46 @@ use crate::CompilationContext;
 
 use super::RuntimeFunction;
 
-/// We implement the long multiplication algorithm.
+/// Implements the long multiplication algorithm for 128 and 256 bit integers.
 ///
-/// We use chunks of 32 bits to be able to have carry, because it can be greater than 1. The
-/// general idea is to implement the elementary's school algorithm. Given two numbers of 128 bits,
-/// we divide then in four chunks of 32 bits.
+/// The algorithm is inspired by the classic grade-school method, breaking down each 128-bit input
+/// into four 32-bit chunks:
+///
 ///    a4 a3 a2 a1
 /// x  b4 b3 b2 b1
 ///
-/// And we proceed with (numbers with ' are carry of the operantion). }
+/// We use 32-bit chunks to allow for carry propagation, as carries can exceed a single bit.
 ///
-/// The first iteration is:
+/// First Iteration (multiplying by b1):
 ///
-/// 1. a1 b1 = r1_1         = c1
-/// 2. a2 b1 = r1_2 + r1_1' = c2
-/// 3. a3 b1 = r1_3 + r1_2' = c3
-/// 4. a4 b1 = r1_4 + r1_3' = c4 -> If there's carry in the last column, overflow!
+/// a1 x b1 = r1_1               → c1
+/// a2 x b1 = r1_2 + carry(r1_1) → c2
+/// a3 x b1 = r1_3 + carry(r1_2) → c3
+/// a4 x b1 = r1_4 + carry(r1_3) → c4
+///    → If there's a carry in this final step, it overflows.
 ///
-/// The second iteration is:
+/// Second Iteration (multiplying by b2):
 ///
-/// 1. a1 b2 = r2_1         = d1
-/// 2. a2 b2 = r2_2 + r2_1' = d2
-/// 3. a3 b2 = r2_3 + r2_2' = d3 -> If there's carry in the third column, overflow!
+/// a1 x b2 = r2_1               → d1
+/// a2 x b2 = r2_2 + carry(r2_1) → d2
+/// a3 x b2 = r2_3 + carry(r2_2) → d3
+///    → If there's a carry here, it overflows.
 ///
-/// and so on..
+/// ...and so on for b3 and b4.
 ///
-/// The result is then
+/// Final Summation:
 ///
 ///    a4 a3 a2 a1
 /// x  b4 b3 b2 b1
 ///    -----------
-///    c4 c3 c2 c1
+/// +  c4 c3 c2 c1
 /// +  d3 d2 d1 0
-///    e2 e1 0  0
-///    f1 0  0  0
+/// +  e2 e1 0  0
+/// +  f1 0  0  0
 ///
-/// This means that we can optimize the carry detection and the overall performance of the
-/// algorithm. Also in terms of space, we just need to allocate the space for the result, since the
-/// sums are done in site, using the result space for intermediate results
+/// This approach allows us to optimize both carry detection and performance.
+/// In terms of memory, we only need to allocate space for the final result, as intermediate
+/// computations are performed in place within the result buffer.
 pub fn heap_integers_mul(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -472,7 +474,6 @@ mod tests {
                 constants: &[],
             },
         );
-        // Shift left
         func_body.call(heap_integers_add_f);
 
         let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
