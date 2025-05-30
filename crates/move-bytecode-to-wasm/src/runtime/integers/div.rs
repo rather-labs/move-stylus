@@ -136,26 +136,10 @@ fn check_if_a_less_than_b(module: &mut Module, compilation_ctx: &CompilationCont
 
     let mut builder = function.name(F_A_LESS_THAN_B.to_owned()).func_body();
 
-    let print_i32 = module
-        .imports
-        .get_func("", "print_i32")
-        .expect("print_i32 function not found");
-
-    let print_i64 = module
-        .imports
-        .get_func("", "print_i64")
-        .expect("print_i64 function not found");
-
-    let print_separator = module
-        .imports
-        .get_func("", "print_separator")
-        .expect("print_separator function not found");
-
     builder
         .local_get(type_heap_size)
         .i32_const(8)
         .binop(BinaryOp::I32Sub)
-        // .i32_const(0)
         .local_set(offset);
 
     builder
@@ -164,8 +148,6 @@ fn check_if_a_less_than_b(module: &mut Module, compilation_ctx: &CompilationCont
 
             block.loop_(None, |loop_| {
                 let loop_id = loop_.id();
-
-                loop_.local_get(offset).call(print_i32);
 
                 // If we processed the chunks we exit the loop
                 loop_
@@ -195,7 +177,6 @@ fn check_if_a_less_than_b(module: &mut Module, compilation_ctx: &CompilationCont
                     )
                     .local_tee(a);
 
-                loop_.local_get(a).call(print_i64);
                 // Load a chunk of b
                 loop_
                     .local_get(b_ptr)
@@ -211,12 +192,10 @@ fn check_if_a_less_than_b(module: &mut Module, compilation_ctx: &CompilationCont
                     )
                     .local_tee(b);
 
-                loop_.local_get(b).call(print_i64);
                 // Make the comparisons
                 // If a < b we break the loop
                 loop_.binop(BinaryOp::I64LtU).local_tee(res).br_if(block_id);
 
-                loop_.call(print_separator);
                 // Otherwise we check
                 loop_
                     .local_get(a)
@@ -276,19 +255,15 @@ mod tests {
     fn test_a_less_than_b_u128(#[case] n1: u128, #[case] n2: u128, #[case] expected: i32) {
         use wasmtime::Engine;
 
-        use crate::utils::display_module;
+        use crate::{
+            test_tools::{get_linker_with_host_debug_functions, inject_host_debug_functions},
+            utils::display_module,
+        };
 
         const TYPE_HEAP_SIZE: i32 = 16;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
 
-        let func_ty = raw_module.types.add(&[ValType::I32], &[]);
-        raw_module.add_import_func("", "print_i32", func_ty);
-
-        let func_ty = raw_module.types.add(&[ValType::I64], &[]);
-        raw_module.add_import_func("", "print_i64", func_ty);
-
-        let func_ty = raw_module.types.add(&[], &[]);
-        raw_module.add_import_func("", "print_separator", func_ty);
+        inject_host_debug_functions(&mut raw_module);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -326,25 +301,7 @@ mod tests {
 
         // display_module(&mut raw_module);
 
-        let mut linker = Linker::new(&Engine::default());
-
-        linker
-            .func_wrap("", "print_i64", |param: i64| {
-                println!("--- i64 ---> {param}");
-            })
-            .unwrap();
-
-        linker
-            .func_wrap("", "print_i32", |param: i32| {
-                println!("--- i32 ---> {param}");
-            })
-            .unwrap();
-
-        linker
-            .func_wrap("", "print_separator", || {
-                println!("-----------------------------------------------");
-            })
-            .unwrap();
+        let linker = get_linker_with_host_debug_functions();
 
         println!("a:{:?}\nb:{:?}", n1.to_le_bytes(), n2.to_le_bytes());
         let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
