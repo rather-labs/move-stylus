@@ -182,58 +182,13 @@ impl IAddress {
 mod tests {
     use alloy_primitives::{Address, U256, address};
     use alloy_sol_types::{SolType, sol};
-    use walrus::{FunctionBuilder, FunctionId, MemoryId, ModuleConfig, ValType};
-    use wasmtime::{
-        Engine, Global, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults,
-    };
+    use walrus::{FunctionBuilder, ValType};
 
     use crate::{
-        abi_types::unpacking::Unpackable, memory::setup_module_memory,
+        abi_types::unpacking::Unpackable,
+        test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
-
-    use super::*;
-
-    fn build_module() -> (Module, FunctionId, MemoryId) {
-        let config = ModuleConfig::new();
-        let mut module = Module::with_config(config);
-        let (allocator_func, memory_id) = setup_module_memory(&mut module);
-
-        (module, allocator_func, memory_id)
-    }
-
-    fn setup_wasmtime_module<R: WasmResults>(
-        module: &mut Module,
-        initial_memory_data: Vec<u8>,
-        function_name: &str,
-    ) -> (Linker<()>, Instance, Store<()>, TypedFunc<(), R>, Global) {
-        let engine = Engine::default();
-        let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
-
-        let linker = Linker::new(&engine);
-
-        let mut store = Store::new(&engine, ());
-        let instance = linker.instantiate(&mut store, &module).unwrap();
-
-        let entrypoint = instance
-            .get_typed_func::<(), R>(&mut store, function_name)
-            .unwrap();
-
-        let global_next_free_memory_pointer = instance
-            .get_global(&mut store, "global_next_free_memory_pointer")
-            .unwrap();
-
-        let memory = instance.get_memory(&mut store, "memory").unwrap();
-        memory.write(&mut store, 0, &initial_memory_data).unwrap();
-
-        (
-            linker,
-            instance,
-            store,
-            entrypoint,
-            global_next_free_memory_pointer,
-        )
-    }
 
     fn test_uint(data: &[u8], int_type: IntermediateType, expected_result_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id) = build_module();
@@ -265,10 +220,14 @@ mod tests {
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        let (_, instance, mut store, entrypoint, global_next_free_memory_pointer) =
-            setup_wasmtime_module::<i32>(&mut raw_module, data.to_vec(), "test_function");
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
-        let result = entrypoint.call(&mut store, ()).unwrap();
+        let global_next_free_memory_pointer = instance
+            .get_global(&mut store, "global_next_free_memory_pointer")
+            .unwrap();
+
+        let result: i32 = entrypoint.call(&mut store, ()).unwrap();
         assert_eq!(result, data.len() as i32);
 
         let global_next_free_memory_pointer = global_next_free_memory_pointer

@@ -1,6 +1,4 @@
 //! This module contains aux functions used in unit tests in this module
-#![cfg(test)]
-
 use walrus::{FunctionId, MemoryId, Module, ModuleConfig};
 use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc};
 
@@ -14,25 +12,30 @@ pub fn build_module() -> (Module, FunctionId, MemoryId) {
     (module, allocator_func, memory_id)
 }
 
-pub fn setup_wasmtime_module<T>(
+pub fn setup_wasmtime_module<T, U>(
     module: &mut Module,
     initial_memory_data: Vec<u8>,
     function_name: &str,
-) -> (Instance, Store<()>, TypedFunc<(T, T), T>)
+    linker: Option<Linker<()>>,
+) -> (Linker<()>, Instance, Store<()>, TypedFunc<T, U>)
 where
-    T: wasmtime::WasmParams + wasmtime::WasmResults,
-    (T, T): wasmtime::WasmParams,
+    U: wasmtime::WasmResults,
+    T: wasmtime::WasmParams,
 {
-    let engine = Engine::default();
-    let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
+    let linker = if let Some(linker) = linker {
+        linker
+    } else {
+        Linker::new(&Engine::default())
+    };
 
-    let linker = Linker::new(&engine);
+    let engine = linker.engine();
 
-    let mut store = Store::new(&engine, ());
+    let module = WasmModule::from_binary(engine, &module.emit_wasm()).unwrap();
+    let mut store = Store::new(engine, ());
     let instance = linker.instantiate(&mut store, &module).unwrap();
 
     let entrypoint = instance
-        .get_typed_func::<(T, T), T>(&mut store, function_name)
+        .get_typed_func::<T, U>(&mut store, function_name)
         .unwrap();
 
     let memory = instance.get_memory(&mut store, "memory").unwrap();
@@ -44,5 +47,5 @@ where
         memory_data.iter().take(64).collect::<Vec<_>>()
     );
 
-    (instance, store, entrypoint)
+    (linker, instance, store, entrypoint)
 }

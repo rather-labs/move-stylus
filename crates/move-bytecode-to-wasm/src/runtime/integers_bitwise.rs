@@ -508,7 +508,7 @@ pub fn heap_int_shift_right(
 
 #[cfg(test)]
 mod tests {
-    use super::super::test_tools::{build_module, setup_wasmtime_module};
+    use crate::test_tools::{build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use rstest::rstest;
     use walrus::FunctionBuilder;
@@ -566,10 +566,10 @@ mod tests {
         // display_module(&mut raw_module);
 
         let data = [n.to_le_bytes()].concat();
-        let (instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
-        let pointer = entrypoint
+        let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
@@ -632,10 +632,10 @@ mod tests {
         // display_module(&mut raw_module);
 
         let data = [n.to_le_bytes::<32>()].concat();
-        let (instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
-        let pointer = entrypoint
+        let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
@@ -698,10 +698,10 @@ mod tests {
         // display_module(&mut raw_module);
 
         let data = [n.to_le_bytes()].concat();
-        let (instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
-        let pointer = entrypoint
+        let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 
@@ -764,10 +764,10 @@ mod tests {
         // display_module(&mut raw_module);
 
         let data = [n.to_le_bytes::<32>()].concat();
-        let (instance, mut store, entrypoint) =
-            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function");
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
-        let pointer = entrypoint
+        let pointer: i32 = entrypoint
             .call(&mut store, (shift_amount, TYPE_HEAP_SIZE))
             .unwrap();
 

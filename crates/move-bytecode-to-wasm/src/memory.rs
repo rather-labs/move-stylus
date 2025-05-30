@@ -126,26 +126,15 @@ pub fn setup_module_memory(module: &mut Module) -> (FunctionId, MemoryId) {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::display_module;
+    use crate::test_tools::build_module;
 
     use super::*;
 
-    use walrus::ModuleConfig;
     use wasmtime::{Engine, Instance, Module as WasmModule, Store};
-
-    fn build_module() -> Module {
-        let config = ModuleConfig::new();
-        let mut module = Module::with_config(config);
-        setup_module_memory(&mut module);
-
-        display_module(&mut module);
-
-        module
-    }
 
     #[test]
     fn test_memory_allocator() {
-        let mut raw_module = build_module();
+        let (mut raw_module, _, _) = build_module();
 
         let engine = Engine::default();
         let module = WasmModule::from_binary(&engine, &raw_module.emit_wasm()).unwrap();

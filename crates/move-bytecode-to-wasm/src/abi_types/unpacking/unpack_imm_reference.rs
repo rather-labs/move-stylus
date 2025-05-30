@@ -79,55 +79,13 @@ impl IRef {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::memory::setup_module_memory;
-    use crate::translation::intermediate_types::IntermediateType;
+    use crate::{
+        test_tools::{build_module, setup_wasmtime_module},
+        translation::intermediate_types::IntermediateType,
+    };
     use alloy_primitives::{U256, address};
     use alloy_sol_types::{SolType, sol};
-    use walrus::{FunctionBuilder, ModuleConfig, ValType};
-    use wasmtime::{
-        Engine, Global, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults,
-    };
-
-    fn build_module() -> (Module, FunctionId, MemoryId) {
-        let config = ModuleConfig::new();
-        let mut module = Module::with_config(config);
-        let (allocator_func, memory_id) = setup_module_memory(&mut module);
-
-        (module, allocator_func, memory_id)
-    }
-
-    fn setup_wasmtime_module<R: WasmResults>(
-        module: &mut Module,
-        initial_memory_data: Vec<u8>,
-        function_name: &str,
-    ) -> (Linker<()>, Instance, Store<()>, TypedFunc<(), R>, Global) {
-        let engine = Engine::default();
-        let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
-
-        let linker = Linker::new(&engine);
-
-        let mut store = Store::new(&engine, ());
-        let instance = linker.instantiate(&mut store, &module).unwrap();
-
-        let entrypoint = instance
-            .get_typed_func::<(), R>(&mut store, function_name)
-            .unwrap();
-
-        let global_next_free_memory_pointer = instance
-            .get_global(&mut store, "global_next_free_memory_pointer")
-            .unwrap();
-
-        let memory = instance.get_memory(&mut store, "memory").unwrap();
-        memory.write(&mut store, 0, &initial_memory_data).unwrap();
-
-        (
-            linker,
-            instance,
-            store,
-            entrypoint,
-            global_next_free_memory_pointer,
-        )
-    }
+    use walrus::{FunctionBuilder, ValType};
 
     fn test_unpack_ref(data: &[u8], ref_type: IntermediateType, expected_memory_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id) = build_module();
@@ -155,10 +113,10 @@ mod tests {
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        let (_, instance, mut store, entrypoint, _) =
-            setup_wasmtime_module::<i32>(&mut raw_module, data.to_vec(), "test_function");
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
-        let result_ptr = entrypoint.call(&mut store, ()).unwrap();
+        let result_ptr: i32 = entrypoint.call(&mut store, ()).unwrap();
         // result_ptr is always 0, is that ok?
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
