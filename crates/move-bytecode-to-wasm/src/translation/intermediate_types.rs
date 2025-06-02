@@ -10,7 +10,7 @@ use walrus::{
 };
 
 use crate::CompilationContext;
-
+use crate::runtime::RuntimeFunction;
 pub mod address;
 pub mod boolean;
 pub mod heap_integers;
@@ -207,13 +207,12 @@ impl IntermediateType {
                 );
             }
             IntermediateType::IU128 => {
-                IU128::copy_local_instructions(builder, module, compilation_ctx);
+                let copy_f = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx));
+                builder.call(copy_f);
             }
-            IntermediateType::IU256 => {
-                IU256::copy_local_instructions(builder, module, compilation_ctx);
-            }
-            IntermediateType::IAddress => {
-                IAddress::copy_local_instructions(builder, module, compilation_ctx);
+            IntermediateType::IU256 | IntermediateType::IAddress => {
+                let copy_f = RuntimeFunction::CopyU256.get(module, Some(compilation_ctx));
+                builder.call(copy_f);
             }
             IntermediateType::IRef(_) => {
                 // Nothing to be done, pointer is already correct
