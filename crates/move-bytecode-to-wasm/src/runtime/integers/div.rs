@@ -186,19 +186,6 @@ fn shift_64bits_right(module: &mut Module, compilation_ctx: &CompilationContext)
         block.loop_(None, |loop_| {
             let loop_id = loop_.id();
 
-            loop_.call(print_separator);
-            loop_.local_get(ptr_offset).call(print_i32);
-            loop_.local_get(a_ptr).call(print_i32);
-            loop_.local_get(type_heap_size).call(print_i32);
-            // If we processed all the chunks we exit the loop
-            loop_
-                .local_get(ptr_offset)
-                .local_get(a_ptr)
-                .binop(BinaryOp::I32Sub)
-                .local_get(type_heap_size)
-                .binop(BinaryOp::I32Eq)
-                .br_if(block_id);
-
             // First we get in the stack the
             loop_
                 .local_get(ptr_offset)
@@ -226,7 +213,14 @@ fn shift_64bits_right(module: &mut Module, compilation_ctx: &CompilationContext)
                 .local_get(ptr_offset)
                 .i32_const(8)
                 .binop(BinaryOp::I32Add)
-                .local_set(ptr_offset)
+                .local_tee(ptr_offset)
+                // If ptr_offset - a_ptr = type_heap_size means that we processed all the chunks,
+                // in that case we exit
+                .local_get(a_ptr)
+                .binop(BinaryOp::I32Sub)
+                .local_get(type_heap_size)
+                .binop(BinaryOp::I32Eq)
+                .br_if(block_id)
                 .br(loop_id);
         });
     });
@@ -452,8 +446,13 @@ mod tests {
     }
 
     #[rstest]
-    #[case(&[1,0,0,0], &[0,1,0,0])]
-    fn test_shift_64bits_right_u128(#[case] a: &[u8], #[case] expected: &[u8]) {
+    #[case(1, u64::MAX as u128 + 1)]
+    #[case(42, 42 << 64)]
+    #[case(u8::MAX as u128, (u8::MAX as u128) << 64)]
+    #[case(u16::MAX as u128, (u16::MAX as u128) << 64)]
+    #[case(u32::MAX as u128, (u32::MAX as u128) << 64)]
+    #[case(u64::MAX as u128, (u64::MAX as u128) << 64)]
+    fn test_shift_64bits_right_u128(#[case] a: u128, #[case] expected: u128) {
         use wasmtime::Engine;
 
         use crate::{
@@ -498,7 +497,7 @@ mod tests {
         let linker = get_linker_with_host_debug_functions();
 
         println!("a: {a:?}");
-        let data = a;
+        let data = a.to_le_bytes();
         let (_, instance, mut store, entrypoint) = setup_wasmtime_module::<i32, ()>(
             &mut raw_module,
             data.to_vec(),
@@ -510,6 +509,6 @@ mod tests {
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let result = &memory.data(&mut store)[0..TYPE_HEAP_SIZE as usize];
-        assert_eq!(result, expected);
+        assert_eq!(result, expected.to_le_bytes());
     }
 }
