@@ -272,75 +272,56 @@ impl IntermediateType {
         compilation_ctx: &CompilationContext,
         local: LocalId,
     ) {
+        // Deref outer pointer
+        builder.local_get(local).load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32 => {
-                builder
-                    .local_get(local)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
             }
             IntermediateType::IU64 => {
-                builder
-                    .local_get(local)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I64 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-            }
-            IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::IAddress
-            | IntermediateType::IRef(_) => {
-                builder.local_get(local).load(
+                builder.load(
                     compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
+                    LoadKind::I64 { atomic: false },
                     MemArg {
                         align: 0,
                         offset: 0,
                     },
                 );
             }
-            IntermediateType::IVector(inner) => {
-                let val = module.locals.add(ValType::I32);
-                builder.local_get(local).load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
+            IntermediateType::IU128 => {
+                IU128::copy_local_instructions(builder, module, compilation_ctx);
+            }
+            IntermediateType::IU256 => {
+                IU256::copy_local_instructions(builder, module, compilation_ctx);
+            }
+            IntermediateType::IAddress => {
+                IAddress::copy_local_instructions(builder, module, compilation_ctx);
+            }
+            IntermediateType::IRef(_) => {}
+            IntermediateType::IVector(inner_type) => {
+                IVector::copy_local_instructions(
+                    inner_type,
+                    module,
+                    builder,
+                    compilation_ctx,
                 );
-                builder.local_set(val);
-                IVector::copy_local_instructions(inner, module, builder, compilation_ctx, val);
             }
             IntermediateType::ISigner => {
                 panic!(r#"trying to introduce copy instructions for "signer" type"#)

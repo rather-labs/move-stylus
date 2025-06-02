@@ -1,5 +1,5 @@
 use walrus::{
-    InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    InstrSeqBuilder, MemoryId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
@@ -91,10 +91,10 @@ impl IVector {
         inner: &IntermediateType,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        compilation_ctx: &CompilationContext,
-        src_local: LocalId,
+        compilation_ctx: &CompilationContext
     ) {
         // === Local declarations ===
+        let src_local = module.locals.add(ValType::I32);
         let dst_local = module.locals.add(ValType::I32);
         let index = module.locals.add(ValType::I32);
         let len = module.locals.add(ValType::I32);
@@ -102,7 +102,7 @@ impl IVector {
         let data_size = inner.stack_data_size() as i32;
 
         // === Read vector length ===
-        builder.local_get(src_local);
+        builder.local_tee(src_local);
         builder.load(
             compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
@@ -150,7 +150,7 @@ impl IVector {
             loop_block.local_get(index);
             loop_block.i32_const(data_size);
             loop_block.binop(BinaryOp::I32Mul);
-            loop_block.i32_const(4); // skip vector length
+            loop_block.i32_const(4);
             loop_block.binop(BinaryOp::I32Add);
             loop_block.local_get(src_local);
             loop_block.binop(BinaryOp::I32Add);
@@ -188,25 +188,26 @@ impl IVector {
                             offset: 0,
                         },
                     );
-                    let elem_ptr = module.locals.add(ValType::I32);
-                    loop_block.local_set(elem_ptr);
+                    let src_elem_ptr = module.locals.add(ValType::I32);
+                    loop_block.local_set(src_elem_ptr);
 
                     loop_block.i32_const(16);
                     loop_block.call(compilation_ctx.allocator);
-                    let ptr = module.locals.add(ValType::I32);
-                    loop_block.local_set(ptr);
+                    let dst_elem_ptr = module.locals.add(ValType::I32);
+                    loop_block.local_set(dst_elem_ptr);
 
                     for i in 0..2 {
-                        loop_block.local_get(ptr);
-                        loop_block.local_get(elem_ptr);
-                        loop_block.load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: i * 8,
-                            },
-                        );
+                        loop_block
+                            .local_get(dst_elem_ptr)
+                            .local_get(src_elem_ptr)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I64 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: i * 8,
+                                },
+                            );
                     }
 
                     for i in 0..2 {
@@ -219,10 +220,11 @@ impl IVector {
                             },
                         );
                     }
-                    loop_block.local_get(ptr);
+
+                    loop_block.local_get(dst_elem_ptr);
                 }
                 IntermediateType::IU256 | IntermediateType::IAddress => {
-                    let elem_ptr = module.locals.add(ValType::I32);
+                    let src_elem_ptr = module.locals.add(ValType::I32);
                     loop_block.load(
                         compilation_ctx.memory_id,
                         LoadKind::I32 { atomic: false },
@@ -231,24 +233,25 @@ impl IVector {
                             offset: 0,
                         },
                     );
-                    loop_block.local_set(elem_ptr);
+                    loop_block.local_set(src_elem_ptr);
 
                     loop_block.i32_const(32);
                     loop_block.call(compilation_ctx.allocator);
-                    let ptr = module.locals.add(ValType::I32);
-                    loop_block.local_set(ptr);
+                    let dst_elem_ptr = module.locals.add(ValType::I32);
+                    loop_block.local_set(dst_elem_ptr);
 
                     for i in 0..4 {
-                        loop_block.local_get(ptr);
-                        loop_block.local_get(elem_ptr);
-                        loop_block.load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: i * 8,
-                            },
-                        );
+                        loop_block
+                            .local_get(dst_elem_ptr)
+                            .local_get(src_elem_ptr)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I64 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: i * 8,
+                                },
+                            );
                     }
 
                     for i in 0..4 {
@@ -261,10 +264,9 @@ impl IVector {
                             },
                         );
                     }
-                    loop_block.local_get(ptr);
+                    loop_block.local_get(dst_elem_ptr);
                 }
                 IntermediateType::IVector(inner_) => {
-                    let tmp_local = module.locals.add(ValType::I32);
                     loop_block.load(
                         compilation_ctx.memory_id,
                         LoadKind::I32 { atomic: false },
@@ -273,13 +275,11 @@ impl IVector {
                             offset: 0,
                         },
                     );
-                    loop_block.local_set(tmp_local);
                     IVector::copy_local_instructions(
                         inner_,
                         module,
                         loop_block,
                         compilation_ctx,
-                        tmp_local,
                     );
                 }
                 _ => {
@@ -525,7 +525,6 @@ mod tests {
         let mut builder = function_builder.func_body();
 
         let data_iter = data.to_vec();
-        let src_local = raw_module.locals.add(ValType::I32);
 
         // Load the constant vector and store in local
         IVector::load_constant_instructions(
@@ -535,7 +534,6 @@ mod tests {
             &mut data_iter.into_iter(),
             &compilation_ctx,
         );
-        builder.local_set(src_local);
 
         // Copy the vector and return the new pointer
         IVector::copy_local_instructions(
@@ -543,7 +541,6 @@ mod tests {
             &mut raw_module,
             &mut builder,
             &compilation_ctx,
-            src_local,
         );
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);

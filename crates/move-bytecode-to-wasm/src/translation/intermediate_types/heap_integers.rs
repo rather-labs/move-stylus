@@ -109,6 +109,42 @@ impl IU128 {
         builder.local_get(pointer);
     }
 
+    pub fn copy_local_instructions(
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+    ) {
+        let src_ptr = module.locals.add(ValType::I32);
+        builder.local_set(src_ptr);
+
+        builder.i32_const(16);
+        builder.call(compilation_ctx.allocator);
+        let dst_ptr = module.locals.add(ValType::I32);
+        builder.local_set(dst_ptr);
+
+        for i in 0..2 {
+            builder.local_get(dst_ptr).local_get(src_ptr).load(
+                compilation_ctx.memory_id,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: i * 8,
+                },
+            );
+        }
+        for i in 0..2 {
+            builder.store(
+                compilation_ctx.memory_id,
+                StoreKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 8 - i * 8,
+                },
+            );
+        }
+        builder.local_get(dst_ptr);
+    }
+
     pub fn bit_or(
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
@@ -357,6 +393,42 @@ impl IU256 {
         }
 
         builder.local_get(pointer);
+    }
+
+    pub fn copy_local_instructions(
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+    ) {
+        let src_ptr = module.locals.add(ValType::I32);
+        builder.local_set(src_ptr);
+
+        builder.i32_const(32);
+        builder.call(compilation_ctx.allocator);
+        let dst_ptr = module.locals.add(ValType::I32);
+        builder.local_set(dst_ptr);
+
+        for i in 0..4 {
+            builder.local_get(dst_ptr).local_get(src_ptr).load(
+                compilation_ctx.memory_id,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: i * 8,
+                },
+            );
+        }
+        for i in 0..4 {
+            builder.store(
+                compilation_ctx.memory_id,
+                StoreKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 24 - i * 8,
+                },
+            );
+        }
+        builder.local_get(dst_ptr);
     }
 
     pub fn bit_or(
