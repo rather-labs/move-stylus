@@ -88,6 +88,11 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
         &[ValType::I32, ValType::I32],
     );
 
+    let print_i32 = module.imports.get_func("", "print_i32").unwrap();
+    let print_separator = module.imports.get_func("", "print_separator").unwrap();
+    let print_i64 = module.imports.get_func("", "print_i64").unwrap();
+    let print_u128 = module.imports.get_func("", "print_u128").unwrap();
+
     let shift_64bits_right_f = shift_64bits_right(module, compilation_ctx);
     let check_if_a_less_than_b_f = check_if_a_less_than_b(module, compilation_ctx);
     let sub_f = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx));
@@ -132,23 +137,26 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
             block.loop_(None, |loop_| {
                 let loop_id = loop_.id();
 
+                loop_.local_get(offset).call(print_i32);
                 // If we evaluated all the chunks we exit the loop
                 loop_
                     .local_get(offset)
                     .i32_const(0)
-                    .binop(BinaryOp::I32Eq)
+                    .binop(BinaryOp::I32LtS)
                     .br_if(block_id);
 
+                loop_.i32_const(1).call(print_i32);
                 // Shift the remainder by 1 digit
                 loop_
                     .local_get(remainder_ptr)
                     .local_get(type_heap_size)
                     .call(shift_64bits_right_f);
 
+                loop_.i32_const(2).call(print_i32);
                 // Set r[0] = D[i]
                 loop_
                     .local_get(remainder_ptr)
-                    .local_get(divisor_ptr)
+                    .local_get(dividend_ptr)
                     .local_get(offset)
                     .binop(BinaryOp::I32Add)
                     .load(
@@ -168,8 +176,9 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
                         },
                     );
 
+                loop_.i32_const(3).call(print_i32);
                 // If remainder < divisor -> q[0]
-                // Otherwise we loop substraction until dividor < remainder
+                // Otherwise we loop substraction until divisor < remainder
                 loop_
                     .local_get(remainder_ptr)
                     .local_get(divisor_ptr)
@@ -179,6 +188,7 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
                         None,
                         // remainder < divisor => q[i] = 0
                         |then| {
+                            then.i32_const(4).call(print_i32);
                             then.local_get(quotient_ptr)
                                 .local_get(offset)
                                 .binop(BinaryOp::I32Add)
@@ -195,12 +205,19 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
                         // otherwise we perform remainder -= divisor until remainder < divisor and we
                         // count each substraction in c. When the loop is finished q[i] = c
                         |else_| {
+                            else_.i32_const(5).call(print_i32);
                             // Set the substraction counter in 0
                             else_.i64_const(0).local_set(substraction_counter);
 
                             else_.loop_(None, |substraction_loop| {
                                 let substraction_loop_id = substraction_loop.id();
 
+                                substraction_loop
+                                    .local_get(substraction_counter)
+                                    .call(print_i64);
+
+                                substraction_loop.local_get(remainder_ptr).call(print_u128);
+                                substraction_loop.local_get(divisor_ptr).call(print_u128);
                                 // remainder -= divisor
                                 substraction_loop
                                     .local_get(remainder_ptr)
@@ -208,6 +225,7 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
                                     .local_get(type_heap_size)
                                     .call(sub_f)
                                     .local_set(remainder_ptr);
+                                substraction_loop.local_get(remainder_ptr).call(print_u128);
 
                                 substraction_loop
                                     .local_get(remainder_ptr)
@@ -217,9 +235,9 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
                                     .if_else(
                                         None,
                                         |then| {
+                                            then.i32_const(6).call(print_i32);
                                             // If remainder < divisor means we finished substracting,
-                                            // we set q[i] = substraction_counter and go to the outer
-                                            // loop
+                                            // we set q[i] = substraction_counter
                                             then.local_get(quotient_ptr)
                                                 .local_get(offset)
                                                 .binop(BinaryOp::I32Add)
@@ -231,10 +249,10 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
                                                         align: 0,
                                                         offset: 0,
                                                     },
-                                                )
-                                                .br(loop_id);
+                                                );
                                         },
                                         |else_| {
+                                            else_.i32_const(7).call(print_i32);
                                             // Otherwise we add 1 to the substraction_counter and loop
                                             // again
                                             else_
@@ -247,7 +265,14 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
                                     );
                             });
                         },
-                    );
+                    )
+                    // We substract 8 from the offset and continue the
+                    // outer loop
+                    .local_get(offset)
+                    .i32_const(8)
+                    .binop(BinaryOp::I32Sub)
+                    .local_set(offset)
+                    .br(loop_id);
             });
         })
         .local_get(quotient_ptr)
@@ -277,9 +302,6 @@ fn shift_64bits_right(module: &mut Module, compilation_ctx: &CompilationContext)
     // Function arguments
     let a_ptr = module.locals.add(ValType::I32);
     let type_heap_size = module.locals.add(ValType::I32);
-
-    let print_i32 = module.imports.get_func("", "print_i32").unwrap();
-    let print_separator = module.imports.get_func("", "print_separator").unwrap();
 
     // Local variables
     let tmp = module.locals.add(ValType::I64);

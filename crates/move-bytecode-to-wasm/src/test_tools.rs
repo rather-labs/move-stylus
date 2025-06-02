@@ -1,6 +1,6 @@
 //! This module contains aux functions used in unit tests in this module
-use walrus::{FunctionId, MemoryId, Module, ModuleConfig, ValType};
-use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc};
+use walrus::{FunctionId, MemoryId, Module, ModuleConfig, ModuleData, ValType};
+use wasmtime::{Caller, Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc};
 
 use crate::memory::setup_module_memory;
 
@@ -72,6 +72,22 @@ pub fn get_linker_with_host_debug_functions<T>() -> Linker<T> {
         .unwrap();
 
     linker
+        .func_wrap("", "print_u128", |mut caller: Caller<'_, T>, ptr: i32| {
+            println!("--- u128 ---\nPointer {ptr}");
+
+            let memory = match caller.get_export("memory") {
+                Some(wasmtime::Extern::Memory(mem)) => mem,
+                _ => panic!("failed to find host memory"),
+            };
+
+            let mut result = [0; 16];
+            memory.read(&caller, ptr as usize, &mut result).unwrap();
+            println!("Data {result:?}");
+            println!("Decimal data {}", u128::from_le_bytes(result));
+            println!("--- end u128 ---\n");
+        })
+        .unwrap();
+    linker
 }
 
 pub fn inject_host_debug_functions(module: &mut Module) {
@@ -80,6 +96,9 @@ pub fn inject_host_debug_functions(module: &mut Module) {
 
     let func_ty = module.types.add(&[ValType::I64], &[]);
     module.add_import_func("", "print_i64", func_ty);
+
+    let func_ty = module.types.add(&[ValType::I32], &[]);
+    module.add_import_func("", "print_u128", func_ty);
 
     let func_ty = module.types.add(&[], &[]);
     module.add_import_func("", "print_separator", func_ty);
