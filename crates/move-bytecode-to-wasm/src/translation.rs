@@ -172,7 +172,7 @@ fn map_bytecode_instruction(
         Bytecode::StLoc(local_id) => {
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = &mapped_function.function_locals_ir[*local_id as usize];
-            local_type.store_local_instructions(module, builder, compilation_ctx, local);
+            local_type.box_local_instructions(module, builder, compilation_ctx, local);
             pop_types_stack(types_stack, local_type).unwrap();
         }
         Bytecode::MoveLoc(local_id) => {

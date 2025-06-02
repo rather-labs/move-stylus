@@ -102,42 +102,12 @@ impl MappedFunction {
             .iter()
             .zip(self.signature.arguments.iter())
         {
+            builder.local_get(*local);
             match ty {
                 IntermediateType::IU64 => {
-                    let val = module.locals.add(ValType::I64);
-                    let val_ptr = module.locals.add(ValType::I32);
                     let outer_ptr = module.locals.add(ValType::I32);
+                    ty.box_local_instructions(module, builder, compilation_ctx, outer_ptr);
 
-                    builder.local_get(*local);
-                    builder.local_set(val);
-
-                    builder
-                        .i32_const(4 as i32)
-                        .call(compilation_ctx.allocator)
-                        .local_tee(outer_ptr)
-                        .i32_const(8 as i32)
-                        .call(compilation_ctx.allocator)
-                        .local_tee(val_ptr)
-                        .store(
-                            compilation_ctx.memory_id,
-                            StoreKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        )
-                        .local_get(val_ptr)
-                        .local_get(val)
-                        .store(
-                            compilation_ctx.memory_id,
-                            StoreKind::I64 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-
-                    // Store the update for later
                     if let Some(index) = self.function_locals.iter().position(|&id| id == *local) {
                         updates.push((index, outer_ptr));
                     } else {
@@ -147,70 +117,12 @@ impl MappedFunction {
                         );
                     }
                 }
-
-                IntermediateType::IBool
-                | IntermediateType::IU8
-                | IntermediateType::IU16
-                | IntermediateType::IU32 => {
-                    let val = module.locals.add(ValType::I32);
-                    let val_ptr = module.locals.add(ValType::I32);
-
-                    builder.local_get(*local);
-                    builder.local_set(val);
-
-                    builder
-                        .i32_const(4 as i32)
-                        .call(compilation_ctx.allocator)
-                        .local_tee(*local)
-                        .i32_const(ty.stack_data_size() as i32)
-                        .call(compilation_ctx.allocator)
-                        .local_tee(val_ptr)
-                        .store(
-                            compilation_ctx.memory_id,
-                            StoreKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        )
-                        .local_get(val_ptr)
-                        .local_get(val)
-                        .store(
-                            compilation_ctx.memory_id,
-                            StoreKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-                }
-                IntermediateType::IU128
-                | IntermediateType::IU256
-                | IntermediateType::IAddress
-                | IntermediateType::ISigner
-                | IntermediateType::IRef(_)
-                | IntermediateType::IVector(_) => {
-                    let inner_pointer = module.locals.add(ValType::I32);
-                    builder.local_get(*local).local_set(inner_pointer);
-
-                    builder
-                        .i32_const(4)
-                        .call(compilation_ctx.allocator)
-                        .local_tee(*local)
-                        .local_get(inner_pointer)
-                        .store(
-                            compilation_ctx.memory_id,
-                            StoreKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
+                _ => {
+                    ty.box_local_instructions(module, builder, compilation_ctx, *local);
                 }
             }
         }
 
-        // Apply local replacement for i64 after the iteration
         for (index, pointer) in updates {
             self.function_locals[index] = pointer;
         }

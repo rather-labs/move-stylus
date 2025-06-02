@@ -91,7 +91,7 @@ impl IVector {
         inner: &IntermediateType,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        compilation_ctx: &CompilationContext
+        compilation_ctx: &CompilationContext,
     ) {
         // === Local declarations ===
         let src_local = module.locals.add(ValType::I32);
@@ -275,12 +275,7 @@ impl IVector {
                             offset: 0,
                         },
                     );
-                    IVector::copy_local_instructions(
-                        inner_,
-                        module,
-                        loop_block,
-                        compilation_ctx,
-                    );
+                    IVector::copy_local_instructions(inner_, module, loop_block, compilation_ctx);
                 }
                 _ => {
                     panic!("Unsupported vector type");
