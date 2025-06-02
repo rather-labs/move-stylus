@@ -225,6 +225,14 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
                                     .local_get(type_heap_size)
                                     .call(sub_f)
                                     .local_set(remainder_ptr);
+
+                                // substraction_counter += 1
+                                substraction_loop
+                                    .local_get(substraction_counter)
+                                    .i64_const(1)
+                                    .binop(BinaryOp::I64Add)
+                                    .local_set(substraction_counter);
+
                                 substraction_loop.local_get(remainder_ptr).call(print_u128);
 
                                 substraction_loop
@@ -255,12 +263,7 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
                                             else_.i32_const(7).call(print_i32);
                                             // Otherwise we add 1 to the substraction_counter and loop
                                             // again
-                                            else_
-                                                .local_get(substraction_counter)
-                                                .i64_const(1)
-                                                .binop(BinaryOp::I64Add)
-                                                .local_set(substraction_counter)
-                                                .br(substraction_loop_id);
+                                            else_.br(substraction_loop_id);
                                         },
                                     );
                             });
