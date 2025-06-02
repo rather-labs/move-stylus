@@ -1,12 +1,13 @@
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use crate::{CompilationContext, runtime::RuntimeFunction};
 
 // Auxiliary function names
 const F_A_LESS_THAN_B: &str = "a_less_than_b";
+const F_SHIFT_64BITS_RIGHT: &str = "shift_64bits_right";
 
 /// Implements the restoring division algorithm for 128 ans 256 bit integers
 ///
@@ -89,14 +90,148 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
     let divisor_ptr = module.locals.add(ValType::I32);
     let type_heap_size = module.locals.add(ValType::I32);
 
+    // Locals
+    let remainder_ptr = module.locals.add(ValType::I32);
+    let quotient_ptr = module.locals.add(ValType::I32);
+
     let mut builder = function
         .name(RuntimeFunction::HeapIntDiv.name().to_owned())
         .func_body();
+
+    builder
+        // Allocate space for the remainder
+        .local_get(type_heap_size)
+        .call(compilation_ctx.allocator)
+        .local_set(remainder_ptr)
+        // Allocate space for the quotient
+        .local_get(type_heap_size)
+        .call(compilation_ctx.allocator)
+        .local_set(quotient_ptr);
+
+    builder.block(None, |block| {
+        let block_id = block.id();
+
+        block.loop_(None, |loop_| {
+            let loop_id = loop_.id();
+        });
+    });
 
     function.finish(
         vec![dividend_ptr, divisor_ptr, type_heap_size],
         &mut module.funcs,
     )
+}
+
+/// Auxiliary function that shifts right by the base.
+///
+/// This is done by moving chunks of 64 bits to the right. For example, for u256:
+/// let a = [1, 2, 3, 4]
+///
+/// 1. First shift  -> a = [0, 1, 2, 3]
+/// 2. Second shift -> a = [0, 0, 1, 2]
+/// 3. Third shift  -> a = [0, 0, 0, 1]
+///
+/// # Arguments
+///    - pointer to the number to shift
+///    - how many bytes the number occupies in heap
+fn shift_64bits_right(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+
+    // Function arguments
+    let a_ptr = module.locals.add(ValType::I32);
+    let type_heap_size = module.locals.add(ValType::I32);
+
+    let print_i32 = module.imports.get_func("", "print_i32").unwrap();
+    let print_separator = module.imports.get_func("", "print_separator").unwrap();
+
+    // Local variables
+    let tmp = module.locals.add(ValType::I64);
+    let ptr_offset = module.locals.add(ValType::I32);
+
+    let mut builder = function.name(F_SHIFT_64BITS_RIGHT.to_owned()).func_body();
+
+    // We set 0 in the first place and copy the first value to move to the tmp variable
+    builder
+        .local_get(a_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(tmp)
+        .local_get(a_ptr)
+        .i64_const(0)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    // The chunk number to process is in the offset 8
+    builder
+        .local_get(a_ptr)
+        .i32_const(8)
+        .binop(BinaryOp::I32Add)
+        .local_set(ptr_offset);
+
+    builder.block(None, |block| {
+        let block_id = block.id();
+
+        block.loop_(None, |loop_| {
+            let loop_id = loop_.id();
+
+            loop_.call(print_separator);
+            loop_.local_get(ptr_offset).call(print_i32);
+            loop_.local_get(a_ptr).call(print_i32);
+            loop_.local_get(type_heap_size).call(print_i32);
+            // If we processed all the chunks we exit the loop
+            loop_
+                .local_get(ptr_offset)
+                .local_get(a_ptr)
+                .binop(BinaryOp::I32Sub)
+                .local_get(type_heap_size)
+                .binop(BinaryOp::I32Eq)
+                .br_if(block_id);
+
+            // First we get in the stack the
+            loop_
+                .local_get(ptr_offset)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                // Update the current position
+                .local_get(ptr_offset)
+                .local_get(tmp)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                // Save the replaced value in tmp
+                .local_set(tmp)
+                .local_get(ptr_offset)
+                .i32_const(8)
+                .binop(BinaryOp::I32Add)
+                .local_set(ptr_offset)
+                .br(loop_id);
+        });
+    });
+
+    function.finish(vec![a_ptr, type_heap_size], &mut module.funcs)
 }
 
 /// Auxiliary function that checks if a big number is less than other.
@@ -313,6 +448,68 @@ mod tests {
         );
 
         let result: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[rstest]
+    #[case(&[1,0,0,0], &[0,1,0,0])]
+    fn test_shift_64bits_right_u128(#[case] a: &[u8], #[case] expected: &[u8]) {
+        use wasmtime::Engine;
+
+        use crate::{
+            test_tools::{get_linker_with_host_debug_functions, inject_host_debug_functions},
+            utils::display_module,
+        };
+
+        const TYPE_HEAP_SIZE: i32 = 16;
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
+
+        inject_host_debug_functions(&mut raw_module);
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[]);
+
+        let a_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for shift_64bits_right (a_ptr, size in heap)
+        func_body.i32_const(0).i32_const(TYPE_HEAP_SIZE);
+
+        let shift_64bits_right_f = shift_64bits_right(
+            &mut raw_module,
+            &CompilationContext {
+                memory_id,
+                allocator: allocator_func,
+                functions_arguments: &[],
+                functions_returns: &[],
+                module_signatures: &[],
+                constants: &[],
+            },
+        );
+        // Shift left
+        func_body.call(shift_64bits_right_f);
+
+        let function = function_builder.finish(vec![a_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        display_module(&mut raw_module);
+
+        let linker = get_linker_with_host_debug_functions();
+
+        println!("a: {a:?}");
+        let data = a;
+        let (_, instance, mut store, entrypoint) = setup_wasmtime_module::<i32, ()>(
+            &mut raw_module,
+            data.to_vec(),
+            "test_function",
+            Some(linker),
+        );
+
+        entrypoint.call(&mut store, 0).unwrap();
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let result = &memory.data(&mut store)[0..TYPE_HEAP_SIZE as usize];
         assert_eq!(result, expected);
     }
 }
