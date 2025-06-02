@@ -87,7 +87,7 @@ impl MappedFunction {
     /// For each value-type argument (like u64, u32, etc.), this stores the value in linear memory
     /// and updates the local to hold a pointer to that memory instead. This allows treating all
     /// arguments as pointers in later code.
-    pub fn convert_args_to_heap(
+    pub fn box_args(
         &mut self,
         builder: &mut InstrSeqBuilder,
         module: &mut Module,

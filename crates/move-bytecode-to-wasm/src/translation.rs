@@ -43,7 +43,7 @@ pub fn translate_function(
 
     entry
         .function
-        .convert_args_to_heap(&mut builder, module, compilation_ctx);
+        .box_args(&mut builder, module, compilation_ctx);
 
     let entry = function_table
         .get(index)
