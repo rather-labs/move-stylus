@@ -71,6 +71,9 @@ const F_SHIFT_64BITS_RIGHT: &str = "shift_64bits_right";
 ///
 /// Checking D = q * d + r => 350 = 26 * 13 + 12
 ///
+/// NOTE: In the implementation indexes and operations are complemented because we are working in
+/// little endian. The description of the algorithm and the example are in big endian.
+///
 /// # Arguments
 ///    - pointer to the dividend
 ///    - pointer to the divisor
@@ -82,8 +85,12 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32, ValType::I32],
-        &[ValType::I32],
+        &[ValType::I32, ValType::I32],
     );
+
+    let shift_64bits_right_f = shift_64bits_right(module, compilation_ctx);
+    let check_if_a_less_than_b_f = check_if_a_less_than_b(module, compilation_ctx);
+    let sub_f = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx));
 
     // Function arguments
     let dividend_ptr = module.locals.add(ValType::I32);
@@ -94,9 +101,19 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
     let remainder_ptr = module.locals.add(ValType::I32);
     let quotient_ptr = module.locals.add(ValType::I32);
 
+    let offset = module.locals.add(ValType::I32);
+    let substraction_counter = module.locals.add(ValType::I64);
+
     let mut builder = function
         .name(RuntimeFunction::HeapIntDiv.name().to_owned())
         .func_body();
+
+    // We initialize the offset to the most significant bit
+    builder
+        .local_get(type_heap_size)
+        .i32_const(8)
+        .binop(BinaryOp::I32Sub)
+        .local_set(offset);
 
     builder
         // Allocate space for the remainder
@@ -108,13 +125,133 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
         .call(compilation_ctx.allocator)
         .local_set(quotient_ptr);
 
-    builder.block(None, |block| {
-        let block_id = block.id();
+    builder
+        .block(None, |block| {
+            let block_id = block.id();
 
-        block.loop_(None, |loop_| {
-            let loop_id = loop_.id();
-        });
-    });
+            block.loop_(None, |loop_| {
+                let loop_id = loop_.id();
+
+                // If we evaluated all the chunks we exit the loop
+                loop_
+                    .local_get(offset)
+                    .i32_const(0)
+                    .binop(BinaryOp::I32Eq)
+                    .br_if(block_id);
+
+                // Shift the remainder by 1 digit
+                loop_
+                    .local_get(remainder_ptr)
+                    .local_get(type_heap_size)
+                    .call(shift_64bits_right_f);
+
+                // Set r[0] = D[i]
+                loop_
+                    .local_get(remainder_ptr)
+                    .local_get(divisor_ptr)
+                    .local_get(offset)
+                    .binop(BinaryOp::I32Add)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                // If remainder < divisor -> q[0]
+                // Otherwise we loop substraction until dividor < remainder
+                loop_
+                    .local_get(remainder_ptr)
+                    .local_get(divisor_ptr)
+                    .local_get(type_heap_size)
+                    .call(check_if_a_less_than_b_f)
+                    .if_else(
+                        None,
+                        // remainder < divisor => q[i] = 0
+                        |then| {
+                            then.local_get(quotient_ptr)
+                                .local_get(offset)
+                                .binop(BinaryOp::I32Add)
+                                .i64_const(0)
+                                .store(
+                                    compilation_ctx.memory_id,
+                                    StoreKind::I64 { atomic: false },
+                                    MemArg {
+                                        align: 0,
+                                        offset: 0,
+                                    },
+                                );
+                        },
+                        // otherwise we perform remainder -= divisor until remainder < divisor and we
+                        // count each substraction in c. When the loop is finished q[i] = c
+                        |else_| {
+                            // Set the substraction counter in 0
+                            else_.i64_const(0).local_set(substraction_counter);
+
+                            else_.loop_(None, |substraction_loop| {
+                                let substraction_loop_id = substraction_loop.id();
+
+                                // remainder -= divisor
+                                substraction_loop
+                                    .local_get(remainder_ptr)
+                                    .local_get(divisor_ptr)
+                                    .local_get(type_heap_size)
+                                    .call(sub_f)
+                                    .local_set(remainder_ptr);
+
+                                substraction_loop
+                                    .local_get(remainder_ptr)
+                                    .local_get(divisor_ptr)
+                                    .local_get(type_heap_size)
+                                    .call(check_if_a_less_than_b_f)
+                                    .if_else(
+                                        None,
+                                        |then| {
+                                            // If remainder < divisor means we finished substracting,
+                                            // we set q[i] = substraction_counter and go to the outer
+                                            // loop
+                                            then.local_get(quotient_ptr)
+                                                .local_get(offset)
+                                                .binop(BinaryOp::I32Add)
+                                                .local_get(substraction_counter)
+                                                .store(
+                                                    compilation_ctx.memory_id,
+                                                    StoreKind::I64 { atomic: false },
+                                                    MemArg {
+                                                        align: 0,
+                                                        offset: 0,
+                                                    },
+                                                )
+                                                .br(loop_id);
+                                        },
+                                        |else_| {
+                                            // Otherwise we add 1 to the substraction_counter and loop
+                                            // again
+                                            else_
+                                                .local_get(substraction_counter)
+                                                .i64_const(1)
+                                                .binop(BinaryOp::I64Add)
+                                                .local_set(substraction_counter)
+                                                .br(substraction_loop_id);
+                                        },
+                                    );
+                            });
+                        },
+                    );
+            });
+        })
+        .local_get(quotient_ptr)
+        .local_get(remainder_ptr);
 
     function.finish(
         vec![dividend_ptr, divisor_ptr, type_heap_size],
@@ -510,5 +647,98 @@ mod tests {
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let result = &memory.data(&mut store)[0..TYPE_HEAP_SIZE as usize];
         assert_eq!(result, expected.to_le_bytes());
+    }
+
+    #[rstest]
+    #[case(350, 13, 26, 12)]
+    fn test_div_mod_u128(
+        #[case] n1: u128,
+        #[case] n2: u128,
+        #[case] quotient: u128,
+        #[case] remainder: u128,
+    ) {
+        use wasmtime::Engine;
+
+        use crate::{
+            test_tools::{get_linker_with_host_debug_functions, inject_host_debug_functions},
+            utils::display_module,
+        };
+
+        const TYPE_HEAP_SIZE: i32 = 16;
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
+
+        inject_host_debug_functions(&mut raw_module);
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32, ValType::I32],
+        );
+
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
+        func_body
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(TYPE_HEAP_SIZE);
+
+        let heap_integers_add_f = heap_integers_div(
+            &mut raw_module,
+            &CompilationContext {
+                memory_id,
+                allocator: allocator_func,
+                functions_arguments: &[],
+                functions_returns: &[],
+                module_signatures: &[],
+                constants: &[],
+            },
+        );
+        // Shift left
+        func_body.call(heap_integers_add_f);
+
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        display_module(&mut raw_module);
+
+        let linker = get_linker_with_host_debug_functions();
+
+        println!("a:{:?}\nb:{:?}", n1.to_le_bytes(), n2.to_le_bytes());
+        let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
+        let (_, instance, mut store, entrypoint) = setup_wasmtime_module(
+            &mut raw_module,
+            data.to_vec(),
+            "test_function",
+            Some(linker),
+        );
+
+        let (quotient_ptr, remainder_ptr): (i32, i32) =
+            entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut quotient_result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+        memory
+            .read(
+                &mut store,
+                quotient_ptr as usize,
+                &mut quotient_result_memory_data,
+            )
+            .unwrap();
+
+        let mut remainder_result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+        memory
+            .read(
+                &mut store,
+                remainder_ptr as usize,
+                &mut remainder_result_memory_data,
+            )
+            .unwrap();
+
+        assert_eq!(quotient_result_memory_data, quotient.to_le_bytes());
+        assert_eq!(remainder_result_memory_data, remainder.to_le_bytes());
     }
 }
