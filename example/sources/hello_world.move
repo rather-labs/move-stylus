@@ -1,8 +1,9 @@
 module 0x01::hello_world;
 
-//  TODO: Add support for native functions
-//  native public fun emit_log(ptr: u32, len: u32, topic: u32);
-
-public fun cast(x: u128): u8 {
-    x as u8
+// Forces the compiler to store literals on locals
+public fun test(): vector<u32> {
+  let x: vector<u32> = vector[1u32, 2u32, 3u32];
+  let y = x; 
+  let _z = x; 
+  y
 }

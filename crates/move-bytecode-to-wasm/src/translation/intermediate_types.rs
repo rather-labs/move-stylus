@@ -241,9 +241,18 @@ impl IntermediateType {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::ISigner
-            | IntermediateType::IVector(_)
             | IntermediateType::IRef(_) => {
                 // For heap types we just forward the pointer
+                builder.local_get(local).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+            IntermediateType::IVector(_) => {
                 builder.local_get(local).load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -321,7 +330,17 @@ impl IntermediateType {
                 );
             }
             IntermediateType::IVector(inner) => {
-                IVector::copy_local_instructions(inner, module, builder, compilation_ctx, local);
+                let val = module.locals.add(ValType::I32);
+                builder.local_get(local).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+                builder.local_set(val);
+                IVector::copy_local_instructions(inner, module, builder, compilation_ctx, val);
             }
             IntermediateType::ISigner => {
                 panic!(r#"trying to introduce copy instructions for "signer" type"#)

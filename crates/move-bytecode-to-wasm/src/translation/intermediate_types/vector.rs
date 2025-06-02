@@ -96,8 +96,6 @@ impl IVector {
     ) {
         // === Local declarations ===
         let dst_local = module.locals.add(ValType::I32);
-        let temp_local = module.locals.add(ValType::I32);
-
         let index = module.locals.add(ValType::I32);
         let len = module.locals.add(ValType::I32);
 
@@ -139,6 +137,15 @@ impl IVector {
         builder.local_set(index);
 
         builder.loop_(None, |loop_block| {
+            // === Compute destination address of element ===
+            loop_block.local_get(index);
+            loop_block.i32_const(data_size);
+            loop_block.binop(BinaryOp::I32Mul);
+            loop_block.i32_const(4);
+            loop_block.binop(BinaryOp::I32Add);
+            loop_block.local_get(dst_local);
+            loop_block.binop(BinaryOp::I32Add);
+
             // === Compute address of copy element ===
             loop_block.local_get(index);
             loop_block.i32_const(data_size);
@@ -153,13 +160,6 @@ impl IVector {
                 | IntermediateType::IU8
                 | IntermediateType::IU16
                 | IntermediateType::IU32 => {
-                    // Dont load the element, the copy_local_instructions expects an address!
-                }
-                IntermediateType::IU64 => {
-                    // loop_block.unop(UnaryOp::I64ExtendUI32);
-                }
-                _ => {
-                    // For heap, load the element (which is a pointer)
                     loop_block.load(
                         compilation_ctx.memory_id,
                         LoadKind::I32 { atomic: false },
@@ -169,21 +169,123 @@ impl IVector {
                         },
                     );
                 }
+                IntermediateType::IU64 => {
+                    loop_block.load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                }
+                IntermediateType::IU128 => {
+                    loop_block.load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                    let elem_ptr = module.locals.add(ValType::I32);
+                    loop_block.local_set(elem_ptr);
+
+                    loop_block.i32_const(16);
+                    loop_block.call(compilation_ctx.allocator);
+                    let ptr = module.locals.add(ValType::I32);
+                    loop_block.local_set(ptr);
+
+                    for i in 0..2 {
+                        loop_block.local_get(ptr);
+                        loop_block.local_get(elem_ptr);
+                        loop_block.load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I64 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: i * 8,
+                            },
+                        );
+                    }
+
+                    for i in 0..2 {
+                        loop_block.store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I64 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 8 - i * 8,
+                            },
+                        );
+                    }
+                    loop_block.local_get(ptr);
+                }
+                IntermediateType::IU256 | IntermediateType::IAddress => {
+                    let elem_ptr = module.locals.add(ValType::I32);
+                    loop_block.load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                    loop_block.local_set(elem_ptr);
+
+                    loop_block.i32_const(32);
+                    loop_block.call(compilation_ctx.allocator);
+                    let ptr = module.locals.add(ValType::I32);
+                    loop_block.local_set(ptr);
+
+                    for i in 0..4 {
+                        loop_block.local_get(ptr);
+                        loop_block.local_get(elem_ptr);
+                        loop_block.load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I64 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: i * 8,
+                            },
+                        );
+                    }
+
+                    for i in 0..4 {
+                        loop_block.store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I64 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 24 - i * 8,
+                            },
+                        );
+                    }
+                    loop_block.local_get(ptr);
+                }
+                IntermediateType::IVector(inner_) => {
+                    let tmp_local = module.locals.add(ValType::I32);
+                    loop_block.load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                    loop_block.local_set(tmp_local);
+                    IVector::copy_local_instructions(
+                        inner_,
+                        module,
+                        loop_block,
+                        compilation_ctx,
+                        tmp_local,
+                    );
+                }
+                _ => {
+                    panic!("Unsupported vector type");
+                }
             }
-
-            loop_block.local_set(temp_local);
-
-            // === Compute destination address of element ===
-            loop_block.local_get(index);
-            loop_block.i32_const(data_size);
-            loop_block.binop(BinaryOp::I32Mul);
-            loop_block.i32_const(4);
-            loop_block.binop(BinaryOp::I32Add);
-            loop_block.local_get(dst_local);
-            loop_block.binop(BinaryOp::I32Add);
-
-            // === Copy element recursively ===
-            inner.copy_local_instructions(module, loop_block, compilation_ctx, temp_local);
 
             // === Store result from stack into memory ===
             loop_block.store(
@@ -355,727 +457,719 @@ impl IVector {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use alloy_primitives::U256;
-//     use walrus::{FunctionBuilder, FunctionId, MemoryId, Module, ModuleConfig, ValType};
-//     use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults};
-
-//     use crate::memory::setup_module_memory;
-
-//     use super::*;
-
-//     fn build_module() -> (Module, FunctionId, MemoryId) {
-//         let config = ModuleConfig::new();
-//         let mut module = Module::with_config(config);
-//         let (allocator_func, memory_id) = setup_module_memory(&mut module);
-
-//         (module, allocator_func, memory_id)
-//     }
-
-//     fn setup_wasmtime_module<R: WasmResults>(
-//         module: &mut Module,
-//         initial_memory_data: Vec<u8>,
-//         function_name: &str,
-//     ) -> (Linker<()>, Instance, Store<()>, TypedFunc<(), R>) {
-//         let engine = Engine::default();
-//         let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
-
-//         let linker = Linker::new(&engine);
-
-//         let mut store = Store::new(&engine, ());
-//         let instance = linker.instantiate(&mut store, &module).unwrap();
-
-//         let entrypoint = instance
-//             .get_typed_func::<(), R>(&mut store, function_name)
-//             .unwrap();
-
-//         let memory = instance.get_memory(&mut store, "memory").unwrap();
-//         memory.write(&mut store, 0, &initial_memory_data).unwrap();
-
-//         (linker, instance, store, entrypoint)
-//     }
-
-//     fn test_vector(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
-//         let (mut raw_module, allocator, memory_id) = build_module();
-
-//         let compilation_ctx = CompilationContext {
-//             constants: &[],
-//             functions_arguments: &[],
-//             functions_returns: &[],
-//             module_signatures: &[],
-//             memory_id,
-//             allocator,
-//         };
-
-//         let mut function_builder =
-//             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
-
-//         let mut builder = function_builder.func_body();
-
-//         let data = data.to_vec();
-//         IVector::load_constant_instructions(
-//             &inner_type,
-//             &mut raw_module,
-//             &mut builder,
-//             &mut data.into_iter(),
-//             &compilation_ctx,
-//         );
-
-//         let function = function_builder.finish(vec![], &mut raw_module.funcs);
-//         raw_module.exports.add("test_function", function);
-
-//         let (_, instance, mut store, entrypoint) =
-//             setup_wasmtime_module::<i32>(&mut raw_module, vec![], "test_function");
-
-//         let result = entrypoint.call(&mut store, ()).unwrap();
-//         assert_eq!(result, 0);
-
-//         let memory = instance.get_memory(&mut store, "memory").unwrap();
-//         let mut result_memory_data = vec![0; expected_result_bytes.len()];
-//         memory
-//             .read(&mut store, result as usize, &mut result_memory_data)
-//             .unwrap();
-//         assert_eq!(result_memory_data, expected_result_bytes);
-//     }
-
-//     fn test_vector_copy(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
-//         let (mut raw_module, allocator, memory_id) = build_module();
-
-//         let compilation_ctx = CompilationContext {
-//             constants: &[],
-//             functions_arguments: &[],
-//             functions_returns: &[],
-//             module_signatures: &[],
-//             memory_id,
-//             allocator,
-//         };
-
-//         let mut function_builder =
-//             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
-//         let mut builder = function_builder.func_body();
-
-//         let data_iter = data.to_vec();
-//         let src_local = raw_module.locals.add(ValType::I32);
-
-//         // Load the constant vector and store in local
-//         IVector::load_constant_instructions(
-//             &inner_type,
-//             &mut raw_module,
-//             &mut builder,
-//             &mut data_iter.into_iter(),
-//             &compilation_ctx,
-//         );
-//         builder.local_set(src_local);
-
-//         // Copy the vector and return the new pointer
-//         IVector::copy_local_instructions(
-//             &inner_type,
-//             &mut raw_module,
-//             &mut builder,
-//             &compilation_ctx,
-//             src_local,
-//         );
-
-//         let function = function_builder.finish(vec![], &mut raw_module.funcs);
-//         raw_module.exports.add("test_copy_vector", function);
-
-//         let (_, instance, mut store, entrypoint) =
-//             setup_wasmtime_module::<i32>(&mut raw_module, vec![], "test_copy_vector");
-
-//         let result_ptr = entrypoint.call(&mut store, ()).unwrap();
-//         let memory = instance.get_memory(&mut store, "memory").unwrap();
-//         let mut result_memory_data = vec![0; expected_result_bytes.len()];
-//         memory
-//             .read(&mut store, result_ptr as usize, &mut result_memory_data)
-//             .unwrap();
-
-//         assert_eq!(result_memory_data, expected_result_bytes);
-//     }
-
-//     fn test_vector_pack(
-//         elements: &[Vec<u8>],
-//         inner_type: IntermediateType,
-//         expected_result_bytes: &[u8],
-//     ) {
-//         let (mut raw_module, allocator, memory_id) = build_module();
-
-//         let compilation_ctx = CompilationContext {
-//             constants: &[],
-//             functions_arguments: &[],
-//             functions_returns: &[],
-//             module_signatures: &[],
-//             memory_id,
-//             allocator,
-//         };
-
-//         let mut function_builder =
-//             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
-//         let mut builder = function_builder.func_body();
-
-//         // Push elements to the stack
-//         for element_bytes in elements.iter() {
-//             let mut data_iter = element_bytes.clone().into_iter();
-//             inner_type.load_constant_instructions(
-//                 &mut raw_module,
-//                 &mut builder,
-//                 &mut data_iter,
-//                 &compilation_ctx,
-//             );
-//         }
-
-//         IVector::vec_pack_instructions(
-//             &inner_type,
-//             &mut raw_module,
-//             &mut builder,
-//             &compilation_ctx,
-//             elements.len() as i32,
-//         );
-
-//         let function = function_builder.finish(vec![], &mut raw_module.funcs);
-//         raw_module.exports.add("test_pack_vector", function);
-
-//         let (_, instance, mut store, entrypoint) =
-//             setup_wasmtime_module::<i32>(&mut raw_module, vec![], "test_pack_vector");
-
-//         let result_ptr = entrypoint.call(&mut store, ()).unwrap();
-//         let memory = instance.get_memory(&mut store, "memory").unwrap();
-//         let mut result_memory_data = vec![0; expected_result_bytes.len()];
-//         memory
-//             .read(&mut store, result_ptr as usize, &mut result_memory_data)
-//             .unwrap();
-
-//         assert_eq!(result_memory_data, expected_result_bytes);
-//     }
-
-//     #[test]
-//     fn test_vector_bool() {
-//         let data = vec![4, 1, 0, 1, 0];
-//         let expected_result_bytes = [
-//             4u32.to_le_bytes().as_slice(),
-//             1u32.to_le_bytes().as_slice(),
-//             0u32.to_le_bytes().as_slice(),
-//             1u32.to_le_bytes().as_slice(),
-//             0u32.to_le_bytes().as_slice(),
-//         ]
-//         .concat();
-//         test_vector(&data, IntermediateType::IBool, &expected_result_bytes);
-//         test_vector_copy(&data, IntermediateType::IBool, &expected_result_bytes);
-//     }
-
-//     #[test]
-//     fn test_vector_u8() {
-//         let data = vec![4, 1, 2, 3];
-
-//         let expected_load_bytes = [
-//             4u32.to_le_bytes().as_slice(),
-//             1u32.to_le_bytes().as_slice(),
-//             2u32.to_le_bytes().as_slice(),
-//             3u32.to_le_bytes().as_slice(),
-//         ]
-//         .concat();
-
-//         test_vector(&data, IntermediateType::IU8, &expected_load_bytes);
-//         test_vector_copy(&data, IntermediateType::IU8, &expected_load_bytes);
-//     }
-
-//     #[test]
-//     fn test_vector_u16() {
-//         let data = [
-//             &[4u8],
-//             1u16.to_le_bytes().as_slice(),
-//             2u16.to_le_bytes().as_slice(),
-//             3u16.to_le_bytes().as_slice(),
-//             4u16.to_le_bytes().as_slice(),
-//         ]
-//         .concat();
-//         let expected_result_bytes = [
-//             4u32.to_le_bytes().as_slice(),
-//             1u32.to_le_bytes().as_slice(),
-//             2u32.to_le_bytes().as_slice(),
-//             3u32.to_le_bytes().as_slice(),
-//             4u32.to_le_bytes().as_slice(),
-//         ]
-//         .concat();
-//         test_vector(&data, IntermediateType::IU16, &expected_result_bytes);
-//         test_vector_copy(&data, IntermediateType::IU16, &expected_result_bytes);
-//     }
-
-//     #[test]
-//     fn test_vector_u32() {
-//         let data = [
-//             &[4u8],
-//             1u32.to_le_bytes().as_slice(),
-//             2u32.to_le_bytes().as_slice(),
-//             3u32.to_le_bytes().as_slice(),
-//             4u32.to_le_bytes().as_slice(),
-//         ]
-//         .concat();
-
-//         let expected_result_bytes = [
-//             4u32.to_le_bytes().as_slice(),
-//             1u32.to_le_bytes().as_slice(),
-//             2u32.to_le_bytes().as_slice(),
-//             3u32.to_le_bytes().as_slice(),
-//             4u32.to_le_bytes().as_slice(),
-//         ]
-//         .concat();
-//         test_vector(&data, IntermediateType::IU32, &expected_result_bytes);
-//         test_vector_copy(&data, IntermediateType::IU32, &expected_result_bytes);
-//     }
-
-//     #[test]
-//     fn test_vector_u64() {
-//         let data = [
-//             &[4u8],
-//             1u64.to_le_bytes().as_slice(),
-//             2u64.to_le_bytes().as_slice(),
-//             3u64.to_le_bytes().as_slice(),
-//             4u64.to_le_bytes().as_slice(),
-//         ]
-//         .concat();
-
-//         let expected_result_bytes = [
-//             4u32.to_le_bytes().as_slice(),
-//             1u64.to_le_bytes().as_slice(),
-//             2u64.to_le_bytes().as_slice(),
-//             3u64.to_le_bytes().as_slice(),
-//             4u64.to_le_bytes().as_slice(),
-//         ]
-//         .concat();
-//         test_vector(&data, IntermediateType::IU64, &expected_result_bytes);
-//         test_vector_copy(&data, IntermediateType::IU64, &expected_result_bytes);
-//     }
-
-//     #[test]
-//     fn test_vector_u128() {
-//         let data = [
-//             &[4u8],
-//             1u128.to_le_bytes().as_slice(),
-//             2u128.to_le_bytes().as_slice(),
-//             3u128.to_le_bytes().as_slice(),
-//             4u128.to_le_bytes().as_slice(),
-//         ]
-//         .concat();
-
-//         let expected_result_bytes = [
-//             4u32.to_le_bytes().as_slice(),
-//             // Pointers to memory
-//             20u32.to_le_bytes().as_slice(),
-//             36u32.to_le_bytes().as_slice(),
-//             52u32.to_le_bytes().as_slice(),
-//             68u32.to_le_bytes().as_slice(),
-//             // Referenced values
-//             1u128.to_le_bytes().as_slice(),
-//             2u128.to_le_bytes().as_slice(),
-//             3u128.to_le_bytes().as_slice(),
-//             4u128.to_le_bytes().as_slice(),
-//         ]
-//         .concat();
-
-//         let expected_copied_vector = [
-//             4u32.to_le_bytes().as_slice(),
-//             20u32.to_le_bytes().as_slice(),
-//             36u32.to_le_bytes().as_slice(),
-//             52u32.to_le_bytes().as_slice(),
-//             68u32.to_le_bytes().as_slice(),
-//         ]
-//         .concat();
-
-//         test_vector(&data, IntermediateType::IU128, &expected_result_bytes);
-//         test_vector_copy(&data, IntermediateType::IU128, &expected_copied_vector);
-//     }
-
-//     #[test]
-//     fn test_vector_u256() {
-//         let data = [
-//             &[4u8],
-//             U256::from(1u128).to_le_bytes::<32>().as_slice(),
-//             U256::from(2u128).to_le_bytes::<32>().as_slice(),
-//             U256::from(3u128).to_le_bytes::<32>().as_slice(),
-//             U256::from(4u128).to_le_bytes::<32>().as_slice(),
-//         ]
-//         .concat();
-
-//         let expected_load_bytes = [
-//             4u32.to_le_bytes().as_slice(),
-//             // Pointers to memory
-//             20u32.to_le_bytes().as_slice(),
-//             52u32.to_le_bytes().as_slice(),
-//             84u32.to_le_bytes().as_slice(),
-//             116u32.to_le_bytes().as_slice(),
-//             // Referenced values
-//             U256::from(1u128).to_le_bytes::<32>().as_slice(),
-//             U256::from(2u128).to_le_bytes::<32>().as_slice(),
-//             U256::from(3u128).to_le_bytes::<32>().as_slice(),
-//             U256::from(4u128).to_le_bytes::<32>().as_slice(),
-//         ]
-//         .concat();
-
-//         let expected_copy_bytes = [
-//             4u32.to_le_bytes().as_slice(),
-//             // Pointers to memory
-//             20u32.to_le_bytes().as_slice(),
-//             52u32.to_le_bytes().as_slice(),
-//             84u32.to_le_bytes().as_slice(),
-//             116u32.to_le_bytes().as_slice(),
-//         ]
-//         .concat();
-
-//         test_vector(&data, IntermediateType::IU256, &expected_load_bytes);
-//         test_vector_copy(&data, IntermediateType::IU256, &expected_copy_bytes);
-//     }
-
-//     #[test]
-//     fn test_vector_address() {
-//         let data = [
-//             &[4u8],
-//             U256::from(0x1111).to_be_bytes::<32>().as_slice(),
-//             U256::from(0x2222).to_be_bytes::<32>().as_slice(),
-//             U256::from(0x3333).to_be_bytes::<32>().as_slice(),
-//             U256::from(0x4444).to_be_bytes::<32>().as_slice(),
-//         ]
-//         .concat();
-
-//         let expected_load_bytes = [
-//             4u32.to_le_bytes().as_slice(),
-//             // Pointers to memory
-//             20u32.to_le_bytes().as_slice(),
-//             52u32.to_le_bytes().as_slice(),
-//             84u32.to_le_bytes().as_slice(),
-//             116u32.to_le_bytes().as_slice(),
-//             // Referenced values
-//             U256::from(0x1111).to_be_bytes::<32>().as_slice(),
-//             U256::from(0x2222).to_be_bytes::<32>().as_slice(),
-//             U256::from(0x3333).to_be_bytes::<32>().as_slice(),
-//             U256::from(0x4444).to_be_bytes::<32>().as_slice(),
-//         ]
-//         .concat();
-
-//         let expected_copy_bytes = [
-//             4u32.to_le_bytes().as_slice(),
-//             // Pointers to memory
-//             20u32.to_le_bytes().as_slice(),
-//             52u32.to_le_bytes().as_slice(),
-//             84u32.to_le_bytes().as_slice(),
-//             116u32.to_le_bytes().as_slice(),
-//         ]
-//         .concat();
-
-//         test_vector(&data, IntermediateType::IAddress, &expected_load_bytes);
-//         test_vector_copy(&data, IntermediateType::IAddress, &expected_copy_bytes);
-//     }
-
-//     #[test]
-//     fn test_vector_vector_u32() {
-//         let data = [
-//             &[2u8],
-//             [
-//                 &[4u8],
-//                 1u32.to_le_bytes().as_slice(),
-//                 2u32.to_le_bytes().as_slice(),
-//                 3u32.to_le_bytes().as_slice(),
-//                 4u32.to_le_bytes().as_slice(),
-//             ]
-//             .concat()
-//             .as_slice(),
-//             [
-//                 &[4u8],
-//                 5u32.to_le_bytes().as_slice(),
-//                 6u32.to_le_bytes().as_slice(),
-//                 7u32.to_le_bytes().as_slice(),
-//                 8u32.to_le_bytes().as_slice(),
-//             ]
-//             .concat()
-//             .as_slice(),
-//         ]
-//         .concat();
-
-//         let expected_load_bytes = [
-//             2u32.to_le_bytes().as_slice(),
-//             12u32.to_le_bytes().as_slice(), // pointer to first vector
-//             32u32.to_le_bytes().as_slice(), // pointer to second vector
-//             [
-//                 4u32.to_le_bytes().as_slice(),
-//                 1u32.to_le_bytes().as_slice(),
-//                 2u32.to_le_bytes().as_slice(),
-//                 3u32.to_le_bytes().as_slice(),
-//                 4u32.to_le_bytes().as_slice(),
-//             ]
-//             .concat()
-//             .as_slice(),
-//             [
-//                 4u32.to_le_bytes().as_slice(),
-//                 5u32.to_le_bytes().as_slice(),
-//                 6u32.to_le_bytes().as_slice(),
-//                 7u32.to_le_bytes().as_slice(),
-//                 8u32.to_le_bytes().as_slice(),
-//             ]
-//             .concat()
-//             .as_slice(),
-//         ]
-//         .concat(); // 52 bytes total
-
-//         let expected_copy_bytes = [
-//             2u32.to_le_bytes().as_slice(),
-//             64u32.to_le_bytes().as_slice(), // pointer to first copied vector: 52 + 4 + 4 + 4
-//             84u32.to_le_bytes().as_slice(), // pointer to second copied vector: 52 + 4 + 4 + 4 + 20
-//             [
-//                 4u32.to_le_bytes().as_slice(),
-//                 1u32.to_le_bytes().as_slice(),
-//                 2u32.to_le_bytes().as_slice(),
-//                 3u32.to_le_bytes().as_slice(),
-//                 4u32.to_le_bytes().as_slice(),
-//             ]
-//             .concat()
-//             .as_slice(),
-//             [
-//                 4u32.to_le_bytes().as_slice(),
-//                 5u32.to_le_bytes().as_slice(),
-//                 6u32.to_le_bytes().as_slice(),
-//                 7u32.to_le_bytes().as_slice(),
-//                 8u32.to_le_bytes().as_slice(),
-//             ]
-//             .concat()
-//             .as_slice(),
-//         ]
-//         .concat();
-
-//         test_vector(
-//             &data,
-//             IntermediateType::IVector(Box::new(IntermediateType::IU32)),
-//             &expected_load_bytes,
-//         );
-//         test_vector_copy(
-//             &data,
-//             IntermediateType::IVector(Box::new(IntermediateType::IU32)),
-//             &expected_copy_bytes,
-//         );
-//     }
-
-//     #[test]
-//     fn test_vector_vector_u256() {
-//         let data = [
-//             &[2u8],
-//             [
-//                 &[4u8],
-//                 U256::from(1u128).to_le_bytes::<32>().as_slice(),
-//                 U256::from(2u128).to_le_bytes::<32>().as_slice(),
-//                 U256::from(3u128).to_le_bytes::<32>().as_slice(),
-//                 U256::from(4u128).to_le_bytes::<32>().as_slice(),
-//             ]
-//             .concat()
-//             .as_slice(),
-//             [
-//                 &[4u8],
-//                 U256::from(5u128).to_le_bytes::<32>().as_slice(),
-//                 U256::from(6u128).to_le_bytes::<32>().as_slice(),
-//                 U256::from(7u128).to_le_bytes::<32>().as_slice(),
-//                 U256::from(8u128).to_le_bytes::<32>().as_slice(),
-//             ]
-//             .concat()
-//             .as_slice(),
-//         ]
-//         .concat();
-
-//         let expected_load_bytes = [
-//             2u32.to_le_bytes().as_slice(),
-//             12u32.to_le_bytes().as_slice(),  // pointer to first vector
-//             160u32.to_le_bytes().as_slice(), // pointer to second vector
-//             [
-//                 4u32.to_le_bytes().as_slice(),
-//                 // Pointers to memory
-//                 32u32.to_le_bytes().as_slice(),
-//                 64u32.to_le_bytes().as_slice(),
-//                 96u32.to_le_bytes().as_slice(),
-//                 128u32.to_le_bytes().as_slice(),
-//                 // Referenced values
-//                 U256::from(1u128).to_le_bytes::<32>().as_slice(),
-//                 U256::from(2u128).to_le_bytes::<32>().as_slice(),
-//                 U256::from(3u128).to_le_bytes::<32>().as_slice(),
-//                 U256::from(4u128).to_le_bytes::<32>().as_slice(),
-//             ]
-//             .concat() // 148 bytes
-//             .as_slice(),
-//             [
-//                 4u32.to_le_bytes().as_slice(),
-//                 // Pointers to memory
-//                 180u32.to_le_bytes().as_slice(),
-//                 212u32.to_le_bytes().as_slice(),
-//                 244u32.to_le_bytes().as_slice(),
-//                 276u32.to_le_bytes().as_slice(),
-//                 // Referenced values
-//                 U256::from(5u128).to_le_bytes::<32>().as_slice(),
-//                 U256::from(6u128).to_le_bytes::<32>().as_slice(),
-//                 U256::from(7u128).to_le_bytes::<32>().as_slice(),
-//                 U256::from(8u128).to_le_bytes::<32>().as_slice(),
-//             ]
-//             .concat() // 148 bytes
-//             .as_slice(),
-//         ]
-//         .concat(); // 308 bytes total
-
-//         let expected_copy_bytes = [
-//             2u32.to_le_bytes().as_slice(),
-//             320u32.to_le_bytes().as_slice(), // pointer to first copied vector: 308 + 4 + 4 + 4
-//             340u32.to_le_bytes().as_slice(), // pointer to second copied vector: 308 + 4 + 4 + 4 + 20
-//             [
-//                 4u32.to_le_bytes().as_slice(),
-//                 // Pointers to memory
-//                 32u32.to_le_bytes().as_slice(),
-//                 64u32.to_le_bytes().as_slice(),
-//                 96u32.to_le_bytes().as_slice(),
-//                 128u32.to_le_bytes().as_slice(),
-//             ]
-//             .concat()
-//             .as_slice(),
-//             [
-//                 4u32.to_le_bytes().as_slice(),
-//                 // Pointers to memory
-//                 180u32.to_le_bytes().as_slice(),
-//                 212u32.to_le_bytes().as_slice(),
-//                 244u32.to_le_bytes().as_slice(),
-//                 276u32.to_le_bytes().as_slice(),
-//             ]
-//             .concat()
-//             .as_slice(),
-//         ]
-//         .concat();
-
-//         test_vector(
-//             &data,
-//             IntermediateType::IVector(Box::new(IntermediateType::IU256)),
-//             &expected_load_bytes,
-//         );
-//         test_vector_copy(
-//             &data,
-//             IntermediateType::IVector(Box::new(IntermediateType::IU256)),
-//             &expected_copy_bytes,
-//         );
-//     }
-
-//     #[test]
-//     fn test_vec_pack_u8() {
-//         let element_bytes = vec![vec![10], vec![20], vec![30]];
-
-//         let expected_result_bytes = vec![3, 0, 0, 0, 10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0];
-
-//         test_vector_pack(
-//             &element_bytes,
-//             IntermediateType::IU8,
-//             &expected_result_bytes,
-//         );
-//     }
-
-//     #[test]
-//     fn test_vec_pack_u32() {
-//         let element_bytes = vec![vec![10, 0, 0, 0], vec![20, 0, 0, 0], vec![30, 0, 0, 0]];
-
-//         let expected_result_bytes = vec![3, 0, 0, 0, 10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0];
-
-//         test_vector_pack(
-//             &element_bytes,
-//             IntermediateType::IU32,
-//             &expected_result_bytes,
-//         );
-//     }
-
-//     #[test]
-//     fn test_vec_pack_u128() {
-//         let element_bytes = vec![
-//             vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-//             vec![2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-//             vec![3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-//             vec![4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-//         ];
-
-//         let expected_result_bytes = vec![
-//             4, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 32, 0, 0, 0, 48, 0, 0, 0,
-//         ];
-
-//         test_vector_pack(
-//             &element_bytes,
-//             IntermediateType::IU128,
-//             &expected_result_bytes,
-//         );
-//     }
-
-//     #[test]
-//     fn test_vec_pack_u256() {
-//         let element_bytes = vec![
-//             vec![
-//                 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//                 0, 0, 0, 0, 0, 0,
-//             ],
-//             vec![
-//                 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//                 0, 0, 0, 0, 0, 0,
-//             ],
-//             vec![
-//                 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-//                 0, 0, 0, 0, 0, 0,
-//             ],
-//         ];
-
-//         let expected_result_bytes = vec![3, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 64, 0, 0, 0];
-
-//         test_vector_pack(
-//             &element_bytes,
-//             IntermediateType::IU256,
-//             &expected_result_bytes,
-//         );
-//     }
-
-//     #[test]
-//     fn test_vec_pack_vec_u32() {
-//         let element_bytes = vec![
-//             vec![2, 0, 0, 0, 10, 0, 0, 0, 20, 0, 0, 0],
-//             vec![2, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0],
-//             vec![2, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0],
-//         ];
-
-//         let expected_result_bytes = vec![3, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 24, 0, 0, 0];
-
-//         test_vector_pack(
-//             &element_bytes,
-//             IntermediateType::IVector(Box::new(IntermediateType::IU32)),
-//             &expected_result_bytes,
-//         );
-//     }
-
-//     #[test]
-//     fn test_vec_pack_vec_u256() {
-//         // Each inner vector has 2 elements of u256 (32 bytes each + 4 bytes for pointer) + 4 bytes for length = 76 bytes
-//         let element_bytes = vec![
-//             // First inner vector [1, 2]
-//             {
-//                 let mut v = vec![2, 0, 0, 0];
-//                 v.extend_from_slice(&[1; 32]);
-//                 v.extend_from_slice(&[2; 32]);
-//                 v
-//             },
-//             // Second inner vector [3, 4]
-//             {
-//                 let mut v = vec![2, 0, 0, 0];
-//                 v.extend_from_slice(&[3; 32]);
-//                 v.extend_from_slice(&[4; 32]);
-//                 v
-//             },
-//             // Third inner vector [5, 6]
-//             {
-//                 let mut v = vec![2, 0, 0, 0];
-//                 v.extend_from_slice(&[5; 32]);
-//                 v.extend_from_slice(&[6; 32]);
-//                 v
-//             },
-//         ];
-
-//         let expected_result_bytes = vec![3, 0, 0, 0, 0, 0, 0, 0, 76, 0, 0, 0, 152, 0, 0, 0];
-
-//         test_vector_pack(
-//             &element_bytes,
-//             IntermediateType::IVector(Box::new(IntermediateType::IU256)),
-//             &expected_result_bytes,
-//         );
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use alloy_primitives::U256;
+    use walrus::{FunctionBuilder, FunctionId, MemoryId, Module, ModuleConfig, ValType};
+    use wasmtime::{Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc, WasmResults};
+
+    use crate::memory::setup_module_memory;
+
+    use super::*;
+
+    fn build_module() -> (Module, FunctionId, MemoryId) {
+        let config = ModuleConfig::new();
+        let mut module = Module::with_config(config);
+        let (allocator_func, memory_id) = setup_module_memory(&mut module);
+
+        (module, allocator_func, memory_id)
+    }
+
+    fn setup_wasmtime_module<R: WasmResults>(
+        module: &mut Module,
+        initial_memory_data: Vec<u8>,
+        function_name: &str,
+    ) -> (Linker<()>, Instance, Store<()>, TypedFunc<(), R>) {
+        let engine = Engine::default();
+        let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
+
+        let linker = Linker::new(&engine);
+
+        let mut store = Store::new(&engine, ());
+        let instance = linker.instantiate(&mut store, &module).unwrap();
+
+        let entrypoint = instance
+            .get_typed_func::<(), R>(&mut store, function_name)
+            .unwrap();
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        memory.write(&mut store, 0, &initial_memory_data).unwrap();
+
+        (linker, instance, store, entrypoint)
+    }
+
+    fn test_vector(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
+        let (mut raw_module, allocator, memory_id) = build_module();
+
+        let compilation_ctx = CompilationContext {
+            constants: &[],
+            functions_arguments: &[],
+            functions_returns: &[],
+            module_signatures: &[],
+            memory_id,
+            allocator,
+        };
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+
+        let mut builder = function_builder.func_body();
+
+        let data = data.to_vec();
+        IVector::load_constant_instructions(
+            &inner_type,
+            &mut raw_module,
+            &mut builder,
+            &mut data.into_iter(),
+            &compilation_ctx,
+        );
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32>(&mut raw_module, vec![], "test_function");
+
+        let result = entrypoint.call(&mut store, ()).unwrap();
+        assert_eq!(result, 0);
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut result_memory_data = vec![0; expected_result_bytes.len()];
+        memory
+            .read(&mut store, result as usize, &mut result_memory_data)
+            .unwrap();
+        assert_eq!(result_memory_data, expected_result_bytes);
+    }
+
+    fn test_vector_copy(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
+        let (mut raw_module, allocator, memory_id) = build_module();
+
+        let compilation_ctx = CompilationContext {
+            constants: &[],
+            functions_arguments: &[],
+            functions_returns: &[],
+            module_signatures: &[],
+            memory_id,
+            allocator,
+        };
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+        let mut builder = function_builder.func_body();
+
+        let data_iter = data.to_vec();
+        let src_local = raw_module.locals.add(ValType::I32);
+
+        // Load the constant vector and store in local
+        IVector::load_constant_instructions(
+            &inner_type,
+            &mut raw_module,
+            &mut builder,
+            &mut data_iter.into_iter(),
+            &compilation_ctx,
+        );
+        builder.local_set(src_local);
+
+        // Copy the vector and return the new pointer
+        IVector::copy_local_instructions(
+            &inner_type,
+            &mut raw_module,
+            &mut builder,
+            &compilation_ctx,
+            src_local,
+        );
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_copy_vector", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32>(&mut raw_module, vec![], "test_copy_vector");
+
+        let result_ptr = entrypoint.call(&mut store, ()).unwrap();
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut result_memory_data = vec![0; expected_result_bytes.len()];
+        memory
+            .read(&mut store, result_ptr as usize, &mut result_memory_data)
+            .unwrap();
+        assert_eq!(result_memory_data, expected_result_bytes);
+    }
+
+    fn test_vector_pack(
+        elements: &[Vec<u8>],
+        inner_type: IntermediateType,
+        expected_result_bytes: &[u8],
+    ) {
+        let (mut raw_module, allocator, memory_id) = build_module();
+
+        let compilation_ctx = CompilationContext {
+            constants: &[],
+            functions_arguments: &[],
+            functions_returns: &[],
+            module_signatures: &[],
+            memory_id,
+            allocator,
+        };
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+        let mut builder = function_builder.func_body();
+
+        // Push elements to the stack
+        for element_bytes in elements.iter() {
+            let mut data_iter = element_bytes.clone().into_iter();
+            inner_type.load_constant_instructions(
+                &mut raw_module,
+                &mut builder,
+                &mut data_iter,
+                &compilation_ctx,
+            );
+        }
+
+        IVector::vec_pack_instructions(
+            &inner_type,
+            &mut raw_module,
+            &mut builder,
+            &compilation_ctx,
+            elements.len() as i32,
+        );
+
+        let function = function_builder.finish(vec![], &mut raw_module.funcs);
+        raw_module.exports.add("test_pack_vector", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32>(&mut raw_module, vec![], "test_pack_vector");
+
+        let result_ptr = entrypoint.call(&mut store, ()).unwrap();
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut result_memory_data = vec![0; expected_result_bytes.len()];
+        memory
+            .read(&mut store, result_ptr as usize, &mut result_memory_data)
+            .unwrap();
+
+        assert_eq!(result_memory_data, expected_result_bytes);
+    }
+
+    #[test]
+    fn test_vector_bool() {
+        let data = vec![4, 1, 0, 1, 0];
+        let expected_result_bytes = [
+            4u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+        test_vector(&data, IntermediateType::IBool, &expected_result_bytes);
+        test_vector_copy(&data, IntermediateType::IBool, &expected_result_bytes);
+    }
+
+    #[test]
+    fn test_vector_u8() {
+        let data = vec![4, 1, 2, 3];
+
+        let expected_load_bytes = [
+            4u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+
+        test_vector(&data, IntermediateType::IU8, &expected_load_bytes);
+        test_vector_copy(&data, IntermediateType::IU8, &expected_load_bytes);
+    }
+
+    #[test]
+    fn test_vector_u16() {
+        let data = [
+            &[4u8],
+            1u16.to_le_bytes().as_slice(),
+            2u16.to_le_bytes().as_slice(),
+            3u16.to_le_bytes().as_slice(),
+            4u16.to_le_bytes().as_slice(),
+        ]
+        .concat();
+        let expected_result_bytes = [
+            4u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+        test_vector(&data, IntermediateType::IU16, &expected_result_bytes);
+        test_vector_copy(&data, IntermediateType::IU16, &expected_result_bytes);
+    }
+
+    #[test]
+    fn test_vector_u32() {
+        let data = [
+            &[4u8],
+            1u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+
+        let expected_result_bytes = [
+            4u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+        test_vector(&data, IntermediateType::IU32, &expected_result_bytes);
+        test_vector_copy(&data, IntermediateType::IU32, &expected_result_bytes);
+    }
+
+    #[test]
+    fn test_vector_u64() {
+        let data = [
+            &[4u8],
+            1u64.to_le_bytes().as_slice(),
+            2u64.to_le_bytes().as_slice(),
+            3u64.to_le_bytes().as_slice(),
+            4u64.to_le_bytes().as_slice(),
+        ]
+        .concat();
+
+        let expected_result_bytes = [
+            4u32.to_le_bytes().as_slice(),
+            1u64.to_le_bytes().as_slice(),
+            2u64.to_le_bytes().as_slice(),
+            3u64.to_le_bytes().as_slice(),
+            4u64.to_le_bytes().as_slice(),
+        ]
+        .concat();
+        test_vector(&data, IntermediateType::IU64, &expected_result_bytes);
+        test_vector_copy(&data, IntermediateType::IU64, &expected_result_bytes);
+    }
+
+    #[test]
+    fn test_vector_u128() {
+        let data = [
+            &[4u8],
+            1u128.to_le_bytes().as_slice(),
+            2u128.to_le_bytes().as_slice(),
+            3u128.to_le_bytes().as_slice(),
+            4u128.to_le_bytes().as_slice(),
+        ]
+        .concat();
+
+        let expected_result_bytes = [
+            4u32.to_le_bytes().as_slice(),
+            // Pointers to memory
+            20u32.to_le_bytes().as_slice(),
+            36u32.to_le_bytes().as_slice(),
+            52u32.to_le_bytes().as_slice(),
+            68u32.to_le_bytes().as_slice(),
+            // Referenced values
+            1u128.to_le_bytes().as_slice(),
+            2u128.to_le_bytes().as_slice(),
+            3u128.to_le_bytes().as_slice(),
+            4u128.to_le_bytes().as_slice(),
+        ]
+        .concat();
+
+        let expected_copied_vector = [
+            4u32.to_le_bytes().as_slice(),
+            104u32.to_le_bytes().as_slice(),
+            120u32.to_le_bytes().as_slice(),
+            136u32.to_le_bytes().as_slice(),
+            152u32.to_le_bytes().as_slice(),
+            1u128.to_le_bytes().as_slice(),
+            2u128.to_le_bytes().as_slice(),
+            3u128.to_le_bytes().as_slice(),
+            4u128.to_le_bytes().as_slice(),
+        ]
+        .concat();
+
+        test_vector(&data, IntermediateType::IU128, &expected_result_bytes);
+        test_vector_copy(&data, IntermediateType::IU128, &expected_copied_vector);
+    }
+
+    #[test]
+    fn test_vector_u256() {
+        let data = [
+            &[2u8],
+            U256::from(1u128).to_le_bytes::<32>().as_slice(),
+            U256::from(2u128).to_le_bytes::<32>().as_slice(),
+        ]
+        .concat();
+
+        let expected_load_bytes = [
+            2u32.to_le_bytes().as_slice(),
+            // Pointers to memory
+            12u32.to_le_bytes().as_slice(),
+            44u32.to_le_bytes().as_slice(),
+            // Referenced values
+            U256::from(1u128).to_le_bytes::<32>().as_slice(),
+            U256::from(2u128).to_le_bytes::<32>().as_slice(),
+        ]
+        .concat();
+
+        let expected_copy_bytes = [
+            2u32.to_le_bytes().as_slice(),
+            // Pointers to memory
+            88u32.to_le_bytes().as_slice(),
+            120u32.to_le_bytes().as_slice(),
+            // Referenced values
+            U256::from(1u128).to_le_bytes::<32>().as_slice(),
+            U256::from(2u128).to_le_bytes::<32>().as_slice(),
+        ]
+        .concat();
+
+        test_vector(&data, IntermediateType::IU256, &expected_load_bytes);
+        test_vector_copy(&data, IntermediateType::IU256, &expected_copy_bytes);
+    }
+
+    #[test]
+    fn test_vector_address() {
+        let data = [
+            &[4u8],
+            U256::from(0x1111).to_be_bytes::<32>().as_slice(),
+            U256::from(0x2222).to_be_bytes::<32>().as_slice(),
+            U256::from(0x3333).to_be_bytes::<32>().as_slice(),
+            U256::from(0x4444).to_be_bytes::<32>().as_slice(),
+        ]
+        .concat();
+
+        let expected_load_bytes = [
+            4u32.to_le_bytes().as_slice(),
+            // Pointers to memory
+            20u32.to_le_bytes().as_slice(),
+            52u32.to_le_bytes().as_slice(),
+            84u32.to_le_bytes().as_slice(),
+            116u32.to_le_bytes().as_slice(),
+            // Referenced values
+            U256::from(0x1111).to_be_bytes::<32>().as_slice(),
+            U256::from(0x2222).to_be_bytes::<32>().as_slice(),
+            U256::from(0x3333).to_be_bytes::<32>().as_slice(),
+            U256::from(0x4444).to_be_bytes::<32>().as_slice(),
+        ]
+        .concat();
+
+        let expected_copy_bytes = [
+            4u32.to_le_bytes().as_slice(),
+            // Pointers to memory
+            168u32.to_le_bytes().as_slice(),
+            200u32.to_le_bytes().as_slice(),
+            232u32.to_le_bytes().as_slice(),
+            264u32.to_le_bytes().as_slice(),
+            U256::from(0x1111).to_be_bytes::<32>().as_slice(),
+            U256::from(0x2222).to_be_bytes::<32>().as_slice(),
+            U256::from(0x3333).to_be_bytes::<32>().as_slice(),
+            U256::from(0x4444).to_be_bytes::<32>().as_slice(),
+        ]
+        .concat();
+
+        test_vector(&data, IntermediateType::IAddress, &expected_load_bytes);
+        test_vector_copy(&data, IntermediateType::IAddress, &expected_copy_bytes);
+    }
+
+    #[test]
+    fn test_vector_vector_u32() {
+        let data = [
+            &[2u8],
+            [
+                &[4u8],
+                1u32.to_le_bytes().as_slice(),
+                2u32.to_le_bytes().as_slice(),
+                3u32.to_le_bytes().as_slice(),
+                4u32.to_le_bytes().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+            [
+                &[4u8],
+                5u32.to_le_bytes().as_slice(),
+                6u32.to_le_bytes().as_slice(),
+                7u32.to_le_bytes().as_slice(),
+                8u32.to_le_bytes().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+        ]
+        .concat();
+
+        let expected_load_bytes = [
+            2u32.to_le_bytes().as_slice(),
+            12u32.to_le_bytes().as_slice(), // pointer to first vector
+            32u32.to_le_bytes().as_slice(), // pointer to second vector
+            [
+                4u32.to_le_bytes().as_slice(),
+                1u32.to_le_bytes().as_slice(),
+                2u32.to_le_bytes().as_slice(),
+                3u32.to_le_bytes().as_slice(),
+                4u32.to_le_bytes().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+            [
+                4u32.to_le_bytes().as_slice(),
+                5u32.to_le_bytes().as_slice(),
+                6u32.to_le_bytes().as_slice(),
+                7u32.to_le_bytes().as_slice(),
+                8u32.to_le_bytes().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+        ]
+        .concat(); // 52 bytes total
+
+        let expected_copy_bytes = [
+            2u32.to_le_bytes().as_slice(),
+            64u32.to_le_bytes().as_slice(), // pointer to first copied vector: 52 + 4 + 4 + 4
+            84u32.to_le_bytes().as_slice(), // pointer to second copied vector: 52 + 4 + 4 + 4 + 20
+            [
+                4u32.to_le_bytes().as_slice(),
+                1u32.to_le_bytes().as_slice(),
+                2u32.to_le_bytes().as_slice(),
+                3u32.to_le_bytes().as_slice(),
+                4u32.to_le_bytes().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+            [
+                4u32.to_le_bytes().as_slice(),
+                5u32.to_le_bytes().as_slice(),
+                6u32.to_le_bytes().as_slice(),
+                7u32.to_le_bytes().as_slice(),
+                8u32.to_le_bytes().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+        ]
+        .concat();
+
+        test_vector(
+            &data,
+            IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+            &expected_load_bytes,
+        );
+        test_vector_copy(
+            &data,
+            IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+            &expected_copy_bytes,
+        );
+    }
+
+    #[test]
+    fn test_vector_vector_u256() {
+        let data = [
+            &[2u8],
+            [
+                &[2u8],
+                U256::from(1u128).to_le_bytes::<32>().as_slice(),
+                U256::from(2u128).to_le_bytes::<32>().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+            [
+                &[2u8],
+                U256::from(3u128).to_le_bytes::<32>().as_slice(),
+                U256::from(4u128).to_le_bytes::<32>().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+        ]
+        .concat();
+
+        let expected_load_bytes = [
+            2u32.to_le_bytes().as_slice(),
+            12u32.to_le_bytes().as_slice(), // pointer to first vector
+            88u32.to_le_bytes().as_slice(), // pointer to second vector
+            [
+                2u32.to_le_bytes().as_slice(),
+                // Pointers to memory
+                24u32.to_le_bytes().as_slice(),
+                56u32.to_le_bytes().as_slice(),
+                // Referenced values
+                U256::from(1u128).to_le_bytes::<32>().as_slice(),
+                U256::from(2u128).to_le_bytes::<32>().as_slice(),
+            ]
+            .concat() // 148 bytes
+            .as_slice(),
+            [
+                2u32.to_le_bytes().as_slice(),
+                // Pointers to memory
+                100u32.to_le_bytes().as_slice(),
+                132u32.to_le_bytes().as_slice(),
+                // Referenced values
+                U256::from(3u128).to_le_bytes::<32>().as_slice(),
+                U256::from(4u128).to_le_bytes::<32>().as_slice(),
+            ]
+            .concat() // 148 bytes
+            .as_slice(),
+        ]
+        .concat(); // 308 bytes total
+
+        let expected_copy_bytes = [
+            2u32.to_le_bytes().as_slice(),
+            176u32.to_le_bytes().as_slice(),
+            252u32.to_le_bytes().as_slice(),
+            [
+                2u32.to_le_bytes().as_slice(),
+                // Pointers to memory
+                188u32.to_le_bytes().as_slice(),
+                220u32.to_le_bytes().as_slice(),
+                // Referenced values
+                U256::from(1u128).to_le_bytes::<32>().as_slice(),
+                U256::from(2u128).to_le_bytes::<32>().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+            [
+                2u32.to_le_bytes().as_slice(),
+                // Pointers to memory
+                264u32.to_le_bytes().as_slice(),
+                296u32.to_le_bytes().as_slice(),
+                //Referenced values
+                U256::from(3u128).to_le_bytes::<32>().as_slice(),
+                U256::from(4u128).to_le_bytes::<32>().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+        ]
+        .concat();
+
+        test_vector(
+            &data,
+            IntermediateType::IVector(Box::new(IntermediateType::IU256)),
+            &expected_load_bytes,
+        );
+        test_vector_copy(
+            &data,
+            IntermediateType::IVector(Box::new(IntermediateType::IU256)),
+            &expected_copy_bytes,
+        );
+    }
+
+    #[test]
+    fn test_vec_pack_u8() {
+        let element_bytes = vec![vec![10], vec![20], vec![30]];
+
+        let expected_result_bytes = vec![3, 0, 0, 0, 10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0];
+
+        test_vector_pack(
+            &element_bytes,
+            IntermediateType::IU8,
+            &expected_result_bytes,
+        );
+    }
+
+    #[test]
+    fn test_vec_pack_u32() {
+        let element_bytes = vec![vec![10, 0, 0, 0], vec![20, 0, 0, 0], vec![30, 0, 0, 0]];
+
+        let expected_result_bytes = vec![3, 0, 0, 0, 10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0];
+
+        test_vector_pack(
+            &element_bytes,
+            IntermediateType::IU32,
+            &expected_result_bytes,
+        );
+    }
+
+    #[test]
+    fn test_vec_pack_u128() {
+        let element_bytes = vec![
+            vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec![4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        ];
+
+        let expected_result_bytes = vec![
+            4, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 32, 0, 0, 0, 48, 0, 0, 0,
+        ];
+
+        test_vector_pack(
+            &element_bytes,
+            IntermediateType::IU128,
+            &expected_result_bytes,
+        );
+    }
+
+    #[test]
+    fn test_vec_pack_u256() {
+        let element_bytes = vec![
+            vec![
+                1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0,
+            ],
+            vec![
+                2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0,
+            ],
+            vec![
+                3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0,
+            ],
+        ];
+
+        let expected_result_bytes = vec![3, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 64, 0, 0, 0];
+
+        test_vector_pack(
+            &element_bytes,
+            IntermediateType::IU256,
+            &expected_result_bytes,
+        );
+    }
+
+    #[test]
+    fn test_vec_pack_vec_u32() {
+        let element_bytes = vec![
+            vec![2, 0, 0, 0, 10, 0, 0, 0, 20, 0, 0, 0],
+            vec![2, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0],
+            vec![2, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0],
+        ];
+
+        let expected_result_bytes = vec![3, 0, 0, 0, 0, 0, 0, 0, 12, 0, 0, 0, 24, 0, 0, 0];
+
+        test_vector_pack(
+            &element_bytes,
+            IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+            &expected_result_bytes,
+        );
+    }
+
+    #[test]
+    fn test_vec_pack_vec_u256() {
+        // Each inner vector has 2 elements of u256 (32 bytes each + 4 bytes for pointer) + 4 bytes for length = 76 bytes
+        let element_bytes = vec![
+            // First inner vector [1, 2]
+            {
+                let mut v = vec![2, 0, 0, 0];
+                v.extend_from_slice(&[1; 32]);
+                v.extend_from_slice(&[2; 32]);
+                v
+            },
+            // Second inner vector [3, 4]
+            {
+                let mut v = vec![2, 0, 0, 0];
+                v.extend_from_slice(&[3; 32]);
+                v.extend_from_slice(&[4; 32]);
+                v
+            },
+            // Third inner vector [5, 6]
+            {
+                let mut v = vec![2, 0, 0, 0];
+                v.extend_from_slice(&[5; 32]);
+                v.extend_from_slice(&[6; 32]);
+                v
+            },
+        ];
+
+        let expected_result_bytes = vec![3, 0, 0, 0, 0, 0, 0, 0, 76, 0, 0, 0, 152, 0, 0, 0];
+
+        test_vector_pack(
+            &element_bytes,
+            IntermediateType::IVector(Box::new(IntermediateType::IU256)),
+            &expected_result_bytes,
+        );
+    }
+}
