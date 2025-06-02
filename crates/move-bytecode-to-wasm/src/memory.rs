@@ -15,17 +15,23 @@ const MEMORY_PAGE_SIZE: i32 = 65536;
 /// As contract execution is short lived and we can afford memory leaks, as runtime will be restarted
 ///
 /// Notes:
-///     - Alignment is assumed to be 1 byte (no alignment) - Alignment is not implemented in the current function
+///     - Alignment is assumed to be 1 byte (no alignment)
+///     - Alignment is not implemented in the current function
 ///     - Memory is allocated in pages of 64KiB
 ///     - Memory starts at offset 0
-pub fn setup_module_memory(module: &mut Module) -> (FunctionId, MemoryId) {
+pub fn setup_module_memory(
+    module: &mut Module,
+    initial_offset: Option<i32>,
+) -> (FunctionId, MemoryId) {
     let memory_id = module.memories.add_local(false, false, 1, None, None);
     module.exports.add("memory", memory_id);
 
-    let global_next_free_memory_pointer =
-        module
-            .globals
-            .add_local(ValType::I32, true, false, ConstExpr::Value(Value::I32(0)));
+    let global_next_free_memory_pointer = module.globals.add_local(
+        ValType::I32,
+        true,
+        false,
+        ConstExpr::Value(Value::I32(initial_offset.unwrap_or(0))),
+    );
 
     let global_available_memory = module.globals.add_local(
         ValType::I32,
@@ -126,26 +132,15 @@ pub fn setup_module_memory(module: &mut Module) -> (FunctionId, MemoryId) {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::display_module;
+    use crate::test_tools::build_module;
 
     use super::*;
 
-    use walrus::ModuleConfig;
     use wasmtime::{Engine, Instance, Module as WasmModule, Store};
-
-    fn build_module() -> Module {
-        let config = ModuleConfig::new();
-        let mut module = Module::with_config(config);
-        setup_module_memory(&mut module);
-
-        display_module(&mut module);
-
-        module
-    }
 
     #[test]
     fn test_memory_allocator() {
-        let mut raw_module = build_module();
+        let (mut raw_module, _, _) = build_module(None);
 
         let engine = Engine::default();
         let module = WasmModule::from_binary(&engine, &raw_module.emit_wasm()).unwrap();

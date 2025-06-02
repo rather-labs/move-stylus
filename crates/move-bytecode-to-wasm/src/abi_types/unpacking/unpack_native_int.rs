@@ -148,46 +148,16 @@ mod tests {
     use std::fmt::Debug;
 
     use alloy_sol_types::sol;
-    use walrus::{FunctionBuilder, FunctionId, ModuleConfig, ValType};
-    use wasmtime::{Engine, Linker, Module as WasmModule, Store, TypedFunc, WasmResults};
+    use walrus::{FunctionBuilder, ValType};
+    use wasmtime::WasmResults;
 
     use crate::{
-        abi_types::unpacking::Unpackable, memory::setup_module_memory,
+        abi_types::unpacking::Unpackable,
+        test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
 
     use super::*;
-
-    fn build_module() -> (Module, FunctionId, MemoryId) {
-        let config = ModuleConfig::new();
-        let mut module = Module::with_config(config);
-        let (allocator_func, memory_id) = setup_module_memory(&mut module);
-
-        (module, allocator_func, memory_id)
-    }
-
-    fn setup_wasmtime_module<R: WasmResults>(
-        module: &mut Module,
-        initial_memory_data: Vec<u8>,
-        function_name: &str,
-    ) -> (Linker<()>, Store<()>, TypedFunc<(), R>) {
-        let engine = Engine::default();
-        let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
-
-        let linker = Linker::new(&engine);
-
-        let mut store = Store::new(&engine, ());
-        let instance = linker.instantiate(&mut store, &module).unwrap();
-
-        let entrypoint = instance
-            .get_typed_func::<(), R>(&mut store, function_name)
-            .unwrap();
-
-        let memory = instance.get_memory(&mut store, "memory").unwrap();
-        memory.write(&mut store, 0, &initial_memory_data).unwrap();
-
-        (linker, store, entrypoint)
-    }
 
     fn test_uint<T: WasmResults + PartialEq + Debug>(
         int_type: impl Unpackable,
@@ -195,7 +165,7 @@ mod tests {
         expected_result: T,
         result_type: ValType,
     ) {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
 
         let mut function_builder = FunctionBuilder::new(&mut raw_module.types, &[], &[result_type]);
 
@@ -218,8 +188,8 @@ mod tests {
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        let (_, mut store, entrypoint) =
-            setup_wasmtime_module::<T>(&mut raw_module, data.to_vec(), "test_function");
+        let (_, _, mut store, entrypoint) =
+            setup_wasmtime_module::<_, T>(&mut raw_module, data.to_vec(), "test_function", None);
 
         let result = entrypoint.call(&mut store, ()).unwrap();
         assert_eq!(result, expected_result);

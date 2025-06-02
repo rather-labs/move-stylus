@@ -94,23 +94,14 @@ pub fn add_entrypoint(module: &mut Module, func: FunctionId) {
 
 #[cfg(test)]
 mod tests {
-    use walrus::{MemoryId, ModuleConfig};
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
     use crate::{
-        memory::setup_module_memory, translation::intermediate_types::ISignature,
+        test_tools::build_module, translation::intermediate_types::ISignature,
         utils::display_module,
     };
 
     use super::*;
-
-    fn build_module() -> (Module, FunctionId, MemoryId) {
-        let config = ModuleConfig::new();
-        let mut module = Module::with_config(config);
-        let (allocator_func, memory_id) = setup_module_memory(&mut module);
-
-        (module, allocator_func, memory_id)
-    }
 
     fn add_noop_function<'a>(module: &mut Module, signature: &'a ISignature) -> PublicFunction<'a> {
         // Noop function
@@ -239,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_build_entrypoint_router_noop() {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
         let signature = ISignature {
             arguments: vec![],
             returns: vec![],
@@ -277,7 +268,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "unreachable")]
     fn test_build_entrypoint_router_no_data() {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
         let signature = ISignature {
             arguments: vec![],
             returns: vec![],
@@ -299,7 +290,7 @@ mod tests {
 
     #[test]
     fn test_build_entrypoint_router_no_match() {
-        let (mut raw_module, allocator_func, memory_id) = build_module();
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
         let signature = ISignature {
             arguments: vec![],
             returns: vec![],

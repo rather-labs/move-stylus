@@ -1,4 +1,5 @@
 pub mod add;
+pub mod bitwise;
 pub mod mul;
 pub mod sub;
 
