@@ -87,7 +87,7 @@ impl MappedFunction {
     /// For each value-type argument (like u64, u32, etc.), this stores the value in linear memory
     /// and updates the local to hold a pointer to that memory instead. This allows treating all
     /// arguments as pointers in later code.
-    pub fn convert_args_to_heap(
+    pub fn box_args(
         &mut self,
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
@@ -102,34 +102,14 @@ impl MappedFunction {
             .iter()
             .zip(self.signature.arguments.iter())
         {
+            builder.local_get(*local);
             match ty {
                 IntermediateType::IU64 => {
-                    let tmp = module.locals.add(ValType::I64);
-                    let pointer = module.locals.add(ValType::I32);
+                    let outer_ptr = module.locals.add(ValType::I32);
+                    ty.box_local_instructions(module, builder, compilation_ctx, outer_ptr);
 
-                    // Save original value
-                    builder.local_get(*local);
-                    builder.local_set(tmp);
-
-                    // Allocate heap memory
-                    builder.i32_const(ty.stack_data_size() as i32);
-                    builder.call(compilation_ctx.allocator);
-                    builder.local_tee(pointer);
-
-                    // Store value
-                    builder.local_get(tmp);
-                    builder.store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I64 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-
-                    // Store the update for later
                     if let Some(index) = self.function_locals.iter().position(|&id| id == *local) {
-                        updates.push((index, pointer));
+                        updates.push((index, outer_ptr));
                     } else {
                         panic!(
                             "Couldn't find original local {:?} in mapped_function",
@@ -137,38 +117,12 @@ impl MappedFunction {
                         );
                     }
                 }
-
-                IntermediateType::IBool
-                | IntermediateType::IU8
-                | IntermediateType::IU16
-                | IntermediateType::IU32 => {
-                    let tmp = module.locals.add(ValType::I32);
-
-                    builder.local_get(*local);
-                    builder.local_set(tmp);
-
-                    builder.i32_const(ty.stack_data_size() as i32);
-                    builder.call(compilation_ctx.allocator);
-                    builder.local_tee(*local);
-
-                    builder.local_get(tmp);
-                    builder.store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-                }
-
                 _ => {
-                    // Already a pointer
+                    ty.box_local_instructions(module, builder, compilation_ctx, *local);
                 }
             }
         }
 
-        // Apply local replacement after the iteration
         for (index, pointer) in updates {
             self.function_locals[index] = pointer;
         }

@@ -2,6 +2,7 @@ use walrus::{FunctionId, Module};
 
 use crate::CompilationContext;
 
+mod copy;
 mod integers;
 mod swap;
 
@@ -26,6 +27,9 @@ pub enum RuntimeFunction {
     // Swap bytes
     SwapI32Bytes,
     SwapI64Bytes,
+    // Copy
+    CopyU128,
+    CopyU256,
 }
 
 impl RuntimeFunction {
@@ -51,11 +55,14 @@ impl RuntimeFunction {
             // Swap bytes
             Self::SwapI32Bytes => "swap_i32_bytes",
             Self::SwapI64Bytes => "swap_i64_bytes",
+            // Copy
+            Self::CopyU128 => "copy_u128",
+            Self::CopyU256 => "copy_u256",
         }
     }
 
     /// Links the function into the module and returns its id. If the function is already present
-    /// it just resunts the id.
+    /// it just returns the id.
     ///
     /// This funciton is idempotent.
     pub fn get(
@@ -98,6 +105,9 @@ impl RuntimeFunction {
                 (Self::HeapIntShiftRight, Some(ctx)) => {
                     integers::bitwise::heap_int_shift_right(module, ctx)
                 }
+                // Copy
+                (Self::CopyU128, Some(ctx)) => copy::copy_u128_function(module, ctx),
+                (Self::CopyU256, Some(ctx)) => copy::copy_u256_function(module, ctx),
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,
                     self.name()
