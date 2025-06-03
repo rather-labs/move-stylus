@@ -6,10 +6,7 @@ use walrus::{
 use super::RuntimeFunction;
 use crate::CompilationContext;
 
-pub fn copy_u128_function(
-    module: &mut Module,
-    compilation_ctx: &CompilationContext,
-) -> FunctionId {
+pub fn copy_u128_function(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
     let mut builder = function
         .name(RuntimeFunction::CopyU128.name().to_owned())
@@ -46,10 +43,7 @@ pub fn copy_u128_function(
     function.finish(vec![src_ptr], &mut module.funcs)
 }
 
-pub fn copy_u256_function(
-    module: &mut Module,
-    compilation_ctx: &CompilationContext,
-) -> FunctionId {
+pub fn copy_u256_function(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
     let mut builder = function
         .name(RuntimeFunction::CopyU256.name().to_owned())

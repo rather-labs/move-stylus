@@ -1,6 +1,6 @@
 use super::Unpackable;
 use crate::translation::intermediate_types::IntermediateType;
-use crate::translation::intermediate_types::imm_reference::IRef;
+use crate::translation::intermediate_types::reference::{IMutRef, IRef};
 use walrus::{
     FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module,
     ir::{MemArg, StoreKind},
@@ -69,7 +69,77 @@ impl IRef {
                 builder.local_get(ptr_local);
             }
 
-            IntermediateType::IRef(_) => {
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                panic!("Inner type cannot be a reference!");
+            }
+        }
+    }
+}
+
+impl IMutRef {
+    pub fn add_unpack_instructions(
+        inner: &IntermediateType,
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        reader_pointer: LocalId,
+        calldata_reader_pointer: LocalId,
+        memory: MemoryId,
+        allocator: FunctionId,
+    ) {
+        match inner {
+            // If inner is a heap type, forward the pointer
+            IntermediateType::IVector(_)
+            | IntermediateType::IAddress
+            | IntermediateType::ISigner
+            | IntermediateType::IU128
+            | IntermediateType::IU256 => {
+                inner.add_unpack_instructions(
+                    builder,
+                    module,
+                    reader_pointer,
+                    calldata_reader_pointer,
+                    memory,
+                    allocator,
+                );
+            }
+            // For immediates, allocate and store
+            IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64
+            | IntermediateType::IBool => {
+                let ptr_local = module.locals.add(walrus::ValType::I32);
+
+                builder.i32_const(inner.stack_data_size() as i32);
+                builder.call(allocator);
+                builder.local_tee(ptr_local);
+
+                inner.add_unpack_instructions(
+                    builder,
+                    module,
+                    reader_pointer,
+                    calldata_reader_pointer,
+                    memory,
+                    allocator,
+                );
+
+                builder.store(
+                    memory,
+                    match inner.stack_data_size() {
+                        4 => StoreKind::I32 { atomic: false },
+                        8 => StoreKind::I64 { atomic: false },
+                        _ => panic!("Unsupported stack_data_size for IRef"),
+                    },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                builder.local_get(ptr_local);
+            }
+
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
         }

@@ -276,11 +276,8 @@ fn map_bytecode_instruction(
                 .expect("ReadRef expects a reference on the stack");
 
             match ref_type {
-                IntermediateType::IRef(inner) => {
-                    // Now call directly on the inner type
+                IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
                     inner.add_read_ref_instructions(builder, compilation_ctx.memory_id);
-
-                    // And push the inner type into the stack
                     types_stack.push(*inner);
                 }
                 _ => panic!("ReadRef expected a IRef type but got: {:?}", ref_type),

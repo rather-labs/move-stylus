@@ -6,14 +6,14 @@ use crate::translation::intermediate_types::{
     IntermediateType,
     address::IAddress,
     heap_integers::{IU128, IU256},
-    imm_reference::IRef,
+    reference::{IMutRef, IRef},
     signer::ISigner,
     vector::IVector,
 };
 
 mod pack_heap_int;
-mod pack_imm_reference;
 mod pack_native_int;
+mod pack_reference;
 mod pack_vector;
 
 pub trait Packable {
@@ -142,7 +142,8 @@ impl Packable for IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IAddress
             | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => {
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -207,6 +208,16 @@ impl Packable for IntermediateType {
                 memory,
                 alloc_function,
             ),
+            IntermediateType::IMutRef(inner) => IMutRef::add_pack_instructions(
+                inner,
+                builder,
+                module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                memory,
+                alloc_function,
+            ),
         }
     }
 
@@ -222,7 +233,8 @@ impl Packable for IntermediateType {
             IntermediateType::IAddress => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::ISigner => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::IVector(_) => 32,
-            IntermediateType::IRef(inner) => inner.encoded_size(),
+            IntermediateType::IRef(inner) => inner.encoded_size(), // TODO: check if this is correct. Shouldnt be 32?
+            IntermediateType::IMutRef(inner) => inner.encoded_size(), // TODO: check if this is correct. Shouldnt be 32?
         }
     }
 }
