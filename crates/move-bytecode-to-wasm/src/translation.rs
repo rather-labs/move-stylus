@@ -283,6 +283,22 @@ fn map_bytecode_instruction(
                 _ => panic!("ReadRef expected a IRef type but got: {:?}", ref_type),
             }
         }
+        Bytecode::WriteRef => match (types_stack.pop(), types_stack.pop()) {
+            (Some(IntermediateType::IMutRef(inner)), Some(value_type)) => {
+                if *inner == value_type {
+                    inner.add_write_ref_instructions(module, builder, compilation_ctx);
+                } else {
+                    panic!(
+                        "WriteRef type mismatch: expected value of type {:?}, got {:?}",
+                        inner, value_type
+                    );
+                }
+            }
+            (Some(other), Some(_)) => {
+                panic!("WriteRef expected a mutable reference, got {:?}", other);
+            }
+            _ => panic!("Type stack underflow on WriteRef"),
+        },
 
         Bytecode::Pop => {
             builder.drop();

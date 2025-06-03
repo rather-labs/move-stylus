@@ -40,3 +40,14 @@ public fun miscellaneous(): vector<u64> {
     let y = x[1];
     vector[y, v[1][1]]
 }
+
+public fun deref_mut_arg(x: &mut vector<u64> ): vector<u64> {
+ *x
+}
+
+public fun write_mut_ref(x: &mut vector<u64> ): vector<u64> {
+ *x = vector<u64>[1, 2, 3];
+ *x
+}
+
+

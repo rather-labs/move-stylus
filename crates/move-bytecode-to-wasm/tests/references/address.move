@@ -18,3 +18,12 @@ public fun deref_nested_address(x: address): address {
     let z = &*y;
     *z
 }
+
+public fun deref_mut_arg(x: &mut address ): address {
+ *x
+}
+
+public fun write_mut_ref(x: &mut address ): address {
+ *x = @0x7890abcdef1234567890abcdef1234567890abcd;
+ *x
+}

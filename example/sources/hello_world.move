@@ -1,9 +1,29 @@
 module 0x01::hello_world;
 
-// Forces the compiler to store literals on locals
-public fun test(): vector<u32> {
-  let x: vector<u32> = vector[1u32, 2u32, 3u32];
-  let y = x; 
-  let _z = x; 
-  y
+public fun deref_u64(x: u64): u64 {
+  let y = &x;
+  *y
+}
+
+public fun deref_u64_ref(y: &u64): u64 {
+  *y
+}
+
+public fun call_deref_u64_ref(x: u64): u64 {
+    deref_u64_ref(&x)
+}
+
+public fun deref_nested_u64(x: u64): u64 {
+    let y = &x;
+    let z = &*y;
+    *z
+}
+
+public fun deref_mut_arg(x: &mut u64 ): u64 {
+ *x
+}
+
+public fun write_mut_ref(x: &mut u64 ): u64 {
+ *x = 1;
+ *x
 }
