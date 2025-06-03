@@ -72,15 +72,18 @@ const F_SHIFT_64BITS_RIGHT: &str = "shift_64bits_right";
 /// **Note:** In the implementation, indices and operations are reversed because we work in
 /// little-endian format. This description and the example assume big-endian for clarity.
 ///
-/// ### Arguments
+/// # Arguments
 /// - Pointer to the dividend
 /// - Pointer to the divisor
 /// - Number of bytes the values occupy in memory
 ///
-/// ### Returns
+/// # Returns
 /// - Pointer to the quotient
 /// - Pointer to the remainder
-pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+pub fn heap_integers_div_mod(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32, ValType::I32],
@@ -501,7 +504,6 @@ mod tests {
     use alloy_primitives::U256;
     use rstest::rstest;
     use walrus::FunctionBuilder;
-    use wasmtime::Linker;
 
     use super::*;
 
@@ -704,17 +706,8 @@ mod tests {
     #[case(u32::MAX as u128, (u32::MAX as u128) << 64)]
     #[case(u64::MAX as u128, (u64::MAX as u128) << 64)]
     fn test_shift_64bits_right_u128(#[case] a: u128, #[case] expected: u128) {
-        use wasmtime::Engine;
-
-        use crate::{
-            test_tools::{get_linker_with_host_debug_functions, inject_host_debug_functions},
-            utils::display_module,
-        };
-
         const TYPE_HEAP_SIZE: i32 = 16;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
-
-        inject_host_debug_functions(&mut raw_module);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[]);
@@ -737,24 +730,14 @@ mod tests {
                 constants: &[],
             },
         );
-        // Shift left
         func_body.call(shift_64bits_right_f);
 
         let function = function_builder.finish(vec![a_ptr], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        display_module(&mut raw_module);
-
-        let linker = get_linker_with_host_debug_functions();
-
-        println!("a: {a:?}");
         let data = a.to_le_bytes();
-        let (_, instance, mut store, entrypoint) = setup_wasmtime_module::<i32, ()>(
-            &mut raw_module,
-            data.to_vec(),
-            "test_function",
-            Some(linker),
-        );
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, ()>(&mut raw_module, data.to_vec(), "test_function", None);
 
         entrypoint.call(&mut store, 0).unwrap();
 
@@ -773,15 +756,8 @@ mod tests {
     #[case(U256::from(u128::MAX), U256::from(u128::MAX) << 64)]
     #[case(U256::MAX, U256::MAX << 64)]
     fn test_shift_64bits_right_u256(#[case] a: U256, #[case] expected: U256) {
-        use crate::{
-            test_tools::{get_linker_with_host_debug_functions, inject_host_debug_functions},
-            utils::display_module,
-        };
-
         const TYPE_HEAP_SIZE: i32 = 32;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
-
-        inject_host_debug_functions(&mut raw_module);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[]);
@@ -804,23 +780,14 @@ mod tests {
                 constants: &[],
             },
         );
-        // Shift left
         func_body.call(shift_64bits_right_f);
 
         let function = function_builder.finish(vec![a_ptr], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        display_module(&mut raw_module);
-
-        let linker = get_linker_with_host_debug_functions();
-
         let data = a.to_le_bytes::<32>();
-        let (_, instance, mut store, entrypoint) = setup_wasmtime_module::<i32, ()>(
-            &mut raw_module,
-            data.to_vec(),
-            "test_function",
-            Some(linker),
-        );
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, ()>(&mut raw_module, data.to_vec(), "test_function", None);
 
         entrypoint.call(&mut store, 0).unwrap();
 
@@ -847,17 +814,8 @@ mod tests {
         #[case] quotient: u128,
         #[case] remainder: u128,
     ) {
-        use wasmtime::Engine;
-
-        use crate::{
-            test_tools::{get_linker_with_host_debug_functions, inject_host_debug_functions},
-            utils::display_module,
-        };
-
         const TYPE_HEAP_SIZE: i32 = 16;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        inject_host_debug_functions(&mut raw_module);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -876,7 +834,7 @@ mod tests {
             .i32_const(TYPE_HEAP_SIZE)
             .i32_const(TYPE_HEAP_SIZE);
 
-        let heap_integers_add_f = heap_integers_div(
+        let heap_integers_add_f = heap_integers_div_mod(
             &mut raw_module,
             &CompilationContext {
                 memory_id,
@@ -893,17 +851,9 @@ mod tests {
         let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        display_module(&mut raw_module);
-
-        let linker = get_linker_with_host_debug_functions();
-
         let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
-        let (_, instance, mut store, entrypoint) = setup_wasmtime_module(
-            &mut raw_module,
-            data.to_vec(),
-            "test_function",
-            Some(linker),
-        );
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
         let (quotient_ptr, remainder_ptr): (i32, i32) =
             entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
@@ -988,7 +938,7 @@ mod tests {
             .i32_const(TYPE_HEAP_SIZE)
             .i32_const(TYPE_HEAP_SIZE);
 
-        let heap_integers_add_f = heap_integers_div(
+        let heap_integers_add_f = heap_integers_div_mod(
             &mut raw_module,
             &CompilationContext {
                 memory_id,

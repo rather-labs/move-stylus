@@ -315,6 +315,37 @@ impl IU128 {
 
         builder.i32_const(Self::HEAP_SIZE).call(mul_function_id);
     }
+
+    pub fn div(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+    ) {
+        let div_mod_function_id = RuntimeFunction::HeapIntDiv.get(module, Some(compilation_ctx));
+
+        builder
+            .i32_const(Self::HEAP_SIZE)
+            .call(div_mod_function_id)
+            // drop the remainder
+            .drop();
+    }
+
+    pub fn remainder(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+    ) {
+        let div_mod_function_id = RuntimeFunction::HeapIntDiv.get(module, Some(compilation_ctx));
+
+        let remainder_ptr = module.locals.add(ValType::I32);
+        builder
+            .i32_const(Self::HEAP_SIZE)
+            .call(div_mod_function_id)
+            .local_set(remainder_ptr)
+            // drop the quotient
+            .drop()
+            .local_get(remainder_ptr);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -547,5 +578,36 @@ impl IU256 {
     ) {
         let mul_function_id = RuntimeFunction::HeapIntMul.get(module, Some(compilation_ctx));
         builder.i32_const(Self::HEAP_SIZE).call(mul_function_id);
+    }
+
+    pub fn div(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+    ) {
+        let div_mod_function_id = RuntimeFunction::HeapIntDiv.get(module, Some(compilation_ctx));
+
+        builder
+            .i32_const(Self::HEAP_SIZE)
+            .call(div_mod_function_id)
+            // drop the remainder
+            .drop();
+    }
+
+    pub fn remainder(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+    ) {
+        let div_mod_function_id = RuntimeFunction::HeapIntDiv.get(module, Some(compilation_ctx));
+
+        let remainder_ptr = module.locals.add(ValType::I32);
+        builder
+            .i32_const(Self::HEAP_SIZE)
+            .call(div_mod_function_id)
+            .local_set(remainder_ptr)
+            // drop the quotient
+            .drop()
+            .local_get(remainder_ptr);
     }
 }

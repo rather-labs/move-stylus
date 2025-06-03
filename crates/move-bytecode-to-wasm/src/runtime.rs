@@ -87,7 +87,7 @@ impl RuntimeFunction {
                 (Self::MulU32, _) => integers::mul::mul_u32(module),
                 (Self::MulU64, _) => integers::mul::mul_u64(module),
                 (Self::HeapIntMul, Some(ctx)) => integers::mul::heap_integers_mul(module, ctx),
-                (Self::HeapIntDiv, Some(ctx)) => integers::div::heap_integers_div(module, ctx),
+                (Self::HeapIntDiv, Some(ctx)) => integers::div::heap_integers_div_mod(module, ctx),
                 // Swap
                 (Self::SwapI32Bytes, _) => swap::swap_i32_bytes_function(module),
                 (Self::SwapI64Bytes, _) => {
