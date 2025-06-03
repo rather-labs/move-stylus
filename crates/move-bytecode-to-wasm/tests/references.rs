@@ -363,6 +363,8 @@ mod reference_address {
         function derefAddressRef(address x) external returns (address);
         function callDerefAddressRef(address x) external returns (address);
         function derefNestedAddress(address x) external returns (address);
+        function derefMutArg(address x) external returns (address);
+        function writeMutRef(address x) external returns (address);
     );
 
     #[fixture]
@@ -387,6 +389,19 @@ mod reference_address {
         let expected_result = <sol!((address,))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+
+    #[rstest]
+    #[case(derefMutArgCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x1234567890abcdef1234567890abcdef12345678"))]
+    #[case(writeMutRefCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x0000000000000000000000000000000000000001"))]
+    fn test_address_mut_ref<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: Address,
+    ) {
+        let expected_result = <sol!((address,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
+    
 }
 
 mod reference_signer {

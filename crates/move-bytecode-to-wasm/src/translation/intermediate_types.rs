@@ -146,7 +146,6 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_) => {
-                // For heap types we just forward the pointer
                 builder.local_get(local).load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
