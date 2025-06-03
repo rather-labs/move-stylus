@@ -26,6 +26,8 @@ mod reference_bool {
         function derefBoolRef(bool x) external returns (bool);
         function callDerefBoolRef(bool x) external returns (bool);
         function derefNestedBool(bool x) external returns (bool);
+        function derefMutArg(bool x) external returns (bool);
+        function writeMutRef(bool x) external returns (bool);
     );
 
     #[fixture]
@@ -44,6 +46,18 @@ mod reference_bool {
     #[case(callDerefBoolRefCall::new((true,)), true)]
     #[case(derefNestedBoolCall::new((false,)), false)]
     fn test_bool_immutable_ref<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: bool,
+    ) {
+        let expected_result = <sol!((bool,))>::abi_encode_params(&(expected_result,));
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
+
+    #[rstest]
+    #[case(derefMutArgCall::new((true,)), true)]
+    #[case(writeMutRefCall::new((false,)), true)]
+    fn test_bool_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: bool,
