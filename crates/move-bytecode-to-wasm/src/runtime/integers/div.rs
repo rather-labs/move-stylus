@@ -88,12 +88,10 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
         &[ValType::I32, ValType::I32],
     );
 
-    /*
-        let print_i32 = module.imports.get_func("", "print_i32").unwrap();
-        let print_separator = module.imports.get_func("", "print_separator").unwrap();
-        let print_i64 = module.imports.get_func("", "print_i64").unwrap();
-        let print_u128 = module.imports.get_func("", "print_u128").unwrap();
-    */
+    let print_i32 = module.imports.get_func("", "print_i32").unwrap();
+    let print_separator = module.imports.get_func("", "print_separator").unwrap();
+    let print_i64 = module.imports.get_func("", "print_i64").unwrap();
+    let print_u128 = module.imports.get_func("", "print_u128").unwrap();
 
     let shift_64bits_right_f = shift_64bits_right(module, compilation_ctx);
     let check_if_a_less_than_b_f = check_if_a_less_than_b(module, compilation_ctx);
@@ -175,6 +173,8 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
                         },
                     );
 
+                loop_.i32_const(0).call(print_i32);
+                loop_.local_get(remainder_ptr).call(print_u128);
                 // If remainder < divisor -> q[0]
                 // Otherwise we loop substraction until divisor < remainder
                 loop_
@@ -205,16 +205,24 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
                             // Set the substraction counter in 0
                             else_.i64_const(0).local_set(substraction_counter);
 
+                            else_.i32_const(1).call(print_i32);
+                            else_.local_get(remainder_ptr).call(print_u128);
                             else_.loop_(None, |substraction_loop| {
                                 let substraction_loop_id = substraction_loop.id();
 
+                                substraction_loop.i32_const(2).call(print_i32);
+                                substraction_loop.local_get(remainder_ptr).call(print_u128);
                                 // remainder -= divisor
                                 substraction_loop
                                     .local_get(remainder_ptr)
                                     .local_get(divisor_ptr)
+                                    .local_get(remainder_ptr)
                                     .local_get(type_heap_size)
                                     .call(sub_f)
-                                    .local_set(remainder_ptr);
+                                    .drop();
+
+                                substraction_loop.i32_const(3).call(print_i32);
+                                substraction_loop.local_get(remainder_ptr).call(print_u128);
 
                                 // substraction_counter += 1
                                 substraction_loop
@@ -664,11 +672,11 @@ mod tests {
     #[case(5, 2, 2, 1)]
     #[case(123456, 1, 123456, 0)]
     // Memory out of bounds
-    // #[case(u128::MAX, u64::MAX as u128 + 1, u64::MAX as u128, u64::MAX as u128)]
-    #[case(987654321, 123456789, 8, 9)]
-    #[case(0, 2, 0, 0)]
+    #[case(u128::MAX, u64::MAX as u128 + 1, u64::MAX as u128, u64::MAX as u128)]
+    // #[case(987654321, 123456789, 8, 9)]
+    // #[case(0, 2, 0, 0)]
     // 2^92 / 2^32 = [q = 2^64, r = 0]
-    #[case(79228162514264337593543950336, 4294967296, 18446744073709551616, 0)]
+    // #[case(79228162514264337593543950336, 4294967296, 18446744073709551616, 0)]
     // (2^128 - 1) / 2^64 = [q = 2^64 - 1, r = 2^64 - 1]
     // Memory out of bounds
     // #[case(u128::MAX, u64::MAX as u128 + 1, u64::MAX as u128, u64::MAX as u128)]
