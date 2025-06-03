@@ -106,9 +106,64 @@ pub fn heap_integers_div_mod(
     let offset = module.locals.add(ValType::I32);
     let substraction_counter = module.locals.add(ValType::I64);
 
+    // To check if divisor is 0
+    let accumulator = module.locals.add(ValType::I64);
+
     let mut builder = function
         .name(RuntimeFunction::HeapIntDiv.name().to_owned())
         .func_body();
+
+    // Before anything we check if divisor is 0
+    builder.block(None, |block| {
+        let block_id = block.id();
+        block.loop_(None, |loop_| {
+            loop_
+                .local_get(offset)
+                .local_get(type_heap_size)
+                .binop(BinaryOp::I32Eq)
+                .br_if(block_id);
+
+            loop_
+                .local_get(divisor_ptr)
+                .local_get(offset)
+                .binop(BinaryOp::I32Add)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .local_get(accumulator)
+                .binop(BinaryOp::I64Or)
+                .local_set(accumulator);
+
+            // offset += 8
+            loop_
+                .i32_const(8)
+                .local_get(offset)
+                .binop(BinaryOp::I32Add)
+                .local_set(offset);
+        });
+
+        // If the accumulator == 0 means the divisor was 0. We divide by 0 to cause a runtime error
+        // divided by 0
+        block
+            .local_get(accumulator)
+            .i64_const(0)
+            .binop(BinaryOp::I64Eq)
+            .if_else(
+                None,
+                |then| {
+                    then.i32_const(1)
+                        .i32_const(0)
+                        .binop(BinaryOp::I32DivU)
+                        .drop();
+                },
+                |_| {},
+            );
+    });
 
     // We initialize the offset to the most significant bit
     builder
@@ -918,6 +973,8 @@ mod tests {
         #[case] quotient: U256,
         #[case] remainder: U256,
     ) {
+        use crate::utils::display_module;
+
         const TYPE_HEAP_SIZE: i32 = 32;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
 
@@ -955,6 +1012,7 @@ mod tests {
         let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
+        display_module(&mut raw_module);
         let data = [n1.to_le_bytes::<32>(), n2.to_le_bytes::<32>()].concat();
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);

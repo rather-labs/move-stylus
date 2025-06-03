@@ -17,7 +17,6 @@ mod hostio;
 mod memory;
 mod runtime;
 mod runtime_error_codes;
-#[cfg(test)]
 mod test_tools;
 mod translation;
 mod utils;
