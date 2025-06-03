@@ -52,6 +52,7 @@ where
     (linker, instance, store, entrypoint)
 }
 
+#[allow(dead_code)]
 pub fn get_linker_with_host_debug_functions<T>() -> Linker<T> {
     let mut linker = Linker::new(&Engine::default());
     linker
@@ -91,6 +92,7 @@ pub fn get_linker_with_host_debug_functions<T>() -> Linker<T> {
     linker
 }
 
+#[allow(dead_code)]
 pub fn inject_host_debug_functions(module: &mut Module) {
     let func_ty = module.types.add(&[ValType::I32], &[]);
     module.add_import_func("", "print_i32", func_ty);
