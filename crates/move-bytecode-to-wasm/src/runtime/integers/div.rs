@@ -110,7 +110,7 @@ pub fn heap_integers_div_mod(
     let accumulator = module.locals.add(ValType::I64);
 
     let mut builder = function
-        .name(RuntimeFunction::HeapIntDiv.name().to_owned())
+        .name(RuntimeFunction::HeapIntDivMod.name().to_owned())
         .func_body();
 
     // Before anything we check if divisor is 0

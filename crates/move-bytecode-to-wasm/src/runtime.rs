@@ -20,7 +20,7 @@ pub enum RuntimeFunction {
     SubU32,
     SubU64,
     HeapIntSub,
-    HeapIntDiv,
+    HeapIntDivMod,
     MulU32,
     MulU64,
     HeapIntMul,
@@ -46,7 +46,7 @@ impl RuntimeFunction {
             Self::MulU32 => "mul_u32",
             Self::MulU64 => "mul_u64",
             Self::HeapIntMul => "heap_integer_mul",
-            Self::HeapIntDiv => "heap_integer_div",
+            Self::HeapIntDivMod => "heap_integer_div_mod",
             // Bitwise
             Self::HeapIntShiftLeft => "heap_integer_shift_left",
             Self::HeapIntShiftRight => "heap_integer_shift_right",
@@ -87,7 +87,9 @@ impl RuntimeFunction {
                 (Self::MulU32, _) => integers::mul::mul_u32(module),
                 (Self::MulU64, _) => integers::mul::mul_u64(module),
                 (Self::HeapIntMul, Some(ctx)) => integers::mul::heap_integers_mul(module, ctx),
-                (Self::HeapIntDiv, Some(ctx)) => integers::div::heap_integers_div_mod(module, ctx),
+                (Self::HeapIntDivMod, Some(ctx)) => {
+                    integers::div::heap_integers_div_mod(module, ctx)
+                }
                 // Swap
                 (Self::SwapI32Bytes, _) => swap::swap_i32_bytes_function(module),
                 (Self::SwapI64Bytes, _) => {

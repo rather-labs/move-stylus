@@ -321,7 +321,7 @@ impl IU128 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
     ) {
-        let div_mod_function_id = RuntimeFunction::HeapIntDiv.get(module, Some(compilation_ctx));
+        let div_mod_function_id = RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx));
 
         builder
             .i32_const(Self::HEAP_SIZE)
@@ -335,7 +335,7 @@ impl IU128 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
     ) {
-        let div_mod_function_id = RuntimeFunction::HeapIntDiv.get(module, Some(compilation_ctx));
+        let div_mod_function_id = RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx));
 
         let remainder_ptr = module.locals.add(ValType::I32);
         builder
@@ -585,7 +585,7 @@ impl IU256 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
     ) {
-        let div_mod_function_id = RuntimeFunction::HeapIntDiv.get(module, Some(compilation_ctx));
+        let div_mod_function_id = RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx));
 
         builder
             .i32_const(Self::HEAP_SIZE)
@@ -599,7 +599,7 @@ impl IU256 {
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
     ) {
-        let div_mod_function_id = RuntimeFunction::HeapIntDiv.get(module, Some(compilation_ctx));
+        let div_mod_function_id = RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx));
 
         let remainder_ptr = module.locals.add(ValType::I32);
         builder
