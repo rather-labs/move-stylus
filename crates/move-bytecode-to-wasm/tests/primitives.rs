@@ -922,8 +922,8 @@ mod uint_128 {
     #[case(0, 2, 0)]
     // 2^96 / 2^32 = [q = 2^64, r = 0]
     #[case(79228162514264337593543950336, 4294967296, 0)]
-    // #[should_panic(expected = "wasm trap: integer divide by zero")]
-    // #[case(10, 0, 0)]
+    #[should_panic(expected = "wasm trap: integer divide by zero")]
+    #[case(10, 0, 0)]
     fn test_uint_128_mod(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] dividend: u128,
@@ -1278,8 +1278,8 @@ mod uint_256 {
         U256::from(18446744073709551616_u128),
         U256::from(0)
     )]
-    //#[should_panic(expected = "wasm trap: integer divide by zero")]
-    //#[case(10, 0, 0)]
+    #[should_panic(expected = "wasm trap: integer divide by zero")]
+    #[case(U256::from(10), U256::from(0), U256::from(0))]
     fn test_uint_256_mod(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] dividend: U256,

@@ -9,7 +9,7 @@ use crate::{CompilationContext, runtime::RuntimeFunction};
 const F_A_LESS_THAN_B: &str = "a_less_than_b";
 const F_SHIFT_64BITS_RIGHT: &str = "shift_64bits_right";
 
-/// Implements the restoring division algorithm for 128 and 256 bit integers.
+/// Implements the long division algorithm for 128 and 256 bit integers.
 ///
 /// We assume a base of the numbers is 64.
 ///
@@ -117,6 +117,8 @@ pub fn heap_integers_div_mod(
     builder.block(None, |block| {
         let block_id = block.id();
         block.loop_(None, |loop_| {
+            let loop_id = loop_.id();
+
             loop_
                 .local_get(offset)
                 .local_get(type_heap_size)
@@ -144,26 +146,27 @@ pub fn heap_integers_div_mod(
                 .i32_const(8)
                 .local_get(offset)
                 .binop(BinaryOp::I32Add)
-                .local_set(offset);
+                .local_set(offset)
+                .br(loop_id);
         });
-
-        // If the accumulator == 0 means the divisor was 0. We divide by 0 to cause a runtime error
-        // divided by 0
-        block
-            .local_get(accumulator)
-            .i64_const(0)
-            .binop(BinaryOp::I64Eq)
-            .if_else(
-                None,
-                |then| {
-                    then.i32_const(1)
-                        .i32_const(0)
-                        .binop(BinaryOp::I32DivU)
-                        .drop();
-                },
-                |_| {},
-            );
     });
+
+    // If the accumulator == 0 means the divisor was 0. We divide by 0 to cause a runtime error
+    // divided by 0
+    builder
+        .local_get(accumulator)
+        .i64_const(0)
+        .binop(BinaryOp::I64Eq)
+        .if_else(
+            None,
+            |then| {
+                then.i32_const(1)
+                    .i32_const(0)
+                    .binop(BinaryOp::I32DivU)
+                    .drop();
+            },
+            |_| {},
+        );
 
     // We initialize the offset to the most significant bit
     builder
@@ -859,6 +862,8 @@ mod tests {
     #[case(0, 2, 0, 0)]
     // 2^96 / 2^32 = [q = 2^64, r = 0]
     #[case(79228162514264337593543950336, 4294967296, 18446744073709551616, 0)]
+    #[should_panic(expected = "wasm trap: integer divide by zero")]
+    #[case(10, 0, 0, 0)]
     // Timeouts, the algorithm is slow yet
     // (2^128 - 1) / 2^64 = [q = 2^64 - 1, r = 2^64 - 1]
     // #[case(u128::MAX, u64::MAX as u128 + 1, u64::MAX as u128, u64::MAX as u128)]
@@ -905,7 +910,6 @@ mod tests {
 
         let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
-
         let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
@@ -973,8 +977,6 @@ mod tests {
         #[case] quotient: U256,
         #[case] remainder: U256,
     ) {
-        use crate::utils::display_module;
-
         const TYPE_HEAP_SIZE: i32 = 32;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
 
@@ -1012,7 +1014,6 @@ mod tests {
         let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        display_module(&mut raw_module);
         let data = [n1.to_le_bytes::<32>(), n2.to_le_bytes::<32>()].concat();
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
