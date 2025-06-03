@@ -1,6 +1,6 @@
 use walrus::{
     InstrSeqBuilder, Module, ValType,
-    ir::{MemArg, StoreKind},
+    ir::{LoadKind, MemArg, StoreKind},
 };
 
 use crate::CompilationContext;

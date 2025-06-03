@@ -149,6 +149,8 @@ pub fn downcast_u128_u256_to_u32(
                     |then| {
                         // If we checked all the heap for zeroes we exit
                         then.local_get(heap_size)
+                            .i32_const(4)
+                            .binop(BinaryOp::I32Sub)
                             .local_get(offset)
                             .binop(BinaryOp::I32Eq)
                             .br_if(inner_block_id);
@@ -234,6 +236,8 @@ pub fn downcast_u128_u256_to_u64(
                     |then| {
                         // If we checked all the heap for zeroes we exit
                         then.local_get(heap_size)
+                            .i32_const(8)
+                            .binop(BinaryOp::I32Sub)
                             .local_get(offset)
                             .binop(BinaryOp::I32Eq)
                             .br_if(inner_block_id);

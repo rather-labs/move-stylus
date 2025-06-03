@@ -43,7 +43,7 @@ pub fn translate_function(
 
     entry
         .function
-        .convert_args_to_heap(&mut builder, module, compilation_ctx);
+        .box_args(&mut builder, module, compilation_ctx);
 
     let entry = function_table
         .get(index)
@@ -172,7 +172,7 @@ fn map_bytecode_instruction(
         Bytecode::StLoc(local_id) => {
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = &mapped_function.function_locals_ir[*local_id as usize];
-            local_type.store_local_instructions(module, builder, compilation_ctx, local);
+            local_type.box_local_instructions(module, builder, compilation_ctx, local);
             pop_types_stack(types_stack, local_type).unwrap();
         }
         Bytecode::MoveLoc(local_id) => {
@@ -210,7 +210,7 @@ fn map_bytecode_instruction(
         Bytecode::ImmBorrowLoc(local_id) => {
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = &mapped_function.function_locals_ir[*local_id as usize];
-            local_type.add_borrow_local_instructions(builder, local);
+            local_type.add_borrow_local_instructions(builder, compilation_ctx, local);
 
             // Push the reference to the type into the types stack
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));

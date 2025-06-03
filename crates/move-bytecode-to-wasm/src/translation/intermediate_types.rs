@@ -10,7 +10,7 @@ use walrus::{
 };
 
 use crate::CompilationContext;
-
+use crate::runtime::RuntimeFunction;
 pub mod address;
 pub mod boolean;
 pub mod heap_integers;
@@ -88,64 +88,6 @@ impl IntermediateType {
         }
     }
 
-    pub fn store_local_instructions(
-        &self,
-        module: &mut Module,
-        builder: &mut InstrSeqBuilder,
-        compilation_ctx: &CompilationContext,
-        local: LocalId,
-    ) {
-        match self {
-            IntermediateType::IBool
-            | IntermediateType::IU8
-            | IntermediateType::IU16
-            | IntermediateType::IU32 => {
-                let tmp = module.locals.add(ValType::I32);
-                builder.local_set(tmp);
-                builder
-                    .i32_const(self.stack_data_size() as i32)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(local);
-
-                builder.local_get(tmp).store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            }
-            IntermediateType::IU64 => {
-                let tmp = module.locals.add(ValType::I64);
-                builder.local_set(tmp);
-                builder
-                    .i32_const(8)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(local);
-
-                builder.local_get(tmp).store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I64 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            }
-
-            IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::IAddress
-            | IntermediateType::ISigner
-            | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => {
-                // For heap/pointer types just store the address
-                builder.local_set(local);
-            }
-        }
-    }
-
     pub fn move_local_instructions(
         &self,
         builder: &mut InstrSeqBuilder,
@@ -157,6 +99,51 @@ impl IntermediateType {
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32 => {
+                builder
+                    .local_get(local)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            }
+            IntermediateType::IU64 => {
+                builder
+                    .local_get(local)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            }
+            IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress
+            | IntermediateType::ISigner
+            | IntermediateType::IRef(_) => {
+                // For heap types we just forward the pointer
                 builder.local_get(local).load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -166,27 +153,19 @@ impl IntermediateType {
                     },
                 );
             }
-            IntermediateType::IU64 => {
+            IntermediateType::IVector(_) => {
                 builder.local_get(local).load(
                     compilation_ctx.memory_id,
-                    LoadKind::I64 { atomic: false },
+                    LoadKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
                         offset: 0,
                     },
                 );
             }
-            IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::IAddress
-            | IntermediateType::ISigner
-            | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => {
-                // For heap types we just forward the pointer
-                builder.local_get(local);
-            }
         }
     }
+
     pub fn copy_local_instructions(
         &self,
         module: &mut Module,
@@ -194,12 +173,21 @@ impl IntermediateType {
         compilation_ctx: &CompilationContext,
         local: LocalId,
     ) {
+        // Deref outer pointer
+        builder.local_get(local).load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32 => {
-                builder.local_get(local).load(
+                builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
                     MemArg {
@@ -209,7 +197,7 @@ impl IntermediateType {
                 );
             }
             IntermediateType::IU64 => {
-                builder.local_get(local).load(
+                builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I64 { atomic: false },
                     MemArg {
@@ -218,14 +206,19 @@ impl IntermediateType {
                     },
                 );
             }
-            IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::IAddress
-            | IntermediateType::IRef(_) => {
-                builder.local_get(local);
+            IntermediateType::IU128 => {
+                let copy_f = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx));
+                builder.call(copy_f);
             }
-            IntermediateType::IVector(inner) => {
-                IVector::copy_local_instructions(inner, module, builder, compilation_ctx, local);
+            IntermediateType::IU256 | IntermediateType::IAddress => {
+                let copy_f = RuntimeFunction::CopyU256.get(module, Some(compilation_ctx));
+                builder.call(copy_f);
+            }
+            IntermediateType::IRef(_) => {
+                // Nothing to be done, pointer is already correct
+            }
+            IntermediateType::IVector(inner_type) => {
+                IVector::copy_local_instructions(inner_type, module, builder, compilation_ctx);
             }
             IntermediateType::ISigner => {
                 panic!(r#"trying to introduce copy instructions for "signer" type"#)
@@ -315,7 +308,12 @@ impl IntermediateType {
         }
     }
 
-    pub fn add_borrow_local_instructions(&self, builder: &mut InstrSeqBuilder, local: LocalId) {
+    pub fn add_borrow_local_instructions(
+        &self,
+        builder: &mut InstrSeqBuilder,
+        compilation_ctx: &CompilationContext,
+        local: LocalId,
+    ) {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -327,7 +325,14 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IAddress
             | IntermediateType::IVector(_) => {
-                builder.local_get(local);
+                builder.local_get(local).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
             }
             IntermediateType::IRef(_) => {
                 panic!("Cannot ImmBorrowLoc on a reference type");
@@ -368,6 +373,102 @@ impl IntermediateType {
                 // No load needed, pointer is already correct
             }
             _ => panic!("Unsupported ReadRef type: {:?}", self),
+        }
+    }
+
+    pub fn box_local_instructions(
+        &self,
+        module: &mut Module,
+        builder: &mut InstrSeqBuilder,
+        compilation_ctx: &CompilationContext,
+        local: LocalId,
+    ) {
+        match self {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32 => {
+                let val = module.locals.add(ValType::I32);
+                let ptr = module.locals.add(ValType::I32);
+                builder
+                    .local_set(val)
+                    .i32_const(4 as i32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(local)
+                    .i32_const(self.stack_data_size() as i32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(ptr)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_get(ptr)
+                    .local_get(val)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            }
+            IntermediateType::IU64 => {
+                let val = module.locals.add(ValType::I64);
+                let ptr = module.locals.add(ValType::I32);
+                builder
+                    .local_set(val)
+                    .i32_const(4 as i32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(local)
+                    .i32_const(8 as i32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(ptr)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_get(ptr)
+                    .local_get(val)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            }
+            IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress
+            | IntermediateType::ISigner
+            | IntermediateType::IVector(_)
+            | IntermediateType::IRef(_) => {
+                let ptr = module.locals.add(ValType::I32);
+                builder
+                    .local_set(ptr)
+                    .i32_const(4 as i32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(local)
+                    .local_get(ptr)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            }
         }
     }
 }
