@@ -751,6 +751,8 @@ mod uint_128 {
         function sum(uint128 x, uint128 y) external returns (uint128);
         function sub(uint128 x, uint128 y) external returns (uint128);
         function mul(uint128 x, uint128 y) external returns (uint128);
+        function div(uint128 x, uint128 y) external returns (uint128);
+        function mod(uint128 x, uint128 y) external returns (uint128);
     );
 
     #[rstest]
@@ -887,6 +889,54 @@ mod uint_128 {
         )
         .unwrap();
     }
+
+    #[rstest]
+    #[case(350, 13, 26)]
+    #[case(5, 2, 2)]
+    #[case(123456, 1, 123456)]
+    #[case(987654321, 123456789, 8)]
+    #[case(0, 2, 0)]
+    // 2^96 / 2^32 = [q = 2^64, r = 0]
+    #[case(79228162514264337593543950336, 4294967296, 18446744073709551616)]
+    //#[should_panic(expected = "wasm trap: integer divide by zero")]
+    //#[case(10, 0, 0)]
+    fn test_uint_128_div(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] dividend: u128,
+        #[case] divisor: u128,
+        #[case] expected_result: u128,
+    ) {
+        run_test(
+            runtime,
+            divCall::new((dividend, divisor)).abi_encode(),
+            <(&u128,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(350, 13, 12)]
+    #[case(5, 2, 1)]
+    #[case(123456, 1, 0)]
+    #[case(987654321, 123456789, 9)]
+    #[case(0, 2, 0)]
+    // 2^96 / 2^32 = [q = 2^64, r = 0]
+    #[case(79228162514264337593543950336, 4294967296, 0)]
+    // #[should_panic(expected = "wasm trap: integer divide by zero")]
+    // #[case(10, 0, 0)]
+    fn test_uint_128_mod(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] dividend: u128,
+        #[case] divisor: u128,
+        #[case] expected_result: u128,
+    ) {
+        run_test(
+            runtime,
+            modCall::new((dividend, divisor)).abi_encode(),
+            <(&u128,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
 }
 
 mod uint_256 {
@@ -912,6 +962,8 @@ mod uint_256 {
         function sum(uint256 x, uint256 y) external returns (uint256);
         function sub(uint256 x, uint256 y) external returns (uint256);
         function mul(uint256 x, uint256 y) external returns (uint256);
+        function div(uint256 x, uint256 y) external returns (uint256);
+        function mod(uint256 x, uint256 y) external returns (uint256);
     );
 
     #[rstest]
@@ -1165,6 +1217,78 @@ mod uint_256 {
         run_test(
             runtime,
             mulCall::new((n1, n2)).abi_encode(),
+            <(&U256,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(U256::from(350), U256::from(13), U256::from(26))]
+    #[case(U256::from(5), U256::from(2), U256::from(2))]
+    #[case(U256::from(123456), U256::from(1), U256::from(123456))]
+    #[case(U256::from(987654321), U256::from(123456789), U256::from(8))]
+    #[case(U256::from(0), U256::from(2), U256::from(0))]
+    // 2^96 / 2^32 = [q = 2^64, r = 0]
+    #[case(
+        U256::from(79228162514264337593543950336_u128),
+        U256::from(4294967296_u128),
+        U256::from(18446744073709551616_u128)
+    )]
+    // 2^192 / 2^64 = [q = 2^128, r = 0]
+    #[case(
+        U256::from_str_radix(
+            "6277101735386680763835789423207666416102355444464034512896", 10
+        ).unwrap(),
+        U256::from(18446744073709551616_u128),
+        U256::from(u128::MAX) + U256::from(1),
+    )]
+    //#[should_panic(expected = "wasm trap: integer divide by zero")]
+    //#[case(10, 0, 0)]
+    fn test_uint_256_div(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] dividend: U256,
+        #[case] divisor: U256,
+        #[case] expected_result: U256,
+    ) {
+        run_test(
+            runtime,
+            divCall::new((dividend, divisor)).abi_encode(),
+            <(&U256,)>::abi_encode_params(&(&expected_result,)),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(U256::from(350), U256::from(13), U256::from(12))]
+    #[case(U256::from(5), U256::from(2), U256::from(1))]
+    #[case(U256::from(123456), U256::from(1), U256::from(0))]
+    #[case(U256::from(987654321), U256::from(123456789), U256::from(9))]
+    #[case(U256::from(0), U256::from(2), U256::from(0))]
+    // 2^96 / 2^32 = [q = 2^64, r = 0]
+    #[case(
+        U256::from(79228162514264337593543950336_u128),
+        U256::from(4294967296_u128),
+        U256::from(0)
+    )]
+    // 2^192 / 2^64 = [q = 2^128, r = 0]
+    #[case(
+        U256::from_str_radix(
+            "6277101735386680763835789423207666416102355444464034512896", 10
+        ).unwrap(),
+        U256::from(18446744073709551616_u128),
+        U256::from(0)
+    )]
+    //#[should_panic(expected = "wasm trap: integer divide by zero")]
+    //#[case(10, 0, 0)]
+    fn test_uint_256_mod(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] dividend: U256,
+        #[case] divisor: U256,
+        #[case] expected_result: U256,
+    ) {
+        run_test(
+            runtime,
+            modCall::new((dividend, divisor)).abi_encode(),
             <(&U256,)>::abi_encode_params(&(&expected_result,)),
         )
         .unwrap();

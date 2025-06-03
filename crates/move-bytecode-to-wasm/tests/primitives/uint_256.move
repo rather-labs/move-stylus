@@ -60,3 +60,11 @@ public fun sub(x: u256, y: u256): u256 {
 public fun mul(x: u256, y: u256): u256 {
     x * y
 }
+
+public fun div(x: u256, y: u256): u256 {
+    x / y
+}
+
+public fun mod_(x: u256, y: u256): u256 {
+    x % y
+}
