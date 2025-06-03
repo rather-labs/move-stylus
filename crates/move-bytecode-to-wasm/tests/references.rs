@@ -415,7 +415,6 @@ mod reference_address {
         let expected_result = <sol!((address,))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
-    
 }
 
 mod reference_signer {
@@ -623,7 +622,7 @@ mod reference_vec_256 {
             .contains("wasm trap: wasm `unreachable` instruction executed");
     }
 
-    #[rstest]   
+    #[rstest]
     #[case(derefMutArgCall::new((vec![U256::from(1), U256::from(2), U256::from(3)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
     #[case(writeMutRefCall::new((vec![U256::from(4), U256::from(5), U256::from(6)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
     fn test_vec_256_mut_ref<T: SolCall>(

@@ -447,7 +447,6 @@ impl IntermediateType {
             IntermediateType::IU128 | IntermediateType::IU256 | IntermediateType::IAddress => {
                 let src_ptr = module.locals.add(ValType::I32); // what to copy
                 let ref_ptr = module.locals.add(ValType::I32); // where to copy
-                let size = self.stack_data_size();
 
                 // Pop the reference and value pointers from the stack
                 builder
@@ -462,8 +461,13 @@ impl IntermediateType {
                     .local_set(ref_ptr)
                     .local_set(src_ptr);
 
+                let bytes = match self {
+                    IntermediateType::IU128 => 16,
+                    _ => 32,
+                };
+
                 // Copy memory in 8-byte chunks
-                for offset in (0..size).step_by(8) {
+                for offset in (0..bytes).step_by(8) {
                     // destination address
                     builder
                         .local_get(ref_ptr)
