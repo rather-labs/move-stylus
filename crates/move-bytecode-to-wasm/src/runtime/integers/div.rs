@@ -9,89 +9,83 @@ use crate::{CompilationContext, runtime::RuntimeFunction};
 const F_A_LESS_THAN_B: &str = "a_less_than_b";
 const F_SHIFT_64BITS_RIGHT: &str = "shift_64bits_right";
 
-/// Implements the restoring division algorithm for 128 ans 256 bit integers
+/// Implements the restoring division algorithm for 128 and 256 bit integers.
 ///
-/// We assume that the base we are using is 64.
+/// We assume a base of the numbers is 64.
 ///
-/// Given a number of 256 bits, we can think of it as composed in 4 chunks of 64 bit numbers.
-/// The algorithm goes as follows:
-/// let
-///    D = [D1, D2, D3, D4]     dividend
-///    d = [d1, d2, d3, d4]     divisor
+/// A 256-bit number is treated as four 64-bit chunks:
 ///
-/// 1. Initialize quotient and remainder to 0
-///    q = [0, 0, 0, 0]         quotient
-///    r = [0, 0, 0, 0]         remainder
+///    D = [D1, D2, D3, D4]     Dividend
+///    d = [d1, d2, d3, d4]     Divisor
 ///
-/// 2. Loop for the quantity of digits 0..4
-///    a. Shift remainder by 1 digit (64 bits)
-///    b. Set r[3] = D[i]
-///    c. If divisor > remainder -> q[i] = 0
-///       Otherwise substract divisor from remainder until remainder < divisor and add 1 to a
-///       counter c for each substraction.
-///       Store q[i] = c
+/// ### Algorithm Steps:
+///
+/// 1. Initialize the quotient and remainder to zero:
+///    q = [0, 0, 0, 0]         Quotient
+///    r = [0, 0, 0, 0]         Remainder
+///
+/// 2. For each digit `i` from 0 to 3:
+///    a. Left-shift the remainder by one chunk (64 bits).
+///    b. Set `r[3] = D[i]`.
+///    c. If the divisor is greater than the remainder, set `q[i] = 0`.
+///    Otherwise, repeatedly subtract the divisor from the remainder until the remainder is
+///    less than the divisor. Count how many subtractions were performed (`c`),
+///    and set `q[i] = c`.
 ///
 /// 3. After the loop:
-///    q = dividend / divisor
-///    r = dividend % divisor
+///     - `q` holds the result of `dividend / divisor`.
+///     - `r` holds the result of `dividend % divisor`.
 ///
-/// For example, using base 10, lets do 350 / 13:
+/// ### Example (Base 10): Compute 350 ÷ 13
 ///
+/// ```text
+/// Initial state:
 /// q = [0, 0, 0]
 /// r = [0, 0, 0]
-/// D = [3, 5, 0]
-/// d = [0, 1, 3]
+/// D = [3, 5, 0]   // 350
+/// d = [0, 1, 3]   // 13
 ///
 /// Iteration 0:
-/// a. r << 1                  -> r = [0, 0, 0]
-/// b. r[3] = D[0]             -> r = [0, 0, 3]
-/// c. 13 > 3 => q[0] = 0      -> q = [0, 0, 0]
+/// a. r << 1                  → r = [0, 0, 0]
+/// b. r[2] = D[0]             → r = [0, 0, 3]
+/// c. 13 > 3 → q[0] = 0       → q = [0, 0, 0]
 ///
 /// Iteration 1:
-/// a. r << 1                  -> r = [0, 3, 0]
-/// b. r[3] = D[1]             -> r = [0, 3, 5]
-/// c. 13 < 35
-///     r -= d = 35 - 13 = 22 | c = 1
-///     r -= d = 22 - 13 =  9 | c = 2
-///     9 < 13 break
-///                            -> r = [0, 0, 9]
-///     q[1] = c => q[1] = 2   -> q = [0, 2, 0]
+/// a. r << 1                  → r = [0, 3, 0]
+/// b. r[2] = D[1]             → r = [0, 3, 5]
+/// c. 35 - 13 = 22            → c = 1
+///    22 - 13 = 9             → c = 2
+///    9 < 13 (stop)           → r = [0, 0, 9], q[1] = 2
 ///
 /// Iteration 2:
-/// a. r << 1                  -> r = [0, 9, 0]
-/// b. r[3] = D[2]             -> r = [0, 9, 0]
-/// c. divisor < remainder - 13 < 90
-///     r -= d = 90 - 13 = 77 | c = 1
-///     r -= d = 77 - 13 = 66 | c = 2
-///     ...
-///     r -= d = 25 - 13 = 12 | c = 6
-///     12 < 13 break
-///                            -> r = [0, 1, 2]
-///     q[2] = c => q[2] = 6   -> q = [0, 2, 6]
+/// a. r << 1                  → r = [0, 9, 0]
+/// b. r[2] = D[2]             → r = [0, 9, 0] (no change)
+/// c. 90 - 13 = 77            → c = 1
+///    77 - 13 = 64            → c = 2
+///    ...
+///    25 - 13 = 12            → c = 6
+///    12 < 13 (stop)          → r = [0, 1, 2], q[2] = 6
 ///
-/// Checking D = q * d + r => 350 = 26 * 13 + 12
+/// Final check: 26 * 13 + 12 = 350
+/// ```
 ///
-/// NOTE: In the implementation indexes and operations are complemented because we are working in
-/// little endian. The description of the algorithm and the example are in big endian.
+/// **Note:** In the implementation, indices and operations are reversed because we work in
+/// little-endian format. This description and the example assume big-endian for clarity.
 ///
-/// # Arguments
-///    - pointer to the dividend
-///    - pointer to the divisor
-///    - how many bytes the number occupies in heap
-/// # Returns:
-///    - pointer to the quotient
-///    - pointer to the remainder
+/// ### Arguments
+/// - Pointer to the dividend
+/// - Pointer to the divisor
+/// - Number of bytes the values occupy in memory
+///
+/// ### Returns
+/// - Pointer to the quotient
+/// - Pointer to the remainder
 pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32, ValType::I32],
         &[ValType::I32, ValType::I32],
     );
-
-    let print_i32 = module.imports.get_func("", "print_i32").unwrap();
-    let print_separator = module.imports.get_func("", "print_separator").unwrap();
-    let print_i64 = module.imports.get_func("", "print_i64").unwrap();
-    let print_u128 = module.imports.get_func("", "print_u128").unwrap();
 
     let shift_64bits_right_f = shift_64bits_right(module, compilation_ctx);
     let check_if_a_less_than_b_f = check_if_a_less_than_b(module, compilation_ctx);
@@ -173,8 +167,6 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
                         },
                     );
 
-                loop_.i32_const(0).call(print_i32);
-                loop_.local_get(remainder_ptr).call(print_u128);
                 // If remainder < divisor -> q[0]
                 // Otherwise we loop substraction until divisor < remainder
                 loop_
@@ -205,13 +197,11 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
                             // Set the substraction counter in 0
                             else_.i64_const(0).local_set(substraction_counter);
 
-                            else_.i32_const(1).call(print_i32);
-                            else_.local_get(remainder_ptr).call(print_u128);
                             else_.loop_(None, |substraction_loop| {
                                 let substraction_loop_id = substraction_loop.id();
 
-                                substraction_loop.i32_const(2).call(print_i32);
-                                substraction_loop.local_get(remainder_ptr).call(print_u128);
+                                // substraction_loop.i32_const(2).call(print_i32);
+                                // substraction_loop.local_get(remainder_ptr).call(print_u128);
                                 // remainder -= divisor
                                 substraction_loop
                                     .local_get(remainder_ptr)
@@ -220,9 +210,6 @@ pub fn heap_integers_div(module: &mut Module, compilation_ctx: &CompilationConte
                                     .local_get(type_heap_size)
                                     .call(sub_f)
                                     .drop();
-
-                                substraction_loop.i32_const(3).call(print_i32);
-                                substraction_loop.local_get(remainder_ptr).call(print_u128);
 
                                 // substraction_counter += 1
                                 substraction_loop
@@ -537,17 +524,8 @@ mod tests {
     #[case(u128::MAX, 42, 0)]
     #[case(42, u128::MAX, 1)]
     fn test_a_less_than_b_u128(#[case] n1: u128, #[case] n2: u128, #[case] expected: i32) {
-        use wasmtime::Engine;
-
-        use crate::{
-            test_tools::{get_linker_with_host_debug_functions, inject_host_debug_functions},
-            utils::display_module,
-        };
-
         const TYPE_HEAP_SIZE: i32 = 16;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
-
-        inject_host_debug_functions(&mut raw_module);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -577,24 +555,142 @@ mod tests {
                 constants: &[],
             },
         );
-        // Shift left
         func_body.call(heap_integers_add_f);
 
         let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
-        // display_module(&mut raw_module);
-
-        let linker = get_linker_with_host_debug_functions();
-
-        println!("a:{:?}\nb:{:?}", n1.to_le_bytes(), n2.to_le_bytes());
         let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
-        let (_, _, mut store, entrypoint) = setup_wasmtime_module(
-            &mut raw_module,
-            data.to_vec(),
-            "test_function",
-            Some(linker),
+        let (_, _, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+
+        let result: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[rstest]
+    #[case(U256::from(1), U256::from(1), 0)]
+    #[case(U256::from(2), U256::from(1), 0)]
+    #[case(U256::from(0), U256::from(2), 1)]
+    #[case(U256::from(4294967295_u128), U256::from(4294967295_u128), 0)]
+    #[case(U256::from(4294967296_u128), U256::from(4294967296_u128), 0)]
+    #[case(U256::from(4294967295_u128), U256::from(4294967296_u128), 1)]
+    #[case(U256::from(4294967296_u128), U256::from(4294967295_u128), 0)]
+    #[case(
+        U256::from(18446744073709551615_u128),
+        U256::from(18446744073709551615_u128),
+        0
+    )]
+    #[case(
+        U256::from(18446744073709551616_u128),
+        U256::from(18446744073709551615_u128),
+        0
+    )]
+    #[case(
+        U256::from(18446744073709551615_u128),
+        U256::from(18446744073709551616_u128),
+        1
+    )]
+    #[case(
+        U256::from(18446744073709551616_u128),
+        U256::from(18446744073709551616_u128),
+        0
+    )]
+    #[case(
+        U256::from(79228162514264337593543950335_u128),
+        U256::from(79228162514264337593543950335_u128),
+        0
+    )]
+    #[case(
+        U256::from(79228162514264337593543950336_u128),
+        U256::from(79228162514264337593543950335_u128),
+        0
+    )]
+    #[case(
+        U256::from(79228162514264337593543950335_u128),
+        U256::from(79228162514264337593543950336_u128),
+        1
+    )]
+    #[case(
+        U256::from(79228162514264337593543950336_u128),
+        U256::from(79228162514264337593543950336_u128),
+        0
+    )]
+    #[case(U256::from(u128::MAX), U256::from(u128::MAX), 0)]
+    #[case(U256::from(u128::MAX) + U256::from(1), U256::from(u128::MAX), 0)]
+    #[case(U256::from(u128::MAX), U256::from(u128::MAX) + U256::from(1), 1)]
+    #[case(
+       U256::from_str_radix("340282366920938463463374607431768211455", 10).unwrap(),
+       U256::from_str_radix("340282366920938463463374607431768211455", 10).unwrap(),
+       0
+    )]
+    #[case(
+       U256::from_str_radix("340282366920938463463374607431768211456", 10).unwrap(),
+       U256::from_str_radix("340282366920938463463374607431768211455", 10).unwrap(),
+       0
+    )]
+    #[case(
+       U256::from_str_radix("340282366920938463463374607431768211455", 10).unwrap(),
+       U256::from_str_radix("340282366920938463463374607431768211456", 10).unwrap(),
+       1
+    )]
+    #[case(
+       U256::from_str_radix("6277101735386680763835789423207666416102355444464034512895", 10).unwrap(),
+       U256::from_str_radix("6277101735386680763835789423207666416102355444464034512895", 10).unwrap(),
+       0
+    )]
+    #[case(
+       U256::from_str_radix("6277101735386680763835789423207666416102355444464034512896", 10).unwrap(),
+       U256::from_str_radix("6277101735386680763835789423207666416102355444464034512895", 10).unwrap(),
+       0
+    )]
+    #[case(
+       U256::from_str_radix("6277101735386680763835789423207666416102355444464034512895", 10).unwrap(),
+       U256::from_str_radix("6277101735386680763835789423207666416102355444464034512896", 10).unwrap(),
+       1
+    )]
+    #[case(U256::MAX, U256::from(42), 0)]
+    #[case(U256::from(42), U256::MAX, 1)]
+    fn test_a_less_than_b_u256(#[case] n1: U256, #[case] n2: U256, #[case] expected: i32) {
+        const TYPE_HEAP_SIZE: i32 = 32;
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
         );
+
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
+        func_body
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(TYPE_HEAP_SIZE);
+
+        let heap_integers_add_f = check_if_a_less_than_b(
+            &mut raw_module,
+            &CompilationContext {
+                memory_id,
+                allocator: allocator_func,
+                functions_arguments: &[],
+                functions_returns: &[],
+                module_signatures: &[],
+                constants: &[],
+            },
+        );
+        func_body.call(heap_integers_add_f);
+
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let data = [n1.to_le_bytes::<32>(), n2.to_le_bytes::<32>()].concat();
+        let (_, _, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
         let result: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
         assert_eq!(result, expected);
@@ -668,18 +764,83 @@ mod tests {
     }
 
     #[rstest]
+    #[case(U256::from(1), U256::from(u64::MAX as u128 + 1))]
+    #[case(U256::from(42), U256::from(42) << 64)]
+    #[case(U256::from(u8::MAX), U256::from(u8::MAX) << 64)]
+    #[case(U256::from(u16::MAX), U256::from(u16::MAX) << 64)]
+    #[case(U256::from(u32::MAX), U256::from(u32::MAX) << 64)]
+    #[case(U256::from(u64::MAX), U256::from(u64::MAX) << 64)]
+    #[case(U256::from(u128::MAX), U256::from(u128::MAX) << 64)]
+    #[case(U256::MAX, U256::MAX << 64)]
+    fn test_shift_64bits_right_u256(#[case] a: U256, #[case] expected: U256) {
+        use crate::{
+            test_tools::{get_linker_with_host_debug_functions, inject_host_debug_functions},
+            utils::display_module,
+        };
+
+        const TYPE_HEAP_SIZE: i32 = 32;
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE));
+
+        inject_host_debug_functions(&mut raw_module);
+
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I32], &[]);
+
+        let a_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for shift_64bits_right (a_ptr, size in heap)
+        func_body.i32_const(0).i32_const(TYPE_HEAP_SIZE);
+
+        let shift_64bits_right_f = shift_64bits_right(
+            &mut raw_module,
+            &CompilationContext {
+                memory_id,
+                allocator: allocator_func,
+                functions_arguments: &[],
+                functions_returns: &[],
+                module_signatures: &[],
+                constants: &[],
+            },
+        );
+        // Shift left
+        func_body.call(shift_64bits_right_f);
+
+        let function = function_builder.finish(vec![a_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        display_module(&mut raw_module);
+
+        let linker = get_linker_with_host_debug_functions();
+
+        let data = a.to_le_bytes::<32>();
+        let (_, instance, mut store, entrypoint) = setup_wasmtime_module::<i32, ()>(
+            &mut raw_module,
+            data.to_vec(),
+            "test_function",
+            Some(linker),
+        );
+
+        entrypoint.call(&mut store, 0).unwrap();
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let result = &memory.data(&mut store)[0..TYPE_HEAP_SIZE as usize];
+        assert_eq!(result, expected.to_le_bytes::<32>());
+    }
+
+    #[rstest]
     #[case(350, 13, 26, 12)]
     #[case(5, 2, 2, 1)]
     #[case(123456, 1, 123456, 0)]
-    // Memory out of bounds
-    #[case(u128::MAX, u64::MAX as u128 + 1, u64::MAX as u128, u64::MAX as u128)]
-    // #[case(987654321, 123456789, 8, 9)]
-    // #[case(0, 2, 0, 0)]
-    // 2^92 / 2^32 = [q = 2^64, r = 0]
-    // #[case(79228162514264337593543950336, 4294967296, 18446744073709551616, 0)]
+    #[case(987654321, 123456789, 8, 9)]
+    #[case(0, 2, 0, 0)]
+    // 2^96 / 2^32 = [q = 2^64, r = 0]
+    #[case(79228162514264337593543950336, 4294967296, 18446744073709551616, 0)]
+    // Timeouts, the algorithm is slow yet
     // (2^128 - 1) / 2^64 = [q = 2^64 - 1, r = 2^64 - 1]
-    // Memory out of bounds
     // #[case(u128::MAX, u64::MAX as u128 + 1, u64::MAX as u128, u64::MAX as u128)]
+    // #[case(u128::MAX, 79228162514264337593543950336, u64::MAX as u128, u64::MAX as u128)]
     fn test_div_mod_u128(
         #[case] n1: u128,
         #[case] n2: u128,
@@ -736,7 +897,6 @@ mod tests {
 
         let linker = get_linker_with_host_debug_functions();
 
-        println!("a:{:?}\nb:{:?}", n1.to_le_bytes(), n2.to_le_bytes());
         let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
         let (_, instance, mut store, entrypoint) = setup_wasmtime_module(
             &mut raw_module,
@@ -769,5 +929,109 @@ mod tests {
 
         assert_eq!(quotient_result_memory_data, quotient.to_le_bytes());
         assert_eq!(remainder_result_memory_data, remainder.to_le_bytes());
+    }
+
+    #[rstest]
+    #[case(U256::from(350), U256::from(13), U256::from(26), U256::from(12))]
+    #[case(U256::from(5), U256::from(2), U256::from(2), U256::from(1))]
+    #[case(U256::from(123456), U256::from(1), U256::from(123456), U256::from(0))]
+    #[case(
+        U256::from(987654321),
+        U256::from(123456789),
+        U256::from(8),
+        U256::from(9)
+    )]
+    #[case(U256::from(0), U256::from(2), U256::from(0), U256::from(0))]
+    // 2^96 / 2^32 = [q = 2^64, r = 0]
+    #[case(
+        U256::from(79228162514264337593543950336_u128),
+        U256::from(4294967296_u128),
+        U256::from(18446744073709551616_u128),
+        U256::from(0)
+    )]
+    // 2^192 / 2^64 = [q = 2^128, r = 0]
+    #[case(
+        U256::from_str_radix(
+            "6277101735386680763835789423207666416102355444464034512896", 10
+        ).unwrap(),
+        U256::from(18446744073709551616_u128),
+        U256::from(u128::MAX) + U256::from(1),
+        U256::from(0)
+    )]
+    // Timeouts, the algorithm is slow yet
+    // (2^128 - 1) / 2^64 = [q = 2^64 - 1, r = 2^64 - 1]
+    // #[case(u128::MAX, u64::MAX as u128 + 1, u64::MAX as u128, u64::MAX as u128)]
+    // #[case(u128::MAX, 79228162514264337593543950336, u64::MAX as u128, u64::MAX as u128)]
+    fn test_div_mod_u256(
+        #[case] n1: U256,
+        #[case] n2: U256,
+        #[case] quotient: U256,
+        #[case] remainder: U256,
+    ) {
+        const TYPE_HEAP_SIZE: i32 = 32;
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32, ValType::I32],
+        );
+
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
+        func_body
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(TYPE_HEAP_SIZE);
+
+        let heap_integers_add_f = heap_integers_div(
+            &mut raw_module,
+            &CompilationContext {
+                memory_id,
+                allocator: allocator_func,
+                functions_arguments: &[],
+                functions_returns: &[],
+                module_signatures: &[],
+                constants: &[],
+            },
+        );
+        // Shift left
+        func_body.call(heap_integers_add_f);
+
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let data = [n1.to_le_bytes::<32>(), n2.to_le_bytes::<32>()].concat();
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+
+        let (quotient_ptr, remainder_ptr): (i32, i32) =
+            entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let mut quotient_result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+        memory
+            .read(
+                &mut store,
+                quotient_ptr as usize,
+                &mut quotient_result_memory_data,
+            )
+            .unwrap();
+
+        let mut remainder_result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
+        memory
+            .read(
+                &mut store,
+                remainder_ptr as usize,
+                &mut remainder_result_memory_data,
+            )
+            .unwrap();
+
+        assert_eq!(quotient_result_memory_data, quotient.to_le_bytes::<32>());
+        assert_eq!(remainder_result_memory_data, remainder.to_le_bytes::<32>());
     }
 }

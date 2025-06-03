@@ -1,5 +1,5 @@
 //! This module contains aux functions used in unit tests in this module
-use walrus::{FunctionId, MemoryId, Module, ModuleConfig, ModuleData, ValType};
+use walrus::{FunctionId, MemoryId, Module, ModuleConfig, ValType};
 use wasmtime::{Caller, Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc};
 
 use crate::memory::setup_module_memory;
