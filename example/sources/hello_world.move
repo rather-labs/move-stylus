@@ -1,6 +1,8 @@
 module 0x01::hello_world;
 
-public fun write_mut_ref(x: &mut address ): address {
- *x = @0x7890abcdef1234567890abcdef1234567890abcd;
- *x
+public fun write_mut_ref( ): u8 {
+ let mut x = 1;
+ let y = &mut x;
+ *y = 2;
+ *y
 }

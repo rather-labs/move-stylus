@@ -78,6 +78,7 @@ mod reference_uint_8 {
         function derefNestedU8(uint8 x) external returns (uint8);
         function derefMutArg(uint8 x) external returns (uint8);
         function writeMutRef(uint8 x) external returns (uint8);
+        function mutBorrowLocal() external returns (uint8);
     );
 
     #[fixture]
@@ -107,6 +108,7 @@ mod reference_uint_8 {
     #[rstest]
     #[case(derefMutArgCall::new((1,)), 1)]
     #[case(writeMutRefCall::new((2,)), 1)]
+    #[case(mutBorrowLocalCall::new(()), 2)]
     fn test_uint_8_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

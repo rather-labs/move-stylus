@@ -215,6 +215,14 @@ fn map_bytecode_instruction(
             // Push the reference to the type into the types stack
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
         }
+        Bytecode::MutBorrowLoc(local_id) => {
+            let local = mapped_function.function_locals[*local_id as usize];
+            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
+            local_type.add_borrow_local_instructions(builder, compilation_ctx, local);
+
+            // Push the reference to the type into the types stack
+            types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
+        }
         Bytecode::VecImmBorrow(signature_index) => {
             match (types_stack.pop(), types_stack.pop()) {
                 (Some(IntermediateType::IU64), Some(IntermediateType::IRef(inner)))
