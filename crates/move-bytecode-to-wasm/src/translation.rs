@@ -146,6 +146,16 @@ fn map_bytecode_instruction(
                 if let Err(e) = pop_types_stack(types_stack, argument) {
                     panic!("Called function signature arguments mismatch at index {i}: {e}");
                 }
+                if let IntermediateType::IMutRef(_) | IntermediateType::IRef(_) = argument {
+                    builder.load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                }
             }
 
             let f = function_table
@@ -172,7 +182,11 @@ fn map_bytecode_instruction(
         Bytecode::StLoc(local_id) => {
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = &mapped_function.function_locals_ir[*local_id as usize];
-            local_type.box_local_instructions(module, builder, compilation_ctx, local);
+            if let IntermediateType::IRef(_) | IntermediateType::IMutRef(_) = local_type {
+                builder.local_set(local);
+            } else {
+                local_type.box_local_instructions(module, builder, compilation_ctx, local);
+            }
             pop_types_stack(types_stack, local_type).unwrap();
         }
         Bytecode::MoveLoc(local_id) => {
@@ -211,16 +225,12 @@ fn map_bytecode_instruction(
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = &mapped_function.function_locals_ir[*local_id as usize];
             local_type.add_borrow_local_instructions(builder, compilation_ctx, local);
-
-            // Push the reference to the type into the types stack
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
         }
         Bytecode::MutBorrowLoc(local_id) => {
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = &mapped_function.function_locals_ir[*local_id as usize];
             local_type.add_borrow_local_instructions(builder, compilation_ctx, local);
-
-            // Push the reference to the type into the types stack
             types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
         }
         Bytecode::VecImmBorrow(signature_index) => {
@@ -235,12 +245,7 @@ fn map_bytecode_instruction(
 
             let inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
-            IVector::add_vec_imm_borrow_instructions(
-                &inner,
-                module,
-                builder,
-                compilation_ctx.memory_id,
-            );
+            IVector::add_vec_imm_borrow_instructions(&inner, module, builder, compilation_ctx);
 
             // Push &T onto the WASM type stack
             types_stack.push(IntermediateType::IRef(Box::new(inner)));
@@ -264,6 +269,14 @@ fn map_bytecode_instruction(
             }
 
             builder
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
                 .load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },

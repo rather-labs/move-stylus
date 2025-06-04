@@ -96,13 +96,13 @@ impl IntermediateType {
         compilation_ctx: &CompilationContext,
         local: LocalId,
     ) {
+        builder.local_get(local);
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32 => {
                 builder
-                    .local_get(local)
                     .load(
                         compilation_ctx.memory_id,
                         LoadKind::I32 { atomic: false },
@@ -122,7 +122,6 @@ impl IntermediateType {
             }
             IntermediateType::IU64 => {
                 builder
-                    .local_get(local)
                     .load(
                         compilation_ctx.memory_id,
                         LoadKind::I32 { atomic: false },
@@ -143,10 +142,8 @@ impl IntermediateType {
             IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
-            | IntermediateType::ISigner
-            | IntermediateType::IRef(_)
-            | IntermediateType::IMutRef(_) => {
-                builder.local_get(local).load(
+            | IntermediateType::ISigner => {
+                builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
                     MemArg {
@@ -155,8 +152,10 @@ impl IntermediateType {
                     },
                 );
             }
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+            }
             IntermediateType::IVector(_) => {
-                builder.local_get(local).load(
+                builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
                     MemArg {
@@ -176,22 +175,49 @@ impl IntermediateType {
         local: LocalId,
     ) {
         builder.local_get(local);
-        // If the type is a mut ref, we need to push the outer pointer in case of a vector
-        if !matches!(self, IntermediateType::IMutRef(_)) {
-            builder.load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-        }
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32 => {
+                builder
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            }
+            IntermediateType::IU64 => {
+                builder
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            }
+            IntermediateType::IU128 => {
                 builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -200,31 +226,35 @@ impl IntermediateType {
                         offset: 0,
                     },
                 );
+                let copy_f = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx));
+                builder.call(copy_f);
             }
-            IntermediateType::IU64 => {
+            IntermediateType::IU256 | IntermediateType::IAddress => {
                 builder.load(
                     compilation_ctx.memory_id,
-                    LoadKind::I64 { atomic: false },
+                    LoadKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
                         offset: 0,
                     },
                 );
-            }
-            IntermediateType::IU128 => {
-                let copy_f = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx));
-                builder.call(copy_f);
-            }
-            IntermediateType::IU256 | IntermediateType::IAddress => {
                 let copy_f = RuntimeFunction::CopyU256.get(module, Some(compilation_ctx));
                 builder.call(copy_f);
             }
-            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                // Nothing to be done, pointer is already correct
-            }
             IntermediateType::IVector(inner_type) => {
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
                 //TODO: move this to a runtime function
                 IVector::copy_local_instructions(inner_type, module, builder, compilation_ctx);
+            }
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                // Nothing to be done, pointer is already correct
             }
             IntermediateType::ISigner => {
                 panic!(r#"trying to introduce copy instructions for "signer" type"#)
@@ -333,14 +363,7 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IAddress
             | IntermediateType::IVector(_) => {
-                builder.local_get(local).load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
+                builder.local_get(local);
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Cannot ImmBorrowLoc on a reference type");
@@ -349,6 +372,14 @@ impl IntermediateType {
     }
 
     pub fn add_read_ref_instructions(&self, builder: &mut InstrSeqBuilder, memory: MemoryId) {
+        builder.load(
+            memory,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
