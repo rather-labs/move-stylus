@@ -11,8 +11,6 @@ const F_SHIFT_64BITS_RIGHT: &str = "shift_64bits_right";
 
 /// Implements the long division algorithm for 128 and 256 bit integers.
 ///
-/// We assume a base of the numbers is 64.
-///
 /// A 256-bit number is treated as four 64-bit chunks:
 ///
 ///    D = [D1, D2, D3, D4]     Dividend
