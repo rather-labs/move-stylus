@@ -116,6 +116,11 @@ mod vector {
         false
     )]
     #[case(eqVecStackTypeCall::new((
+        vec![u16::MAX, u16::MAX, 0, 1, 2, 3, u16::MAX],
+        vec![u16::MAX, u16::MAX, 0, 1, 2, 3, 4])),
+        false
+    )]
+    #[case(eqVecStackTypeCall::new((
         vec![u16::MAX, u16::MAX, 0, 1, 2, 3],
         vec![u16::MAX, u16::MAX, 0, 1, 2, 3, u16::MAX])),
         false
@@ -133,6 +138,11 @@ mod vector {
     #[case(eqVecHeapTypeCall::new((
         vec![u128::MAX, u128::MAX, 0, 1, 2, 3, u128::MAX],
         vec![u128::MAX, u128::MAX, 9, 8, 7, 6, u128::MAX])),
+        false
+    )]
+    #[case(eqVecHeapTypeCall::new((
+        vec![u128::MAX, u128::MAX, 0, 1, 2, 3, u128::MAX],
+        vec![u128::MAX, u128::MAX, 0, 1, 2, 3, 4])),
         false
     )]
     #[case(eqVecHeapTypeCall::new((

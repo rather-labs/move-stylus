@@ -518,10 +518,27 @@ impl IVector {
                     | IntermediateType::IAddress) => {
                         let equality_f_id =
                             RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+
                         let res = module.locals.add(ValType::I32);
+                        let offset = module.locals.add(ValType::I32);
 
                         // Set res to true
                         then.i32_const(1).local_set(res);
+                        // Set the pointers past the length
+                        then.local_get(v1_ptr)
+                            .i32_const(4)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(v1_ptr)
+                            .local_get(v2_ptr)
+                            .i32_const(4)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(v2_ptr);
+
+                        // Set the size as the length * 4 (pointer size)
+                        then.local_get(size)
+                            .i32_const(4)
+                            .binop(BinaryOp::I32Mul)
+                            .local_set(size);
 
                         // We must follow pointer by pointer and use the equality function
                         then.block(None, |block| {
@@ -530,20 +547,19 @@ impl IVector {
                             block.loop_(None, |loop_| {
                                 let loop_id = loop_.id();
 
-                                // Here we leave true in the stack:
-                                // - If we are at the end of the loop means we finished comparing,
-                                //   so we break the loop with the true in stack
-                                // - If we are not at the end, we drop the true and continue the
-                                //   loop
+                                // If we are at the end of the loop means we finished comparing,
+                                // so we break the loop with the true in res
                                 loop_
                                     .local_get(size)
-                                    .local_get(v1_ptr)
+                                    .local_get(offset)
                                     .binop(BinaryOp::I32Eq)
                                     .br_if(block_id);
 
                                 // Load both pointers into stack
                                 loop_
                                     .local_get(v1_ptr)
+                                    .local_get(offset)
+                                    .binop(BinaryOp::I32Add)
                                     .load(
                                         compilation_ctx.memory_id,
                                         LoadKind::I32 { atomic: false },
@@ -553,6 +569,8 @@ impl IVector {
                                         },
                                     )
                                     .local_get(v2_ptr)
+                                    .local_get(offset)
+                                    .binop(BinaryOp::I32Add)
                                     .load(
                                         compilation_ctx.memory_id,
                                         LoadKind::I32 { atomic: false },
@@ -571,20 +589,15 @@ impl IVector {
 
                                 loop_
                                     .call(equality_f_id)
-                                    // If they are equal we continue the loop, otherwise, we leave
-                                    // false in the stack and break the loop
-                                    // it
+                                    // If they are equal we continue the loop
+                                    // Otherwise, we leave set res as false and break the loop
                                     .if_else(
                                         None,
                                         |then| {
-                                            then.local_get(v1_ptr)
+                                            then.local_get(offset)
                                                 .i32_const(4)
                                                 .binop(BinaryOp::I32Add)
-                                                .local_set(v1_ptr)
-                                                .local_get(v2_ptr)
-                                                .i32_const(4)
-                                                .binop(BinaryOp::I32Add)
-                                                .local_set(v2_ptr)
+                                                .local_set(offset)
                                                 .br(loop_id);
                                         },
                                         |else_| {
@@ -593,6 +606,7 @@ impl IVector {
                                     );
                             });
                         });
+
                         then.local_get(res);
                     }
                     IntermediateType::IVector(intermediate_type) => todo!(),
