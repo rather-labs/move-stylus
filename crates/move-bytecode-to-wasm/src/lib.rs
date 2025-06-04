@@ -17,12 +17,13 @@ mod hostio;
 mod memory;
 mod runtime;
 mod runtime_error_codes;
-#[cfg(test)]
-mod test_tools;
 mod translation;
 mod utils;
 mod wasm_helpers;
 mod wasm_validation;
+
+#[cfg(test)]
+mod test_tools;
 
 /// Compilation context
 ///

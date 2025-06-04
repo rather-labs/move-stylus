@@ -542,7 +542,6 @@ mod tests {
         U256::from(u128::MAX) + U256::from(1),
         (U256::from(u128::MAX) + U256::from(1)) * U256::from(2)
     )]
-    // asd
     #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
     #[case(U256::MAX, U256::from(2), U256::from(0))]
     #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]

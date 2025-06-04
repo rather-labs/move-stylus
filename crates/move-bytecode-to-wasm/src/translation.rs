@@ -422,8 +422,8 @@ fn map_bytecode_instruction(
                 IntermediateType::IU16 => IU16::div(builder),
                 IntermediateType::IU32 => IU32::div(builder),
                 IntermediateType::IU64 => IU64::div(builder),
-                IntermediateType::IU128 => todo!(),
-                IntermediateType::IU256 => todo!(),
+                IntermediateType::IU128 => IU128::div(builder, module, compilation_ctx),
+                IntermediateType::IU256 => IU256::div(builder, module, compilation_ctx),
                 t => panic!("type stack error: trying to divide two {t:?}"),
             }
 
@@ -441,8 +441,8 @@ fn map_bytecode_instruction(
                 IntermediateType::IU16 => IU16::remainder(builder),
                 IntermediateType::IU32 => IU32::remainder(builder),
                 IntermediateType::IU64 => IU64::remainder(builder),
-                IntermediateType::IU128 => todo!(),
-                IntermediateType::IU256 => todo!(),
+                IntermediateType::IU128 => IU128::remainder(builder, module, compilation_ctx),
+                IntermediateType::IU256 => IU256::remainder(builder, module, compilation_ctx),
                 t => panic!("type stack error: trying to mod two {t:?}"),
             }
 

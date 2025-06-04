@@ -60,3 +60,11 @@ public fun sub(x: u128, y: u128): u128 {
 public fun mul(x: u128, y: u128): u128 {
     x * y
 }
+
+public fun div(x: u128, y: u128): u128 {
+    x / y
+}
+
+public fun mod_(x: u128, y: u128): u128 {
+    x % y
+}
