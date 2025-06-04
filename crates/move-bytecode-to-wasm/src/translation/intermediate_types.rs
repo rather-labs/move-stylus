@@ -394,8 +394,14 @@ impl IntermediateType {
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
-            | IntermediateType::IU32 => {
-                let val = module.locals.add(ValType::I32);
+            | IntermediateType::IU32
+            | IntermediateType::IU64 => {
+                let (val_type, store_kind) = if *self == IntermediateType::IU64 {
+                    (ValType::I64, StoreKind::I64 { atomic: false })
+                } else {
+                    (ValType::I32, StoreKind::I32 { atomic: false })
+                };
+                let val = module.locals.add(val_type);
                 let ptr = module.locals.add(ValType::I32);
                 builder
                     .load(
@@ -412,32 +418,7 @@ impl IntermediateType {
                     .local_get(val)
                     .store(
                         compilation_ctx.memory_id,
-                        StoreKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-            }
-            IntermediateType::IU64 => {
-                let val = module.locals.add(ValType::I64);
-                let ptr = module.locals.add(ValType::I32);
-                builder
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_set(ptr)
-                    .local_set(val)
-                    .local_get(ptr)
-                    .local_get(val)
-                    .store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I64 { atomic: false },
+                        store_kind,
                         MemArg {
                             align: 0,
                             offset: 0,
@@ -465,7 +446,7 @@ impl IntermediateType {
                     IntermediateType::IU128 => 16,
                     _ => 32,
                 };
-                
+
                 // Copy memory in 8-byte chunks
                 for offset in (0..bytes).step_by(8) {
                     // destination address
