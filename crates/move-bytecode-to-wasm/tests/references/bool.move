@@ -34,3 +34,11 @@ public fun mut_borrow_local(): bool {
  *y = false;
  *y
 }
+
+public fun freeze_ref(y: bool): bool {
+    let mut x = true;
+    let x_mut_ref: &mut bool = &mut x;
+    *x_mut_ref = y;
+    let x_frozen_ref: &bool = freeze(x_mut_ref); 
+    *x_frozen_ref
+}

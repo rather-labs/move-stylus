@@ -34,3 +34,11 @@ public fun mut_borrow_local(): u256 {
  *y = 2;
  *y
 }
+
+public fun freeze_ref(y: u256): u256 {
+    let mut x = 1;
+    let x_mut_ref: &mut u256 = &mut x;
+    *x_mut_ref = y;
+    let x_frozen_ref: &u256 = freeze(x_mut_ref); 
+    *x_frozen_ref
+}

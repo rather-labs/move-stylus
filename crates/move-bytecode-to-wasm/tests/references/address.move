@@ -34,3 +34,11 @@ public fun mut_borrow_local(): address {
  *y = @0x02;
  *y
 }
+
+public fun freeze_ref(y: address): address {
+    let mut x = @0x01;
+    let x_mut_ref: &mut address = &mut x;
+    *x_mut_ref = y;
+    let x_frozen_ref: &address = freeze(x_mut_ref); 
+    *x_frozen_ref
+}

@@ -57,3 +57,10 @@ public fun mut_borrow_local(): vector<u64> {
  *y
 }
 
+public fun freeze_ref(y: vector<u64>): vector<u64> {
+    let mut x = vector<u64>[1, 2, 3];
+    let x_mut_ref: &mut vector<u64> = &mut x;
+    *x_mut_ref = y;
+    let x_frozen_ref: &vector<u64> = freeze(x_mut_ref); 
+    *x_frozen_ref
+}

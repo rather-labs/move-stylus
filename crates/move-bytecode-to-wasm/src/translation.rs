@@ -245,7 +245,6 @@ fn map_bytecode_instruction(
             // Push &T onto the WASM type stack
             types_stack.push(IntermediateType::IRef(Box::new(inner)));
         }
-
         Bytecode::VecLen(signature_index) => {
             let elem_ir_type = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
@@ -277,7 +276,6 @@ fn map_bytecode_instruction(
 
             types_stack.push(IntermediateType::IU64);
         }
-
         Bytecode::ReadRef => {
             let ref_type = types_stack
                 .pop()
@@ -307,7 +305,18 @@ fn map_bytecode_instruction(
             }
             _ => panic!("Type stack underflow on WriteRef"),
         },
+        Bytecode::FreezeRef => {
+            let ref_type = types_stack
+                .pop()
+                .expect("FreezeRef expects a reference on the stack");
 
+            match ref_type {
+                IntermediateType::IMutRef(inner) => {
+                    types_stack.push(IntermediateType::IRef(inner.clone()));
+                }
+                _ => panic!("FreezeRef expected a mutable reference, got {:?}", ref_type),
+            }
+        }
         Bytecode::Pop => {
             builder.drop();
             types_stack

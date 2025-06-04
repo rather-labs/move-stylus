@@ -34,3 +34,11 @@ public fun mut_borrow_local(): u64 {
  *y = 2;
  *y
 }
+
+public fun freeze_ref(y: u64): u64 {
+    let mut x = 1;
+    let x_mut_ref: &mut u64 = &mut x;
+    *x_mut_ref = y;
+    let x_frozen_ref: &u64 = freeze(x_mut_ref); 
+    *x_frozen_ref
+}
