@@ -1,14 +1,17 @@
 use walrus::{
     InstrSeqBuilder, Module, ValType,
-    ir::{LoadKind, MemArg, StoreKind},
+    ir::{MemArg, StoreKind},
 };
 
-use crate::CompilationContext;
+use crate::{CompilationContext, runtime::RuntimeFunction};
 
 #[derive(Clone, Copy)]
 pub struct IAddress;
 
 impl IAddress {
+    /// Heap size (in bytes)
+    pub const HEAP_SIZE: i32 = 32;
+
     pub fn load_constant_instructions(
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
@@ -46,5 +49,14 @@ impl IAddress {
         }
 
         builder.local_get(pointer);
+    }
+
+    pub fn equality(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+    ) {
+        let equality_f_id = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+        builder.i32_const(Self::HEAP_SIZE).call(equality_f_id);
     }
 }

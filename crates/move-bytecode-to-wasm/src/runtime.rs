@@ -3,6 +3,7 @@ use walrus::{FunctionId, Module};
 use crate::CompilationContext;
 
 mod copy;
+mod equality;
 mod integers;
 mod swap;
 
@@ -31,6 +32,8 @@ pub enum RuntimeFunction {
     // Copy
     CopyU128,
     CopyU256,
+    // Equality
+    HeapTypeEquality,
 }
 
 impl RuntimeFunction {
@@ -60,6 +63,8 @@ impl RuntimeFunction {
             // Copy
             Self::CopyU128 => "copy_u128",
             Self::CopyU256 => "copy_u256",
+            // Equality
+            Self::HeapTypeEquality => "heap_type_equality",
         }
     }
 
@@ -113,6 +118,9 @@ impl RuntimeFunction {
                 // Copy
                 (Self::CopyU128, Some(ctx)) => copy::copy_u128_function(module, ctx),
                 (Self::CopyU256, Some(ctx)) => copy::copy_u256_function(module, ctx),
+                // Equality
+                (Self::HeapTypeEquality, Some(ctx)) => equality::a_equals_b(module, ctx),
+                // Error
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,
                     self.name()

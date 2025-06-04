@@ -346,6 +346,15 @@ impl IU128 {
             .drop()
             .local_get(remainder_ptr);
     }
+
+    pub fn equality(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+    ) {
+        let equality_f_id = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+        builder.i32_const(Self::HEAP_SIZE).call(equality_f_id);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -609,5 +618,14 @@ impl IU256 {
             // drop the quotient
             .drop()
             .local_get(remainder_ptr);
+    }
+
+    pub fn equality(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+        compilation_ctx: &CompilationContext,
+    ) {
+        let equality_f_id = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+        builder.i32_const(Self::HEAP_SIZE).call(equality_f_id);
     }
 }

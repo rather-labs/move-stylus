@@ -3,7 +3,9 @@ use functions::{
     MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
 };
 use intermediate_types::IntermediateType;
+use intermediate_types::address::IAddress;
 use intermediate_types::heap_integers::{IU128, IU256};
+use intermediate_types::signer::ISigner;
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
@@ -447,6 +449,38 @@ fn map_bytecode_instruction(
             }
 
             types_stack.push(t1);
+        }
+        Bytecode::Eq => {
+            let [t1, t2] = pop_n_from_stack(types_stack);
+            assert_eq!(
+                t1, t2,
+                "types stack error: trying to compare by equality two different types {t1:?} {t2:?}"
+            );
+
+            match t1 {
+                IntermediateType::IBool
+                | IntermediateType::IU8
+                | IntermediateType::IU16
+                | IntermediateType::IU32 => {
+                    builder.binop(BinaryOp::I32Eq);
+                }
+                IntermediateType::IU64 => {
+                    builder.binop(BinaryOp::I64Eq);
+                }
+                IntermediateType::IU128 => IU128::equality(builder, module, compilation_ctx),
+                IntermediateType::IU256 => IU256::equality(builder, module, compilation_ctx),
+                IntermediateType::IAddress => IAddress::equality(builder, module, compilation_ctx),
+                IntermediateType::ISigner => {
+                    // Signers can only be created by the VM and injected into the smart contract.
+                    // There can only be one signer, so if we find a situation where signers are
+                    // compared, we are comparing the same thing.
+                    builder.i32_const(1);
+                }
+                IntermediateType::IVector(intermediate_type) => todo!(),
+                IntermediateType::IRef(intermediate_type) => todo!(),
+            }
+
+            types_stack.push(IntermediateType::IBool);
         }
         Bytecode::Or => {
             pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
