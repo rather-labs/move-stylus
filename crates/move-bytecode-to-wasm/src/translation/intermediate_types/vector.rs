@@ -3,7 +3,7 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
-use crate::CompilationContext;
+use crate::{CompilationContext, runtime::RuntimeFunction};
 
 use super::IntermediateType;
 
@@ -449,6 +449,163 @@ impl IVector {
                 panic!("Cannot VecImmBorrow an existing reference type");
             }
         }
+    }
+
+    pub fn equality(
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        inner: &IntermediateType,
+    ) {
+        let v1_ptr = module.locals.add(ValType::I32);
+        let v2_ptr = module.locals.add(ValType::I32);
+        let size = module.locals.add(ValType::I32);
+
+        // Load the size of both vectors
+        builder
+            .local_set(v1_ptr)
+            .local_tee(v2_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_get(v1_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_tee(size);
+
+        // And chech if they equal, if they are, we compare element by element, otherwise, we
+        // return false
+        builder.binop(BinaryOp::I32Eq).if_else(
+            ValType::I32,
+            |then| {
+                match inner {
+                    IntermediateType::IBool
+                    | IntermediateType::IU8
+                    | IntermediateType::IU16
+                    | IntermediateType::IU32
+                    | IntermediateType::IU64 => {
+                        let equality_f_id =
+                            RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+
+                        // Set the size as size * stack_data_size + 4.
+                        // 4 bytes extra are occupied by the length of the vector
+                        then.local_get(size)
+                            .i32_const(inner.stack_data_size() as i32)
+                            .binop(BinaryOp::I32Mul)
+                            .i32_const(4)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(size);
+
+                        // Call the generic equality function
+                        then.local_get(v1_ptr)
+                            .local_get(v2_ptr)
+                            .local_get(size)
+                            .call(equality_f_id);
+                    }
+                    t @ (IntermediateType::IU128
+                    | IntermediateType::IU256
+                    | IntermediateType::IAddress) => {
+                        let equality_f_id =
+                            RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+                        let res = module.locals.add(ValType::I32);
+
+                        // Set res to true
+                        then.i32_const(1).local_set(res);
+
+                        // We must follow pointer by pointer and use the equality function
+                        then.block(None, |block| {
+                            let block_id = block.id();
+
+                            block.loop_(None, |loop_| {
+                                let loop_id = loop_.id();
+
+                                // Here we leave true in the stack:
+                                // - If we are at the end of the loop means we finished comparing,
+                                //   so we break the loop with the true in stack
+                                // - If we are not at the end, we drop the true and continue the
+                                //   loop
+                                loop_
+                                    .local_get(size)
+                                    .local_get(v1_ptr)
+                                    .binop(BinaryOp::I32Eq)
+                                    .br_if(block_id);
+
+                                // Load both pointers into stack
+                                loop_
+                                    .local_get(v1_ptr)
+                                    .load(
+                                        compilation_ctx.memory_id,
+                                        LoadKind::I32 { atomic: false },
+                                        MemArg {
+                                            align: 0,
+                                            offset: 0,
+                                        },
+                                    )
+                                    .local_get(v2_ptr)
+                                    .load(
+                                        compilation_ctx.memory_id,
+                                        LoadKind::I32 { atomic: false },
+                                        MemArg {
+                                            align: 0,
+                                            offset: 0,
+                                        },
+                                    );
+
+                                // Load the heap size of the stack
+                                loop_.i32_const(if *t == IntermediateType::IU128 {
+                                    16
+                                } else {
+                                    32
+                                });
+
+                                loop_
+                                    .call(equality_f_id)
+                                    // If they are equal we continue the loop, otherwise, we leave
+                                    // false in the stack and break the loop
+                                    // it
+                                    .if_else(
+                                        None,
+                                        |then| {
+                                            then.local_get(v1_ptr)
+                                                .i32_const(4)
+                                                .binop(BinaryOp::I32Add)
+                                                .local_set(v1_ptr)
+                                                .local_get(v2_ptr)
+                                                .i32_const(4)
+                                                .binop(BinaryOp::I32Add)
+                                                .local_set(v2_ptr)
+                                                .br(loop_id);
+                                        },
+                                        |else_| {
+                                            else_.i32_const(0).local_set(res).br(block_id);
+                                        },
+                                    );
+                            });
+                        });
+                        then.local_get(res);
+                    }
+                    IntermediateType::IVector(intermediate_type) => todo!(),
+                    IntermediateType::IRef(intermediate_type) => todo!(),
+                    IntermediateType::ISigner => {
+                        panic!("should not be possible to have a vector of signers")
+                    }
+                }
+            },
+            |else_| {
+                else_.i32_const(0);
+            },
+        );
     }
 }
 

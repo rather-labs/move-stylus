@@ -10,7 +10,7 @@ use super::RuntimeFunction;
 ///    - pointer to b
 ///    - How many bytes occupies in memory
 /// # Returns:
-///    - 1 if a < b, otherwise 0
+///    - a == b
 pub fn a_equals_b(module: &mut Module, compilation_ctx: &crate::CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,

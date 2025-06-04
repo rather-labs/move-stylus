@@ -6,7 +6,7 @@ use simple_integers::{IU8, IU16, IU32, IU64};
 use vector::IVector;
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
-    ir::{LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use crate::CompilationContext;
@@ -392,7 +392,7 @@ impl IntermediateType {
                 let ptr = module.locals.add(ValType::I32);
                 builder
                     .local_set(val)
-                    .i32_const(4 as i32)
+                    .i32_const(4)
                     .call(compilation_ctx.allocator)
                     .local_tee(local)
                     .i32_const(self.stack_data_size() as i32)
@@ -422,10 +422,10 @@ impl IntermediateType {
                 let ptr = module.locals.add(ValType::I32);
                 builder
                     .local_set(val)
-                    .i32_const(4 as i32)
+                    .i32_const(4)
                     .call(compilation_ctx.allocator)
                     .local_tee(local)
-                    .i32_const(8 as i32)
+                    .i32_const(8)
                     .call(compilation_ctx.allocator)
                     .local_tee(ptr)
                     .store(
@@ -456,7 +456,7 @@ impl IntermediateType {
                 let ptr = module.locals.add(ValType::I32);
                 builder
                     .local_set(ptr)
-                    .i32_const(4 as i32)
+                    .i32_const(4)
                     .call(compilation_ctx.allocator)
                     .local_tee(local)
                     .local_get(ptr)
@@ -469,6 +469,33 @@ impl IntermediateType {
                         },
                     );
             }
+        }
+    }
+
+    pub fn load_equality_instructions(
+        &self,
+        module: &mut Module,
+        builder: &mut InstrSeqBuilder,
+        compilation_ctx: &CompilationContext,
+    ) {
+        match self {
+            Self::IBool | Self::IU8 | Self::IU16 | Self::IU32 => {
+                builder.binop(BinaryOp::I32Eq);
+            }
+            Self::IU64 => {
+                builder.binop(BinaryOp::I64Eq);
+            }
+            Self::IU128 => IU128::equality(builder, module, compilation_ctx),
+            Self::IU256 => IU256::equality(builder, module, compilation_ctx),
+            Self::IAddress => IAddress::equality(builder, module, compilation_ctx),
+            Self::ISigner => {
+                // Signers can only be created by the VM and injected into the smart contract.
+                // There can only be one signer, so if we find a situation where signers are
+                // compared, we are comparing the same thing.
+                builder.i32_const(1);
+            }
+            Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner),
+            Self::IRef(inner) => inner.load_equality_instructions(module, builder, compilation_ctx),
         }
     }
 }

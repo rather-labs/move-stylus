@@ -457,28 +457,7 @@ fn map_bytecode_instruction(
                 "types stack error: trying to compare by equality two different types {t1:?} {t2:?}"
             );
 
-            match t1 {
-                IntermediateType::IBool
-                | IntermediateType::IU8
-                | IntermediateType::IU16
-                | IntermediateType::IU32 => {
-                    builder.binop(BinaryOp::I32Eq);
-                }
-                IntermediateType::IU64 => {
-                    builder.binop(BinaryOp::I64Eq);
-                }
-                IntermediateType::IU128 => IU128::equality(builder, module, compilation_ctx),
-                IntermediateType::IU256 => IU256::equality(builder, module, compilation_ctx),
-                IntermediateType::IAddress => IAddress::equality(builder, module, compilation_ctx),
-                IntermediateType::ISigner => {
-                    // Signers can only be created by the VM and injected into the smart contract.
-                    // There can only be one signer, so if we find a situation where signers are
-                    // compared, we are comparing the same thing.
-                    builder.i32_const(1);
-                }
-                IntermediateType::IVector(intermediate_type) => todo!(),
-                IntermediateType::IRef(intermediate_type) => todo!(),
-            }
+            t1.load_equality_instructions(module, builder, compilation_ctx);
 
             types_stack.push(IntermediateType::IBool);
         }
