@@ -182,6 +182,7 @@ fn map_bytecode_instruction(
         Bytecode::StLoc(local_id) => {
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = &mapped_function.function_locals_ir[*local_id as usize];
+            // If type is a reference we set the local directly, else we box it.
             if let IntermediateType::IRef(_) | IntermediateType::IMutRef(_) = local_type {
                 builder.local_set(local);
             } else {
