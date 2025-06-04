@@ -495,6 +495,7 @@ impl IVector {
                     | IntermediateType::IU16
                     | IntermediateType::IU32
                     | IntermediateType::IU64 => {
+                        println!("simple type!!");
                         let equality_f_id =
                             RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
 
@@ -516,6 +517,7 @@ impl IVector {
                     t @ (IntermediateType::IU128
                     | IntermediateType::IU256
                     | IntermediateType::IAddress) => {
+                        println!("{t:?}!!");
                         let equality_f_id =
                             RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
 
@@ -609,8 +611,96 @@ impl IVector {
 
                         then.local_get(res);
                     }
-                    IntermediateType::IVector(intermediate_type) => todo!(),
-                    IntermediateType::IRef(intermediate_type) => todo!(),
+
+                    IntermediateType::IVector(inner_v) => {
+                        println!("vector!");
+                        let res = module.locals.add(ValType::I32);
+                        let offset = module.locals.add(ValType::I32);
+
+                        // Set res to true
+                        then.i32_const(1).local_set(res);
+
+                        // Set the pointers past the length
+                        then.local_get(v1_ptr)
+                            .i32_const(4)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(v1_ptr)
+                            .local_get(v2_ptr)
+                            .i32_const(4)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(v2_ptr);
+
+                        // Set the size as the length * 4 (pointer size)
+                        then.local_get(size)
+                            .i32_const(4)
+                            .binop(BinaryOp::I32Mul)
+                            .local_set(size);
+
+                        // We must follow pointer by pointer and use the equality function
+                        then.block(None, |block| {
+                            let block_id = block.id();
+
+                            block.loop_(None, |loop_| {
+                                let loop_id = loop_.id();
+
+                                // If we are at the end of the loop means we finished comparing,
+                                // so we break the loop with the true in res
+                                loop_
+                                    .local_get(size)
+                                    .local_get(offset)
+                                    .binop(BinaryOp::I32Eq)
+                                    .br_if(block_id);
+
+                                // Load both pointers into stack
+                                loop_
+                                    .local_get(v1_ptr)
+                                    .local_get(offset)
+                                    .binop(BinaryOp::I32Add)
+                                    .load(
+                                        compilation_ctx.memory_id,
+                                        LoadKind::I32 { atomic: false },
+                                        MemArg {
+                                            align: 0,
+                                            offset: 0,
+                                        },
+                                    )
+                                    .local_get(v2_ptr)
+                                    .local_get(offset)
+                                    .binop(BinaryOp::I32Add)
+                                    .load(
+                                        compilation_ctx.memory_id,
+                                        LoadKind::I32 { atomic: false },
+                                        MemArg {
+                                            align: 0,
+                                            offset: 0,
+                                        },
+                                    );
+
+                                Self::equality(loop_, module, compilation_ctx, inner_v);
+
+                                // If they are equal we continue the loop
+                                // Otherwise, we leave set res as false and break the loop
+                                loop_.if_else(
+                                    None,
+                                    |then| {
+                                        then.local_get(offset)
+                                            .i32_const(4)
+                                            .binop(BinaryOp::I32Add)
+                                            .local_set(offset)
+                                            .br(loop_id);
+                                    },
+                                    |else_| {
+                                        else_.i32_const(0).local_set(res).br(block_id);
+                                    },
+                                );
+                            });
+                        });
+
+                        then.local_get(res);
+                    }
+                    IntermediateType::IRef(_) => {
+                        panic!("vector of rereferences found")
+                    }
                     IntermediateType::ISigner => {
                         panic!("should not be possible to have a vector of signers")
                     }

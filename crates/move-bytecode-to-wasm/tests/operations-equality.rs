@@ -12,7 +12,10 @@ fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u
         result == 0,
         "Function returned non-zero exit code: {result}"
     );
-    anyhow::ensure!(return_data == expected_result, "return data mismatch");
+    anyhow::ensure!(
+        return_data == expected_result,
+        "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
+    );
 
     Ok(())
 }
@@ -100,11 +103,12 @@ mod vector {
         #[allow(missing_docs)]
         function eqVecStackType(uint16[], uint16[]) external returns (bool);
         function eqVecHeapType(uint128[], uint128[]) external returns (bool);
-        // function eqVecNestedStackType(uint16[][], uint16[][]) external returns (bool);
-        // function eqVecNestedHeapType(uint128[][], uint128[][]) external returns (bool);
+        function eqVecNestedStackType(uint16[][], uint16[][]) external returns (bool);
+        function eqVecNestedHeapType(uint128[][], uint128[][]) external returns (bool);
     );
 
     #[rstest]
+    /*
     #[case(eqVecStackTypeCall::new((
         vec![u16::MAX, u16::MAX, 0, 1, 2, 3, u16::MAX],
         vec![u16::MAX, u16::MAX, 0, 1, 2, 3, u16::MAX])),
@@ -155,6 +159,70 @@ mod vector {
         vec![u128::MAX, u128::MAX, 0, 1, 2, 3])),
         false
     )]
+    #[case(eqVecNestedStackTypeCall::new((
+        vec![vec![u16::MAX, u16::MAX], vec![0, 1], vec![2, 3, u16::MAX]],
+        vec![vec![u16::MAX, u16::MAX], vec![0, 1], vec![2, 3, u16::MAX]])),
+        true
+    )]
+    #[case(eqVecNestedStackTypeCall::new((
+        vec![vec![u16::MAX, u16::MAX], vec![0, 1], vec![2, 3, u16::MAX]],
+        vec![vec![u16::MAX, u16::MAX], vec![0, 2], vec![2, 3, u16::MAX]])),
+        false
+    )]
+    #[case(eqVecNestedStackTypeCall::new((
+        vec![vec![u16::MAX, u16::MAX], vec![0, 1], vec![2, 3, u16::MAX]],
+        vec![vec![u16::MAX, u16::MAX], vec![0, 1], vec![2, 3, 4]])),
+        false
+    )]
+    #[case(eqVecNestedStackTypeCall::new((
+        vec![vec![u16::MAX, u16::MAX], vec![0, 1]],
+        vec![vec![u16::MAX, u16::MAX], vec![0, 1], vec![2, 3, u16::MAX]])),
+        false
+    )]
+    #[case(eqVecNestedStackTypeCall::new((
+        vec![vec![u16::MAX, u16::MAX], vec![0, 1], vec![2, 3, u16::MAX]],
+        vec![vec![u16::MAX, u16::MAX], vec![0, 1]])),
+        false
+    )]
+    #[case(eqVecNestedHeapTypeCall::new((
+        vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX]],
+        vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX]])),
+        true
+    )]
+    */
+    #[case(eqVecNestedHeapTypeCall::new((
+        vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX]],
+        vec![vec![u128::MAX, u128::MAX], vec![0, u128::MAX], vec![2, 3, u128::MAX]])),
+        false
+    )]
+    /*
+    #[case(eqVecNestedHeapTypeCall::new((
+        vec![vec![u128::MAX, 1], vec![0, 1], vec![2, 3, u128::MAX]],
+        vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX]])),
+        false
+    )]
+    #[case(eqVecHeapTypeCall::new((
+        vec![0, 1],
+        vec![0, 2])),
+        false
+    )]*/
+    /*
+    #[case(eqVecNestedHeapTypeCall::new((
+        vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX]],
+        vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, 4]])),
+        false
+    )]
+    #[case(eqVecNestedHeapTypeCall::new((
+        vec![vec![u128::MAX, u128::MAX], vec![0, 1]],
+        vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX]])),
+        false
+    )]
+    #[case(eqVecNestedHeapTypeCall::new((
+        vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX]],
+        vec![vec![u128::MAX, u128::MAX], vec![0, 1]])),
+        false
+    )]
+    */
     fn test_equality_vector<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
