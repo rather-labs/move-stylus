@@ -50,4 +50,10 @@ public fun write_mut_ref(x: &mut vector<u64> ): vector<u64> {
  *x
 }
 
+public fun mut_borrow_local(): vector<u64> {
+ let mut x = vector<u64>[1, 2, 3];
+ let y = &mut x;
+ *y = vector<u64>[4, 5, 6];
+ *y
+}
 

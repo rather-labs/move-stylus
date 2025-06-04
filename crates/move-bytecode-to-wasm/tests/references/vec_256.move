@@ -49,3 +49,10 @@ public fun write_mut_ref(x: &mut vector<u256> ): vector<u256> {
  *x = vector<u256>[1, 2, 3];
  *x
 }
+
+public fun mut_borrow_local(): vector<u256> {
+ let mut x = vector<u256>[1, 2, 3];
+ let y = &mut x;
+ *y = vector<u256>[4, 5, 6];
+ *y
+}

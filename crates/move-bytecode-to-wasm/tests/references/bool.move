@@ -27,3 +27,10 @@ public fun write_mut_ref(x: &mut bool ): bool {
  *x = true;
  *x
 }
+
+public fun mut_borrow_local(): bool {
+ let mut x = true;
+ let y = &mut x;
+ *y = false;
+ *y
+}

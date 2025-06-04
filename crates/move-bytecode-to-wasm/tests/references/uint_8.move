@@ -28,9 +28,10 @@ public fun write_mut_ref(x: &mut u8 ): u8 {
  *x
 }
 
-public fun mut_borrow_local(): u8 {
+public fun mut_borrow_local(z: &mut u8): u8 {
  let mut x = 1;
  let y = &mut x;
  *y = 2;
+ *z = 3;
  *y
 }

@@ -233,8 +233,8 @@ impl Packable for IntermediateType {
             IntermediateType::IAddress => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::ISigner => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::IVector(_) => 32,
-            IntermediateType::IRef(inner) => inner.encoded_size(), // TODO: check if this is correct. Shouldnt be 32?
-            IntermediateType::IMutRef(inner) => inner.encoded_size(), // TODO: check if this is correct. Shouldnt be 32?
+            IntermediateType::IRef(inner) => inner.encoded_size(), 
+            IntermediateType::IMutRef(inner) => inner.encoded_size(),
         }
     }
 }

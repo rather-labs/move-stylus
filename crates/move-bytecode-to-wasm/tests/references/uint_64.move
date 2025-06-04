@@ -27,3 +27,10 @@ public fun write_mut_ref(x: &mut u64 ): u64 {
  *x = 1;
  *x
 }
+
+public fun mut_borrow_local(): u64 {
+ let mut x = 1;
+ let y = &mut x;
+ *y = 2;
+ *y
+}

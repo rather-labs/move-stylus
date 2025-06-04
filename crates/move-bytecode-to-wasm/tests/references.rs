@@ -28,6 +28,7 @@ mod reference_bool {
         function derefNestedBool(bool x) external returns (bool);
         function derefMutArg(bool x) external returns (bool);
         function writeMutRef(bool x) external returns (bool);
+        function mutBorrowLocal() external returns (bool);
     );
 
     #[fixture]
@@ -57,6 +58,7 @@ mod reference_bool {
     #[rstest]
     #[case(derefMutArgCall::new((true,)), true)]
     #[case(writeMutRefCall::new((false,)), true)]
+    #[case(mutBorrowLocalCall::new(()), false)]
     fn test_bool_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -78,7 +80,7 @@ mod reference_uint_8 {
         function derefNestedU8(uint8 x) external returns (uint8);
         function derefMutArg(uint8 x) external returns (uint8);
         function writeMutRef(uint8 x) external returns (uint8);
-        function mutBorrowLocal() external returns (uint8);
+        function mutBorrowLocal(uint8 x) external returns (uint8);
     );
 
     #[fixture]
@@ -108,7 +110,7 @@ mod reference_uint_8 {
     #[rstest]
     #[case(derefMutArgCall::new((1,)), 1)]
     #[case(writeMutRefCall::new((2,)), 1)]
-    #[case(mutBorrowLocalCall::new(()), 2)]
+    #[case(mutBorrowLocalCall::new((1,)), 2)]
     fn test_uint_8_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -130,6 +132,7 @@ mod reference_uint_16 {
         function derefNestedU16(uint16 x) external returns (uint16);
         function derefMutArg(uint16 x) external returns (uint16);
         function writeMutRef(uint16 x) external returns (uint16);
+        function mutBorrowLocal() external returns (uint16);
     );
 
     #[fixture]
@@ -159,6 +162,7 @@ mod reference_uint_16 {
     #[rstest]
     #[case(derefMutArgCall::new((1,)), 1)]
     #[case(writeMutRefCall::new((2,)), 1)]
+    #[case(mutBorrowLocalCall::new(()), 2)]
     fn test_uint_16_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -180,6 +184,7 @@ mod reference_uint_32 {
         function derefNestedU32(uint32 x) external returns (uint32);
         function derefMutArg(uint32 x) external returns (uint32);
         function writeMutRef(uint32 x) external returns (uint32);
+        function mutBorrowLocal() external returns (uint32);
     );
 
     #[fixture]
@@ -209,6 +214,7 @@ mod reference_uint_32 {
     #[rstest]
     #[case(derefMutArgCall::new((1,)), 1)]
     #[case(writeMutRefCall::new((2,)), 1)]
+    #[case(mutBorrowLocalCall::new(()), 2)]
     fn test_uint_32_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -230,6 +236,7 @@ mod reference_uint_64 {
         function derefNestedU64(uint64 x) external returns (uint64);
         function derefMutArg(uint64 x) external returns (uint64);
         function writeMutRef(uint64 x) external returns (uint64);
+        function mutBorrowLocal() external returns (uint64);
     );
 
     #[fixture]
@@ -259,6 +266,7 @@ mod reference_uint_64 {
     #[rstest]
     #[case(derefMutArgCall::new((1,)), 1)]
     #[case(writeMutRefCall::new((2,)), 1)]
+    #[case(mutBorrowLocalCall::new(()), 2)]
     fn test_uint_64_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -280,6 +288,7 @@ mod reference_uint_128 {
         function derefNestedU128(uint128 x) external returns (uint128);
         function derefMutArg(uint128 x) external returns (uint128);
         function writeMutRef(uint128 x) external returns (uint128);
+        function mutBorrowLocal() external returns (uint128);
     );
 
     #[fixture]
@@ -309,6 +318,7 @@ mod reference_uint_128 {
     #[rstest]
     #[case(derefMutArgCall::new((1,)), 1)]
     #[case(writeMutRefCall::new((2,)), 1)]
+    #[case(mutBorrowLocalCall::new(()), 2)]
     fn test_uint_128_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -330,6 +340,7 @@ mod reference_uint_256 {
         function derefNestedU256(uint256 x) external returns (uint256);
         function derefMutArg(uint256 x) external returns (uint256);
         function writeMutRef(uint256 x) external returns (uint256);
+        function mutBorrowLocal() external returns (uint256);
     );
 
     #[fixture]
@@ -359,6 +370,7 @@ mod reference_uint_256 {
     #[rstest]
     #[case(derefMutArgCall::new((U256::from(1),)), U256::from(1))]
     #[case(writeMutRefCall::new((U256::from(2),)), U256::from(1))]
+    #[case(mutBorrowLocalCall::new(()), U256::from(2))]
     fn test_uint_256_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -381,6 +393,7 @@ mod reference_address {
         function derefNestedAddress(address x) external returns (address);
         function derefMutArg(address x) external returns (address);
         function writeMutRef(address x) external returns (address);
+        function mutBorrowLocal() external returns (address);
     );
 
     #[fixture]
@@ -409,6 +422,7 @@ mod reference_address {
     #[rstest]
     #[case(derefMutArgCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x1234567890abcdef1234567890abcdef12345678"))]
     #[case(writeMutRefCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x0000000000000000000000000000000000000001"))]
+    #[case(mutBorrowLocalCall::new(()), address!("0x0000000000000000000000000000000000000002"))]
     fn test_address_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -462,6 +476,7 @@ mod reference_vec_8 {
         function miscellaneous() external returns (uint8[]);
         function derefMutArg(uint8[] x) external returns (uint8[]);
         function writeMutRef(uint8[] x) external returns (uint8[]);
+        function mutBorrowLocal() external returns (uint8[]);
     );
 
     #[fixture]
@@ -506,6 +521,7 @@ mod reference_vec_8 {
     #[rstest]
     #[case(derefMutArgCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
     #[case(writeMutRefCall::new((vec![4, 5, 6],)), vec![1, 2, 3])]
+    #[case(mutBorrowLocalCall::new(()), vec![4, 5, 6])]
     fn test_vec_8_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -529,6 +545,7 @@ mod reference_vec_64 {
         function miscellaneous() external returns (uint64[]);
         function derefMutArg(uint64[] x) external returns (uint64[]);
         function writeMutRef(uint64[] x) external returns (uint64[]);
+        function mutBorrowLocal() external returns (uint64[]);
     );
 
     #[fixture]
@@ -560,6 +577,7 @@ mod reference_vec_64 {
     #[rstest]
     #[case(derefMutArgCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
     #[case(writeMutRefCall::new((vec![4, 5, 6],)), vec![1, 2, 3])]
+    #[case(mutBorrowLocalCall::new(()), vec![4, 5, 6])]
     fn test_vec_64_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -583,6 +601,7 @@ mod reference_vec_256 {
         function miscellaneous() external returns (uint256[]);
         function derefMutArg(uint256[] x) external returns (uint256[]);
         function writeMutRef(uint256[] x) external returns (uint256[]);
+        function mutBorrowLocal() external returns (uint256[]);
     );
 
     #[fixture]
@@ -627,6 +646,7 @@ mod reference_vec_256 {
     #[rstest]
     #[case(derefMutArgCall::new((vec![U256::from(1), U256::from(2), U256::from(3)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
     #[case(writeMutRefCall::new((vec![U256::from(4), U256::from(5), U256::from(6)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
+    #[case(mutBorrowLocalCall::new(()), vec![U256::from(4), U256::from(5), U256::from(6)])]
     fn test_vec_256_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

@@ -27,3 +27,10 @@ public fun write_mut_ref(x: &mut address ): address {
  *x = @0x01;
  *x
 }
+
+public fun mut_borrow_local(): address {
+ let mut x = @0x01;
+ let y = &mut x;
+ *y = @0x02;
+ *y
+}
