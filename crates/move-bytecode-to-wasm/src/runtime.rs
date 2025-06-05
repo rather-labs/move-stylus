@@ -34,6 +34,7 @@ pub enum RuntimeFunction {
     CopyU256,
     // Equality
     HeapTypeEquality,
+    VecEqualityHeapType,
 }
 
 impl RuntimeFunction {
@@ -65,6 +66,7 @@ impl RuntimeFunction {
             Self::CopyU256 => "copy_u256",
             // Equality
             Self::HeapTypeEquality => "heap_type_equality",
+            Self::VecEqualityHeapType => "vec_equality_heap_type",
         }
     }
 
@@ -120,6 +122,9 @@ impl RuntimeFunction {
                 (Self::CopyU256, Some(ctx)) => copy::copy_u256_function(module, ctx),
                 // Equality
                 (Self::HeapTypeEquality, Some(ctx)) => equality::a_equals_b(module, ctx),
+                (Self::VecEqualityHeapType, Some(ctx)) => {
+                    equality::vec_equality_heap_type(module, ctx)
+                }
                 // Error
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,
