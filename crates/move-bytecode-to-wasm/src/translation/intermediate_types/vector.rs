@@ -461,6 +461,14 @@ impl IVector {
         let v2_ptr = module.locals.add(ValType::I32);
         let size = module.locals.add(ValType::I32);
 
+        let print_i32 = module.imports.get_func("", "print_i32").unwrap();
+        let print_u128 = module.imports.get_func("", "print_u128").unwrap();
+        let print_separator = module.imports.get_func("", "print_separator").unwrap();
+
+        let print_memory = module.imports.get_func("", "print_memory").unwrap();
+
+        // builder.call(print_memory);
+
         // Load the size of both vectors
         builder
             .local_set(v1_ptr)
@@ -526,6 +534,8 @@ impl IVector {
 
                         // Set res to true
                         then.i32_const(1).local_set(res);
+                        then.i32_const(0).local_set(offset);
+
                         // Set the pointers past the length
                         then.local_get(v1_ptr)
                             .i32_const(4)
@@ -549,6 +559,11 @@ impl IVector {
                             block.loop_(None, |loop_| {
                                 let loop_id = loop_.id();
 
+                                loop_.i32_const(42).call(print_i32);
+                                loop_.local_get(size).call(print_i32);
+                                loop_.local_get(offset).call(print_i32);
+                                loop_.i32_const(42).call(print_i32);
+
                                 // If we are at the end of the loop means we finished comparing,
                                 // so we break the loop with the true in res
                                 loop_
@@ -556,6 +571,35 @@ impl IVector {
                                     .local_get(offset)
                                     .binop(BinaryOp::I32Eq)
                                     .br_if(block_id);
+
+                                loop_
+                                    .local_get(v1_ptr)
+                                    .local_get(offset)
+                                    .binop(BinaryOp::I32Add)
+                                    .load(
+                                        compilation_ctx.memory_id,
+                                        LoadKind::I32 { atomic: false },
+                                        MemArg {
+                                            align: 0,
+                                            offset: 0,
+                                        },
+                                    )
+                                    .call(print_u128);
+                                loop_
+                                    .local_get(v2_ptr)
+                                    .local_get(offset)
+                                    .binop(BinaryOp::I32Add)
+                                    .load(
+                                        compilation_ctx.memory_id,
+                                        LoadKind::I32 { atomic: false },
+                                        MemArg {
+                                            align: 0,
+                                            offset: 0,
+                                        },
+                                    )
+                                    .call(print_u128);
+
+                                loop_.call(print_separator);
 
                                 // Load both pointers into stack
                                 loop_
@@ -619,6 +663,7 @@ impl IVector {
 
                         // Set res to true
                         then.i32_const(1).local_set(res);
+                        then.i32_const(0).local_set(offset);
 
                         // Set the pointers past the length
                         then.local_get(v1_ptr)
@@ -631,10 +676,12 @@ impl IVector {
                             .local_set(v2_ptr);
 
                         // Set the size as the length * 4 (pointer size)
-                        then.local_get(size)
-                            .i32_const(4)
-                            .binop(BinaryOp::I32Mul)
-                            .local_set(size);
+                        // then.local_get(size)
+                        //    .i32_const(inner_v.stack_data_size() as i32)
+                        //    .binop(BinaryOp::I32Mul)
+                        //    .local_set(size);
+
+                        // then.local_get(size).call(print_i32);
 
                         // We must follow pointer by pointer and use the equality function
                         then.block(None, |block| {
@@ -643,6 +690,10 @@ impl IVector {
                             block.loop_(None, |loop_| {
                                 let loop_id = loop_.id();
 
+                                loop_.i32_const(77).call(print_i32);
+                                loop_.local_get(size).call(print_i32);
+                                loop_.local_get(offset).call(print_i32);
+                                loop_.i32_const(77).call(print_i32);
                                 // If we are at the end of the loop means we finished comparing,
                                 // so we break the loop with the true in res
                                 loop_
@@ -653,8 +704,10 @@ impl IVector {
 
                                 // Load both pointers into stack
                                 loop_
-                                    .local_get(v1_ptr)
                                     .local_get(offset)
+                                    .i32_const(4)
+                                    .binop(BinaryOp::I32Mul)
+                                    .local_get(v1_ptr)
                                     .binop(BinaryOp::I32Add)
                                     .load(
                                         compilation_ctx.memory_id,
@@ -664,8 +717,10 @@ impl IVector {
                                             offset: 0,
                                         },
                                     )
-                                    .local_get(v2_ptr)
                                     .local_get(offset)
+                                    .i32_const(4)
+                                    .binop(BinaryOp::I32Mul)
+                                    .local_get(v2_ptr)
                                     .binop(BinaryOp::I32Add)
                                     .load(
                                         compilation_ctx.memory_id,
@@ -684,7 +739,8 @@ impl IVector {
                                     None,
                                     |then| {
                                         then.local_get(offset)
-                                            .i32_const(4)
+                                            .i32_const(1)
+                                            //.local_get(size)
                                             .binop(BinaryOp::I32Add)
                                             .local_set(offset)
                                             .br(loop_id);

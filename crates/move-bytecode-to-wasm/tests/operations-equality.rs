@@ -30,6 +30,7 @@ mod primitives {
         const SOURCE_PATH: &str = "tests/operations-equality/primitives.move";
 
         let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
         RuntimeSandbox::new(&mut translated_package)
     }
 
@@ -108,7 +109,6 @@ mod vector {
     );
 
     #[rstest]
-    /*
     #[case(eqVecStackTypeCall::new((
         vec![u16::MAX, u16::MAX, 0, 1, 2, 3, u16::MAX],
         vec![u16::MAX, u16::MAX, 0, 1, 2, 3, u16::MAX])),
@@ -189,13 +189,11 @@ mod vector {
         vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX]])),
         true
     )]
-    */
     #[case(eqVecNestedHeapTypeCall::new((
-        vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX]],
-        vec![vec![u128::MAX, u128::MAX], vec![0, u128::MAX], vec![2, 3, u128::MAX]])),
+        vec![vec![50], vec![61], vec![70]],
+        vec![vec![50], vec![62], vec![70]])),
         false
     )]
-    /*
     #[case(eqVecNestedHeapTypeCall::new((
         vec![vec![u128::MAX, 1], vec![0, 1], vec![2, 3, u128::MAX]],
         vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX]])),
@@ -205,8 +203,7 @@ mod vector {
         vec![0, 1],
         vec![0, 2])),
         false
-    )]*/
-    /*
+    )]
     #[case(eqVecNestedHeapTypeCall::new((
         vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX]],
         vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, 4]])),
@@ -222,7 +219,6 @@ mod vector {
         vec![vec![u128::MAX, u128::MAX], vec![0, 1]])),
         false
     )]
-    */
     fn test_equality_vector<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
