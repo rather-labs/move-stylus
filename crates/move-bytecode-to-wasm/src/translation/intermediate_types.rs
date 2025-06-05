@@ -687,6 +687,7 @@ impl IntermediateType {
                     .local_set(ptr2);
 
                 match inner.as_ref() {
+                    // If inner is a simple type, we load te value into stack
                     IntermediateType::IBool
                     | IntermediateType::IU8
                     | IntermediateType::IU16
@@ -720,6 +721,8 @@ impl IntermediateType {
                                 },
                             );
                     }
+                    // If inner is a heap type, we already loaded the value of intermediate
+                    // pointers, so we load them
                     IntermediateType::IU128
                     | IntermediateType::IU256
                     | IntermediateType::IAddress
