@@ -2,8 +2,11 @@ pub mod constants;
 
 use anyhow::Result;
 use constants::SIGNER_ADDRESS;
-use walrus::{Module, ValType};
+use walrus::Module;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
+
+#[cfg(feature = "inject-host-debug-fns")]
+use walrus::ValType;
 
 struct ModuleData {
     pub data: Vec<u8>,

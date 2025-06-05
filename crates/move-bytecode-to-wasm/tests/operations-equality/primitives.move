@@ -27,11 +27,3 @@ public fun eq_u8(x: u8, y: u8): bool {
 public fun eq_address(x: address, y: address): bool {
     x == y
 }
-
-
-// Only one signer injected by the VM can exist
-/*
-public fun eq_signer(x: signer): bool {
-    x == x
-}
-*/

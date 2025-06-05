@@ -3,9 +3,7 @@ use functions::{
     MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
 };
 use intermediate_types::IntermediateType;
-use intermediate_types::address::IAddress;
 use intermediate_types::heap_integers::{IU128, IU256};
-use intermediate_types::signer::ISigner;
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
