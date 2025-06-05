@@ -14,7 +14,7 @@ use crate::runtime::RuntimeFunction;
 pub mod address;
 pub mod boolean;
 pub mod heap_integers;
-pub mod imm_reference;
+pub mod reference;
 pub mod signer;
 pub mod simple_integers;
 pub mod vector;
@@ -32,6 +32,7 @@ pub enum IntermediateType {
     ISigner,
     IVector(Box<IntermediateType>),
     IRef(Box<IntermediateType>),
+    IMutRef(Box<IntermediateType>),
 }
 
 impl IntermediateType {
@@ -48,7 +49,8 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => 4,
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => 4,
         }
     }
 
@@ -82,7 +84,7 @@ impl IntermediateType {
             IntermediateType::IVector(inner) => {
                 IVector::load_constant_instructions(inner, module, builder, bytes, compilation_ctx)
             }
-            IntermediateType::IRef(_) => {
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("cannot load a constant for a reference type");
             }
         }
@@ -94,13 +96,13 @@ impl IntermediateType {
         compilation_ctx: &CompilationContext,
         local: LocalId,
     ) {
+        builder.local_get(local);
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32 => {
                 builder
-                    .local_get(local)
                     .load(
                         compilation_ctx.memory_id,
                         LoadKind::I32 { atomic: false },
@@ -120,7 +122,6 @@ impl IntermediateType {
             }
             IntermediateType::IU64 => {
                 builder
-                    .local_get(local)
                     .load(
                         compilation_ctx.memory_id,
                         LoadKind::I32 { atomic: false },
@@ -141,10 +142,8 @@ impl IntermediateType {
             IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
-            | IntermediateType::ISigner
-            | IntermediateType::IRef(_) => {
-                // For heap types we just forward the pointer
-                builder.local_get(local).load(
+            | IntermediateType::ISigner => {
+                builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
                     MemArg {
@@ -153,8 +152,10 @@ impl IntermediateType {
                     },
                 );
             }
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+            }
             IntermediateType::IVector(_) => {
-                builder.local_get(local).load(
+                builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
                     MemArg {
@@ -173,20 +174,50 @@ impl IntermediateType {
         compilation_ctx: &CompilationContext,
         local: LocalId,
     ) {
-        // Deref outer pointer
-        builder.local_get(local).load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
+        builder.local_get(local);
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32 => {
+                builder
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            }
+            IntermediateType::IU64 => {
+                builder
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            }
+            IntermediateType::IU128 => {
                 builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -195,30 +226,35 @@ impl IntermediateType {
                         offset: 0,
                     },
                 );
+                let copy_f = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx));
+                builder.call(copy_f);
             }
-            IntermediateType::IU64 => {
+            IntermediateType::IU256 | IntermediateType::IAddress => {
                 builder.load(
                     compilation_ctx.memory_id,
-                    LoadKind::I64 { atomic: false },
+                    LoadKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
                         offset: 0,
                     },
                 );
-            }
-            IntermediateType::IU128 => {
-                let copy_f = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx));
-                builder.call(copy_f);
-            }
-            IntermediateType::IU256 | IntermediateType::IAddress => {
                 let copy_f = RuntimeFunction::CopyU256.get(module, Some(compilation_ctx));
                 builder.call(copy_f);
             }
-            IntermediateType::IRef(_) => {
-                // Nothing to be done, pointer is already correct
-            }
             IntermediateType::IVector(inner_type) => {
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+                //TODO: move this to a runtime function
                 IVector::copy_local_instructions(inner_type, module, builder, compilation_ctx);
+            }
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                // Nothing to be done, pointer is already correct
             }
             IntermediateType::ISigner => {
                 panic!(r#"trying to introduce copy instructions for "signer" type"#)
@@ -243,7 +279,8 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => {
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => {
                 let local = module.locals.add(ValType::I32);
 
                 builder.local_get(pointer);
@@ -295,7 +332,8 @@ impl IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IAddress
             | IntermediateType::ISigner
-            | IntermediateType::IRef(_) => {
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -325,22 +363,23 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IAddress
             | IntermediateType::IVector(_) => {
-                builder.local_get(local).load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
+                builder.local_get(local);
             }
-            IntermediateType::IRef(_) => {
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Cannot ImmBorrowLoc on a reference type");
             }
         }
     }
 
     pub fn add_read_ref_instructions(&self, builder: &mut InstrSeqBuilder, memory: MemoryId) {
+        builder.load(
+            memory,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -373,6 +412,133 @@ impl IntermediateType {
                 // No load needed, pointer is already correct
             }
             _ => panic!("Unsupported ReadRef type: {:?}", self),
+        }
+    }
+
+    pub fn add_write_ref_instructions(
+        &self,
+        module: &mut Module,
+        builder: &mut InstrSeqBuilder,
+        compilation_ctx: &CompilationContext,
+    ) {
+        match self {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64 => {
+                let (val_type, store_kind) = if *self == IntermediateType::IU64 {
+                    (ValType::I64, StoreKind::I64 { atomic: false })
+                } else {
+                    (ValType::I32, StoreKind::I32 { atomic: false })
+                };
+                let val = module.locals.add(val_type);
+                let ptr = module.locals.add(ValType::I32);
+                builder
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(ptr)
+                    .local_set(val)
+                    .local_get(ptr)
+                    .local_get(val)
+                    .store(
+                        compilation_ctx.memory_id,
+                        store_kind,
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            }
+            IntermediateType::IU128 | IntermediateType::IU256 | IntermediateType::IAddress => {
+                let src_ptr = module.locals.add(ValType::I32); // what to copy
+                let ref_ptr = module.locals.add(ValType::I32); // where to copy
+
+                // Pop the reference and value pointers from the stack
+                builder
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(ref_ptr)
+                    .local_set(src_ptr);
+
+                let bytes = match self {
+                    IntermediateType::IU128 => 16,
+                    _ => 32,
+                };
+
+                // Copy memory in 8-byte chunks
+                for offset in (0..bytes).step_by(8) {
+                    // destination address
+                    builder
+                        .local_get(ref_ptr)
+                        .i32_const(offset as i32)
+                        .binop(BinaryOp::I32Add);
+
+                    // source address
+                    builder
+                        .local_get(src_ptr)
+                        .i32_const(offset as i32)
+                        .binop(BinaryOp::I32Add)
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I64 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
+
+                    // store at destination address
+                    builder.store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                }
+            }
+            IntermediateType::IVector(_) => {
+                // Since the memory needed for vectors might differ, we don't overwrite it.
+                // We update the inner pointer to point to the location where the new vector is already allocated.
+                let src_ptr = module.locals.add(ValType::I32);
+                let ref_ptr = module.locals.add(ValType::I32);
+
+                // Swap pointers order in the stack
+                builder
+                    .local_set(ref_ptr)
+                    .local_set(src_ptr)
+                    .local_get(ref_ptr)
+                    .local_get(src_ptr);
+
+                // Store src_ptr at ref_ptr
+                // Now the inner pointer is updated to point to the new vector
+                builder.store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+            IntermediateType::ISigner => {
+                panic!("This type cannot be mutated: {:?}", self);
+            }
+            _ => unreachable!(),
         }
     }
 
@@ -452,7 +618,8 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => {
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => {
                 let ptr = module.locals.add(ValType::I32);
                 builder
                     .local_set(ptr)
@@ -513,7 +680,8 @@ impl From<&IntermediateType> for ValType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IRef(_) => ValType::I32,
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => ValType::I32,
         }
     }
 }
@@ -546,6 +714,10 @@ impl TryFrom<&SignatureToken> for IntermediateType {
             SignatureToken::Reference(token) => {
                 let itoken = Self::try_from(token.as_ref())?;
                 Ok(IntermediateType::IRef(Box::new(itoken)))
+            }
+            SignatureToken::MutableReference(token) => {
+                let itoken = Self::try_from(token.as_ref())?;
+                Ok(IntermediateType::IMutRef(Box::new(itoken)))
             }
             _ => Err(anyhow::anyhow!("Unsupported signature token: {value:?}")),
         }
