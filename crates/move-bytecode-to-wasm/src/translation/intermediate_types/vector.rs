@@ -522,7 +522,6 @@ impl IVector {
                     | IntermediateType::IU16
                     | IntermediateType::IU32
                     | IntermediateType::IU64 => {
-                        println!("simple type!!");
                         let equality_f_id =
                             RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
 

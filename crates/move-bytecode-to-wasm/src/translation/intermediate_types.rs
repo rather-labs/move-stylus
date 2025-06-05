@@ -348,7 +348,7 @@ impl IntermediateType {
     pub fn add_borrow_local_instructions(
         &self,
         builder: &mut InstrSeqBuilder,
-        compilation_ctx: &CompilationContext,
+        _compilation_ctx: &CompilationContext,
         local: LocalId,
     ) {
         match self {
@@ -482,13 +482,13 @@ impl IntermediateType {
                     // destination address
                     builder
                         .local_get(ref_ptr)
-                        .i32_const(offset as i32)
+                        .i32_const(offset)
                         .binop(BinaryOp::I32Add);
 
                     // source address
                     builder
                         .local_get(src_ptr)
-                        .i32_const(offset as i32)
+                        .i32_const(offset)
                         .binop(BinaryOp::I32Add)
                         .load(
                             compilation_ctx.memory_id,
@@ -662,6 +662,76 @@ impl IntermediateType {
             }
             Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner),
             Self::IRef(inner) | Self::IMutRef(inner) => {
+                let ptr1 = module.locals.add(ValType::I32);
+                let ptr2 = module.locals.add(ValType::I32);
+
+                // Load the intermediate pointers
+                builder
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(ptr1)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(ptr2);
+
+                match inner.as_ref() {
+                    IntermediateType::IBool
+                    | IntermediateType::IU8
+                    | IntermediateType::IU16
+                    | IntermediateType::IU32
+                    | IntermediateType::IU64 => {
+                        builder
+                            .local_get(ptr1)
+                            .load(
+                                compilation_ctx.memory_id,
+                                if **inner == IntermediateType::IU64 {
+                                    LoadKind::I64 { atomic: false }
+                                } else {
+                                    LoadKind::I32 { atomic: false }
+                                },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            )
+                            .local_get(ptr2)
+                            .load(
+                                compilation_ctx.memory_id,
+                                if **inner == IntermediateType::IU64 {
+                                    LoadKind::I64 { atomic: false }
+                                } else {
+                                    LoadKind::I32 { atomic: false }
+                                },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+                    }
+                    IntermediateType::IU128
+                    | IntermediateType::IU256
+                    | IntermediateType::IAddress
+                    | IntermediateType::ISigner
+                    | IntermediateType::IVector(_) => {
+                        builder.local_get(ptr1).local_get(ptr2);
+                    }
+                    IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                        panic!("found reference of reference");
+                    }
+                }
+
                 inner.load_equality_instructions(module, builder, compilation_ctx)
             }
         }
