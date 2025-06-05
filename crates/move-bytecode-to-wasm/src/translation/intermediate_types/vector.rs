@@ -461,14 +461,6 @@ impl IVector {
         let v2_ptr = module.locals.add(ValType::I32);
         let size = module.locals.add(ValType::I32);
 
-        let print_i32 = module.imports.get_func("", "print_i32").unwrap();
-        let print_u128 = module.imports.get_func("", "print_u128").unwrap();
-        let print_separator = module.imports.get_func("", "print_separator").unwrap();
-
-        let print_address = module.imports.get_func("", "print_address").unwrap();
-
-        // builder.call(print_memory);
-
         // Load the size of both vectors
         builder
             .local_set(v1_ptr)
@@ -567,34 +559,6 @@ impl IVector {
                                     .local_get(offset)
                                     .binop(BinaryOp::I32Eq)
                                     .br_if(block_id);
-
-                                loop_
-                                    .local_get(v1_ptr)
-                                    .local_get(offset)
-                                    .binop(BinaryOp::I32Add)
-                                    .load(
-                                        compilation_ctx.memory_id,
-                                        LoadKind::I32 { atomic: false },
-                                        MemArg {
-                                            align: 0,
-                                            offset: 0,
-                                        },
-                                    )
-                                    .call(print_address);
-
-                                loop_
-                                    .local_get(v2_ptr)
-                                    .local_get(offset)
-                                    .binop(BinaryOp::I32Add)
-                                    .load(
-                                        compilation_ctx.memory_id,
-                                        LoadKind::I32 { atomic: false },
-                                        MemArg {
-                                            align: 0,
-                                            offset: 0,
-                                        },
-                                    )
-                                    .call(print_address);
 
                                 // Load both pointers into stack
                                 loop_
