@@ -1,10 +1,12 @@
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg},
+    ir::{BinaryOp, LoadKind, MemArg},
 };
 
 use super::RuntimeFunction;
 
+/// Verifies if two elements a and b are equal
+///
 /// # Arguments
 ///    - pointer to a
 ///    - pointer to b
@@ -51,16 +53,14 @@ pub fn a_equals_b(module: &mut Module, compilation_ctx: &crate::CompilationConte
                     .binop(BinaryOp::I32Eq)
                     .br_if(block_id);
 
-                // Read both numbers bytes at offset and compare them
+                // Read both pointers at offset and compare them
                 loop_
                     .local_get(a_ptr)
                     .local_get(offset)
                     .binop(BinaryOp::I32Add)
                     .load(
                         compilation_ctx.memory_id,
-                        LoadKind::I32_8 {
-                            kind: ExtendedLoad::ZeroExtend,
-                        },
+                        LoadKind::I32 { atomic: false },
                         MemArg {
                             align: 0,
                             offset: 0,
@@ -71,9 +71,7 @@ pub fn a_equals_b(module: &mut Module, compilation_ctx: &crate::CompilationConte
                     .binop(BinaryOp::I32Add)
                     .load(
                         compilation_ctx.memory_id,
-                        LoadKind::I32_8 {
-                            kind: ExtendedLoad::ZeroExtend,
-                        },
+                        LoadKind::I32 { atomic: false },
                         MemArg {
                             align: 0,
                             offset: 0,
@@ -91,7 +89,7 @@ pub fn a_equals_b(module: &mut Module, compilation_ctx: &crate::CompilationConte
 
                 loop_
                     .local_get(offset)
-                    .i32_const(1)
+                    .i32_const(4)
                     .binop(BinaryOp::I32Add)
                     .local_set(offset)
                     .br(loop_id);
