@@ -40,3 +40,28 @@ public fun miscellaneous(): vector<u8> {
     let y = x[1];
     vector[y, v[1][1]]
 }
+
+public fun deref_mut_arg(x: &mut vector<u8> ): vector<u8> {
+ *x
+}
+
+public fun write_mut_ref(x: &mut vector<u8> ): vector<u8> {
+ *x = vector<u8>[1, 2, 3];
+ *x 
+}
+
+
+public fun mut_borrow_local(): vector<u8> {
+ let mut x = vector<u8>[1, 2, 3];
+ let y = &mut x;
+ *y = vector<u8>[4, 5, 6];
+ *y
+}
+
+public fun freeze_ref(y: vector<u8>): vector<u8> {
+    let mut x = vector<u8>[1, 2, 3];
+    let x_mut_ref: &mut vector<u8> = &mut x;
+    *x_mut_ref = y;
+    let x_frozen_ref: &vector<u8> = freeze(x_mut_ref); 
+    *x_frozen_ref
+}

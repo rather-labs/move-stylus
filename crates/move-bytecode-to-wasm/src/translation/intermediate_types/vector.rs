@@ -1,5 +1,5 @@
 use walrus::{
-    InstrSeqBuilder, MemoryId, Module, ValType,
+    InstrSeqBuilder, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
@@ -365,7 +365,7 @@ impl IVector {
         inner: &IntermediateType,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-        memory: MemoryId,
+        compilation_ctx: &CompilationContext,
     ) {
         let size = inner.stack_data_size() as i32;
         let index_i64 = module.locals.add(ValType::I64); // referenced element index
@@ -390,14 +390,23 @@ impl IVector {
 
         // Set vector base address
         let vector_address = module.locals.add(ValType::I32);
-        builder.local_set(vector_address);
+        builder
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_set(vector_address);
 
         // Trap if index >= length
         builder.block(None, |block| {
             block
                 .local_get(vector_address)
                 .load(
-                    memory,
+                    compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
@@ -409,6 +418,13 @@ impl IVector {
             block.br_if(block.id());
             block.unreachable();
         });
+
+        // Reference to element
+        let ref_local = module.locals.add(ValType::I32);
+        builder
+            .i32_const(4)
+            .call(compilation_ctx.allocator)
+            .local_tee(ref_local);
 
         // Compute element
         builder
@@ -426,7 +442,7 @@ impl IVector {
             | IntermediateType::IU16
             | IntermediateType::IU32
             | IntermediateType::IU64 => {
-                // pointer to value
+                // Store element at ref address
             }
 
             IntermediateType::IVector(_)
@@ -436,7 +452,7 @@ impl IVector {
             | IntermediateType::IAddress => {
                 // load pointer to value
                 builder.load(
-                    memory,
+                    compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
@@ -445,10 +461,21 @@ impl IVector {
                 );
             }
 
-            IntermediateType::IRef(_) => {
-                panic!("Cannot VecImmBorrow an existing reference type");
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                panic!("VecImmBorrow operation is not allowed on reference types");
             }
         }
+
+        builder.store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+        builder.local_get(ref_local);
     }
 }
 

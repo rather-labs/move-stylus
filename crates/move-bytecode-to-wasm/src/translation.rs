@@ -146,6 +146,16 @@ fn map_bytecode_instruction(
                 if let Err(e) = pop_types_stack(types_stack, argument) {
                     panic!("Called function signature arguments mismatch at index {i}: {e}");
                 }
+                if let IntermediateType::IMutRef(_) | IntermediateType::IRef(_) = argument {
+                    builder.load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                }
             }
 
             let f = function_table
@@ -172,7 +182,12 @@ fn map_bytecode_instruction(
         Bytecode::StLoc(local_id) => {
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = &mapped_function.function_locals_ir[*local_id as usize];
-            local_type.box_local_instructions(module, builder, compilation_ctx, local);
+            // If type is a reference we set the local directly, else we box it.
+            if let IntermediateType::IRef(_) | IntermediateType::IMutRef(_) = local_type {
+                builder.local_set(local);
+            } else {
+                local_type.box_local_instructions(module, builder, compilation_ctx, local);
+            }
             pop_types_stack(types_stack, local_type).unwrap();
         }
         Bytecode::MoveLoc(local_id) => {
@@ -211,9 +226,13 @@ fn map_bytecode_instruction(
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = &mapped_function.function_locals_ir[*local_id as usize];
             local_type.add_borrow_local_instructions(builder, compilation_ctx, local);
-
-            // Push the reference to the type into the types stack
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
+        }
+        Bytecode::MutBorrowLoc(local_id) => {
+            let local = mapped_function.function_locals[*local_id as usize];
+            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
+            local_type.add_borrow_local_instructions(builder, compilation_ctx, local);
+            types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
         }
         Bytecode::VecImmBorrow(signature_index) => {
             match (types_stack.pop(), types_stack.pop()) {
@@ -227,17 +246,11 @@ fn map_bytecode_instruction(
 
             let inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
-            IVector::add_vec_imm_borrow_instructions(
-                &inner,
-                module,
-                builder,
-                compilation_ctx.memory_id,
-            );
+            IVector::add_vec_imm_borrow_instructions(&inner, module, builder, compilation_ctx);
 
             // Push &T onto the WASM type stack
             types_stack.push(IntermediateType::IRef(Box::new(inner)));
         }
-
         Bytecode::VecLen(signature_index) => {
             let elem_ir_type = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
@@ -265,28 +278,59 @@ fn map_bytecode_instruction(
                         offset: 0,
                     },
                 )
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
                 .unop(UnaryOp::I64ExtendUI32);
 
             types_stack.push(IntermediateType::IU64);
         }
-
         Bytecode::ReadRef => {
             let ref_type = types_stack
                 .pop()
                 .expect("ReadRef expects a reference on the stack");
 
             match ref_type {
-                IntermediateType::IRef(inner) => {
-                    // Now call directly on the inner type
+                IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
                     inner.add_read_ref_instructions(builder, compilation_ctx.memory_id);
-
-                    // And push the inner type into the stack
                     types_stack.push(*inner);
                 }
                 _ => panic!("ReadRef expected a IRef type but got: {:?}", ref_type),
             }
         }
+        Bytecode::WriteRef => match (types_stack.pop(), types_stack.pop()) {
+            (Some(IntermediateType::IMutRef(inner)), Some(value_type)) => {
+                if *inner == value_type {
+                    inner.add_write_ref_instructions(module, builder, compilation_ctx);
+                } else {
+                    panic!(
+                        "WriteRef type mismatch: expected value of type {:?}, got {:?}",
+                        inner, value_type
+                    );
+                }
+            }
+            (Some(other), Some(_)) => {
+                panic!("WriteRef expected a mutable reference, got {:?}", other);
+            }
+            _ => panic!("Type stack underflow on WriteRef"),
+        },
+        Bytecode::FreezeRef => {
+            let ref_type = types_stack
+                .pop()
+                .expect("FreezeRef expects a reference on the stack");
 
+            match ref_type {
+                IntermediateType::IMutRef(inner) => {
+                    types_stack.push(IntermediateType::IRef(inner.clone()));
+                }
+                _ => panic!("FreezeRef expected a mutable reference, got {:?}", ref_type),
+            }
+        }
         Bytecode::Pop => {
             builder.drop();
             types_stack

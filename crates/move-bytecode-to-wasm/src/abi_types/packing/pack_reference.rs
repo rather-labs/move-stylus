@@ -1,6 +1,6 @@
 use super::Packable;
 use crate::translation::intermediate_types::IntermediateType;
-use crate::translation::intermediate_types::imm_reference::IRef;
+use crate::translation::intermediate_types::reference::{IMutRef, IRef};
 use walrus::{
     FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
     ir::{LoadKind, MemArg},
@@ -71,7 +71,79 @@ impl IRef {
                     allocator,
                 );
             }
-            IntermediateType::IRef(_) => {
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                panic!("Inner type cannot be a reference!");
+            }
+        }
+    }
+}
+
+impl IMutRef {
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_pack_instructions(
+        inner: &IntermediateType,
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        local: LocalId,
+        writer_pointer: LocalId,
+        calldata_reference_pointer: LocalId,
+        memory: MemoryId,
+        allocator: FunctionId,
+    ) {
+        match inner {
+            // Heap types: just forward the pointer
+            IntermediateType::IVector(_)
+            | IntermediateType::ISigner
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress => {
+                inner.add_pack_instructions(
+                    builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    memory,
+                    allocator,
+                );
+            }
+            // Immediate types: deref the pointer and pass the value as LocalId
+            IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64
+            | IntermediateType::IBool => {
+                builder.local_get(local);
+                builder.load(
+                    memory,
+                    match inner.stack_data_size() {
+                        4 => LoadKind::I32 { atomic: false },
+                        8 => LoadKind::I64 { atomic: false },
+                        _ => panic!("Unsupported stack_data_size for IRef pack"),
+                    },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+                let value_local = module.locals.add(match inner.stack_data_size() {
+                    4 => ValType::I32,
+                    8 => ValType::I64,
+                    _ => panic!("Unsupported stack_data_size for IRef pack"),
+                });
+                builder.local_set(value_local);
+
+                inner.add_pack_instructions(
+                    builder,
+                    module,
+                    value_local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    memory,
+                    allocator,
+                );
+            }
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
         }

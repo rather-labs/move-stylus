@@ -18,3 +18,27 @@ public fun deref_nested_address(x: address): address {
     let z = &*y;
     *z
 }
+
+public fun deref_mut_arg(x: &mut address ): address {
+ *x
+}
+
+public fun write_mut_ref(x: &mut address ): address {
+ *x = @0x01;
+ *x
+}
+
+public fun mut_borrow_local(): address {
+ let mut x = @0x01;
+ let y = &mut x;
+ *y = @0x02;
+ *y
+}
+
+public fun freeze_ref(y: address): address {
+    let mut x = @0x01;
+    let x_mut_ref: &mut address = &mut x;
+    *x_mut_ref = y;
+    let x_frozen_ref: &address = freeze(x_mut_ref); 
+    *x_frozen_ref
+}
