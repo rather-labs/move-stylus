@@ -104,8 +104,10 @@ mod vector {
         #[allow(missing_docs)]
         function eqVecStackType(uint16[], uint16[]) external returns (bool);
         function eqVecHeapType(uint128[], uint128[]) external returns (bool);
+        function eqVecHeapType2(address[], address[]) external returns (bool);
         function eqVecNestedStackType(uint16[][], uint16[][]) external returns (bool);
         function eqVecNestedHeapType(uint128[][], uint128[][]) external returns (bool);
+        function eqVecNestedHeapType2(address[][], address[][]) external returns (bool);
     );
 
     #[rstest]
@@ -159,6 +161,53 @@ mod vector {
         vec![u128::MAX, u128::MAX, 0, 1, 2, 3])),
         false
     )]
+    #[case(eqVecHeapType2Call::new((
+        vec![
+            address!("0xdeadbeef0000000000000000000000000000cafe"),
+            address!("0xcafe000000000000000000000000000000007357")
+        ],
+        vec![
+            address!("0xdeadbeef0000000000000000000000000000cafe"),
+            address!("0xcafe000000000000000000000000000000007357")
+        ])),
+        true
+    )]
+    #[case(eqVecHeapType2Call::new((
+        vec![
+            address!("0xdeadbeef0000000000000000000000000000cafe"),
+            address!("0xcafe000000000000000000000000000000007357")
+        ],
+        vec![
+            address!("0xcafe0000000cafecafe000000000000000007357"),
+            address!("0xdeadbeef0000000000000000000000000000cafe")
+        ])),
+        false
+    )]
+    #[case(eqVecHeapType2Call::new((
+        vec![
+            address!("0xdeadbeef0000000000000000000000000000cafe"),
+            address!("0xcafe000000000000000000000000000000007357")
+        ],
+        vec![
+            address!("0xdeadbeef0000000000000000000000000000cafe"),
+        ])),
+        false
+    )]
+    #[case(eqVecHeapType2Call::new((
+        vec![
+            address!("0xdeadbeef0000000000000000000000000000cafe"),
+        ],
+        vec![
+            address!("0xdeadbeef0000000000000000000000000000cafe"),
+            address!("0xcafe000000000000000000000000000000007357")
+        ])),
+        false
+    )]
+    #[case(eqVecHeapTypeCall::new((
+        vec![u128::MAX, u128::MAX, 0, 1, 2, 3, u128::MAX],
+        vec![u128::MAX, u128::MAX, 0, 1, 2, 3])),
+        false
+    )]
     #[case(eqVecNestedStackTypeCall::new((
         vec![vec![u16::MAX, u16::MAX], vec![0, 1], vec![2, 3, u16::MAX]],
         vec![vec![u16::MAX, u16::MAX], vec![0, 1], vec![2, 3, u16::MAX]])),
@@ -199,11 +248,6 @@ mod vector {
         vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX]])),
         false
     )]
-    #[case(eqVecHeapTypeCall::new((
-        vec![0, 1],
-        vec![0, 2])),
-        false
-    )]
     #[case(eqVecNestedHeapTypeCall::new((
         vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX]],
         vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, 4]])),
@@ -217,6 +261,103 @@ mod vector {
     #[case(eqVecNestedHeapTypeCall::new((
         vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX]],
         vec![vec![u128::MAX, u128::MAX], vec![0, 1]])),
+        false
+    )]
+    #[case(eqVecNestedHeapTypeCall::new((
+        vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX]],
+        vec![vec![u128::MAX, u128::MAX], vec![0, 1], vec![2, 3, u128::MAX - 1]])),
+        false
+    )]
+    #[case(eqVecNestedHeapType2Call::new((
+        vec![
+            vec![
+                address!("0xdeadbeef0000000000000000000000000000cafe"),
+                address!("0xcafe000000000000000000000000000000007357")
+            ],
+            vec![
+                address!("0xdeadbeef0002000000000000000000000000cafe"),
+                address!("0xcafe000000020000000000000000000000007357")
+            ],
+            vec![
+                address!("0xdeadbeef0003000000000000000000000000cafe"),
+                address!("0xcafe000000030000000000000000000000007357")
+            ],
+        ],
+        vec![
+            vec![
+                address!("0xdeadbeef0000000000000000000000000000cafe"),
+                address!("0xcafe000000000000000000000000000000007357")
+            ],
+            vec![
+                address!("0xdeadbeef0002000000000000000000000000cafe"),
+                address!("0xcafe000000020000000000000000000000007357")
+            ],
+            vec![
+                address!("0xdeadbeef0003000000000000000000000000cafe"),
+                address!("0xcafe000000030000000000000000000000007357")
+            ],
+        ])),
+        true
+    )]
+    #[case(eqVecNestedHeapType2Call::new((
+        vec![
+            vec![
+                address!("0xdeadbeef0000000000000000000000000000cafe"),
+                address!("0xcafe000000000000000000000000000000007357")
+            ],
+            vec![
+                address!("0xdeadbeef0002000000000000000000000000cafe"),
+                address!("0xcafe000000020000000000000000000000007357")
+            ],
+            vec![
+                address!("0xdeadbeef0003000000000000000000000000cafe"),
+                address!("0xcafe000000030000000000000000000000007357")
+            ],
+        ],
+        vec![
+            vec![
+                address!("0xdeadbeef0000000000000000000000000000cafe"),
+                address!("0xcafe000000000000000000000000000000007357")
+            ],
+            vec![
+                address!("0xcafe0000000cafecafecafecafe0000000007357"),
+                address!("0xdeadbeef0002000000000000000000000000cafe"),
+            ],
+            vec![
+                address!("0xdeadbeef0003000000000000000000000000cafe"),
+                address!("0xcafe000000030000000000000000000000007357")
+            ],
+        ])),
+        false
+    )]
+    #[case(eqVecNestedHeapType2Call::new((
+        vec![
+            vec![
+                address!("0xdeadbeef0000000000000000000000000000cafe"),
+                address!("0xcafe000000000000000000000000000000007357")
+            ],
+            vec![
+                address!("0xdeadbeef0002000000000000000000000000cafe"),
+                address!("0xcafe000000020000000000000000000000007357")
+            ],
+            vec![
+                address!("0xdeadbeef0003000000000000000000000000cafe"),
+                address!("0xcafe000000030000000000000000000000007357")
+            ],
+        ],
+        vec![
+            vec![
+                address!("0xdeadbeef0000000000000000000000000000cafe"),
+                address!("0xcafe000000000000000000000000000000007357")
+            ],
+            vec![
+                address!("0xcafe0000000cafecafecafecafe0000000007357"),
+                address!("0xdeadbeef0002000000000000000000000000cafe"),
+            ],
+            vec![
+                address!("0xdeadbeef0003000000000000000000000000cafe"),
+            ],
+        ])),
         false
     )]
     fn test_equality_vector<T: SolCall>(

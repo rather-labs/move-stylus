@@ -465,7 +465,7 @@ impl IVector {
         let print_u128 = module.imports.get_func("", "print_u128").unwrap();
         let print_separator = module.imports.get_func("", "print_separator").unwrap();
 
-        let print_memory = module.imports.get_func("", "print_memory").unwrap();
+        let print_address = module.imports.get_func("", "print_address").unwrap();
 
         // builder.call(print_memory);
 
@@ -525,16 +525,17 @@ impl IVector {
                     t @ (IntermediateType::IU128
                     | IntermediateType::IU256
                     | IntermediateType::IAddress) => {
-                        println!("{t:?}!!");
                         let equality_f_id =
                             RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
 
                         let res = module.locals.add(ValType::I32);
                         let offset = module.locals.add(ValType::I32);
 
-                        // Set res to true
-                        then.i32_const(1).local_set(res);
-                        then.i32_const(0).local_set(offset);
+                        // Set res to true and offset to 0
+                        then.i32_const(1)
+                            .local_set(res)
+                            .i32_const(0)
+                            .local_set(offset);
 
                         // Set the pointers past the length
                         then.local_get(v1_ptr)
@@ -559,11 +560,6 @@ impl IVector {
                             block.loop_(None, |loop_| {
                                 let loop_id = loop_.id();
 
-                                loop_.i32_const(42).call(print_i32);
-                                loop_.local_get(size).call(print_i32);
-                                loop_.local_get(offset).call(print_i32);
-                                loop_.i32_const(42).call(print_i32);
-
                                 // If we are at the end of the loop means we finished comparing,
                                 // so we break the loop with the true in res
                                 loop_
@@ -584,7 +580,8 @@ impl IVector {
                                             offset: 0,
                                         },
                                     )
-                                    .call(print_u128);
+                                    .call(print_address);
+
                                 loop_
                                     .local_get(v2_ptr)
                                     .local_get(offset)
@@ -597,9 +594,7 @@ impl IVector {
                                             offset: 0,
                                         },
                                     )
-                                    .call(print_u128);
-
-                                loop_.call(print_separator);
+                                    .call(print_address);
 
                                 // Load both pointers into stack
                                 loop_
@@ -657,13 +652,14 @@ impl IVector {
                     }
 
                     IntermediateType::IVector(inner_v) => {
-                        println!("vector!");
                         let res = module.locals.add(ValType::I32);
                         let offset = module.locals.add(ValType::I32);
 
-                        // Set res to true
-                        then.i32_const(1).local_set(res);
-                        then.i32_const(0).local_set(offset);
+                        // Set res to true and offset to 0
+                        then.i32_const(1)
+                            .local_set(res)
+                            .i32_const(0)
+                            .local_set(offset);
 
                         // Set the pointers past the length
                         then.local_get(v1_ptr)
@@ -675,13 +671,11 @@ impl IVector {
                             .binop(BinaryOp::I32Add)
                             .local_set(v2_ptr);
 
-                        // Set the size as the length * 4 (pointer size)
-                        // then.local_get(size)
-                        //    .i32_const(inner_v.stack_data_size() as i32)
-                        //    .binop(BinaryOp::I32Mul)
-                        //    .local_set(size);
-
-                        // then.local_get(size).call(print_i32);
+                        // Set the size as the length * the inner type stack size
+                        then.local_get(size)
+                            .i32_const(inner_v.stack_data_size() as i32)
+                            .binop(BinaryOp::I32Mul)
+                            .local_set(size);
 
                         // We must follow pointer by pointer and use the equality function
                         then.block(None, |block| {
@@ -690,10 +684,6 @@ impl IVector {
                             block.loop_(None, |loop_| {
                                 let loop_id = loop_.id();
 
-                                loop_.i32_const(77).call(print_i32);
-                                loop_.local_get(size).call(print_i32);
-                                loop_.local_get(offset).call(print_i32);
-                                loop_.i32_const(77).call(print_i32);
                                 // If we are at the end of the loop means we finished comparing,
                                 // so we break the loop with the true in res
                                 loop_
@@ -704,10 +694,8 @@ impl IVector {
 
                                 // Load both pointers into stack
                                 loop_
-                                    .local_get(offset)
-                                    .i32_const(4)
-                                    .binop(BinaryOp::I32Mul)
                                     .local_get(v1_ptr)
+                                    .local_get(offset)
                                     .binop(BinaryOp::I32Add)
                                     .load(
                                         compilation_ctx.memory_id,
@@ -717,10 +705,8 @@ impl IVector {
                                             offset: 0,
                                         },
                                     )
-                                    .local_get(offset)
-                                    .i32_const(4)
-                                    .binop(BinaryOp::I32Mul)
                                     .local_get(v2_ptr)
+                                    .local_get(offset)
                                     .binop(BinaryOp::I32Add)
                                     .load(
                                         compilation_ctx.memory_id,
@@ -739,8 +725,7 @@ impl IVector {
                                     None,
                                     |then| {
                                         then.local_get(offset)
-                                            .i32_const(1)
-                                            //.local_get(size)
+                                            .i32_const(4)
                                             .binop(BinaryOp::I32Add)
                                             .local_set(offset)
                                             .br(loop_id);

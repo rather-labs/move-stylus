@@ -92,20 +92,25 @@ pub fn translate_package(
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
 
-        let func_ty = module.types.add(&[ValType::I32], &[]);
-        module.add_import_func("", "print_i32", func_ty);
+        if cfg!(feature = "inject-host-debug-fns") {
+            let func_ty = module.types.add(&[ValType::I32], &[]);
+            module.add_import_func("", "print_i32", func_ty);
 
-        let func_ty = module.types.add(&[], &[]);
-        module.add_import_func("", "print_memory", func_ty);
+            let func_ty = module.types.add(&[], &[]);
+            module.add_import_func("", "print_memory", func_ty);
 
-        let func_ty = module.types.add(&[ValType::I64], &[]);
-        module.add_import_func("", "print_i64", func_ty);
+            let func_ty = module.types.add(&[ValType::I64], &[]);
+            module.add_import_func("", "print_i64", func_ty);
 
-        let func_ty = module.types.add(&[ValType::I32], &[]);
-        module.add_import_func("", "print_u128", func_ty);
+            let func_ty = module.types.add(&[ValType::I32], &[]);
+            module.add_import_func("", "print_u128", func_ty);
 
-        let func_ty = module.types.add(&[], &[]);
-        module.add_import_func("", "print_separator", func_ty);
+            let func_ty = module.types.add(&[], &[]);
+            module.add_import_func("", "print_separator", func_ty);
+
+            let func_ty = module.types.add(&[ValType::I32], &[]);
+            module.add_import_func("", "print_address", func_ty);
+        }
 
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
