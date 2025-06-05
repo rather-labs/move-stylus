@@ -730,7 +730,7 @@ impl IVector {
 
                         then.local_get(res);
                     }
-                    IntermediateType::IRef(_) => {
+                    IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                         panic!("vector of rereferences found")
                     }
                     IntermediateType::ISigner => {

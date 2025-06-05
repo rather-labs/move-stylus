@@ -152,8 +152,7 @@ impl IntermediateType {
                     },
                 );
             }
-            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-            }
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {}
             IntermediateType::IVector(_) => {
                 builder.load(
                     compilation_ctx.memory_id,
@@ -662,7 +661,9 @@ impl IntermediateType {
                 builder.i32_const(1);
             }
             Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner),
-            Self::IRef(inner) => inner.load_equality_instructions(module, builder, compilation_ctx),
+            Self::IRef(inner) | Self::IMutRef(inner) => {
+                inner.load_equality_instructions(module, builder, compilation_ctx)
+            }
         }
     }
 }
