@@ -42,6 +42,12 @@ mod lessthan {
         function lessThanU32(uint32 x, uint32 y) external returns (bool);
         function lessThanU16(uint16 x, uint16 y) external returns (bool);
         function lessThanU8(uint8 x, uint8 y) external returns (bool);
+        function lessThanEqU256(uint256 x, uint256 y) external returns (bool);
+        function lessThanEqU128(uint128 x, uint128 y) external returns (bool);
+        function lessThanEqU64(uint64 x, uint64 y) external returns (bool);
+        function lessThanEqU32(uint32 x, uint32 y) external returns (bool);
+        function lessThanEqU16(uint16 x, uint16 y) external returns (bool);
+        function lessThanEqU8(uint8 x, uint8 y) external returns (bool);
     );
 
     #[rstest]
@@ -64,6 +70,38 @@ mod lessthan {
     #[case(lessThanU8Call::new((u8::MAX - 1, u8::MAX - 2)), false)]
     #[case(lessThanU8Call::new((u8::MAX - 1, u8::MAX)), true)]
     fn test_less_than<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: bool,
+    ) {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(lessThanEqU256Call::new((U256::MAX, U256::MAX)), true)]
+    #[case(lessThanEqU256Call::new((U256::MAX - U256::from(1), U256::MAX - U256::from(2))), false)]
+    #[case(lessThanEqU256Call::new((U256::MAX - U256::from(1), U256::MAX)), true)]
+    #[case(lessThanEqU128Call::new((u128::MAX, u128::MAX)), true)]
+    #[case(lessThanEqU128Call::new((u128::MAX - 1, u128::MAX - 2)), false)]
+    #[case(lessThanEqU128Call::new((u128::MAX - 1, u128::MAX)), true)]
+    #[case(lessThanEqU64Call::new((u64::MAX, u64::MAX)), true)]
+    #[case(lessThanEqU64Call::new((u64::MAX - 1, u64::MAX - 2)), false)]
+    #[case(lessThanEqU64Call::new((u64::MAX - 1, u64::MAX)), true)]
+    #[case(lessThanEqU32Call::new((u32::MAX, u32::MAX)), true)]
+    #[case(lessThanEqU32Call::new((u32::MAX - 1, u32::MAX - 2)), false)]
+    #[case(lessThanEqU32Call::new((u32::MAX - 1, u32::MAX)), true)]
+    #[case(lessThanEqU16Call::new((u16::MAX, u16::MAX)), true)]
+    #[case(lessThanEqU16Call::new((u16::MAX - 1, u16::MAX - 2)), false)]
+    #[case(lessThanEqU16Call::new((u16::MAX - 1, u16::MAX)), true)]
+    #[case(lessThanEqU8Call::new((u8::MAX, u8::MAX)), true)]
+    #[case(lessThanEqU8Call::new((u8::MAX - 1, u8::MAX - 2)), false)]
+    #[case(lessThanEqU8Call::new((u8::MAX - 1, u8::MAX)), true)]
+    fn test_less_eq_than<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: bool,
