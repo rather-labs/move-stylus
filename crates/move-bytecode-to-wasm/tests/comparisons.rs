@@ -76,3 +76,60 @@ mod lessthan {
         .unwrap();
     }
 }
+
+mod greaterthan {
+    use super::*;
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "greater_than";
+        const SOURCE_PATH: &str = "tests/operations-comparisons/greater_than.move";
+
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+        function greaterThanU256(uint256 x, uint256 y) external returns (bool);
+        function greaterThanU128(uint128 x, uint128 y) external returns (bool);
+        function greaterThanU64(uint64 x, uint64 y) external returns (bool);
+        function greaterThanU32(uint32 x, uint32 y) external returns (bool);
+        function greaterThanU16(uint16 x, uint16 y) external returns (bool);
+        function greaterThanU8(uint8 x, uint8 y) external returns (bool);
+    );
+
+    #[rstest]
+    #[case(greaterThanU256Call::new((U256::MAX, U256::MAX)), false)]
+    #[case(greaterThanU256Call::new((U256::MAX, U256::MAX - U256::from(1))), true)]
+    #[case(greaterThanU256Call::new((U256::MAX - U256::from(1), U256::MAX)), false)]
+    #[case(greaterThanU128Call::new((u128::MAX, u128::MAX)), false)]
+    #[case(greaterThanU128Call::new((u128::MAX, u128::MAX - 1)), true)]
+    #[case(greaterThanU128Call::new((u128::MAX - 1, u128::MAX)), false)]
+    #[case(greaterThanU64Call::new((u64::MAX, u64::MAX)), false)]
+    #[case(greaterThanU64Call::new((u64::MAX, u64::MAX - 1)), true)]
+    #[case(greaterThanU64Call::new((u64::MAX - 1, u64::MAX)), false)]
+    #[case(greaterThanU32Call::new((u32::MAX, u32::MAX)), false)]
+    #[case(greaterThanU32Call::new((u32::MAX, u32::MAX - 1)), true)]
+    #[case(greaterThanU32Call::new((u32::MAX - 1, u32::MAX)), false)]
+    #[case(greaterThanU16Call::new((u16::MAX, u16::MAX)), false)]
+    #[case(greaterThanU16Call::new((u16::MAX, u16::MAX - 1)), true)]
+    #[case(greaterThanU16Call::new((u16::MAX - 1, u16::MAX)), false)]
+    #[case(greaterThanU8Call::new((u8::MAX, u8::MAX)), false)]
+    #[case(greaterThanU8Call::new((u8::MAX, u8::MAX - 1)), true)]
+    #[case(greaterThanU8Call::new((u8::MAX - 1, u8::MAX)), false)]
+    fn test_greater_than<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: bool,
+    ) {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+        )
+        .unwrap();
+    }
+}
