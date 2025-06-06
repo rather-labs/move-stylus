@@ -503,6 +503,17 @@ fn map_bytecode_instruction(
 
             types_stack.push(IntermediateType::IBool);
         }
+        Bytecode::Neq => {
+            let [t1, t2] = pop_n_from_stack(types_stack);
+            assert_eq!(
+                t1, t2,
+                "types stack error: trying to compare by equality two different types {t1:?} {t2:?}"
+            );
+
+            t1.load_not_equality_instructions(module, builder, compilation_ctx);
+
+            types_stack.push(IntermediateType::IBool);
+        }
         Bytecode::Or => {
             pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
             pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();

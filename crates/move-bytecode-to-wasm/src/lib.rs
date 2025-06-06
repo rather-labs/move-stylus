@@ -20,6 +20,7 @@ mod runtime;
 mod runtime_error_codes;
 mod translation;
 mod utils;
+mod wasm_builder_extension;
 mod wasm_helpers;
 mod wasm_validation;
 
