@@ -828,8 +828,19 @@ mod tests {
             0u32.to_le_bytes().as_slice(),
         ]
         .concat();
+
+        let expected_pop_bytes = [
+            3u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+
         test_vector(&data, IntermediateType::IBool, &expected_result_bytes);
         test_vector_copy(&data, IntermediateType::IBool, &expected_result_bytes);
+        test_vector_pop_back(&data, IntermediateType::IBool, &expected_pop_bytes, 0);
     }
 
     #[test]
