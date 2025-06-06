@@ -43,3 +43,11 @@ public fun echo(x: vector<u128>): vector<u128> {
   x
 }
 
+public fun vec_pop_back(x: vector<u128>): vector<u128> {
+  let mut y = x;
+  y.pop_back();
+  y.pop_back();
+  y
+}
+
+
