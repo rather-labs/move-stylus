@@ -17,6 +17,7 @@ use walrus::{
 
 use crate::CompilationContext;
 use crate::runtime::RuntimeFunction;
+use crate::wasm_builder_extensions::WasmBuilderExtension;
 
 pub mod functions;
 /// The types in this module represent an intermediate Rust representation of Move types
@@ -522,29 +523,28 @@ fn map_bytecode_instruction(
                 IntermediateType::IU128 => {
                     let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
 
+                    // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
 
-                    // Swap a and b
-                    builder.local_set(a).local_set(b).local_get(a).local_get(b);
-
-                    // Compare
-                    builder.i32_const(IU128::HEAP_SIZE).call(less_than_f);
-
-                    // Negate the result
-                    builder.i32_const(1).binop(BinaryOp::I32Ne);
+                    builder
+                        .swap(a, b)
+                        .i32_const(IU128::HEAP_SIZE)
+                        .call(less_than_f)
+                        .negate();
                 }
                 IntermediateType::IU256 => {
                     let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
 
+                    // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
 
-                    builder.local_set(a).local_set(b).local_get(a).local_get(b);
-
-                    builder.i32_const(IU256::HEAP_SIZE).call(less_than_f);
-
-                    builder.i32_const(1).binop(BinaryOp::I32Ne);
+                    builder
+                        .swap(a, b)
+                        .i32_const(IU256::HEAP_SIZE)
+                        .call(less_than_f)
+                        .negate();
                 }
                 _ => panic!("trying to compare two {t1:?}"),
             }
@@ -573,11 +573,10 @@ fn map_bytecode_instruction(
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
 
-                    // Swap a and b
-                    builder.local_set(a).local_set(b).local_get(a).local_get(b);
-
-                    // Compare
-                    builder.i32_const(IU128::HEAP_SIZE).call(less_than_f);
+                    builder
+                        .swap(a, b)
+                        .i32_const(IU128::HEAP_SIZE)
+                        .call(less_than_f);
                 }
                 IntermediateType::IU256 => {
                     let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
@@ -585,9 +584,10 @@ fn map_bytecode_instruction(
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
 
-                    builder.local_set(a).local_set(b).local_get(a).local_get(b);
-
-                    builder.i32_const(IU256::HEAP_SIZE).call(less_than_f);
+                    builder
+                        .swap(a, b)
+                        .i32_const(IU256::HEAP_SIZE)
+                        .call(less_than_f);
                 }
                 _ => panic!("trying to compare two {t1:?}"),
             }
@@ -614,18 +614,18 @@ fn map_bytecode_instruction(
                     let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
 
                     // Compare
-                    builder.i32_const(IU128::HEAP_SIZE).call(less_than_f);
-
-                    // Negate the result
-                    builder.i32_const(1).binop(BinaryOp::I32Ne);
+                    builder
+                        .i32_const(IU128::HEAP_SIZE)
+                        .call(less_than_f)
+                        .negate();
                 }
                 IntermediateType::IU256 => {
                     let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
 
-                    builder.i32_const(IU256::HEAP_SIZE).call(less_than_f);
-
-                    // Negate the result
-                    builder.i32_const(1).binop(BinaryOp::I32Ne);
+                    builder
+                        .i32_const(IU256::HEAP_SIZE)
+                        .call(less_than_f)
+                        .negate();
                 }
                 _ => panic!("trying to compare two {t1:?}"),
             }
