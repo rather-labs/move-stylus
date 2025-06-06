@@ -1,8 +1,8 @@
 module 0x01::hello_world;
 
-public fun eq_u256(x: u256, y: u256): bool {
-    let w = &x;
-    let z = &y;
-
-    w == z
+public fun vec_pop_back(x: vector<u32>): vector<u32> {
+  let mut y = x;
+  y.pop_back();
+  y.pop_back();
+  y
 }
