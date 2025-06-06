@@ -222,6 +222,27 @@ fn map_bytecode_instruction(
 
             types_stack.push(IntermediateType::IVector(Box::new(inner)));
         }
+        Bytecode::VecPopBack(signature_index) => {
+            if let Some(ty) = types_stack.pop() {
+                if let IntermediateType::IMutRef(mut_inner_type) = ty {
+                    if let IntermediateType::IVector(inner_type) = *mut_inner_type {
+                        IVector::add_vec_pop_back_instructions(
+                            &*inner_type,
+                            module,
+                            builder,
+                            compilation_ctx,
+                        );
+                        types_stack.push(*inner_type);
+                    } else {
+                        panic!("Expected vector type inside mutable reference");
+                    }
+                } else {
+                    panic!("Expected mutable reference to vector, got {:?}", ty);
+                }
+            } else {
+                panic!("Stack underflow");
+            }
+        }
         Bytecode::ImmBorrowLoc(local_id) => {
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = &mapped_function.function_locals_ir[*local_id as usize];
