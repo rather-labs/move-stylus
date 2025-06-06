@@ -223,6 +223,8 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IVector(Box::new(inner)));
         }
         Bytecode::VecPopBack(signature_index) => {
+            let expected_type = get_ir_for_signature_index(compilation_ctx, *signature_index);
+            println!("expected_type: {:?}", expected_type);
             if let Some(ty) = types_stack.pop() {
                 if let IntermediateType::IMutRef(mut_inner_type) = ty {
                     if let IntermediateType::IVector(inner_type) = *mut_inner_type {
