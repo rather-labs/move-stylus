@@ -891,7 +891,7 @@ mod tests {
     #[test]
     fn test_vector_u32() {
         let data = [
-            &[0u8],
+            &[4u8],
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
