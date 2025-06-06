@@ -1,0 +1,78 @@
+use alloy_primitives::U256;
+use alloy_sol_types::{SolCall, SolType, sol};
+use anyhow::Result;
+use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
+use rstest::{fixture, rstest};
+
+mod common;
+
+fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
+    let (result, return_data) = runtime.call_entrypoint(call_data)?;
+    anyhow::ensure!(
+        result == 0,
+        "Function returned non-zero exit code: {result}"
+    );
+    anyhow::ensure!(
+        return_data == expected_result,
+        "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
+    );
+
+    Ok(())
+}
+
+mod lessthan {
+    use super::*;
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "less_than";
+        const SOURCE_PATH: &str = "tests/operations-comparisons/less_than.move";
+
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+        function lessThanU256(uint256 x, uint256 y) external returns (bool);
+        function lessThanU128(uint128 x, uint128 y) external returns (bool);
+        function lessThanU64(uint64 x, uint64 y) external returns (bool);
+        function lessThanU32(uint32 x, uint32 y) external returns (bool);
+        function lessThanU16(uint16 x, uint16 y) external returns (bool);
+        function lessThanU8(uint8 x, uint8 y) external returns (bool);
+    );
+
+    #[rstest]
+    #[case(lessThanU256Call::new((U256::MAX, U256::MAX)), false)]
+    #[case(lessThanU256Call::new((U256::MAX - U256::from(1), U256::MAX - U256::from(2))), false)]
+    #[case(lessThanU256Call::new((U256::MAX - U256::from(1), U256::MAX)), true)]
+    #[case(lessThanU128Call::new((u128::MAX, u128::MAX)), false)]
+    #[case(lessThanU128Call::new((u128::MAX - 1, u128::MAX - 2)), false)]
+    #[case(lessThanU128Call::new((u128::MAX - 1, u128::MAX)), true)]
+    #[case(lessThanU64Call::new((u64::MAX, u64::MAX)), false)]
+    #[case(lessThanU64Call::new((u64::MAX - 1, u64::MAX - 2)), false)]
+    #[case(lessThanU64Call::new((u64::MAX - 1, u64::MAX)), true)]
+    #[case(lessThanU32Call::new((u32::MAX, u32::MAX)), false)]
+    #[case(lessThanU32Call::new((u32::MAX - 1, u32::MAX - 2)), false)]
+    #[case(lessThanU32Call::new((u32::MAX - 1, u32::MAX)), true)]
+    #[case(lessThanU16Call::new((u16::MAX, u16::MAX)), false)]
+    #[case(lessThanU16Call::new((u16::MAX - 1, u16::MAX - 2)), false)]
+    #[case(lessThanU16Call::new((u16::MAX - 1, u16::MAX)), true)]
+    #[case(lessThanU8Call::new((u8::MAX, u8::MAX)), false)]
+    #[case(lessThanU8Call::new((u8::MAX - 1, u8::MAX - 2)), false)]
+    #[case(lessThanU8Call::new((u8::MAX - 1, u8::MAX)), true)]
+    fn test_less_than<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: bool,
+    ) {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+        )
+        .unwrap();
+    }
+}
