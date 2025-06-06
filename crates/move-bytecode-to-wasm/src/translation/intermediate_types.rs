@@ -152,8 +152,7 @@ impl IntermediateType {
                     },
                 );
             }
-            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-            }
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {}
             IntermediateType::IVector(_) => {
                 builder.load(
                     compilation_ctx.memory_id,

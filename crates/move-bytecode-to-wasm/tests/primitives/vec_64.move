@@ -28,3 +28,9 @@ public fun echo(x: vector<u64>): vector<u64> {
   x
 }
 
+public fun vec_pop_back(x: vector<u64>): vector<u64> {
+  let mut y = x;
+  y.pop_back();
+  y.pop_back();
+  y
+}
