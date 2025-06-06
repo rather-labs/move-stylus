@@ -10,7 +10,7 @@ pub trait WasmBuilderExtension {
 
     /// Swaps the top two values of the stack.
     ///
-    /// [..., v1, v2] --> swap() -> [..., v2, v2]
+    /// [..., v1, v2] --> swap() -> [..., v2, v1]
     ///
     /// The `LocalId` arguments are used as temp variables to perform the swap.
     fn swap(&mut self, v1: LocalId, v2: LocalId) -> &mut Self;
