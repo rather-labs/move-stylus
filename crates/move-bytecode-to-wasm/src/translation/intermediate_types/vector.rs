@@ -4,6 +4,7 @@ use walrus::{
 };
 
 use crate::CompilationContext;
+use crate::runtime::RuntimeFunction;
 
 use super::IntermediateType;
 
@@ -638,31 +639,10 @@ impl IVector {
                 .binop(BinaryOp::I64Eq)
                 .br_if(block_id);
 
-            // Helper: emit trap if i64 > u32::MAX
-            let trap_if_out_of_bounds = |b: &mut InstrSeqBuilder, local: LocalId| {
-                b.local_get(local)
-                    .i64_const(u32::MAX as i64)
-                    .binop(BinaryOp::I64LeU)
-                    .if_else(
-                        None,
-                        |_| {},
-                        |else_| {
-                            else_.unreachable();
-                        },
-                    );
-            };
+            let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None);
 
-            trap_if_out_of_bounds(block, idx1_i64);
-            trap_if_out_of_bounds(block, idx2_i64);
-
-            // Cast to i32
-            block
-                .local_get(idx1_i64)
-                .unop(UnaryOp::I32WrapI64)
-                .local_set(idx1)
-                .local_get(idx2_i64)
-                .unop(UnaryOp::I32WrapI64)
-                .local_set(idx2);
+            block.local_get(idx1_i64).call(downcast_f).local_set(idx1);
+            block.local_get(idx2_i64).call(downcast_f).local_set(idx2);
 
             // Helper: emit trap if idx >= len
             let trap_if_idx_oob = |b: &mut InstrSeqBuilder, idx: LocalId| {
