@@ -22,20 +22,24 @@ pub fn vec_swap_function(
         .name(RuntimeFunction::VecSwap.name().to_owned())
         .func_body();
 
-    let vec_ref = module.locals.add(ValType::I32);
+    let ptr = module.locals.add(ValType::I32);
     let idx1_i64 = module.locals.add(ValType::I64);
     let idx2_i64 = module.locals.add(ValType::I64);
 
     let idx2 = module.locals.add(ValType::I32);
     let idx1 = module.locals.add(ValType::I32);
-    let ptr = module.locals.add(ValType::I32);
     let len = module.locals.add(ValType::I32);
+
+    let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None, None);
+
+    builder.local_get(idx1_i64).call(downcast_f).local_set(idx1);
+    builder.local_get(idx2_i64).call(downcast_f).local_set(idx2);
 
     let size = inner.stack_data_size() as i32;
 
     // Load vector ptr and len
     builder
-        .local_get(vec_ref)
+        .local_get(ptr)
         .load(
             compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
@@ -63,11 +67,6 @@ pub fn vec_swap_function(
             .local_get(idx2_i64)
             .binop(BinaryOp::I64Eq)
             .br_if(block_id);
-
-        let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None, None);
-
-        block.local_get(idx1_i64).call(downcast_f).local_set(idx1);
-        block.local_get(idx2_i64).call(downcast_f).local_set(idx2);
 
         // Helper: emit trap if idx >= len
         let trap_if_idx_oob = |b: &mut InstrSeqBuilder, idx: LocalId| {
@@ -155,5 +154,5 @@ pub fn vec_swap_function(
             },
         );
     });
-    function.finish(vec![vec_ref, idx1_i64, idx2_i64], &mut module.funcs)
+    function.finish(vec![ptr, idx1_i64, idx2_i64], &mut module.funcs)
 }
