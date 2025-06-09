@@ -293,12 +293,8 @@ fn map_bytecode_instruction(
                 );
             }
 
-            // IVector::add_vec_swap_instructions(&*inner_type, module, builder, compilation_ctx);
-            let swap_f = RuntimeFunction::VecSwap.get(
-                module,
-                Some(compilation_ctx),
-                Some(&inner_type),
-            );
+            let swap_f =
+                RuntimeFunction::VecSwap.get(module, Some(compilation_ctx), Some(&inner_type));
             builder.call(swap_f);
         }
 
