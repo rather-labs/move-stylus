@@ -225,7 +225,7 @@ impl IntermediateType {
                         offset: 0,
                     },
                 );
-                let copy_f = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx));
+                let copy_f = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx), None);
                 builder.call(copy_f);
             }
             IntermediateType::IU256 | IntermediateType::IAddress => {
@@ -237,7 +237,7 @@ impl IntermediateType {
                         offset: 0,
                     },
                 );
-                let copy_f = RuntimeFunction::CopyU256.get(module, Some(compilation_ctx));
+                let copy_f = RuntimeFunction::CopyU256.get(module, Some(compilation_ctx), None);
                 builder.call(copy_f);
             }
             IntermediateType::IVector(inner_type) => {

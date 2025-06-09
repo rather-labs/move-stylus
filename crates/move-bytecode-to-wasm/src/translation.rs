@@ -293,7 +293,13 @@ fn map_bytecode_instruction(
                 );
             }
 
-            IVector::add_vec_swap_instructions(&*inner_type, module, builder, compilation_ctx);
+            // IVector::add_vec_swap_instructions(&*inner_type, module, builder, compilation_ctx);
+            let swap_f = RuntimeFunction::VecSwap.get(
+                module,
+                Some(compilation_ctx),
+                Some(&inner_type),
+            );
+            builder.call(swap_f);
         }
 
         Bytecode::VecImmBorrow(signature_index) => {
@@ -550,12 +556,14 @@ fn map_bytecode_instruction(
                     builder.binop(BinaryOp::I64LtU);
                 }
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     builder.i32_const(IU128::HEAP_SIZE).call(less_than_f);
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     builder.i32_const(IU256::HEAP_SIZE).call(less_than_f);
                 }
@@ -581,7 +589,8 @@ fn map_bytecode_instruction(
                 // For u128 and u256 instead of doing a <= b, we do !(b < a) == a <= b, this way
                 // we can reuse the LessThan function
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
@@ -594,7 +603,8 @@ fn map_bytecode_instruction(
                         .negate();
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
@@ -628,7 +638,8 @@ fn map_bytecode_instruction(
                 // For u128 and u256 instead of doing a > b, we do b < a, this way we can reuse the
                 // LessThan function
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
@@ -639,7 +650,8 @@ fn map_bytecode_instruction(
                         .call(less_than_f);
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
@@ -671,7 +683,8 @@ fn map_bytecode_instruction(
                 // For u128 and u256 instead of doing a >= b, we do !(a < b) == a >= b, this way we can reuse the
                 // LessThan function
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     // Compare
                     builder
@@ -680,7 +693,8 @@ fn map_bytecode_instruction(
                         .negate();
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     builder
                         .i32_const(IU256::HEAP_SIZE)

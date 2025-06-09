@@ -21,7 +21,7 @@ impl IU128 {
         memory: MemoryId,
     ) {
         // Little-endian to Big-endian
-        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None);
+        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None, None);
 
         for i in 0..2 {
             block.local_get(writer_pointer);
@@ -61,7 +61,7 @@ impl IU256 {
         memory: MemoryId,
     ) {
         // Little-endian to Big-endian
-        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None);
+        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None, None);
 
         for i in 0..4 {
             block.local_get(writer_pointer);
