@@ -205,6 +205,18 @@ fn map_bytecode_instruction(
             local_type.copy_local_instructions(module, builder, compilation_ctx, local);
             types_stack.push(local_type);
         }
+        Bytecode::ImmBorrowLoc(local_id) => {
+            let local = mapped_function.function_locals[*local_id as usize];
+            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
+            local_type.add_borrow_local_instructions(builder, local);
+            types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
+        }
+        Bytecode::MutBorrowLoc(local_id) => {
+            let local = mapped_function.function_locals[*local_id as usize];
+            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
+            local_type.add_borrow_local_instructions(builder, local);
+            types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
+        }
         Bytecode::VecPack(signature_index, num_elements) => {
             let inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
             IVector::vec_pack_instructions(
@@ -248,19 +260,44 @@ fn map_bytecode_instruction(
             IVector::add_vec_pop_back_instructions(&*inner_type, module, builder, compilation_ctx);
             types_stack.push(*inner_type);
         }
+        Bytecode::VecSwap(signature_index) => {
+            let expected_type = get_ir_for_signature_index(compilation_ctx, *signature_index);
+            let Some(id2_ty) = types_stack.pop() else {
+                panic!("Stack underflow");
+            };
+            let IntermediateType::IU64 = id2_ty else {
+                panic!("Expected IU64, got {:?}", id2_ty);
+            };
+            let Some(id1_ty) = types_stack.pop() else {
+                panic!("Stack underflow");
+            };
+            let IntermediateType::IU64 = id1_ty else {
+                panic!("Expected IU64, got {:?}", id1_ty);
+            };
+            let Some(ty) = types_stack.pop() else {
+                panic!("Stack underflow");
+            };
 
-        Bytecode::ImmBorrowLoc(local_id) => {
-            let local = mapped_function.function_locals[*local_id as usize];
-            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
-            local_type.add_borrow_local_instructions(builder, compilation_ctx, local);
-            types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
+            let IntermediateType::IMutRef(mut_inner_type) = ty else {
+                panic!("Expected mutable reference to vector, got {:?}", ty);
+            };
+
+            let IntermediateType::IVector(inner_type) = *mut_inner_type else {
+                panic!("Expected vector type inside mutable reference");
+            };
+
+            if *inner_type != expected_type {
+                panic!(
+                    "Expected vector inner type {:?}, got {:?}",
+                    expected_type, *inner_type
+                );
+            }
+
+            let swap_f =
+                RuntimeFunction::VecSwap.get(module, Some(compilation_ctx), Some(&inner_type));
+            builder.call(swap_f);
         }
-        Bytecode::MutBorrowLoc(local_id) => {
-            let local = mapped_function.function_locals[*local_id as usize];
-            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
-            local_type.add_borrow_local_instructions(builder, compilation_ctx, local);
-            types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
-        }
+
         Bytecode::VecImmBorrow(signature_index) => {
             match (types_stack.pop(), types_stack.pop()) {
                 (Some(IntermediateType::IU64), Some(IntermediateType::IRef(inner)))
@@ -515,12 +552,14 @@ fn map_bytecode_instruction(
                     builder.binop(BinaryOp::I64LtU);
                 }
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     builder.i32_const(IU128::HEAP_SIZE).call(less_than_f);
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     builder.i32_const(IU256::HEAP_SIZE).call(less_than_f);
                 }
@@ -546,7 +585,8 @@ fn map_bytecode_instruction(
                 // For u128 and u256 instead of doing a <= b, we do !(b < a) == a <= b, this way
                 // we can reuse the LessThan function
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
@@ -559,7 +599,8 @@ fn map_bytecode_instruction(
                         .negate();
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
@@ -593,7 +634,8 @@ fn map_bytecode_instruction(
                 // For u128 and u256 instead of doing a > b, we do b < a, this way we can reuse the
                 // LessThan function
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
@@ -604,7 +646,8 @@ fn map_bytecode_instruction(
                         .call(less_than_f);
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
@@ -636,7 +679,8 @@ fn map_bytecode_instruction(
                 // For u128 and u256 instead of doing a >= b, we do !(a < b) == a >= b, this way we can reuse the
                 // LessThan function
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     // Compare
                     builder
@@ -645,7 +689,8 @@ fn map_bytecode_instruction(
                         .negate();
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
 
                     builder
                         .i32_const(IU256::HEAP_SIZE)

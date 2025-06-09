@@ -34,7 +34,7 @@ pub fn heap_int_shift_left(
         .name(RuntimeFunction::HeapIntShiftLeft.name().to_owned())
         .func_body();
 
-    let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+    let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None, None);
     // Max value for the shift amount should be 127 for u128 and 255 for u256
     builder
         .local_get(shift_amount)
@@ -284,7 +284,7 @@ pub fn heap_int_shift_right(
         .name(RuntimeFunction::HeapIntShiftRight.name().to_owned())
         .func_body();
 
-    let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+    let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None, None);
     // Max value for the shift amount should be 127 for u128 and 255 for u256
     builder
         .local_get(shift_amount)
