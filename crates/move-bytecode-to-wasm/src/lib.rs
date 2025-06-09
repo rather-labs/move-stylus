@@ -1,8 +1,9 @@
 use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
-use move_binary_format::file_format::{Constant, Signature, Visibility};
+use move_binary_format::file_format::{Constant, DatatypeHandleIndex, Signature, Visibility};
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
+use translation::intermediate_types::structs::IStruct;
 use translation::{
     functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
     translate_function,
@@ -43,11 +44,19 @@ pub struct CompilationContext<'a> {
     /// Module's signatures
     pub module_signatures: &'a [Signature],
 
+    /// Module's structs
+    pub module_structs: &'a [IStruct],
+
     /// WASM memory id
     pub memory_id: MemoryId,
 
     /// Allocator function id
     pub allocator: FunctionId,
+}
+
+pub enum UserDefinedType {
+    Struct(usize),
+    Enum(usize),
 }
 
 pub fn translate_single_module(package: CompiledPackage, module_name: &str) -> Module {
@@ -80,14 +89,45 @@ pub fn translate_package(
         let root_compiled_module = root_compiled_module.unit.module;
 
         assert!(
-            root_compiled_module.struct_defs.is_empty(),
-            "Structs are not supported yet"
-        );
-
-        assert!(
             root_compiled_module.enum_defs.is_empty(),
             "Enums are not supported yet"
         );
+
+        // This Hasmap maps the move's datatype handles to our internal representation of those
+        // types.
+        let mut datatype_handles_map = HashMap::new();
+
+        // Module's structs
+        let mut module_structs: Vec<IStruct> = vec![];
+        for (index, struct_def) in root_compiled_module.struct_defs.iter().enumerate() {
+            let fields = if let Some(fields) = struct_def.fields() {
+                fields
+                    .iter()
+                    .map(|f| {
+                        IntermediateType::try_from_signature_token(
+                            &f.signature.0,
+                            &datatype_handles_map,
+                        )
+                    })
+                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .unwrap()
+            } else {
+                vec![]
+            };
+
+            let addition_result = datatype_handles_map
+                .insert(struct_def.struct_handle, UserDefinedType::Struct(index));
+
+            assert!(
+                addition_result.is_none(),
+                "user defined data with handle {:?} already defined",
+                struct_def.struct_handle
+            );
+
+            module_structs.push(IStruct::new(struct_def.struct_handle, fields));
+        }
+
+        println!("{module_structs:#?}");
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
 
@@ -111,7 +151,7 @@ pub fn translate_package(
                 move_function_arguments
                     .0
                     .iter()
-                    .map(IntermediateType::try_from)
+                    .map(|s| IntermediateType::try_from_signature_token(s, &datatype_handles_map))
                     .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
                     .unwrap(),
             );
@@ -123,7 +163,7 @@ pub fn translate_package(
                 move_function_return
                     .0
                     .iter()
-                    .map(IntermediateType::try_from)
+                    .map(|s| IntermediateType::try_from_signature_token(s, &datatype_handles_map))
                     .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
                     .unwrap(),
             );
@@ -152,6 +192,7 @@ pub fn translate_package(
             functions_arguments: &functions_arguments,
             functions_returns: &functions_returns,
             module_signatures: &root_compiled_module.signatures,
+            module_structs: &module_structs,
             memory_id,
             allocator: allocator_func,
         };

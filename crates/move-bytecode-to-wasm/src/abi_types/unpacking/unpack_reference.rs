@@ -72,6 +72,7 @@ impl IRef {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
+            IntermediateType::IStruct(_) => todo!(),
         }
     }
 }
@@ -142,6 +143,7 @@ impl IMutRef {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
+            IntermediateType::IStruct(_) => todo!(),
         }
     }
 }

@@ -449,7 +449,8 @@ impl IVector {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::ISigner
-            | IntermediateType::IAddress => {
+            | IntermediateType::IAddress
+            | IntermediateType::IStruct(_) => {
                 // load pointer to value
                 builder.load(
                     compilation_ctx.memory_id,
@@ -544,7 +545,8 @@ impl IVector {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::ISigner
-            | IntermediateType::IVector(_) => {
+            | IntermediateType::IVector(_)
+            | IntermediateType::IStruct(_) => {
                 // for simple types, we load the element to the stack
                 builder.load(
                     compilation_ctx.memory_id,
@@ -605,6 +607,7 @@ mod tests {
             functions_arguments: &[],
             functions_returns: &[],
             module_signatures: &[],
+            module_structs: &[],
             memory_id,
             allocator,
         };
@@ -648,6 +651,7 @@ mod tests {
             functions_arguments: &[],
             functions_returns: &[],
             module_signatures: &[],
+            module_structs: &[],
             memory_id,
             allocator,
         };
@@ -702,6 +706,7 @@ mod tests {
             functions_arguments: &[],
             functions_returns: &[],
             module_signatures: &[],
+            module_structs: &[],
             memory_id,
             allocator,
         };
@@ -758,6 +763,7 @@ mod tests {
             functions_arguments: &[],
             functions_returns: &[],
             module_signatures: &[],
+            module_structs: &[],
             memory_id,
             allocator,
         };
@@ -790,7 +796,7 @@ mod tests {
         );
 
         // pop back
-        builder.local_get(ptr); // this would be the mutable reference to the vector 
+        builder.local_get(ptr); // this would be the mutable reference to the vector
         IVector::add_vec_pop_back_instructions(
             &inner_type,
             &mut raw_module,

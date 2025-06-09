@@ -347,6 +347,7 @@ mod tests {
                 functions_arguments: &[],
                 functions_returns: &[],
                 module_signatures: &[],
+                module_structs: &[],
                 constants: &[],
             },
         );
@@ -450,6 +451,7 @@ mod tests {
                 functions_arguments: &[],
                 functions_returns: &[],
                 module_signatures: &[],
+                module_structs: &[],
                 constants: &[],
             },
         );

@@ -174,6 +174,7 @@ impl Unpackable for IntermediateType {
                 memory,
                 allocator,
             ),
+            IntermediateType::IStruct(_) => todo!(),
         }
     }
 }

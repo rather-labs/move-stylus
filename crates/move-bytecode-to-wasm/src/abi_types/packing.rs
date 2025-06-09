@@ -153,6 +153,7 @@ impl Packable for IntermediateType {
                 builder.local_set(local);
                 local
             }
+            IntermediateType::IStruct(_) => todo!(),
         }
     }
 
@@ -218,6 +219,7 @@ impl Packable for IntermediateType {
                 memory,
                 alloc_function,
             ),
+            IntermediateType::IStruct(_) => todo!(),
         }
     }
 
@@ -235,6 +237,7 @@ impl Packable for IntermediateType {
             IntermediateType::IVector(_) => 32,
             IntermediateType::IRef(inner) => inner.encoded_size(),
             IntermediateType::IMutRef(inner) => inner.encoded_size(),
+            IntermediateType::IStruct(_) => todo!(),
         }
     }
 }

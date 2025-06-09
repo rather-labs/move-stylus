@@ -448,6 +448,7 @@ mod tests {
             functions_arguments: &[],
             functions_returns: &[],
             module_signatures: &[],
+            module_structs: &[],
             memory_id,
             allocator,
         };
@@ -531,6 +532,7 @@ mod tests {
             functions_arguments: &[],
             functions_returns: &[],
             module_signatures: &[],
+            module_structs: &[],
             memory_id,
             allocator,
         };
