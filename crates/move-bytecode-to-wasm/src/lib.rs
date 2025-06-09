@@ -97,9 +97,34 @@ pub fn translate_package(
         // types.
         let mut datatype_handles_map = HashMap::new();
 
+        for (index, datatype_handle) in root_compiled_module.datatype_handles().iter().enumerate() {
+            let idx = DatatypeHandleIndex::new(index as u16);
+            let addition_result = if let Some(s) = root_compiled_module
+                .struct_defs()
+                .iter()
+                .find(|s| s.struct_handle == idx)
+            {
+                datatype_handles_map.insert(s.struct_handle, UserDefinedType::Struct(index))
+            } else if let Some(e) = root_compiled_module
+                .enum_defs()
+                .iter()
+                .find(|e| e.enum_handle == idx)
+            {
+                datatype_handles_map.insert(e.enum_handle, UserDefinedType::Enum(index))
+            } else {
+                panic!("datatype handle index {index} not found");
+            };
+
+            assert!(
+                addition_result.is_none(),
+                "user defined data with handle {:?} already defined",
+                idx
+            );
+        }
+
         // Module's structs
         let mut module_structs: Vec<IStruct> = vec![];
-        for (index, struct_def) in root_compiled_module.struct_defs.iter().enumerate() {
+        for struct_def in root_compiled_module.struct_defs() {
             let fields = if let Some(fields) = struct_def.fields() {
                 fields
                     .iter()
@@ -114,15 +139,6 @@ pub fn translate_package(
             } else {
                 vec![]
             };
-
-            let addition_result = datatype_handles_map
-                .insert(struct_def.struct_handle, UserDefinedType::Struct(index));
-
-            assert!(
-                addition_result.is_none(),
-                "user defined data with handle {:?} already defined",
-                struct_def.struct_handle
-            );
 
             module_structs.push(IStruct::new(struct_def.struct_handle, fields));
         }
