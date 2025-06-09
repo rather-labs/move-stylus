@@ -36,6 +36,7 @@ pub enum RuntimeFunction {
     CopyU256,
     // Vector
     VecSwap,
+    VecPopBack,
 }
 
 impl RuntimeFunction {
@@ -68,6 +69,7 @@ impl RuntimeFunction {
             Self::CopyU256 => "copy_u256",
             // Vector
             Self::VecSwap => "vec_swap",
+            Self::VecPopBack => "vec_pop_back",
         }
     }
 
@@ -126,6 +128,9 @@ impl RuntimeFunction {
                 // Vector
                 (Self::VecSwap, Some(ctx), Some(inner_type)) => {
                     vector::vec_swap_function(module, ctx, inner_type)
+                }
+                (Self::VecPopBack, Some(ctx), Some(inner_type)) => {
+                    vector::vec_pop_back_function(module, ctx, inner_type)
                 }
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,

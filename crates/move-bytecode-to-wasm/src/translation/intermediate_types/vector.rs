@@ -460,116 +460,6 @@ impl IVector {
 
         builder.local_get(ref_local);
     }
-
-    // Pops the last element from the vector and places it on the stack
-    // The item is not duplicated; for heap types, the pointer added to the stack refers to the item's original memory location
-    // Vector length is reduced by 1
-    pub fn add_vec_pop_back_instructions(
-        inner: &IntermediateType,
-        module: &mut Module,
-        builder: &mut InstrSeqBuilder,
-        compilation_ctx: &CompilationContext,
-    ) {
-        let size = inner.stack_data_size() as i32;
-        let ptr = module.locals.add(ValType::I32);
-        let len = module.locals.add(ValType::I32);
-
-        builder // on top of the stack there is a mutable reference to the vector
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_tee(ptr)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_set(len);
-
-        // Trap if vector length == 0
-        builder
-            .local_get(len)
-            .i32_const(0)
-            .binop(BinaryOp::I32Eq)
-            .if_else(
-                None,
-                |then| {
-                    then.unreachable(); // panic: cannot pop from empty vector
-                },
-                |_| {},
-            );
-
-        builder
-            .local_get(ptr)
-            .i32_const(4)
-            .binop(BinaryOp::I32Add)
-            .local_get(len)
-            .i32_const(1)
-            .binop(BinaryOp::I32Sub)
-            .i32_const(size)
-            .binop(BinaryOp::I32Mul)
-            .binop(BinaryOp::I32Add);
-
-        match inner {
-            IntermediateType::IBool
-            | IntermediateType::IU8
-            | IntermediateType::IU16
-            | IntermediateType::IU32
-            | IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::IAddress
-            | IntermediateType::ISigner
-            | IntermediateType::IVector(_) => {
-                // for simple types, we load the element to the stack
-                builder.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            }
-            IntermediateType::IU64 => {
-                // for u64, we load the high and low parts separately
-                builder.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I64 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            }
-            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                // In fact vectors of references are not allowed entirely
-                panic!("VecPopBack operation is not allowed on reference types");
-            }
-        }
-
-        // reduce length by 1
-        builder
-            .local_get(ptr)
-            .local_get(len)
-            .i32_const(1)
-            .binop(BinaryOp::I32Sub)
-            .store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-    }
 }
 
 #[cfg(test)]
@@ -774,12 +664,11 @@ mod tests {
 
         // pop back
         builder.local_get(ptr); // this would be the mutable reference to the vector 
-        IVector::add_vec_pop_back_instructions(
-            &inner_type,
+        builder.call(RuntimeFunction::VecPopBack.get(
             &mut raw_module,
-            &mut builder,
-            &compilation_ctx,
-        );
+            Some(&compilation_ctx),
+            Some(&inner_type),
+        ));
 
         if inner_type == IntermediateType::IU64 {
             builder.unop(UnaryOp::I32WrapI64);

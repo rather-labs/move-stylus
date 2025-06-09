@@ -257,7 +257,9 @@ fn map_bytecode_instruction(
                 );
             }
 
-            IVector::add_vec_pop_back_instructions(&*inner_type, module, builder, compilation_ctx);
+            let vec_pop_back_f =
+                RuntimeFunction::VecPopBack.get(module, Some(compilation_ctx), Some(&inner_type));
+            builder.call(vec_pop_back_f);
             types_stack.push(*inner_type);
         }
         Bytecode::VecSwap(signature_index) => {
