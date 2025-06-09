@@ -26,6 +26,7 @@ pub enum RuntimeFunction {
     MulU32,
     MulU64,
     HeapIntMul,
+    LessThan,
     // Swap bytes
     SwapI32Bytes,
     SwapI64Bytes,
@@ -55,6 +56,7 @@ impl RuntimeFunction {
             Self::MulU64 => "mul_u64",
             Self::HeapIntMul => "heap_integer_mul",
             Self::HeapIntDivMod => "heap_integer_div_mod",
+            Self::LessThan => "less_than",
             // Bitwise
             Self::HeapIntShiftLeft => "heap_integer_shift_left",
             Self::HeapIntShiftRight => "heap_integer_shift_right",
@@ -104,6 +106,7 @@ impl RuntimeFunction {
                 (Self::HeapIntDivMod, Some(ctx)) => {
                     integers::div::heap_integers_div_mod(module, ctx)
                 }
+                (Self::LessThan, Some(ctx)) => integers::check_if_a_less_than_b(module, ctx),
                 // Swap
                 (Self::SwapI32Bytes, _) => swap::swap_i32_bytes_function(module),
                 (Self::SwapI64Bytes, _) => {
