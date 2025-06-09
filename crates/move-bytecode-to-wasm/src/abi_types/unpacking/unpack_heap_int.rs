@@ -25,7 +25,7 @@ impl IU128 {
             sol_data::Uint::<128>::ENCODED_SIZE.expect("U128 should have a fixed size");
 
         // Big-endian to Little-endian
-        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None, None);
+        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None);
 
         block.i32_const(16);
         block.call(allocator);
@@ -83,7 +83,7 @@ impl IU256 {
             sol_data::Uint::<256>::ENCODED_SIZE.expect("U256 should have a fixed size");
 
         // Big-endian to Little-endian
-        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None, None);
+        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None);
 
         block.i32_const(32);
         block.call(allocator);

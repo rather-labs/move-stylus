@@ -257,9 +257,28 @@ fn map_bytecode_instruction(
                 );
             }
 
-            let vec_pop_back_f =
-                RuntimeFunction::VecPopBack.get(module, Some(compilation_ctx), Some(&inner_type));
-            builder.call(vec_pop_back_f);
+            match *inner_type {
+                IntermediateType::IBool
+                | IntermediateType::IU8
+                | IntermediateType::IU16
+                | IntermediateType::IU32
+                | IntermediateType::IU128
+                | IntermediateType::IU256
+                | IntermediateType::IAddress
+                | IntermediateType::ISigner
+                | IntermediateType::IVector(_) => {
+                    let swap_f = RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
+                    builder.call(swap_f);
+                }
+                IntermediateType::IU64 => {
+                    let swap_f = RuntimeFunction::VecPopBack64.get(module, Some(compilation_ctx));
+                    builder.call(swap_f);
+                }
+                IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                    panic!("VecPopBack operation is not allowed on reference types");
+                }
+            }
+
             types_stack.push(*inner_type);
         }
         Bytecode::VecSwap(signature_index) => {
@@ -295,9 +314,16 @@ fn map_bytecode_instruction(
                 );
             }
 
-            let swap_f =
-                RuntimeFunction::VecSwap.get(module, Some(compilation_ctx), Some(&inner_type));
-            builder.call(swap_f);
+            match *inner_type {
+                IntermediateType::IU64 => {
+                    let swap_f = RuntimeFunction::VecSwap64.get(module, Some(compilation_ctx));
+                    builder.call(swap_f);
+                }
+                _ => {
+                    let swap_f = RuntimeFunction::VecSwap32.get(module, Some(compilation_ctx));
+                    builder.call(swap_f);
+                }
+            }
         }
 
         Bytecode::VecImmBorrow(signature_index) => {
@@ -554,14 +580,12 @@ fn map_bytecode_instruction(
                     builder.binop(BinaryOp::I64LtU);
                 }
                 IntermediateType::IU128 => {
-                    let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
 
                     builder.i32_const(IU128::HEAP_SIZE).call(less_than_f);
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
 
                     builder.i32_const(IU256::HEAP_SIZE).call(less_than_f);
                 }
@@ -587,8 +611,7 @@ fn map_bytecode_instruction(
                 // For u128 and u256 instead of doing a <= b, we do !(b < a) == a <= b, this way
                 // we can reuse the LessThan function
                 IntermediateType::IU128 => {
-                    let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
 
                     // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
@@ -601,8 +624,7 @@ fn map_bytecode_instruction(
                         .negate();
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
 
                     // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
@@ -636,8 +658,7 @@ fn map_bytecode_instruction(
                 // For u128 and u256 instead of doing a > b, we do b < a, this way we can reuse the
                 // LessThan function
                 IntermediateType::IU128 => {
-                    let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
 
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
@@ -648,8 +669,7 @@ fn map_bytecode_instruction(
                         .call(less_than_f);
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
 
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
@@ -681,8 +701,7 @@ fn map_bytecode_instruction(
                 // For u128 and u256 instead of doing a >= b, we do !(a < b) == a >= b, this way we can reuse the
                 // LessThan function
                 IntermediateType::IU128 => {
-                    let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
 
                     // Compare
                     builder
@@ -691,8 +710,7 @@ fn map_bytecode_instruction(
                         .negate();
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f =
-                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx), None);
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
 
                     builder
                         .i32_const(IU256::HEAP_SIZE)

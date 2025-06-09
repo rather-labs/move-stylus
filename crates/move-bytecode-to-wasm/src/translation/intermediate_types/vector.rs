@@ -1,5 +1,5 @@
 use walrus::{
-    InstrSeqBuilder, LocalId, Module, ValType,
+    InstrSeqBuilder, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
@@ -664,11 +664,28 @@ mod tests {
 
         // pop back
         builder.local_get(ptr); // this would be the mutable reference to the vector 
-        builder.call(RuntimeFunction::VecPopBack.get(
-            &mut raw_module,
-            Some(&compilation_ctx),
-            Some(&inner_type),
-        ));
+
+        match inner_type {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress
+            | IntermediateType::ISigner
+            | IntermediateType::IVector(_) => {
+                let swap_f = RuntimeFunction::VecPopBack32.get(&mut raw_module, Some(&compilation_ctx));
+                builder.call(swap_f);
+            }
+            IntermediateType::IU64 => {
+                let swap_f = RuntimeFunction::VecPopBack64.get(&mut raw_module, Some(&compilation_ctx));
+                builder.call(swap_f);
+            }
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                panic!("VecPopBack operation is not allowed on reference types");
+            }
+        }
 
         if inner_type == IntermediateType::IU64 {
             builder.unop(UnaryOp::I32WrapI64);
@@ -738,12 +755,16 @@ mod tests {
         builder.i64_const(idx1); // idx1
         builder.i64_const(idx2); // idx2
 
-        let swap_f = RuntimeFunction::VecSwap.get(
-            &mut raw_module,
-            Some(&compilation_ctx),
-            Some(&inner_type),
-        );
-        builder.call(swap_f);
+        match inner_type {
+            IntermediateType::IU64 => {
+                let swap_f = RuntimeFunction::VecSwap64.get(&mut raw_module, Some(&compilation_ctx));
+                builder.call(swap_f);
+            }
+            _ => {
+                let swap_f = RuntimeFunction::VecSwap32.get(&mut raw_module, Some(&compilation_ctx));
+                builder.call(swap_f);
+            }
+        }
 
         builder.i32_const(0);
 

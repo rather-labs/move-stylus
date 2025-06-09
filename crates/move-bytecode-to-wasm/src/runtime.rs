@@ -1,7 +1,6 @@
 use walrus::{FunctionId, Module};
 
 use crate::CompilationContext;
-use crate::translation::intermediate_types::IntermediateType;
 
 mod copy;
 mod integers;
@@ -35,8 +34,10 @@ pub enum RuntimeFunction {
     CopyU128,
     CopyU256,
     // Vector
-    VecSwap,
-    VecPopBack,
+    VecSwap32,
+    VecSwap64,
+    VecPopBack32,
+    VecPopBack64,
 }
 
 impl RuntimeFunction {
@@ -68,8 +69,10 @@ impl RuntimeFunction {
             Self::CopyU128 => "copy_u128",
             Self::CopyU256 => "copy_u256",
             // Vector
-            Self::VecSwap => "vec_swap",
-            Self::VecPopBack => "vec_pop_back",
+            Self::VecSwap32 => "vec_swap_32",
+            Self::VecSwap64 => "vec_swap_64",
+            Self::VecPopBack32 => "vec_pop_back_32",
+            Self::VecPopBack64 => "vec_pop_back_64",
         }
     }
 
@@ -81,57 +84,54 @@ impl RuntimeFunction {
         &self,
         module: &mut Module,
         compilation_ctx: Option<&CompilationContext>,
-        inner_type: Option<&IntermediateType>,
     ) -> FunctionId {
         if let Some(function) = module.funcs.by_name(self.name()) {
             function
         } else {
-            match (self, compilation_ctx, inner_type) {
+            match (self, compilation_ctx) {
                 // Integers
-                (Self::HeapIntSum, Some(ctx), _) => integers::add::heap_integers_add(module, ctx),
-                (Self::HeapIntSub, Some(ctx), _) => integers::sub::heap_integers_sub(module, ctx),
-                (Self::AddU32, _, _) => integers::add::add_u32(module),
-                (Self::AddU64, _, _) => integers::add::add_u64(module),
-                (Self::SubU32, _, _) => integers::sub::sub_u32(module),
-                (Self::SubU64, _, _) => integers::sub::sub_u64(module),
-                (Self::CheckOverflowU8U16, _, _) => integers::check_overflow_u8_u16(module),
-                (Self::DowncastU64ToU32, _, _) => integers::downcast_u64_to_u32(module),
-                (Self::DowncastU128U256ToU32, Some(ctx), _) => {
+                (Self::HeapIntSum, Some(ctx)) => integers::add::heap_integers_add(module, ctx),
+                (Self::HeapIntSub, Some(ctx)) => integers::sub::heap_integers_sub(module, ctx),
+                (Self::AddU32, _) => integers::add::add_u32(module),
+                (Self::AddU64, _) => integers::add::add_u64(module),
+                (Self::SubU32, _) => integers::sub::sub_u32(module),
+                (Self::SubU64, _) => integers::sub::sub_u64(module),
+                (Self::CheckOverflowU8U16, _) => integers::check_overflow_u8_u16(module),
+                (Self::DowncastU64ToU32, _) => integers::downcast_u64_to_u32(module),
+                (Self::DowncastU128U256ToU32, Some(ctx)) => {
                     integers::downcast_u128_u256_to_u32(module, ctx)
                 }
-                (Self::DowncastU128U256ToU64, Some(ctx), _) => {
+                (Self::DowncastU128U256ToU64, Some(ctx)) => {
                     integers::downcast_u128_u256_to_u64(module, ctx)
                 }
-                (Self::MulU32, _, _) => integers::mul::mul_u32(module),
-                (Self::MulU64, _, _) => integers::mul::mul_u64(module),
-                (Self::HeapIntMul, Some(ctx), _) => integers::mul::heap_integers_mul(module, ctx),
-                (Self::HeapIntDivMod, Some(ctx), _) => {
+                (Self::MulU32, _) => integers::mul::mul_u32(module),
+                (Self::MulU64, _) => integers::mul::mul_u64(module),
+                (Self::HeapIntMul, Some(ctx)) => integers::mul::heap_integers_mul(module, ctx),
+                (Self::HeapIntDivMod, Some(ctx)) => {
                     integers::div::heap_integers_div_mod(module, ctx)
                 }
-                (Self::LessThan, Some(ctx), _) => integers::check_if_a_less_than_b(module, ctx),
+                (Self::LessThan, Some(ctx)) => integers::check_if_a_less_than_b(module, ctx),
                 // Swap
-                (Self::SwapI32Bytes, _, _) => swap::swap_i32_bytes_function(module),
-                (Self::SwapI64Bytes, _, _) => {
-                    let swap_i32_f = Self::SwapI32Bytes.get(module, compilation_ctx, None);
+                (Self::SwapI32Bytes, _) => swap::swap_i32_bytes_function(module),
+                (Self::SwapI64Bytes, _) => {
+                    let swap_i32_f = Self::SwapI32Bytes.get(module, compilation_ctx);
                     swap::swap_i64_bytes_function(module, swap_i32_f)
                 }
                 // Bitwise
-                (Self::HeapIntShiftLeft, Some(ctx), _) => {
+                (Self::HeapIntShiftLeft, Some(ctx)) => {
                     integers::bitwise::heap_int_shift_left(module, ctx)
                 }
-                (Self::HeapIntShiftRight, Some(ctx), _) => {
+                (Self::HeapIntShiftRight, Some(ctx)) => {
                     integers::bitwise::heap_int_shift_right(module, ctx)
                 }
                 // Copy
-                (Self::CopyU128, Some(ctx), _) => copy::copy_u128_function(module, ctx),
-                (Self::CopyU256, Some(ctx), _) => copy::copy_u256_function(module, ctx),
+                (Self::CopyU128, Some(ctx)) => copy::copy_u128_function(module, ctx),
+                (Self::CopyU256, Some(ctx)) => copy::copy_u256_function(module, ctx),
                 // Vector
-                (Self::VecSwap, Some(ctx), Some(inner_type)) => {
-                    vector::vec_swap_function(module, ctx, inner_type)
-                }
-                (Self::VecPopBack, Some(ctx), Some(inner_type)) => {
-                    vector::vec_pop_back_function(module, ctx, inner_type)
-                }
+                (Self::VecSwap32, Some(ctx)) => vector::vec_swap_32_function(module, ctx),
+                (Self::VecSwap64, Some(ctx)) => vector::vec_swap_64_function(module, ctx),
+                (Self::VecPopBack32, Some(ctx)) => vector::vec_pop_back_32_function(module, ctx),
+                (Self::VecPopBack64, Some(ctx)) => vector::vec_pop_back_64_function(module, ctx),
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,
                     self.name()

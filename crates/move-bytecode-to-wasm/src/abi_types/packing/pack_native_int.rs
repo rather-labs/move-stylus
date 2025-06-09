@@ -18,7 +18,7 @@ pub fn pack_i32_type_instructions(
     block.local_get(local);
 
     // Little-endian to Big-endian
-    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None, None);
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
     block.call(swap_i32_bytes_function);
 
     block.store(
@@ -45,7 +45,7 @@ pub fn pack_i64_type_instructions(
     block.local_get(local);
 
     // Little-endian to Big-endian
-    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None, None);
+    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None);
     block.call(swap_i64_bytes_function);
 
     block.store(
