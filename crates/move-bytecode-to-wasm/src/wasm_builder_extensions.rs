@@ -14,6 +14,16 @@ pub trait WasmBuilderExtension {
     ///
     /// The `LocalId` arguments are used as temp variables to perform the swap.
     fn swap(&mut self, v1: LocalId, v2: LocalId) -> &mut Self;
+
+    /// Computes the address of an element in a vector.
+    ///
+    /// [..., ptr, index] --> vec_ptr_at(size) -> [..., element_address]
+    ///
+    /// Where:
+    /// - ptr: pointer to the vector
+    /// - index: index of the element
+    /// - size: size of each element in bytes
+    fn vec_ptr_at(&mut self, ptr: LocalId, index: LocalId, size: i32) -> &mut Self;
 }
 
 impl WasmBuilderExtension for InstrSeqBuilder<'_> {
@@ -25,5 +35,15 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
 
     fn swap(&mut self, v1: LocalId, v2: LocalId) -> &mut Self {
         self.local_set(v1).local_set(v2).local_get(v1).local_get(v2)
+    }
+
+    fn vec_ptr_at(&mut self, ptr: LocalId, index: LocalId, size: i32) -> &mut Self {
+        self.local_get(ptr)
+            .i32_const(4)
+            .binop(BinaryOp::I32Add)
+            .local_get(index)
+            .i32_const(size)
+            .binop(BinaryOp::I32Mul)
+            .binop(BinaryOp::I32Add)
     }
 }

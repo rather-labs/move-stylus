@@ -5,6 +5,7 @@ use walrus::{
 
 use crate::CompilationContext;
 use crate::runtime::RuntimeFunction;
+use crate::wasm_builder_extensions::WasmBuilderExtension;
 
 use super::IntermediateType;
 
@@ -139,22 +140,10 @@ impl IVector {
 
         builder.loop_(None, |loop_block| {
             // === Compute destination address of element ===
-            loop_block.local_get(index);
-            loop_block.i32_const(data_size);
-            loop_block.binop(BinaryOp::I32Mul);
-            loop_block.i32_const(4);
-            loop_block.binop(BinaryOp::I32Add);
-            loop_block.local_get(dst_local);
-            loop_block.binop(BinaryOp::I32Add);
+            loop_block.vec_ptr_at(dst_local, index, data_size);
 
             // === Compute address of copy element ===
-            loop_block.local_get(index);
-            loop_block.i32_const(data_size);
-            loop_block.binop(BinaryOp::I32Mul);
-            loop_block.i32_const(4);
-            loop_block.binop(BinaryOp::I32Add);
-            loop_block.local_get(src_local);
-            loop_block.binop(BinaryOp::I32Add);
+            loop_block.vec_ptr_at(src_local, index, data_size);
 
             match inner {
                 IntermediateType::IBool
@@ -428,14 +417,7 @@ impl IVector {
             .local_tee(ref_local);
 
         // Compute element
-        builder
-            .local_get(vector_address)
-            .i32_const(4)
-            .binop(BinaryOp::I32Add)
-            .local_get(index_i32)
-            .i32_const(size)
-            .binop(BinaryOp::I32Mul)
-            .binop(BinaryOp::I32Add);
+        builder.vec_ptr_at(vector_address, index_i32, size);
 
         match inner {
             IntermediateType::IBool
@@ -680,20 +662,10 @@ impl IVector {
             let ptr1 = module.locals.add(ValType::I32);
             let ptr2 = module.locals.add(ValType::I32);
 
-            let compute_element_address = |b: &mut InstrSeqBuilder, index: LocalId| {
-                b.local_get(ptr)
-                    .i32_const(4)
-                    .binop(BinaryOp::I32Add)
-                    .local_get(index)
-                    .i32_const(size)
-                    .binop(BinaryOp::I32Mul)
-                    .binop(BinaryOp::I32Add);
-            };
-
-            compute_element_address(block, idx1);
+            block.vec_ptr_at(ptr, idx1, size);
             block.local_set(ptr1);
 
-            compute_element_address(block, idx2);
+            block.vec_ptr_at(ptr, idx2, size);
             block.local_set(ptr2);
 
             // Load elem 1 into aux
