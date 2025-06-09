@@ -16,6 +16,8 @@ use walrus::{
 };
 
 use crate::CompilationContext;
+use crate::runtime::RuntimeFunction;
+use crate::wasm_builder_extensions::WasmBuilderExtension;
 
 pub mod functions;
 /// The types in this module represent an intermediate Rust representation of Move types
@@ -497,6 +499,163 @@ fn map_bytecode_instruction(
             }
 
             types_stack.push(t1);
+        }
+        Bytecode::Lt => {
+            let [t1, t2] = pop_n_from_stack(types_stack);
+            assert_eq!(
+                t1, t2,
+                "types stack error: trying to compare two different types {t1:?} {t2:?}"
+            );
+
+            match t1 {
+                IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
+                    builder.binop(BinaryOp::I32LtU);
+                }
+                IntermediateType::IU64 => {
+                    builder.binop(BinaryOp::I64LtU);
+                }
+                IntermediateType::IU128 => {
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+
+                    builder.i32_const(IU128::HEAP_SIZE).call(less_than_f);
+                }
+                IntermediateType::IU256 => {
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+
+                    builder.i32_const(IU256::HEAP_SIZE).call(less_than_f);
+                }
+                _ => panic!("trying to compare two {t1:?}"),
+            }
+
+            types_stack.push(IntermediateType::IBool);
+        }
+        Bytecode::Le => {
+            let [t1, t2] = pop_n_from_stack(types_stack);
+            assert_eq!(
+                t1, t2,
+                "types stack error: trying to compare two different types {t1:?} {t2:?}"
+            );
+
+            match t1 {
+                IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
+                    builder.binop(BinaryOp::I32LeU);
+                }
+                IntermediateType::IU64 => {
+                    builder.binop(BinaryOp::I64LeU);
+                }
+                // For u128 and u256 instead of doing a <= b, we do !(b < a) == a <= b, this way
+                // we can reuse the LessThan function
+                IntermediateType::IU128 => {
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+
+                    // Temp variables to perform the swap
+                    let a = module.locals.add(ValType::I32);
+                    let b = module.locals.add(ValType::I32);
+
+                    builder
+                        .swap(a, b)
+                        .i32_const(IU128::HEAP_SIZE)
+                        .call(less_than_f)
+                        .negate();
+                }
+                IntermediateType::IU256 => {
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+
+                    // Temp variables to perform the swap
+                    let a = module.locals.add(ValType::I32);
+                    let b = module.locals.add(ValType::I32);
+
+                    builder
+                        .swap(a, b)
+                        .i32_const(IU256::HEAP_SIZE)
+                        .call(less_than_f)
+                        .negate();
+                }
+                _ => panic!("trying to compare two {t1:?}"),
+            }
+
+            types_stack.push(IntermediateType::IBool);
+        }
+        Bytecode::Gt => {
+            let [t1, t2] = pop_n_from_stack(types_stack);
+            assert_eq!(
+                t1, t2,
+                "types stack error: trying to compare two different types {t1:?} {t2:?}"
+            );
+
+            match t1 {
+                IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
+                    builder.binop(BinaryOp::I32GtU);
+                }
+                IntermediateType::IU64 => {
+                    builder.binop(BinaryOp::I64GtU);
+                }
+                // For u128 and u256 instead of doing a > b, we do b < a, this way we can reuse the
+                // LessThan function
+                IntermediateType::IU128 => {
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+
+                    let a = module.locals.add(ValType::I32);
+                    let b = module.locals.add(ValType::I32);
+
+                    builder
+                        .swap(a, b)
+                        .i32_const(IU128::HEAP_SIZE)
+                        .call(less_than_f);
+                }
+                IntermediateType::IU256 => {
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+
+                    let a = module.locals.add(ValType::I32);
+                    let b = module.locals.add(ValType::I32);
+
+                    builder
+                        .swap(a, b)
+                        .i32_const(IU256::HEAP_SIZE)
+                        .call(less_than_f);
+                }
+                _ => panic!("trying to compare two {t1:?}"),
+            }
+
+            types_stack.push(IntermediateType::IBool);
+        }
+        Bytecode::Ge => {
+            let [t1, t2] = pop_n_from_stack(types_stack);
+            assert_eq!(
+                t1, t2,
+                "types stack error: trying to compare two different types {t1:?} {t2:?}"
+            );
+
+            match t1 {
+                IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
+                    builder.binop(BinaryOp::I32GeU);
+                }
+                IntermediateType::IU64 => {
+                    builder.binop(BinaryOp::I64GeU);
+                }
+                // For u128 and u256 instead of doing a >= b, we do !(a < b) == a >= b, this way we can reuse the
+                // LessThan function
+                IntermediateType::IU128 => {
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+
+                    // Compare
+                    builder
+                        .i32_const(IU128::HEAP_SIZE)
+                        .call(less_than_f)
+                        .negate();
+                }
+                IntermediateType::IU256 => {
+                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+
+                    builder
+                        .i32_const(IU256::HEAP_SIZE)
+                        .call(less_than_f)
+                        .negate();
+                }
+                _ => panic!("trying to compare two {t1:?}"),
+            }
+
+            types_stack.push(IntermediateType::IBool);
         }
         Bytecode::Mod => {
             let [t1, t2] = pop_n_from_stack(types_stack);
