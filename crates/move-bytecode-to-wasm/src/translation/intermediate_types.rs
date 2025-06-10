@@ -385,7 +385,8 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IRef(_)
-            | IntermediateType::IMutRef(_) => {
+            | IntermediateType::IMutRef(_)
+            | IntermediateType::IStruct(_) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -395,7 +396,6 @@ impl IntermediateType {
                 builder.local_set(local);
                 local
             }
-            IntermediateType::IStruct(_) => todo!(),
         }
     }
 

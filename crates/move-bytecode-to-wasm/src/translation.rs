@@ -249,7 +249,7 @@ fn map_bytecode_instruction(
                 );
             }
 
-            IVector::add_vec_pop_back_instructions(&*inner_type, module, builder, compilation_ctx);
+            IVector::add_vec_pop_back_instructions(&inner_type, module, builder, compilation_ctx);
             types_stack.push(*inner_type);
         }
 
@@ -805,6 +805,60 @@ fn map_bytecode_instruction(
                 t => panic!("type stack error: invalid type for Shr: {t:?}"),
             }
             types_stack.push(t);
+        }
+        Bytecode::Pack(struct_definition_index) => {
+            let Some(struct_) = compilation_ctx
+                .module_structs
+                .iter()
+                .find(|s| s.struct_definition_index == *struct_definition_index)
+            else {
+                panic!("pack struct: struct with index {struct_definition_index:?} not found")
+            };
+
+            let pointer = module.locals.add(ValType::I32);
+            let val_32 = module.locals.add(ValType::I32);
+            let val_64 = module.locals.add(ValType::I32);
+            let mut offset = 0;
+
+            builder
+                .i32_const(struct_.heap_size as i32)
+                .call(compilation_ctx.allocator)
+                .local_set(pointer);
+
+            for pack_type in struct_.fields.iter().rev() {
+                match types_stack.pop() {
+                    Some(t) if &t == pack_type => {
+                        // Stack data size is used because for complex types we just save a pointer
+                        // in the struct
+                        let data_size = pack_type.stack_data_size();
+
+                        // If data is 64 bits
+                        let (val, store_kind) = if data_size == 8 {
+                            builder.local_set(val_64);
+                            (val_64, StoreKind::I64 { atomic: false })
+                        } else {
+                            builder.local_set(val_32);
+                            (val_32, StoreKind::I64 { atomic: false })
+                        };
+
+                        builder.local_get(pointer).local_get(val).store(
+                            compilation_ctx.memory_id,
+                            store_kind,
+                            MemArg { align: 0, offset },
+                        );
+
+                        offset += data_size;
+                    }
+                    Some(t) => panic!("expected {pack_type:?} in types stack, found {t:?}"),
+                    None => panic!("types stack is empty, expected type {types_stack:?}"),
+                }
+            }
+
+            builder.local_get(pointer);
+
+            types_stack.push(IntermediateType::IStruct(
+                struct_definition_index.0 as usize,
+            ));
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }

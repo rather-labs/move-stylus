@@ -48,6 +48,9 @@ pub struct CompilationContext<'a> {
     /// Module's structs: contains all the user defined structs
     pub module_structs: &'a [IStruct],
 
+    // This Hashmap maps the move's datatype handles to our internal representation of those
+    // types. The datatype handles are used interally by move to look for user defined data
+    // types
     pub datatype_handles_map: &'a HashMap<DatatypeHandleIndex, UserDefinedType>,
 
     /// WASM memory id
@@ -96,9 +99,6 @@ pub fn translate_package(
             "Enums are not supported yet"
         );
 
-        // This Hashmap maps the move's datatype handles to our internal representation of those
-        // types. The datatype handles are used interally by move to look for user defined data
-        // types
         let mut datatype_handles_map = HashMap::new();
 
         for (index, datatype_handle) in root_compiled_module.datatype_handles().iter().enumerate() {
@@ -110,18 +110,18 @@ pub fn translate_package(
                 root_compiled_module.datatype_handles()[idx.into_index()]
             );
 
-            let addition_result = if let Some(s) = root_compiled_module
+            let addition_result = if let Some(position) = root_compiled_module
                 .struct_defs()
                 .iter()
-                .find(|s| s.struct_handle == idx)
+                .position(|s| s.struct_handle == idx)
             {
-                datatype_handles_map.insert(s.struct_handle, UserDefinedType::Struct(index))
-            } else if let Some(e) = root_compiled_module
+                datatype_handles_map.insert(idx, UserDefinedType::Struct(position))
+            } else if let Some(position) = root_compiled_module
                 .enum_defs()
                 .iter()
-                .find(|e| e.enum_handle == idx)
+                .position(|e| e.enum_handle == idx)
             {
-                datatype_handles_map.insert(e.enum_handle, UserDefinedType::Enum(index))
+                datatype_handles_map.insert(idx, UserDefinedType::Enum(position))
             } else {
                 panic!("datatype handle index {index} not found");
             };
@@ -136,7 +136,7 @@ pub fn translate_package(
         // Module's structs
         //
         let mut module_structs: Vec<IStruct> = vec![];
-        for struct_def in root_compiled_module.struct_defs() {
+        for (index, struct_def) in root_compiled_module.struct_defs().iter().enumerate() {
             let fields = if let Some(fields) = struct_def.fields() {
                 fields
                     .iter()
@@ -152,7 +152,7 @@ pub fn translate_package(
                 vec![]
             };
 
-            module_structs.push(IStruct::new(struct_def.struct_handle, fields));
+            module_structs.push(IStruct::new(index, fields));
         }
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
