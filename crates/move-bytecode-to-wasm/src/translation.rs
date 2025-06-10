@@ -256,13 +256,13 @@ fn map_bytecode_instruction(
         Bytecode::ImmBorrowLoc(local_id) => {
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = &mapped_function.function_locals_ir[*local_id as usize];
-            local_type.add_borrow_local_instructions(builder, compilation_ctx, local);
+            local_type.add_borrow_local_instructions(builder, local);
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
         }
         Bytecode::MutBorrowLoc(local_id) => {
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = &mapped_function.function_locals_ir[*local_id as usize];
-            local_type.add_borrow_local_instructions(builder, compilation_ctx, local);
+            local_type.add_borrow_local_instructions(builder, local);
             types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
         }
         Bytecode::VecImmBorrow(signature_index) => {

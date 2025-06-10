@@ -248,7 +248,7 @@ pub fn translate_package(
             }
         }
 
-        hostio::build_entrypoint_router(&mut module, allocator_func, memory_id, &public_functions);
+        hostio::build_entrypoint_router(&mut module, &public_functions, &compilation_ctx);
 
         // Fill the WASM table with the function ids
         for (index, function_id) in function_ids.into_iter().enumerate() {

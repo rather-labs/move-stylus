@@ -938,8 +938,8 @@ mod tests {
             4u32.to_le_bytes().as_slice(),
         ]
         .concat();
-        // test_vector(&data, IntermediateType::IU32, &expected_result_bytes);
-        // test_vector_copy(&data, IntermediateType::IU32, &expected_result_bytes);
+        test_vector(&data, IntermediateType::IU32, &expected_result_bytes);
+        test_vector_copy(&data, IntermediateType::IU32, &expected_result_bytes);
         test_vector_pop_back(&data, IntermediateType::IU32, &expected_pop_bytes, 4);
     }
 

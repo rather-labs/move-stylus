@@ -399,12 +399,7 @@ impl IntermediateType {
         }
     }
 
-    pub fn add_borrow_local_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        compilation_ctx: &CompilationContext,
-        local: LocalId,
-    ) {
+    pub fn add_borrow_local_instructions(&self, builder: &mut InstrSeqBuilder, local: LocalId) {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -537,13 +532,13 @@ impl IntermediateType {
                     // destination address
                     builder
                         .local_get(ref_ptr)
-                        .i32_const(offset as i32)
+                        .i32_const(offset)
                         .binop(BinaryOp::I32Add);
 
                     // source address
                     builder
                         .local_get(src_ptr)
-                        .i32_const(offset as i32)
+                        .i32_const(offset)
                         .binop(BinaryOp::I32Add)
                         .load(
                             compilation_ctx.memory_id,
@@ -612,7 +607,7 @@ impl IntermediateType {
                 let ptr = module.locals.add(ValType::I32);
                 builder
                     .local_set(val)
-                    .i32_const(4 as i32)
+                    .i32_const(4)
                     .call(compilation_ctx.allocator)
                     .local_tee(local)
                     .i32_const(self.stack_data_size() as i32)
@@ -642,10 +637,10 @@ impl IntermediateType {
                 let ptr = module.locals.add(ValType::I32);
                 builder
                     .local_set(val)
-                    .i32_const(4 as i32)
+                    .i32_const(4)
                     .call(compilation_ctx.allocator)
                     .local_tee(local)
-                    .i32_const(8 as i32)
+                    .i32_const(8)
                     .call(compilation_ctx.allocator)
                     .local_tee(ptr)
                     .store(
@@ -677,7 +672,7 @@ impl IntermediateType {
                 let ptr = module.locals.add(ValType::I32);
                 builder
                     .local_set(ptr)
-                    .i32_const(4 as i32)
+                    .i32_const(4)
                     .call(compilation_ctx.allocator)
                     .local_tee(local)
                     .local_get(ptr)

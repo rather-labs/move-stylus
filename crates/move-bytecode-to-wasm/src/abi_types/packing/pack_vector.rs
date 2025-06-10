@@ -1,7 +1,10 @@
-use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType, ir::BinaryOp};
+use walrus::{InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
 
 use super::{Packable, pack_native_int::pack_i32_type_instructions};
-use crate::translation::intermediate_types::{IntermediateType, vector::IVector};
+use crate::{
+    CompilationContext,
+    translation::intermediate_types::{IntermediateType, vector::IVector},
+};
 
 impl IVector {
     #[allow(clippy::too_many_arguments)]
@@ -12,14 +15,17 @@ impl IVector {
         local: LocalId,
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
-        memory: MemoryId,
-        alloc_function: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         let data_pointer = module.locals.add(ValType::I32);
         let inner_data_reference = module.locals.add(ValType::I32);
 
-        let length = IntermediateType::IU32
-            .add_load_memory_to_local_instructions(module, block, local, memory);
+        let length = IntermediateType::IU32.add_load_memory_to_local_instructions(
+            module,
+            block,
+            local,
+            compilation_ctx.memory_id,
+        );
 
         // Allocate memory for the packed value, this will be allocate at the end of calldata
         block.local_get(length);
@@ -28,7 +34,7 @@ impl IVector {
         block.i32_const(32); // The size of the length value itself
         block.binop(BinaryOp::I32Add);
 
-        block.call(alloc_function);
+        block.call(compilation_ctx.allocator);
         block.local_tee(data_pointer);
 
         // The value stored at this param position should be the distance from the start of this calldata portion to the pointer
@@ -37,7 +43,13 @@ impl IVector {
         block.local_get(calldata_reference_pointer);
         block.binop(BinaryOp::I32Sub);
         block.local_set(reference_value);
-        pack_i32_type_instructions(block, module, memory, reference_value, writer_pointer);
+        pack_i32_type_instructions(
+            block,
+            module,
+            compilation_ctx.memory_id,
+            reference_value,
+            writer_pointer,
+        );
 
         // increment the local to point to first value
         block.local_get(local);
@@ -50,7 +62,13 @@ impl IVector {
          */
 
         // Length
-        pack_i32_type_instructions(block, module, memory, length, data_pointer);
+        pack_i32_type_instructions(
+            block,
+            module,
+            compilation_ctx.memory_id,
+            length,
+            data_pointer,
+        );
 
         // increment the data pointer
         block.local_get(data_pointer);
@@ -66,8 +84,12 @@ impl IVector {
         block.loop_(None, |loop_block| {
             let loop_block_id = loop_block.id();
 
-            let inner_local =
-                inner.add_load_memory_to_local_instructions(module, loop_block, local, memory);
+            let inner_local = inner.add_load_memory_to_local_instructions(
+                module,
+                loop_block,
+                local,
+                compilation_ctx.memory_id,
+            );
 
             inner.add_pack_instructions(
                 loop_block,
@@ -75,8 +97,7 @@ impl IVector {
                 inner_local,
                 data_pointer,
                 inner_data_reference,
-                memory,
-                alloc_function,
+                compilation_ctx,
             );
 
             // increment the local to point to next first value
@@ -112,6 +133,7 @@ mod tests {
 
     use crate::{
         abi_types::packing::Packable,
+        test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
@@ -121,6 +143,8 @@ mod tests {
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+
+        let compilation_ctx = test_compilation_context!(memory_id, alloc_function);
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -145,8 +169,7 @@ mod tests {
             local,
             writer_pointer,
             calldata_reference_pointer,
-            memory_id,
-            alloc_function,
+            &compilation_ctx,
         );
 
         func_body.local_get(writer_pointer);

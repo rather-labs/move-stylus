@@ -1,14 +1,18 @@
 use alloy_sol_types::{SolType, sol_data};
 use pack_native_int::{pack_i32_type_instructions, pack_i64_type_instructions};
-use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType, ir::BinaryOp};
+use walrus::{InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
 
-use crate::translation::intermediate_types::{
-    IntermediateType,
-    address::IAddress,
-    heap_integers::{IU128, IU256},
-    reference::{IMutRef, IRef},
-    signer::ISigner,
-    vector::IVector,
+use crate::{
+    CompilationContext,
+    translation::intermediate_types::{
+        IntermediateType,
+        address::IAddress,
+        heap_integers::{IU128, IU256},
+        reference::{IMutRef, IRef},
+        signer::ISigner,
+        structs::IStruct,
+        vector::IVector,
+    },
 };
 
 mod pack_heap_int;
@@ -32,8 +36,7 @@ pub trait Packable {
         local: LocalId,
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
-        memory: MemoryId,
-        alloc_function: FunctionId,
+        compilation_ctx: &CompilationContext,
     );
 
     /// Adds the instructions to load the value into a local variable.
@@ -63,8 +66,7 @@ pub fn build_pack_instructions<T: Packable>(
     builder: &mut InstrSeqBuilder,
     function_return_signature: &[T],
     module: &mut Module,
-    memory: MemoryId,
-    alloc_function: FunctionId,
+    compilation_ctx: &CompilationContext,
 ) {
     if function_return_signature.is_empty() {
         builder.i32_const(0);
@@ -88,7 +90,7 @@ pub fn build_pack_instructions<T: Packable>(
 
     // Allocate memory for the first level arguments
     builder.i32_const(args_size as i32);
-    builder.call(alloc_function);
+    builder.call(compilation_ctx.allocator);
     builder.local_tee(pointer);
 
     // Store the writer pointer
@@ -106,8 +108,7 @@ pub fn build_pack_instructions<T: Packable>(
             *local,
             writer_pointer,
             calldata_reference_pointer,
-            memory,
-            alloc_function,
+            compilation_ctx,
         );
 
         builder.local_get(writer_pointer);
@@ -120,7 +121,7 @@ pub fn build_pack_instructions<T: Packable>(
 
     // use the allocator to get a pointer to the end of the calldata
     builder.i32_const(0);
-    builder.call(alloc_function);
+    builder.call(compilation_ctx.allocator);
     builder.local_get(pointer);
     builder.binop(BinaryOp::I32Sub);
     // The value remaining in the stack is the length of the encoded data
@@ -143,7 +144,8 @@ impl Packable for IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
-            | IntermediateType::IMutRef(_) => {
+            | IntermediateType::IMutRef(_)
+            | IntermediateType::IStruct(_) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -153,7 +155,6 @@ impl Packable for IntermediateType {
                 builder.local_set(local);
                 local
             }
-            IntermediateType::IStruct(_) => todo!(),
         }
     }
 
@@ -164,31 +165,58 @@ impl Packable for IntermediateType {
         local: LocalId,
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
-        memory: MemoryId,
-        alloc_function: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32 => {
-                pack_i32_type_instructions(builder, module, memory, local, writer_pointer);
+                pack_i32_type_instructions(
+                    builder,
+                    module,
+                    compilation_ctx.memory_id,
+                    local,
+                    writer_pointer,
+                );
             }
             IntermediateType::IU64 => {
-                pack_i64_type_instructions(builder, module, memory, local, writer_pointer);
+                pack_i64_type_instructions(
+                    builder,
+                    module,
+                    compilation_ctx.memory_id,
+                    local,
+                    writer_pointer,
+                );
             }
-            IntermediateType::IU128 => {
-                IU128::add_pack_instructions(builder, module, local, writer_pointer, memory)
-            }
-            IntermediateType::IU256 => {
-                IU256::add_pack_instructions(builder, module, local, writer_pointer, memory)
-            }
-            IntermediateType::ISigner => {
-                ISigner::add_pack_instructions(builder, module, local, writer_pointer, memory)
-            }
-            IntermediateType::IAddress => {
-                IAddress::add_pack_instructions(builder, module, local, writer_pointer, memory)
-            }
+            IntermediateType::IU128 => IU128::add_pack_instructions(
+                builder,
+                module,
+                local,
+                writer_pointer,
+                compilation_ctx.memory_id,
+            ),
+            IntermediateType::IU256 => IU256::add_pack_instructions(
+                builder,
+                module,
+                local,
+                writer_pointer,
+                compilation_ctx.memory_id,
+            ),
+            IntermediateType::ISigner => ISigner::add_pack_instructions(
+                builder,
+                module,
+                local,
+                writer_pointer,
+                compilation_ctx.memory_id,
+            ),
+            IntermediateType::IAddress => IAddress::add_pack_instructions(
+                builder,
+                module,
+                local,
+                writer_pointer,
+                compilation_ctx.memory_id,
+            ),
             IntermediateType::IVector(inner) => IVector::add_pack_instructions(
                 inner,
                 builder,
@@ -196,8 +224,7 @@ impl Packable for IntermediateType {
                 local,
                 writer_pointer,
                 calldata_reference_pointer,
-                memory,
-                alloc_function,
+                compilation_ctx,
             ),
             IntermediateType::IRef(inner) => IRef::add_pack_instructions(
                 inner,
@@ -206,8 +233,7 @@ impl Packable for IntermediateType {
                 local,
                 writer_pointer,
                 calldata_reference_pointer,
-                memory,
-                alloc_function,
+                compilation_ctx,
             ),
             IntermediateType::IMutRef(inner) => IMutRef::add_pack_instructions(
                 inner,
@@ -216,10 +242,16 @@ impl Packable for IntermediateType {
                 local,
                 writer_pointer,
                 calldata_reference_pointer,
-                memory,
-                alloc_function,
+                compilation_ctx,
             ),
-            IntermediateType::IStruct(_) => todo!(),
+            IntermediateType::IStruct(_) => IStruct::add_pack_instructions(
+                builder,
+                module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                compilation_ctx,
+            ),
         }
     }
 
@@ -237,7 +269,7 @@ impl Packable for IntermediateType {
             IntermediateType::IVector(_) => 32,
             IntermediateType::IRef(inner) => inner.encoded_size(),
             IntermediateType::IMutRef(inner) => inner.encoded_size(),
-            IntermediateType::IStruct(_) => todo!(),
+            IntermediateType::IStruct(_) => 32, // TODO: Struct - not sure about this
         }
     }
 }
@@ -250,6 +282,7 @@ mod tests {
     use wasmtime::{Caller, Engine, Extern, Linker};
 
     use crate::{
+        test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
         utils::display_module,
     };
@@ -284,6 +317,7 @@ mod tests {
     #[test]
     fn test_build_pack_instructions() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
 
         let validator_func_type = raw_module.types.add(&[ValType::I32, ValType::I32], &[]);
         let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);
@@ -309,8 +343,7 @@ mod tests {
                 IntermediateType::IU64,
             ],
             &mut raw_module,
-            memory_id,
-            allocator_func,
+            &compilation_ctx,
         );
 
         // validation
@@ -346,6 +379,7 @@ mod tests {
     fn test_build_pack_instructions_memory_offset() {
         // Memory offset starts at 100
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(100));
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
 
         let validator_func_type = raw_module.types.add(&[ValType::I32, ValType::I32], &[]);
         let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);
@@ -371,8 +405,7 @@ mod tests {
                 IntermediateType::IU64,
             ],
             &mut raw_module,
-            memory_id,
-            allocator_func,
+            &compilation_ctx,
         );
 
         // validation
@@ -432,6 +465,7 @@ mod tests {
         let data_len = data.len() as i32;
 
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(data_len));
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
 
         let validator_func_type = raw_module.types.add(&[ValType::I32, ValType::I32], &[]);
         let (validator_func, _) = raw_module.add_import_func("", "validator", validator_func_type);
@@ -459,8 +493,7 @@ mod tests {
                 IntermediateType::IU256,
             ],
             &mut raw_module,
-            memory_id,
-            allocator_func,
+            &compilation_ctx,
         );
 
         // validation

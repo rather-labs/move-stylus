@@ -1,4 +1,7 @@
 use move_binary_format::file_format::StructDefinitionIndex;
+use walrus::{InstrSeqBuilder, LocalId, Module};
+
+use crate::CompilationContext;
 
 use super::IntermediateType;
 
@@ -34,5 +37,16 @@ impl IStruct {
             acc += f.stack_data_size();
             acc
         })
+    }
+
+    pub fn add_pack_instructions(
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        local: LocalId,
+        writer_pointer: LocalId,
+        calldata_reference_pointer: LocalId,
+        compilation_ctx: &CompilationContext,
+    ) {
+        todo!()
     }
 }

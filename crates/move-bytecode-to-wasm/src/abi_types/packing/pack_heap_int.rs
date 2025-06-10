@@ -144,6 +144,7 @@ mod tests {
 
     use crate::{
         abi_types::packing::Packable,
+        test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
@@ -153,6 +154,7 @@ mod tests {
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+        let compilation_ctx = test_compilation_context!(memory_id, alloc_function);
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -175,8 +177,7 @@ mod tests {
             local,
             writer_pointer,
             writer_pointer, // unused for this type
-            memory_id,
-            alloc_function,
+            &compilation_ctx,
         );
 
         func_body.local_get(writer_pointer);
