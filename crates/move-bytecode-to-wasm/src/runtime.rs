@@ -6,6 +6,7 @@ mod copy;
 mod equality;
 mod integers;
 mod swap;
+mod vector;
 
 #[derive(PartialEq)]
 pub enum RuntimeFunction {
@@ -36,6 +37,11 @@ pub enum RuntimeFunction {
     // Equality
     HeapTypeEquality,
     VecEqualityHeapType,
+    // Vector
+    VecSwap32,
+    VecSwap64,
+    VecPopBack32,
+    VecPopBack64,
 }
 
 impl RuntimeFunction {
@@ -69,6 +75,11 @@ impl RuntimeFunction {
             // Equality
             Self::HeapTypeEquality => "heap_type_equality",
             Self::VecEqualityHeapType => "vec_equality_heap_type",
+            // Vector
+            Self::VecSwap32 => "vec_swap_32",
+            Self::VecSwap64 => "vec_swap_64",
+            Self::VecPopBack32 => "vec_pop_back_32",
+            Self::VecPopBack64 => "vec_pop_back_64",
         }
     }
 
@@ -128,6 +139,11 @@ impl RuntimeFunction {
                 (Self::VecEqualityHeapType, Some(ctx)) => {
                     equality::vec_equality_heap_type(module, ctx)
                 }
+                // Vector
+                (Self::VecSwap32, Some(ctx)) => vector::vec_swap_32_function(module, ctx),
+                (Self::VecSwap64, Some(ctx)) => vector::vec_swap_64_function(module, ctx),
+                (Self::VecPopBack32, Some(ctx)) => vector::vec_pop_back_32_function(module, ctx),
+                (Self::VecPopBack64, Some(ctx)) => vector::vec_pop_back_64_function(module, ctx),
                 // Error
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,

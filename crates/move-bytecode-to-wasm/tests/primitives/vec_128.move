@@ -50,4 +50,9 @@ public fun vec_pop_back(x: vector<u128>): vector<u128> {
   y
 }
 
+public fun vec_swap(x: vector<u128>, id1: u64, id2: u64): vector<u128> {
+  let mut y = x;
+  y.swap(id1, id2);
+  y
+}
 

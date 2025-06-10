@@ -205,6 +205,18 @@ fn map_bytecode_instruction(
             local_type.copy_local_instructions(module, builder, compilation_ctx, local);
             types_stack.push(local_type);
         }
+        Bytecode::ImmBorrowLoc(local_id) => {
+            let local = mapped_function.function_locals[*local_id as usize];
+            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
+            local_type.add_borrow_local_instructions(builder, local);
+            types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
+        }
+        Bytecode::MutBorrowLoc(local_id) => {
+            let local = mapped_function.function_locals[*local_id as usize];
+            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
+            local_type.add_borrow_local_instructions(builder, local);
+            types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
+        }
         Bytecode::VecPack(signature_index, num_elements) => {
             let inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
             IVector::vec_pack_instructions(
@@ -245,22 +257,75 @@ fn map_bytecode_instruction(
                 );
             }
 
-            IVector::add_vec_pop_back_instructions(&*inner_type, module, builder, compilation_ctx);
+            match *inner_type {
+                IntermediateType::IBool
+                | IntermediateType::IU8
+                | IntermediateType::IU16
+                | IntermediateType::IU32
+                | IntermediateType::IU128
+                | IntermediateType::IU256
+                | IntermediateType::IAddress
+                | IntermediateType::ISigner
+                | IntermediateType::IVector(_) => {
+                    let swap_f = RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
+                    builder.call(swap_f);
+                }
+                IntermediateType::IU64 => {
+                    let swap_f = RuntimeFunction::VecPopBack64.get(module, Some(compilation_ctx));
+                    builder.call(swap_f);
+                }
+                IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                    panic!("VecPopBack operation is not allowed on reference types");
+                }
+            }
+
             types_stack.push(*inner_type);
         }
+        Bytecode::VecSwap(signature_index) => {
+            let expected_type = get_ir_for_signature_index(compilation_ctx, *signature_index);
+            let Some(id2_ty) = types_stack.pop() else {
+                panic!("Stack underflow");
+            };
+            let IntermediateType::IU64 = id2_ty else {
+                panic!("Expected IU64, got {:?}", id2_ty);
+            };
+            let Some(id1_ty) = types_stack.pop() else {
+                panic!("Stack underflow");
+            };
+            let IntermediateType::IU64 = id1_ty else {
+                panic!("Expected IU64, got {:?}", id1_ty);
+            };
+            let Some(ty) = types_stack.pop() else {
+                panic!("Stack underflow");
+            };
 
-        Bytecode::ImmBorrowLoc(local_id) => {
-            let local = mapped_function.function_locals[*local_id as usize];
-            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
-            local_type.add_borrow_local_instructions(builder, compilation_ctx, local);
-            types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
+            let IntermediateType::IMutRef(mut_inner_type) = ty else {
+                panic!("Expected mutable reference to vector, got {:?}", ty);
+            };
+
+            let IntermediateType::IVector(inner_type) = *mut_inner_type else {
+                panic!("Expected vector type inside mutable reference");
+            };
+
+            if *inner_type != expected_type {
+                panic!(
+                    "Expected vector inner type {:?}, got {:?}",
+                    expected_type, *inner_type
+                );
+            }
+
+            match *inner_type {
+                IntermediateType::IU64 => {
+                    let swap_f = RuntimeFunction::VecSwap64.get(module, Some(compilation_ctx));
+                    builder.call(swap_f);
+                }
+                _ => {
+                    let swap_f = RuntimeFunction::VecSwap32.get(module, Some(compilation_ctx));
+                    builder.call(swap_f);
+                }
+            }
         }
-        Bytecode::MutBorrowLoc(local_id) => {
-            let local = mapped_function.function_locals[*local_id as usize];
-            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
-            local_type.add_borrow_local_instructions(builder, compilation_ctx, local);
-            types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
-        }
+
         Bytecode::VecImmBorrow(signature_index) => {
             match (types_stack.pop(), types_stack.pop()) {
                 (Some(IntermediateType::IU64), Some(IntermediateType::IRef(inner)))

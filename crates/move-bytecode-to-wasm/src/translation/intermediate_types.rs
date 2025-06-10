@@ -345,12 +345,7 @@ impl IntermediateType {
         }
     }
 
-    pub fn add_borrow_local_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        _compilation_ctx: &CompilationContext,
-        local: LocalId,
-    ) {
+    pub fn add_borrow_local_instructions(&self, builder: &mut InstrSeqBuilder, local: LocalId) {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
