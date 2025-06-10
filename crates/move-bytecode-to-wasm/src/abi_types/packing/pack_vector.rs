@@ -37,7 +37,8 @@ impl IVector {
         block.call(compilation_ctx.allocator);
         block.local_tee(data_pointer);
 
-        // The value stored at this param position should be the distance from the start of this calldata portion to the pointer
+        // The value stored at this param position should be the distance from the start of this
+        // calldata portion to the pointer
         let reference_value = module.locals.add(ValType::I32);
 
         block.local_get(calldata_reference_pointer);

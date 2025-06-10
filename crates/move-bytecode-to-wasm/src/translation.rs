@@ -817,7 +817,7 @@ fn map_bytecode_instruction(
 
             let pointer = module.locals.add(ValType::I32);
             let val_32 = module.locals.add(ValType::I32);
-            let val_64 = module.locals.add(ValType::I32);
+            let val_64 = module.locals.add(ValType::I64);
             let mut offset = 0;
 
             builder
@@ -838,7 +838,7 @@ fn map_bytecode_instruction(
                             (val_64, StoreKind::I64 { atomic: false })
                         } else {
                             builder.local_set(val_32);
-                            (val_32, StoreKind::I64 { atomic: false })
+                            (val_32, StoreKind::I32 { atomic: false })
                         };
 
                         builder.local_get(pointer).local_get(val).store(
