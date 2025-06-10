@@ -115,7 +115,7 @@ impl IVector {
 
         // We set the capacity to twice the length
         block.local_get(length);
-        block.i32_const(2); 
+        block.i32_const(2);
         block.binop(BinaryOp::I32Mul);
         block.local_set(capacity);
 
@@ -305,7 +305,8 @@ mod tests {
         let int_type = IntermediateType::IVector(Box::new(IntermediateType::IU8));
 
         let data = SolType::abi_encode_params::<(Vec<u8>,)>(&(vec![],));
-        let expected_result_bytes = [0u32.to_le_bytes().as_slice(), 0u32.to_le_bytes().as_slice()].concat();
+        let expected_result_bytes =
+            [0u32.to_le_bytes().as_slice(), 0u32.to_le_bytes().as_slice()].concat();
         test_vec_unpacking(&data, int_type, &expected_result_bytes);
     }
 
@@ -510,14 +511,14 @@ mod tests {
 
         let data = SolType::abi_encode_params(&(vec![vec![1, 2, 3], vec![4, 5, 6]],));
         let expected_result_bytes = [
-            2u32.to_le_bytes().as_slice(), // len
-            4u32.to_le_bytes().as_slice(), // capacity
-            ((data.len() + 24) as u32).to_le_bytes().as_slice(), // first element pointer
+            2u32.to_le_bytes().as_slice(),                        // len
+            4u32.to_le_bytes().as_slice(),                        // capacity
+            ((data.len() + 24) as u32).to_le_bytes().as_slice(),  // first element pointer
             ((data.len() + 104) as u32).to_le_bytes().as_slice(), // second element pointer
-            0u32.to_le_bytes().as_slice(), // buffer memory pointer
-            0u32.to_le_bytes().as_slice(), // buffer memory size
-            3u32.to_le_bytes().as_slice(), // first element length
-            6u32.to_le_bytes().as_slice(), // first element capacity
+            0u32.to_le_bytes().as_slice(),                        // buffer memory pointer
+            0u32.to_le_bytes().as_slice(),                        // buffer memory size
+            3u32.to_le_bytes().as_slice(),                        // first element length
+            6u32.to_le_bytes().as_slice(),                        // first element capacity
             ((data.len() + 56) as u32).to_le_bytes().as_slice(), // first element - first value pointer
             ((data.len() + 72) as u32).to_le_bytes().as_slice(), // first element - second value pointer
             ((data.len() + 88) as u32).to_le_bytes().as_slice(), // first element - third value pointer

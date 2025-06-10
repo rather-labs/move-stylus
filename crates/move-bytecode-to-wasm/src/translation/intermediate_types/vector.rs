@@ -675,11 +675,13 @@ mod tests {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_) => {
-                let swap_f = RuntimeFunction::VecPopBack32.get(&mut raw_module, Some(&compilation_ctx));
+                let swap_f =
+                    RuntimeFunction::VecPopBack32.get(&mut raw_module, Some(&compilation_ctx));
                 builder.call(swap_f);
             }
             IntermediateType::IU64 => {
-                let swap_f = RuntimeFunction::VecPopBack64.get(&mut raw_module, Some(&compilation_ctx));
+                let swap_f =
+                    RuntimeFunction::VecPopBack64.get(&mut raw_module, Some(&compilation_ctx));
                 builder.call(swap_f);
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -757,11 +759,13 @@ mod tests {
 
         match inner_type {
             IntermediateType::IU64 => {
-                let swap_f = RuntimeFunction::VecSwap64.get(&mut raw_module, Some(&compilation_ctx));
+                let swap_f =
+                    RuntimeFunction::VecSwap64.get(&mut raw_module, Some(&compilation_ctx));
                 builder.call(swap_f);
             }
             _ => {
-                let swap_f = RuntimeFunction::VecSwap32.get(&mut raw_module, Some(&compilation_ctx));
+                let swap_f =
+                    RuntimeFunction::VecSwap32.get(&mut raw_module, Some(&compilation_ctx));
                 builder.call(swap_f);
             }
         }
