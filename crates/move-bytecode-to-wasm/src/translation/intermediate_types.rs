@@ -75,15 +75,15 @@ impl IntermediateType {
             SignatureToken::Address => Ok(Self::IAddress),
             SignatureToken::Signer => Ok(Self::ISigner),
             SignatureToken::Vector(token) => {
-                let itoken = Self::try_from(token.as_ref())?;
+                let itoken = Self::try_from_signature_token(token.as_ref(), handles_map)?;
                 Ok(IntermediateType::IVector(Box::new(itoken)))
             }
             SignatureToken::Reference(token) => {
-                let itoken = Self::try_from(token.as_ref())?;
+                let itoken = Self::try_from_signature_token(token.as_ref(), handles_map)?;
                 Ok(IntermediateType::IRef(Box::new(itoken)))
             }
             SignatureToken::MutableReference(token) => {
-                let itoken = Self::try_from(token.as_ref())?;
+                let itoken = Self::try_from_signature_token(token.as_ref(), handles_map)?;
                 Ok(IntermediateType::IMutRef(Box::new(itoken)))
             }
             SignatureToken::Datatype(index) => {
@@ -721,49 +721,21 @@ impl From<IntermediateType> for ValType {
     }
 }
 
-impl TryFrom<&SignatureToken> for IntermediateType {
-    // TODO: Change when handling errors better
-    type Error = anyhow::Error;
-
-    fn try_from(value: &SignatureToken) -> Result<Self, Self::Error> {
-        match value {
-            SignatureToken::Bool => Ok(Self::IBool),
-            SignatureToken::U8 => Ok(Self::IU8),
-            SignatureToken::U16 => Ok(Self::IU16),
-            SignatureToken::U32 => Ok(Self::IU32),
-            SignatureToken::U64 => Ok(Self::IU64),
-            SignatureToken::U128 => Ok(Self::IU128),
-            SignatureToken::U256 => Ok(Self::IU256),
-            SignatureToken::Address => Ok(Self::IAddress),
-            SignatureToken::Signer => Ok(Self::ISigner),
-            SignatureToken::Vector(token) => {
-                let itoken = Self::try_from(token.as_ref())?;
-                Ok(IntermediateType::IVector(Box::new(itoken)))
-            }
-            SignatureToken::Reference(token) => {
-                let itoken = Self::try_from(token.as_ref())?;
-                Ok(IntermediateType::IRef(Box::new(itoken)))
-            }
-            SignatureToken::MutableReference(token) => {
-                let itoken = Self::try_from(token.as_ref())?;
-                Ok(IntermediateType::IMutRef(Box::new(itoken)))
-            }
-            _ => Err(anyhow::anyhow!("Unsupported signature token: {value:?}")),
-        }
-    }
-}
-
 pub struct ISignature {
     pub arguments: Vec<IntermediateType>,
     pub returns: Vec<IntermediateType>,
 }
 
 impl ISignature {
-    pub fn from_signatures(arguments: &Signature, returns: &Signature) -> Self {
+    pub fn from_signatures(
+        arguments: &Signature,
+        returns: &Signature,
+        handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+    ) -> Self {
         let arguments = arguments
             .0
             .iter()
-            .map(|token| token.try_into())
+            .map(|token| IntermediateType::try_from_signature_token(token, handles_map))
             .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
             // TODO: unwrap
             .unwrap();
@@ -771,7 +743,7 @@ impl ISignature {
         let returns = returns
             .0
             .iter()
-            .map(|token| token.try_into())
+            .map(|token| IntermediateType::try_from_signature_token(token, handles_map))
             .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
             // TODO: unwrap
             .unwrap();

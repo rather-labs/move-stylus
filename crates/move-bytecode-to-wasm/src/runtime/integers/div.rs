@@ -433,6 +433,7 @@ mod tests {
     use crate::test_tools::{build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use rstest::rstest;
+    use std::collections::HashMap;
     use walrus::FunctionBuilder;
 
     use super::*;
@@ -467,6 +468,7 @@ mod tests {
                 functions_returns: &[],
                 module_signatures: &[],
                 module_structs: &[],
+                datatype_handles_map: &HashMap::new(),
                 constants: &[],
             },
         );
@@ -518,6 +520,7 @@ mod tests {
                 functions_returns: &[],
                 module_signatures: &[],
                 module_structs: &[],
+                datatype_handles_map: &HashMap::new(),
                 constants: &[],
             },
         );
@@ -586,6 +589,7 @@ mod tests {
                 functions_returns: &[],
                 module_signatures: &[],
                 module_structs: &[],
+                datatype_handles_map: &HashMap::new(),
                 constants: &[],
             },
         );
@@ -690,6 +694,7 @@ mod tests {
                 functions_returns: &[],
                 module_signatures: &[],
                 module_structs: &[],
+                datatype_handles_map: &HashMap::new(),
                 constants: &[],
             },
         );

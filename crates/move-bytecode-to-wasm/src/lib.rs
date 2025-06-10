@@ -2,6 +2,7 @@ use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
 use move_binary_format::file_format::{Constant, DatatypeHandleIndex, Signature, Visibility};
+use move_binary_format::internals::ModuleIndex;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
 use translation::intermediate_types::structs::IStruct;
 use translation::{
@@ -44,8 +45,10 @@ pub struct CompilationContext<'a> {
     /// Module's signatures
     pub module_signatures: &'a [Signature],
 
-    /// Module's structs
+    /// Module's structs: contains all the user defined structs
     pub module_structs: &'a [IStruct],
+
+    pub datatype_handles_map: &'a HashMap<DatatypeHandleIndex, UserDefinedType>,
 
     /// WASM memory id
     pub memory_id: MemoryId,
@@ -93,12 +96,20 @@ pub fn translate_package(
             "Enums are not supported yet"
         );
 
-        // This Hasmap maps the move's datatype handles to our internal representation of those
-        // types.
+        // This Hashmap maps the move's datatype handles to our internal representation of those
+        // types. The datatype handles are used interally by move to look for user defined data
+        // types
         let mut datatype_handles_map = HashMap::new();
 
         for (index, datatype_handle) in root_compiled_module.datatype_handles().iter().enumerate() {
             let idx = DatatypeHandleIndex::new(index as u16);
+
+            // Assert the index we constructed is ok
+            assert_eq!(
+                *datatype_handle,
+                root_compiled_module.datatype_handles()[idx.into_index()]
+            );
+
             let addition_result = if let Some(s) = root_compiled_module
                 .struct_defs()
                 .iter()
@@ -123,6 +134,7 @@ pub fn translate_package(
         }
 
         // Module's structs
+        //
         let mut module_structs: Vec<IStruct> = vec![];
         for struct_def in root_compiled_module.struct_defs() {
             let fields = if let Some(fields) = struct_def.fields() {
@@ -142,8 +154,6 @@ pub fn translate_package(
 
             module_structs.push(IStruct::new(struct_def.struct_handle, fields));
         }
-
-        println!("{module_structs:#?}");
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
 
@@ -197,6 +207,7 @@ pub fn translate_package(
                 move_function_return,
                 code_locals,
                 function_def,
+                &datatype_handles_map,
                 &mut module,
             );
 
@@ -209,6 +220,7 @@ pub fn translate_package(
             functions_returns: &functions_returns,
             module_signatures: &root_compiled_module.signatures,
             module_structs: &module_structs,
+            datatype_handles_map: &datatype_handles_map,
             memory_id,
             allocator: allocator_func,
         };

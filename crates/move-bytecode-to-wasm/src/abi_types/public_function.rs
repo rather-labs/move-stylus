@@ -259,6 +259,7 @@ impl<'a> PublicFunction<'a> {
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::{SolType, sol};
+    use std::collections::HashMap;
     use walrus::{
         FunctionBuilder, MemoryId,
         ir::{LoadKind, MemArg},
@@ -449,6 +450,7 @@ mod tests {
             functions_returns: &[],
             module_signatures: &[],
             module_structs: &[],
+            datatype_handles_map: &HashMap::new(),
             memory_id,
             allocator,
         };
@@ -533,6 +535,7 @@ mod tests {
             functions_returns: &[],
             module_signatures: &[],
             module_structs: &[],
+            datatype_handles_map: &HashMap::new(),
             memory_id,
             allocator,
         };

@@ -593,6 +593,8 @@ impl IVector {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::test_tools::{build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use walrus::{FunctionBuilder, ValType};
@@ -608,6 +610,7 @@ mod tests {
             functions_returns: &[],
             module_signatures: &[],
             module_structs: &[],
+            datatype_handles_map: &HashMap::new(),
             memory_id,
             allocator,
         };
@@ -652,6 +655,7 @@ mod tests {
             functions_returns: &[],
             module_signatures: &[],
             module_structs: &[],
+            datatype_handles_map: &HashMap::new(),
             memory_id,
             allocator,
         };
@@ -707,6 +711,7 @@ mod tests {
             functions_returns: &[],
             module_signatures: &[],
             module_structs: &[],
+            datatype_handles_map: &HashMap::new(),
             memory_id,
             allocator,
         };
@@ -764,6 +769,7 @@ mod tests {
             functions_returns: &[],
             module_signatures: &[],
             module_structs: &[],
+            datatype_handles_map: &HashMap::new(),
             memory_id,
             allocator,
         };

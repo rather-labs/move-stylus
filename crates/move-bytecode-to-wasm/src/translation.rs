@@ -86,7 +86,11 @@ fn map_bytecode_instruction(
             let constant = &compilation_ctx.constants[global_index.0 as usize];
             let mut data = constant.data.clone().into_iter();
             let constant_type = &constant.type_;
-            let constant_type: IntermediateType = constant_type.try_into().unwrap();
+            let constant_type: IntermediateType = IntermediateType::try_from_signature_token(
+                constant_type,
+                compilation_ctx.datatype_handles_map,
+            )
+            .unwrap();
 
             constant_type.load_constant_instructions(module, builder, &mut data, compilation_ctx);
 
@@ -846,7 +850,11 @@ fn get_ir_for_signature_index(
     signature_index: SignatureIndex,
 ) -> IntermediateType {
     let signature_token = &compilation_ctx.module_signatures[signature_index.0 as usize].0;
-    (&signature_token[0]).try_into().unwrap()
+    IntermediateType::try_from_signature_token(
+        &signature_token[0],
+        compilation_ctx.datatype_handles_map,
+    )
+    .unwrap()
 }
 
 fn pop_types_stack(

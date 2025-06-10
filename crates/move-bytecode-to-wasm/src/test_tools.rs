@@ -1,8 +1,10 @@
 //! This module contains aux functions used in unit tests in this module
+use std::collections::HashMap;
+
 use walrus::{FunctionId, MemoryId, Module, ModuleConfig, ValType};
 use wasmtime::{Caller, Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc};
 
-use crate::memory::setup_module_memory;
+use crate::{CompilationContext, memory::setup_module_memory};
 
 pub fn build_module(initial_memory_offset: Option<i32>) -> (Module, FunctionId, MemoryId) {
     let config = ModuleConfig::new();
