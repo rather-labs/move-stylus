@@ -688,6 +688,111 @@ impl IntermediateType {
             }
         }
     }
+
+    pub fn load_equality_instructions(
+        &self,
+        module: &mut Module,
+        builder: &mut InstrSeqBuilder,
+        compilation_ctx: &CompilationContext,
+    ) {
+        match self {
+            Self::IBool | Self::IU8 | Self::IU16 | Self::IU32 => {
+                builder.binop(BinaryOp::I32Eq);
+            }
+            Self::IU64 => {
+                builder.binop(BinaryOp::I64Eq);
+            }
+            Self::IU128 => IU128::equality(builder, module, compilation_ctx),
+            Self::IU256 => IU256::equality(builder, module, compilation_ctx),
+            Self::IAddress => IAddress::equality(builder, module, compilation_ctx),
+            Self::ISigner => {
+                // Signers can only be created by the VM and injected into the smart contract.
+                // There can only be one signer, so if we find a situation where signers are
+                // compared, we are comparing the same thing.
+                builder.i32_const(1);
+            }
+            Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner),
+            Self::IStruct(_) => todo!(),
+            Self::IRef(inner) | Self::IMutRef(inner) => {
+                let ptr1 = module.locals.add(ValType::I32);
+                let ptr2 = module.locals.add(ValType::I32);
+
+                // Load the intermediate pointers
+                builder
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(ptr1)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(ptr2);
+
+                match inner.as_ref() {
+                    // If inner is a simple type, we load te value into stack
+                    IntermediateType::IBool
+                    | IntermediateType::IU8
+                    | IntermediateType::IU16
+                    | IntermediateType::IU32
+                    | IntermediateType::IU64 => {
+                        builder
+                            .local_get(ptr1)
+                            .load(
+                                compilation_ctx.memory_id,
+                                if **inner == IntermediateType::IU64 {
+                                    LoadKind::I64 { atomic: false }
+                                } else {
+                                    LoadKind::I32 { atomic: false }
+                                },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            )
+                            .local_get(ptr2)
+                            .load(
+                                compilation_ctx.memory_id,
+                                if **inner == IntermediateType::IU64 {
+                                    LoadKind::I64 { atomic: false }
+                                } else {
+                                    LoadKind::I32 { atomic: false }
+                                },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+                    }
+                    // If inner is a heap type, we already loaded the value of intermediate
+                    // pointers, so we load them
+                    IntermediateType::IU128
+                    | IntermediateType::IU256
+                    | IntermediateType::IAddress
+                    | IntermediateType::ISigner
+                    | IntermediateType::IVector(_) => {
+                        builder.local_get(ptr1).local_get(ptr2);
+                    }
+                    IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                        panic!("found reference of reference");
+                    }
+
+                    Self::IStruct(_) => todo!(),
+                }
+
+                inner.load_equality_instructions(module, builder, compilation_ctx)
+            }
+        }
+    }
 }
 
 impl From<&IntermediateType> for ValType {

@@ -14,6 +14,7 @@ use translation::{
 };
 use walrus::FunctionId;
 use walrus::MemoryId;
+use walrus::ValType;
 use walrus::{Module, RefType};
 use wasm_validation::validate_stylus_wasm;
 
@@ -73,6 +74,7 @@ pub enum UserDefinedType {
 
 pub fn translate_single_module(package: CompiledPackage, module_name: &str) -> Module {
     let mut modules = translate_package(package, Some(module_name.to_string()));
+
     modules.remove(module_name).expect("Module not compiled")
 }
 
@@ -178,6 +180,26 @@ pub fn translate_package(
         }
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
+
+        if cfg!(feature = "inject-host-debug-fns") {
+            let func_ty = module.types.add(&[ValType::I32], &[]);
+            module.add_import_func("", "print_i32", func_ty);
+
+            let func_ty = module.types.add(&[], &[]);
+            module.add_import_func("", "print_memory", func_ty);
+
+            let func_ty = module.types.add(&[ValType::I64], &[]);
+            module.add_import_func("", "print_i64", func_ty);
+
+            let func_ty = module.types.add(&[ValType::I32], &[]);
+            module.add_import_func("", "print_u128", func_ty);
+
+            let func_ty = module.types.add(&[], &[]);
+            module.add_import_func("", "print_separator", func_ty);
+
+            let func_ty = module.types.add(&[ValType::I32], &[]);
+            module.add_import_func("", "print_address", func_ty);
+        }
 
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
