@@ -6,6 +6,7 @@ mod copy;
 mod equality;
 mod integers;
 mod swap;
+mod vector;
 
 #[derive(PartialEq)]
 pub enum RuntimeFunction {
@@ -26,6 +27,7 @@ pub enum RuntimeFunction {
     MulU32,
     MulU64,
     HeapIntMul,
+    LessThan,
     // Swap bytes
     SwapI32Bytes,
     SwapI64Bytes,
@@ -35,6 +37,11 @@ pub enum RuntimeFunction {
     // Equality
     HeapTypeEquality,
     VecEqualityHeapType,
+    // Vector
+    VecSwap32,
+    VecSwap64,
+    VecPopBack32,
+    VecPopBack64,
 }
 
 impl RuntimeFunction {
@@ -55,6 +62,7 @@ impl RuntimeFunction {
             Self::MulU64 => "mul_u64",
             Self::HeapIntMul => "heap_integer_mul",
             Self::HeapIntDivMod => "heap_integer_div_mod",
+            Self::LessThan => "less_than",
             // Bitwise
             Self::HeapIntShiftLeft => "heap_integer_shift_left",
             Self::HeapIntShiftRight => "heap_integer_shift_right",
@@ -67,6 +75,11 @@ impl RuntimeFunction {
             // Equality
             Self::HeapTypeEquality => "heap_type_equality",
             Self::VecEqualityHeapType => "vec_equality_heap_type",
+            // Vector
+            Self::VecSwap32 => "vec_swap_32",
+            Self::VecSwap64 => "vec_swap_64",
+            Self::VecPopBack32 => "vec_pop_back_32",
+            Self::VecPopBack64 => "vec_pop_back_64",
         }
     }
 
@@ -104,6 +117,7 @@ impl RuntimeFunction {
                 (Self::HeapIntDivMod, Some(ctx)) => {
                     integers::div::heap_integers_div_mod(module, ctx)
                 }
+                (Self::LessThan, Some(ctx)) => integers::check_if_a_less_than_b(module, ctx),
                 // Swap
                 (Self::SwapI32Bytes, _) => swap::swap_i32_bytes_function(module),
                 (Self::SwapI64Bytes, _) => {
@@ -125,6 +139,11 @@ impl RuntimeFunction {
                 (Self::VecEqualityHeapType, Some(ctx)) => {
                     equality::vec_equality_heap_type(module, ctx)
                 }
+                // Vector
+                (Self::VecSwap32, Some(ctx)) => vector::vec_swap_32_function(module, ctx),
+                (Self::VecSwap64, Some(ctx)) => vector::vec_swap_64_function(module, ctx),
+                (Self::VecPopBack32, Some(ctx)) => vector::vec_pop_back_32_function(module, ctx),
+                (Self::VecPopBack64, Some(ctx)) => vector::vec_pop_back_64_function(module, ctx),
                 // Error
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,

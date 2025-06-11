@@ -32,3 +32,16 @@ public fun vec_len(x: vector<vector<u128>>): u64 {
   x.length()
 }
 
+public fun vec_pop_back(x: vector<vector<u128>>): vector<vector<u128>> {
+  let mut y = x;
+  y.pop_back();
+  y.pop_back();
+  y
+}
+
+public fun vec_swap(x: vector<vector<u128>>, id1: u64, id2: u64): vector<vector<u128>> {
+  let mut y = x;
+  y.swap(id1, id2);
+  y
+}
+  

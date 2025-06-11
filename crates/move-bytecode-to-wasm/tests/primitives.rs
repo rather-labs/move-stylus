@@ -1393,6 +1393,8 @@ fn test_vec_32() {
         function vecFromVec(uint32[] x, uint32[] y) external returns (uint32[][]);
         function vecFromVecAndInt(uint32[] x, uint32 y) external returns (uint32[][]);
         function vecLen(uint32[] x) external returns (uint64);
+        function vecPopBack(uint32[] x) external returns (uint32[]);
+        function vecSwap(uint32[] x, uint64 id1, uint64 id2) external returns (uint32[]);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -1451,6 +1453,22 @@ fn test_vec_32() {
     let data = vecLenCall::abi_encode(&vecLenCall::new((vec![1u32, 2u32, 3u32],)));
     let expected_result = <sol!((uint64,))>::abi_encode_params(&(3u64,));
     run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecPopBackCall::abi_encode(&vecPopBackCall::new((vec![1u32, 2u32, 3u32],)));
+    let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecPopBackCall::abi_encode(&vecPopBackCall::new((vec![],)));
+    let result = run_test(&runtime, data, vec![]);
+    assert!(result.is_err(), "Expected out-of-bounds error");
+
+    let data = vecSwapCall::abi_encode(&vecSwapCall::new((vec![1u32, 2u32, 3u32], 0u64, 1u64)));
+    let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![2u32, 1u32, 3u32],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecSwapCall::abi_encode(&vecSwapCall::new((vec![1u32, 2u32, 3u32], 0u64, 3u64)));
+    let result = run_test(&runtime, data, vec![]);
+    assert!(result.is_err(), "Expected out-of-bounds error");
 }
 
 #[test]
@@ -1465,6 +1483,8 @@ fn test_vec_64() {
         function getLiteral() external returns (uint64[]);
         function getCopiedLocal() external returns (uint64[]);
         function echo(uint64[] x) external returns (uint64[]);
+        function vecPopBack(uint64[] x) external returns (uint64[]);
+        function vecSwap(uint64[] x, uint64 id1, uint64 id2) external returns (uint64[]);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -1492,6 +1512,22 @@ fn test_vec_64() {
     let data = echoCall::abi_encode(&echoCall::new((vec![1u64, 2u64, 3u64],)));
     let expected_result = <sol!((uint64[],))>::abi_encode_params(&(vec![1u64, 2u64, 3u64],));
     run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecPopBackCall::abi_encode(&vecPopBackCall::new((vec![1u64, 2u64, 3u64],)));
+    let expected_result = <sol!((uint64[],))>::abi_encode_params(&(vec![1u64],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecPopBackCall::abi_encode(&vecPopBackCall::new((vec![],)));
+    let result = run_test(&runtime, data, vec![]);
+    assert!(result.is_err(), "Expected out-of-bounds error");
+
+    let data = vecSwapCall::abi_encode(&vecSwapCall::new((vec![1u64, 2u64, 3u64], 1u64, 2u64)));
+    let expected_result = <sol!((uint64[],))>::abi_encode_params(&(vec![1u64, 3u64, 2u64],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecSwapCall::abi_encode(&vecSwapCall::new((vec![1u64, 2u64, 3u64], 1u64, 3u64)));
+    let result = run_test(&runtime, data, vec![]);
+    assert!(result.is_err(), "Expected out-of-bounds error");
 }
 
 #[test]
@@ -1509,6 +1545,8 @@ fn test_vec_128() {
         function vecFromInt(uint128 x, uint128 y) external returns (uint128[]);
         function vecFromVec(uint128[] x, uint128[] y) external returns (uint128[][]);
         function vecFromVecAndInt(uint128[] x, uint128 y) external returns (uint128[][]);
+        function vecPopBack(uint128[] x) external returns (uint128[]);
+        function vecSwap(uint128[] x, uint64 id1, uint64 id2) external returns (uint128[]);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -1563,6 +1601,22 @@ fn test_vec_128() {
         vec![4u128, 4u128],
     ],));
     run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecPopBackCall::abi_encode(&vecPopBackCall::new((vec![1u128, 2u128, 3u128],)));
+    let expected_result = <sol!((uint128[],))>::abi_encode_params(&(vec![1u128],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecPopBackCall::abi_encode(&vecPopBackCall::new((vec![],)));
+    let result = run_test(&runtime, data, vec![]);
+    assert!(result.is_err(), "Expected out-of-bounds error");
+
+    let data = vecSwapCall::abi_encode(&vecSwapCall::new((vec![1u128, 2u128, 3u128], 1u64, 2u64)));
+    let expected_result = <sol!((uint128[],))>::abi_encode_params(&(vec![1u128, 3u128, 2u128],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecSwapCall::abi_encode(&vecSwapCall::new((vec![1u128, 2u128, 3u128], 1u64, 3u64)));
+    let result = run_test(&runtime, data, vec![]);
+    assert!(result.is_err(), "Expected out-of-bounds error");
 }
 
 #[test]
@@ -1578,6 +1632,8 @@ fn test_vec_vec_128() {
         function getCopiedLocal() external returns (uint128[][]);
         function echo(uint128[][] x) external returns (uint128[][]);
         function vecLen(uint128[][] x) external returns (uint64);
+        function vecPopBack(uint128[][] x) external returns (uint128[][]);
+        function vecSwap(uint128[][] x, uint64 id1, uint64 id2) external returns (uint128[][]);
     );
 
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
@@ -1636,4 +1692,41 @@ fn test_vec_vec_128() {
     ],)));
     let expected_result = <sol!((uint64,))>::abi_encode_params(&(3u64,));
     run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecPopBackCall::abi_encode(&vecPopBackCall::new((vec![
+        vec![1u128, 2u128, 3u128],
+        vec![4u128, 5u128, 6u128],
+        vec![7u128, 8u128, 9u128],
+    ],)));
+    let expected_result =
+        <sol!((uint128[][],))>::abi_encode_params(&(vec![vec![1u128, 2u128, 3u128]],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecSwapCall::abi_encode(&vecSwapCall::new((
+        vec![
+            vec![1u128, 2u128, 3u128],
+            vec![4u128, 5u128, 6u128],
+            vec![7u128, 8u128, 9u128],
+        ],
+        0u64,
+        1u64,
+    )));
+    let expected_result = <sol!((uint128[][],))>::abi_encode_params(&(vec![
+        vec![4u128, 5u128, 6u128],
+        vec![1u128, 2u128, 3u128],
+        vec![7u128, 8u128, 9u128],
+    ],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecSwapCall::abi_encode(&vecSwapCall::new((
+        vec![
+            vec![1u128, 2u128, 3u128],
+            vec![4u128, 5u128, 6u128],
+            vec![7u128, 8u128, 9u128],
+        ],
+        0u64,
+        3u64,
+    )));
+    let result = run_test(&runtime, data, vec![]);
+    assert!(result.is_err(), "Expected out-of-bounds error");
 }

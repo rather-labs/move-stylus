@@ -9,8 +9,8 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use crate::runtime::RuntimeFunction;
-use crate::{CompilationContext, wasm_builder_extension::WasmBuilderExtension};
+use crate::CompilationContext;
+use crate::{runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension};
 pub mod address;
 pub mod boolean;
 pub mod heap_integers;
@@ -345,12 +345,7 @@ impl IntermediateType {
         }
     }
 
-    pub fn add_borrow_local_instructions(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        _compilation_ctx: &CompilationContext,
-        local: LocalId,
-    ) {
+    pub fn add_borrow_local_instructions(&self, builder: &mut InstrSeqBuilder, local: LocalId) {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
