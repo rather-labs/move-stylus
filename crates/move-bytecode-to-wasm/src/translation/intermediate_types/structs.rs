@@ -30,7 +30,7 @@ impl IStruct {
         // size.
         let mut heap_size = 0;
         let mut field_offsets = BTreeMap::new();
-        for (index, field) in &fields {
+        for (index, field) in fields.iter().rev() {
             field_offsets.insert(*index, heap_size);
             heap_size += field.stack_data_size();
         }

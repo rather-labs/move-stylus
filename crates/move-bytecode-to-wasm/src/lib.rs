@@ -155,24 +155,25 @@ pub fn translate_package(
                     )
                     .unwrap();
 
-                    let field_index = FieldHandleIndex::new(
-                        root_compiled_module
-                            .field_handles()
-                            .iter()
-                            .position(|f| f.field == field_index as u16 && f.owner == struct_index)
-                            .unwrap() as u16,
-                    );
+                    let field_index = root_compiled_module
+                        .field_handles()
+                        .iter()
+                        .position(|f| f.field == field_index as u16 && f.owner == struct_index)
+                        .map(|i| FieldHandleIndex::new(i as u16));
 
-                    let res = fields_map.insert(field_index, intermediate_type);
-                    assert!(
-                        res.is_none(),
-                        "there was an error creating a field in struct {struct_index}, field with index {field_index} already exist"
-                    );
-                    let res = fields_to_struct_map.insert(field_index, struct_index);
-                    assert!(
-                        res.is_none(),
-                        "there was an error mapping field {field_index} to struct {struct_index}, already mapped"
-                    );
+                    // If field_index is None means the field is never referenced in the code
+                    if let Some(field_index) = field_index {
+                        let res = fields_map.insert(field_index, intermediate_type);
+                        assert!(
+                            res.is_none(),
+                            "there was an error creating a field in struct {struct_index}, field with index {field_index} already exist"
+                        );
+                        let res = fields_to_struct_map.insert(field_index, struct_index);
+                        assert!(
+                            res.is_none(),
+                            "there was an error mapping field {field_index} to struct {struct_index}, already mapped"
+                        );
+                    }
                 }
             }
 
@@ -185,8 +186,8 @@ pub fn translate_package(
             let func_ty = module.types.add(&[ValType::I32], &[]);
             module.add_import_func("", "print_i32", func_ty);
 
-            let func_ty = module.types.add(&[], &[]);
-            module.add_import_func("", "print_memory", func_ty);
+            let func_ty = module.types.add(&[ValType::I32], &[]);
+            module.add_import_func("", "print_memory_from", func_ty);
 
             let func_ty = module.types.add(&[ValType::I64], &[]);
             module.add_import_func("", "print_i64", func_ty);

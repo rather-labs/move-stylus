@@ -249,9 +249,37 @@ fn map_bytecode_instruction(
                 panic!("{field_id} offset not found in {struct_id}")
             };
 
+            // Intermediate pointer
+            let middle_ptr = module.locals.add(ValType::I32);
+            // Where the field is located
+            let field_ptr_value = module.locals.add(ValType::I32);
+
             builder
+                .i32_const(4)
+                .call(compilation_ctx.allocator)
+                .local_set(middle_ptr)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
                 .i32_const(*field_offset as i32)
-                .binop(BinaryOp::I32Add);
+                .binop(BinaryOp::I32Add)
+                .local_set(field_ptr_value)
+                .local_get(middle_ptr)
+                .local_get(field_ptr_value)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .local_get(middle_ptr);
 
             types_stack.push(IntermediateType::IRef(Box::new(field_type.clone())));
         }
