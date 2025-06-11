@@ -147,6 +147,7 @@ pub fn translate_package(
         for (index, struct_def) in root_compiled_module.struct_defs().iter().enumerate() {
             let struct_index = StructDefinitionIndex::new(index as u16);
             let mut fields_map = BTreeMap::new();
+            let mut all_fields = Vec::new();
             if let Some(fields) = struct_def.fields() {
                 for (field_index, field) in fields.iter().enumerate() {
                     let intermediate_type = IntermediateType::try_from_signature_token(
@@ -163,7 +164,7 @@ pub fn translate_package(
 
                     // If field_index is None means the field is never referenced in the code
                     if let Some(field_index) = field_index {
-                        let res = fields_map.insert(field_index, intermediate_type);
+                        let res = fields_map.insert(field_index, intermediate_type.clone());
                         assert!(
                             res.is_none(),
                             "there was an error creating a field in struct {struct_index}, field with index {field_index} already exist"
@@ -173,11 +174,14 @@ pub fn translate_package(
                             res.is_none(),
                             "there was an error mapping field {field_index} to struct {struct_index}, already mapped"
                         );
+                        all_fields.push((Some(field_index), intermediate_type));
+                    } else {
+                        all_fields.push((None, intermediate_type));
                     }
                 }
             }
 
-            module_structs.push(IStruct::new(struct_index, fields_map));
+            module_structs.push(IStruct::new(struct_index, all_fields, fields_map));
         }
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();

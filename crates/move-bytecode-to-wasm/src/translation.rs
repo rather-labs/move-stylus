@@ -241,7 +241,7 @@ fn map_bytecode_instruction(
                 ),
             }
 
-            let Some(field_type) = struct_.fields.get(field_id) else {
+            let Some(field_type) = struct_.fields_types.get(field_id) else {
                 panic!("{field_id} not found in {struct_id}")
             };
 
@@ -970,7 +970,7 @@ fn map_bytecode_instruction(
                 .call(compilation_ctx.allocator)
                 .local_set(pointer);
 
-            for pack_type in struct_.fields.values().rev() {
+            for pack_type in struct_.fields.iter().rev() {
                 match types_stack.pop() {
                     Some(t) if &t == pack_type => {
                         // Stack data size is used because for complex types we just save a pointer
