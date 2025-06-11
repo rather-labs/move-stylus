@@ -532,32 +532,18 @@ impl IVector {
         builder.local_get(ptr_local);
     }
 
-    pub fn add_vec_imm_borrow_instructions(
+    pub fn vec_borrow_instructions(
         inner: &IntermediateType,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
     ) {
         let size = inner.stack_data_size() as i32;
-        let index_i64 = module.locals.add(ValType::I64); // referenced element index
-        builder.local_set(index_i64); // index is on top of stack (as i64)
 
-        // Trap if index > u32::MAX
-        builder.block(None, |block| {
-            block
-                .local_get(index_i64)
-                .i64_const(0xFFFF_FFFF)
-                .binop(BinaryOp::I64LeU);
-            block.br_if(block.id());
-            block.unreachable();
-        });
+        let index = module.locals.add(ValType::I32);
+        let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None);
 
-        //  Cast index to i32
-        let index_i32 = module.locals.add(ValType::I32);
-        builder
-            .local_get(index_i64)
-            .unop(UnaryOp::I32WrapI64)
-            .local_set(index_i32);
+        builder.call(downcast_f).local_set(index);
 
         // Set vector base address
         let vector_address = module.locals.add(ValType::I32);
@@ -584,7 +570,7 @@ impl IVector {
                         offset: 0,
                     },
                 )
-                .local_get(index_i32)
+                .local_get(index)
                 .binop(BinaryOp::I32GtU);
             block.br_if(block.id());
             block.unreachable();
@@ -598,7 +584,7 @@ impl IVector {
             .local_tee(ref_local);
 
         // Compute element
-        builder.vec_ptr_at(vector_address, index_i32, size);
+        builder.vec_ptr_at(vector_address, index, size);
 
         match inner {
             IntermediateType::IBool
