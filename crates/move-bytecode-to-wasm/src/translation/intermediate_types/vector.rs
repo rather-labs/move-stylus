@@ -860,6 +860,7 @@ mod tests {
 
         let expected_pop_bytes = [
             3u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
@@ -867,9 +868,20 @@ mod tests {
         ]
         .concat();
 
+        let expected_swap_bytes = [
+            4u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+
         test_vector(&data, IntermediateType::IBool, &expected_bytes);
         test_vector_copy(&data, IntermediateType::IBool, &expected_bytes);
-        // test_vector_pop_back(&data, IntermediateType::IBool, &expected_pop_bytes, 0);
+        test_vector_pop_back(&data, IntermediateType::IBool, &expected_pop_bytes, 0);
+        test_vector_swap(&data, IntermediateType::IBool, &expected_swap_bytes, 0, 1);
     }
 
     #[test]
@@ -887,15 +899,26 @@ mod tests {
 
         let expected_pop_bytes = [
             2u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
         ]
         .concat();
 
+        let expected_swap_bytes = [
+            3u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+
         test_vector(&data, IntermediateType::IU8, &expected_bytes);
         test_vector_copy(&data, IntermediateType::IU8, &expected_bytes);
-        // test_vector_pop_back(&data, IntermediateType::IU8, &expected_pop_bytes, 3);
+        test_vector_pop_back(&data, IntermediateType::IU8, &expected_pop_bytes, 3);
+        test_vector_swap(&data, IntermediateType::IU8, &expected_swap_bytes, 0, 2);
     }
 
     #[test]
@@ -917,9 +940,9 @@ mod tests {
             4u32.to_le_bytes().as_slice(),
         ]
         .concat();
-
         let expected_pop_bytes = [
             3u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
@@ -927,6 +950,7 @@ mod tests {
         ]
         .concat();
         let expected_swap_bytes = [
+            4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
@@ -936,8 +960,8 @@ mod tests {
         .concat();
         test_vector(&data, IntermediateType::IU16, &expected_bytes);
         test_vector_copy(&data, IntermediateType::IU16, &expected_bytes);
-        // test_vector_pop_back(&data, IntermediateType::IU16, &expected_pop_bytes, 4);
-        // test_vector_swap(&data, IntermediateType::IU16, &expected_swap_bytes, 0, 2);
+        test_vector_pop_back(&data, IntermediateType::IU16, &expected_pop_bytes, 4);
+        test_vector_swap(&data, IntermediateType::IU16, &expected_swap_bytes, 0, 2);
     }
 
     #[test]
@@ -962,6 +986,7 @@ mod tests {
         .concat();
         let expected_pop_bytes = [
             3u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
@@ -969,6 +994,7 @@ mod tests {
         ]
         .concat();
         let expected_swap_bytes = [
+            4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
@@ -978,8 +1004,8 @@ mod tests {
         .concat();
         test_vector(&data, IntermediateType::IU32, &expected_bytes);
         test_vector_copy(&data, IntermediateType::IU32, &expected_bytes);
-        // test_vector_pop_back(&data, IntermediateType::IU32, &expected_pop_bytes, 4);
-        // test_vector_swap(&data, IntermediateType::IU32, &expected_swap_bytes, 1, 3);
+        test_vector_pop_back(&data, IntermediateType::IU32, &expected_pop_bytes, 4);
+        test_vector_swap(&data, IntermediateType::IU32, &expected_swap_bytes, 1, 3);
     }
 
     #[test]
@@ -1004,6 +1030,7 @@ mod tests {
         .concat();
         let expected_pop_bytes = [
             3u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
             1u64.to_le_bytes().as_slice(),
             2u64.to_le_bytes().as_slice(),
             3u64.to_le_bytes().as_slice(),
@@ -1011,6 +1038,7 @@ mod tests {
         ]
         .concat();
         let expected_swap_bytes = [
+            4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
             4u64.to_le_bytes().as_slice(),
             2u64.to_le_bytes().as_slice(),
@@ -1020,8 +1048,8 @@ mod tests {
         .concat();
         test_vector(&data, IntermediateType::IU64, &expected_bytes);
         test_vector_copy(&data, IntermediateType::IU64, &expected_bytes);
-        // test_vector_pop_back(&data, IntermediateType::IU64, &expected_pop_bytes, 4);
-        // test_vector_swap(&data, IntermediateType::IU64, &expected_swap_bytes, 0, 3);
+        test_vector_pop_back(&data, IntermediateType::IU64, &expected_pop_bytes, 4);
+        test_vector_swap(&data, IntermediateType::IU64, &expected_swap_bytes, 0, 3);
     }
 
     #[test]
@@ -1066,10 +1094,11 @@ mod tests {
         .concat();
         let expected_pop_bytes = [
             3u32.to_le_bytes().as_slice(),
-            24u32.to_le_bytes().as_slice(),
-            40u32.to_le_bytes().as_slice(),
-            56u32.to_le_bytes().as_slice(),
-            72u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
+            28u32.to_le_bytes().as_slice(),
+            44u32.to_le_bytes().as_slice(),
+            60u32.to_le_bytes().as_slice(),
+            76u32.to_le_bytes().as_slice(),
             1u128.to_le_bytes().as_slice(),
             2u128.to_le_bytes().as_slice(),
             3u128.to_le_bytes().as_slice(),
@@ -1078,10 +1107,11 @@ mod tests {
         .concat();
         let expected_swap_bytes = [
             4u32.to_le_bytes().as_slice(),
-            24u32.to_le_bytes().as_slice(),
-            40u32.to_le_bytes().as_slice(),
-            72u32.to_le_bytes().as_slice(),
-            56u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
+            28u32.to_le_bytes().as_slice(),
+            44u32.to_le_bytes().as_slice(),
+            76u32.to_le_bytes().as_slice(),
+            60u32.to_le_bytes().as_slice(),
             1u128.to_le_bytes().as_slice(),
             2u128.to_le_bytes().as_slice(),
             3u128.to_le_bytes().as_slice(),
@@ -1090,8 +1120,8 @@ mod tests {
         .concat();
         test_vector(&data, IntermediateType::IU128, &expected_bytes);
         test_vector_copy(&data, IntermediateType::IU128, &expected_copied_vector);
-        // test_vector_pop_back(&data, IntermediateType::IU128, &expected_pop_bytes, 72);
-        // test_vector_swap(&data, IntermediateType::IU128, &expected_swap_bytes, 2, 3);
+        test_vector_pop_back(&data, IntermediateType::IU128, &expected_pop_bytes, 76);
+        test_vector_swap(&data, IntermediateType::IU128, &expected_swap_bytes, 2, 3);
     }
 
     #[test]
@@ -1129,16 +1159,18 @@ mod tests {
 
         let expected_pop_bytes = [
             1u32.to_le_bytes().as_slice(),
-            16u32.to_le_bytes().as_slice(),
-            48u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            20u32.to_le_bytes().as_slice(),
+            52u32.to_le_bytes().as_slice(),
             U256::from(1u128).to_le_bytes::<32>().as_slice(),
             U256::from(2u128).to_le_bytes::<32>().as_slice(),
         ]
         .concat();
         let expected_swap_bytes = [
             2u32.to_le_bytes().as_slice(),
-            48u32.to_le_bytes().as_slice(),
-            16u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            52u32.to_le_bytes().as_slice(),
+            20u32.to_le_bytes().as_slice(),
             U256::from(1u128).to_le_bytes::<32>().as_slice(),
             U256::from(2u128).to_le_bytes::<32>().as_slice(),
         ]
@@ -1146,8 +1178,8 @@ mod tests {
 
         test_vector(&data, IntermediateType::IU256, &expected_bytes);
         test_vector_copy(&data, IntermediateType::IU256, &expected_copy_bytes);
-        // test_vector_pop_back(&data, IntermediateType::IU256, &expected_pop_bytes, 48);
-        // test_vector_swap(&data, IntermediateType::IU256, &expected_swap_bytes, 0, 1);
+        test_vector_pop_back(&data, IntermediateType::IU256, &expected_pop_bytes, 52);
+        test_vector_swap(&data, IntermediateType::IU256, &expected_swap_bytes, 0, 1);
     }
 
     #[test]
@@ -1193,11 +1225,12 @@ mod tests {
         .concat();
         let expected_pop_bytes = [
             3u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
             // Pointers to memory
-            24u32.to_le_bytes().as_slice(),
-            56u32.to_le_bytes().as_slice(),
-            88u32.to_le_bytes().as_slice(),
-            120u32.to_le_bytes().as_slice(),
+            28u32.to_le_bytes().as_slice(),
+            60u32.to_le_bytes().as_slice(),
+            92u32.to_le_bytes().as_slice(),
+            124u32.to_le_bytes().as_slice(),
             // Referenced values
             U256::from(0x1111).to_be_bytes::<32>().as_slice(),
             U256::from(0x2222).to_be_bytes::<32>().as_slice(),
@@ -1208,11 +1241,12 @@ mod tests {
 
         let expected_swap_bytes = [
             4u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
             // Pointers to memory
-            120u32.to_le_bytes().as_slice(),
-            56u32.to_le_bytes().as_slice(),
-            88u32.to_le_bytes().as_slice(),
-            24u32.to_le_bytes().as_slice(),
+            124u32.to_le_bytes().as_slice(),
+            60u32.to_le_bytes().as_slice(),
+            92u32.to_le_bytes().as_slice(),
+            28u32.to_le_bytes().as_slice(),
             // Referenced values
             U256::from(0x1111).to_be_bytes::<32>().as_slice(),
             U256::from(0x2222).to_be_bytes::<32>().as_slice(),
@@ -1223,14 +1257,14 @@ mod tests {
 
         test_vector(&data, IntermediateType::IAddress, &expected_load_bytes);
         test_vector_copy(&data, IntermediateType::IAddress, &expected_copy_bytes);
-        // test_vector_pop_back(&data, IntermediateType::IAddress, &expected_pop_bytes, 120);
-        // test_vector_swap(
-        //     &data,
-        //     IntermediateType::IAddress,
-        //     &expected_swap_bytes,
-        //     0,
-        //     3,
-        // );
+        test_vector_pop_back(&data, IntermediateType::IAddress, &expected_pop_bytes, 124);
+        test_vector_swap(
+            &data,
+            IntermediateType::IAddress,
+            &expected_swap_bytes,
+            0,
+            3,
+        );
     }
 
     #[test]
@@ -1316,9 +1350,11 @@ mod tests {
 
         let expected_pop_bytes = [
             1u32.to_le_bytes().as_slice(),
-            16u32.to_le_bytes().as_slice(),
-            36u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            20u32.to_le_bytes().as_slice(),
+            44u32.to_le_bytes().as_slice(),
             [
+                4u32.to_le_bytes().as_slice(),
                 4u32.to_le_bytes().as_slice(),
                 1u32.to_le_bytes().as_slice(),
                 2u32.to_le_bytes().as_slice(),
@@ -1328,6 +1364,7 @@ mod tests {
             .concat()
             .as_slice(),
             [
+                4u32.to_le_bytes().as_slice(),
                 4u32.to_le_bytes().as_slice(),
                 5u32.to_le_bytes().as_slice(),
                 6u32.to_le_bytes().as_slice(),
@@ -1341,9 +1378,11 @@ mod tests {
 
         let expected_swap_bytes = [
             2u32.to_le_bytes().as_slice(),
-            36u32.to_le_bytes().as_slice(),
-            16u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            44u32.to_le_bytes().as_slice(),
+            20u32.to_le_bytes().as_slice(),
             [
+                4u32.to_le_bytes().as_slice(),
                 4u32.to_le_bytes().as_slice(),
                 1u32.to_le_bytes().as_slice(),
                 2u32.to_le_bytes().as_slice(),
@@ -1354,6 +1393,7 @@ mod tests {
             .as_slice(),
             [
                 4u32.to_le_bytes().as_slice(),
+                4u32.to_le_bytes().as_slice(),
                 5u32.to_le_bytes().as_slice(),
                 6u32.to_le_bytes().as_slice(),
                 7u32.to_le_bytes().as_slice(),
@@ -1362,7 +1402,7 @@ mod tests {
             .concat()
             .as_slice(),
         ]
-        .concat(); // 52 bytes total
+        .concat(); 
 
         test_vector(
             &data,
@@ -1374,19 +1414,19 @@ mod tests {
             IntermediateType::IVector(Box::new(IntermediateType::IU32)),
             &expected_copy_bytes,
         );
-        // test_vector_pop_back(
-        //     &data,
-        //     IntermediateType::IVector(Box::new(IntermediateType::IU32)),
-        //     &expected_pop_bytes,
-        //     36,
-        // );
-        // test_vector_swap(
-        //     &data,
-        //     IntermediateType::IVector(Box::new(IntermediateType::IU32)),
-        //     &expected_swap_bytes,
-        //     0,
-        //     1,
-        // );
+        test_vector_pop_back(
+            &data,
+            IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+            &expected_pop_bytes,
+            44,
+        );
+        test_vector_swap(
+            &data,
+            IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+            &expected_swap_bytes,
+            0,
+            1,
+        );
     }
 
     #[test]
@@ -1476,12 +1516,14 @@ mod tests {
 
         let expected_pop_bytes = [
             1u32.to_le_bytes().as_slice(),
-            16u32.to_le_bytes().as_slice(),
-            92u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            20u32.to_le_bytes().as_slice(),
+            100u32.to_le_bytes().as_slice(),
             [
                 2u32.to_le_bytes().as_slice(),
-                28u32.to_le_bytes().as_slice(),
-                60u32.to_le_bytes().as_slice(),
+                2u32.to_le_bytes().as_slice(),
+                36u32.to_le_bytes().as_slice(),
+                68u32.to_le_bytes().as_slice(),
                 U256::from(1u128).to_le_bytes::<32>().as_slice(),
                 U256::from(2u128).to_le_bytes::<32>().as_slice(),
             ]
@@ -1489,8 +1531,9 @@ mod tests {
             .as_slice(),
             [
                 2u32.to_le_bytes().as_slice(),
-                104u32.to_le_bytes().as_slice(),
-                136u32.to_le_bytes().as_slice(),
+                2u32.to_le_bytes().as_slice(),
+                116u32.to_le_bytes().as_slice(),
+                148u32.to_le_bytes().as_slice(),
                 U256::from(3u128).to_le_bytes::<32>().as_slice(),
                 U256::from(4u128).to_le_bytes::<32>().as_slice(),
             ]
@@ -1500,12 +1543,14 @@ mod tests {
         .concat();
         let expected_swap_bytes = [
             2u32.to_le_bytes().as_slice(),
-            92u32.to_le_bytes().as_slice(),
-            16u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            100u32.to_le_bytes().as_slice(),
+            20u32.to_le_bytes().as_slice(),
             [
                 2u32.to_le_bytes().as_slice(),
-                28u32.to_le_bytes().as_slice(),
-                60u32.to_le_bytes().as_slice(),
+                2u32.to_le_bytes().as_slice(),
+                36u32.to_le_bytes().as_slice(),
+                68u32.to_le_bytes().as_slice(),
                 U256::from(1u128).to_le_bytes::<32>().as_slice(),
                 U256::from(2u128).to_le_bytes::<32>().as_slice(),
             ]
@@ -1513,8 +1558,9 @@ mod tests {
             .as_slice(),
             [
                 2u32.to_le_bytes().as_slice(),
-                104u32.to_le_bytes().as_slice(),
-                136u32.to_le_bytes().as_slice(),
+                2u32.to_le_bytes().as_slice(),
+                116u32.to_le_bytes().as_slice(),
+                148u32.to_le_bytes().as_slice(),
                 U256::from(3u128).to_le_bytes::<32>().as_slice(),
                 U256::from(4u128).to_le_bytes::<32>().as_slice(),
             ]
@@ -1533,19 +1579,19 @@ mod tests {
             IntermediateType::IVector(Box::new(IntermediateType::IU256)),
             &expected_copy_bytes,
         );
-        // test_vector_pop_back(
-        //     &data,
-        //     IntermediateType::IVector(Box::new(IntermediateType::IU256)),
-        //     &expected_pop_bytes,
-        //     92,
-        // );
-        // test_vector_swap(
-        //     &data,
-        //     IntermediateType::IVector(Box::new(IntermediateType::IU256)),
-        //     &expected_swap_bytes,
-        //     0,
-        //     1,
-        // );
+        test_vector_pop_back(
+            &data,
+            IntermediateType::IVector(Box::new(IntermediateType::IU256)),
+            &expected_pop_bytes,
+            100,
+        );
+        test_vector_swap(
+            &data,
+            IntermediateType::IVector(Box::new(IntermediateType::IU256)),
+            &expected_swap_bytes,
+            0,
+            1,
+        );
     }
 
     #[test]
