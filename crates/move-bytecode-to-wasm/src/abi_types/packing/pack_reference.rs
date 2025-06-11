@@ -284,6 +284,7 @@ mod tests {
         test_pack(
             &[
                 3u32.to_le_bytes().as_slice(),
+                3u32.to_le_bytes().as_slice(),
                 1u32.to_le_bytes().as_slice(),
                 2u32.to_le_bytes().as_slice(),
                 3u32.to_le_bytes().as_slice(),
@@ -305,11 +306,13 @@ mod tests {
 
         // 1. Length = 3
         heap_data.extend(&3u32.to_le_bytes());
+        heap_data.extend(&4u32.to_le_bytes()); 
 
         // 2. Pointers to heap-allocated u128 values
-        heap_data.extend(&16u32.to_le_bytes());
-        heap_data.extend(&32u32.to_le_bytes());
-        heap_data.extend(&48u32.to_le_bytes());
+        heap_data.extend(&24u32.to_le_bytes());
+        heap_data.extend(&40u32.to_le_bytes());
+        heap_data.extend(&56u32.to_le_bytes());
+        heap_data.extend(&0u32.to_le_bytes());
 
         // 3. Actual values at those pointers (u128 little endian)
         heap_data.extend(&1u128.to_le_bytes());
@@ -333,16 +336,27 @@ mod tests {
 
         let data = [
             2u32.to_le_bytes().as_slice(),
-            12u32.to_le_bytes().as_slice(),
-            28u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(), // capacity
+            24u32.to_le_bytes().as_slice(), // pointer to first element
+            56u32.to_le_bytes().as_slice(), // pointer to second element
+            0u32.to_le_bytes().as_slice(), // first buffer mem
+            0u32.to_le_bytes().as_slice(), // second buffer mem
             3u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
             5u32.to_le_bytes().as_slice(),
             6u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
         ]
         .concat();
         test_pack(&data, ref_type.clone(), &expected_result);
@@ -358,19 +372,22 @@ mod tests {
         let expected_result = SolType::abi_encode_params(&(vec![vec![1, 2, 3], vec![4, 5, 6]],));
         let data = [
             2u32.to_le_bytes().as_slice(),
-            12u32.to_le_bytes().as_slice(),
-            76u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            16u32.to_le_bytes().as_slice(),
+            84u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            28u32.to_le_bytes().as_slice(),
-            44u32.to_le_bytes().as_slice(),
-            60u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            36u32.to_le_bytes().as_slice(),
+            52u32.to_le_bytes().as_slice(),
+            68u32.to_le_bytes().as_slice(),
             1u128.to_le_bytes().as_slice(),
             2u128.to_le_bytes().as_slice(),
             3u128.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            92u32.to_le_bytes().as_slice(),
-            108u32.to_le_bytes().as_slice(),
-            124u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            104u32.to_le_bytes().as_slice(),
+            120u32.to_le_bytes().as_slice(),
+            136u32.to_le_bytes().as_slice(),
             4u128.to_le_bytes().as_slice(),
             5u128.to_le_bytes().as_slice(),
             6u128.to_le_bytes().as_slice(),
