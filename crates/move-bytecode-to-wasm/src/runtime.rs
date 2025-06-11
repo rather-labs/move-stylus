@@ -3,6 +3,7 @@ use walrus::{FunctionId, Module};
 use crate::CompilationContext;
 
 mod copy;
+mod equality;
 mod integers;
 mod swap;
 mod vector;
@@ -33,6 +34,9 @@ pub enum RuntimeFunction {
     // Copy
     CopyU128,
     CopyU256,
+    // Equality
+    HeapTypeEquality,
+    VecEqualityHeapType,
     // Vector
     VecSwap32,
     VecSwap64,
@@ -68,6 +72,9 @@ impl RuntimeFunction {
             // Copy
             Self::CopyU128 => "copy_u128",
             Self::CopyU256 => "copy_u256",
+            // Equality
+            Self::HeapTypeEquality => "heap_type_equality",
+            Self::VecEqualityHeapType => "vec_equality_heap_type",
             // Vector
             Self::VecSwap32 => "vec_swap_32",
             Self::VecSwap64 => "vec_swap_64",
@@ -127,11 +134,17 @@ impl RuntimeFunction {
                 // Copy
                 (Self::CopyU128, Some(ctx)) => copy::copy_u128_function(module, ctx),
                 (Self::CopyU256, Some(ctx)) => copy::copy_u256_function(module, ctx),
+                // Equality
+                (Self::HeapTypeEquality, Some(ctx)) => equality::a_equals_b(module, ctx),
+                (Self::VecEqualityHeapType, Some(ctx)) => {
+                    equality::vec_equality_heap_type(module, ctx)
+                }
                 // Vector
                 (Self::VecSwap32, Some(ctx)) => vector::vec_swap_32_function(module, ctx),
                 (Self::VecSwap64, Some(ctx)) => vector::vec_swap_64_function(module, ctx),
                 (Self::VecPopBack32, Some(ctx)) => vector::vec_pop_back_32_function(module, ctx),
                 (Self::VecPopBack64, Some(ctx)) => vector::vec_pop_back_64_function(module, ctx),
+                // Error
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,
                     self.name()

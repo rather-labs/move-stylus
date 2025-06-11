@@ -5,6 +5,9 @@ use constants::SIGNER_ADDRESS;
 use walrus::Module;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
 
+#[cfg(feature = "inject-host-debug-fns")]
+use walrus::ValType;
+
 struct ModuleData {
     pub data: Vec<u8>,
     pub return_data: Vec<u8>,
@@ -19,6 +22,7 @@ pub struct RuntimeSandbox {
 impl RuntimeSandbox {
     pub fn new(module: &mut Module) -> Self {
         let engine = Engine::default();
+
         let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
 
         let mut linker = Linker::new(&engine);
@@ -111,6 +115,89 @@ impl RuntimeSandbox {
                 },
             )
             .unwrap();
+
+        if cfg!(feature = "inject-host-debug-fns") {
+            linker
+                .func_wrap("", "print_i64", |param: i64| {
+                    println!("--- i64 ---> {param}");
+                })
+                .unwrap();
+
+            linker
+                .func_wrap("", "print_i32", |param: i32| {
+                    println!("--- i32 ---> {param}");
+                })
+                .unwrap();
+
+            linker
+                .func_wrap("", "print_separator", || {
+                    println!("-----------------------------------------------");
+                })
+                .unwrap();
+
+            linker
+                .func_wrap(
+                    "",
+                    "print_u128",
+                    |mut caller: Caller<'_, ModuleData>, ptr: i32| {
+                        println!("--- u128 ---\nPointer {ptr}");
+
+                        let memory = match caller.get_export("memory") {
+                            Some(wasmtime::Extern::Memory(mem)) => mem,
+                            _ => panic!("failed to find host memory"),
+                        };
+
+                        let mut result = [0; 16];
+                        memory.read(&caller, ptr as usize, &mut result).unwrap();
+                        println!("Data {result:?}");
+                        println!("Decimal data {}", u128::from_le_bytes(result));
+                        println!("--- end u128 ---\n");
+                    },
+                )
+                .unwrap();
+
+            linker
+                .func_wrap("", "print_memory", |mut caller: Caller<'_, ModuleData>| {
+                    println!("--- First 512 bytes of memory ----");
+
+                    let memory = match caller.get_export("memory") {
+                        Some(wasmtime::Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    let mut result = [0; 512];
+                    memory.read(&caller, 512, &mut result).unwrap();
+                    println!("Data {result:?}");
+                    println!("--- --- ---\n");
+                })
+                .unwrap();
+
+            linker
+                .func_wrap(
+                    "",
+                    "print_address",
+                    |mut caller: Caller<'_, ModuleData>, ptr: i32| {
+                        println!("--- address ---\nPointer {ptr}");
+
+                        let memory = match caller.get_export("memory") {
+                            Some(wasmtime::Extern::Memory(mem)) => mem,
+                            _ => panic!("failed to find host memory"),
+                        };
+
+                        let mut result = [0; 32];
+                        memory.read(&caller, ptr as usize, &mut result).unwrap();
+                        println!(
+                            "Data 0x{}",
+                            result[12..]
+                                .iter()
+                                .map(|b| format!("{:02x}", b))
+                                .collect::<String>()
+                        );
+                        println!("--- end address ---\n");
+                    },
+                )
+                .unwrap();
+        }
 
         Self {
             engine,
