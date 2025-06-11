@@ -23,6 +23,19 @@ impl IVector {
         capacity: LocalId,
         data_size: i32,
     ) {
+
+        builder
+            .local_get(len)
+            .local_get(capacity)
+            .binop(BinaryOp::I32GtU)
+            .if_else(
+                None,
+                |then_| {
+                    then_.unreachable();  // Trap if len > capacity
+                },
+                |_| {}
+            );
+
         // Allocate memory: capacity * element size + 8 bytes for header
         builder
             .local_get(capacity)
