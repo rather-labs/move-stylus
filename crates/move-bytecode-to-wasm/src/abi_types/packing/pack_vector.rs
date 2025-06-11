@@ -392,7 +392,7 @@ mod tests {
 
         let expected_result = SolType::abi_encode_params(&(vec![vec![1, 2, 3], vec![4, 5, 6]],));
         let data = [
-            2u32.to_le_bytes().as_slice(),                        
+            2u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
             24u32.to_le_bytes().as_slice(),
             104u32.to_le_bytes().as_slice(),
@@ -406,10 +406,10 @@ mod tests {
             0u32.to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
-            1u128.to_le_bytes().as_slice(), 
-            2u128.to_le_bytes().as_slice(), 
-            3u128.to_le_bytes().as_slice(), 
-            3u32.to_le_bytes().as_slice(), 
+            1u128.to_le_bytes().as_slice(),
+            2u128.to_le_bytes().as_slice(),
+            3u128.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
             6u32.to_le_bytes().as_slice(),
             136u32.to_le_bytes().as_slice(),
             152u32.to_le_bytes().as_slice(),

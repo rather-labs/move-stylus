@@ -8,6 +8,8 @@ use crate::{
     translation::intermediate_types::{IntermediateType, vector::IVector},
 };
 
+use crate::CompilationContext;
+
 use super::Unpackable;
 
 impl IVector {
@@ -17,9 +19,18 @@ impl IVector {
         module: &mut Module,
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
-        memory: MemoryId,
+        memory_id: MemoryId,
         allocator: FunctionId,
     ) {
+        let compilation_ctx = CompilationContext {
+            constants: &[],
+            functions_arguments: &[],
+            functions_returns: &[],
+            module_signatures: &[],
+            memory_id,
+            allocator,
+        };
+
         // Big-endian to Little-endian
         let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
 
@@ -35,7 +46,7 @@ impl IVector {
 
                 inner_block.local_get(reader_pointer);
                 inner_block.load(
-                    memory,
+                    compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
@@ -51,7 +62,7 @@ impl IVector {
         }
         block.local_get(reader_pointer);
         block.load(
-            memory,
+            compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
             MemArg {
                 align: 0,
@@ -79,7 +90,7 @@ impl IVector {
 
                 inner_block.local_get(data_reader_pointer);
                 inner_block.load(
-                    memory,
+                    compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
@@ -102,7 +113,7 @@ impl IVector {
 
         block.local_get(data_reader_pointer);
         block.load(
-            memory,
+            compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
             MemArg {
                 align: 0,
@@ -128,38 +139,16 @@ impl IVector {
         let vector_pointer = module.locals.add(ValType::I32);
         let writer_pointer = module.locals.add(ValType::I32);
 
-        // Vector memory allocation
-        block.local_get(capacity);
-        block.i32_const(inner.stack_data_size() as i32);
-        block.binop(BinaryOp::I32Mul);
-        block.i32_const(8);
-        block.binop(BinaryOp::I32Add); // + the length + capacity value
-        block.call(allocator);
-        block.local_tee(vector_pointer);
-        block.local_tee(writer_pointer);
-
-        // Store the length
-        block.local_get(length);
-        block.store(
-            memory,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
+        IVector::allocate_vector_with_header(
+            block,
+            &compilation_ctx,
+            vector_pointer,
+            length,
+            capacity,
+            inner.stack_data_size() as i32,
         );
-
-        // Store the capacity
         block.local_get(vector_pointer);
-        block.local_get(capacity);
-        block.store(
-            memory,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 4, // skip the length
-            },
-        );
+        block.local_set(writer_pointer);
 
         // increment pointer
         block.local_get(writer_pointer);
@@ -186,14 +175,14 @@ impl IVector {
                 module,
                 data_reader_pointer,
                 calldata_reader_pointer,
-                memory,
+                memory_id,
                 allocator,
             );
 
             // store the value
             if inner.stack_data_size() == 4 {
                 loop_block.store(
-                    memory,
+                    compilation_ctx.memory_id,
                     StoreKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
@@ -202,7 +191,7 @@ impl IVector {
                 );
             } else if inner.stack_data_size() == 8 {
                 loop_block.store(
-                    memory,
+                    compilation_ctx.memory_id,
                     StoreKind::I64 { atomic: false },
                     MemArg {
                         align: 0,
@@ -237,6 +226,7 @@ impl IVector {
 
 #[cfg(test)]
 mod tests {
+    use crate::CompilationContext;
     use alloy_primitives::{U256, address};
     use alloy_sol_types::{SolType, sol};
     use walrus::{FunctionBuilder, ValType};

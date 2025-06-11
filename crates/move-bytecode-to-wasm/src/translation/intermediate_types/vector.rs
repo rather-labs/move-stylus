@@ -18,7 +18,6 @@ impl IVector {
     pub fn allocate_vector_with_header(
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
-        module: &mut Module,
         pointer: LocalId,
         len: LocalId,
         capacity: LocalId,
@@ -77,7 +76,6 @@ impl IVector {
         IVector::allocate_vector_with_header(
             builder,
             compilation_ctx,
-            module,
             ptr_local,
             len_local,
             len_local,
@@ -173,7 +171,6 @@ impl IVector {
         IVector::allocate_vector_with_header(
             builder,
             compilation_ctx,
-            module,
             dst_local,
             len,
             capacity,
@@ -371,7 +368,6 @@ impl IVector {
         IVector::allocate_vector_with_header(
             builder,
             compilation_ctx,
-            module,
             ptr_local,
             len_local,
             capacity_local,
@@ -1577,7 +1573,7 @@ mod tests {
         ];
 
         let expected_result_bytes = vec![
-            2, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0 , 0, 0, 0, 0, 0, 0, 0,
+            2, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ];
 
         test_vector_pack(
@@ -1604,7 +1600,10 @@ mod tests {
             ],
         ];
 
-        let expected_result_bytes = vec![3, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let expected_result_bytes = vec![
+            3, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0,
+        ];
 
         test_vector_pack(
             &element_bytes,
@@ -1620,7 +1619,9 @@ mod tests {
             vec![2, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0],
         ];
 
-        let expected_result_bytes = vec![2, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let expected_result_bytes = vec![
+            2, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
 
         test_vector_pack(
             &element_bytes,
@@ -1656,7 +1657,10 @@ mod tests {
             },
         ];
 
-        let expected_result_bytes = vec![3, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 80, 0, 0, 0, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let expected_result_bytes = vec![
+            3, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 80, 0, 0, 0, 160, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0,
+        ];
 
         test_vector_pack(
             &element_bytes,
