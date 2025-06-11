@@ -64,3 +64,12 @@ public fun freeze_ref(y: vector<u256>): vector<u256> {
     let x_frozen_ref: &vector<u256> = freeze(x_mut_ref); 
     *x_frozen_ref 
 }
+
+public fun vec_mut_borrow(x: vector<u256>): vector<u256> {
+  let mut y = x;
+  let a = &mut y[0];
+  let b = 77;
+  *a = 99;
+  *vector::borrow_mut(&mut y, 1) = b;
+  y
+}

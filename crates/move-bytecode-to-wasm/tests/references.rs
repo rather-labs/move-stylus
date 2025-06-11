@@ -493,6 +493,7 @@ mod reference_vec_8 {
         function writeMutRef(uint8[] x) external returns (uint8[]);
         function mutBorrowLocal() external returns (uint8[]);
         function freezeRef(uint8[] x) external returns (uint8[]);
+        function vecMutBorrow(uint8[] x) external returns (uint8[]);
     );
 
     #[fixture]
@@ -539,6 +540,7 @@ mod reference_vec_8 {
     #[case(writeMutRefCall::new((vec![4, 5, 6],)), vec![1, 2, 3])]
     #[case(mutBorrowLocalCall::new(()), vec![4, 5, 6])]
     #[case(freezeRefCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
+    #[case(vecMutBorrowCall::new((vec![1, 2, 3],)), vec![0, 1, 3])]
     fn test_vec_8_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -564,6 +566,7 @@ mod reference_vec_64 {
         function writeMutRef(uint64[] x) external returns (uint64[]);
         function mutBorrowLocal() external returns (uint64[]);
         function freezeRef(uint64[] x) external returns (uint64[]);
+        function vecMutBorrow(uint64[] x) external returns (uint64[]);
     );
 
     #[fixture]
@@ -597,6 +600,7 @@ mod reference_vec_64 {
     #[case(writeMutRefCall::new((vec![4, 5, 6],)), vec![1, 2, 3])]
     #[case(mutBorrowLocalCall::new(()), vec![4, 5, 6])]
     #[case(freezeRefCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
+    #[case(vecMutBorrowCall::new((vec![1, 2, 3],)), vec![0, 1, 3])]
     fn test_vec_64_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -622,6 +626,7 @@ mod reference_vec_256 {
         function writeMutRef(uint256[] x) external returns (uint256[]);
         function mutBorrowLocal() external returns (uint256[]);
         function freezeRef(uint256[] x) external returns (uint256[]);
+        function vecMutBorrow(uint256[] x) external returns (uint256[]);
     );
 
     #[fixture]
@@ -668,6 +673,7 @@ mod reference_vec_256 {
     #[case(writeMutRefCall::new((vec![U256::from(4), U256::from(5), U256::from(6)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
     #[case(mutBorrowLocalCall::new(()), vec![U256::from(4), U256::from(5), U256::from(6)])]
     #[case(freezeRefCall::new((vec![U256::from(1), U256::from(2), U256::from(3)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
+    #[case(vecMutBorrowCall::new((vec![U256::from(1), U256::from(2), U256::from(3)],)), vec![U256::from(99), U256::from(77), U256::from(3)])]
     fn test_vec_256_mut_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

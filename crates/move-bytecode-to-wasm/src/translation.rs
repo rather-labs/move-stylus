@@ -236,7 +236,7 @@ fn map_bytecode_instruction(
 
             types_stack.push(IntermediateType::IVector(Box::new(inner)));
         }
-        Bytecode::VecPopBack(signature_index) => {          
+        Bytecode::VecPopBack(signature_index) => {
             let [ty] = pop_n_from_stack(types_stack);
 
             let IntermediateType::IMutRef(mut_inner) = ty else {
@@ -282,7 +282,7 @@ fn map_bytecode_instruction(
         }
         Bytecode::VecSwap(signature_index) => {
             let [id2_ty, id1_ty, ref_ty] = pop_n_from_stack(types_stack);
-            
+
             let IntermediateType::IU64 = id2_ty else {
                 panic!("Expected IU64, got {:?}", id2_ty);
             };

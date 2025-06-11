@@ -1,6 +1,6 @@
 use walrus::{
     InstrSeqBuilder, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use crate::CompilationContext;
@@ -634,6 +634,7 @@ mod tests {
     use crate::test_tools::{build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use walrus::{FunctionBuilder, ValType};
+    use walrus::ir::{UnaryOp};
 
     use super::*;
 
