@@ -1,7 +1,10 @@
+use std::collections::BTreeMap;
 use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
-use move_binary_format::file_format::{Constant, DatatypeHandleIndex, Signature, Visibility};
+use move_binary_format::file_format::{
+    Constant, DatatypeHandleIndex, FieldHandleIndex, Signature, StructDefinitionIndex, Visibility,
+};
 use move_binary_format::internals::ModuleIndex;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
 use translation::intermediate_types::structs::IStruct;
@@ -47,6 +50,9 @@ pub struct CompilationContext<'a> {
 
     /// Module's structs: contains all the user defined structs
     pub module_structs: &'a [IStruct],
+
+    /// Maps a field index to its corresponding struct
+    pub fields_to_struct_map: &'a HashMap<FieldHandleIndex, StructDefinitionIndex>,
 
     // This Hashmap maps the move's datatype handles to our internal representation of those
     // types. The datatype handles are used interally by move to look for user defined data
@@ -134,25 +140,41 @@ pub fn translate_package(
         }
 
         // Module's structs
-        //
         let mut module_structs: Vec<IStruct> = vec![];
+        let mut fields_to_struct_map = HashMap::new();
         for (index, struct_def) in root_compiled_module.struct_defs().iter().enumerate() {
-            let fields = if let Some(fields) = struct_def.fields() {
-                fields
-                    .iter()
-                    .map(|f| {
-                        IntermediateType::try_from_signature_token(
-                            &f.signature.0,
-                            &datatype_handles_map,
-                        )
-                    })
-                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-                    .unwrap()
-            } else {
-                vec![]
-            };
+            let struct_index = StructDefinitionIndex::new(index as u16);
+            let mut fields_map = BTreeMap::new();
+            if let Some(fields) = struct_def.fields() {
+                for (field_index, field) in fields.iter().enumerate() {
+                    let intermediate_type = IntermediateType::try_from_signature_token(
+                        &field.signature.0,
+                        &datatype_handles_map,
+                    )
+                    .unwrap();
 
-            module_structs.push(IStruct::new(index, fields));
+                    let field_index = FieldHandleIndex::new(
+                        root_compiled_module
+                            .field_handles()
+                            .iter()
+                            .position(|f| f.field == field_index as u16 && f.owner == struct_index)
+                            .unwrap() as u16,
+                    );
+
+                    let res = fields_map.insert(field_index, intermediate_type);
+                    assert!(
+                        res.is_none(),
+                        "there was an error creating a field in struct {struct_index}, field with index {field_index} already exist"
+                    );
+                    let res = fields_to_struct_map.insert(field_index, struct_index);
+                    assert!(
+                        res.is_none(),
+                        "there was an error mapping field {field_index} to struct {struct_index}, already mapped"
+                    );
+                }
+            }
+
+            module_structs.push(IStruct::new(struct_index, fields_map));
         }
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
@@ -221,6 +243,7 @@ pub fn translate_package(
             module_signatures: &root_compiled_module.signatures,
             module_structs: &module_structs,
             datatype_handles_map: &datatype_handles_map,
+            fields_to_struct_map: &fields_to_struct_map,
             memory_id,
             allocator: allocator_func,
         };
@@ -258,7 +281,7 @@ pub fn translate_package(
         }
 
         function_table.ensure_all_functions_added().unwrap();
-        // validate_stylus_wasm(&mut module).unwrap();
+        validate_stylus_wasm(&mut module).unwrap();
 
         modules.insert(module_name, module);
     }

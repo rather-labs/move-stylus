@@ -593,9 +593,10 @@ impl IVector {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
-    use crate::test_tools::{build_module, setup_wasmtime_module};
+    use crate::{
+        test_compilation_context,
+        test_tools::{build_module, setup_wasmtime_module},
+    };
     use alloy_primitives::U256;
     use walrus::{FunctionBuilder, ValType};
 
@@ -604,16 +605,7 @@ mod tests {
     fn test_vector(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id) = build_module(None);
 
-        let compilation_ctx = CompilationContext {
-            constants: &[],
-            functions_arguments: &[],
-            functions_returns: &[],
-            module_signatures: &[],
-            module_structs: &[],
-            datatype_handles_map: &HashMap::new(),
-            memory_id,
-            allocator,
-        };
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -649,16 +641,7 @@ mod tests {
     fn test_vector_copy(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id) = build_module(None);
 
-        let compilation_ctx = CompilationContext {
-            constants: &[],
-            functions_arguments: &[],
-            functions_returns: &[],
-            module_signatures: &[],
-            module_structs: &[],
-            datatype_handles_map: &HashMap::new(),
-            memory_id,
-            allocator,
-        };
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -704,17 +687,7 @@ mod tests {
         expected_result_bytes: &[u8],
     ) {
         let (mut raw_module, allocator, memory_id) = build_module(None);
-
-        let compilation_ctx = CompilationContext {
-            constants: &[],
-            functions_arguments: &[],
-            functions_returns: &[],
-            module_signatures: &[],
-            module_structs: &[],
-            datatype_handles_map: &HashMap::new(),
-            memory_id,
-            allocator,
-        };
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -763,16 +736,7 @@ mod tests {
     ) {
         let (mut raw_module, allocator, memory_id) = build_module(None);
 
-        let compilation_ctx = CompilationContext {
-            constants: &[],
-            functions_arguments: &[],
-            functions_returns: &[],
-            module_signatures: &[],
-            module_structs: &[],
-            datatype_handles_map: &HashMap::new(),
-            memory_id,
-            allocator,
-        };
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);

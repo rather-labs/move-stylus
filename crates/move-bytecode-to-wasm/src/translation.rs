@@ -259,6 +259,9 @@ fn map_bytecode_instruction(
             local_type.add_borrow_local_instructions(builder, local);
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
         }
+        Bytecode::ImmBorrowField(field_id) => {
+            todo!()
+        }
         Bytecode::MutBorrowLoc(local_id) => {
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = &mapped_function.function_locals_ir[*local_id as usize];
@@ -825,7 +828,7 @@ fn map_bytecode_instruction(
                 .call(compilation_ctx.allocator)
                 .local_set(pointer);
 
-            for pack_type in struct_.fields.iter().rev() {
+            for pack_type in struct_.fields.values().rev() {
                 match types_stack.pop() {
                     Some(t) if &t == pack_type => {
                         // Stack data size is used because for complex types we just save a pointer

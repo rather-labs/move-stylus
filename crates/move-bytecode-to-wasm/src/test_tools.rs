@@ -115,6 +115,7 @@ macro_rules! test_compilation_context {
             module_signatures: &[],
             module_structs: &[],
             datatype_handles_map: &std::collections::HashMap::new(),
+            fields_to_struct_map: &std::collections::HashMap::new(),
             memory_id: $memory_id,
             allocator: $allocator,
         }

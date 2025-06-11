@@ -508,10 +508,10 @@ pub fn heap_int_shift_right(
 
 #[cfg(test)]
 mod tests {
+    use crate::test_compilation_context;
     use crate::test_tools::{build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use rstest::rstest;
-    use std::collections::HashMap;
     use walrus::FunctionBuilder;
 
     use super::*;
@@ -546,19 +546,8 @@ mod tests {
         // Heap size
         func_body.i32_const(TYPE_HEAP_SIZE);
 
-        let shift_left_f = heap_int_shift_left(
-            &mut raw_module,
-            &CompilationContext {
-                memory_id,
-                allocator: allocator_func,
-                functions_arguments: &[],
-                functions_returns: &[],
-                module_signatures: &[],
-                module_structs: &[],
-                datatype_handles_map: &HashMap::new(),
-                constants: &[],
-            },
-        );
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let shift_left_f = heap_int_shift_left(&mut raw_module, &compilation_ctx);
         // Shift left
         func_body.call(shift_left_f);
 
@@ -613,19 +602,8 @@ mod tests {
         // Heap size
         func_body.i32_const(TYPE_HEAP_SIZE);
 
-        let shift_left_f = heap_int_shift_left(
-            &mut raw_module,
-            &CompilationContext {
-                memory_id,
-                allocator: allocator_func,
-                functions_arguments: &[],
-                functions_returns: &[],
-                module_signatures: &[],
-                module_structs: &[],
-                datatype_handles_map: &HashMap::new(),
-                constants: &[],
-            },
-        );
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let shift_left_f = heap_int_shift_left(&mut raw_module, &compilation_ctx);
         // Shift left
         func_body.call(shift_left_f);
 
@@ -680,19 +658,8 @@ mod tests {
         // Heap size
         func_body.i32_const(TYPE_HEAP_SIZE);
 
-        let shift_right_f = heap_int_shift_right(
-            &mut raw_module,
-            &CompilationContext {
-                memory_id,
-                allocator: allocator_func,
-                functions_arguments: &[],
-                functions_returns: &[],
-                module_signatures: &[],
-                module_structs: &[],
-                datatype_handles_map: &HashMap::new(),
-                constants: &[],
-            },
-        );
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let shift_right_f = heap_int_shift_right(&mut raw_module, &compilation_ctx);
         // Shift right
         func_body.call(shift_right_f);
 
@@ -745,19 +712,8 @@ mod tests {
         // Heap size
         func_body.i32_const(TYPE_HEAP_SIZE);
 
-        let shift_right_f = heap_int_shift_right(
-            &mut raw_module,
-            &CompilationContext {
-                memory_id,
-                allocator: allocator_func,
-                functions_arguments: &[],
-                functions_returns: &[],
-                module_signatures: &[],
-                module_structs: &[],
-                datatype_handles_map: &HashMap::new(),
-                constants: &[],
-            },
-        );
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let shift_right_f = heap_int_shift_right(&mut raw_module, &compilation_ctx);
         // Shift right
         func_body.call(shift_right_f);
 

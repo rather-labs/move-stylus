@@ -20,7 +20,7 @@ impl IStruct {
             .unwrap_or_else(|| panic!("packing struct: struct with index {struct_index} not found in compilation context"));
 
         // Packing an struct is simply packing every inner value one besides the other
-        for pack_type in &struct_to_pack.fields {
+        for pack_type in struct_to_pack.fields.values() {
             // for pack_type in struct_to_pack.fields.iter().rev() {
             let local = if pack_type.stack_data_size() == 8 {
                 module.locals.add(ValType::I64)

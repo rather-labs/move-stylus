@@ -410,13 +410,13 @@ impl IntermediateType {
             | IntermediateType::IU256
             | IntermediateType::ISigner
             | IntermediateType::IAddress
-            | IntermediateType::IVector(_) => {
+            | IntermediateType::IVector(_)
+            | IntermediateType::IStruct(_) => {
                 builder.local_get(local);
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Cannot ImmBorrowLoc on a reference type");
             }
-            IntermediateType::IStruct(_) => todo!(),
         }
     }
 
@@ -668,7 +668,8 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
-            | IntermediateType::IMutRef(_) => {
+            | IntermediateType::IMutRef(_)
+            | IntermediateType::IStruct(_) => {
                 let ptr = module.locals.add(ValType::I32);
                 builder
                     .local_set(ptr)
@@ -685,7 +686,6 @@ impl IntermediateType {
                         },
                     );
             }
-            IntermediateType::IStruct(_) => todo!(),
         }
     }
 }

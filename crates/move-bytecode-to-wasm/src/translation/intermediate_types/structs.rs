@@ -1,12 +1,14 @@
+use std::collections::BTreeMap;
+
 use super::IntermediateType;
-use move_binary_format::file_format::StructDefinitionIndex;
+use move_binary_format::file_format::{FieldHandleIndex, StructDefinitionIndex};
 
 #[derive(Debug)]
 pub struct IStruct {
     // Name that identifies the struct
     // name: String,
     /// Field's types ordered by index
-    pub fields: Vec<IntermediateType>,
+    pub fields: BTreeMap<FieldHandleIndex, IntermediateType>,
 
     /// Move's struct index
     pub struct_definition_index: StructDefinitionIndex,
@@ -16,10 +18,14 @@ pub struct IStruct {
 }
 
 impl IStruct {
-    pub fn new(index: usize, fields: Vec<IntermediateType>) -> Self {
+    pub fn new(
+        index: StructDefinitionIndex,
+        fields: BTreeMap<FieldHandleIndex, IntermediateType>,
+    ) -> Self {
+        let heap_size = Self::calculate_heap_size(fields.values());
         Self {
-            struct_definition_index: StructDefinitionIndex::new(index as u16),
-            heap_size: Self::calculate_heap_size(&fields),
+            struct_definition_index: index,
+            heap_size,
             fields,
         }
     }
@@ -28,8 +34,8 @@ impl IStruct {
     ///
     /// We use the stack data size because for complex or heap types we just save the pointer. In
     /// the case of simple types, the stack size matches the heap size.
-    fn calculate_heap_size(fields: &[IntermediateType]) -> u32 {
-        fields.iter().fold(0, |mut acc, f| {
+    fn calculate_heap_size<'a>(fields: impl Iterator<Item = &'a IntermediateType>) -> u32 {
+        fields.fold(0, |mut acc, f| {
             acc += f.stack_data_size();
             acc
         })
