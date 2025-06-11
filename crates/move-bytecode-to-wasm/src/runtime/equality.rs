@@ -4,6 +4,7 @@ use walrus::{
 };
 
 use super::RuntimeFunction;
+use crate::wasm_builder_extensions::WasmBuilderExtension;
 
 /// Verifies if two elements a and b are equal
 ///
@@ -145,16 +146,9 @@ pub fn vec_equality_heap_type(
         .i32_const(0)
         .local_set(offset);
 
-    // Set the pointers past the length
-    builder
-        .local_get(v1_ptr)
-        .i32_const(4)
-        .binop(BinaryOp::I32Add)
-        .local_set(v1_ptr)
-        .local_get(v2_ptr)
-        .i32_const(4)
-        .binop(BinaryOp::I32Add)
-        .local_set(v2_ptr);
+    // Skip the length and capacity of the vectors
+    builder.skip_vec_header(v1_ptr).local_set(v1_ptr);
+    builder.skip_vec_header(v2_ptr).local_set(v2_ptr);
 
     // Set the size as the length * 4 (pointer size)
     builder

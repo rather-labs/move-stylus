@@ -23,7 +23,6 @@ impl IVector {
         capacity: LocalId,
         data_size: i32,
     ) {
-
         builder
             .local_get(len)
             .local_get(capacity)
@@ -31,9 +30,9 @@ impl IVector {
             .if_else(
                 None,
                 |then_| {
-                    then_.unreachable();  // Trap if len > capacity
+                    then_.unreachable(); // Trap if len > capacity
                 },
-                |_| {}
+                |_| {},
             );
 
         // Allocate memory: capacity * element size + 8 bytes for header
@@ -362,9 +361,10 @@ impl IVector {
     ) {
         let v1_ptr = module.locals.add(ValType::I32);
         let v2_ptr = module.locals.add(ValType::I32);
-        let size = module.locals.add(ValType::I32);
+        let len = module.locals.add(ValType::I32);
+        let capacity = module.locals.add(ValType::I32);
 
-        // Load the size of both vectors
+        // Load and compare the length of both vectors
         builder
             .local_set(v1_ptr)
             .local_tee(v2_ptr)
@@ -385,11 +385,35 @@ impl IVector {
                     offset: 0,
                 },
             )
-            .local_tee(size);
+            .local_tee(len)
+            .binop(BinaryOp::I32Eq);
 
-        // And chech if they equal, if they are, we compare element by element, otherwise, we
-        // return false
-        builder.binop(BinaryOp::I32Eq).if_else(
+        // Load and compare the capacity of both vectors
+        builder
+            .local_get(v1_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 4,
+                },
+            )
+            .local_get(v2_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 4,
+                },
+            )
+            .local_tee(capacity)
+            .binop(BinaryOp::I32Eq);
+
+        // If both lengths and both capacities are equal, we compare element by element, otherwise,
+        // we return false
+        builder.binop(BinaryOp::I32And).if_else(
             ValType::I32,
             |then| {
                 match inner {
@@ -401,19 +425,14 @@ impl IVector {
                         let equality_f_id =
                             RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
 
-                        // Set the size as size * stack_data_size + 4.
-                        // 4 bytes extra are occupied by the length of the vector
-                        then.local_get(size)
-                            .i32_const(inner.stack_data_size() as i32)
-                            .binop(BinaryOp::I32Mul)
-                            .i32_const(4)
-                            .binop(BinaryOp::I32Add)
-                            .local_set(size);
-
                         // Call the generic equality function
                         then.local_get(v1_ptr)
                             .local_get(v2_ptr)
-                            .local_get(size)
+                            .local_get(len)
+                            .i32_const(inner.stack_data_size() as i32)
+                            .binop(BinaryOp::I32Mul)
+                            .i32_const(8)
+                            .binop(BinaryOp::I32Add)
                             .call(equality_f_id);
                     }
                     t @ (IntermediateType::IU128
@@ -424,7 +443,7 @@ impl IVector {
 
                         then.local_get(v1_ptr)
                             .local_get(v2_ptr)
-                            .local_get(size)
+                            .local_get(len)
                             .i32_const(if *t == IntermediateType::IU128 {
                                 16
                             } else {
@@ -443,21 +462,15 @@ impl IVector {
                             .i32_const(0)
                             .local_set(offset);
 
-                        // Set the pointers past the length
-                        then.local_get(v1_ptr)
-                            .i32_const(4)
-                            .binop(BinaryOp::I32Add)
-                            .local_set(v1_ptr)
-                            .local_get(v2_ptr)
-                            .i32_const(4)
-                            .binop(BinaryOp::I32Add)
-                            .local_set(v2_ptr);
+                        // Skip the length and capacity of the vectors
+                        then.skip_vec_header(v1_ptr).local_set(v1_ptr);
+                        then.skip_vec_header(v2_ptr).local_set(v2_ptr);
 
                         // Set the size as the length * the inner type stack size
-                        then.local_get(size)
+                        then.local_get(len)
                             .i32_const(inner_v.stack_data_size() as i32)
                             .binop(BinaryOp::I32Mul)
-                            .local_set(size);
+                            .local_set(len);
 
                         // We must follow pointer by pointer and use the equality function
                         then.block(None, |block| {
@@ -469,7 +482,7 @@ impl IVector {
                                 // If we are at the end of the loop means we finished comparing,
                                 // so we break the loop with the true in res
                                 loop_
-                                    .local_get(size)
+                                    .local_get(len)
                                     .local_get(offset)
                                     .binop(BinaryOp::I32Eq)
                                     .br_if(block_id);
@@ -1583,7 +1596,7 @@ mod tests {
             .concat()
             .as_slice(),
         ]
-        .concat(); 
+        .concat();
 
         test_vector(
             &data,
