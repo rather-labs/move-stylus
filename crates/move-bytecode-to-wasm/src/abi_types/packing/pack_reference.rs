@@ -306,7 +306,7 @@ mod tests {
 
         // 1. Length = 3
         heap_data.extend(&3u32.to_le_bytes());
-        heap_data.extend(&4u32.to_le_bytes()); 
+        heap_data.extend(&4u32.to_le_bytes());
 
         // 2. Pointers to heap-allocated u128 values
         heap_data.extend(&24u32.to_le_bytes());
@@ -336,11 +336,11 @@ mod tests {
 
         let data = [
             2u32.to_le_bytes().as_slice(),
-            4u32.to_le_bytes().as_slice(), // capacity
+            4u32.to_le_bytes().as_slice(),  // capacity
             24u32.to_le_bytes().as_slice(), // pointer to first element
             56u32.to_le_bytes().as_slice(), // pointer to second element
-            0u32.to_le_bytes().as_slice(), // first buffer mem
-            0u32.to_le_bytes().as_slice(), // second buffer mem
+            0u32.to_le_bytes().as_slice(),  // first buffer mem
+            0u32.to_le_bytes().as_slice(),  // second buffer mem
             3u32.to_le_bytes().as_slice(),
             6u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
