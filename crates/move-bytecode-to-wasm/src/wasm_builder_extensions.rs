@@ -39,7 +39,7 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
 
     fn vec_ptr_at(&mut self, ptr: LocalId, index: LocalId, size: i32) -> &mut Self {
         self.local_get(ptr)
-            .i32_const(4)
+            .i32_const(8) // 4 bytes for length + 4 bytes for capacity
             .binop(BinaryOp::I32Add)
             .local_get(index)
             .i32_const(size)
