@@ -149,7 +149,6 @@ impl IVector {
         let dst_local = module.locals.add(ValType::I32);
         let index = module.locals.add(ValType::I32);
         let len = module.locals.add(ValType::I32);
-        let capacity = module.locals.add(ValType::I32);
 
         let data_size = inner.stack_data_size() as i32;
 
@@ -166,26 +165,13 @@ impl IVector {
             )
             .local_set(len);
 
-        // === Read vector capacity ===
-        builder
-            .local_get(src_local)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 4,
-                },
-            )
-            .local_set(capacity);
-
         // Allocate memory and write length and capacity at the beginning
         IVector::allocate_vector_with_header(
             builder,
             compilation_ctx,
             dst_local,
             len,
-            capacity,
+            len,
             data_size,
         );
 
@@ -436,7 +422,7 @@ impl IVector {
                             .i32_const(0)
                             .local_set(offset);
 
-                        // Skip the length and capacity of the vectors
+                        // Skip vectors headers
                         then.skip_vec_header(v1_ptr).local_set(v1_ptr);
                         then.skip_vec_header(v2_ptr).local_set(v2_ptr);
 
@@ -532,26 +518,19 @@ impl IVector {
         // Local declarations
         let ptr_local = module.locals.add(ValType::I32);
         let len_local = module.locals.add(ValType::I32);
-        let capacity_local = module.locals.add(ValType::I32);
         let temp_local = module.locals.add(inner.into());
         let data_size = inner.stack_data_size() as i32;
 
         // Set lenght
         builder.i32_const(num_elements).local_set(len_local);
 
-        // Set capacity
-        builder
-            .i32_const(num_elements)
-            .i32_const(2)
-            .binop(BinaryOp::I32Mul)
-            .local_set(capacity_local);
 
         IVector::allocate_vector_with_header(
             builder,
             compilation_ctx,
             ptr_local,
             len_local,
-            capacity_local,
+            len_local,
             data_size,
         );
 
