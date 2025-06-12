@@ -434,19 +434,22 @@ mod tests {
     fn test_build_pack_instructions_dynamic_types() {
         let data = [
             2u32.to_le_bytes().as_slice(),
-            12u32.to_le_bytes().as_slice(),
-            76u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            16u32.to_le_bytes().as_slice(),
+            84u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            28u32.to_le_bytes().as_slice(),
-            44u32.to_le_bytes().as_slice(),
-            60u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            36u32.to_le_bytes().as_slice(),
+            52u32.to_le_bytes().as_slice(),
+            68u32.to_le_bytes().as_slice(),
             1u128.to_le_bytes().as_slice(),
             2u128.to_le_bytes().as_slice(),
             3u128.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            92u32.to_le_bytes().as_slice(),
-            108u32.to_le_bytes().as_slice(),
-            124u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            104u32.to_le_bytes().as_slice(),
+            120u32.to_le_bytes().as_slice(),
+            136u32.to_le_bytes().as_slice(),
             4u128.to_le_bytes().as_slice(),
             5u128.to_le_bytes().as_slice(),
             6u128.to_le_bytes().as_slice(),
@@ -474,7 +477,7 @@ mod tests {
         // Load arguments to stack
         func_body.i32_const(1234);
         func_body.i32_const(0); // vector pointer
-        func_body.i32_const(140); // u256 pointer
+        func_body.i32_const(152); // u256 pointer
 
         build_pack_instructions(
             &mut func_body,
