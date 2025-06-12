@@ -295,7 +295,7 @@ pub fn vec_pop_back_32_function(
         .name(RuntimeFunction::VecPopBack32.name().to_owned())
         .func_body();
 
-    let size = 4 as i32;
+    let size = 4;
     let ptr = module.locals.add(ValType::I32);
     let len = module.locals.add(ValType::I32);
 
@@ -389,7 +389,7 @@ pub fn vec_pop_back_64_function(
         .name(RuntimeFunction::VecPopBack64.name().to_owned())
         .func_body();
 
-    let size = 8 as i32;
+    let size = 8;
     let ptr = module.locals.add(ValType::I32);
     let len = module.locals.add(ValType::I32);
 
