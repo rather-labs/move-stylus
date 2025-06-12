@@ -469,6 +469,11 @@ pub fn vec_pop_back_64_function(
     function.finish(vec![ptr], &mut module.funcs)
 }
 
+/// Pushes a pointer to a non-heap element in a vector.
+///
+/// Stack transition:
+///
+/// ```..., vector_reference, index -> ..., element ptr```
 pub fn vec_borrow_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -516,7 +521,7 @@ pub fn vec_borrow_function(
         block.unreachable();
     });
 
-    // Reference to element
+    // Pointer to element
     let elem_ptr = module.locals.add(ValType::I32);
     builder
         .i32_const(4)
@@ -540,6 +545,11 @@ pub fn vec_borrow_function(
     function.finish(vec![vec_ref, index, size], &mut module.funcs)
 }
 
+/// Pushes a pointer to a heap element in a vector
+///
+/// Stack transition:
+///
+/// ```..., vector_reference, index -> ..., element ptr```
 pub fn vec_borrow_heap_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
