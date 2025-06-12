@@ -35,6 +35,25 @@ public fun mut_borrow_local(): address {
  *y
 }
 
+public fun miscellaneous_0(): vector<address> {
+ let mut x = @0x01;
+ let y = x;
+ x = @0x02;
+ let w = x;
+ vector[y, w, x]
+}
+
+public fun miscellaneous_1():  vector<address> {
+  let mut x = @0x01;
+  let y = x;
+  x = @0x02;
+  let z =  &mut x;
+  let w = *z;
+  *z = @0x03;
+  vector[y, *z, w]
+}
+
+
 public fun freeze_ref(y: address): address {
     let mut x = @0x01;
     let x_mut_ref: &mut address = &mut x;
