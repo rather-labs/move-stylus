@@ -24,6 +24,11 @@ pub trait WasmBuilderExtension {
     /// - index: index of the element
     /// - size: size of each element in bytes
     fn vec_ptr_at(&mut self, ptr: LocalId, index: LocalId, size: i32) -> &mut Self;
+
+    /// Skips the length and capacity of a vector.
+    ///
+    /// [..., ptr] --> skip_vec_header() -> [..., ptr + 8]
+    fn skip_vec_header(&mut self, ptr: LocalId) -> &mut Self;
 }
 
 impl WasmBuilderExtension for InstrSeqBuilder<'_> {
@@ -39,11 +44,15 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
 
     fn vec_ptr_at(&mut self, ptr: LocalId, index: LocalId, size: i32) -> &mut Self {
         self.local_get(ptr)
-            .i32_const(4)
+            .i32_const(8) // 4 bytes for length + 4 bytes for capacity
             .binop(BinaryOp::I32Add)
             .local_get(index)
             .i32_const(size)
             .binop(BinaryOp::I32Mul)
             .binop(BinaryOp::I32Add)
+    }
+
+    fn skip_vec_header(&mut self, ptr: LocalId) -> &mut Self {
+        self.local_get(ptr).i32_const(8).binop(BinaryOp::I32Add)
     }
 }
