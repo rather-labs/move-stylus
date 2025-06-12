@@ -362,7 +362,6 @@ impl IVector {
         let v1_ptr = module.locals.add(ValType::I32);
         let v2_ptr = module.locals.add(ValType::I32);
         let len = module.locals.add(ValType::I32);
-        let capacity = module.locals.add(ValType::I32);
 
         // Load and compare the length of both vectors
         builder
@@ -385,35 +384,10 @@ impl IVector {
                     offset: 0,
                 },
             )
-            .local_tee(len)
-            .binop(BinaryOp::I32Eq);
+            .local_tee(len);
 
-        // Load and compare the capacity of both vectors
-        builder
-            .local_get(v1_ptr)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 4,
-                },
-            )
-            .local_get(v2_ptr)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 4,
-                },
-            )
-            .local_tee(capacity)
-            .binop(BinaryOp::I32Eq);
-
-        // If both lengths and both capacities are equal, we compare element by element, otherwise,
-        // we return false
-        builder.binop(BinaryOp::I32And).if_else(
+        // If both lengths are equal, we skip the capacity and compare element by element, otherwise we return false
+        builder.binop(BinaryOp::I32Eq).if_else(
             ValType::I32,
             |then| {
                 match inner {
