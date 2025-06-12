@@ -33,14 +33,6 @@ public fun get_element_vector(index: u64): vector<u64> {
     x
 }
 
-public fun miscellaneous(): vector<u64> {
-    let v = vector[vector[10u64, 20u64], vector[30u64, 40u64]];
-    dummy(&v[0]);
-    let x = v[0]; 
-    let y = x[1];
-    vector[y, v[1][1]]
-}
-
 public fun deref_mut_arg(x: &mut vector<u64> ): vector<u64> {
  *x
 }
@@ -50,11 +42,30 @@ public fun write_mut_ref(x: &mut vector<u64> ): vector<u64> {
  *x
 }
 
-public fun mut_borrow_local(): vector<u64> {
+public fun miscellaneous_0(): vector<u64> {
  let mut x = vector<u64>[1, 2, 3];
  let y = &mut x;
  *y = vector<u64>[4, 5, 6];
- *y
+ vector[y[0], y[1], x[0]]
+}
+
+public fun miscellaneous_1(): vector<u64> {
+    let v = vector[vector[10u64, 20u64], vector[30u64, 40u64]];
+    dummy(&v[0]);
+    let x = v[0]; 
+    let y = x[1];
+    vector[y, v[1][1]]
+}
+
+public fun miscellaneous_2(): vector<u64> {
+ let mut x = vector<u64>[1, 2, 3];
+ let y =  x;
+ x = vector<u64>[4, 5, 6];
+ let w = x;
+ let z = &mut x;
+ *z = vector<u64>[7, 8, 9];
+ let v = *z;
+ vector[y[0], w[0], v[0]]
 }
 
 public fun freeze_ref(y: vector<u64>): vector<u64> {

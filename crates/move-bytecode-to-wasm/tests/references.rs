@@ -29,7 +29,8 @@ mod reference_bool {
         function derefNestedBool(bool x) external returns (bool);
         function derefMutArg(bool x) external returns (bool);
         function writeMutRef(bool x) external returns (bool);
-        function mutBorrowLocal() external returns (bool);
+        function miscellaneous0() external returns (bool[]);
+        function miscellaneous1() external returns (bool[]);
     );
 
     #[fixture]
@@ -47,7 +48,9 @@ mod reference_bool {
     #[case(derefBoolRefCall::new((false,)), false)]
     #[case(callDerefBoolRefCall::new((true,)), true)]
     #[case(derefNestedBoolCall::new((false,)), false)]
-    fn test_bool_immutable_ref<T: SolCall>(
+    #[case(derefMutArgCall::new((true,)), true)]
+    #[case(writeMutRefCall::new((false,)), true)]
+    fn test_bool_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: bool,
@@ -57,19 +60,17 @@ mod reference_bool {
     }
 
     #[rstest]
-    #[case(derefMutArgCall::new((true,)), true)]
-    #[case(writeMutRefCall::new((false,)), true)]
-    #[case(mutBorrowLocalCall::new(()), false)]
-    fn test_bool_mut_ref<T: SolCall>(
+    #[case(miscellaneous0Call::new(()), vec![false, true, false])]
+    #[case(miscellaneous1Call::new(()), vec![true, true, false])]
+    fn test_bool_ref_misc<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
-        #[case] expected_result: bool,
+        #[case] expected_result: Vec<bool>,
     ) {
-        let expected_result = <sol!((bool,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((bool[],))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
-
 mod reference_uint_8 {
     use super::*;
 
@@ -81,7 +82,8 @@ mod reference_uint_8 {
         function derefNestedU8(uint8 x) external returns (uint8);
         function derefMutArg(uint8 x) external returns (uint8);
         function writeMutRef(uint8 x) external returns (uint8);
-        function mutBorrowLocal(uint8 x) external returns (uint8);
+        function miscellaneous0() external returns (uint8[]);
+        function miscellaneous1() external returns (uint8[]);
         function freezeRef(uint8 x) external returns (uint8);
     );
 
@@ -100,7 +102,10 @@ mod reference_uint_8 {
     #[case(derefU8RefCall::new((u8::MAX,)), u8::MAX)]
     #[case(callDerefU8RefCall::new((1,)), 1)]
     #[case(derefNestedU8Call::new((7,)), 7)]
-    fn test_uint_8_immutable_ref<T: SolCall>(
+    #[case(derefMutArgCall::new((1,)), 1)]
+    #[case(writeMutRefCall::new((2,)), 1)]
+    #[case(freezeRefCall::new((3,)), 3)]
+    fn test_uint_8_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: u8,
@@ -110,20 +115,17 @@ mod reference_uint_8 {
     }
 
     #[rstest]
-    #[case(derefMutArgCall::new((1,)), 1)]
-    #[case(writeMutRefCall::new((2,)), 1)]
-    #[case(mutBorrowLocalCall::new((1,)), 2)]
-    #[case(freezeRefCall::new((3,)), 3)]
-    fn test_uint_8_mut_ref<T: SolCall>(
+    #[case(miscellaneous0Call::new(()), vec![1u8, 2u8, 3u8])]
+    #[case(miscellaneous1Call::new(()), vec![1u8, 2u8, 3u8])]
+    fn test_uint_8_mut_ref_misc<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
-        #[case] expected_result: u8,
+        #[case] expected_result: Vec<u8>,
     ) {
-        let expected_result = <sol!((uint8,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint8[],))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
-
 mod reference_uint_16 {
     use super::*;
 
@@ -135,7 +137,8 @@ mod reference_uint_16 {
         function derefNestedU16(uint16 x) external returns (uint16);
         function derefMutArg(uint16 x) external returns (uint16);
         function writeMutRef(uint16 x) external returns (uint16);
-        function mutBorrowLocal() external returns (uint16);
+        function miscellaneous0() external returns (uint16[]);
+        function miscellaneous1() external returns (uint16[]);
         function freezeRef(uint16 x) external returns (uint16);
     );
 
@@ -154,7 +157,10 @@ mod reference_uint_16 {
     #[case(derefU16RefCall::new((u16::MAX,)), u16::MAX)]
     #[case(callDerefU16RefCall::new((1,)), 1)]
     #[case(derefNestedU16Call::new((7,)), 7)]
-    fn test_uint_16_immutable_ref<T: SolCall>(
+    #[case(derefMutArgCall::new((1,)), 1)]
+    #[case(writeMutRefCall::new((2,)), 1)]
+    #[case(freezeRefCall::new((3,)), 3)]
+    fn test_uint_16_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: u16,
@@ -164,20 +170,17 @@ mod reference_uint_16 {
     }
 
     #[rstest]
-    #[case(derefMutArgCall::new((1,)), 1)]
-    #[case(writeMutRefCall::new((2,)), 1)]
-    #[case(mutBorrowLocalCall::new(()), 2)]
-    #[case(freezeRefCall::new((3,)), 3)]
-    fn test_uint_16_mut_ref<T: SolCall>(
+    #[case(miscellaneous0Call::new(()), vec![1u16, 2u16, 3u16])]
+    #[case(miscellaneous1Call::new(()), vec![1u16, 2u16, 3u16])]
+    fn test_uint_16_mut_ref_misc<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
-        #[case] expected_result: u16,
+        #[case] expected_result: Vec<u16>,
     ) {
-        let expected_result = <sol!((uint16,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint16[],))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
-
 mod reference_uint_32 {
     use super::*;
 
@@ -189,8 +192,9 @@ mod reference_uint_32 {
         function derefNestedU32(uint32 x) external returns (uint32);
         function derefMutArg(uint32 x) external returns (uint32);
         function writeMutRef(uint32 x) external returns (uint32);
-        function mutBorrowLocal() external returns (uint32);
-        function freezeRef(uint32 x) external returns (uint32);
+        function miscellaneous0() external returns (uint32[]);
+        function miscellaneous1() external returns (uint32[]);
+        function freezeRef(uint32 x) external returns (uint32[]);
     );
 
     #[fixture]
@@ -208,7 +212,10 @@ mod reference_uint_32 {
     #[case(derefU32RefCall::new((u32::MAX,)), u32::MAX)]
     #[case(callDerefU32RefCall::new((1,)), 1)]
     #[case(derefNestedU32Call::new((7,)), 7)]
-    fn test_uint_32_immutable_ref<T: SolCall>(
+    #[case(derefMutArgCall::new((1,)), 1)]
+    #[case(writeMutRefCall::new((2,)), 1)]
+    #[case(freezeRefCall::new((3,)), 3)]
+    fn test_uint_32_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: u32,
@@ -218,20 +225,17 @@ mod reference_uint_32 {
     }
 
     #[rstest]
-    #[case(derefMutArgCall::new((1,)), 1)]
-    #[case(writeMutRefCall::new((2,)), 1)]
-    #[case(mutBorrowLocalCall::new(()), 2)]
-    #[case(freezeRefCall::new((3,)), 3)]
-    fn test_uint_32_mut_ref<T: SolCall>(
+    #[case(miscellaneous0Call::new(()), vec![1u32, 2u32, 3u32])]
+    #[case(miscellaneous1Call::new(()), vec![1u32, 2u32, 3u32])]
+    fn test_uint_32_mut_ref_misc<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
-        #[case] call_data: T,
-        #[case] expected_result: u32,
+        #[case] call_data: T,   
+        #[case] expected_result: Vec<u32>,  
     ) {
-        let expected_result = <sol!((uint32,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint32[],))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
-
 mod reference_uint_64 {
     use super::*;
 
@@ -243,8 +247,9 @@ mod reference_uint_64 {
         function derefNestedU64(uint64 x) external returns (uint64);
         function derefMutArg(uint64 x) external returns (uint64);
         function writeMutRef(uint64 x) external returns (uint64);
-        function mutBorrowLocal() external returns (uint64);
-        function freezeRef(uint64 x) external returns (uint64);
+        function miscellaneous0() external returns (uint64[]);
+        function miscellaneous1() external returns (uint64[]);
+        function freezeRef(uint64 x) external returns (uint64[]);
     );
 
     #[fixture]
@@ -262,7 +267,10 @@ mod reference_uint_64 {
     #[case(derefU64RefCall::new((u64::MAX,)), u64::MAX)]
     #[case(callDerefU64RefCall::new((1,)), 1)]
     #[case(derefNestedU64Call::new((7,)), 7)]
-    fn test_uint_64_immutable_ref<T: SolCall>(
+    #[case(derefMutArgCall::new((1,)), 1)]
+    #[case(writeMutRefCall::new((2,)), 1)]
+    #[case(freezeRefCall::new((3,)), 3)]
+    fn test_uint_64_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: u64,
@@ -271,21 +279,18 @@ mod reference_uint_64 {
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
-    #[rstest]
-    #[case(derefMutArgCall::new((1,)), 1)]
-    #[case(writeMutRefCall::new((2,)), 1)]
-    #[case(mutBorrowLocalCall::new(()), 2)]
-    #[case(freezeRefCall::new((3,)), 3)]
-    fn test_uint_64_mut_ref<T: SolCall>(
+    #[rstest]   
+    #[case(miscellaneous0Call::new(()), vec![1u64, 2u64, 3u64])]
+    #[case(miscellaneous1Call::new(()), vec![1u64, 2u64, 3u64])]
+    fn test_uint_64_mut_ref_misc<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
-        #[case] expected_result: u64,
+        #[case] expected_result: Vec<u64>,
     ) {
-        let expected_result = <sol!((uint64,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint64[],))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
-
 mod reference_uint_128 {
     use super::*;
 
@@ -297,8 +302,9 @@ mod reference_uint_128 {
         function derefNestedU128(uint128 x) external returns (uint128);
         function derefMutArg(uint128 x) external returns (uint128);
         function writeMutRef(uint128 x) external returns (uint128);
-        function mutBorrowLocal() external returns (uint128);
-        function freezeRef(uint128 x) external returns (uint128);
+        function miscellaneous0() external returns (uint128[]);
+        function miscellaneous1() external returns (uint128[]);
+        function freezeRef(uint128 x) external returns (uint128[]);
     );
 
     #[fixture]
@@ -316,7 +322,10 @@ mod reference_uint_128 {
     #[case(derefU128RefCall::new((u128::MAX,)), u128::MAX)]
     #[case(callDerefU128RefCall::new((1,)), 1)]
     #[case(derefNestedU128Call::new((7,)), 7)]
-    fn test_uint_128_immutable_ref<T: SolCall>(
+    #[case(derefMutArgCall::new((1,)), 1)]
+    #[case(writeMutRefCall::new((2,)), 1)]
+    #[case(freezeRefCall::new((3,)), 3)]
+    fn test_uint_128_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: u128,
@@ -326,20 +335,18 @@ mod reference_uint_128 {
     }
 
     #[rstest]
-    #[case(derefMutArgCall::new((1,)), 1)]
-    #[case(writeMutRefCall::new((2,)), 1)]
-    #[case(mutBorrowLocalCall::new(()), 2)]
-    #[case(freezeRefCall::new((3,)), 3)]
-    fn test_uint_128_mut_ref<T: SolCall>(
+    #[case(miscellaneous0Call::new(()), vec![1u128, 2u128, 3u128])]
+    #[case(miscellaneous1Call::new(()), vec![1u128, 2u128, 3u128])]
+    fn test_uint_128_mut_ref_misc<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
-        #[case] expected_result: u128,
+        #[case] expected_result: Vec<u128>,
     ) {
-        let expected_result = <sol!((uint128,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint128[],))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
+    
 }
-
 mod reference_uint_256 {
     use super::*;
 
@@ -351,8 +358,9 @@ mod reference_uint_256 {
         function derefNestedU256(uint256 x) external returns (uint256);
         function derefMutArg(uint256 x) external returns (uint256);
         function writeMutRef(uint256 x) external returns (uint256);
-        function mutBorrowLocal() external returns (uint256);
-        function freezeRef(uint256 x) external returns (uint256);
+        function miscellaneous0() external returns (uint256[]);
+        function miscellaneous1() external returns (uint256[]);
+        function freezeRef(uint256 x) external returns (uint256[]);
     );
 
     #[fixture]
@@ -370,7 +378,10 @@ mod reference_uint_256 {
     #[case(derefU256RefCall::new((U256::from(1234567890),)), U256::from(1234567890))]
     #[case(callDerefU256RefCall::new((U256::from(1),)), U256::from(1))]
     #[case(derefNestedU256Call::new((U256::from(7),)), U256::from(7))]
-    fn test_uint_256_immutable_ref<T: SolCall>(
+    #[case(derefMutArgCall::new((U256::from(1),)), U256::from(1))]
+    #[case(writeMutRefCall::new((U256::from(2),)), U256::from(1))]
+    #[case(freezeRefCall::new((U256::from(3),)), U256::from(3))]
+    fn test_uint_256_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: U256,
@@ -380,20 +391,17 @@ mod reference_uint_256 {
     }
 
     #[rstest]
-    #[case(derefMutArgCall::new((U256::from(1),)), U256::from(1))]
-    #[case(writeMutRefCall::new((U256::from(2),)), U256::from(1))]
-    #[case(mutBorrowLocalCall::new(()), U256::from(2))]
-    #[case(freezeRefCall::new((U256::from(3),)), U256::from(3))]
-    fn test_uint_256_mut_ref<T: SolCall>(
+    #[case(miscellaneous0Call::new(()), vec![U256::from(1), U256::from(2), U256::from(3)])]
+    #[case(miscellaneous1Call::new(()), vec![U256::from(1), U256::from(2), U256::from(3)])]
+    fn test_uint_256_ref_misc<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
-        #[case] expected_result: U256,
+        #[case] expected_result: Vec<U256>,
     ) {
-        let expected_result = <sol!((uint256,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint256[],))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
-
 mod reference_address {
     use super::*;
     use alloy_primitives::{Address, address};
@@ -406,7 +414,8 @@ mod reference_address {
         function derefNestedAddress(address x) external returns (address);
         function derefMutArg(address x) external returns (address);
         function writeMutRef(address x) external returns (address);
-        function mutBorrowLocal() external returns (address);
+        function miscellaneous0() external returns (address[]);
+        function miscellaneous1() external returns (address[]);
         function freezeRef(address x) external returns (address);
     );
 
@@ -424,7 +433,10 @@ mod reference_address {
     #[case(derefAddressCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x1234567890abcdef1234567890abcdef12345678"))]
     #[case(callDerefAddressRefCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x1234567890abcdef1234567890abcdef12345678"))]
     #[case(derefNestedAddressCall::new((address!("0x7890abcdef1234567890abcdef1234567890abcd"),)), address!("0x7890abcdef1234567890abcdef1234567890abcd"))]
-    fn test_address_immutable_ref<T: SolCall>(
+    #[case(derefMutArgCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x1234567890abcdef1234567890abcdef12345678"))]
+    #[case(writeMutRefCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x0000000000000000000000000000000000000001"))]
+    #[case(freezeRefCall::new((address!("0x0000000000000000000000000000000000000003"),)), address!("0x0000000000000000000000000000000000000003"))]
+    fn test_address_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: Address,
@@ -433,21 +445,18 @@ mod reference_address {
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
-    #[rstest]
-    #[case(derefMutArgCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x1234567890abcdef1234567890abcdef12345678"))]
-    #[case(writeMutRefCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x0000000000000000000000000000000000000001"))]
-    #[case(mutBorrowLocalCall::new(()), address!("0x0000000000000000000000000000000000000002"))]
-    #[case(freezeRefCall::new((address!("0x0000000000000000000000000000000000000003"),)), address!("0x0000000000000000000000000000000000000003"))]
-    fn test_address_mut_ref<T: SolCall>(
+    #[rstest]   
+    #[case(miscellaneous0Call::new(()), vec![address!("0x0000000000000000000000000000000000000001"), address!("0x0000000000000000000000000000000000000002"), address!("0x0000000000000000000000000000000000000002")])]
+    #[case(miscellaneous1Call::new(()), vec![address!("0x0000000000000000000000000000000000000001"), address!("0x0000000000000000000000000000000000000003"), address!("0x0000000000000000000000000000000000000002")])]
+    fn test_address_ref_misc<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
-        #[case] expected_result: Address,
+        #[case] expected_result: Vec<Address>,
     ) {
-        let expected_result = <sol!((address,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((address[],))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
-
 mod reference_signer {
     use super::*;
 
@@ -477,7 +486,6 @@ mod reference_signer {
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
-
 mod reference_vec_8 {
     use super::*;
 
@@ -488,10 +496,11 @@ mod reference_vec_8 {
         function callDerefArg(uint8[] x) external returns (uint8[]);
         function vecFromElement(uint64 index) external returns (uint8[]);
         function getElementVector(uint64 index) external returns (uint8[]);
-        function miscellaneous() external returns (uint8[]);
         function derefMutArg(uint8[] x) external returns (uint8[]);
         function writeMutRef(uint8[] x) external returns (uint8[]);
-        function mutBorrowLocal() external returns (uint8[]);
+        function miscellaneous0() external returns (uint8[]);
+        function miscellaneous1() external returns (uint8[]);
+        function miscellaneous2() external returns (uint8[]);
         function freezeRef(uint8[] x) external returns (uint8[]);
         function vecMutBorrow(uint8[] x) external returns (uint8[]);
     );
@@ -512,8 +521,13 @@ mod reference_vec_8 {
     #[case(callDerefArgCall::new((vec![7, 8, 9],)), vec![7, 8, 9])]
     #[case(vecFromElementCall::new((0,)), vec![10])]
     #[case(getElementVectorCall::new((0,)), vec![10, 20])]
-    #[case(miscellaneousCall::new(()), vec![20u8, 40u8])]
-    fn test_vec_8_immutable_ref<T: SolCall>(
+    #[case(derefMutArgCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
+    #[case(writeMutRefCall::new((vec![4, 5, 6],)), vec![1, 2, 3])]
+    #[case(freezeRefCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
+    #[case(miscellaneous0Call::new(()), vec![4, 5, 4])]
+    #[case(miscellaneous1Call::new(()), vec![20, 40])]
+    #[case(miscellaneous2Call::new(()), vec![1, 4, 7])]
+    fn test_vec_8_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: Vec<u8>,
@@ -534,23 +548,7 @@ mod reference_vec_8 {
             .to_string()
             .contains("wasm trap: wasm `unreachable` instruction executed");
     }
-
-    #[rstest]
-    #[case(derefMutArgCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
-    #[case(writeMutRefCall::new((vec![4, 5, 6],)), vec![1, 2, 3])]
-    #[case(mutBorrowLocalCall::new(()), vec![4, 5, 6])]
-    #[case(freezeRefCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
-    #[case(vecMutBorrowCall::new((vec![1, 2, 3],)), vec![0, 1, 3])]
-    fn test_vec_8_mut_ref<T: SolCall>(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] call_data: T,
-        #[case] expected_result: Vec<u8>,
-    ) {
-        let expected_result = <sol!((uint8[],))>::abi_encode_params(&(expected_result,));
-        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
-    }
 }
-
 mod reference_vec_64 {
     use super::*;
 
@@ -561,10 +559,11 @@ mod reference_vec_64 {
         function callDerefArg(uint64[] x) external returns (uint64[]);
         function vecFromElement(uint64 index) external returns (uint64[]);
         function getElementVector(uint64 index) external returns (uint64[]);
-        function miscellaneous() external returns (uint64[]);
         function derefMutArg(uint64[] x) external returns (uint64[]);
         function writeMutRef(uint64[] x) external returns (uint64[]);
-        function mutBorrowLocal() external returns (uint64[]);
+        function miscellaneous0() external returns (uint64[]);
+        function miscellaneous1() external returns (uint64[]);
+        function miscellaneous2() external returns (uint64[]);
         function freezeRef(uint64[] x) external returns (uint64[]);
         function vecMutBorrow(uint64[] x) external returns (uint64[]);
     );
@@ -585,23 +584,13 @@ mod reference_vec_64 {
     #[case(callDerefArgCall::new((vec![7, 8, 9],)), vec![7, 8, 9])]
     #[case(vecFromElementCall::new((0,)), vec![10])]
     #[case(getElementVectorCall::new((0,)), vec![10, 20])]
-    #[case(miscellaneousCall::new(()), vec![20, 40])]
-    fn test_vec_64_immutable_ref<T: SolCall>(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] call_data: T,
-        #[case] expected_result: Vec<u64>,
-    ) {
-        let expected_result = <sol!((uint64[],))>::abi_encode_params(&(expected_result,));
-        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
-    }
-
-    #[rstest]
     #[case(derefMutArgCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
     #[case(writeMutRefCall::new((vec![4, 5, 6],)), vec![1, 2, 3])]
-    #[case(mutBorrowLocalCall::new(()), vec![4, 5, 6])]
     #[case(freezeRefCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
-    #[case(vecMutBorrowCall::new((vec![1, 2, 3],)), vec![0, 1, 3])]
-    fn test_vec_64_mut_ref<T: SolCall>(
+    #[case(miscellaneous0Call::new(()), vec![4, 5, 4])]
+    #[case(miscellaneous1Call::new(()), vec![20, 40])]
+    #[case(miscellaneous2Call::new(()), vec![1, 4, 7])]
+    fn test_vec_64_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: Vec<u64>,
@@ -610,7 +599,6 @@ mod reference_vec_64 {
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
-
 mod reference_vec_256 {
     use super::*;
 
@@ -621,10 +609,11 @@ mod reference_vec_256 {
         function callDerefArg(uint256[] x) external returns (uint256[]);
         function vecFromElement(uint64 index) external returns (uint256[]);
         function getElementVector(uint64 index) external returns (uint256[]);
-        function miscellaneous() external returns (uint256[]);
         function derefMutArg(uint256[] x) external returns (uint256[]);
         function writeMutRef(uint256[] x) external returns (uint256[]);
-        function mutBorrowLocal() external returns (uint256[]);
+        function miscellaneous0() external returns (uint256[]);
+        function miscellaneous1() external returns (uint256[]);
+        function miscellaneous2() external returns (uint256[]);
         function freezeRef(uint256[] x) external returns (uint256[]);
         function vecMutBorrow(uint256[] x) external returns (uint256[]);
     );
@@ -645,7 +634,12 @@ mod reference_vec_256 {
     #[case(callDerefArgCall::new((vec![U256::from(7), U256::from(8), U256::from(9)],)), vec![U256::from(7), U256::from(8), U256::from(9)])]
     #[case(vecFromElementCall::new((0,)), vec![U256::from(10)])]
     #[case(getElementVectorCall::new((0,)), vec![U256::from(10), U256::from(20)])]
-    #[case(miscellaneousCall::new(()), vec![U256::from(20), U256::from(40)])]
+    #[case(derefMutArgCall::new((vec![U256::from(1), U256::from(2), U256::from(3)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
+    #[case(writeMutRefCall::new((vec![U256::from(4), U256::from(5), U256::from(6)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
+    #[case(freezeRefCall::new((vec![U256::from(1), U256::from(2), U256::from(3)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
+    #[case(miscellaneous0Call::new(()), vec![U256::from(4), U256::from(5), U256::from(4)])]
+    #[case(miscellaneous1Call::new(()), vec![U256::from(20), U256::from(40)])]
+    #[case(miscellaneous2Call::new(()), vec![U256::from(1), U256::from(4), U256::from(7)])]
     fn test_vec_256_immutable_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -666,20 +660,5 @@ mod reference_vec_256 {
             .expect_err("should fail")
             .to_string()
             .contains("wasm trap: wasm `unreachable` instruction executed");
-    }
-
-    #[rstest]
-    #[case(derefMutArgCall::new((vec![U256::from(1), U256::from(2), U256::from(3)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
-    #[case(writeMutRefCall::new((vec![U256::from(4), U256::from(5), U256::from(6)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
-    #[case(mutBorrowLocalCall::new(()), vec![U256::from(4), U256::from(5), U256::from(6)])]
-    #[case(freezeRefCall::new((vec![U256::from(1), U256::from(2), U256::from(3)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
-    #[case(vecMutBorrowCall::new((vec![U256::from(1), U256::from(2), U256::from(3)],)), vec![U256::from(99), U256::from(77), U256::from(3)])]
-    fn test_vec_256_mut_ref<T: SolCall>(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] call_data: T,
-        #[case] expected_result: Vec<U256>,
-    ) {
-        let expected_result = <sol!((uint256[],))>::abi_encode_params(&(expected_result,));
-        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }

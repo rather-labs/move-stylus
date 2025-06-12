@@ -28,12 +28,27 @@ public fun write_mut_ref(x: &mut u256 ): u256 {
  *x
 }
 
-public fun mut_borrow_local(): u256 {
+public fun miscellaneous_0(): vector<u256> {
  let mut x = 1;
- let y = &mut x;
- *y = 2;
- *y
+ let y = x;
+ x = 2;
+ let w = x;
+ x = 99;
+ let z = &mut x;
+ *z = 3;
+ vector[y, w, *z]
 }
+
+public fun miscellaneous_1():  vector<u256> {
+  let mut x = 1;
+  let y = x;
+  x = 3;
+  let z =  &mut x;
+  let w = *z;
+  *z = 2;
+  vector[y, *z, w]
+}
+
 
 public fun freeze_ref(y: u256): u256 {
     let mut x = 1;

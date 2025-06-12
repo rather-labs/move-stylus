@@ -421,7 +421,7 @@ fn map_bytecode_instruction(
 
             match ref_type {
                 IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
-                    inner.add_read_ref_instructions(builder, compilation_ctx.memory_id);
+                    inner.add_read_ref_instructions(builder, module, compilation_ctx);
                     types_stack.push(*inner);
                 }
                 _ => panic!("ReadRef expected a IRef type but got: {:?}", ref_type),
@@ -781,6 +781,17 @@ fn map_bytecode_instruction(
             );
 
             t1.load_equality_instructions(module, builder, compilation_ctx);
+
+            types_stack.push(IntermediateType::IBool);
+        }
+        Bytecode::Neq => {
+            let [t1, t2] = pop_n_from_stack(types_stack);
+            assert_eq!(
+                t1, t2,
+                "types stack error: trying to compare by equality two different types {t1:?} {t2:?}"
+            );
+
+            t1.load_not_equality_instructions(module, builder, compilation_ctx);
 
             types_stack.push(IntermediateType::IBool);
         }
