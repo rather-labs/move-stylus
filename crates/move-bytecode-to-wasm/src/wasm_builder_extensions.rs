@@ -32,6 +32,11 @@ pub trait WasmBuilderExtension {
     /// Where:
     /// - ptr: pointer to the vector
     fn vec_ptr_at_dynamic(&mut self, ptr: LocalId, index: LocalId, size_local: LocalId) -> &mut Self;
+    
+    /// Skips the length and capacity of a vector.
+    ///
+    /// [..., ptr] --> skip_vec_header() -> [..., ptr + 8]
+    fn skip_vec_header(&mut self, ptr: LocalId) -> &mut Self;
 }
 
 impl WasmBuilderExtension for InstrSeqBuilder<'_> {
@@ -47,7 +52,7 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
 
     fn vec_ptr_at(&mut self, ptr: LocalId, index: LocalId, size: i32) -> &mut Self {
         self.local_get(ptr)
-            .i32_const(4)
+            .i32_const(8) // 4 bytes for length + 4 bytes for capacity
             .binop(BinaryOp::I32Add)
             .local_get(index)
             .i32_const(size)
@@ -57,11 +62,15 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
 
     fn vec_ptr_at_dynamic(&mut self, ptr: LocalId, index: LocalId, size_local: LocalId) -> &mut Self {
         self.local_get(ptr)
-            .i32_const(4)
+            .i32_const(8)
             .binop(BinaryOp::I32Add)
             .local_get(index)
             .local_get(size_local)
             .binop(BinaryOp::I32Mul)
             .binop(BinaryOp::I32Add)
+    }
+
+    fn skip_vec_header(&mut self, ptr: LocalId) -> &mut Self {
+        self.local_get(ptr).i32_const(8).binop(BinaryOp::I32Add)
     }
 }

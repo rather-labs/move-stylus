@@ -158,7 +158,7 @@ mod tests {
     use walrus::{FunctionBuilder, ValType};
 
     fn test_unpack_ref(data: &[u8], ref_type: IntermediateType, expected_memory_bytes: &[u8]) {
-        let (mut raw_module, allocator, memory_id) = build_module(None);
+        let (mut raw_module, allocator, memory_id) = build_module(Some(data.len() as i32));
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -186,9 +186,19 @@ mod tests {
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
-        let result_ptr: i32 = entrypoint.call(&mut store, ()).unwrap();
-        // result_ptr is always 0, is that ok?
+        let global_next_free_memory_pointer = instance
+            .get_global(&mut store, "global_next_free_memory_pointer")
+            .unwrap();
 
+        let result_ptr: i32 = entrypoint.call(&mut store, ()).unwrap();
+        let global_next_free_memory_pointer = global_next_free_memory_pointer
+            .get(&mut store)
+            .i32()
+            .unwrap();
+        assert_eq!(
+            global_next_free_memory_pointer,
+            (expected_memory_bytes.len() + data.len()) as i32
+        );
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; expected_memory_bytes.len()];
         memory
@@ -262,15 +272,16 @@ mod tests {
             inner_type.clone(),
         ))));
 
-        let vec_data = vec![1u8, 2u8, 3u8];
+        let vec_data = vec![1u8, 2u8, 3u8, 4u8];
         let data = SolType::abi_encode_params(&(vec_data.clone(),));
 
         let mut expected = Vec::new();
-        expected.extend(&(vec_data.len() as u32).to_le_bytes()); // length inside header
-        for v in &vec_data {
-            expected.extend(&(*v as u32).to_le_bytes()); // pad each u8 to i32 (4 bytes)
-        }
-
+        expected.extend(&4u32.to_le_bytes()); // length 
+        expected.extend(&4u32.to_le_bytes()); // capacity
+        expected.extend(&1u32.to_le_bytes()); // first elem
+        expected.extend(&2u32.to_le_bytes()); // second elem
+        expected.extend(&3u32.to_le_bytes()); // third elem
+        expected.extend(&4u32.to_le_bytes()); // fourth elem
         test_unpack_ref(&data, vector_type.clone(), &expected);
     }
 
@@ -282,21 +293,20 @@ mod tests {
             inner_type.clone(),
         ))));
 
-        let vec_data = vec![1u128, 2u128];
+        let vec_data = vec![1u128, 2u128, 3u128];
         let data = SolType::abi_encode_params(&(vec_data.clone(),));
 
         let mut expected = Vec::new();
-        expected.extend(&(vec_data.len() as u32).to_le_bytes()); // length = 2
+        expected.extend(&3u32.to_le_bytes()); // length = 2
+        expected.extend(&3u32.to_le_bytes()); // capacity
 
         // pointers to heap elements
-        expected.extend(&12u32.to_le_bytes());
-        expected.extend(&28u32.to_le_bytes());
-
-        // first u128 at 16
+        expected.extend(&180u32.to_le_bytes());
+        expected.extend(&196u32.to_le_bytes());
+        expected.extend(&212u32.to_le_bytes());
         expected.extend(&1u128.to_le_bytes());
-
-        // second u128 at 32
         expected.extend(&2u128.to_le_bytes());
+        expected.extend(&3u128.to_le_bytes());
 
         test_unpack_ref(&data, vector_type.clone(), &expected);
     }
