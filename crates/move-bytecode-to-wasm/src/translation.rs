@@ -254,32 +254,61 @@ fn map_bytecode_instruction(
             // Where the field is located
             let field_ptr_value = module.locals.add(ValType::I32);
 
-            builder
-                .i32_const(4)
-                .call(compilation_ctx.allocator)
-                .local_set(middle_ptr)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .i32_const(*field_offset as i32)
-                .binop(BinaryOp::I32Add)
-                .local_set(field_ptr_value)
-                .local_get(middle_ptr)
-                .local_get(field_ptr_value)
-                .store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .local_get(middle_ptr);
+            match field_type {
+                IntermediateType::IBool
+                | IntermediateType::IU8
+                | IntermediateType::IU16
+                | IntermediateType::IU32
+                | IntermediateType::IU64 => {
+                    builder
+                        .i32_const(4)
+                        .call(compilation_ctx.allocator)
+                        .local_set(middle_ptr)
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .i32_const(*field_offset as i32)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(field_ptr_value)
+                        .local_get(middle_ptr)
+                        .local_get(field_ptr_value)
+                        .store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_get(middle_ptr);
+                }
+                IntermediateType::IU128
+                | IntermediateType::IU256
+                | IntermediateType::IAddress
+                | IntermediateType::ISigner
+                | IntermediateType::IVector(_)
+                | IntermediateType::IStruct(_) => {
+                    builder
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .i32_const(*field_offset as i32)
+                        .binop(BinaryOp::I32Add);
+                }
+                IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                    panic!("references inside structs not allowed")
+                }
+            }
 
             types_stack.push(IntermediateType::IRef(Box::new(field_type.clone())));
         }
