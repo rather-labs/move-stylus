@@ -365,9 +365,14 @@ impl IntermediateType {
         }
     }
 
-    pub fn add_read_ref_instructions(&self, builder: &mut InstrSeqBuilder, memory: MemoryId) {
+    pub fn add_read_ref_instructions(
+        &self,
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+    ) {
         builder.load(
-            memory,
+            compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
             MemArg {
                 align: 0,
@@ -380,7 +385,7 @@ impl IntermediateType {
             | IntermediateType::IU16
             | IntermediateType::IU32 => {
                 builder.load(
-                    memory,
+                    compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
@@ -390,7 +395,7 @@ impl IntermediateType {
             }
             IntermediateType::IU64 => {
                 builder.load(
-                    memory,
+                    compilation_ctx.memory_id,
                     LoadKind::I64 { atomic: false },
                     MemArg {
                         align: 0,
@@ -398,12 +403,19 @@ impl IntermediateType {
                     },
                 );
             }
-            IntermediateType::IVector(_)
-            | IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::ISigner
-            | IntermediateType::IAddress => {
-                // No load needed, pointer is already correct
+            IntermediateType::IU128 => {
+                let copy_f = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx));
+                builder.call(copy_f);
+            }
+            IntermediateType::IU256 | IntermediateType::IAddress => {
+                let copy_f = RuntimeFunction::CopyU256.get(module, Some(compilation_ctx));
+                builder.call(copy_f);
+            }
+            IntermediateType::IVector(inner_type) => {
+                IVector::copy_local_instructions(inner_type, module, builder, compilation_ctx);
+            }
+            IntermediateType::ISigner => {
+                // Signer type is read-only, we push the pointer only
             }
             _ => panic!("Unsupported ReadRef type: {:?}", self),
         }
