@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 
+use crate::{
+    CompilationContext, UserDefinedType, runtime::RuntimeFunction,
+    wasm_builder_extensions::WasmBuilderExtension,
+};
 use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
@@ -11,8 +15,6 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use crate::CompilationContext;
-use crate::{UserDefinedType, runtime::RuntimeFunction};
 pub mod address;
 pub mod boolean;
 pub mod heap_integers;
@@ -792,6 +794,16 @@ impl IntermediateType {
                 inner.load_equality_instructions(module, builder, compilation_ctx)
             }
         }
+    }
+
+    pub fn load_not_equality_instructions(
+        &self,
+        module: &mut Module,
+        builder: &mut InstrSeqBuilder,
+        compilation_ctx: &CompilationContext,
+    ) {
+        self.load_equality_instructions(module, builder, compilation_ctx);
+        builder.negate();
     }
 }
 
