@@ -468,3 +468,154 @@ pub fn vec_pop_back_64_function(
 
     function.finish(vec![ptr], &mut module.funcs)
 }
+
+pub fn vec_borrow_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function
+        .name(RuntimeFunction::VecBorrow.name().to_owned())
+        .func_body();
+
+    let size = module.locals.add(ValType::I32);
+    let index = module.locals.add(ValType::I32);
+    let vec_ref = module.locals.add(ValType::I32);
+    let vec_ptr = module.locals.add(ValType::I32);
+    builder
+        .local_get(vec_ref)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(vec_ptr);
+
+    // Trap if index >= length
+    builder.block(None, |block| {
+        block
+            .local_get(vec_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_get(index)
+            .binop(BinaryOp::I32GtU);
+        block.br_if(block.id());
+        block.unreachable();
+    });
+
+    // Reference to element
+    let elem_ptr = module.locals.add(ValType::I32);
+    builder
+        .i32_const(4)
+        .call(compilation_ctx.allocator)
+        .local_tee(elem_ptr);
+
+    // Compute element
+    builder.vec_ptr_at_dynamic(vec_ptr, index, size);
+
+    builder.store(
+        compilation_ctx.memory_id,
+        StoreKind::I32 { atomic: false },
+        MemArg {
+            align: 0,
+            offset: 0,
+        },
+    );
+
+    builder.local_get(elem_ptr);
+
+    function.finish(vec![vec_ref, index, size], &mut module.funcs)
+}
+
+pub fn vec_borrow_heap_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function
+        .name(RuntimeFunction::VecBorrowHeap.name().to_owned())
+        .func_body();
+
+    let size = module.locals.add(ValType::I32);
+    let index = module.locals.add(ValType::I32);
+    let vec_ref = module.locals.add(ValType::I32);
+    let vec_ptr = module.locals.add(ValType::I32);
+    builder
+        .local_get(vec_ref)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(vec_ptr);
+
+    // Trap if index >= length
+    builder.block(None, |block| {
+        block
+            .local_get(vec_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_get(index)
+            .binop(BinaryOp::I32GtU);
+        block.br_if(block.id());
+        block.unreachable();
+    });
+
+    // Reference to element
+    let elem_ptr = module.locals.add(ValType::I32);
+    builder
+        .i32_const(4)
+        .call(compilation_ctx.allocator)
+        .local_tee(elem_ptr);
+
+    // Compute element
+    builder.vec_ptr_at_dynamic(vec_ptr, index, size);
+
+    builder.load(
+        compilation_ctx.memory_id,
+        LoadKind::I32 { atomic: false },
+        MemArg {
+            align: 0,
+            offset: 0,
+        },
+    );
+
+    builder.store(
+        compilation_ctx.memory_id,
+        StoreKind::I32 { atomic: false },
+        MemArg {
+            align: 0,
+            offset: 0,
+        },
+    );
+
+    builder.local_get(elem_ptr);
+
+    function.finish(vec![vec_ref, index, size], &mut module.funcs)
+}

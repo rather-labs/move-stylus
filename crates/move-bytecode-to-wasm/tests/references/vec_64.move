@@ -80,7 +80,7 @@ public fun vec_mut_borrow(x: vector<u64>): vector<u64> {
   let mut y = x;
   let a = &mut y[0];
   let b = *a;
-  *a = 0;
+  *a = 99;
   *vector::borrow_mut(&mut y, 1) = b;
   y
 }

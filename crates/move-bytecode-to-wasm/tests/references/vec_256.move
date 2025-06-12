@@ -80,7 +80,7 @@ public fun freeze_ref(y: vector<u256>): vector<u256> {
 public fun vec_mut_borrow(x: vector<u256>): vector<u256> {
   let mut y = x;
   let a = &mut y[0];
-  let b = 77;
+  let b = *a;
   *a = 99;
   *vector::borrow_mut(&mut y, 1) = b;
   y
