@@ -10,7 +10,6 @@ use crate::{
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         signer::ISigner,
-        structs::IStruct,
         vector::IVector,
     },
 };

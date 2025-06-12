@@ -1,13 +1,16 @@
-use walrus::{FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType};
+use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
-use crate::translation::intermediate_types::{
-    IntermediateType,
-    address::IAddress,
-    boolean::IBool,
-    heap_integers::{IU128, IU256},
-    reference::{IMutRef, IRef},
-    simple_integers::{IU8, IU16, IU32, IU64},
-    vector::IVector,
+use crate::{
+    CompilationContext,
+    translation::intermediate_types::{
+        IntermediateType,
+        address::IAddress,
+        boolean::IBool,
+        heap_integers::{IU128, IU256},
+        reference::{IMutRef, IRef},
+        simple_integers::{IU8, IU16, IU32, IU64},
+        vector::IVector,
+    },
 };
 
 mod unpack_heap_int;
@@ -31,8 +34,7 @@ pub trait Unpackable {
         module: &mut Module,
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
-        memory: MemoryId,
-        allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     );
 }
 
@@ -45,8 +47,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
     module: &mut Module,
     function_arguments_signature: &[T],
     args_pointer: LocalId,
-    memory: MemoryId,
-    allocator: FunctionId,
+    compilation_ctx: &CompilationContext,
 ) {
     let reader_pointer = module.locals.add(ValType::I32);
     let calldata_reader_pointer = module.locals.add(ValType::I32);
@@ -63,8 +64,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
             module,
             reader_pointer,
             calldata_reader_pointer,
-            memory,
-            allocator,
+            compilation_ctx,
         );
     }
 }
@@ -76,8 +76,7 @@ impl Unpackable for IntermediateType {
         module: &mut Module,
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
-        memory: MemoryId,
-        allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         match self {
             IntermediateType::IBool => IBool::add_unpack_instructions(
@@ -85,64 +84,56 @@ impl Unpackable for IntermediateType {
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
-                memory,
-                allocator,
+                compilation_ctx,
             ),
             IntermediateType::IU8 => IU8::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
-                memory,
-                allocator,
+                compilation_ctx,
             ),
             IntermediateType::IU16 => IU16::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
-                memory,
-                allocator,
+                compilation_ctx,
             ),
             IntermediateType::IU32 => IU32::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
-                memory,
-                allocator,
+                compilation_ctx,
             ),
             IntermediateType::IU64 => IU64::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
-                memory,
-                allocator,
+                compilation_ctx,
             ),
             IntermediateType::IU128 => IU128::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
-                memory,
-                allocator,
+                compilation_ctx,
             ),
             IntermediateType::IU256 => IU256::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
-                memory,
-                allocator,
+                compilation_ctx,
             ),
             IntermediateType::IAddress => IAddress::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
-                memory,
-                allocator,
+                compilation_ctx,
             ),
             IntermediateType::IVector(inner) => IVector::add_unpack_instructions(
                 inner,
@@ -150,8 +141,7 @@ impl Unpackable for IntermediateType {
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
-                memory,
-                allocator,
+                compilation_ctx,
             ),
             // The signer must not be unpacked here, since it can't be part of the calldata. It is
             // injected directly by the VM into the stack
@@ -162,8 +152,7 @@ impl Unpackable for IntermediateType {
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
-                memory,
-                allocator,
+                compilation_ctx,
             ),
             IntermediateType::IMutRef(inner) => IMutRef::add_unpack_instructions(
                 inner,
@@ -171,8 +160,7 @@ impl Unpackable for IntermediateType {
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
-                memory,
-                allocator,
+                compilation_ctx,
             ),
             IntermediateType::IStruct(_) => todo!(),
         }
@@ -186,6 +174,7 @@ mod tests {
     use wasmtime::{Engine, Linker};
 
     use crate::{
+        test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
         utils::display_module,
     };
@@ -203,6 +192,7 @@ mod tests {
     #[test]
     fn test_build_unpack_instructions() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
 
         let validator_func_type = raw_module
             .types
@@ -226,8 +216,7 @@ mod tests {
                 IntermediateType::IU64,
             ],
             args_pointer,
-            memory_id,
-            allocator_func,
+            &compilation_ctx,
         );
 
         // validation
@@ -260,6 +249,7 @@ mod tests {
     #[test]
     fn test_build_unpack_instructions_reversed() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
 
         let validator_func_type = raw_module
             .types
@@ -283,8 +273,7 @@ mod tests {
                 IntermediateType::IBool,
             ],
             args_pointer,
-            memory_id,
-            allocator_func,
+            &compilation_ctx,
         );
 
         // validation
@@ -324,6 +313,7 @@ mod tests {
     #[test]
     fn test_build_unpack_instructions_offset_memory() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
 
         let validator_func_type = raw_module
             .types
@@ -347,8 +337,7 @@ mod tests {
                 IntermediateType::IU64,
             ],
             args_pointer,
-            memory_id,
-            allocator_func,
+            &compilation_ctx,
         );
 
         // validation

@@ -1,10 +1,11 @@
 use alloy_sol_types::{SolType, sol_data};
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module,
+    InstrSeqBuilder, LocalId, MemoryId, Module,
     ir::{BinaryOp, LoadKind, MemArg},
 };
 
 use crate::{
+    CompilationContext,
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         boolean::IBool,
@@ -18,11 +19,16 @@ impl IBool {
         module: &mut Module,
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
-        memory: MemoryId,
-        _allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         let encoded_size = sol_data::Bool::ENCODED_SIZE.expect("Bool should have a fixed size");
-        unpack_i32_type_instructions(block, module, memory, reader_pointer, encoded_size);
+        unpack_i32_type_instructions(
+            block,
+            module,
+            compilation_ctx.memory_id,
+            reader_pointer,
+            encoded_size,
+        );
     }
 }
 
@@ -32,11 +38,16 @@ impl IU8 {
         module: &mut Module,
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
-        memory: MemoryId,
-        _allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         let encoded_size = sol_data::Uint::<8>::ENCODED_SIZE.expect("U8 should have a fixed size");
-        unpack_i32_type_instructions(block, module, memory, reader_pointer, encoded_size);
+        unpack_i32_type_instructions(
+            block,
+            module,
+            compilation_ctx.memory_id,
+            reader_pointer,
+            encoded_size,
+        );
     }
 }
 
@@ -46,12 +57,17 @@ impl IU16 {
         module: &mut Module,
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
-        memory: MemoryId,
-        _allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         let encoded_size =
             sol_data::Uint::<16>::ENCODED_SIZE.expect("U16 should have a fixed size");
-        unpack_i32_type_instructions(block, module, memory, reader_pointer, encoded_size);
+        unpack_i32_type_instructions(
+            block,
+            module,
+            compilation_ctx.memory_id,
+            reader_pointer,
+            encoded_size,
+        );
     }
 }
 
@@ -61,12 +77,17 @@ impl IU32 {
         module: &mut Module,
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
-        memory: MemoryId,
-        _allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         let encoded_size =
             sol_data::Uint::<32>::ENCODED_SIZE.expect("U32 should have a fixed size");
-        unpack_i32_type_instructions(block, module, memory, reader_pointer, encoded_size);
+        unpack_i32_type_instructions(
+            block,
+            module,
+            compilation_ctx.memory_id,
+            reader_pointer,
+            encoded_size,
+        );
     }
 }
 
@@ -76,12 +97,17 @@ impl IU64 {
         module: &mut Module,
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
-        memory: MemoryId,
-        _allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         let encoded_size =
             sol_data::Uint::<64>::ENCODED_SIZE.expect("U64 should have a fixed size");
-        unpack_i64_type_instructions(block, module, memory, reader_pointer, encoded_size);
+        unpack_i64_type_instructions(
+            block,
+            module,
+            compilation_ctx.memory_id,
+            reader_pointer,
+            encoded_size,
+        );
     }
 }
 
@@ -153,6 +179,7 @@ mod tests {
 
     use crate::{
         abi_types::unpacking::Unpackable,
+        test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
@@ -166,6 +193,7 @@ mod tests {
         result_type: ValType,
     ) {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
 
         let mut function_builder = FunctionBuilder::new(&mut raw_module.types, &[], &[result_type]);
 
@@ -181,8 +209,7 @@ mod tests {
             &mut raw_module,
             args_pointer,
             args_pointer,
-            memory_id,
-            allocator_func,
+            &compilation_ctx,
         );
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);

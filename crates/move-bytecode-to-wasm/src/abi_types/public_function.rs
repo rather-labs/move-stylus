@@ -155,8 +155,7 @@ impl<'a> PublicFunction<'a> {
             module,
             &self.signature.arguments,
             args_pointer,
-            compilation_ctx.memory_id,
-            compilation_ctx.allocator,
+            compilation_ctx,
         );
         block.call(self.function_id);
         add_unpack_function_return_values_instructions(

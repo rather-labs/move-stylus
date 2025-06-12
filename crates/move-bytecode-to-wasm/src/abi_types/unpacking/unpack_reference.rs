@@ -1,8 +1,9 @@
 use super::Unpackable;
+use crate::CompilationContext;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::reference::{IMutRef, IRef};
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module,
+    InstrSeqBuilder, LocalId, Module,
     ir::{MemArg, StoreKind},
 };
 
@@ -13,8 +14,7 @@ impl IRef {
         module: &mut Module,
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
-        memory: MemoryId,
-        allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         match inner {
             // If inner is a heap type, forward the pointer
@@ -28,8 +28,7 @@ impl IRef {
                     module,
                     reader_pointer,
                     calldata_reader_pointer,
-                    memory,
-                    allocator,
+                    compilation_ctx,
                 );
             }
             // For immediates, allocate and store
@@ -41,7 +40,7 @@ impl IRef {
                 let ptr_local = module.locals.add(walrus::ValType::I32);
 
                 builder.i32_const(inner.stack_data_size() as i32);
-                builder.call(allocator);
+                builder.call(compilation_ctx.allocator);
                 builder.local_tee(ptr_local);
 
                 inner.add_unpack_instructions(
@@ -49,12 +48,11 @@ impl IRef {
                     module,
                     reader_pointer,
                     calldata_reader_pointer,
-                    memory,
-                    allocator,
+                    compilation_ctx,
                 );
 
                 builder.store(
-                    memory,
+                    compilation_ctx.memory_id,
                     match inner.stack_data_size() {
                         4 => StoreKind::I32 { atomic: false },
                         8 => StoreKind::I64 { atomic: false },
@@ -84,8 +82,7 @@ impl IMutRef {
         module: &mut Module,
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
-        memory: MemoryId,
-        allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         match inner {
             // If inner is a heap type, forward the pointer
@@ -99,8 +96,7 @@ impl IMutRef {
                     module,
                     reader_pointer,
                     calldata_reader_pointer,
-                    memory,
-                    allocator,
+                    compilation_ctx,
                 );
             }
             // For immediates, allocate and store
@@ -112,7 +108,7 @@ impl IMutRef {
                 let ptr_local = module.locals.add(walrus::ValType::I32);
 
                 builder.i32_const(inner.stack_data_size() as i32);
-                builder.call(allocator);
+                builder.call(compilation_ctx.allocator);
                 builder.local_tee(ptr_local);
 
                 inner.add_unpack_instructions(
@@ -120,12 +116,11 @@ impl IMutRef {
                     module,
                     reader_pointer,
                     calldata_reader_pointer,
-                    memory,
-                    allocator,
+                    compilation_ctx,
                 );
 
                 builder.store(
-                    memory,
+                    compilation_ctx.memory_id,
                     match inner.stack_data_size() {
                         4 => StoreKind::I32 { atomic: false },
                         8 => StoreKind::I64 { atomic: false },
@@ -152,6 +147,7 @@ impl IMutRef {
 mod tests {
     use super::*;
     use crate::{
+        test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
@@ -161,6 +157,7 @@ mod tests {
 
     fn test_unpack_ref(data: &[u8], ref_type: IntermediateType, expected_memory_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id) = build_module(Some(data.len() as i32));
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -178,8 +175,7 @@ mod tests {
             &mut raw_module,
             args_pointer,
             calldata_reader_pointer,
-            memory_id,
-            allocator,
+            &compilation_ctx,
         );
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
@@ -278,7 +274,7 @@ mod tests {
         let data = SolType::abi_encode_params(&(vec_data.clone(),));
 
         let mut expected = Vec::new();
-        expected.extend(&4u32.to_le_bytes()); // length 
+        expected.extend(&4u32.to_le_bytes()); // length
         expected.extend(&4u32.to_le_bytes()); // capacity
         expected.extend(&1u32.to_le_bytes()); // first elem
         expected.extend(&2u32.to_le_bytes()); // second elem
