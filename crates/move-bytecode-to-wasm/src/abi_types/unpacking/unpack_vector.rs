@@ -108,9 +108,6 @@ impl IVector {
         // Vector length: current number of elements in the vector
         let length = module.locals.add(ValType::I32);
 
-        // Vector capacity: maximum number of elements the vector can hold without reallocating
-        let capacity = module.locals.add(ValType::I32);
-
         block.local_get(data_reader_pointer);
         block.load(
             compilation_ctx.memory_id,
@@ -123,12 +120,6 @@ impl IVector {
         );
         block.call(swap_i32_bytes_function);
         block.local_set(length);
-
-        // We set the capacity to twice the length
-        block.local_get(length);
-        block.i32_const(2);
-        block.binop(BinaryOp::I32Mul);
-        block.local_set(capacity);
 
         // increment data reader pointer
         block.local_get(data_reader_pointer);
@@ -144,7 +135,7 @@ impl IVector {
             &compilation_ctx,
             vector_pointer,
             length,
-            capacity,
+            length,
             inner.stack_data_size() as i32,
         );
         block.local_get(vector_pointer);
@@ -307,13 +298,10 @@ mod tests {
         let data = SolType::abi_encode_params(&(vec![1, 2, 3],));
         let expected_result_bytes = [
             3u32.to_le_bytes().as_slice(),
-            6u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
         ]
         .concat();
         test_vec_unpacking(&data, int_type, &expected_result_bytes);
@@ -327,11 +315,9 @@ mod tests {
         let data = SolType::abi_encode_params(&(vec![1, 2],));
         let expected_result_bytes = [
             2u32.to_le_bytes().as_slice(),
-            4u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
         ]
         .concat();
         test_vec_unpacking(&data, int_type, &expected_result_bytes);
@@ -345,13 +331,10 @@ mod tests {
         let data = SolType::abi_encode_params(&(vec![1, 2, 3],));
         let expected_result_bytes = [
             3u32.to_le_bytes().as_slice(),
-            6u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
         ]
         .concat();
         test_vec_unpacking(&data, int_type, &expected_result_bytes);
@@ -365,13 +348,10 @@ mod tests {
         let data = SolType::abi_encode_params(&(vec![1, 2, 3],));
         let expected_result_bytes = [
             3u32.to_le_bytes().as_slice(),
-            6u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
             1u64.to_le_bytes().as_slice(),
             2u64.to_le_bytes().as_slice(),
             3u64.to_le_bytes().as_slice(),
-            0u64.to_le_bytes().as_slice(),
-            0u64.to_le_bytes().as_slice(),
-            0u64.to_le_bytes().as_slice(),
         ]
         .concat();
         test_vec_unpacking(&data, int_type, &expected_result_bytes);
@@ -385,13 +365,10 @@ mod tests {
         let data = SolType::abi_encode_params(&(vec![1, 2, 3],));
         let expected_result_bytes = [
             3u32.to_le_bytes().as_slice(),
-            6u32.to_le_bytes().as_slice(),
-            ((data.len() + 12 + 20) as u32).to_le_bytes().as_slice(),
-            ((data.len() + 12 + 36) as u32).to_le_bytes().as_slice(),
-            ((data.len() + 12 + 52) as u32).to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            ((data.len() + 20) as u32).to_le_bytes().as_slice(),
+            ((data.len() + 36) as u32).to_le_bytes().as_slice(),
+            ((data.len() + 52) as u32).to_le_bytes().as_slice(),
             1u128.to_le_bytes().as_slice(),
             2u128.to_le_bytes().as_slice(),
             3u128.to_le_bytes().as_slice(),
@@ -409,13 +386,10 @@ mod tests {
             SolType::abi_encode_params(&(vec![U256::from(1), U256::from(2), U256::from(3)],));
         let expected_result_bytes = [
             3u32.to_le_bytes().as_slice(),
-            6u32.to_le_bytes().as_slice(),
-            ((data.len() + 12 + 20) as u32).to_le_bytes().as_slice(),
-            ((data.len() + 12 + 52) as u32).to_le_bytes().as_slice(),
-            ((data.len() + 12 + 84) as u32).to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            ((data.len() + 20) as u32).to_le_bytes().as_slice(),
+            ((data.len() + 52) as u32).to_le_bytes().as_slice(),
+            ((data.len() + 84) as u32).to_le_bytes().as_slice(),
             U256::from(1).to_le_bytes::<32>().as_slice(),
             U256::from(2).to_le_bytes::<32>().as_slice(),
             U256::from(3).to_le_bytes::<32>().as_slice(),
@@ -436,13 +410,10 @@ mod tests {
         ],));
         let expected_result_bytes = [
             3u32.to_le_bytes().as_slice(),
-            6u32.to_le_bytes().as_slice(),
-            ((data.len() + 12 + 20) as u32).to_le_bytes().as_slice(),
-            ((data.len() + 12 + 52) as u32).to_le_bytes().as_slice(),
-            ((data.len() + 12 + 84) as u32).to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
+            ((data.len() + 20) as u32).to_le_bytes().as_slice(),
+            ((data.len() + 52) as u32).to_le_bytes().as_slice(),
+            ((data.len() + 84) as u32).to_le_bytes().as_slice(),
             &[0; 12],
             address!("0x1234567890abcdef1234567890abcdef12345678").as_slice(),
             &[0; 12],
@@ -465,27 +436,19 @@ mod tests {
 
         let expected_result_bytes = [
             2u32.to_le_bytes().as_slice(),
-            4u32.to_le_bytes().as_slice(),
-            ((data.len() + 24) as u32).to_le_bytes().as_slice(),
-            ((data.len() + 56) as u32).to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
+            2u32.to_le_bytes().as_slice(),
+            ((data.len() + 16) as u32).to_le_bytes().as_slice(),
+            ((data.len() + 36) as u32).to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            6u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            6u32.to_le_bytes().as_slice(),
+            3u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
             5u32.to_le_bytes().as_slice(),
             6u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
         ]
         .concat();
         test_vec_unpacking(&data, int_type, &expected_result_bytes);
@@ -501,30 +464,22 @@ mod tests {
         let data = SolType::abi_encode_params(&(vec![vec![1, 2, 3], vec![4, 5, 6]],));
         let expected_result_bytes = [
             2u32.to_le_bytes().as_slice(),                        // len
-            4u32.to_le_bytes().as_slice(),                        // capacity
-            ((data.len() + 24) as u32).to_le_bytes().as_slice(),  // first element pointer
-            ((data.len() + 104) as u32).to_le_bytes().as_slice(), // second element pointer
-            0u32.to_le_bytes().as_slice(),                        // buffer memory pointer
-            0u32.to_le_bytes().as_slice(),                        // buffer memory size
+            2u32.to_le_bytes().as_slice(),                        // capacity
+            ((data.len() + 16) as u32).to_le_bytes().as_slice(),  // first element pointer
+            ((data.len() + 84) as u32).to_le_bytes().as_slice(), // second element pointer
             3u32.to_le_bytes().as_slice(),                        // first element length
-            6u32.to_le_bytes().as_slice(),                        // first element capacity
-            ((data.len() + 56) as u32).to_le_bytes().as_slice(), // first element - first value pointer
-            ((data.len() + 72) as u32).to_le_bytes().as_slice(), // first element - second value pointer
-            ((data.len() + 88) as u32).to_le_bytes().as_slice(), // first element - third value pointer
-            0u32.to_le_bytes().as_slice(), // first element - buffer memory pointer
-            0u32.to_le_bytes().as_slice(), // first element - buffer memory size
-            0u32.to_le_bytes().as_slice(), // first element - buffer memory pointer
+            3u32.to_le_bytes().as_slice(),                        // first element capacity
+            ((data.len() + 36) as u32).to_le_bytes().as_slice(), // first element - first value pointer
+            ((data.len() + 52) as u32).to_le_bytes().as_slice(), // first element - second value pointer
+            ((data.len() + 68) as u32).to_le_bytes().as_slice(), // first element - third value pointer
             1u128.to_le_bytes().as_slice(), // first element - first value
             2u128.to_le_bytes().as_slice(), // first element - second value
             3u128.to_le_bytes().as_slice(), // first element - third value
             3u32.to_le_bytes().as_slice(), // second element length
-            6u32.to_le_bytes().as_slice(), // second element capacity
-            ((data.len() + 136) as u32).to_le_bytes().as_slice(), // second element - first value pointer
-            ((data.len() + 152) as u32).to_le_bytes().as_slice(), // second element - second value pointer
-            ((data.len() + 168) as u32).to_le_bytes().as_slice(), // second element - third value pointer
-            0u32.to_le_bytes().as_slice(), // second element - buffer memory pointer
-            0u32.to_le_bytes().as_slice(), // second element - buffer memory size
-            0u32.to_le_bytes().as_slice(), // second element - buffer memory pointer
+            3u32.to_le_bytes().as_slice(), // second element capacity
+            ((data.len() + 104) as u32).to_le_bytes().as_slice(), // second element - first value pointer
+            ((data.len() + 120) as u32).to_le_bytes().as_slice(), // second element - second value pointer
+            ((data.len() + 136) as u32).to_le_bytes().as_slice(), // second element - third value pointer
             4u128.to_le_bytes().as_slice(), // second element - first value
             5u128.to_le_bytes().as_slice(), // second element - second value
             6u128.to_le_bytes().as_slice(), // second element - third value

@@ -277,15 +277,11 @@ mod tests {
 
         let mut expected = Vec::new();
         expected.extend(&4u32.to_le_bytes()); // length 
-        expected.extend(&8u32.to_le_bytes()); // capacity
+        expected.extend(&4u32.to_le_bytes()); // capacity
         expected.extend(&1u32.to_le_bytes()); // first elem
         expected.extend(&2u32.to_le_bytes()); // second elem
         expected.extend(&3u32.to_le_bytes()); // third elem
         expected.extend(&4u32.to_le_bytes()); // fourth elem
-        expected.extend(&0u32.to_le_bytes()); // buffer
-        expected.extend(&0u32.to_le_bytes()); // buffer
-        expected.extend(&0u32.to_le_bytes()); // buffer
-        expected.extend(&0u32.to_le_bytes()); // buffer
         test_unpack_ref(&data, vector_type.clone(), &expected);
     }
 
@@ -302,15 +298,12 @@ mod tests {
 
         let mut expected = Vec::new();
         expected.extend(&3u32.to_le_bytes()); // length = 2
-        expected.extend(&6u32.to_le_bytes()); // capacity
+        expected.extend(&3u32.to_le_bytes()); // capacity
 
         // pointers to heap elements
-        expected.extend(&192u32.to_le_bytes());
-        expected.extend(&208u32.to_le_bytes());
-        expected.extend(&224u32.to_le_bytes());
-        expected.extend(&0u32.to_le_bytes());
-        expected.extend(&0u32.to_le_bytes());
-        expected.extend(&0u32.to_le_bytes());
+        expected.extend(&180u32.to_le_bytes());
+        expected.extend(&196u32.to_le_bytes());
+        expected.extend(&212u32.to_le_bytes());
         expected.extend(&1u128.to_le_bytes());
         expected.extend(&2u128.to_le_bytes());
         expected.extend(&3u128.to_le_bytes());
