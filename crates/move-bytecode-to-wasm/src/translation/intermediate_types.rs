@@ -10,7 +10,7 @@ use walrus::{
 };
 
 use crate::CompilationContext;
-use crate::runtime::RuntimeFunction;
+use crate::{runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension};
 pub mod address;
 pub mod boolean;
 pub mod heap_integers;
@@ -745,6 +745,16 @@ impl IntermediateType {
                 inner.load_equality_instructions(module, builder, compilation_ctx)
             }
         }
+    }
+
+    pub fn load_not_equality_instructions(
+        &self,
+        module: &mut Module,
+        builder: &mut InstrSeqBuilder,
+        compilation_ctx: &CompilationContext,
+    ) {
+        self.load_equality_instructions(module, builder, compilation_ctx);
+        builder.negate();
     }
 }
 
