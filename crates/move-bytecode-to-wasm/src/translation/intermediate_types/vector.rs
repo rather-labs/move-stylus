@@ -23,6 +23,7 @@ impl IVector {
         capacity: LocalId,
         data_size: i32,
     ) {
+        // This is a failsafe to prevent UB if static checks failed
         builder
             .local_get(len)
             .local_get(capacity)
