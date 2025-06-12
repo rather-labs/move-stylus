@@ -35,4 +35,3 @@ public fun sum32(x: u32, y: u32): u32 {
 public fun sum64(x: u64, y: u64): u64 {
     x + y
 }
-
