@@ -1,4 +1,4 @@
-module 0x00::structs;
+module 0x00::struct_fields;
 
 public struct Bar has drop {
     n: u32,

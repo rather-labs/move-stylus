@@ -263,6 +263,54 @@ fn map_bytecode_instruction(
 
             types_stack.push(IntermediateType::IRef(Box::new(field_type.clone())));
         }
+        Bytecode::MutBorrowField(field_id) => {
+            let struct_id = compilation_ctx
+                .fields_to_struct_map
+                .get(field_id)
+                .unwrap_or_else(|| panic!("struct that contains field {field_id} not found"));
+            let struct_ = compilation_ctx
+                .module_structs
+                .iter()
+                .find(|s| &s.struct_definition_index == struct_id)
+                .unwrap_or_else(|| panic!("struct that contains field {field_id} not found"));
+
+            // Check if in the types stack we have the correct type
+            match types_stack.pop() {
+                Some(IntermediateType::IMutRef(inner)) => {
+                    assert!(
+                        matches!(inner.as_ref(), IntermediateType::IStruct(i) if *i == struct_.index() as usize),
+                        "expected struct with index {} in types struct, got {inner:?}",
+                        struct_.index()
+                    );
+                }
+                t => panic!(
+                    "types stack error: expected struct with index {} got {t:?}",
+                    struct_.index()
+                ),
+            }
+
+            let Some(field_type) = struct_.fields_types.get(field_id) else {
+                panic!("{field_id} not found in {struct_id}")
+            };
+
+            let Some(field_offset) = struct_.field_offsets.get(field_id) else {
+                panic!("{field_id} offset not found in {struct_id}")
+            };
+
+            builder
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .i32_const(*field_offset as i32)
+                .binop(BinaryOp::I32Add);
+
+            types_stack.push(IntermediateType::IMutRef(Box::new(field_type.clone())));
+        }
         Bytecode::MutBorrowLoc(local_id) => {
             let local = mapped_function.function_locals[*local_id as usize];
             let local_type = &mapped_function.function_locals_ir[*local_id as usize];
