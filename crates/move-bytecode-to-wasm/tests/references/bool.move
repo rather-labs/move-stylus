@@ -28,11 +28,22 @@ public fun write_mut_ref(x: &mut bool ): bool {
  *x
 }
 
-public fun mut_borrow_local(): bool {
+public fun miscellaneous_0(): vector<bool> {
  let mut x = true;
+ let w = x;
  let y = &mut x;
  *y = false;
- *y
+ vector[*y, w, x]
+}
+
+public fun miscellaneous_1(): vector<bool> {
+  let mut x = true;
+  let y = x;
+  x = false;
+  let z =  &mut x;
+  let w = *z;
+  *z = true;
+  vector[y, *z, w]
 }
 
 public fun freeze_ref(y: bool): bool {

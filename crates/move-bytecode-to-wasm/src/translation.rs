@@ -442,7 +442,7 @@ fn map_bytecode_instruction(
 
             match ref_type {
                 IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
-                    inner.add_read_ref_instructions(builder, compilation_ctx.memory_id);
+                    inner.add_read_ref_instructions(builder, module, compilation_ctx);
                     types_stack.push(*inner);
                 }
                 _ => panic!("ReadRef expected a IRef type but got: {:?}", ref_type),
