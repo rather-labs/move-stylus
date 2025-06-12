@@ -1,4 +1,4 @@
-use alloy_primitives::U256;
+use alloy_primitives::{U256, address};
 use alloy_sol_types::SolValue;
 use alloy_sol_types::abi::TokenSeq;
 use alloy_sol_types::{SolCall, SolType, sol};
@@ -42,6 +42,9 @@ sol!(
     function echoU64(uint64 a) external returns (uint64);
     function echoU128(uint128 a) external returns (uint128);
     function echoU256(uint256 a) external returns (uint256);
+    function echoVecStackType(uint32[] a) external returns (uint32[]);
+    function echoVecHeapType(uint128[] a) external returns (uint128[]);
+    function echoAddress(address a) external returns (address);
 );
 
 #[rstest]
@@ -59,6 +62,12 @@ sol!(
 #[case(echoU128Call::new((1,)), (1,))]
 #[case(echoU256Call::new((U256::MAX,)), (U256::MAX,))]
 #[case(echoU256Call::new((U256::from(1),)), (U256::from(1),))]
+#[case(echoVecStackTypeCall::new((vec![1,2,u32::MAX,3,4],)), (vec![1,2,u32::MAX,3,4],))]
+#[case(echoVecHeapTypeCall::new((vec![1,2,u128::MAX,3,4],)), (vec![1,2,u128::MAX,3,4],))]
+#[case(echoAddressCall::new(
+    (address!("0xcafe000000000000000000000000000000007357"),)),
+    (address!("0xcafe000000000000000000000000000000007357"),))
+]
 fn test_struct_field_reference<T: SolCall, V: SolValue>(
     #[by_ref] runtime: &RuntimeSandbox,
     #[case] call_data: T,
