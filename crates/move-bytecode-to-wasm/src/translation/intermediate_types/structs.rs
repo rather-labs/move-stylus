@@ -118,6 +118,28 @@ impl IStruct {
         builder.local_set(s1_ptr).local_set(s2_ptr);
         builder.i32_const(1).local_set(result);
 
+        let load_value_to_stack = |field: &IntermediateType, builder: &mut InstrSeqBuilder<'_>| {
+            if field.stack_data_size() == 8 {
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            } else {
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+        };
+
         builder.block(None, |block| {
             let block_id = block.id();
             for (index, field) in struct_.fields.iter().rev().enumerate() {
@@ -131,25 +153,7 @@ impl IStruct {
                 );
 
                 if field.is_stack_type() {
-                    if field.stack_data_size() == 8 {
-                        block.load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-                    } else {
-                        block.load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-                    }
+                    load_value_to_stack(field, block);
                 }
 
                 block.local_get(s2_ptr).load(
@@ -159,26 +163,7 @@ impl IStruct {
                 );
 
                 if field.is_stack_type() {
-                    if field.stack_data_size() == 8 {
-                        block.load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-                    } else {
-                        block.load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-                    }
-                    // builder.local_tee(tmp).call(print_i32).local_get(tmp);
+                    load_value_to_stack(field, block);
                 }
 
                 field.load_equality_instructions(module, block, compilation_ctx);
