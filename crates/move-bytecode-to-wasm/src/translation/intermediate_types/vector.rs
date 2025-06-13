@@ -180,8 +180,8 @@ impl IVector {
         builder.local_set(index);
 
         builder.loop_(None, |loop_block| {
-            loop_block.vec_ptr_at(dst_local, index, data_size); // where to store the element
-            loop_block.vec_ptr_at(src_local, index, data_size); // where to read the element
+            loop_block.vec_elem_ptr(dst_local, index, data_size); // where to store the element
+            loop_block.vec_elem_ptr(src_local, index, data_size); // where to read the element
 
             match inner {
                 IntermediateType::IBool
@@ -524,7 +524,6 @@ impl IVector {
         // Set lenght
         builder.i32_const(num_elements).local_set(len_local);
 
-
         IVector::allocate_vector_with_header(
             builder,
             compilation_ctx,
@@ -562,19 +561,20 @@ impl IVector {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
     ) {
+        let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None);
+
         match inner {
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                panic!("VecImmBorrow operation is not allowed on reference types");
+            }
+
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32
             | IntermediateType::IU64 => {
-                let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None);
                 builder.call(downcast_f);
-
-                builder.i32_const(inner.stack_data_size() as i32);
-
-                let borrow_f = RuntimeFunction::VecBorrow.get(module, Some(compilation_ctx));
-                builder.call(borrow_f);
+                builder.i32_const(0);
             }
 
             IntermediateType::IVector(_)
@@ -582,20 +582,15 @@ impl IVector {
             | IntermediateType::IU256
             | IntermediateType::ISigner
             | IntermediateType::IAddress => {
-                let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None);
                 builder.call(downcast_f);
-
-                builder.i32_const(inner.stack_data_size() as i32);
-
-                let borrow_heap_f =
-                    RuntimeFunction::VecBorrowHeap.get(module, Some(compilation_ctx));
-                builder.call(borrow_heap_f);
-            }
-
-            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                panic!("VecImmBorrow operation is not allowed on reference types");
+                builder.i32_const(1);
             }
         }
+
+        builder.i32_const(inner.stack_data_size() as i32);
+
+        let borrow_f = RuntimeFunction::VecBorrow.get(module, Some(compilation_ctx));
+        builder.call(borrow_f);
     }
 }
 
@@ -1711,9 +1706,7 @@ mod tests {
             vec![2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ];
 
-        let expected_result_bytes = vec![
-            2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0,
-        ];
+        let expected_result_bytes = vec![2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0];
 
         test_vector_pack(
             &element_bytes,
@@ -1739,9 +1732,8 @@ mod tests {
             ],
         ];
 
-        let expected_result_bytes = vec![
-            3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 64, 0, 0, 0,
-        ];
+        let expected_result_bytes =
+            vec![3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 64, 0, 0, 0];
 
         test_vector_pack(
             &element_bytes,
@@ -1757,9 +1749,7 @@ mod tests {
             vec![2, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0],
         ];
 
-        let expected_result_bytes = vec![
-            2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0,
-        ];
+        let expected_result_bytes = vec![2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0];
 
         test_vector_pack(
             &element_bytes,

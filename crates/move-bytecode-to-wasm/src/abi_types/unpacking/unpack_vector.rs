@@ -466,23 +466,23 @@ mod tests {
             2u32.to_le_bytes().as_slice(),                        // len
             2u32.to_le_bytes().as_slice(),                        // capacity
             ((data.len() + 16) as u32).to_le_bytes().as_slice(),  // first element pointer
-            ((data.len() + 84) as u32).to_le_bytes().as_slice(), // second element pointer
+            ((data.len() + 84) as u32).to_le_bytes().as_slice(),  // second element pointer
             3u32.to_le_bytes().as_slice(),                        // first element length
             3u32.to_le_bytes().as_slice(),                        // first element capacity
             ((data.len() + 36) as u32).to_le_bytes().as_slice(), // first element - first value pointer
             ((data.len() + 52) as u32).to_le_bytes().as_slice(), // first element - second value pointer
             ((data.len() + 68) as u32).to_le_bytes().as_slice(), // first element - third value pointer
-            1u128.to_le_bytes().as_slice(), // first element - first value
-            2u128.to_le_bytes().as_slice(), // first element - second value
-            3u128.to_le_bytes().as_slice(), // first element - third value
-            3u32.to_le_bytes().as_slice(), // second element length
-            3u32.to_le_bytes().as_slice(), // second element capacity
+            1u128.to_le_bytes().as_slice(),                      // first element - first value
+            2u128.to_le_bytes().as_slice(),                      // first element - second value
+            3u128.to_le_bytes().as_slice(),                      // first element - third value
+            3u32.to_le_bytes().as_slice(),                       // second element length
+            3u32.to_le_bytes().as_slice(),                       // second element capacity
             ((data.len() + 104) as u32).to_le_bytes().as_slice(), // second element - first value pointer
             ((data.len() + 120) as u32).to_le_bytes().as_slice(), // second element - second value pointer
             ((data.len() + 136) as u32).to_le_bytes().as_slice(), // second element - third value pointer
-            4u128.to_le_bytes().as_slice(), // second element - first value
-            5u128.to_le_bytes().as_slice(), // second element - second value
-            6u128.to_le_bytes().as_slice(), // second element - third value
+            4u128.to_le_bytes().as_slice(),                       // second element - first value
+            5u128.to_le_bytes().as_slice(),                       // second element - second value
+            6u128.to_le_bytes().as_slice(),                       // second element - third value
         ]
         .concat();
         test_vec_unpacking(&data, int_type, &expected_result_bytes);
