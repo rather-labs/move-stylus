@@ -45,8 +45,14 @@
 //! field management across all types.
 use std::collections::HashMap;
 
+use crate::CompilationContext;
+
 use super::IntermediateType;
 use move_binary_format::file_format::{FieldHandleIndex, StructDefinitionIndex};
+use walrus::{
+    InstrSeqBuilder, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg},
+};
 
 #[derive(Debug)]
 pub struct IStruct {
@@ -90,6 +96,50 @@ impl IStruct {
             field_offsets,
             fields_types,
             fields,
+        }
+    }
+
+    pub fn equality(
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        index: usize,
+    ) {
+        let struct_ = compilation_ctx
+            .module_structs
+            .iter()
+            .find(|s| s.index() == index as u16)
+            .unwrap_or_else(|| panic!("struct with index {index} not found"));
+
+        let s1_ptr = module.locals.add(ValType::I32);
+        let s2_ptr = module.locals.add(ValType::I32);
+
+        for (index, field) in struct_.fields.iter().enumerate() {
+            builder
+                .local_set(s1_ptr)
+                .i32_const(index as i32 * 4)
+                .binop(BinaryOp::I32Add)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .local_set(s2_ptr)
+                .i32_const(index as i32 * 4)
+                .binop(BinaryOp::I32Add)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+            field.load_equality_instructions(module, builder, compilation_ctx);
         }
     }
 

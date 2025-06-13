@@ -9,6 +9,7 @@ use boolean::IBool;
 use heap_integers::{IU128, IU256};
 use move_binary_format::file_format::{DatatypeHandleIndex, Signature, SignatureToken};
 use simple_integers::{IU8, IU16, IU32, IU64};
+use structs::IStruct;
 use vector::IVector;
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
@@ -193,7 +194,8 @@ impl IntermediateType {
             IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
-            | IntermediateType::ISigner => {
+            | IntermediateType::ISigner
+            | IntermediateType::IStruct(_) => {
                 builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -214,7 +216,6 @@ impl IntermediateType {
                     },
                 );
             }
-            IntermediateType::IStruct(_) => todo!(),
         }
     }
 
@@ -726,7 +727,7 @@ impl IntermediateType {
                 builder.i32_const(1);
             }
             Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner),
-            Self::IStruct(_) => todo!(),
+            Self::IStruct(index) => IStruct::equality(builder, module, compilation_ctx, *index),
             Self::IRef(inner) | Self::IMutRef(inner) => {
                 let ptr1 = module.locals.add(ValType::I32);
                 let ptr2 = module.locals.add(ValType::I32);
