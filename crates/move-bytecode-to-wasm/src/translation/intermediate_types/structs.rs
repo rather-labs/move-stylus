@@ -111,35 +111,11 @@ impl IStruct {
             .find(|s| s.index() == index as u16)
             .unwrap_or_else(|| panic!("struct with index {index} not found"));
 
-        let print_memory_from = module.imports.get_func("", "print_memory_from").unwrap();
-        let print_i32 = module.imports.get_func("", "print_i32").unwrap();
-
         let s1_ptr = module.locals.add(ValType::I32);
         let s2_ptr = module.locals.add(ValType::I32);
         let result = module.locals.add(ValType::I32);
 
-        builder
-            /*
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )*/
-            .local_set(s1_ptr)
-            /*
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )*/
-            .local_set(s2_ptr);
-
+        builder.local_set(s1_ptr).local_set(s2_ptr);
         builder.i32_const(1).local_set(result);
 
         builder.block(None, |block| {

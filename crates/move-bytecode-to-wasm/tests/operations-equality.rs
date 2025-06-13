@@ -1055,6 +1055,7 @@ mod structs {
 
     sol!(
         #[allow(missing_docs)]
+        function eqStructBool(bool a, bool b) external returns (bool);
         function eqStructAddress(address a, address b) external returns (bool);
         function eqStructU256(uint256 a, uint256 b) external returns (bool);
         function eqStructU128(uint128 a, uint128 b) external returns (bool);
@@ -1062,7 +1063,9 @@ mod structs {
         function eqStructU32(uint32 a, uint32 b) external returns (bool);
         function eqStructU16(uint16 a, uint16 b) external returns (bool);
         function eqStructU8(uint8 a, uint8 b) external returns (bool);
-        function eqStructBool(bool a, bool b) external returns (bool);
+        function eqStructVecStackType(uint32[] a, uint32[] b) external returns (bool);
+        function eqStructVecHeapType(uint128[] a, uint128[] b) external returns (bool);
+        function eqStructStruct(uint32 a, uint128 b, uint32 c, uint128 d) external returns (bool);
     );
 
     #[rstest]
@@ -1080,18 +1083,22 @@ mod structs {
     #[case(eqStructU128Call::new((1, u128::MAX)), false)]
     #[case(eqStructU256Call::new((U256::MAX, U256::MAX)), true)]
     #[case(eqStructU256Call::new((U256::from(1), U256::MAX)), false)]
-    /*
-        #[case(eqStructVecStackTypeCall::new((vec![1,2,u32::MAX,3,4],)), (vec![1,2,u32::MAX,3,4],))]
-        #[case(eqStructVecHeapTypeCall::new((vec![1,2,u128::MAX,3,4],)), (vec![1,2,u128::MAX,3,4],))]
-        #[case(eqStructAddressCall::new(
-        (address!("0xcafe000000000000000000000000000000007357"),)),
-        (address!("0xcafe000000000000000000000000000000007357"),))
-    ]
-        #[case(eqStructBarStructFieldsCall::new((u32::MAX, u128::MAX)), (u32::MAX, u128::MAX),)]
-        #[case(eqStructBarStructFieldsCall::new((1, u128::MAX)), (1, u128::MAX),)]
-        #[case(eqStructBarStructFieldsCall::new((u32::MAX, 1)), (u32::MAX, 1),)]
-        #[case(eqStructBarStructFieldsCall::new((1, 1)), (1, 1),)]
-        */
+    #[case(eqStructVecStackTypeCall::new((vec![1,2,u32::MAX,3,4], vec![1,2,u32::MAX,3,4])), true)]
+    #[case(eqStructVecStackTypeCall::new((vec![1,2,u32::MAX,3,4], vec![1,2,3,4,5])), false)]
+    #[case(eqStructVecHeapTypeCall::new((vec![1,2,u128::MAX,3,4], vec![1,2,u128::MAX,3,4])), true)]
+    #[case(eqStructVecHeapTypeCall::new((vec![1,2,u128::MAX,3,4], vec![1,2,3,4,5])), false)]
+    #[case(eqStructAddressCall::new(
+        (address!("0xcafe000000000000000000000000000000007357"),
+         address!("0xcafe000000000000000000000000000000007357"))),
+         true
+    )]
+    #[case(eqStructAddressCall::new(
+        (address!("0xcafe0000000000deadbeefdeadbeef0000007357"),
+         address!("0xcafe000000000000000000000000000000007357"))),
+         false
+    )]
+    #[case(eqStructStructCall::new((u32::MAX, u128::MAX, u32::MAX, u128::MAX)), true)]
+    #[case(eqStructStructCall::new((u32::MAX, u128::MAX, 1, u128::MAX)), false)]
     fn test_equality_struct<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
