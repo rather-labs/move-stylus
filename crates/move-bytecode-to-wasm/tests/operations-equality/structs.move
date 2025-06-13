@@ -51,7 +51,7 @@ public fun eq_struct_bool(a: bool, b: bool): bool {
     foo == bar
 }
 
-public fun eq_struct_u8(a: u8, b: u8): u8 {
+public fun eq_struct_u8(a: u8, b: u8): bool {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -83,7 +83,7 @@ public fun eq_struct_u8(a: u8, b: u8): u8 {
     foo == bar
 }
 
-public fun eq_struct_u16(a: u16, b: u16): u16 {
+public fun eq_struct_u16(a: u16, b: u16): bool {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -115,7 +115,7 @@ public fun eq_struct_u16(a: u16, b: u16): u16 {
     foo == bar
 }
 
-public fun eq_struct_u32(a: u32, b: u32): u32 {
+public fun eq_struct_u32(a: u32, b: u32): bool {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -147,7 +147,7 @@ public fun eq_struct_u32(a: u32, b: u32): u32 {
     foo == bar
 }
 
-public fun eq_struct_u64(a: u64, b: u64): u64 {
+public fun eq_struct_u64(a: u64, b: u64): bool {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -179,7 +179,7 @@ public fun eq_struct_u64(a: u64, b: u64): u64 {
     foo == bar
 }
 
-public fun eq_struct_u128(a: u128, b: u128): u128 {
+public fun eq_struct_u128(a: u128, b: u128): bool {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -211,7 +211,7 @@ public fun eq_struct_u128(a: u128, b: u128): u128 {
     foo == bar
 }
 
-public fun eq_struct_u256(a: u256, b: u256): u256{
+public fun eq_struct_u256(a: u256, b: u256): bool {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -243,7 +243,7 @@ public fun eq_struct_u256(a: u256, b: u256): u256{
     foo == bar
 }
 
-public fun eq_struct_vec_stack_type(a: vector<u32>, b: vector<u32>): vector<u32> {
+public fun eq_struct_vec_stack_type(a: vector<u32>, b: vector<u32>): bool {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -275,7 +275,7 @@ public fun eq_struct_vec_stack_type(a: vector<u32>, b: vector<u32>): vector<u32>
     foo == bar
 }
 
-public fun eq_struct_vec_heap_type(a: vector<u128>, b: vector<128>): vector<u128> {
+public fun eq_struct_vec_heap_type(a: vector<u128>, b: vector<u128>): bool {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -307,7 +307,7 @@ public fun eq_struct_vec_heap_type(a: vector<u128>, b: vector<128>): vector<u128
     foo == bar
 }
 
-public fun eq_struct_address(a: address, b: address): address {
+public fun eq_struct_address(a: address, b: address): bool {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: a,

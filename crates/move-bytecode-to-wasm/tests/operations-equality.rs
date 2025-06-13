@@ -1092,7 +1092,7 @@ mod structs {
         #[case(eqStructBarStructFieldsCall::new((u32::MAX, 1)), (u32::MAX, 1),)]
         #[case(eqStructBarStructFieldsCall::new((1, 1)), (1, 1),)]
         */
-    fn test_equality_primitive_types<T: SolCall>(
+    fn test_equality_struct<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: bool,

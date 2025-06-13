@@ -818,6 +818,26 @@ impl IntermediateType {
         self.load_equality_instructions(module, builder, compilation_ctx);
         builder.negate();
     }
+
+    /// Returns true if the type is a stack type (the value is directly hanndled in wasm stack
+    /// instead of handling a pointer), otherwise returns false.
+    pub fn is_stack_type(&self) -> bool {
+        match self {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64 => true,
+            IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress
+            | IntermediateType::ISigner
+            | IntermediateType::IVector(_)
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_)
+            | IntermediateType::IStruct(_) => false,
+        }
+    }
 }
 
 impl From<&IntermediateType> for ValType {
