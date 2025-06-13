@@ -1061,7 +1061,7 @@ mod structs {
         function eqStructU64(uint64 a, uint64 b) external returns (bool);
         function eqStructU32(uint32 a, uint32 b) external returns (bool);
         function eqStructU16(uint16 a, uint16 b) external returns (bool);
-        function eqStructU8(uint8 a, uint16 b) external returns (bool);
+        function eqStructU8(uint8 a, uint8 b) external returns (bool);
         function eqStructBool(bool a, bool b) external returns (bool);
     );
 

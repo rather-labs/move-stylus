@@ -112,9 +112,12 @@ impl IStruct {
             .unwrap_or_else(|| panic!("struct with index {index} not found"));
 
         let print_memory_from = module.imports.get_func("", "print_memory_from").unwrap();
+        let print_i32 = module.imports.get_func("", "print_i32").unwrap();
 
         let s1_ptr = module.locals.add(ValType::I32);
         let s2_ptr = module.locals.add(ValType::I32);
+        let result = module.locals.add(ValType::I32);
+
         builder
             /*
             .load(
@@ -137,82 +140,84 @@ impl IStruct {
             )*/
             .local_set(s2_ptr);
 
-        builder.local_get(s1_ptr).call(print_memory_from);
-        builder.local_get(s2_ptr).call(print_memory_from);
+        builder.i32_const(1).local_set(result);
 
-        for (index, field) in struct_.fields.iter().rev().enumerate() {
-            builder
-                .local_get(s1_ptr)
-                .i32_const(index as i32 * 4)
-                .binop(BinaryOp::I32Add)
-                .load(
+        builder.block(None, |block| {
+            let block_id = block.id();
+            for (index, field) in struct_.fields.iter().rev().enumerate() {
+                // Offset of the field's pointer
+                let offset = index as u32 * 4;
+
+                block.local_get(s1_ptr).load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
+                    MemArg { align: 0, offset },
                 );
 
-            if field.is_stack_type() {
-                if field.stack_data_size() == 8 {
-                    builder.load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I64 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-                } else {
-                    builder.load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
+                if field.is_stack_type() {
+                    if field.stack_data_size() == 8 {
+                        block.load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I64 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
+                    } else {
+                        block.load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
+                    }
                 }
-            }
 
-            builder
-                .local_get(s2_ptr)
-                .i32_const(index as i32 * 4)
-                .binop(BinaryOp::I32Add)
-                .load(
+                block.local_get(s2_ptr).load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
+                    MemArg { align: 0, offset },
                 );
 
-            if field.is_stack_type() {
-                if field.stack_data_size() == 8 {
-                    builder.load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I64 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-                } else {
-                    builder.load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
+                if field.is_stack_type() {
+                    if field.stack_data_size() == 8 {
+                        block.load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I64 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
+                    } else {
+                        block.load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
+                    }
+                    // builder.local_tee(tmp).call(print_i32).local_get(tmp);
                 }
-            }
 
-            field.load_equality_instructions(module, builder, compilation_ctx);
-        }
+                field.load_equality_instructions(module, block, compilation_ctx);
+
+                block.if_else(
+                    None,
+                    |_| {},
+                    |else_| {
+                        else_.i32_const(0).local_set(result).br(block_id);
+                    },
+                );
+            }
+        });
+
+        builder.local_get(result);
     }
 
     pub fn index(&self) -> u16 {
