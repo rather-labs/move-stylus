@@ -500,6 +500,9 @@ mod reference_vec_8 {
         function miscellaneous0() external returns (uint8[]);
         function miscellaneous1() external returns (uint8[]);
         function miscellaneous2() external returns (uint8[]);
+        function miscellaneous3(uint8[] x) external returns (uint8[]);
+        function miscellaneous4() external returns (uint8[]);
+        function miscellaneous5() external returns (uint8[]);
         function freezeRef(uint8[] x) external returns (uint8[]);
     );
 
@@ -525,6 +528,9 @@ mod reference_vec_8 {
     #[case(miscellaneous0Call::new(()), vec![4, 5, 4])]
     #[case(miscellaneous1Call::new(()), vec![20, 40])]
     #[case(miscellaneous2Call::new(()), vec![1, 4, 7])]
+    #[case(miscellaneous3Call::new((vec![1, 2, 3],)), vec![99, 1, 3])]
+    #[case(miscellaneous4Call::new(()), vec![1, 12, 111, 12, 11, 112])]
+    #[case(miscellaneous5Call::new(()), vec![1, 12, 112, 11, 112, 113, 112])]
     fn test_vec_8_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -562,6 +568,8 @@ mod reference_vec_64 {
         function miscellaneous0() external returns (uint64[]);
         function miscellaneous1() external returns (uint64[]);
         function miscellaneous2() external returns (uint64[]);
+        function miscellaneous3(uint64[] x) external returns (uint64[]);
+        function miscellaneous4() external returns (uint64[]);
         function freezeRef(uint64[] x) external returns (uint64[]);
     );
 
@@ -587,12 +595,15 @@ mod reference_vec_64 {
     #[case(miscellaneous0Call::new(()), vec![4, 5, 4])]
     #[case(miscellaneous1Call::new(()), vec![20, 40])]
     #[case(miscellaneous2Call::new(()), vec![1, 4, 7])]
+    #[case(miscellaneous3Call::new((vec![1, 2, 3],)), vec![99, 1, 3])]
+    #[case(miscellaneous4Call::new(()), vec![1, 12, 111, 12, 11, 112])]
     fn test_vec_64_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: Vec<u64>,
     ) {
         let expected_result = <sol!((uint64[],))>::abi_encode_params(&(expected_result,));
+        println!("expected_result: {:?}", expected_result);
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
@@ -611,6 +622,8 @@ mod reference_vec_256 {
         function miscellaneous0() external returns (uint256[]);
         function miscellaneous1() external returns (uint256[]);
         function miscellaneous2() external returns (uint256[]);
+        function miscellaneous3(uint256[] x) external returns (uint256[]);
+        function miscellaneous4() external returns (uint256[]);
         function freezeRef(uint256[] x) external returns (uint256[]);
     );
 
@@ -636,7 +649,9 @@ mod reference_vec_256 {
     #[case(miscellaneous0Call::new(()), vec![U256::from(4), U256::from(5), U256::from(4)])]
     #[case(miscellaneous1Call::new(()), vec![U256::from(20), U256::from(40)])]
     #[case(miscellaneous2Call::new(()), vec![U256::from(1), U256::from(4), U256::from(7)])]
-    fn test_vec_256_immutable_ref<T: SolCall>(
+    #[case(miscellaneous3Call::new((vec![U256::from(1), U256::from(2), U256::from(3)],)), vec![U256::from(99), U256::from(1), U256::from(3)])]
+    #[case(miscellaneous4Call::new(()), vec![U256::from(1), U256::from(12), U256::from(111), U256::from(12), U256::from(11), U256::from(112)])]
+    fn test_vec_256_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: Vec<U256>,

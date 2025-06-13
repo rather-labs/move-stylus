@@ -91,10 +91,10 @@ pub fn vec_swap_32_function(
         let ptr1 = module.locals.add(ValType::I32);
         let ptr2 = module.locals.add(ValType::I32);
 
-        block.vec_ptr_at(ptr, idx1, 4);
+        block.vec_elem_ptr(ptr, idx1, 4);
         block.local_set(ptr1);
 
-        block.vec_ptr_at(ptr, idx2, 4);
+        block.vec_elem_ptr(ptr, idx2, 4);
         block.local_set(ptr2);
 
         // Load elem 1 into aux
@@ -228,10 +228,10 @@ pub fn vec_swap_64_function(
         let ptr1 = module.locals.add(ValType::I32);
         let ptr2 = module.locals.add(ValType::I32);
 
-        block.vec_ptr_at(ptr, idx1, 8);
+        block.vec_elem_ptr(ptr, idx1, 8);
         block.local_set(ptr1);
 
-        block.vec_ptr_at(ptr, idx2, 8);
+        block.vec_elem_ptr(ptr, idx2, 8);
         block.local_set(ptr2);
 
         // Load elem 1 into aux
@@ -361,7 +361,7 @@ pub fn vec_pop_back_32_function(
         )
         .local_set(len);
 
-    builder.vec_ptr_at(ptr, len, size);
+    builder.vec_elem_ptr(ptr, len, size);
 
     builder.load(
         compilation_ctx.memory_id,
@@ -455,7 +455,7 @@ pub fn vec_pop_back_64_function(
         )
         .local_set(len);
 
-    builder.vec_ptr_at(ptr, len, size);
+    builder.vec_elem_ptr(ptr, len, size);
 
     builder.load(
         compilation_ctx.memory_id,
@@ -467,4 +467,107 @@ pub fn vec_pop_back_64_function(
     );
 
     function.finish(vec![ptr], &mut module.funcs)
+}
+
+/// Pushes a pointer to a non-heap element in a vector.
+///
+/// # Arguments:
+///    - vector_reference: (i32) reference to the vector
+///    - index: (i64) index of the element to borrow
+///    - is_heap: (i32) boolean indicating if the element is heap or not
+///    - size: (i32) stack size of the vector inner type
+/// # Returns:
+///    - i32 reference to the borrowed element
+pub fn vec_borrow_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32, ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function
+        .name(RuntimeFunction::VecBorrow.name().to_owned())
+        .func_body();
+
+    // Local variables
+    let is_heap = module.locals.add(ValType::I32);
+    let size = module.locals.add(ValType::I32);
+    let index = module.locals.add(ValType::I32);
+    let vec_ref = module.locals.add(ValType::I32);
+    let vec_ptr = module.locals.add(ValType::I32);
+
+    // Load vector reference
+    builder
+        .local_get(vec_ref)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(vec_ptr);
+
+    // Trap if index >= length
+    builder.block(None, |block| {
+        block
+            .local_get(vec_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_get(index)
+            .binop(BinaryOp::I32GtU);
+        block.br_if(block.id());
+        block.unreachable();
+    });
+
+    // Element reference
+    let elem_ref = module.locals.add(ValType::I32);
+    builder
+        .i32_const(4)
+        .call(compilation_ctx.allocator)
+        .local_tee(elem_ref);
+
+    // Pointer to element
+    let elem_ptr = module.locals.add(ValType::I32);
+    builder.vec_elem_ptr_dynamic(vec_ptr, index, size);
+    builder.local_set(elem_ptr);
+
+    builder.local_get(is_heap).if_else(
+        ValType::I32,
+        |then| {
+            then.local_get(elem_ptr).load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+        },
+        |else_| {
+            else_.local_get(elem_ptr);
+        },
+    );
+
+    builder.store(
+        compilation_ctx.memory_id,
+        StoreKind::I32 { atomic: false },
+        MemArg {
+            align: 0,
+            offset: 0,
+        },
+    );
+
+    builder.local_get(elem_ref);
+
+    function.finish(vec![vec_ref, index, is_heap, size], &mut module.funcs)
 }

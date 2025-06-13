@@ -1,6 +1,6 @@
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use crate::CompilationContext;
@@ -150,7 +150,6 @@ impl IVector {
         let dst_local = module.locals.add(ValType::I32);
         let index = module.locals.add(ValType::I32);
         let len = module.locals.add(ValType::I32);
-
         let data_size = inner.stack_data_size() as i32;
 
         // === Read vector length ===
@@ -181,8 +180,8 @@ impl IVector {
         builder.local_set(index);
 
         builder.loop_(None, |loop_block| {
-            loop_block.vec_ptr_at(dst_local, index, data_size); // where to store the element
-            loop_block.vec_ptr_at(src_local, index, data_size); // where to read the element
+            loop_block.vec_elem_ptr(dst_local, index, data_size); // where to store the element
+            loop_block.vec_elem_ptr(src_local, index, data_size); // where to read the element
 
             match inner {
                 IntermediateType::IBool
@@ -557,81 +556,26 @@ impl IVector {
         builder.local_get(ptr_local);
     }
 
-    pub fn add_vec_imm_borrow_instructions(
+    pub fn vec_borrow_instructions(
         inner: &IntermediateType,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
     ) {
-        let size = inner.stack_data_size() as i32;
-        let index_i64 = module.locals.add(ValType::I64); // referenced element index
-        builder.local_set(index_i64); // index is on top of stack (as i64)
-
-        // Trap if index > u32::MAX
-        builder.block(None, |block| {
-            block
-                .local_get(index_i64)
-                .i64_const(0xFFFF_FFFF)
-                .binop(BinaryOp::I64LeU);
-            block.br_if(block.id());
-            block.unreachable();
-        });
-
-        //  Cast index to i32
-        let index_i32 = module.locals.add(ValType::I32);
-        builder
-            .local_get(index_i64)
-            .unop(UnaryOp::I32WrapI64)
-            .local_set(index_i32);
-
-        // Set vector base address
-        let vector_address = module.locals.add(ValType::I32);
-        builder
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_set(vector_address);
-
-        // Trap if index >= length
-        builder.block(None, |block| {
-            block
-                .local_get(vector_address)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .local_get(index_i32)
-                .binop(BinaryOp::I32GtU);
-            block.br_if(block.id());
-            block.unreachable();
-        });
-
-        // Reference to element
-        let ref_local = module.locals.add(ValType::I32);
-        builder
-            .i32_const(4)
-            .call(compilation_ctx.allocator)
-            .local_tee(ref_local);
-
-        // Compute element
-        builder.vec_ptr_at(vector_address, index_i32, size);
+        let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None);
 
         match inner {
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                panic!("VecImmBorrow operation is not allowed on reference types");
+            }
+
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32
             | IntermediateType::IU64 => {
-                // Store element at ref address
+                builder.call(downcast_f);
+                builder.i32_const(0);
             }
 
             IntermediateType::IVector(_)
@@ -640,32 +584,15 @@ impl IVector {
             | IntermediateType::ISigner
             | IntermediateType::IAddress
             | IntermediateType::IStruct(_) => {
-                // load pointer to value
-                builder.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            }
-
-            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                panic!("VecImmBorrow operation is not allowed on reference types");
+                builder.call(downcast_f);
+                builder.i32_const(1);
             }
         }
 
-        builder.store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
+        builder.i32_const(inner.stack_data_size() as i32);
 
-        builder.local_get(ref_local);
+        let borrow_f = RuntimeFunction::VecBorrow.get(module, Some(compilation_ctx));
+        builder.call(borrow_f);
     }
 }
 
@@ -676,6 +603,7 @@ mod tests {
         test_tools::{build_module, setup_wasmtime_module},
     };
     use alloy_primitives::U256;
+    use walrus::ir::UnaryOp;
     use walrus::{FunctionBuilder, ValType};
 
     use super::*;
