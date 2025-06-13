@@ -502,6 +502,7 @@ mod reference_vec_8 {
         function miscellaneous2() external returns (uint8[]);
         function miscellaneous3(uint8[] x) external returns (uint8[]);
         function miscellaneous4() external returns (uint8[]);
+        function miscellaneous5() external returns (uint8[]);
         function freezeRef(uint8[] x) external returns (uint8[]);
     );
 
@@ -529,6 +530,7 @@ mod reference_vec_8 {
     #[case(miscellaneous2Call::new(()), vec![1, 4, 7])]
     #[case(miscellaneous3Call::new((vec![1, 2, 3],)), vec![99, 1, 3])]
     #[case(miscellaneous4Call::new(()), vec![1, 12, 111, 12, 11, 112])]
+    #[case(miscellaneous5Call::new(()), vec![1, 12, 112, 11, 112, 113, 112])]
     fn test_vec_8_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
