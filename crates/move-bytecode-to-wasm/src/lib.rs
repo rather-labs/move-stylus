@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
@@ -146,7 +145,7 @@ pub fn translate_package(
         let mut fields_to_struct_map = HashMap::new();
         for (index, struct_def) in root_compiled_module.struct_defs().iter().enumerate() {
             let struct_index = StructDefinitionIndex::new(index as u16);
-            let mut fields_map = BTreeMap::new();
+            let mut fields_map = HashMap::new();
             let mut all_fields = Vec::new();
             if let Some(fields) = struct_def.fields() {
                 for (field_index, field) in fields.iter().enumerate() {

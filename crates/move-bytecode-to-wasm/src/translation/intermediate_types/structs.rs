@@ -43,7 +43,7 @@
 //! Because fields are always accessed via references, using pointers uniformly (even for simple
 //! values) simplifies the implementation, reduces special-case logic, and ensures consistent
 //! field management across all types.
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 use super::IntermediateType;
 use move_binary_format::file_format::{FieldHandleIndex, StructDefinitionIndex};
@@ -54,10 +54,10 @@ pub struct IStruct {
     pub fields: Vec<IntermediateType>,
 
     /// Map between handles and fields types
-    pub fields_types: BTreeMap<FieldHandleIndex, IntermediateType>,
+    pub fields_types: HashMap<FieldHandleIndex, IntermediateType>,
 
     /// Map between handles and fields offset
-    pub field_offsets: BTreeMap<FieldHandleIndex, u32>,
+    pub field_offsets: HashMap<FieldHandleIndex, u32>,
 
     /// Move's struct index
     pub struct_definition_index: StructDefinitionIndex,
@@ -71,10 +71,10 @@ impl IStruct {
     pub fn new(
         index: StructDefinitionIndex,
         fields: Vec<(Option<FieldHandleIndex>, IntermediateType)>,
-        fields_types: BTreeMap<FieldHandleIndex, IntermediateType>,
+        fields_types: HashMap<FieldHandleIndex, IntermediateType>,
     ) -> Self {
         let mut heap_size = 0;
-        let mut field_offsets = BTreeMap::new();
+        let mut field_offsets = HashMap::new();
         for (index, _) in fields.iter().rev() {
             if let Some(idx) = index {
                 field_offsets.insert(*idx, heap_size);
