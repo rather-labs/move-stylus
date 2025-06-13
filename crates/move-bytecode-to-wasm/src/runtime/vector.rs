@@ -544,15 +544,14 @@ pub fn vec_borrow_function(
     builder.local_get(is_heap).if_else(
         ValType::I32,
         |then| {
-            then.local_get(elem_ptr)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
+            then.local_get(elem_ptr).load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
         },
         |else_| {
             else_.local_get(elem_ptr);

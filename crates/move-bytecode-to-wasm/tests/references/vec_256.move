@@ -77,11 +77,24 @@ public fun freeze_ref(y: vector<u256>): vector<u256> {
     *x_frozen_ref 
 }
 
-public fun vec_mut_borrow(x: vector<u256>): vector<u256> {
+public fun miscellaneous_3(x: vector<u256>): vector<u256> {
   let mut y = x;
   let a = &mut y[0];
   let b = *a;
   *a = 99;
   *vector::borrow_mut(&mut y, 1) = b;
   y
+}
+
+
+public fun miscellaneous_4(): vector<u256> {
+  let mut x = vector[vector[1u256, 2u256], vector[3u256, 4u256]]; // x = [ [1, 2], [3, 4] ]
+  let a = &mut x[0]; // a = vector[1, 2]
+  *vector::borrow_mut(a, 1) = 12; // a = vector[1, 12]
+  let b = *a; // b = vector[1, 12]
+  let mut c = b; // c = vector[1, 12]
+  *vector::borrow_mut(a, 0) = 11; // a = vector[11, 12]
+  *vector::borrow_mut(a, 1) = 112; // a = vector[11, 112]
+  *vector::borrow_mut(&mut c, 0) = 111;  // c = vector[111, 12]
+  vector[b[0], b[1], c[0], c[1], a[0], a[1]]
 }
