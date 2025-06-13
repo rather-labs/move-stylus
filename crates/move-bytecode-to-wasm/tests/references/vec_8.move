@@ -69,6 +69,42 @@ public fun miscellaneous_2(): vector<u8> {
  vector[y[0], w[0], v[0]]
 }
 
+public fun miscellaneous_3(x: vector<u8>): vector<u8> {
+  let mut y = x;
+  let a = &mut y[0];
+  let b = *a;
+  *a = 99;
+  *vector::borrow_mut(&mut y, 1) = b;
+  y
+}
+
+public fun miscellaneous_4(): vector<u8> {
+  let mut x = vector[vector[1u8, 2u8], vector[3u8, 4u8]]; // x = [ [1, 2], [3, 4] ]
+  let a = &mut x[0]; // a = vector[1, 2]
+  *vector::borrow_mut(a, 1) = 12; // a = vector[1, 12]
+  let b = *a; // b = vector[1, 12]
+  let mut c = b; // c = vector[1, 12]
+  *vector::borrow_mut(a, 0) = 11; // a = vector[11, 12]
+  *vector::borrow_mut(a, 1) = 112; // a = vector[11, 112]
+  *vector::borrow_mut(&mut c, 0) = 111;  // c = vector[111, 12]
+  vector[b[0], b[1], c[0], c[1], a[0], a[1]]
+}
+
+public fun miscellaneous_5(): vector<u8> {
+  let mut x = vector[vector[1u8, 2u8], vector[3u8, 4u8]]; // x = [ [1, 2], [3, 4] ]
+  let a = &mut x[0]; // a = vector[1, 2]
+  *vector::borrow_mut(a, 1) = 12; // a = vector[1, 12]
+  let b = *a; // b = vector[1, 12]
+  *vector::borrow_mut(a, 0) = 11; // a = vector[11, 12]
+  let c = vector::borrow_mut(a, 1); // c = 12
+  *c = 112; // c = 112 and a = vector[11, 112]
+  let c_val = *c;
+  freeze(c);
+  let d = *a;
+  *vector::borrow_mut(a, 0) = 113; // a = vector[113, 112]
+  vector[b[0], b[1], c_val, d[0], d[1], a[0], a[1]]
+}
+
 public fun freeze_ref(y: vector<u8>): vector<u8> {
     let mut x = vector<u8>[1, 2, 3];
     let x_mut_ref: &mut vector<u8> = &mut x;
