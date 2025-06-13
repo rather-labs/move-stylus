@@ -258,6 +258,7 @@ pub fn sub_u64(module: &mut Module) -> FunctionId {
 
 #[cfg(test)]
 mod tests {
+    use crate::test_compilation_context;
     use crate::test_tools::{build_module, setup_wasmtime_module};
     use alloy_primitives::U256;
     use rstest::rstest;
@@ -314,17 +315,8 @@ mod tests {
             .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE);
 
-        let heap_integers_add_f = heap_integers_sub(
-            &mut raw_module,
-            &CompilationContext {
-                memory_id,
-                allocator: allocator_func,
-                functions_arguments: &[],
-                functions_returns: &[],
-                module_signatures: &[],
-                constants: &[],
-            },
-        );
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let heap_integers_add_f = heap_integers_sub(&mut raw_module, &compilation_ctx);
         // Shift left
         func_body.call(heap_integers_add_f);
 
@@ -444,17 +436,8 @@ mod tests {
             .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE);
 
-        let heap_integers_add_f = heap_integers_sub(
-            &mut raw_module,
-            &CompilationContext {
-                memory_id,
-                allocator: allocator_func,
-                functions_arguments: &[],
-                functions_returns: &[],
-                module_signatures: &[],
-                constants: &[],
-            },
-        );
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let heap_integers_add_f = heap_integers_sub(&mut raw_module, &compilation_ctx);
         // Shift left
         func_body.call(heap_integers_add_f);
 

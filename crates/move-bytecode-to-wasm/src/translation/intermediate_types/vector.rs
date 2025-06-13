@@ -500,6 +500,7 @@ impl IVector {
                     IntermediateType::ISigner => {
                         panic!("should not be possible to have a vector of signers")
                     }
+                    IntermediateType::IStruct(_) => todo!(),
                 }
             },
             |else_| {
@@ -581,7 +582,8 @@ impl IVector {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::ISigner
-            | IntermediateType::IAddress => {
+            | IntermediateType::IAddress
+            | IntermediateType::IStruct(_) => {
                 builder.call(downcast_f);
                 builder.i32_const(1);
             }
@@ -596,7 +598,10 @@ impl IVector {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_tools::{build_module, setup_wasmtime_module};
+    use crate::{
+        test_compilation_context,
+        test_tools::{build_module, setup_wasmtime_module},
+    };
     use alloy_primitives::U256;
     use walrus::ir::UnaryOp;
     use walrus::{FunctionBuilder, ValType};
@@ -606,14 +611,7 @@ mod tests {
     fn test_vector(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id) = build_module(None);
 
-        let compilation_ctx = CompilationContext {
-            constants: &[],
-            functions_arguments: &[],
-            functions_returns: &[],
-            module_signatures: &[],
-            memory_id,
-            allocator,
-        };
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -649,14 +647,7 @@ mod tests {
     fn test_vector_copy(data: &[u8], inner_type: IntermediateType, expected_result_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id) = build_module(None);
 
-        let compilation_ctx = CompilationContext {
-            constants: &[],
-            functions_arguments: &[],
-            functions_returns: &[],
-            module_signatures: &[],
-            memory_id,
-            allocator,
-        };
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -702,15 +693,7 @@ mod tests {
         expected_result_bytes: &[u8],
     ) {
         let (mut raw_module, allocator, memory_id) = build_module(None);
-
-        let compilation_ctx = CompilationContext {
-            constants: &[],
-            functions_arguments: &[],
-            functions_returns: &[],
-            module_signatures: &[],
-            memory_id,
-            allocator,
-        };
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -759,14 +742,7 @@ mod tests {
     ) {
         let (mut raw_module, allocator, memory_id) = build_module(None);
 
-        let compilation_ctx = CompilationContext {
-            constants: &[],
-            functions_arguments: &[],
-            functions_returns: &[],
-            module_signatures: &[],
-            memory_id,
-            allocator,
-        };
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
@@ -820,6 +796,7 @@ mod tests {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("VecPopBack operation is not allowed on reference types");
             }
+            IntermediateType::IStruct(_) => todo!(),
         }
 
         if inner_type == IntermediateType::IU64 {
@@ -850,14 +827,7 @@ mod tests {
     ) {
         let (mut raw_module, allocator, memory_id) = build_module(None);
 
-        let compilation_ctx = CompilationContext {
-            constants: &[],
-            functions_arguments: &[],
-            functions_returns: &[],
-            module_signatures: &[],
-            memory_id,
-            allocator,
-        };
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);

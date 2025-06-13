@@ -1,8 +1,11 @@
 use walrus::{FunctionId, InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
 
-use crate::translation::{
-    functions::add_unpack_function_return_values_instructions,
-    intermediate_types::{ISignature, IntermediateType, signer::ISigner},
+use crate::{
+    CompilationContext,
+    translation::{
+        functions::add_unpack_function_return_values_instructions,
+        intermediate_types::{ISignature, IntermediateType, signer::ISigner},
+    },
 };
 
 use super::{
@@ -67,7 +70,7 @@ impl<'a> PublicFunction<'a> {
         storage_flush_cache_function: FunctionId,
         tx_origin_function: FunctionId,
         emit_log_function: FunctionId,
-        allocator_func: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         router_builder.block(None, |block| {
             let block_id = block.id();
@@ -90,7 +93,7 @@ impl<'a> PublicFunction<'a> {
                     self.handle_signer(
                         block,
                         module,
-                        allocator_func,
+                        compilation_ctx.allocator,
                         tx_origin_function,
                         emit_log_function,
                     );
@@ -99,7 +102,7 @@ impl<'a> PublicFunction<'a> {
                     self.handle_signer(
                         block,
                         module,
-                        allocator_func,
+                        compilation_ctx.allocator,
                         tx_origin_function,
                         emit_log_function,
                     );
@@ -115,7 +118,7 @@ impl<'a> PublicFunction<'a> {
             }
 
             // Wrap function to pack/unpack parameters
-            self.wrap_public_function(module, block, args_pointer, allocator_func);
+            self.wrap_public_function(module, block, args_pointer, compilation_ctx);
 
             // Stack: [return_data_pointer] [return_data_length] [status]
             let status = module.locals.add(ValType::I32);
@@ -143,7 +146,7 @@ impl<'a> PublicFunction<'a> {
         module: &mut Module,
         block: &mut InstrSeqBuilder,
         args_pointer: LocalId,
-        allocator_func: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         let memory_id = module.get_memory_id().expect("memory not found");
 
@@ -152,8 +155,7 @@ impl<'a> PublicFunction<'a> {
             module,
             &self.signature.arguments,
             args_pointer,
-            memory_id,
-            allocator_func,
+            compilation_ctx,
         );
         block.call(self.function_id);
         add_unpack_function_return_values_instructions(
@@ -163,13 +165,7 @@ impl<'a> PublicFunction<'a> {
             memory_id,
         );
 
-        build_pack_instructions(
-            block,
-            &self.signature.returns,
-            module,
-            memory_id,
-            allocator_func,
-        );
+        build_pack_instructions(block, &self.signature.returns, module, compilation_ctx);
 
         // TODO: Define error handling strategy, for now it will always result in traps
         // So it will only reach this point in the case of success
@@ -266,8 +262,8 @@ mod tests {
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
     use crate::{
-        CompilationContext,
         hostio::host_functions,
+        test_compilation_context,
         test_tools::build_module,
         translation::{functions::prepare_function_return, intermediate_types::IntermediateType},
         utils::display_module,
@@ -381,6 +377,7 @@ mod tests {
         allocator_func: FunctionId,
         memory_id: MemoryId,
     ) {
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
         // Build mock router
         let (write_return_data_function, _) = host_functions::write_result(module);
         let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
@@ -428,7 +425,7 @@ mod tests {
             storage_flush_cache_function,
             tx_origin_function,
             emit_log_function,
-            allocator_func,
+            &compilation_ctx,
         );
 
         // if no match, return -1
@@ -443,15 +440,7 @@ mod tests {
     fn test_build_public_function() {
         let (mut raw_module, allocator, memory_id) = build_module(None);
 
-        let compilation_ctx = CompilationContext {
-            constants: &[],
-            functions_arguments: &[],
-            functions_returns: &[],
-            module_signatures: &[],
-            memory_id,
-            allocator,
-        };
-
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
             &[ValType::I32, ValType::I32, ValType::I64],
@@ -526,14 +515,7 @@ mod tests {
     #[test]
     fn test_build_public_function_with_signer() {
         let (mut raw_module, allocator, memory_id) = build_module(None);
-        let compilation_ctx = CompilationContext {
-            constants: &[],
-            functions_arguments: &[],
-            functions_returns: &[],
-            module_signatures: &[],
-            memory_id,
-            allocator,
-        };
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,

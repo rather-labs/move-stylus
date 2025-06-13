@@ -1,10 +1,12 @@
-use move_binary_format::file_format::{FunctionDefinition, Signature};
+use std::collections::HashMap;
+
+use move_binary_format::file_format::{DatatypeHandleIndex, FunctionDefinition, Signature};
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
     ir::{LoadKind, MemArg, StoreKind},
 };
 
-use crate::{CompilationContext, translation::intermediate_types::ISignature};
+use crate::{CompilationContext, UserDefinedType, translation::intermediate_types::ISignature};
 
 use super::intermediate_types::IntermediateType;
 
@@ -24,6 +26,7 @@ impl MappedFunction {
         move_rets: &Signature,
         move_locals: &Signature,
         move_def: FunctionDefinition,
+        handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         module: &mut Module,
     ) -> Self {
         assert!(
@@ -31,7 +34,7 @@ impl MappedFunction {
             "Acquiring global resources is not supported yet"
         );
 
-        let signature = ISignature::from_signatures(move_args, move_rets);
+        let signature = ISignature::from_signatures(move_args, move_rets, handles_map);
         let wasm_arg_types = signature.get_argument_wasm_types();
         let wasm_ret_types = signature.get_return_wasm_types();
 
@@ -46,10 +49,16 @@ impl MappedFunction {
             .map(|ty| module.locals.add(*ty))
             .collect();
 
-        let ir_arg_types = move_args.0.iter().map(IntermediateType::try_from);
+        let ir_arg_types = move_args
+            .0
+            .iter()
+            .map(|s| IntermediateType::try_from_signature_token(s, handles_map));
 
         // Declared locals
-        let ir_declared_locals_types = move_locals.0.iter().map(IntermediateType::try_from);
+        let ir_declared_locals_types = move_locals
+            .0
+            .iter()
+            .map(|s| IntermediateType::try_from_signature_token(s, handles_map));
 
         let wasm_declared_locals = ir_declared_locals_types
             .clone()

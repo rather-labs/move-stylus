@@ -1,5 +1,5 @@
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
@@ -19,18 +19,8 @@ impl IVector {
         module: &mut Module,
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
-        memory_id: MemoryId,
-        allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
-        let compilation_ctx = CompilationContext {
-            constants: &[],
-            functions_arguments: &[],
-            functions_returns: &[],
-            module_signatures: &[],
-            memory_id,
-            allocator,
-        };
-
         // Big-endian to Little-endian
         let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
 
@@ -132,7 +122,7 @@ impl IVector {
 
         IVector::allocate_vector_with_header(
             block,
-            &compilation_ctx,
+            compilation_ctx,
             vector_pointer,
             length,
             length,
@@ -166,8 +156,7 @@ impl IVector {
                 module,
                 data_reader_pointer,
                 calldata_reader_pointer,
-                memory_id,
-                allocator,
+                compilation_ctx,
             );
 
             // store the value
@@ -217,12 +206,12 @@ impl IVector {
 
 #[cfg(test)]
 mod tests {
-    use crate::CompilationContext;
     use alloy_primitives::{U256, address};
     use alloy_sol_types::{SolType, sol};
     use walrus::{FunctionBuilder, ValType};
 
     use crate::{
+        test_compilation_context,
         test_tools::{build_module, setup_wasmtime_module},
         translation::intermediate_types::IntermediateType,
     };
@@ -231,6 +220,7 @@ mod tests {
 
     fn test_vec_unpacking(data: &[u8], int_type: IntermediateType, expected_result_bytes: &[u8]) {
         let (mut raw_module, allocator, memory_id) = build_module(Some(data.len() as i32));
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
 
@@ -247,8 +237,7 @@ mod tests {
             &mut raw_module,
             args_pointer,
             calldata_reader_pointer,
-            memory_id,
-            allocator,
+            &compilation_ctx,
         );
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);

@@ -1,8 +1,12 @@
 use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
-use move_binary_format::file_format::{Constant, Signature, Visibility};
+use move_binary_format::file_format::{
+    Constant, DatatypeHandleIndex, FieldHandleIndex, Signature, StructDefinitionIndex, Visibility,
+};
+use move_binary_format::internals::ModuleIndex;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
+use translation::intermediate_types::structs::IStruct;
 use translation::{
     functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
     translate_function,
@@ -44,11 +48,27 @@ pub struct CompilationContext<'a> {
     /// Module's signatures
     pub module_signatures: &'a [Signature],
 
+    /// Module's structs: contains all the user defined structs
+    pub module_structs: &'a [IStruct],
+
+    /// Maps a field index to its corresponding struct
+    pub fields_to_struct_map: &'a HashMap<FieldHandleIndex, StructDefinitionIndex>,
+
+    // This Hashmap maps the move's datatype handles to our internal representation of those
+    // types. The datatype handles are used interally by move to look for user defined data
+    // types
+    pub datatype_handles_map: &'a HashMap<DatatypeHandleIndex, UserDefinedType>,
+
     /// WASM memory id
     pub memory_id: MemoryId,
 
     /// Allocator function id
     pub allocator: FunctionId,
+}
+
+pub enum UserDefinedType {
+    Struct(usize),
+    Enum(usize),
 }
 
 pub fn translate_single_module(package: CompiledPackage, module_name: &str) -> Module {
@@ -82,14 +102,86 @@ pub fn translate_package(
         let root_compiled_module = root_compiled_module.unit.module;
 
         assert!(
-            root_compiled_module.struct_defs.is_empty(),
-            "Structs are not supported yet"
-        );
-
-        assert!(
             root_compiled_module.enum_defs.is_empty(),
             "Enums are not supported yet"
         );
+
+        let mut datatype_handles_map = HashMap::new();
+
+        for (index, datatype_handle) in root_compiled_module.datatype_handles().iter().enumerate() {
+            let idx = DatatypeHandleIndex::new(index as u16);
+
+            // Assert the index we constructed is ok
+            assert_eq!(
+                *datatype_handle,
+                root_compiled_module.datatype_handles()[idx.into_index()]
+            );
+
+            let addition_result = if let Some(position) = root_compiled_module
+                .struct_defs()
+                .iter()
+                .position(|s| s.struct_handle == idx)
+            {
+                datatype_handles_map.insert(idx, UserDefinedType::Struct(position))
+            } else if let Some(position) = root_compiled_module
+                .enum_defs()
+                .iter()
+                .position(|e| e.enum_handle == idx)
+            {
+                datatype_handles_map.insert(idx, UserDefinedType::Enum(position))
+            } else {
+                panic!("datatype handle index {index} not found");
+            };
+
+            assert!(
+                addition_result.is_none(),
+                "user defined data with handle {:?} already defined",
+                idx
+            );
+        }
+
+        // Module's structs
+        let mut module_structs: Vec<IStruct> = vec![];
+        let mut fields_to_struct_map = HashMap::new();
+        for (index, struct_def) in root_compiled_module.struct_defs().iter().enumerate() {
+            let struct_index = StructDefinitionIndex::new(index as u16);
+            let mut fields_map = HashMap::new();
+            let mut all_fields = Vec::new();
+            if let Some(fields) = struct_def.fields() {
+                for (field_index, field) in fields.iter().enumerate() {
+                    let intermediate_type = IntermediateType::try_from_signature_token(
+                        &field.signature.0,
+                        &datatype_handles_map,
+                    )
+                    .unwrap();
+
+                    let field_index = root_compiled_module
+                        .field_handles()
+                        .iter()
+                        .position(|f| f.field == field_index as u16 && f.owner == struct_index)
+                        .map(|i| FieldHandleIndex::new(i as u16));
+
+                    // If field_index is None means the field is never referenced in the code
+                    if let Some(field_index) = field_index {
+                        let res = fields_map.insert(field_index, intermediate_type.clone());
+                        assert!(
+                            res.is_none(),
+                            "there was an error creating a field in struct {struct_index}, field with index {field_index} already exist"
+                        );
+                        let res = fields_to_struct_map.insert(field_index, struct_index);
+                        assert!(
+                            res.is_none(),
+                            "there was an error mapping field {field_index} to struct {struct_index}, already mapped"
+                        );
+                        all_fields.push((Some(field_index), intermediate_type));
+                    } else {
+                        all_fields.push((None, intermediate_type));
+                    }
+                }
+            }
+
+            module_structs.push(IStruct::new(struct_index, all_fields, fields_map));
+        }
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
 
@@ -97,8 +189,8 @@ pub fn translate_package(
             let func_ty = module.types.add(&[ValType::I32], &[]);
             module.add_import_func("", "print_i32", func_ty);
 
-            let func_ty = module.types.add(&[], &[]);
-            module.add_import_func("", "print_memory", func_ty);
+            let func_ty = module.types.add(&[ValType::I32], &[]);
+            module.add_import_func("", "print_memory_from", func_ty);
 
             let func_ty = module.types.add(&[ValType::I64], &[]);
             module.add_import_func("", "print_i64", func_ty);
@@ -133,7 +225,7 @@ pub fn translate_package(
                 move_function_arguments
                     .0
                     .iter()
-                    .map(IntermediateType::try_from)
+                    .map(|s| IntermediateType::try_from_signature_token(s, &datatype_handles_map))
                     .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
                     .unwrap(),
             );
@@ -145,7 +237,7 @@ pub fn translate_package(
                 move_function_return
                     .0
                     .iter()
-                    .map(IntermediateType::try_from)
+                    .map(|s| IntermediateType::try_from_signature_token(s, &datatype_handles_map))
                     .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
                     .unwrap(),
             );
@@ -163,6 +255,7 @@ pub fn translate_package(
                 move_function_return,
                 code_locals,
                 function_def,
+                &datatype_handles_map,
                 &mut module,
             );
 
@@ -174,6 +267,9 @@ pub fn translate_package(
             functions_arguments: &functions_arguments,
             functions_returns: &functions_returns,
             module_signatures: &root_compiled_module.signatures,
+            module_structs: &module_structs,
+            datatype_handles_map: &datatype_handles_map,
+            fields_to_struct_map: &fields_to_struct_map,
             memory_id,
             allocator: allocator_func,
         };
@@ -201,7 +297,7 @@ pub fn translate_package(
             }
         }
 
-        hostio::build_entrypoint_router(&mut module, allocator_func, memory_id, &public_functions);
+        hostio::build_entrypoint_router(&mut module, &public_functions, &compilation_ctx);
 
         // Fill the WASM table with the function ids
         for (index, function_id) in function_ids.into_iter().enumerate() {
