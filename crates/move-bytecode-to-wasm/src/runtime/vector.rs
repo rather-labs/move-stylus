@@ -471,9 +471,13 @@ pub fn vec_pop_back_64_function(
 
 /// Pushes a pointer to a non-heap element in a vector.
 ///
-/// Stack transition:
-///
-/// ```..., vector_reference, index -> ..., element ptr```
+/// # Arguments:
+///    - vector_reference: (i32) reference to the vector
+///    - index: (i64) index of the element to borrow
+///    - is_heap: (i32) boolean indicating if the element is heap or not
+///    - size: (i32) stack size of the vector inner type
+/// # Returns:
+///    - i32 reference to the borrowed element
 pub fn vec_borrow_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
