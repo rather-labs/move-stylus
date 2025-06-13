@@ -1,10 +1,11 @@
 use walrus::{
-    FunctionBuilder, FunctionId, MemoryId, Module, ValType,
+    FunctionBuilder, FunctionId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg},
 };
 
 use crate::{
-    abi_types::public_function::PublicFunction, runtime_error_codes::ERROR_NO_FUNCTION_MATCH,
+    CompilationContext, abi_types::public_function::PublicFunction,
+    runtime_error_codes::ERROR_NO_FUNCTION_MATCH,
 };
 
 use super::host_functions;
@@ -15,9 +16,8 @@ use super::host_functions;
 /// Status is 0 for success and non-zero for failure.
 pub fn build_entrypoint_router(
     module: &mut Module,
-    allocator_func: FunctionId,
-    memory_id: MemoryId,
     functions: &[PublicFunction],
+    compilation_ctx: &CompilationContext,
 ) {
     let (read_args_function, _) = host_functions::read_args(module);
     let (write_return_data_function, _) = host_functions::write_result(module);
@@ -47,14 +47,14 @@ pub fn build_entrypoint_router(
 
     // Load function args to memory
     router_builder.local_get(args_len);
-    router_builder.call(allocator_func);
+    router_builder.call(compilation_ctx.allocator);
     router_builder.local_tee(args_pointer);
     router_builder.call(read_args_function);
 
     // Load selector from first 4 bytes of args
     router_builder.local_get(args_pointer);
     router_builder.load(
-        memory_id,
+        compilation_ctx.memory_id,
         LoadKind::I32 { atomic: false },
         MemArg {
             align: 0,
@@ -74,7 +74,7 @@ pub fn build_entrypoint_router(
             storage_flush_cache_function,
             tx_origin_function,
             emit_log_function,
-            allocator_func,
+            compilation_ctx,
         );
     }
 
@@ -97,8 +97,8 @@ mod tests {
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
     use crate::{
-        test_tools::build_module, translation::intermediate_types::ISignature,
-        utils::display_module,
+        test_compilation_context, test_tools::build_module,
+        translation::intermediate_types::ISignature, utils::display_module,
     };
 
     use super::*;
@@ -231,6 +231,7 @@ mod tests {
     #[test]
     fn test_build_entrypoint_router_noop() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
         let signature = ISignature {
             arguments: vec![],
             returns: vec![],
@@ -241,7 +242,7 @@ mod tests {
         let noop_selector_data = noop.get_selector().to_vec();
         let noop_2_selector_data = noop_2.get_selector().to_vec();
 
-        build_entrypoint_router(&mut raw_module, allocator_func, memory_id, &[noop, noop_2]);
+        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx);
         display_module(&mut raw_module);
 
         let data = ReadArgsData {
@@ -269,6 +270,7 @@ mod tests {
     #[should_panic(expected = "unreachable")]
     fn test_build_entrypoint_router_no_data() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
         let signature = ISignature {
             arguments: vec![],
             returns: vec![],
@@ -276,7 +278,7 @@ mod tests {
         let noop = add_noop_function(&mut raw_module, &signature);
         let noop_2 = add_noop_2_function(&mut raw_module, &signature);
 
-        build_entrypoint_router(&mut raw_module, allocator_func, memory_id, &[noop, noop_2]);
+        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx);
         display_module(&mut raw_module);
 
         // Invalid selector
@@ -291,6 +293,7 @@ mod tests {
     #[test]
     fn test_build_entrypoint_router_no_match() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
         let signature = ISignature {
             arguments: vec![],
             returns: vec![],
@@ -298,7 +301,7 @@ mod tests {
         let noop = add_noop_function(&mut raw_module, &signature);
         let noop_2 = add_noop_2_function(&mut raw_module, &signature);
 
-        build_entrypoint_router(&mut raw_module, allocator_func, memory_id, &[noop, noop_2]);
+        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx);
         display_module(&mut raw_module);
 
         // Invalid selector

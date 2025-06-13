@@ -1,4 +1,5 @@
 //! This module contains aux functions used in unit tests in this module
+#![allow(dead_code)]
 use walrus::{FunctionId, MemoryId, Module, ModuleConfig, ValType};
 use wasmtime::{Caller, Engine, Instance, Linker, Module as WasmModule, Store, TypedFunc};
 
@@ -51,7 +52,6 @@ where
     (linker, instance, store, entrypoint)
 }
 
-#[allow(dead_code)]
 pub fn get_linker_with_host_debug_functions<T>() -> Linker<T> {
     let mut linker = Linker::new(&Engine::default());
     linker
@@ -91,7 +91,6 @@ pub fn get_linker_with_host_debug_functions<T>() -> Linker<T> {
     linker
 }
 
-#[allow(dead_code)]
 pub fn inject_host_debug_functions(module: &mut Module) {
     let func_ty = module.types.add(&[ValType::I32], &[]);
     module.add_import_func("", "print_i32", func_ty);
@@ -104,4 +103,21 @@ pub fn inject_host_debug_functions(module: &mut Module) {
 
     let func_ty = module.types.add(&[], &[]);
     module.add_import_func("", "print_separator", func_ty);
+}
+
+#[macro_export]
+macro_rules! test_compilation_context {
+    ($memory_id: ident, $allocator: ident) => {
+        $crate::CompilationContext {
+            constants: &[],
+            functions_arguments: &[],
+            functions_returns: &[],
+            module_signatures: &[],
+            module_structs: &[],
+            datatype_handles_map: &std::collections::HashMap::new(),
+            fields_to_struct_map: &std::collections::HashMap::new(),
+            memory_id: $memory_id,
+            allocator: $allocator,
+        }
+    };
 }

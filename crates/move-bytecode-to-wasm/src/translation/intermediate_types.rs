@@ -1,7 +1,13 @@
+use std::collections::HashMap;
+
+use crate::{
+    CompilationContext, UserDefinedType, runtime::RuntimeFunction,
+    wasm_builder_extensions::WasmBuilderExtension,
+};
 use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
-use move_binary_format::file_format::{Signature, SignatureToken};
+use move_binary_format::file_format::{DatatypeHandleIndex, Signature, SignatureToken};
 use simple_integers::{IU8, IU16, IU32, IU64};
 use vector::IVector;
 use walrus::{
@@ -9,14 +15,13 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use crate::CompilationContext;
-use crate::{runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension};
 pub mod address;
 pub mod boolean;
 pub mod heap_integers;
 pub mod reference;
 pub mod signer;
 pub mod simple_integers;
+pub mod structs;
 pub mod vector;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -33,6 +38,8 @@ pub enum IntermediateType {
     IVector(Box<IntermediateType>),
     IRef(Box<IntermediateType>),
     IMutRef(Box<IntermediateType>),
+    // The usize is the struct's index in the compilation context's vector of declared structs
+    IStruct(usize),
 }
 
 impl IntermediateType {
@@ -50,7 +57,50 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
-            | IntermediateType::IMutRef(_) => 4,
+            | IntermediateType::IMutRef(_)
+            | IntermediateType::IStruct(_) => 4,
+        }
+    }
+
+    pub fn try_from_signature_token(
+        value: &SignatureToken,
+        handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+    ) -> Result<Self, anyhow::Error> {
+        match value {
+            SignatureToken::Bool => Ok(Self::IBool),
+            SignatureToken::U8 => Ok(Self::IU8),
+            SignatureToken::U16 => Ok(Self::IU16),
+            SignatureToken::U32 => Ok(Self::IU32),
+            SignatureToken::U64 => Ok(Self::IU64),
+            SignatureToken::U128 => Ok(Self::IU128),
+            SignatureToken::U256 => Ok(Self::IU256),
+            SignatureToken::Address => Ok(Self::IAddress),
+            SignatureToken::Signer => Ok(Self::ISigner),
+            SignatureToken::Vector(token) => {
+                let itoken = Self::try_from_signature_token(token.as_ref(), handles_map)?;
+                Ok(IntermediateType::IVector(Box::new(itoken)))
+            }
+            SignatureToken::Reference(token) => {
+                let itoken = Self::try_from_signature_token(token.as_ref(), handles_map)?;
+                Ok(IntermediateType::IRef(Box::new(itoken)))
+            }
+            SignatureToken::MutableReference(token) => {
+                let itoken = Self::try_from_signature_token(token.as_ref(), handles_map)?;
+                Ok(IntermediateType::IMutRef(Box::new(itoken)))
+            }
+            SignatureToken::Datatype(index) => {
+                if let Some(udt) = handles_map.get(index) {
+                    Ok(match udt {
+                        UserDefinedType::Struct(i) => IntermediateType::IStruct(*i),
+                        UserDefinedType::Enum(_) => todo!(),
+                    })
+                } else {
+                    Err(anyhow::anyhow!(
+                        "No user defined data with handler index: {index:?} found"
+                    ))
+                }
+            }
+            _ => Err(anyhow::anyhow!("Unsupported signature token: {value:?}")),
         }
     }
 
@@ -87,6 +137,7 @@ impl IntermediateType {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("cannot load a constant for a reference type");
             }
+            IntermediateType::IStruct(_) => todo!(),
         }
     }
 
@@ -163,6 +214,7 @@ impl IntermediateType {
                     },
                 );
             }
+            IntermediateType::IStruct(_) => todo!(),
         }
     }
 
@@ -258,6 +310,7 @@ impl IntermediateType {
             IntermediateType::ISigner => {
                 panic!(r#"trying to introduce copy instructions for "signer" type"#)
             }
+            IntermediateType::IStruct(_) => todo!(),
         }
     }
 
@@ -311,6 +364,8 @@ impl IntermediateType {
 
                 local
             }
+
+            IntermediateType::IStruct(_) => todo!(),
         }
     }
 
@@ -332,7 +387,8 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IRef(_)
-            | IntermediateType::IMutRef(_) => {
+            | IntermediateType::IMutRef(_)
+            | IntermediateType::IStruct(_) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -356,7 +412,8 @@ impl IntermediateType {
             | IntermediateType::IU256
             | IntermediateType::ISigner
             | IntermediateType::IAddress
-            | IntermediateType::IVector(_) => {
+            | IntermediateType::IVector(_)
+            | IntermediateType::IStruct(_) => {
                 builder.local_get(local);
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -625,7 +682,8 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
-            | IntermediateType::IMutRef(_) => {
+            | IntermediateType::IMutRef(_)
+            | IntermediateType::IStruct(_) => {
                 let ptr = module.locals.add(ValType::I32);
                 builder
                     .local_set(ptr)
@@ -668,6 +726,7 @@ impl IntermediateType {
                 builder.i32_const(1);
             }
             Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner),
+            Self::IStruct(_) => todo!(),
             Self::IRef(inner) | Self::IMutRef(inner) => {
                 let ptr1 = module.locals.add(ValType::I32);
                 let ptr2 = module.locals.add(ValType::I32);
@@ -740,6 +799,8 @@ impl IntermediateType {
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                         panic!("found reference of reference");
                     }
+
+                    Self::IStruct(_) => todo!(),
                 }
 
                 inner.load_equality_instructions(module, builder, compilation_ctx)
@@ -772,7 +833,8 @@ impl From<&IntermediateType> for ValType {
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
-            | IntermediateType::IMutRef(_) => ValType::I32,
+            | IntermediateType::IMutRef(_)
+            | IntermediateType::IStruct(_) => ValType::I32,
         }
     }
 }
@@ -783,49 +845,21 @@ impl From<IntermediateType> for ValType {
     }
 }
 
-impl TryFrom<&SignatureToken> for IntermediateType {
-    // TODO: Change when handling errors better
-    type Error = anyhow::Error;
-
-    fn try_from(value: &SignatureToken) -> Result<Self, Self::Error> {
-        match value {
-            SignatureToken::Bool => Ok(Self::IBool),
-            SignatureToken::U8 => Ok(Self::IU8),
-            SignatureToken::U16 => Ok(Self::IU16),
-            SignatureToken::U32 => Ok(Self::IU32),
-            SignatureToken::U64 => Ok(Self::IU64),
-            SignatureToken::U128 => Ok(Self::IU128),
-            SignatureToken::U256 => Ok(Self::IU256),
-            SignatureToken::Address => Ok(Self::IAddress),
-            SignatureToken::Signer => Ok(Self::ISigner),
-            SignatureToken::Vector(token) => {
-                let itoken = Self::try_from(token.as_ref())?;
-                Ok(IntermediateType::IVector(Box::new(itoken)))
-            }
-            SignatureToken::Reference(token) => {
-                let itoken = Self::try_from(token.as_ref())?;
-                Ok(IntermediateType::IRef(Box::new(itoken)))
-            }
-            SignatureToken::MutableReference(token) => {
-                let itoken = Self::try_from(token.as_ref())?;
-                Ok(IntermediateType::IMutRef(Box::new(itoken)))
-            }
-            _ => Err(anyhow::anyhow!("Unsupported signature token: {value:?}")),
-        }
-    }
-}
-
 pub struct ISignature {
     pub arguments: Vec<IntermediateType>,
     pub returns: Vec<IntermediateType>,
 }
 
 impl ISignature {
-    pub fn from_signatures(arguments: &Signature, returns: &Signature) -> Self {
+    pub fn from_signatures(
+        arguments: &Signature,
+        returns: &Signature,
+        handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+    ) -> Self {
         let arguments = arguments
             .0
             .iter()
-            .map(|token| token.try_into())
+            .map(|token| IntermediateType::try_from_signature_token(token, handles_map))
             .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
             // TODO: unwrap
             .unwrap();
@@ -833,7 +867,7 @@ impl ISignature {
         let returns = returns
             .0
             .iter()
-            .map(|token| token.try_into())
+            .map(|token| IntermediateType::try_from_signature_token(token, handles_map))
             .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
             // TODO: unwrap
             .unwrap();

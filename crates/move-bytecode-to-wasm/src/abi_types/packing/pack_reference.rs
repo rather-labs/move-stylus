@@ -1,8 +1,9 @@
 use super::Packable;
+use crate::CompilationContext;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::reference::{IMutRef, IRef};
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    InstrSeqBuilder, LocalId, Module, ValType,
     ir::{LoadKind, MemArg},
 };
 
@@ -15,8 +16,7 @@ impl IRef {
         local: LocalId,
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
-        memory: MemoryId,
-        allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         match inner {
             // Heap types: just forward the pointer
@@ -31,8 +31,7 @@ impl IRef {
                     local,
                     writer_pointer,
                     calldata_reference_pointer,
-                    memory,
-                    allocator,
+                    compilation_ctx,
                 );
             }
             // Immediate types: deref the pointer and pass the value as LocalId
@@ -43,7 +42,7 @@ impl IRef {
             | IntermediateType::IBool => {
                 builder.local_get(local);
                 builder.load(
-                    memory,
+                    compilation_ctx.memory_id,
                     match inner.stack_data_size() {
                         4 => LoadKind::I32 { atomic: false },
                         8 => LoadKind::I64 { atomic: false },
@@ -67,13 +66,13 @@ impl IRef {
                     value_local,
                     writer_pointer,
                     calldata_reference_pointer,
-                    memory,
-                    allocator,
+                    compilation_ctx,
                 );
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
+            IntermediateType::IStruct(_) => todo!(),
         }
     }
 }
@@ -87,8 +86,7 @@ impl IMutRef {
         local: LocalId,
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
-        memory: MemoryId,
-        allocator: FunctionId,
+        compilation_ctx: &CompilationContext,
     ) {
         match inner {
             // Heap types: just forward the pointer
@@ -103,8 +101,7 @@ impl IMutRef {
                     local,
                     writer_pointer,
                     calldata_reference_pointer,
-                    memory,
-                    allocator,
+                    compilation_ctx,
                 );
             }
             // Immediate types: deref the pointer and pass the value as LocalId
@@ -115,7 +112,7 @@ impl IMutRef {
             | IntermediateType::IBool => {
                 builder.local_get(local);
                 builder.load(
-                    memory,
+                    compilation_ctx.memory_id,
                     match inner.stack_data_size() {
                         4 => LoadKind::I32 { atomic: false },
                         8 => LoadKind::I64 { atomic: false },
@@ -139,13 +136,13 @@ impl IMutRef {
                     value_local,
                     writer_pointer,
                     calldata_reference_pointer,
-                    memory,
-                    allocator,
+                    compilation_ctx,
                 );
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
+            IntermediateType::IStruct(_) => todo!(),
         }
     }
 }
@@ -153,6 +150,7 @@ impl IMutRef {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_compilation_context;
     use crate::test_tools::build_module;
     use crate::test_tools::setup_wasmtime_module;
     use crate::translation::intermediate_types::IntermediateType;
@@ -165,6 +163,8 @@ mod tests {
 
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[], &[ValType::I32]);
+
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let local = raw_module.locals.add(ValType::I32);
         let writer_pointer = raw_module.locals.add(ValType::I32);
@@ -190,8 +190,7 @@ mod tests {
             local,
             writer_pointer,
             calldata_reference_pointer,
-            memory_id,
-            allocator,
+            &compilation_ctx,
         );
 
         // Return the writer pointer for reading the calldata back
