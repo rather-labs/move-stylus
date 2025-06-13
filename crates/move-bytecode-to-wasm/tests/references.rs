@@ -229,8 +229,8 @@ mod reference_uint_32 {
     #[case(miscellaneous1Call::new(()), vec![1u32, 2u32, 3u32])]
     fn test_uint_32_mut_ref_misc<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
-        #[case] call_data: T,   
-        #[case] expected_result: Vec<u32>,  
+        #[case] call_data: T,
+        #[case] expected_result: Vec<u32>,
     ) {
         let expected_result = <sol!((uint32[],))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
@@ -279,7 +279,7 @@ mod reference_uint_64 {
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
-    #[rstest]   
+    #[rstest]
     #[case(miscellaneous0Call::new(()), vec![1u64, 2u64, 3u64])]
     #[case(miscellaneous1Call::new(()), vec![1u64, 2u64, 3u64])]
     fn test_uint_64_mut_ref_misc<T: SolCall>(
@@ -345,7 +345,6 @@ mod reference_uint_128 {
         let expected_result = <sol!((uint128[],))>::abi_encode_params(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
-    
 }
 mod reference_uint_256 {
     use super::*;
@@ -445,7 +444,7 @@ mod reference_address {
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
-    #[rstest]   
+    #[rstest]
     #[case(miscellaneous0Call::new(()), vec![address!("0x0000000000000000000000000000000000000001"), address!("0x0000000000000000000000000000000000000002"), address!("0x0000000000000000000000000000000000000002")])]
     #[case(miscellaneous1Call::new(()), vec![address!("0x0000000000000000000000000000000000000001"), address!("0x0000000000000000000000000000000000000003"), address!("0x0000000000000000000000000000000000000002")])]
     fn test_address_ref_misc<T: SolCall>(

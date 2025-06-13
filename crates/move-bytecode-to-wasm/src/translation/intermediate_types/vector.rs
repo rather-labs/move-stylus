@@ -526,7 +526,6 @@ impl IVector {
         // Set lenght
         builder.i32_const(num_elements).local_set(len_local);
 
-
         IVector::allocate_vector_with_header(
             builder,
             compilation_ctx,
@@ -1749,9 +1748,7 @@ mod tests {
             vec![2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         ];
 
-        let expected_result_bytes = vec![
-            2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0,
-        ];
+        let expected_result_bytes = vec![2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0];
 
         test_vector_pack(
             &element_bytes,
@@ -1777,9 +1774,8 @@ mod tests {
             ],
         ];
 
-        let expected_result_bytes = vec![
-            3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 64, 0, 0, 0,
-        ];
+        let expected_result_bytes =
+            vec![3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 64, 0, 0, 0];
 
         test_vector_pack(
             &element_bytes,
@@ -1795,9 +1791,7 @@ mod tests {
             vec![2, 0, 0, 0, 30, 0, 0, 0, 40, 0, 0, 0],
         ];
 
-        let expected_result_bytes = vec![
-            2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0,
-        ];
+        let expected_result_bytes = vec![2, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 16, 0, 0, 0];
 
         test_vector_pack(
             &element_bytes,
