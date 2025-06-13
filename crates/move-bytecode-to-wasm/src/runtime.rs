@@ -42,6 +42,7 @@ pub enum RuntimeFunction {
     VecSwap64,
     VecPopBack32,
     VecPopBack64,
+    VecBorrow,
 }
 
 impl RuntimeFunction {
@@ -80,6 +81,7 @@ impl RuntimeFunction {
             Self::VecSwap64 => "vec_swap_64",
             Self::VecPopBack32 => "vec_pop_back_32",
             Self::VecPopBack64 => "vec_pop_back_64",
+            Self::VecBorrow => "vec_borrow",
         }
     }
 
@@ -144,6 +146,7 @@ impl RuntimeFunction {
                 (Self::VecSwap64, Some(ctx)) => vector::vec_swap_64_function(module, ctx),
                 (Self::VecPopBack32, Some(ctx)) => vector::vec_pop_back_32_function(module, ctx),
                 (Self::VecPopBack64, Some(ctx)) => vector::vec_pop_back_64_function(module, ctx),
+                (Self::VecBorrow, Some(ctx)) => vector::vec_borrow_function(module, ctx),
                 // Error
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,

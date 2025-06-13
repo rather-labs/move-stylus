@@ -17,13 +17,28 @@ pub trait WasmBuilderExtension {
 
     /// Computes the address of an element in a vector.
     ///
-    /// [..., ptr, index] --> vec_ptr_at(size) -> [..., element_address]
+    /// [..., ptr, index] --> vec_elem_ptr(size) -> [..., element_address]
     ///
     /// Where:
     /// - ptr: pointer to the vector
     /// - index: index of the element
     /// - size: size of each element in bytes
-    fn vec_ptr_at(&mut self, ptr: LocalId, index: LocalId, size: i32) -> &mut Self;
+    fn vec_elem_ptr(&mut self, ptr: LocalId, index: LocalId, size: i32) -> &mut Self;
+
+    /// Computes the address of an element in a vector.
+    ///
+    /// [..., ptr, index, size_local] --> vec_elem_ptr_dynamic() -> [..., element_address]
+    ///
+    /// Where:
+    /// - ptr: pointer to the vector
+    /// - index: index of the element
+    /// - size_local: local variable containing the size of each element
+    fn vec_elem_ptr_dynamic(
+        &mut self,
+        ptr: LocalId,
+        index: LocalId,
+        size_local: LocalId,
+    ) -> &mut Self;
 
     /// Skips the length and capacity of a vector.
     ///
@@ -42,12 +57,23 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         self.local_set(v1).local_set(v2).local_get(v1).local_get(v2)
     }
 
-    fn vec_ptr_at(&mut self, ptr: LocalId, index: LocalId, size: i32) -> &mut Self {
-        self.local_get(ptr)
-            .i32_const(8) // 4 bytes for length + 4 bytes for capacity
-            .binop(BinaryOp::I32Add)
+    fn vec_elem_ptr(&mut self, ptr: LocalId, index: LocalId, size: i32) -> &mut Self {
+        self.skip_vec_header(ptr)
             .local_get(index)
             .i32_const(size)
+            .binop(BinaryOp::I32Mul)
+            .binop(BinaryOp::I32Add)
+    }
+
+    fn vec_elem_ptr_dynamic(
+        &mut self,
+        ptr: LocalId,
+        index: LocalId,
+        size_local: LocalId,
+    ) -> &mut Self {
+        self.skip_vec_header(ptr)
+            .local_get(index)
+            .local_get(size_local)
             .binop(BinaryOp::I32Mul)
             .binop(BinaryOp::I32Add)
     }
