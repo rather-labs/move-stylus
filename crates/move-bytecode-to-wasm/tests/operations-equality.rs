@@ -1066,6 +1066,17 @@ mod structs {
         function eqStructVecStackType(uint32[] a, uint32[] b) external returns (bool);
         function eqStructVecHeapType(uint128[] a, uint128[] b) external returns (bool);
         function eqStructStruct(uint32 a, uint128 b, uint32 c, uint128 d) external returns (bool);
+        function neqStructBool(bool a, bool b) external returns (bool);
+        function neqStructAddress(address a, address b) external returns (bool);
+        function neqStructU256(uint256 a, uint256 b) external returns (bool);
+        function neqStructU128(uint128 a, uint128 b) external returns (bool);
+        function neqStructU64(uint64 a, uint64 b) external returns (bool);
+        function neqStructU32(uint32 a, uint32 b) external returns (bool);
+        function neqStructU16(uint16 a, uint16 b) external returns (bool);
+        function neqStructU8(uint8 a, uint8 b) external returns (bool);
+        function neqStructVecStackType(uint32[] a, uint32[] b) external returns (bool);
+        function neqStructVecHeapType(uint128[] a, uint128[] b) external returns (bool);
+        function neqStructStruct(uint32 a, uint128 b, uint32 c, uint128 d) external returns (bool);
     );
 
     #[rstest]
@@ -1100,6 +1111,50 @@ mod structs {
     #[case(eqStructStructCall::new((u32::MAX, u128::MAX, u32::MAX, u128::MAX)), true)]
     #[case(eqStructStructCall::new((u32::MAX, u128::MAX, 1, u128::MAX)), false)]
     fn test_equality_struct<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: bool,
+    ) {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(neqStructBoolCall::new((true, true)), false)]
+    #[case(neqStructBoolCall::new((false, true)), true)]
+    #[case(neqStructU8Call::new((255, 255)), false)]
+    #[case(neqStructU8Call::new((1, 255)), true)]
+    #[case(neqStructU16Call::new((u16::MAX, u16::MAX)), false)]
+    #[case(neqStructU16Call::new((1, u16::MAX)), true)]
+    #[case(neqStructU32Call::new((u32::MAX, u32::MAX)), false)]
+    #[case(neqStructU32Call::new((1, u32::MAX)), true)]
+    #[case(neqStructU64Call::new((u64::MAX, u64::MAX)), false)]
+    #[case(neqStructU64Call::new((1, u64::MAX)), true)]
+    #[case(neqStructU128Call::new((u128::MAX, u128::MAX)), false)]
+    #[case(neqStructU128Call::new((1, u128::MAX)), true)]
+    #[case(neqStructU256Call::new((U256::MAX, U256::MAX)), false)]
+    #[case(neqStructU256Call::new((U256::from(1), U256::MAX)), true)]
+    #[case(neqStructVecStackTypeCall::new((vec![1,2,u32::MAX,3,4], vec![1,2,u32::MAX,3,4])), false)]
+    #[case(neqStructVecStackTypeCall::new((vec![1,2,u32::MAX,3,4], vec![1,2,3,4,5])), true)]
+    #[case(neqStructVecHeapTypeCall::new((vec![1,2,u128::MAX,3,4], vec![1,2,u128::MAX,3,4])), false)]
+    #[case(neqStructVecHeapTypeCall::new((vec![1,2,u128::MAX,3,4], vec![1,2,3,4,5])), true)]
+    #[case(neqStructAddressCall::new(
+        (address!("0xcafe000000000000000000000000000000007357"),
+         address!("0xcafe000000000000000000000000000000007357"))),
+         false
+    )]
+    #[case(neqStructAddressCall::new(
+        (address!("0xcafe0000000000deadbeefdeadbeef0000007357"),
+         address!("0xcafe000000000000000000000000000000007357"))),
+         true
+    )]
+    #[case(neqStructStructCall::new((u32::MAX, u128::MAX, u32::MAX, u128::MAX)), false)]
+    #[case(neqStructStructCall::new((u32::MAX, u128::MAX, 1, u128::MAX)), true)]
+    fn test_not_equality_struct<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: bool,

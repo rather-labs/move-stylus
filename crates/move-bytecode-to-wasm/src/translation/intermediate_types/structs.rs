@@ -51,7 +51,7 @@ use super::IntermediateType;
 use move_binary_format::file_format::{FieldHandleIndex, StructDefinitionIndex};
 use walrus::{
     InstrSeqBuilder, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
+    ir::{LoadKind, MemArg},
 };
 
 #[derive(Debug)]
