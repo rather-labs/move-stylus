@@ -48,7 +48,6 @@ mod struct_fields {
         function echoVecHeapType(uint128[] a) external returns (uint128[]);
         function echoAddress(address a) external returns (address);
         function echoBarStructFields(uint32 a, uint128 b) external returns (uint32, uint128);
-
     );
 
     #[rstest]
@@ -118,6 +117,7 @@ mod struct_mut_fields {
         function echoMutVecStackType(uint32[] a) external returns (uint32[]);
         function echoMutVecHeapType(uint128[] a) external returns (uint128[]);
         function echoMutAddress(address a) external returns (address);
+        function echoBarStructFields(uint32 a, uint128 b) external returns (uint32, uint128);
     );
 
     #[rstest]
@@ -137,9 +137,13 @@ mod struct_mut_fields {
     #[case(echoMutVecStackTypeCall::new((vec![1,2,u32::MAX,3,4],)), (vec![1,2,u32::MAX,3,4],))]
     #[case(echoMutVecHeapTypeCall::new((vec![1,2,u128::MAX,3,4],)), (vec![1,2,u128::MAX,3,4],))]
     #[case(echoMutAddressCall::new(
-    (address!("0xcafe000000000000000000000000000000007357"),)),
-    (address!("0xcafe000000000000000000000000000000007357"),))
-]
+        (address!("0xcafe000000000000000000000000000000007357"),)),
+        (address!("0xcafe000000000000000000000000000000007357"),))
+    ]
+    #[case(echoBarStructFieldsCall::new((u32::MAX, u128::MAX)), (u32::MAX, u128::MAX),)]
+    #[case(echoBarStructFieldsCall::new((1, u128::MAX)), (1, u128::MAX),)]
+    #[case(echoBarStructFieldsCall::new((u32::MAX, 1)), (u32::MAX, 1),)]
+    #[case(echoBarStructFieldsCall::new((1, 1)), (1, 1),)]
     fn test_struct_field_mut_reference<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
