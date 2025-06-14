@@ -139,6 +139,16 @@ impl IVector {
         );
     }
 
+    /// Perform a deep copy of a vector.
+    ///
+    /// # Stack Arguments
+    ///
+    /// * `src_ptr`: (i32) A pointer referencing the vector to be duplicated.
+    /// * `multiplier`: (i32) A factor used to determine the new vector's capacity, calculated as `multiplier * len`.
+    ///
+    /// # Returns
+    ///
+    /// * `dst_ptr`: (i32) A pointer to the newly copied vector.
     pub fn copy_local_instructions(
         inner: &IntermediateType,
         module: &mut Module,
