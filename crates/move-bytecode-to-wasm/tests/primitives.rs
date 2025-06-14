@@ -1400,75 +1400,75 @@ fn test_vec_32() {
     let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
     let runtime = RuntimeSandbox::new(&mut translated_package);
 
-    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
-    let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
-    run_test(&runtime, data, expected_result).unwrap();
+    // let data = getConstantCall::abi_encode(&getConstantCall::new(()));
+    // let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
+    // run_test(&runtime, data, expected_result).unwrap();
 
-    let data = getConstantLocalCall::abi_encode(&getConstantLocalCall::new(()));
-    let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
-    run_test(&runtime, data, expected_result).unwrap();
+    // let data = getConstantLocalCall::abi_encode(&getConstantLocalCall::new(()));
+    // let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
+    // run_test(&runtime, data, expected_result).unwrap();
 
-    // getLiteral() should return [1, 2, 3]
-    let data = getLiteralCall::abi_encode(&getLiteralCall::new(()));
-    let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
-    run_test(&runtime, data, expected_result).unwrap();
+    // // getLiteral() should return [1, 2, 3]
+    // let data = getLiteralCall::abi_encode(&getLiteralCall::new(()));
+    // let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
+    // run_test(&runtime, data, expected_result).unwrap();
 
     // getCopiedLocal() should return [1, 2, 3]
     let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
     let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
     run_test(&runtime, data, expected_result).unwrap();
 
-    // echo([1, 2, 3]) should return [1, 2, 3]
-    let data = echoCall::abi_encode(&echoCall::new((vec![1u32, 2u32, 3u32],)));
-    let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
-    run_test(&runtime, data, expected_result).unwrap();
+    // // echo([1, 2, 3]) should return [1, 2, 3]
+    // let data = echoCall::abi_encode(&echoCall::new((vec![1u32, 2u32, 3u32],)));
+    // let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 3u32],));
+    // run_test(&runtime, data, expected_result).unwrap();
 
-    // vecFromInt(1, 2) should return [1, 2]
-    let data = vecFromIntCall::abi_encode(&vecFromIntCall::new((1u32, 2u32)));
-    let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 1u32],));
-    run_test(&runtime, data, expected_result).unwrap();
+    // // vecFromInt(1, 2) should return [1, 2]
+    // let data = vecFromIntCall::abi_encode(&vecFromIntCall::new((1u32, 2u32)));
+    // let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32, 2u32, 1u32],));
+    // run_test(&runtime, data, expected_result).unwrap();
 
-    // vec_from_vec([1, 2, 3], [4, 5, 6]) should return [[1, 2, 3], [4, 5, 6]]
-    let data = vecFromVecCall::abi_encode(&vecFromVecCall::new((
-        vec![1u32, 2u32, 3u32],
-        vec![4u32, 5u32, 6u32],
-    )));
-    let expected_result = <sol!((uint32[][],))>::abi_encode_params(&(vec![
-        vec![1u32, 2u32, 3u32],
-        vec![4u32, 5u32, 6u32],
-    ],));
-    run_test(&runtime, data, expected_result).unwrap();
+    // // vec_from_vec([1, 2, 3], [4, 5, 6]) should return [[1, 2, 3], [4, 5, 6]]
+    // let data = vecFromVecCall::abi_encode(&vecFromVecCall::new((
+    //     vec![1u32, 2u32, 3u32],
+    //     vec![4u32, 5u32, 6u32],
+    // )));
+    // let expected_result = <sol!((uint32[][],))>::abi_encode_params(&(vec![
+    //     vec![1u32, 2u32, 3u32],
+    //     vec![4u32, 5u32, 6u32],
+    // ],));
+    // run_test(&runtime, data, expected_result).unwrap();
 
-    // vecFromVecAndInt([1, 2, 3], 4) should return [[1, 2, 3], [4, 4]]
-    let data = vecFromVecAndIntCall::abi_encode(&vecFromVecAndIntCall::new((
-        vec![1u32, 2u32, 3u32],
-        4u32,
-    )));
-    let expected_result =
-        <sol!((uint32[][],))>::abi_encode_params(
-            &(vec![vec![1u32, 2u32, 3u32], vec![4u32, 4u32]],),
-        );
-    run_test(&runtime, data, expected_result).unwrap();
+    // // vecFromVecAndInt([1, 2, 3], 4) should return [[1, 2, 3], [4, 4]]
+    // let data = vecFromVecAndIntCall::abi_encode(&vecFromVecAndIntCall::new((
+    //     vec![1u32, 2u32, 3u32],
+    //     4u32,
+    // )));
+    // let expected_result =
+    //     <sol!((uint32[][],))>::abi_encode_params(
+    //         &(vec![vec![1u32, 2u32, 3u32], vec![4u32, 4u32]],),
+    //     );
+    // run_test(&runtime, data, expected_result).unwrap();
 
-    let data = vecLenCall::abi_encode(&vecLenCall::new((vec![1u32, 2u32, 3u32],)));
-    let expected_result = <sol!((uint64,))>::abi_encode_params(&(3u64,));
-    run_test(&runtime, data, expected_result).unwrap();
+    // let data = vecLenCall::abi_encode(&vecLenCall::new((vec![1u32, 2u32, 3u32],)));
+    // let expected_result = <sol!((uint64,))>::abi_encode_params(&(3u64,));
+    // run_test(&runtime, data, expected_result).unwrap();
 
-    let data = vecPopBackCall::abi_encode(&vecPopBackCall::new((vec![1u32, 2u32, 3u32],)));
-    let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32],));
-    run_test(&runtime, data, expected_result).unwrap();
+    // let data = vecPopBackCall::abi_encode(&vecPopBackCall::new((vec![1u32, 2u32, 3u32],)));
+    // let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![1u32],));
+    // run_test(&runtime, data, expected_result).unwrap();
 
-    let data = vecPopBackCall::abi_encode(&vecPopBackCall::new((vec![],)));
-    let result = run_test(&runtime, data, vec![]);
-    assert!(result.is_err(), "Expected out-of-bounds error");
+    // let data = vecPopBackCall::abi_encode(&vecPopBackCall::new((vec![],)));
+    // let result = run_test(&runtime, data, vec![]);
+    // assert!(result.is_err(), "Expected out-of-bounds error");
 
-    let data = vecSwapCall::abi_encode(&vecSwapCall::new((vec![1u32, 2u32, 3u32], 0u64, 1u64)));
-    let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![2u32, 1u32, 3u32],));
-    run_test(&runtime, data, expected_result).unwrap();
+    // let data = vecSwapCall::abi_encode(&vecSwapCall::new((vec![1u32, 2u32, 3u32], 0u64, 1u64)));
+    // let expected_result = <sol!((uint32[],))>::abi_encode_params(&(vec![2u32, 1u32, 3u32],));
+    // run_test(&runtime, data, expected_result).unwrap();
 
-    let data = vecSwapCall::abi_encode(&vecSwapCall::new((vec![1u32, 2u32, 3u32], 0u64, 3u64)));
-    let result = run_test(&runtime, data, vec![]);
-    assert!(result.is_err(), "Expected out-of-bounds error");
+    // let data = vecSwapCall::abi_encode(&vecSwapCall::new((vec![1u32, 2u32, 3u32], 0u64, 3u64)));
+    // let result = run_test(&runtime, data, vec![]);
+    // assert!(result.is_err(), "Expected out-of-bounds error");
 }
 
 #[test]

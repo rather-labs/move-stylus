@@ -146,15 +146,19 @@ impl IVector {
         compilation_ctx: &CompilationContext,
     ) {
         // === Local declarations ===
-        let src_local = module.locals.add(ValType::I32);
-        let dst_local = module.locals.add(ValType::I32);
+        let src_ptr = module.locals.add(ValType::I32);
+        let dst_ptr = module.locals.add(ValType::I32);
         let index = module.locals.add(ValType::I32);
         let len = module.locals.add(ValType::I32);
+        let multiplier = module.locals.add(ValType::I32);
+        let capacity = module.locals.add(ValType::I32);
         let data_size = inner.stack_data_size() as i32;
 
-        // === Read vector length ===
+        builder.local_set(multiplier);
+
+        // === Set vector ptr and length ===
         builder
-            .local_tee(src_local)
+            .local_tee(src_ptr)
             .load(
                 compilation_ctx.memory_id,
                 LoadKind::I32 { atomic: false },
@@ -163,15 +167,21 @@ impl IVector {
                     offset: 0,
                 },
             )
-            .local_set(len);
+            .local_tee(len);
+
+        // Calculate the capacity
+        builder
+            .local_get(multiplier)
+            .binop(BinaryOp::I32Mul)
+            .local_set(capacity);
 
         // Allocate memory and write length and capacity at the beginning
         IVector::allocate_vector_with_header(
             builder,
             compilation_ctx,
-            dst_local,
+            dst_ptr,
             len,
-            len,
+            capacity,
             data_size,
         );
 
@@ -180,8 +190,8 @@ impl IVector {
         builder.local_set(index);
 
         builder.loop_(None, |loop_block| {
-            loop_block.vec_elem_ptr(dst_local, index, data_size); // where to store the element
-            loop_block.vec_elem_ptr(src_local, index, data_size); // where to read the element
+            loop_block.vec_elem_ptr(dst_ptr, index, data_size); // where to store the element
+            loop_block.vec_elem_ptr(src_ptr, index, data_size); // where to read the element
 
             match inner {
                 IntermediateType::IBool
@@ -303,6 +313,7 @@ impl IVector {
                             offset: 0,
                         },
                     );
+                    loop_block.local_get(multiplier); // We use the same multiplier for nested vectors
                     IVector::copy_local_instructions(inner_, module, loop_block, compilation_ctx);
                 }
                 _ => {
@@ -336,7 +347,7 @@ impl IVector {
         });
 
         // === Return pointer to copied vector ===
-        builder.local_get(dst_local);
+        builder.local_get(dst_ptr);
     }
 
     pub fn equality(
@@ -594,6 +605,131 @@ impl IVector {
         let borrow_f = RuntimeFunction::VecBorrow.get(module, Some(compilation_ctx));
         builder.call(borrow_f);
     }
+
+    pub fn vec_push_back_instructions(
+        inner: &IntermediateType,
+        module: &mut Module,
+        builder: &mut InstrSeqBuilder,
+        compilation_ctx: &CompilationContext,
+    ) {
+        let size = inner.stack_data_size() as i32;
+        let vec_ref = module.locals.add(ValType::I32);
+        let vec_ptr = module.locals.add(ValType::I32);
+        let len = module.locals.add(ValType::I32);
+        let elem = module.locals.add(inner.into());
+
+        builder.local_set(elem);
+
+        builder
+            .local_tee(vec_ref)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_tee(vec_ptr) // now we have the actual vector pointer
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_tee(len)
+            .local_get(vec_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 4,
+                },
+            );
+
+        // Check if we can push back to the vector
+        builder.binop(BinaryOp::I32Eq).if_else(
+            None,
+            |then| {
+                // We need to allocate a new vector with more capacity
+                then.local_get(vec_ptr);
+                then.i32_const(2); // Length multiplier
+
+                // Copy the vector but increasing the capacity
+                IVector::copy_local_instructions(inner, module, then, compilation_ctx);
+
+                // set the new pointer in vec_ptr
+                then.local_set(vec_ptr);
+
+                // store the new element
+                then.vec_elem_ptr(vec_ptr, len, size).local_get(elem).store(
+                    compilation_ctx.memory_id,
+                    match inner.into() {
+                        ValType::I64 => StoreKind::I64 { atomic: false },
+                        ValType::I32 => StoreKind::I32 { atomic: false },
+                        _ => panic!("Unsupported ValType"),
+                    },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                // increment the length
+                then.local_get(vec_ptr)
+                    .local_get(len)
+                    .i32_const(1)
+                    .binop(BinaryOp::I32Add)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                // store the new pointer in #vec_ref
+                then.local_get(vec_ref).local_get(vec_ptr).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            },
+            |else_| {
+                // We can push back to the vector
+                else_
+                    .vec_elem_ptr(vec_ptr, len, size)
+                    .local_get(elem)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    ) // store the new element
+                    .local_get(vec_ptr)
+                    .local_get(len)
+                    .i32_const(1)
+                    .binop(BinaryOp::I32Add)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    ); // increase lenght by 1
+            },
+        );
+    }
 }
 
 #[cfg(test)]
@@ -663,6 +799,9 @@ mod tests {
             &mut data_iter.into_iter(),
             &compilation_ctx,
         );
+
+        // Set the capacity equal to the length in this case
+        builder.i32_const(1);
 
         // Copy the vector and return the new pointer
         IVector::copy_local_instructions(

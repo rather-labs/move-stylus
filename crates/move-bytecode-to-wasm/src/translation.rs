@@ -318,12 +318,14 @@ fn map_bytecode_instruction(
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
                 | IntermediateType::IVector(_) => {
-                    let swap_f = RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
-                    builder.call(swap_f);
+                    let pop_back_f =
+                        RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
+                    builder.call(pop_back_f);
                 }
                 IntermediateType::IU64 => {
-                    let swap_f = RuntimeFunction::VecPopBack64.get(module, Some(compilation_ctx));
-                    builder.call(swap_f);
+                    let pop_back_f =
+                        RuntimeFunction::VecPopBack64.get(module, Some(compilation_ctx));
+                    builder.call(pop_back_f);
                 }
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                     panic!("VecPopBack operation is not allowed on reference types");
@@ -332,6 +334,35 @@ fn map_bytecode_instruction(
             }
 
             types_stack.push(*vec_inner);
+        }
+        Bytecode::VecPushBack(signature_index) => {
+            let [elem_ty, ref_ty] = pop_n_from_stack(types_stack);
+
+            let IntermediateType::IMutRef(mut_inner) = ref_ty else {
+                panic!("Expected mutable reference to vector, got {:?}", ref_ty);
+            };
+
+            let IntermediateType::IVector(vec_inner) = *mut_inner else {
+                panic!("Expected vector type inside mutable reference");
+            };
+
+            let expected_elem_type = get_ir_for_signature_index(compilation_ctx, *signature_index);
+
+            if *vec_inner != expected_elem_type {
+                panic!(
+                    "Expected vector inner type {:?}, got {:?}",
+                    expected_elem_type, *vec_inner
+                );
+            }
+
+            if elem_ty != expected_elem_type {
+                panic!(
+                    "Expected element type {:?}, got {:?}",
+                    expected_elem_type, elem_ty
+                );
+            }
+
+            IVector::vec_push_back_instructions(&elem_ty, module, builder, compilation_ctx);
         }
         Bytecode::VecSwap(signature_index) => {
             let [id2_ty, id1_ty, ref_ty] = pop_n_from_stack(types_stack);
