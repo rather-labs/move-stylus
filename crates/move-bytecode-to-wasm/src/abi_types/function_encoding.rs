@@ -86,7 +86,14 @@ impl SolName for IntermediateType {
 
 #[cfg(test)]
 mod tests {
-    use crate::{test_compilation_context, test_tools::build_module};
+    use std::collections::HashMap;
+
+    use move_binary_format::file_format::StructDefinitionIndex;
+
+    use crate::{
+        test_compilation_context, test_tools::build_module,
+        translation::intermediate_types::structs::IStruct,
+    };
 
     use super::*;
 
@@ -138,6 +145,42 @@ mod tests {
             selector("testArray(uint128[][],bool[])")
         );
 
+        let struct_1 = IStruct::new(
+            "Foo".to_owned(),
+            StructDefinitionIndex::new(0),
+            vec![
+                (None, IntermediateType::IAddress),
+                (
+                    None,
+                    IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+                ),
+                (
+                    None,
+                    IntermediateType::IVector(Box::new(IntermediateType::IU128)),
+                ),
+                (None, IntermediateType::IBool),
+                (None, IntermediateType::IU8),
+                (None, IntermediateType::IU16),
+                (None, IntermediateType::IU32),
+                (None, IntermediateType::IU64),
+                (None, IntermediateType::IU128),
+                (None, IntermediateType::IU256),
+                (None, IntermediateType::IStruct(1, "Bar".to_owned())),
+            ],
+            HashMap::new(),
+        );
+        let struct_2 = IStruct::new(
+            "Bar".to_owned(),
+            StructDefinitionIndex::new(1),
+            vec![
+                (None, IntermediateType::IU32),
+                (None, IntermediateType::IU128),
+            ],
+            HashMap::new(),
+        );
+        let module_structs = vec![struct_1, struct_2];
+        compilation_ctx.module_structs = &module_structs;
+
         let signature: &[IntermediateType] = &[
             IntermediateType::IStruct(0, "Foo".to_owned()),
             IntermediateType::IVector(Box::new(IntermediateType::IStruct(1, "Bar".to_owned()))),
@@ -145,7 +188,9 @@ mod tests {
 
         assert_eq!(
             move_signature_to_abi_selector("test_struct", signature, &compilation_ctx),
-            selector("testStruct(Foo,Bar[])")
+            selector(
+                "testStruct((address,uint32[],uint128[],bool,uint8,uint16,uint32,uint64,uint128,uint256,(uint32,uint128)),(uint32,uint128)[])"
+            )
         );
     }
 
