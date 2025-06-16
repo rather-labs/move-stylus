@@ -500,7 +500,7 @@ impl IVector {
                     IntermediateType::ISigner => {
                         panic!("should not be possible to have a vector of signers")
                     }
-                    IntermediateType::IStruct(_) => todo!(),
+                    IntermediateType::IStruct(_, _) => todo!(),
                 }
             },
             |else_| {
@@ -583,7 +583,7 @@ impl IVector {
             | IntermediateType::IU256
             | IntermediateType::ISigner
             | IntermediateType::IAddress
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_, _) => {
                 builder.call(downcast_f);
                 builder.i32_const(1);
             }
@@ -796,7 +796,7 @@ mod tests {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("VecPopBack operation is not allowed on reference types");
             }
-            IntermediateType::IStruct(_) => todo!(),
+            IntermediateType::IStruct(_, _) => todo!(),
         }
 
         if inner_type == IntermediateType::IU64 {

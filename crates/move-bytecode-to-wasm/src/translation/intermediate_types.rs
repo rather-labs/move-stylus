@@ -39,7 +39,8 @@ pub enum IntermediateType {
     IRef(Box<IntermediateType>),
     IMutRef(Box<IntermediateType>),
     // The usize is the struct's index in the compilation context's vector of declared structs
-    IStruct(usize),
+    // The string is the identifier
+    IStruct(usize, String),
 }
 
 impl IntermediateType {
@@ -58,7 +59,7 @@ impl IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_) => 4,
+            | IntermediateType::IStruct(_, _) => 4,
         }
     }
 
@@ -91,7 +92,9 @@ impl IntermediateType {
             SignatureToken::Datatype(index) => {
                 if let Some(udt) = handles_map.get(index) {
                     Ok(match udt {
-                        UserDefinedType::Struct(i) => IntermediateType::IStruct(*i),
+                        UserDefinedType::Struct(i, name) => {
+                            IntermediateType::IStruct(*i, name.clone())
+                        }
                         UserDefinedType::Enum(_) => todo!(),
                     })
                 } else {
@@ -137,7 +140,7 @@ impl IntermediateType {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("cannot load a constant for a reference type");
             }
-            IntermediateType::IStruct(_) => todo!(),
+            IntermediateType::IStruct(_, _) => todo!(),
         }
     }
 
@@ -214,7 +217,7 @@ impl IntermediateType {
                     },
                 );
             }
-            IntermediateType::IStruct(_) => todo!(),
+            IntermediateType::IStruct(_, _) => todo!(),
         }
     }
 
@@ -310,7 +313,7 @@ impl IntermediateType {
             IntermediateType::ISigner => {
                 panic!(r#"trying to introduce copy instructions for "signer" type"#)
             }
-            IntermediateType::IStruct(_) => todo!(),
+            IntermediateType::IStruct(_, _) => todo!(),
         }
     }
 
@@ -365,7 +368,7 @@ impl IntermediateType {
                 local
             }
 
-            IntermediateType::IStruct(_) => todo!(),
+            IntermediateType::IStruct(_, _) => todo!(),
         }
     }
 
@@ -388,7 +391,7 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_, _) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -413,7 +416,7 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IAddress
             | IntermediateType::IVector(_)
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_, _) => {
                 builder.local_get(local);
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -683,7 +686,7 @@ impl IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_, _) => {
                 let ptr = module.locals.add(ValType::I32);
                 builder
                     .local_set(ptr)
@@ -726,7 +729,7 @@ impl IntermediateType {
                 builder.i32_const(1);
             }
             Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner),
-            Self::IStruct(_) => todo!(),
+            Self::IStruct(_, _) => todo!(),
             Self::IRef(inner) | Self::IMutRef(inner) => {
                 let ptr1 = module.locals.add(ValType::I32);
                 let ptr2 = module.locals.add(ValType::I32);
@@ -800,7 +803,7 @@ impl IntermediateType {
                         panic!("found reference of reference");
                     }
 
-                    Self::IStruct(_) => todo!(),
+                    Self::IStruct(_, _) => todo!(),
                 }
 
                 inner.load_equality_instructions(module, builder, compilation_ctx)
@@ -834,7 +837,7 @@ impl From<&IntermediateType> for ValType {
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_) => ValType::I32,
+            | IntermediateType::IStruct(_, _) => ValType::I32,
         }
     }
 }

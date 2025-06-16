@@ -58,7 +58,7 @@ impl SolName for IntermediateType {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => inner.sol_name(),
             IntermediateType::IVector(inner) => inner.sol_name().map(|sol_n| format!("{sol_n}[]")),
             IntermediateType::ISigner => None,
-            IntermediateType::IStruct(_) => todo!(),
+            IntermediateType::IStruct(_, _) => todo!(),
         }
     }
 }

@@ -230,7 +230,7 @@ fn map_bytecode_instruction(
             match types_stack.pop() {
                 Some(IntermediateType::IRef(inner)) => {
                     assert!(
-                        matches!(inner.as_ref(), IntermediateType::IStruct(i) if *i == struct_.index() as usize),
+                        matches!(inner.as_ref(), IntermediateType::IStruct(i, _) if *i == struct_.index() as usize),
                         "expected struct with index {} in types struct, got {inner:?}",
                         struct_.index()
                     );
@@ -328,7 +328,7 @@ fn map_bytecode_instruction(
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                     panic!("VecPopBack operation is not allowed on reference types");
                 }
-                IntermediateType::IStruct(_) => todo!(),
+                IntermediateType::IStruct(_, _) => todo!(),
             }
 
             types_stack.push(*vec_inner);
@@ -1040,7 +1040,7 @@ fn map_bytecode_instruction(
                             | IntermediateType::IAddress
                             | IntermediateType::ISigner
                             | IntermediateType::IVector(_)
-                            | IntermediateType::IStruct(_) => {
+                            | IntermediateType::IStruct(_, _) => {
                                 builder.local_set(ptr_to_data);
                             }
                             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -1065,6 +1065,7 @@ fn map_bytecode_instruction(
 
             types_stack.push(IntermediateType::IStruct(
                 struct_definition_index.0 as usize,
+                struct_.name.clone(),
             ));
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),

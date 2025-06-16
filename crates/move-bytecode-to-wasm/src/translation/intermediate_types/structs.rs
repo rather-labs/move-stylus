@@ -50,6 +50,9 @@ use move_binary_format::file_format::{FieldHandleIndex, StructDefinitionIndex};
 
 #[derive(Debug)]
 pub struct IStruct {
+    /// Struct's identifier
+    pub name: String,
+
     /// Field's types ordered by index
     pub fields: Vec<IntermediateType>,
 
@@ -69,6 +72,7 @@ pub struct IStruct {
 
 impl IStruct {
     pub fn new(
+        name: String,
         index: StructDefinitionIndex,
         fields: Vec<(Option<FieldHandleIndex>, IntermediateType)>,
         fields_types: HashMap<FieldHandleIndex, IntermediateType>,
@@ -85,6 +89,7 @@ impl IStruct {
         let fields = fields.into_iter().map(|(_, t)| t).collect();
 
         Self {
+            name,
             struct_definition_index: index,
             heap_size,
             field_offsets,
