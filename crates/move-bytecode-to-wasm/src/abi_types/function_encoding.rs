@@ -58,7 +58,7 @@ impl SolName for IntermediateType {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => inner.sol_name(),
             IntermediateType::IVector(inner) => inner.sol_name().map(|sol_n| format!("{sol_n}[]")),
             IntermediateType::ISigner => None,
-            IntermediateType::IStruct(_, _) => todo!(),
+            IntermediateType::IStruct(_, name) => Some(name.clone()),
         }
     }
 }
@@ -110,6 +110,15 @@ mod tests {
         assert_eq!(
             move_signature_to_abi_selector("test_array", signature),
             selector("testArray(uint128[][],bool[])")
+        );
+
+        let signature: &[IntermediateType] = &[
+            IntermediateType::IStruct(0, "Foo".to_owned()),
+            IntermediateType::IVector(Box::new(IntermediateType::IStruct(1, "Bar".to_owned()))),
+        ];
+        assert_eq!(
+            move_signature_to_abi_selector("test_struct", signature),
+            selector("testStruct(Foo,Bar[])")
         );
     }
 
