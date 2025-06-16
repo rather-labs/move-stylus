@@ -103,19 +103,10 @@ mod tests {
 
     use super::*;
 
-    fn add_noop_function<'a>(module: &mut Module, signature: &'a ISignature) -> PublicFunction<'a> {
-        // Noop function
-        let mut noop_builder = FunctionBuilder::new(&mut module.types, &[], &[]);
-        noop_builder.func_body();
-
-        let noop = noop_builder.finish(vec![], &mut module.funcs);
-
-        PublicFunction::new(noop, "noop", signature)
-    }
-
-    fn add_noop_2_function<'a>(
+    fn add_noop_function<'a>(
         module: &mut Module,
         signature: &'a ISignature,
+        compilation_ctx: &CompilationContext,
     ) -> PublicFunction<'a> {
         // Noop function
         let mut noop_builder = FunctionBuilder::new(&mut module.types, &[], &[]);
@@ -123,7 +114,21 @@ mod tests {
 
         let noop = noop_builder.finish(vec![], &mut module.funcs);
 
-        PublicFunction::new(noop, "noop_2", signature)
+        PublicFunction::new(noop, "noop", signature, compilation_ctx)
+    }
+
+    fn add_noop_2_function<'a>(
+        module: &mut Module,
+        signature: &'a ISignature,
+        compilation_ctx: &CompilationContext,
+    ) -> PublicFunction<'a> {
+        // Noop function
+        let mut noop_builder = FunctionBuilder::new(&mut module.types, &[], &[]);
+        noop_builder.func_body();
+
+        let noop = noop_builder.finish(vec![], &mut module.funcs);
+
+        PublicFunction::new(noop, "noop_2", signature, compilation_ctx)
     }
 
     struct ReadArgsData {
@@ -236,8 +241,8 @@ mod tests {
             arguments: vec![],
             returns: vec![],
         };
-        let noop = add_noop_function(&mut raw_module, &signature);
-        let noop_2 = add_noop_2_function(&mut raw_module, &signature);
+        let noop = add_noop_function(&mut raw_module, &signature, &compilation_ctx);
+        let noop_2 = add_noop_2_function(&mut raw_module, &signature, &compilation_ctx);
 
         let noop_selector_data = noop.get_selector().to_vec();
         let noop_2_selector_data = noop_2.get_selector().to_vec();
@@ -275,8 +280,8 @@ mod tests {
             arguments: vec![],
             returns: vec![],
         };
-        let noop = add_noop_function(&mut raw_module, &signature);
-        let noop_2 = add_noop_2_function(&mut raw_module, &signature);
+        let noop = add_noop_function(&mut raw_module, &signature, &compilation_ctx);
+        let noop_2 = add_noop_2_function(&mut raw_module, &signature, &compilation_ctx);
 
         build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx);
         display_module(&mut raw_module);
@@ -298,8 +303,8 @@ mod tests {
             arguments: vec![],
             returns: vec![],
         };
-        let noop = add_noop_function(&mut raw_module, &signature);
-        let noop_2 = add_noop_2_function(&mut raw_module, &signature);
+        let noop = add_noop_function(&mut raw_module, &signature, &compilation_ctx);
+        let noop_2 = add_noop_2_function(&mut raw_module, &signature, &compilation_ctx);
 
         build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx);
         display_module(&mut raw_module);

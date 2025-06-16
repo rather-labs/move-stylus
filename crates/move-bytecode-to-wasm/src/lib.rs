@@ -311,6 +311,7 @@ pub fn translate_package(
                     *function_id,
                     &mapped_function.name,
                     &mapped_function.signature,
+                    &compilation_ctx,
                 ));
             }
         }

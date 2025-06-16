@@ -37,11 +37,17 @@ pub struct PublicFunction<'a> {
 }
 
 impl<'a> PublicFunction<'a> {
-    pub fn new(function_id: FunctionId, function_name: &str, signature: &'a ISignature) -> Self {
+    pub fn new(
+        function_id: FunctionId,
+        function_name: &str,
+        signature: &'a ISignature,
+        compilation_ctx: &CompilationContext,
+    ) -> Self {
         Self::check_signature_arguments(function_name, &signature.arguments)
             .unwrap_or_else(|e| panic!("ABI error: {e}"));
 
-        let function_selector = move_signature_to_abi_selector(function_name, &signature.arguments);
+        let function_selector =
+            move_signature_to_abi_selector(function_name, &signature.arguments, compilation_ctx);
 
         Self {
             function_id,
@@ -484,7 +490,8 @@ mod tests {
             ],
             returns,
         };
-        let public_function = PublicFunction::new(function, "test_function", &signature);
+        let public_function =
+            PublicFunction::new(function, "test_function", &signature, &compilation_ctx);
 
         let mut data =
             <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
@@ -544,7 +551,8 @@ mod tests {
             arguments: vec![IntermediateType::ISigner, IntermediateType::IU8],
             returns,
         };
-        let public_function = PublicFunction::new(function, "test_function", &signature);
+        let public_function =
+            PublicFunction::new(function, "test_function", &signature, &compilation_ctx);
 
         let mut data = <sol!((uint8,))>::abi_encode_params(&(1,));
         data = [public_function.get_selector().to_vec(), data].concat();
@@ -576,6 +584,7 @@ mod tests {
     #[test]
     fn test_build_entrypoint_router_no_match() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -615,7 +624,8 @@ mod tests {
             ],
             returns: vec![IntermediateType::IU32],
         };
-        let public_function = PublicFunction::new(function, "test_function", &signature);
+        let public_function =
+            PublicFunction::new(function, "test_function", &signature, &compilation_ctx);
 
         let mut data =
             <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
@@ -646,7 +656,8 @@ mod tests {
     // injects a mock address as signer and execute the function
     #[test]
     fn public_function_with_signature() {
-        let (mut raw_module, _, _) = build_module(None);
+        let (mut raw_module, allocator, memory_id) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let function_builder = FunctionBuilder::new(
             &mut raw_module.types,
@@ -669,7 +680,7 @@ mod tests {
             ],
             returns: vec![],
         };
-        PublicFunction::new(function, "test_function", &signature);
+        PublicFunction::new(function, "test_function", &signature, &compilation_ctx);
     }
 
     #[test]
@@ -677,7 +688,8 @@ mod tests {
         expected = r#"ABI error: error in argument 2 of function "test_function", only one "signer" argument at the beginning is admitted"#
     )]
     fn test_fail_public_function_signature() {
-        let (mut raw_module, _, _) = build_module(None);
+        let (mut raw_module, allocator, memory_id) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32, ValType::I64], &[]);
@@ -697,7 +709,7 @@ mod tests {
             ],
             returns: vec![],
         };
-        PublicFunction::new(function, "test_function", &signature);
+        PublicFunction::new(function, "test_function", &signature, &compilation_ctx);
     }
 
     #[test]
@@ -705,7 +717,8 @@ mod tests {
         expected = r#"ABI error: error in argument 3 of function "test_function", complex types can't contain the type "signer""#
     )]
     fn test_fail_public_function_signature_complex_type() {
-        let (mut raw_module, _, _) = build_module(None);
+        let (mut raw_module, allocator, memory_id) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32, ValType::I64], &[]);
@@ -725,7 +738,7 @@ mod tests {
             ],
             returns: vec![],
         };
-        PublicFunction::new(function, "test_function", &signature);
+        PublicFunction::new(function, "test_function", &signature, &compilation_ctx);
     }
 
     #[test]
@@ -733,7 +746,8 @@ mod tests {
         expected = r#"ABI error: error in argument 3 of function "test_function", complex types can't contain the type "signer""#
     )]
     fn test_fail_public_function_signature_complex_type_2() {
-        let (mut raw_module, _, _) = build_module(None);
+        let (mut raw_module, allocator, memory_id) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator);
 
         let function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I32, ValType::I64], &[]);
@@ -755,6 +769,8 @@ mod tests {
             ],
             returns: vec![],
         };
-        PublicFunction::new(function, "test_function", &signature);
+        PublicFunction::new(function, "test_function", &signature, &compilation_ctx);
     }
+
+    // TODO: ADD TESTS FOR STRUCT
 }

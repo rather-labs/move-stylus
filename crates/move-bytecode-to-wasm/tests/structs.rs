@@ -106,11 +106,18 @@ mod struct_unpacking {
         RuntimeSandbox::new(&mut translated_package)
     }
 
-    sol!(UnapackStruct, "tests/structs/UnapackStruct.abi");
+    sol! {
+        struct Bar {
+            uint32 n;
+            uint128 o;
+        }
+
+        function echoBar(Bar bar) external returns (uint32, uint128);
+    }
 
     #[rstest]
-    #[case(UnapackStruct::echoBarCall::new(
-        (UnapackStruct::Bar { n: 42, o: 4242 },)),
+    #[case(echoBarCall::new(
+        (Bar { n: 42, o: 4242 },)),
         (42,4242)
     )]
     fn test_struct_unpacking<T: SolCall, V: SolValue>(

@@ -1,4 +1,4 @@
-contract UnapackStruct {
+contract UnpackStruct {
     struct Bar {
         uint32 n;
         uint128 o;
