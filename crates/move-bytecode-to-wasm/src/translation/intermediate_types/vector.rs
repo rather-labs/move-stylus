@@ -323,7 +323,8 @@ impl IVector {
                             offset: 0,
                         },
                     );
-                    loop_block.local_get(multiplier); // We use the same multiplier for nested vectors
+                    // loop_block.local_get(multiplier); // We use the same multiplier for nested vectors
+                    loop_block.i32_const(1);
                     IVector::copy_local_instructions(inner_, module, loop_block, compilation_ctx);
                 }
                 _ => {
@@ -994,20 +995,31 @@ mod tests {
 
         builder.local_get(vec_ref);
 
-        let element_data_len = element_data.len();
         let element_data = element_data.to_vec();
+        let element_pointer = raw_module.locals.add(inner_type.clone().into());
         inner_type.load_constant_instructions(
             &mut raw_module,
             &mut builder,
             &mut element_data.into_iter(),
             &compilation_ctx,
         );
+        builder.local_tee(element_pointer);
 
         // Stack:
         // [Element pointer]
         // [Reference to vector]
 
-        // If the vector's capacity equals its current length, this operation may reallocate vector data and update the vector reference to the new memory location.
+        // First push back copies the entire vector, increasing its capacity
+        IVector::vec_push_back_instructions(
+            &inner_type,
+            &mut raw_module,
+            &mut builder,
+            &compilation_ctx,
+        );
+
+        // Second push back pushes the element to the new copied vector, which has capacity
+        builder.local_get(vec_ref);
+        builder.local_get(element_pointer);
         IVector::vec_push_back_instructions(
             &inner_type,
             &mut raw_module,
@@ -1023,8 +1035,7 @@ mod tests {
                 offset: 0,
             },
         );
-        
-        
+
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
 
@@ -1044,7 +1055,10 @@ mod tests {
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_memory_data = vec![0; expected_result_bytes.len()];
-        memory.read(&mut store, vector_pointer as usize, &mut result_memory_data).unwrap();
+        let offset = global_next_free_memory_pointer as usize - expected_result_bytes.len();
+        memory
+            .read(&mut store, offset, &mut result_memory_data)
+            .unwrap();
         assert_eq!(result_memory_data, expected_result_bytes);
     }
 
@@ -1143,6 +1157,21 @@ mod tests {
         ]
         .concat();
 
+        let expected_push_bytes = [
+            5u32.to_le_bytes().as_slice(),
+            8u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            1u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+        let element_bytes = [1u8];
+
         let expected_swap_bytes = [
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
@@ -1182,13 +1211,13 @@ mod tests {
         .concat();
 
         let expected_push_bytes = [
-            4u32.to_le_bytes().as_slice(),
+            5u32.to_le_bytes().as_slice(),
             6u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
         ]
         .concat();
@@ -1207,13 +1236,13 @@ mod tests {
         test_vector(&data, IntermediateType::IU8, &expected_bytes);
         test_vector_copy(&data, IntermediateType::IU8, &expected_bytes);
         test_vector_pop_back(&data, IntermediateType::IU8, &expected_pop_bytes, 3);
+        test_vector_swap(&data, IntermediateType::IU8, &expected_swap_bytes, 0, 2);
         test_vector_push_back(
             &data,
             &element_bytes,
             IntermediateType::IU8,
             &expected_push_bytes,
         );
-        test_vector_swap(&data, IntermediateType::IU8, &expected_swap_bytes, 0, 2);
     }
 
     #[test]
@@ -1246,17 +1275,17 @@ mod tests {
         ]
         .concat();
 
-        let element_bytes = [4u16.to_le_bytes().as_slice()].concat();
+        let element_bytes = [5u16.to_le_bytes().as_slice()].concat();
 
         let expected_push_bytes = [
-            5u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
             8u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            4u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
+            5u32.to_le_bytes().as_slice(),
+            5u32.to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
         ]
@@ -1314,19 +1343,19 @@ mod tests {
         ]
         .concat();
         let expected_push_bytes = [
-            5u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
             8u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
-            4u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
+            5u32.to_le_bytes().as_slice(),
+            5u32.to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
         ]
         .concat();
-        let element_bytes = [4u32.to_le_bytes().as_slice()].concat();
+        let element_bytes = [5u32.to_le_bytes().as_slice()].concat();
         let expected_swap_bytes = [
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
@@ -1378,19 +1407,19 @@ mod tests {
         ]
         .concat();
         let expected_push_bytes = [
-            5u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
             8u32.to_le_bytes().as_slice(),
             1u64.to_le_bytes().as_slice(),
             2u64.to_le_bytes().as_slice(),
             3u64.to_le_bytes().as_slice(),
             4u64.to_le_bytes().as_slice(),
-            4u64.to_le_bytes().as_slice(),
-            0u64.to_le_bytes().as_slice(),
+            5u64.to_le_bytes().as_slice(),
+            5u64.to_le_bytes().as_slice(),
             0u64.to_le_bytes().as_slice(),
             0u64.to_le_bytes().as_slice(),
         ]
         .concat();
-        let element_bytes = [4u64.to_le_bytes().as_slice()].concat();
+        let element_bytes = [5u64.to_le_bytes().as_slice()].concat();
         let expected_swap_bytes = [
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
@@ -1468,14 +1497,15 @@ mod tests {
         .concat();
 
         let expected_push_bytes = [
-            5u32.to_le_bytes().as_slice(),
+            99u128.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
             8u32.to_le_bytes().as_slice(),
             148u32.to_le_bytes().as_slice(),
             164u32.to_le_bytes().as_slice(),
             180u32.to_le_bytes().as_slice(),
             196u32.to_le_bytes().as_slice(),
             92u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
+            92u32.to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
             1u128.to_le_bytes().as_slice(),
@@ -1555,12 +1585,13 @@ mod tests {
         .concat();
 
         let expected_push_bytes = [
-            3u32.to_le_bytes().as_slice(),
+            U256::from(99u128).to_le_bytes::<32>().as_slice(),
+            4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
             140u32.to_le_bytes().as_slice(),
             172u32.to_le_bytes().as_slice(),
             84u32.to_le_bytes().as_slice(),
-            0u32.to_le_bytes().as_slice(),
+            84u32.to_le_bytes().as_slice(),
             U256::from(1u128).to_le_bytes::<32>().as_slice(),
             U256::from(2u128).to_le_bytes::<32>().as_slice(),
         ]
@@ -1646,6 +1677,28 @@ mod tests {
         ]
         .concat();
 
+        let expected_push_bytes = [
+            U256::from(0x5555).to_be_bytes::<32>().as_slice(),
+            6u32.to_le_bytes().as_slice(),
+            8u32.to_le_bytes().as_slice(),
+            // Pointers to memory
+            228u32.to_le_bytes().as_slice(),
+            260u32.to_le_bytes().as_slice(),
+            292u32.to_le_bytes().as_slice(),
+            324u32.to_le_bytes().as_slice(),
+            156u32.to_le_bytes().as_slice(),
+            156u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            0u32.to_le_bytes().as_slice(),
+            U256::from(0x1111).to_be_bytes::<32>().as_slice(),
+            U256::from(0x2222).to_be_bytes::<32>().as_slice(),
+            U256::from(0x3333).to_be_bytes::<32>().as_slice(),
+            U256::from(0x4444).to_be_bytes::<32>().as_slice(),
+        ]
+        .concat();
+
+        let element_bytes = [U256::from(0x5555).to_be_bytes::<32>().as_slice()].concat();
+
         let expected_swap_bytes = [
             4u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),
@@ -1671,6 +1724,12 @@ mod tests {
             &expected_swap_bytes,
             0,
             3,
+        );
+        test_vector_push_back(
+            &data,
+            &element_bytes,
+            IntermediateType::IAddress,
+            &expected_push_bytes,
         );
     }
 
@@ -1783,6 +1842,55 @@ mod tests {
         ]
         .concat(); // 52 bytes total
 
+        let expected_push_bytes = [
+            [
+                4u32.to_le_bytes().as_slice(),
+                4u32.to_le_bytes().as_slice(),
+                101u32.to_le_bytes().as_slice(),
+                102u32.to_le_bytes().as_slice(),
+                103u32.to_le_bytes().as_slice(),
+                104u32.to_le_bytes().as_slice(),
+            ]
+            .concat()
+            .as_slice(), // push back element is loaded before the new vector!
+            4u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
+            116u32.to_le_bytes().as_slice(),
+            140u32.to_le_bytes().as_slice(),
+            68u32.to_le_bytes().as_slice(),
+            68u32.to_le_bytes().as_slice(),
+            [
+                4u32.to_le_bytes().as_slice(),
+                4u32.to_le_bytes().as_slice(),
+                1u32.to_le_bytes().as_slice(),
+                2u32.to_le_bytes().as_slice(),
+                3u32.to_le_bytes().as_slice(),
+                4u32.to_le_bytes().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+            [
+                4u32.to_le_bytes().as_slice(),
+                4u32.to_le_bytes().as_slice(),
+                5u32.to_le_bytes().as_slice(),
+                6u32.to_le_bytes().as_slice(),
+                7u32.to_le_bytes().as_slice(),
+                8u32.to_le_bytes().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+        ]
+        .concat();
+
+        let element_bytes = [
+            &[4u8],
+            101u32.to_le_bytes().as_slice(),
+            102u32.to_le_bytes().as_slice(),
+            103u32.to_le_bytes().as_slice(),
+            104u32.to_le_bytes().as_slice(),
+        ]
+        .concat();
+
         let expected_swap_bytes = [
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
@@ -1826,6 +1934,12 @@ mod tests {
             IntermediateType::IVector(Box::new(IntermediateType::IU32)),
             &expected_pop_bytes,
             44,
+        );
+        test_vector_push_back(
+            &data,
+            &element_bytes,
+            IntermediateType::IVector(Box::new(IntermediateType::IU32)),
+            &expected_push_bytes,
         );
         test_vector_swap(
             &data,
@@ -1948,6 +2062,59 @@ mod tests {
             .as_slice(),
         ]
         .concat();
+
+        let expected_push_bytes = [
+            [
+                2u32.to_le_bytes().as_slice(),
+                2u32.to_le_bytes().as_slice(),
+                // Pointers to memory
+                196u32.to_le_bytes().as_slice(),
+                228u32.to_le_bytes().as_slice(),
+                //Referenced values
+                U256::from(5u128).to_le_bytes::<32>().as_slice(),
+                U256::from(6u128).to_le_bytes::<32>().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+            4u32.to_le_bytes().as_slice(),
+            4u32.to_le_bytes().as_slice(),
+            284u32.to_le_bytes().as_slice(),
+            364u32.to_le_bytes().as_slice(),
+            180u32.to_le_bytes().as_slice(),
+            180u32.to_le_bytes().as_slice(),
+            [
+                2u32.to_le_bytes().as_slice(),
+                2u32.to_le_bytes().as_slice(),
+                // Pointers to memory
+                300u32.to_le_bytes().as_slice(),
+                332u32.to_le_bytes().as_slice(),
+                // Referenced values
+                U256::from(1u128).to_le_bytes::<32>().as_slice(),
+                U256::from(2u128).to_le_bytes::<32>().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+            [
+                2u32.to_le_bytes().as_slice(),
+                2u32.to_le_bytes().as_slice(),
+                // Pointers to memory
+                380u32.to_le_bytes().as_slice(),
+                412u32.to_le_bytes().as_slice(),
+                //Referenced values
+                U256::from(3u128).to_le_bytes::<32>().as_slice(),
+                U256::from(4u128).to_le_bytes::<32>().as_slice(),
+            ]
+            .concat()
+            .as_slice(),
+        ]
+        .concat();
+        let element_bytes = [
+            &[2u8],
+            U256::from(5u128).to_le_bytes::<32>().as_slice(),
+            U256::from(6u128).to_le_bytes::<32>().as_slice(),
+        ]
+        .concat();
+
         let expected_swap_bytes = [
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
@@ -1991,6 +2158,12 @@ mod tests {
             IntermediateType::IVector(Box::new(IntermediateType::IU256)),
             &expected_pop_bytes,
             100,
+        );
+        test_vector_push_back(
+            &data,
+            &element_bytes,
+            IntermediateType::IVector(Box::new(IntermediateType::IU256)),
+            &expected_push_bytes,
         );
         test_vector_swap(
             &data,
