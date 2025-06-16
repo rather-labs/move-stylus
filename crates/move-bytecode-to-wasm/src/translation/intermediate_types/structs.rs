@@ -79,7 +79,7 @@ impl IStruct {
     ) -> Self {
         let mut heap_size = 0;
         let mut field_offsets = HashMap::new();
-        for (index, _) in fields.iter().rev() {
+        for (index, _) in fields.iter() {
             if let Some(idx) = index {
                 field_offsets.insert(*idx, heap_size);
             }

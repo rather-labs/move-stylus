@@ -117,8 +117,8 @@ mod struct_unpacking {
 
     #[rstest]
     #[case(echoBarCall::new(
-        (Bar { n: 42, o: 4242 },)),
-        (42,4242)
+        (Bar { n: u32::MAX, o: u128::MAX },)),
+        (u32::MAX, u128::MAX)
     )]
     fn test_struct_unpacking<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,

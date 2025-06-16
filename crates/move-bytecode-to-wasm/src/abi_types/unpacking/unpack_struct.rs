@@ -25,6 +25,8 @@ impl IStruct {
             .find(|s| s.index() == index as u16)
             .unwrap_or_else(|| panic!("struct that with index {index} not found"));
 
+        let print_memory_from = module.imports.get_func("", "print_memory_from").unwrap();
+
         let struct_ptr = module.locals.add(ValType::I32);
         let val_32 = module.locals.add(ValType::I32);
         let val_64 = module.locals.add(ValType::I64);
@@ -38,6 +40,8 @@ impl IStruct {
 
         let mut offset = 0;
         for field in &struct_.fields {
+            builder.local_get(reader_pointer).call(print_memory_from);
+
             // Unpack field
             field.add_unpack_instructions(
                 builder,
@@ -92,14 +96,10 @@ impl IStruct {
                 MemArg { align: 0, offset },
             );
 
-            builder
-                .local_get(calldata_reader_pointer)
-                .i32_const(32)
-                .binop(BinaryOp::I32Add)
-                .local_set(calldata_reader_pointer);
-
             offset += 4;
         }
+
+        builder.local_get(struct_ptr).call(print_memory_from);
 
         builder.local_get(struct_ptr);
     }
