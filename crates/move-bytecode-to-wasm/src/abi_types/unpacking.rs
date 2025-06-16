@@ -9,6 +9,7 @@ use crate::{
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         simple_integers::{IU8, IU16, IU32, IU64},
+        structs::IStruct,
         vector::IVector,
     },
 };
@@ -16,6 +17,7 @@ use crate::{
 mod unpack_heap_int;
 mod unpack_native_int;
 mod unpack_reference;
+mod unpack_struct;
 mod unpack_vector;
 
 pub trait Unpackable {
@@ -162,7 +164,14 @@ impl Unpackable for IntermediateType {
                 calldata_reader_pointer,
                 compilation_ctx,
             ),
-            IntermediateType::IStruct(_) => todo!(),
+            IntermediateType::IStruct(index) => IStruct::add_unpack_instructions(
+                *index,
+                function_builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                compilation_ctx,
+            ),
         }
     }
 }

@@ -88,3 +88,7 @@ fn test_struct_field_reference<T: SolCall, V: SolValue>(
     )
     .unwrap();
 }
+
+mod struct_unpacking {
+    use super::*;
+}
