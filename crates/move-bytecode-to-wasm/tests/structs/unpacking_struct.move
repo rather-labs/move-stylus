@@ -1,4 +1,4 @@
-module 0x00::structs_unpacking;
+module 0x00::unpacking_struct;
 
 public struct Bar has drop {
     n: u32,

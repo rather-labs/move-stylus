@@ -9,7 +9,7 @@ move-package.workspace = true
 move-binary-format.workspace = true
 
 alloy-primitives = "1.0.0"
-alloy-sol-types = "1.0.0"
+alloy-sol-types = { version = "1.0.0", features = ["json"] }
 walrus = "0.23"
 wasmprinter = "0.228"
 wasmparser = "0.228"
