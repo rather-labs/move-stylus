@@ -1673,6 +1673,153 @@ fn test_vec_128() {
 }
 
 #[test]
+fn test_vec_vec_32() {
+    const MODULE_NAME: &str = "vec_vec_32";
+    const SOURCE_PATH: &str = "tests/primitives/vec_vec_32.move";
+
+    sol!(
+        #[allow(missing_docs)]
+        function getConstant() external returns (uint32[][]);
+        function getConstantLocal() external returns (uint32[][]);
+        function getLiteral() external returns (uint32[][]);
+        function getCopiedLocal() external returns (uint32[][]);
+        function echo(uint32[][] x) external returns (uint32[][]);
+        function vecLen(uint32[][] x) external returns (uint64);
+        function vecPopBack(uint32[][] x) external returns (uint32[][]);
+        function vecSwap(uint32[][] x, uint64 id1, uint64 id2) external returns (uint32[][]);
+        function vecPushBack(uint32[][] x, uint32[] y) external returns (uint32[][]);
+        function vecPushBackToElement(uint32[][] x, uint32 y) external returns (uint32[][]);
+        function vecPushAndPopBack(uint32[][] x, uint32[] y) external returns (uint32[][]);
+    );
+
+    let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+    let runtime = RuntimeSandbox::new(&mut translated_package);
+
+    let data = getConstantCall::abi_encode(&getConstantCall::new(()));
+    let expected_result = <sol!((uint32[][],))>::abi_encode_params(&(vec![
+        vec![1u32, 2u32, 3u32],
+        vec![4u32, 5u32, 6u32],
+        vec![7u32, 8u32, 9u32],
+    ],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = getConstantLocalCall::abi_encode(&getConstantLocalCall::new(()));
+    let expected_result = <sol!((uint32[][],))>::abi_encode_params(&(vec![
+        vec![1u32, 2u32, 3u32],
+        vec![4u32, 5u32, 6u32],
+        vec![7u32, 8u32, 9u32],
+    ],));
+    run_test(&runtime, data, expected_result).unwrap();
+    // getLiteral() should return [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    let data = getLiteralCall::abi_encode(&getLiteralCall::new(()));
+    let expected_result = <sol!((uint32[][],))>::abi_encode_params(&(vec![
+        vec![1u32, 2u32, 3u32],
+        vec![4u32, 5u32, 6u32],
+        vec![7u32, 8u32, 9u32],
+    ],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // getCopiedLocal() should return [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    let data = getCopiedLocalCall::abi_encode(&getCopiedLocalCall::new(()));
+    let expected_result = <sol!((uint32[][],))>::abi_encode_params(&(vec![
+        vec![1u32, 2u32, 3u32],
+        vec![4u32, 5u32, 6u32],
+        vec![7u32, 8u32, 9u32],
+    ],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    // echo([[1, 2, 3], [4, 5, 6], [7, 8, 9]]) should return the same
+    let data = echoCall::abi_encode(&echoCall::new((vec![
+        vec![1u32, 2u32, 3u32],
+        vec![4u32, 5u32, 6u32],
+        vec![7u32, 8u32, 9u32],
+    ],)));
+    let expected_result = <sol!((uint32[][],))>::abi_encode_params(&(vec![
+        vec![1u32, 2u32, 3u32],
+        vec![4u32, 5u32, 6u32],
+        vec![7u32, 8u32, 9u32],
+    ],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecLenCall::abi_encode(&vecLenCall::new((vec![
+        vec![1u32, 2u32, 3u32],
+        vec![4u32, 5u32, 6u32],
+        vec![7u32, 8u32, 9u32],
+    ],)));
+    let expected_result = <sol!((uint64,))>::abi_encode_params(&(3u64,));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecPopBackCall::abi_encode(&vecPopBackCall::new((vec![
+        vec![1u32, 2u32, 3u32],
+        vec![4u32, 5u32, 6u32],
+        vec![7u32, 8u32, 9u32],
+    ],)));
+    let expected_result =
+        <sol!((uint32[][],))>::abi_encode_params(&(vec![vec![1u32, 2u32, 3u32]],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecSwapCall::abi_encode(&vecSwapCall::new((
+        vec![
+            vec![1u32, 2u32, 3u32],
+            vec![4u32, 5u32, 6u32],
+            vec![7u32, 8u32, 9u32],
+        ],
+        0u64,
+        1u64,
+    )));
+    let expected_result = <sol!((uint32[][],))>::abi_encode_params(&(vec![
+        vec![4u32, 5u32, 6u32],
+        vec![1u32, 2u32, 3u32],
+        vec![7u32, 8u32, 9u32],
+    ],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecSwapCall::abi_encode(&vecSwapCall::new((
+        vec![
+            vec![1u32, 2u32, 3u32],
+            vec![4u32, 5u32, 6u32],
+            vec![7u32, 8u32, 9u32],
+        ],
+        0u64,
+        3u64,
+    )));
+    let result = run_test(&runtime, data, vec![]);
+    assert!(result.is_err(), "Expected out-of-bounds error");
+
+    let data = vecPushBackCall::abi_encode(&vecPushBackCall::new((
+        vec![vec![1u32, 2u32], vec![3u32, 4u32]],
+        vec![5u32, 6u32],
+    )));
+    let expected_result = <sol!((uint32[][],))>::abi_encode_params(&(vec![
+        vec![1u32, 2u32],
+        vec![3u32, 4u32],
+        vec![5u32, 6u32],
+        vec![5u32, 6u32],
+    ],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecPushBackToElementCall::abi_encode(&vecPushBackToElementCall::new((
+        vec![vec![1u32, 2u32], vec![3u32, 4u32]],
+        88u32,
+    )));
+    let expected_result = <sol!((uint32[][],))>::abi_encode_params(&(vec![
+        vec![1u32, 2u32, 88u32, 88u32],
+        vec![3u32, 4u32],
+    ],));
+    run_test(&runtime, data, expected_result).unwrap();
+
+    let data = vecPushAndPopBackCall::abi_encode(&vecPushAndPopBackCall::new((
+        vec![vec![1u32, 2u32, 3u32], vec![4u32, 5u32, 6u32]],
+        vec![7u32, 8u32],
+    )));
+    let expected_result = <sol!((uint32[][],))>::abi_encode_params(&(vec![
+        vec![1u32, 2u32, 3u32],
+        vec![4u32, 5u32, 6u32],
+    ],));
+    run_test(&runtime, data, expected_result).unwrap();
+}
+
+#[test]
 fn test_vec_vec_128() {
     const MODULE_NAME: &str = "vec_vec_128";
     const SOURCE_PATH: &str = "tests/primitives/vec_vec_128.move";
@@ -1796,14 +1943,14 @@ fn test_vec_vec_128() {
         vec![5u128, 6u128],
         vec![5u128, 6u128],
     ],));
-    // run_test(&runtime, data, expected_result).unwrap();
+    run_test(&runtime, data, expected_result).unwrap();
 
     let data = vecPushBackToElementCall::abi_encode(&vecPushBackToElementCall::new((
         vec![vec![1u128, 2u128], vec![3u128, 4u128]],
         88u128,
     )));
     let expected_result = <sol!((uint128[][],))>::abi_encode_params(&(vec![
-        vec![1u128, 2u128, 88u128],
+        vec![1u128, 2u128, 88u128, 88u128],
         vec![3u128, 4u128],
     ],));
     run_test(&runtime, data, expected_result).unwrap();
@@ -1816,5 +1963,5 @@ fn test_vec_vec_128() {
         vec![1u128, 2u128, 3u128],
         vec![4u128, 5u128, 6u128],
     ],));
-    // run_test(&runtime, data, expected_result).unwrap();
+    run_test(&runtime, data, expected_result).unwrap();
 }

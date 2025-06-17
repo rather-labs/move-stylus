@@ -269,6 +269,7 @@ fn map_bytecode_instruction(
             local_type.add_borrow_local_instructions(builder, local);
             types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
         }
+        // Vector instructions
         Bytecode::VecImmBorrow(signature_index) => {
             let [t1, t2] = pop_n_from_stack(types_stack);
 

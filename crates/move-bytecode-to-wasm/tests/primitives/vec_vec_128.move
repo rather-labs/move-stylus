@@ -52,6 +52,13 @@ public fun vec_push_back(x: vector<vector<u128>>, y: vector<u128>): vector<vecto
   z
 }
 
+public fun vec_push_back_to_element(x: vector<vector<u128>>, y: u128): vector<vector<u128>> {
+  let mut w = x;
+  w[0].push_back(y);
+  w[0].push_back(y);
+  w
+}
+
 public fun vec_push_and_pop_back(x: vector<vector<u128>>, y: vector<u128>): vector<vector<u128>> {
   let mut z = x;
   z.push_back(y);
@@ -59,10 +66,4 @@ public fun vec_push_and_pop_back(x: vector<vector<u128>>, y: vector<u128>): vect
   z
 }
   
-public fun vec_push_back_to_element(x: vector<vector<u128>>, y: u128): vector<vector<u128>> {
-  let mut w = x;
-  w[0].push_back(y);
-  // w[0].push_back(z);
-  w
-}
   
