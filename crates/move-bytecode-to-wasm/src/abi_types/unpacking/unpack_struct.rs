@@ -143,51 +143,56 @@ impl IStruct {
         let val_64 = module.locals.add(ValType::I64);
         let field_ptr = module.locals.add(ValType::I32);
 
-        // In a dynamic struct, the first value is where the values are packed in the calldata
         // Big-endian to Little-endian
         let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
+        // Moving pointer for reading data of the fields
         let data_reader_pointer = module.locals.add(ValType::I32);
-        let c_data_reader_pointer = module.locals.add(ValType::I32);
+        // Pointer to where the struct is packed
+        let call_data_ptr = module.locals.add(ValType::I32);
 
         builder
             .local_get(data_reader_pointer)
             .call(print_memory_from);
 
+        // In a dynamic struct, the first value is where the values are packed in the calldata
         for i in 0..7 {
             builder.block(None, |inner_block| {
                 let inner_block_id = inner_block.id();
 
-                inner_block.local_get(reader_pointer);
-                inner_block.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        // Abi encoded value is Big endian
-                        offset: i * 4,
-                    },
-                );
-                inner_block.i32_const(0);
-                inner_block.binop(BinaryOp::I32Eq);
-                inner_block.br_if(inner_block_id);
-                inner_block.unreachable();
+                inner_block
+                    .local_get(reader_pointer)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            // Abi encoded value is Big endian
+                            offset: i * 4,
+                        },
+                    )
+                    .i32_const(0)
+                    .binop(BinaryOp::I32Eq)
+                    .br_if(inner_block_id)
+                    .unreachable();
             });
         }
-        builder.local_get(reader_pointer);
-        builder.load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                // Abi encoded value is Big endian
-                offset: 28,
-            },
-        );
-        builder.call(swap_i32_bytes_function);
-        builder.local_get(calldata_reader_pointer);
-        builder.binop(BinaryOp::I32Add);
-        builder.local_tee(data_reader_pointer);
-        builder.local_set(calldata_reader_pointer);
+
+        builder
+            .local_get(reader_pointer)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    // Abi encoded value is Big endian
+                    offset: 28,
+                },
+            )
+            .call(swap_i32_bytes_function)
+            .local_get(calldata_reader_pointer)
+            .binop(BinaryOp::I32Add)
+            .local_tee(data_reader_pointer)
+            .local_set(call_data_ptr);
 
         // Allocate space for the struct
         builder
@@ -201,43 +206,12 @@ impl IStruct {
                 .local_get(data_reader_pointer)
                 .call(print_memory_from);
 
-            // Before unpacking a field we need to check if it is dynamically encoded in the abi.
-            // If that's the case, we first need to read the value that points to the actual data.
-            match field {
-                IntermediateType::IVector(_) => {
-                    /*
-                    builder
-                        .local_get(data_reader_pointer)
-                        .load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                // Abi encoded value is Big endian
-                                offset: 28,
-                            },
-                        )
-                        .call(swap_i32_bytes_function)
-                        .local_get(data_reader_pointer)
-                        .binop(BinaryOp::I32Add)
-                        .local_set(data_reader_pointer);
-                    */
-
-                    /*
-                    builder
-                        .local_get(data_reader_pointer)
-                        .local_set(c_data_reader_pointer);*/
-                }
-                // TODO: Check struct
-                _ => {}
-            }
-
             // Unpack field
             field.add_unpack_instructions(
                 builder,
                 module,
                 data_reader_pointer,
-                calldata_reader_pointer,
+                call_data_ptr,
                 compilation_ctx,
             );
 
