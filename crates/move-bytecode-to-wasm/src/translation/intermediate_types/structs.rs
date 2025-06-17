@@ -45,8 +45,14 @@
 //! field management across all types.
 use std::collections::HashMap;
 
+use crate::CompilationContext;
+
 use super::IntermediateType;
 use move_binary_format::file_format::{FieldHandleIndex, StructDefinitionIndex};
+use walrus::{
+    InstrSeqBuilder, Module, ValType,
+    ir::{LoadKind, MemArg},
+};
 
 #[derive(Debug)]
 pub struct IStruct {
@@ -91,6 +97,88 @@ impl IStruct {
             fields_types,
             fields,
         }
+    }
+
+    pub fn equality(
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        index: usize,
+    ) {
+        let struct_ = compilation_ctx
+            .module_structs
+            .iter()
+            .find(|s| s.index() == index as u16)
+            .unwrap_or_else(|| panic!("struct with index {index} not found"));
+
+        let s1_ptr = module.locals.add(ValType::I32);
+        let s2_ptr = module.locals.add(ValType::I32);
+        let result = module.locals.add(ValType::I32);
+
+        builder.local_set(s1_ptr).local_set(s2_ptr);
+        builder.i32_const(1).local_set(result);
+
+        let load_value_to_stack = |field: &IntermediateType, builder: &mut InstrSeqBuilder<'_>| {
+            if field.stack_data_size() == 8 {
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            } else {
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+        };
+
+        builder.block(None, |block| {
+            let block_id = block.id();
+            for (index, field) in struct_.fields.iter().rev().enumerate() {
+                // Offset of the field's pointer
+                let offset = index as u32 * 4;
+
+                block.local_get(s1_ptr).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg { align: 0, offset },
+                );
+
+                if field.is_stack_type() {
+                    load_value_to_stack(field, block);
+                }
+
+                block.local_get(s2_ptr).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg { align: 0, offset },
+                );
+
+                if field.is_stack_type() {
+                    load_value_to_stack(field, block);
+                }
+
+                field.load_equality_instructions(module, block, compilation_ctx);
+
+                block.if_else(
+                    None,
+                    |_| {},
+                    |else_| {
+                        else_.i32_const(0).local_set(result).br(block_id);
+                    },
+                );
+            }
+        });
+
+        builder.local_get(result);
     }
 
     pub fn index(&self) -> u16 {
