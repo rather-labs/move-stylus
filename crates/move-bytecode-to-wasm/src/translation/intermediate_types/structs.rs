@@ -45,6 +45,8 @@
 //! field management across all types.
 use std::collections::HashMap;
 
+use crate::CompilationContext;
+
 use super::IntermediateType;
 use move_binary_format::file_format::{FieldHandleIndex, StructDefinitionIndex};
 
@@ -100,5 +102,55 @@ impl IStruct {
 
     pub fn index(&self) -> u16 {
         self.struct_definition_index.0
+    }
+
+    /// According to the formal speciication of the encoding, a tuple (T1,...,Tk) is dynamic if
+    /// Ti is dynamic for some 1 <= i <= k.
+    ///
+    /// Structs are encoded as a tuple of its fields, so, if any field is dynamic, then the whole
+    /// struct is dynamic.
+    ///
+    /// According to documentation, dynamic types are:
+    /// - bytes
+    /// - string
+    /// - T[] for any T
+    /// - T[k] for any dynamic T and any k >= 0
+    /// - (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k
+    ///
+    /// For more information:
+    /// https://docs.soliditylang.org/en/develop/abi-spec.html#formal-specification-of-the-encoding
+    pub fn solidity_abi_encode_is_static(&self, compilation_ctx: &CompilationContext) -> bool {
+        for field in &self.fields {
+            match field {
+                IntermediateType::IBool
+                | IntermediateType::IU8
+                | IntermediateType::IU16
+                | IntermediateType::IU32
+                | IntermediateType::IU64
+                | IntermediateType::IU128
+                | IntermediateType::IU256
+                | IntermediateType::IAddress => continue,
+                IntermediateType::IVector(_) => return false,
+                IntermediateType::IStruct(index, _) => {
+                    let struct_ = compilation_ctx
+                        .module_structs
+                        .iter()
+                        .find(|s| s.index() == *index as u16)
+                        .unwrap_or_else(|| panic!("struct that with index {index} not found"));
+
+                    if struct_.solidity_abi_encode_is_static(compilation_ctx) {
+                        continue;
+                    } else {
+                        return false;
+                    }
+                }
+                IntermediateType::ISigner => panic!("signer is not abi econdable"),
+                IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                    panic!("found reference inside struct")
+                }
+            }
+        }
+
+        true
     }
 }

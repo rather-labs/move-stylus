@@ -25,6 +25,32 @@ impl IStruct {
             .find(|s| s.index() == index as u16)
             .unwrap_or_else(|| panic!("struct that with index {index} not found"));
 
+        if struct_.solidity_abi_encode_is_static(compilation_ctx) {
+            Self::add_unpack_instructions_static_struct(
+                index,
+                builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                compilation_ctx,
+            );
+        }
+    }
+
+    fn add_unpack_instructions_static_struct(
+        index: usize,
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        reader_pointer: LocalId,
+        calldata_reader_pointer: LocalId,
+        compilation_ctx: &CompilationContext,
+    ) {
+        let struct_ = compilation_ctx
+            .module_structs
+            .iter()
+            .find(|s| s.index() == index as u16)
+            .unwrap_or_else(|| panic!("struct that with index {index} not found"));
+
         let struct_ptr = module.locals.add(ValType::I32);
         let val_32 = module.locals.add(ValType::I32);
         let val_64 = module.locals.add(ValType::I64);
