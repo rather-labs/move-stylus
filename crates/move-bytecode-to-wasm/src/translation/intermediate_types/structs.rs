@@ -79,14 +79,14 @@ impl IStruct {
     ) -> Self {
         let mut heap_size = 0;
         let mut field_offsets = HashMap::new();
-        for (index, _) in fields.iter() {
+        let mut ir_fields = vec![];
+        for (index, field) in fields {
             if let Some(idx) = index {
-                field_offsets.insert(*idx, heap_size);
+                field_offsets.insert(idx, heap_size);
             }
+            ir_fields.push(field);
             heap_size += 4;
         }
-
-        let fields = fields.into_iter().map(|(_, t)| t).collect();
 
         Self {
             name,
@@ -94,7 +94,7 @@ impl IStruct {
             heap_size,
             field_offsets,
             fields_types,
-            fields,
+            fields: ir_fields,
         }
     }
 

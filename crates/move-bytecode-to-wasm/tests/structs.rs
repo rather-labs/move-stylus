@@ -109,8 +109,6 @@ mod struct_unpacking {
     sol! {
         struct Foo {
             address q;
-            // uint32[] r;
-            // uint128[] s;
             bool t;
             uint8 u;
             uint16 v;
@@ -120,7 +118,6 @@ mod struct_unpacking {
             uint256 z;
         }
 
-        // function echoFoo(Foo foo) external returns (address, uint32[], uint128[], bool, uint8, uint16, uint32, uint64, uint128, uint256);
         function echoFoo(Foo foo) external returns (address, bool, uint8, uint16, uint32, uint64, uint128, uint256);
     }
 
@@ -128,8 +125,6 @@ mod struct_unpacking {
     #[case(echoFooCall::new(
         (Foo {
             q: address!("0xcafe000000000000000000000000000000007357"),
-            // r: vec![1, 2, u32::MAX],
-            // s: vec![1, 2, u128::MAX],
             t: true,
             u: 255,
             v: u16::MAX,
@@ -140,8 +135,6 @@ mod struct_unpacking {
         },)),
         (
             address!("0xcafe000000000000000000000000000000007357"),
-            // vec![1, 2, u32::MAX],
-            // vec![1, 2, u128::MAX],
             true,
             255,
             u16::MAX,
