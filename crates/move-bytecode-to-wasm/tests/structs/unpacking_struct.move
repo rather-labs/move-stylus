@@ -27,6 +27,18 @@ public fun echo_foo(foo: Foo): (address, bool, u8, u16, u32, u64, u128, u256) {
     )
 }
 
+public struct Bar has drop {
+    u: u8,
+    r: vector<u32>,
+}
+
+public fun echo_bar(bar: Bar): (vector<u32>, u8) {
+    (
+        bar.r,
+        bar.u,
+    )
+}
+
 /*
 // Dynamic abi struct
 public struct Bar has drop {

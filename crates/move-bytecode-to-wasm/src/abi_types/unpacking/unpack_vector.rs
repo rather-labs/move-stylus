@@ -21,6 +21,11 @@ impl IVector {
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) {
+        let print_i32 = module.imports.get_func("", "print_i32").unwrap();
+
+        block.local_get(reader_pointer).call(print_i32);
+        block.local_get(calldata_reader_pointer).call(print_i32);
+
         // Big-endian to Little-endian
         let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
 
@@ -64,6 +69,11 @@ impl IVector {
         block.local_get(calldata_reader_pointer);
         block.binop(BinaryOp::I32Add);
         block.local_set(data_reader_pointer); // This references the vector actual data
+        //
+
+        let print_memory_from = module.imports.get_func("", "print_memory_from").unwrap();
+        block.i32_const(44).call(print_i32);
+        block.local_get(data_reader_pointer).call(print_memory_from);
 
         // The reader will only be incremented until the next argument
         block.local_get(reader_pointer);
@@ -98,6 +108,9 @@ impl IVector {
         // Vector length: current number of elements in the vector
         let length = module.locals.add(ValType::I32);
 
+        block.i32_const(45).call(print_i32);
+        block.local_get(data_reader_pointer).call(print_memory_from);
+
         block.local_get(data_reader_pointer);
         block.load(
             compilation_ctx.memory_id,
@@ -110,6 +123,9 @@ impl IVector {
         );
         block.call(swap_i32_bytes_function);
         block.local_set(length);
+
+        block.i32_const(46).call(print_i32);
+        block.local_get(length).call(print_i32);
 
         // increment data reader pointer
         block.local_get(data_reader_pointer);

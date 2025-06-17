@@ -69,9 +69,9 @@ mod structs {
     #[case(echoVecStackTypeCall::new((vec![1,2,u32::MAX,3,4],)), (vec![1,2,u32::MAX,3,4],))]
     #[case(echoVecHeapTypeCall::new((vec![1,2,u128::MAX,3,4],)), (vec![1,2,u128::MAX,3,4],))]
     #[case(echoAddressCall::new(
-    (address!("0xcafe000000000000000000000000000000007357"),)),
-    (address!("0xcafe000000000000000000000000000000007357"),))
-]
+        (address!("0xcafe000000000000000000000000000000007357"),)),
+        (address!("0xcafe000000000000000000000000000000007357"),))
+    ]
     #[case(echoBarStructFieldsCall::new((u32::MAX, u128::MAX)), (u32::MAX, u128::MAX),)]
     #[case(echoBarStructFieldsCall::new((1, u128::MAX)), (1, u128::MAX),)]
     #[case(echoBarStructFieldsCall::new((u32::MAX, 1)), (u32::MAX, 1),)]
@@ -118,7 +118,13 @@ mod struct_unpacking {
             uint256 z;
         }
 
+        struct Bar {
+            uint8 u;
+            uint32[] r;
+        }
+
         function echoFoo(Foo foo) external returns (address, bool, uint8, uint16, uint32, uint64, uint128, uint256);
+        function echoBar(Bar bar) external returns (uint32[], uint8);
     }
 
     #[rstest]
@@ -142,6 +148,16 @@ mod struct_unpacking {
             u64::MAX,
             u128::MAX,
             U256::MAX
+        )
+    )]
+    #[case(echoBarCall::new(
+        (Bar {
+            u: 254,
+            r: vec![1, 2, u32::MAX],
+        },)),
+        (
+            vec![1, 2, u32::MAX],
+            254,
         )
     )]
     fn test_struct_unpacking<T: SolCall, V: SolValue>(
