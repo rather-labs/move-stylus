@@ -78,10 +78,3 @@ public fun vec_push_and_pop_back(x: vector<u32>, y: u32): vector<u32> {
   z.pop_back();
   z
 }
-
-
-public fun vec_push_back_to_element(x: vector<vector<u32>>, y: u32): vector<vector<u32>> {
-  let mut z = x;
-  z[0].push_back(y);
-  z
-}
