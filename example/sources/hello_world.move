@@ -1,19 +1,13 @@
 module 0x01::hello_world;
 
-public fun vec_push_back(): vector<vector<u32>> {
-  let mut x = vector[vector[1, 2], vector[3, 4]];
-  x[0].push_back(5);
-  x
+public fun vec_from_element(index: u64): vector<u8> {
+    let v = vector[10u8, 20u8];
+    let x = v[index];  
+    vector[x]
 }
 
-public fun vec_push_back_2(): vector<u32> {
-  let mut x = vector[1, 2, 3, 4];
-  x.push_back(5);
-  x
+public fun get_element_vector(index: u64): vector<u8> {
+    let v = vector[vector[10u8, 20u8], vector[30u8, 40u8]];
+    let x = v[index];  
+    x
 }
-
-// public fun vec_pop_back(x: vector<u32>): vector<u32> {
-//   let mut z = x;
-//   z.pop_back();
-//   z
-// }

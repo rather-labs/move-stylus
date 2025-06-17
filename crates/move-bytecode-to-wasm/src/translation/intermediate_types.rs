@@ -193,7 +193,8 @@ impl IntermediateType {
             IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
-            | IntermediateType::ISigner => {
+            | IntermediateType::ISigner
+            | IntermediateType::IVector(_) => {
                 builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -204,16 +205,6 @@ impl IntermediateType {
                 );
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {}
-            IntermediateType::IVector(_) => {
-                builder.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            }
             IntermediateType::IStruct(_) => todo!(),
         }
     }

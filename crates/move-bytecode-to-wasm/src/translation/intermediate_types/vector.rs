@@ -1608,10 +1608,10 @@ mod tests {
         ]
         .concat();
 
-        // test_vector(&data, IntermediateType::IU256, &expected_bytes);
-        // test_vector_copy(&data, IntermediateType::IU256, &expected_copy_bytes);
-        // test_vector_pop_back(&data, IntermediateType::IU256, &expected_pop_bytes, 52);
-        // test_vector_swap(&data, IntermediateType::IU256, &expected_swap_bytes, 0, 1);
+        test_vector(&data, IntermediateType::IU256, &expected_bytes);
+        test_vector_copy(&data, IntermediateType::IU256, &expected_copy_bytes);
+        test_vector_pop_back(&data, IntermediateType::IU256, &expected_pop_bytes, 52);
+        test_vector_swap(&data, IntermediateType::IU256, &expected_swap_bytes, 0, 1);
         test_vector_push_back(
             &data,
             &element_bytes,

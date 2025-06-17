@@ -111,8 +111,6 @@ impl MappedFunction {
             .iter()
             .zip(self.signature.arguments.iter())
         {
-            println!("box_args local: {:?}", local);
-            println!("box_args ty: {:?}", ty);
             builder.local_get(*local);
             match ty {
                 IntermediateType::IU64 => {

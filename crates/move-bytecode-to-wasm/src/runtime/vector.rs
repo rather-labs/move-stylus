@@ -529,45 +529,31 @@ pub fn vec_borrow_function(
         block.unreachable();
     });
 
-    // Element reference
-    let elem_ref = module.locals.add(ValType::I32);
-    builder
-        .i32_const(4)
-        .call(compilation_ctx.allocator)
-        .local_tee(elem_ref);
-
-    // Pointer to element
-    let elem_ptr = module.locals.add(ValType::I32);
-    builder.vec_elem_ptr_dynamic(vec_ptr, index, size);
-    builder.local_set(elem_ptr);
-
+    // If the element is stored on the heap, we directly return vec_elem_ptr, as it is already a reference (pointer to a pointer).
+    // If the element is not on the heap, we convert the pointer returned by vec_elem_ptr into a reference by wrapping it.
     builder.local_get(is_heap).if_else(
         ValType::I32,
         |then| {
-            then.local_get(elem_ptr).load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
+            then.vec_elem_ptr_dynamic(vec_ptr, index, size);
         },
         |else_| {
-            else_.local_get(elem_ptr);
+            let elem_ref = module.locals.add(ValType::I32);
+            else_
+                .i32_const(4)
+                .call(compilation_ctx.allocator)
+                .local_tee(elem_ref)
+                .vec_elem_ptr_dynamic(vec_ptr, index, size)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .local_get(elem_ref);
         },
     );
-
-    builder.store(
-        compilation_ctx.memory_id,
-        StoreKind::I32 { atomic: false },
-        MemArg {
-            align: 0,
-            offset: 0,
-        },
-    );
-
-    builder.local_get(elem_ref);
 
     function.finish(vec![vec_ref, index, is_heap, size], &mut module.funcs)
 }
