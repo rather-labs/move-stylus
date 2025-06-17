@@ -107,6 +107,11 @@ mod struct_unpacking {
     }
 
     sol! {
+        struct Baz {
+            uint16 a;
+            uint128 b;
+        }
+
         struct Foo {
             address q;
             bool t;
@@ -116,6 +121,12 @@ mod struct_unpacking {
             uint64 x;
             uint128 y;
             uint256 z;
+            Baz baz;
+        }
+
+        struct Bazz {
+            uint16 a;
+            uint256[] b;
         }
 
         struct Bar {
@@ -129,10 +140,11 @@ mod struct_unpacking {
             uint64 x;
             uint128 y;
             uint256 z;
+            Bazz bazz;
         }
 
-        function echoFoo(Foo foo) external returns (address, bool, uint8, uint16, uint32, uint64, uint128, uint256);
-        function echoBar(Bar bar) external returns (address, uint32[], uint128[], bool, uint8, uint16, uint32, uint64, uint128, uint256);
+        function echoFoo(Foo foo) external returns (address, bool, uint8, uint16, uint32, uint64, uint128, uint256, uint16, uint128);
+        function echoBar(Bar bar) external returns (address, uint32[], uint128[], bool, uint8, uint16, uint32, uint64, uint128, uint256, uint16, uint256[]);
     }
 
     #[rstest]
@@ -145,7 +157,8 @@ mod struct_unpacking {
             w: u32::MAX,
             x: u64::MAX,
             y: u128::MAX,
-            z: U256::MAX
+            z: U256::MAX,
+            baz: Baz { a: 42, b: 4242}
         },)),
         (
             address!("0xcafe000000000000000000000000000000007357"),
@@ -155,7 +168,9 @@ mod struct_unpacking {
             u32::MAX,
             u64::MAX,
             u128::MAX,
-            U256::MAX
+            U256::MAX,
+            42,
+            4242,
         )
     )]
     #[case(echoBarCall::new(
@@ -169,7 +184,16 @@ mod struct_unpacking {
             w: u32::MAX,
             x: u64::MAX,
             y: u128::MAX,
-            z: U256::MAX
+            z: U256::MAX,
+            bazz: Bazz {
+                a: 42,
+                b: vec![
+                    U256::from(9),
+                    U256::from(8),
+                    U256::from(7),
+                    U256::from(6)
+                ]
+            }
         },)),
         (
             address!("0xcafe000000000000000000000000000000007357"),
@@ -181,7 +205,14 @@ mod struct_unpacking {
             u32::MAX,
             u64::MAX,
             u128::MAX,
-            U256::MAX
+            U256::MAX,
+            42,
+            vec![
+                U256::from(9),
+                U256::from(8),
+                U256::from(7),
+                U256::from(6)
+            ]
         )
     )]
     fn test_struct_unpacking<T: SolCall, V: SolValue>(

@@ -1,5 +1,10 @@
 module 0x00::unpacking_struct;
 
+public struct Baz has drop {
+    a: u16,
+    b: u128,
+}
+
 // static abi struct
 public struct Foo has drop {
     q: address,
@@ -10,11 +15,11 @@ public struct Foo has drop {
     x: u64,
     y: u128,
     z: u256,
+    baz: Baz,
 }
 
 // TODO: Add another struct when packing is done
-// public fun echo_foo(foo: Foo): (address, vector<u32>, vector<u128>, bool, u8, u16, u32, u64, u128, u256) {
-public fun echo_foo(foo: Foo): (address, bool, u8, u16, u32, u64, u128, u256) {
+public fun echo_foo(foo: Foo): (address, bool, u8, u16, u32, u64, u128, u256, u16, u128) {
     (
         foo.q,
         foo.t,
@@ -24,7 +29,14 @@ public fun echo_foo(foo: Foo): (address, bool, u8, u16, u32, u64, u128, u256) {
         foo.x,
         foo.y,
         foo.z,
+        foo.baz.a,
+        foo.baz.b,
     )
+}
+
+public struct Bazz has drop {
+    a: u16,
+    b: vector<u256>,
 }
 
 // Dynamic abi struct
@@ -39,9 +51,10 @@ public struct Bar has drop {
     x: u64,
     y: u128,
     z: u256,
+    bazz: Bazz,
 }
 
-public fun echo_bar(bar: Bar): (address, vector<u32>, vector<u128>, bool, u8, u16, u32, u64, u128, u256) {
+public fun echo_bar(bar: Bar): (address, vector<u32>, vector<u128>, bool, u8, u16, u32, u64, u128, u256, u16, vector<u256>) {
     (
         bar.q,
         bar.r,
@@ -53,5 +66,7 @@ public fun echo_bar(bar: Bar): (address, vector<u32>, vector<u128>, bool, u8, u1
         bar.x,
         bar.y,
         bar.z,
+        bar.bazz.a,
+        bar.bazz.b,
     )
 }
