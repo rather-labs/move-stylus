@@ -104,7 +104,7 @@ impl IStruct {
         self.struct_definition_index.0
     }
 
-    /// According to the formal speciication of the encoding, a tuple (T1,...,Tk) is dynamic if
+    /// According to the formal specification of the encoding, a tuple (T1,...,Tk) is dynamic if
     /// Ti is dynamic for some 1 <= i <= k.
     ///
     /// Structs are encoded as a tuple of its fields, so, if any field is dynamic, then the whole
@@ -119,7 +119,7 @@ impl IStruct {
     ///
     /// For more information:
     /// https://docs.soliditylang.org/en/develop/abi-spec.html#formal-specification-of-the-encoding
-    pub fn solidity_abi_encode_is_static(&self, compilation_ctx: &CompilationContext) -> bool {
+    pub fn solidity_abi_encode_is_dynamic(&self, compilation_ctx: &CompilationContext) -> bool {
         for field in &self.fields {
             match field {
                 IntermediateType::IBool
@@ -130,7 +130,7 @@ impl IStruct {
                 | IntermediateType::IU128
                 | IntermediateType::IU256
                 | IntermediateType::IAddress => continue,
-                IntermediateType::IVector(_) => return false,
+                IntermediateType::IVector(_) => return true,
                 IntermediateType::IStruct(index, _) => {
                     let struct_ = compilation_ctx
                         .module_structs
@@ -138,7 +138,7 @@ impl IStruct {
                         .find(|s| s.index() == *index as u16)
                         .unwrap_or_else(|| panic!("struct that with index {index} not found"));
 
-                    if struct_.solidity_abi_encode_is_static(compilation_ctx) {
+                    if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
                         continue;
                     } else {
                         return false;
@@ -151,6 +151,6 @@ impl IStruct {
             }
         }
 
-        true
+        false
     }
 }
