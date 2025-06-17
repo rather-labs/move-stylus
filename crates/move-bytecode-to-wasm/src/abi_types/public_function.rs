@@ -771,6 +771,4 @@ mod tests {
         };
         PublicFunction::new(function, "test_function", &signature, &compilation_ctx);
     }
-
-    // TODO: ADD TESTS FOR STRUCT
 }

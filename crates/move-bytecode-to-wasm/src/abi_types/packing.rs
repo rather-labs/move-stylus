@@ -144,7 +144,7 @@ impl Packable for IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_, _) => {
+            | IntermediateType::IStruct(_) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -243,7 +243,7 @@ impl Packable for IntermediateType {
                 calldata_reference_pointer,
                 compilation_ctx,
             ),
-            IntermediateType::IStruct(_, _) => todo!(),
+            IntermediateType::IStruct(_) => todo!(),
         }
     }
 
@@ -261,7 +261,7 @@ impl Packable for IntermediateType {
             IntermediateType::IVector(_) => 32,
             IntermediateType::IRef(inner) => inner.encoded_size(),
             IntermediateType::IMutRef(inner) => inner.encoded_size(),
-            IntermediateType::IStruct(_, _) => 32, // TODO: Struct - not sure about this
+            IntermediateType::IStruct(_) => 32,
         }
     }
 }

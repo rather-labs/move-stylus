@@ -52,9 +52,6 @@ use move_binary_format::file_format::{FieldHandleIndex, StructDefinitionIndex};
 
 #[derive(Debug)]
 pub struct IStruct {
-    /// Struct's identifier
-    pub name: String,
-
     /// Field's types ordered by index
     pub fields: Vec<IntermediateType>,
 
@@ -74,7 +71,6 @@ pub struct IStruct {
 
 impl IStruct {
     pub fn new(
-        name: String,
         index: StructDefinitionIndex,
         fields: Vec<(Option<FieldHandleIndex>, IntermediateType)>,
         fields_types: HashMap<FieldHandleIndex, IntermediateType>,
@@ -91,7 +87,6 @@ impl IStruct {
         }
 
         Self {
-            name,
             struct_definition_index: index,
             heap_size,
             field_offsets,
@@ -131,11 +126,11 @@ impl IStruct {
                 | IntermediateType::IU256
                 | IntermediateType::IAddress => continue,
                 IntermediateType::IVector(_) => return true,
-                IntermediateType::IStruct(index, _) => {
+                IntermediateType::IStruct(index) => {
                     let struct_ = compilation_ctx
                         .module_structs
                         .iter()
-                        .find(|s| s.index() == *index as u16)
+                        .find(|s| s.index() == *index)
                         .unwrap_or_else(|| panic!("struct that with index {index} not found"));
 
                     if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {

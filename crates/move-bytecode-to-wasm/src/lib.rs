@@ -67,7 +67,7 @@ pub struct CompilationContext<'a> {
 }
 
 pub enum UserDefinedType {
-    Struct(usize, String),
+    Struct(u16),
     Enum(usize),
 }
 
@@ -122,11 +122,7 @@ pub fn translate_package(
                 .iter()
                 .position(|s| s.struct_handle == idx)
             {
-                let name = root_compiled_module.identifiers()[datatype_handle.name.0 as usize]
-                    .as_str()
-                    .to_owned();
-
-                datatype_handles_map.insert(idx, UserDefinedType::Struct(position, name))
+                datatype_handles_map.insert(idx, UserDefinedType::Struct(position as u16))
             } else if let Some(position) = root_compiled_module
                 .enum_defs()
                 .iter()
@@ -184,21 +180,7 @@ pub fn translate_package(
                 }
             }
 
-            let UserDefinedType::Struct(_, ref name) =
-                datatype_handles_map[&struct_def.struct_handle]
-            else {
-                panic!(
-                    "user defined type with datatype handle index {} not found",
-                    struct_def.struct_handle
-                )
-            };
-
-            module_structs.push(IStruct::new(
-                name.clone(),
-                struct_index,
-                all_fields,
-                fields_map,
-            ));
+            module_structs.push(IStruct::new(struct_index, all_fields, fields_map));
         }
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();

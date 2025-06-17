@@ -64,11 +64,11 @@ impl SolName for IntermediateType {
             IntermediateType::IVector(inner) => inner
                 .sol_name(compilation_ctx)
                 .map(|sol_n| format!("{sol_n}[]")),
-            IntermediateType::IStruct(index, _) => {
+            IntermediateType::IStruct(index) => {
                 let struct_ = compilation_ctx
                     .module_structs
                     .iter()
-                    .find(|s| s.index() == *index as u16)
+                    .find(|s| s.index() == *index)
                     .unwrap_or_else(|| panic!("struct that with index {index} not found"));
 
                 struct_
@@ -146,7 +146,6 @@ mod tests {
         );
 
         let struct_1 = IStruct::new(
-            "Foo".to_owned(),
             StructDefinitionIndex::new(0),
             vec![
                 (None, IntermediateType::IAddress),
@@ -165,12 +164,11 @@ mod tests {
                 (None, IntermediateType::IU64),
                 (None, IntermediateType::IU128),
                 (None, IntermediateType::IU256),
-                (None, IntermediateType::IStruct(1, "Bar".to_owned())),
+                (None, IntermediateType::IStruct(1)),
             ],
             HashMap::new(),
         );
         let struct_2 = IStruct::new(
-            "Bar".to_owned(),
             StructDefinitionIndex::new(1),
             vec![
                 (None, IntermediateType::IU32),
@@ -182,8 +180,8 @@ mod tests {
         compilation_ctx.module_structs = &module_structs;
 
         let signature: &[IntermediateType] = &[
-            IntermediateType::IStruct(0, "Foo".to_owned()),
-            IntermediateType::IVector(Box::new(IntermediateType::IStruct(1, "Bar".to_owned()))),
+            IntermediateType::IStruct(0),
+            IntermediateType::IVector(Box::new(IntermediateType::IStruct(1))),
         ];
 
         assert_eq!(

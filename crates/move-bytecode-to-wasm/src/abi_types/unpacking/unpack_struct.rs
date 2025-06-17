@@ -80,7 +80,7 @@ use super::Unpackable;
 
 impl IStruct {
     pub fn add_unpack_instructions(
-        index: usize,
+        index: u16,
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
         reader_pointer: LocalId,
@@ -90,7 +90,7 @@ impl IStruct {
         let struct_ = compilation_ctx
             .module_structs
             .iter()
-            .find(|s| s.index() == index as u16)
+            .find(|s| s.index() == index)
             .unwrap_or_else(|| panic!("struct that with index {index} not found"));
 
         let struct_ptr = module.locals.add(ValType::I32);
