@@ -723,7 +723,10 @@ impl IVector {
             );
 
         // length++
-        builder.local_get(vec_ptr).local_get(len).call(RuntimeFunction::VecIncrementLen.get(module, Some(compilation_ctx)));
+        builder
+            .local_get(vec_ptr)
+            .local_get(len)
+            .call(RuntimeFunction::VecIncrementLen.get(module, Some(compilation_ctx)));
     }
 }
 

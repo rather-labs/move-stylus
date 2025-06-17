@@ -67,3 +67,13 @@ public fun vec_push_and_pop_back(x: vector<vector<u128>>, y: vector<u128>): vect
 }
   
   
+public fun misc_0(x: vector<vector<u128>>, y: u128): vector<vector<u128>> {
+  let mut w = x;
+  w[0].push_back(y);
+  let mut a = w[1];
+  a.swap(0, 1);
+  a.pop_back();
+  a.push_back(y);
+  let z = vector[w[0], a];
+  z
+}
