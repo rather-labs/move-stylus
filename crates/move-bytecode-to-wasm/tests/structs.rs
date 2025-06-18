@@ -166,8 +166,8 @@ mod struct_unpacking {
     #[fixture]
     #[once]
     fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "unpacking_struct";
-        const SOURCE_PATH: &str = "tests/structs/unpacking_struct.move";
+        const MODULE_NAME: &str = "struct_unpacking";
+        const SOURCE_PATH: &str = "tests/structs/struct_unpacking.move";
 
         let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
 
@@ -284,6 +284,83 @@ mod struct_unpacking {
         )
     )]
     fn test_struct_unpacking<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode_params(),
+        )
+        .unwrap();
+    }
+}
+
+mod struct_packing {
+    use super::*;
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "struct_packing";
+        const SOURCE_PATH: &str = "tests/structs/struct_packing.move";
+
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol! {
+        struct Baz {
+            uint16 a;
+            uint128 b;
+        }
+
+        struct Foo {
+            address q;
+            bool t;
+            uint8 u;
+            uint16 v;
+            uint32 w;
+            uint64 x;
+            uint128 y;
+            uint256 z;
+            Baz baz;
+        }
+
+        function echoFoo(address q, bool t, uint8 u, uint16 v, uint32 w, uint64 x, uint128 y, uint256 z, uint16 ba, uint128 bb) external returns (Foo);
+    }
+
+    #[rstest]
+    #[case(echoFooCall::new(
+        (
+            address!("0xcafe000000000000000000000000000000007357"),
+            true,
+            255,
+            u16::MAX,
+            u32::MAX,
+            u64::MAX,
+            u128::MAX,
+            U256::MAX,
+            42,
+            4242,
+        )),
+        Foo {
+            q: address!("0xcafe000000000000000000000000000000007357"),
+            t: true,
+            u: 255,
+            v: u16::MAX,
+            w: u32::MAX,
+            x: u64::MAX,
+            y: u128::MAX,
+            z: U256::MAX,
+            baz: Baz { a: 42, b: 4242}
+        }
+    )]
+    fn test_struct_packing<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,

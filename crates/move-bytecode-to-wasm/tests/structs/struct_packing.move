@@ -1,4 +1,4 @@
-module 0x00::unpacking_struct;
+module 0x00::struct_packing;
 
 public struct Baz has drop {
     a: u16,
@@ -18,21 +18,22 @@ public struct Foo has drop {
     baz: Baz,
 }
 
-public fun echo_foo(foo: Foo): (address, bool, u8, u16, u32, u64, u128, u256, u16, u128) {
-    (
-        foo.q,
-        foo.t,
-        foo.u,
-        foo.v,
-        foo.w,
-        foo.x,
-        foo.y,
-        foo.z,
-        foo.baz.a,
-        foo.baz.b,
-    )
+public fun echo_foo(
+    q: address,
+    t: bool,
+    u: u8,
+    v: u16,
+    w: u32,
+    x: u64,
+    y: u128,
+    z: u256,
+    ba: u16,
+    bb: u128
+): Foo {
+    Foo { q, t, u, v, w, x, y, z, baz: Baz { a: ba, b: bb } }
 }
 
+/*
 public struct Bazz has drop {
     a: u16,
     b: vector<u256>,
@@ -69,3 +70,4 @@ public fun echo_bar(bar: Bar): (address, vector<u32>, vector<u128>, bool, u8, u1
         bar.bazz.b,
     )
 }
+*/
