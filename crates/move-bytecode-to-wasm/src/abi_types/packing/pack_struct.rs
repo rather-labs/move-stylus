@@ -1,10 +1,11 @@
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use crate::{
     CompilationContext,
+    runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
 
@@ -36,13 +37,35 @@ impl IStruct {
         // If the struct is static, the space for packing it is already allocated, we just need to
         // pack its values
         if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
+            let struct_values_ptr = module.locals.add(ValType::I32);
             // Allocate memory for the packed value.
             block
                 .i32_const(struct_.solidity_abi_encode_size(compilation_ctx) as i32)
-                .call(compilation_ctx.allocator)
-                .local_tee(calldata_reference_pointer)
-                .local_set(writer_pointer);
-            todo!()
+                .call(compilation_ctx.allocator);
+
+            // The pointer in the packed data must be relative to the calldata_reference_pointer,
+            // so we substract calldata_reference_pointer from the struct_values_ptr
+            block
+                .local_get(calldata_reference_pointer)
+                .binop(BinaryOp::I32Sub)
+                .local_set(struct_values_ptr);
+
+            // The result is saved where calldata_reference_pointer is pointing at, the value will
+            // be the address where the struct  values are packed, using as origin
+            // calldata_reference_pointer
+            let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
+            block
+                .local_get(calldata_reference_pointer)
+                .local_get(struct_values_ptr)
+                .call(swap_i32_bytes_function)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 28,
+                    },
+                );
         }
 
         for (index, field) in struct_.fields.iter().enumerate() {
@@ -56,6 +79,7 @@ impl IStruct {
                 },
             );
 
+            // Load the value
             let field_local = match field {
                 IntermediateType::IBool
                 | IntermediateType::IU8
@@ -98,12 +122,10 @@ impl IStruct {
             );
 
             block
-                .i32_const(32)
+                .i32_const(field.encoded_size(compilation_ctx) as i32)
                 .local_get(writer_pointer)
                 .binop(BinaryOp::I32Add)
                 .local_set(writer_pointer);
         }
-
-        // block.local_get(calldata_reference_pointer);
     }
 }

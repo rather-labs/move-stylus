@@ -15,7 +15,7 @@ use translation::{
 use walrus::{Module, RefType, ValType};
 use wasm_validation::validate_stylus_wasm;
 
-mod abi_types;
+pub(crate) mod abi_types;
 mod compilation_context;
 mod hostio;
 mod memory;
