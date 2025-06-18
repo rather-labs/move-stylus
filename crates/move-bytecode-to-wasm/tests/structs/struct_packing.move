@@ -15,7 +15,7 @@ public struct Foo has drop {
     x: u64,
     y: u128,
     z: u256,
-    baz: Baz,
+    // baz: Baz,
 }
 
 public fun echo_foo(
@@ -27,10 +27,10 @@ public fun echo_foo(
     x: u64,
     y: u128,
     z: u256,
-    ba: u16,
-    bb: u128
+    // ba: u16,
+    // bb: u128
 ): Foo {
-    Foo { q, t, u, v, w, x, y, z, baz: Baz { a: ba, b: bb } }
+    Foo { q, t, u, v, w, x, y, z, /* baz: Baz { a: ba, b: bb } */ }
 }
 
 /*

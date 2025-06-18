@@ -52,7 +52,7 @@ pub trait Packable {
     ) -> LocalId;
 
     /// Returns the ABI encoded size of the type
-    fn encoded_size(&self) -> usize;
+    fn encoded_size(&self, compilation_ctx: &CompilationContext) -> usize;
 }
 
 /// Builds the instructions to pack WASM return values into memory according to Solidity's ABI encoding.
@@ -82,7 +82,7 @@ pub fn build_pack_instructions<T: Packable>(
     for signature_token in function_return_signature.iter().rev() {
         let local = signature_token.add_load_local_instructions(builder, module);
         locals.push(local);
-        args_size += signature_token.encoded_size();
+        args_size += signature_token.encoded_size(compilation_ctx);
     }
     locals.reverse();
 
@@ -113,7 +113,7 @@ pub fn build_pack_instructions<T: Packable>(
         );
 
         builder.local_get(writer_pointer);
-        builder.i32_const(signature_token.encoded_size() as i32);
+        builder.i32_const(signature_token.encoded_size(compilation_ctx) as i32);
         builder.binop(BinaryOp::I32Add);
         builder.local_set(writer_pointer);
     }
@@ -257,7 +257,7 @@ impl Packable for IntermediateType {
         }
     }
 
-    fn encoded_size(&self) -> usize {
+    fn encoded_size(&self, compilation_ctx: &CompilationContext) -> usize {
         match self {
             IntermediateType::IBool => sol_data::Bool::ENCODED_SIZE.unwrap(),
             IntermediateType::IU8 => sol_data::Uint::<8>::ENCODED_SIZE.unwrap(),
@@ -269,9 +269,17 @@ impl Packable for IntermediateType {
             IntermediateType::IAddress => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::ISigner => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::IVector(_) => 32,
-            IntermediateType::IRef(inner) => inner.encoded_size(),
-            IntermediateType::IMutRef(inner) => inner.encoded_size(),
-            IntermediateType::IStruct(_) => 32,
+            IntermediateType::IRef(inner) => inner.encoded_size(compilation_ctx),
+            IntermediateType::IMutRef(inner) => inner.encoded_size(compilation_ctx),
+            IntermediateType::IStruct(index) => {
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+
+                if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
+                    32
+                } else {
+                    struct_.solidity_abi_encode_size(compilation_ctx) as usize
+                }
+            }
         }
     }
 }
