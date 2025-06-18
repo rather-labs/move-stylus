@@ -5,6 +5,7 @@ use walrus::{
 
 use crate::{
     CompilationContext,
+    abi_types::packing::pack_native_int::pack_i32_type_instructions,
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
@@ -32,7 +33,7 @@ impl IStruct {
         let calldata_ptr = module.locals.add(ValType::I32);
         let writer_ptr = module.locals.add(ValType::I32);
 
-        let struct_values_ptr = module.locals.add(ValType::I32);
+        let reference_value = module.locals.add(ValType::I32);
 
         let tmp = module.locals.add(ValType::I32);
         println!(
@@ -58,18 +59,26 @@ impl IStruct {
             block
                 .i32_const(struct_.solidity_abi_encode_size(compilation_ctx) as i32)
                 .call(compilation_ctx.allocator)
-                .local_tee(writer_pointer);
+                .local_tee(writer_ptr);
 
             // The pointer in the packed data must be relative to the calldata_reference_pointer,
             // so we substract calldata_reference_pointer from the writer_pointer
             block
                 .local_get(calldata_reference_pointer)
                 .binop(BinaryOp::I32Sub)
-                .local_set(struct_values_ptr);
+                .local_set(reference_value);
 
             // The result is saved where calldata_reference_pointer is pointing at, the value will
             // be the address where the struct  values are packed, using as origin
             // calldata_reference_pointer
+            pack_i32_type_instructions(
+                block,
+                module,
+                compilation_ctx.memory_id,
+                reference_value,
+                writer_pointer,
+            );
+            /*
             let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
             block
                 .local_get(calldata_reference_pointer)
@@ -82,7 +91,7 @@ impl IStruct {
                         align: 0,
                         offset: 28,
                     },
-                );
+                );*/
         }
 
         for (index, field) in struct_.fields.iter().enumerate() {
