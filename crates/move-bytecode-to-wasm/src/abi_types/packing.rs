@@ -97,11 +97,20 @@ pub fn build_pack_instructions<T: Packable>(
     // Store the writer pointer
     builder.local_set(writer_pointer);
 
+    let print_i32 = module.imports.get_func("", "print_i32").unwrap();
     for (local, signature_token) in locals.iter().zip(function_return_signature.iter()) {
         // Copy the reference just to be safe in case in internal function modifies it
         let calldata_reference_pointer = module.locals.add(ValType::I32);
         builder.local_get(pointer);
         builder.local_set(calldata_reference_pointer);
+
+        builder.i32_const(111).call(print_i32);
+        builder.local_get(pointer).call(print_i32);
+        builder
+            .local_get(calldata_reference_pointer)
+            .call(print_i32);
+        builder.local_get(writer_pointer).call(print_i32);
+        builder.i32_const(1111).call(print_i32);
 
         signature_token.add_pack_instructions(
             builder,
