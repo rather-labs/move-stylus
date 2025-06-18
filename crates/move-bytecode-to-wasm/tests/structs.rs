@@ -314,12 +314,10 @@ mod struct_packing {
     }
 
     sol! {
-        /*
         struct Baz {
             uint16 a;
             uint128 b;
         }
-        */
 
         struct Foo {
             address q;
@@ -330,10 +328,10 @@ mod struct_packing {
             uint64 x;
             uint128 y;
             uint256 z;
-            // Baz baz;
+            Baz baz;
         }
 
-        function echoFoo(address q, bool t, uint8 u, uint16 v, uint32 w, uint64 x, uint128 y, uint256 z/*, uint16 ba, uint128 bb*/) external returns (Foo);
+        function echoFoo(address q, bool t, uint8 u, uint16 v, uint32 w, uint64 x, uint128 y, uint256 z, uint16 ba, uint128 bb) external returns (Foo);
     }
 
     #[rstest]
@@ -347,8 +345,8 @@ mod struct_packing {
             u64::MAX,
             u128::MAX,
             U256::MAX,
-            // 42,
-            // 4242,
+            42,
+            4242,
         )),
         Foo {
             q: address!("0xcafe000000000000000000000000000000007357"),
@@ -359,7 +357,7 @@ mod struct_packing {
             x: u64::MAX,
             y: u128::MAX,
             z: U256::MAX,
-            // baz: Baz { a: 42, b: 4242}
+            baz: Baz { a: 42, b: 4242}
         }
     )]
     fn test_struct_packing<T: SolCall, V: SolValue>(
