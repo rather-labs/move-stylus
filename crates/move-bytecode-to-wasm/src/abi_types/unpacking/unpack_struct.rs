@@ -87,11 +87,7 @@ impl IStruct {
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) {
-        let struct_ = compilation_ctx
-            .module_structs
-            .iter()
-            .find(|s| s.index() == index)
-            .unwrap_or_else(|| panic!("struct that with index {index} not found"));
+        let struct_ = compilation_ctx.get_struct_by_index(index).unwrap();
 
         let struct_ptr = module.locals.add(ValType::I32);
         let val_32 = module.locals.add(ValType::I32);
