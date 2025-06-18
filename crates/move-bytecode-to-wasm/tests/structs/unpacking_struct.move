@@ -18,7 +18,6 @@ public struct Foo has drop {
     baz: Baz,
 }
 
-// TODO: Add another struct when packing is done
 public fun echo_foo(foo: Foo): (address, bool, u8, u16, u32, u64, u128, u256, u16, u128) {
     (
         foo.q,
