@@ -1,8 +1,9 @@
 use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
+pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use move_binary_format::file_format::{
-    Constant, DatatypeHandleIndex, FieldHandleIndex, Signature, StructDefinitionIndex, Visibility,
+    DatatypeHandleIndex, FieldHandleIndex, StructDefinitionIndex, Visibility,
 };
 use move_binary_format::internals::ModuleIndex;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
@@ -11,13 +12,11 @@ use translation::{
     functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
     translate_function,
 };
-use walrus::FunctionId;
-use walrus::MemoryId;
-use walrus::ValType;
-use walrus::{Module, RefType};
+use walrus::{Module, RefType, ValType};
 use wasm_validation::validate_stylus_wasm;
 
 mod abi_types;
+mod compilation_context;
 mod hostio;
 mod memory;
 mod runtime;
@@ -30,46 +29,6 @@ mod wasm_validation;
 
 #[cfg(test)]
 mod test_tools;
-
-/// Compilation context
-///
-/// Functions are processed in order. To access function information (i.e: arguments or return
-/// arguments we must know the index of it)
-pub struct CompilationContext<'a> {
-    /// Move's connstant pool
-    pub constants: &'a [Constant],
-
-    /// Module's functions arguments.
-    pub functions_arguments: &'a [Vec<IntermediateType>],
-
-    /// Module's functions Returns.
-    pub functions_returns: &'a [Vec<IntermediateType>],
-
-    /// Module's signatures
-    pub module_signatures: &'a [Signature],
-
-    /// Module's structs: contains all the user defined structs
-    pub module_structs: &'a [IStruct],
-
-    /// Maps a field index to its corresponding struct
-    pub fields_to_struct_map: &'a HashMap<FieldHandleIndex, StructDefinitionIndex>,
-
-    // This Hashmap maps the move's datatype handles to our internal representation of those
-    // types. The datatype handles are used interally by move to look for user defined data
-    // types
-    pub datatype_handles_map: &'a HashMap<DatatypeHandleIndex, UserDefinedType>,
-
-    /// WASM memory id
-    pub memory_id: MemoryId,
-
-    /// Allocator function id
-    pub allocator: FunctionId,
-}
-
-pub enum UserDefinedType {
-    Struct(u16),
-    Enum(usize),
-}
 
 pub fn translate_single_module(package: CompiledPackage, module_name: &str) -> Module {
     let mut modules = translate_package(package, Some(module_name.to_string()));

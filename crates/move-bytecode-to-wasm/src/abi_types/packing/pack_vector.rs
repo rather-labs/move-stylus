@@ -7,7 +7,6 @@ use crate::{
 };
 
 impl IVector {
-    #[allow(clippy::too_many_arguments)]
     pub fn add_pack_instructions(
         inner: &IntermediateType,
         block: &mut InstrSeqBuilder,

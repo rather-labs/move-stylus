@@ -10,6 +10,7 @@ use crate::{
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         signer::ISigner,
+        structs::IStruct,
         vector::IVector,
     },
 };
@@ -17,6 +18,7 @@ use crate::{
 mod pack_heap_int;
 mod pack_native_int;
 mod pack_reference;
+mod pack_struct;
 mod pack_vector;
 
 pub trait Packable {
@@ -243,7 +245,15 @@ impl Packable for IntermediateType {
                 calldata_reference_pointer,
                 compilation_ctx,
             ),
-            IntermediateType::IStruct(_) => todo!(),
+            IntermediateType::IStruct(index) => IStruct::add_pack_instructions(
+                *index,
+                builder,
+                module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                compilation_ctx,
+            ),
         }
     }
 
