@@ -216,15 +216,9 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
         }
         Bytecode::ImmBorrowField(field_id) => {
-            let struct_id = compilation_ctx
-                .fields_to_struct_map
-                .get(field_id)
-                .unwrap_or_else(|| panic!("struct that contains field {field_id} not found"));
             let struct_ = compilation_ctx
-                .module_structs
-                .iter()
-                .find(|s| &s.struct_definition_index == struct_id)
-                .unwrap_or_else(|| panic!("struct that contains field {field_id} not found"));
+                .get_struct_by_field_handle_idx(field_id)
+                .unwrap();
 
             // Check if in the types stack we have the correct type
             match types_stack.pop() {
@@ -242,11 +236,17 @@ fn map_bytecode_instruction(
             }
 
             let Some(field_type) = struct_.fields_types.get(field_id) else {
-                panic!("{field_id} not found in {struct_id}")
+                panic!(
+                    "{field_id} not found in {}",
+                    struct_.struct_definition_index
+                )
             };
 
             let Some(field_offset) = struct_.field_offsets.get(field_id) else {
-                panic!("{field_id} offset not found in {struct_id}")
+                panic!(
+                    "{field_id} offset not found in {}",
+                    struct_.struct_definition_index
+                )
             };
 
             builder
@@ -264,15 +264,9 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IRef(Box::new(field_type.clone())));
         }
         Bytecode::MutBorrowField(field_id) => {
-            let struct_id = compilation_ctx
-                .fields_to_struct_map
-                .get(field_id)
-                .unwrap_or_else(|| panic!("struct that contains field {field_id} not found"));
             let struct_ = compilation_ctx
-                .module_structs
-                .iter()
-                .find(|s| &s.struct_definition_index == struct_id)
-                .unwrap_or_else(|| panic!("struct that contains field {field_id} not found"));
+                .get_struct_by_field_handle_idx(field_id)
+                .unwrap();
 
             // Check if in the types stack we have the correct type
             match types_stack.pop() {
@@ -290,11 +284,17 @@ fn map_bytecode_instruction(
             }
 
             let Some(field_type) = struct_.fields_types.get(field_id) else {
-                panic!("{field_id} not found in {struct_id}")
+                panic!(
+                    "{field_id} not found in {}",
+                    struct_.struct_definition_index
+                )
             };
 
             let Some(field_offset) = struct_.field_offsets.get(field_id) else {
-                panic!("{field_id} offset not found in {struct_id}")
+                panic!(
+                    "{field_id} offset not found in {}",
+                    struct_.struct_definition_index
+                )
             };
 
             builder
@@ -1023,13 +1023,9 @@ fn map_bytecode_instruction(
             types_stack.push(t);
         }
         Bytecode::Pack(struct_definition_index) => {
-            let Some(struct_) = compilation_ctx
-                .module_structs
-                .iter()
-                .find(|s| s.struct_definition_index == *struct_definition_index)
-            else {
-                panic!("pack struct: struct with index {struct_definition_index:?} not found")
-            };
+            let struct_ = compilation_ctx
+                .get_struct_by_struct_definition_idx(struct_definition_index)
+                .unwrap();
 
             // Pointer to the struct
             let pointer = module.locals.add(ValType::I32);

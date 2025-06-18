@@ -15,6 +15,12 @@ pub enum UserDefinedType {
 pub enum CompilationContextError {
     #[error("struct with index {0} not found in compilation context")]
     StructNotFound(u16),
+
+    #[error("struct with field id {0:?} not found in compilation context")]
+    StructWithFieldIdxNotFound(FieldHandleIndex),
+
+    #[error("struct with field id {0:?} not found in compilation context")]
+    StructWithDefinitionIdxNotFound(StructDefinitionIndex),
 }
 
 /// Compilation context
@@ -58,5 +64,33 @@ impl CompilationContext<'_> {
             .iter()
             .find(|s| s.index() == index)
             .ok_or(CompilationContextError::StructNotFound(index))
+    }
+
+    pub fn get_struct_by_field_handle_idx(
+        &self,
+        field_index: &FieldHandleIndex,
+    ) -> Result<&IStruct, CompilationContextError> {
+        let struct_id = self.fields_to_struct_map.get(field_index).ok_or(
+            CompilationContextError::StructWithFieldIdxNotFound(*field_index),
+        )?;
+
+        self.module_structs
+            .iter()
+            .find(|s| &s.struct_definition_index == struct_id)
+            .ok_or(CompilationContextError::StructWithFieldIdxNotFound(
+                *field_index,
+            ))
+    }
+
+    pub fn get_struct_by_struct_definition_idx(
+        &self,
+        struct_index: &StructDefinitionIndex,
+    ) -> Result<&IStruct, CompilationContextError> {
+        self.module_structs
+            .iter()
+            .find(|s| &s.struct_definition_index == struct_index)
+            .ok_or(CompilationContextError::StructWithDefinitionIdxNotFound(
+                *struct_index,
+            ))
     }
 }
