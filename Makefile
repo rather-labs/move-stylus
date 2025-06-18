@@ -28,19 +28,3 @@ install-wasm-tools:
 
 parse-rust-example:
 	wasm-tools print ./example-rust/target/wasm32-unknown-unknown/release/stylus_hello_world.wasm -o ./example-rust/target/wasm32-unknown-unknown/release/stylus_hello_world.wat
-
-# This is used to compile solidity contracts and obtain a compiled abi.
-# It is useful for contracts that have complex datatypes such as enums or structs, because abigen!
-# can't parse them.
-# Usage = make compile-sol-abi SOL_SRC=./crates/move-bytecode-to-wasm/tests/structs/unpacking_struct.sol
-SOL_SRC_ABS := $(realpath $(SOL_SRC))
-SOL_SRC_DIR := $(dir $(SOL_SRC_ABS))
-SOL_SRC_FILE := $(notdir $(SOL_SRC_ABS))
-compile-sol-abi:
-	docker run --rm \
-		--volume "$(SOL_SRC_DIR):/sources" \
-		ethereum/solc:stable \
-		/sources/$(SOL_SRC_FILE) \
-		--abi \
-		--overwrite \
-		--output-dir /sources
