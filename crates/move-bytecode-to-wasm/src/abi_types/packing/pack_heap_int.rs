@@ -166,7 +166,7 @@ mod tests {
         func_body.call(alloc_function);
         func_body.local_set(local);
 
-        func_body.i32_const(int_type.encoded_size() as i32);
+        func_body.i32_const(int_type.encoded_size(&compilation_ctx) as i32);
         func_body.call(alloc_function);
         func_body.local_set(writer_pointer);
 

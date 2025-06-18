@@ -23,20 +23,25 @@ impl IStruct {
         let struct_ = compilation_ctx.get_struct_by_index(index).unwrap();
         let val_32 = module.locals.add(ValType::I32);
         let val_64 = module.locals.add(ValType::I64);
-        let packed_struct_ptr = module.locals.add(ValType::I32);
-        let write_data_ptr = module.locals.add(ValType::I32);
         let struct_ptr = local;
 
-        // Allocate memory for the packed value. To calculate the size of the allocation we divide
-        // the struct heap size by 4 to compute the number of fields, after that we multiply it by
-        // 32 because each field will occupy 32 bytes
-        block
-            .i32_const(struct_.heap_size as i32 / 4 * 32)
-            .call(compilation_ctx.allocator)
-            .local_tee(packed_struct_ptr)
-            .local_set(write_data_ptr);
+        println!(
+            "=== > {}",
+            struct_.solidity_abi_encode_size(compilation_ctx)
+        );
 
+        // If the struct is dynamic, the space allocated for the struct is only 32 bytes long and we
+        // need to save in calldata_reference_pointer the value pointing to the packed struct.
+        //
+        // If the struct is static, the space for packing it is already allocated, we just need to
+        // pack its values
         if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
+            // Allocate memory for the packed value.
+            block
+                .i32_const(struct_.solidity_abi_encode_size(compilation_ctx) as i32)
+                .call(compilation_ctx.allocator)
+                .local_tee(calldata_reference_pointer)
+                .local_set(writer_pointer);
             todo!()
         }
 
@@ -82,23 +87,23 @@ impl IStruct {
                 }
             };
 
-            // Unpack field
+            // Pack field
             field.add_pack_instructions(
                 block,
                 module,
                 field_local,
-                write_data_ptr,
-                packed_struct_ptr,
+                writer_pointer,
+                calldata_reference_pointer,
                 compilation_ctx,
             );
 
             block
                 .i32_const(32)
-                .local_get(write_data_ptr)
+                .local_get(writer_pointer)
                 .binop(BinaryOp::I32Add)
-                .local_set(write_data_ptr);
+                .local_set(writer_pointer);
         }
 
-        block.local_get(packed_struct_ptr);
+        // block.local_get(calldata_reference_pointer);
     }
 }

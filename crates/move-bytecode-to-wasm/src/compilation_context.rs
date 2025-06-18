@@ -12,6 +12,7 @@ pub enum UserDefinedType {
 }
 
 #[derive(Debug, thiserror::Error)]
+#[allow(clippy::enum_variant_names)]
 pub enum CompilationContextError {
     #[error("struct with index {0} not found in compilation context")]
     StructNotFound(u16),

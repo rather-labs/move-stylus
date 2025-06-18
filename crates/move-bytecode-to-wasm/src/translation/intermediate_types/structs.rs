@@ -226,4 +226,38 @@ impl IStruct {
 
         false
     }
+
+    pub fn solidity_abi_encode_size(&self, compilation_ctx: &CompilationContext) -> u32 {
+        let mut size = 0;
+        for field in &self.fields {
+            match field {
+                IntermediateType::IBool
+                | IntermediateType::IU8
+                | IntermediateType::IU16
+                | IntermediateType::IU32
+                | IntermediateType::IU64
+                | IntermediateType::IU128
+                | IntermediateType::IU256
+                | IntermediateType::IAddress
+                | IntermediateType::IVector(_) => {
+                    size += 32;
+                }
+                IntermediateType::IStruct(index) => {
+                    let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+
+                    if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
+                        size += 32;
+                    } else {
+                        size += struct_.solidity_abi_encode_size(compilation_ctx);
+                    }
+                }
+                IntermediateType::ISigner => panic!("signer is not abi econdable"),
+                IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                    panic!("found reference inside struct")
+                }
+            }
+        }
+
+        size
+    }
 }
