@@ -45,7 +45,7 @@
 //! field management across all types.
 use std::collections::HashMap;
 
-use crate::CompilationContext;
+use crate::{CompilationContext, abi_types::packing::Packable};
 
 use super::IntermediateType;
 use move_binary_format::file_format::{FieldHandleIndex, StructDefinitionIndex};
@@ -240,7 +240,7 @@ impl IStruct {
                 | IntermediateType::IU256
                 | IntermediateType::IAddress
                 | IntermediateType::IVector(_) => {
-                    size += 32;
+                    size += (field as &dyn Packable).encoded_size(compilation_ctx) as u32;
                 }
                 IntermediateType::IStruct(index) => {
                     let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();

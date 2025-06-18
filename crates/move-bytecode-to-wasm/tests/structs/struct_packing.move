@@ -33,7 +33,6 @@ public fun echo_foo(
     Foo { q, t, u, v, w, x, y, z, baz: Baz { a: ba, b: bb } }
 }
 
-/*
 public struct Bazz has drop {
     a: u16,
     b: vector<u256>,
@@ -54,20 +53,19 @@ public struct Bar has drop {
     bazz: Bazz,
 }
 
-public fun echo_bar(bar: Bar): (address, vector<u32>, vector<u128>, bool, u8, u16, u32, u64, u128, u256, u16, vector<u256>) {
-    (
-        bar.q,
-        bar.r,
-        bar.s,
-        bar.t,
-        bar.u,
-        bar.v,
-        bar.w,
-        bar.x,
-        bar.y,
-        bar.z,
-        bar.bazz.a,
-        bar.bazz.b,
-    )
+public fun echo_bar(
+    q: address,
+    r: vector<u32>,
+    s: vector<u128>,
+    t: bool,
+    u: u8,
+    v: u16,
+    w: u32,
+    x: u64,
+    y: u128,
+    z: u256,
+    ba: u16,
+    bb: vector<u256>
+): Bar {
+    Bar { q, r, s, t, u, v, w, x, y, z, bazz: Bazz { a: ba, b: bb } }
 }
-*/
