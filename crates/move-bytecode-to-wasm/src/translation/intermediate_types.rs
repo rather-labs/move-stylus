@@ -195,6 +195,7 @@ impl IntermediateType {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::ISigner
+            | IntermediateType::IVector(_)
             | IntermediateType::IStruct(_) => {
                 builder.load(
                     compilation_ctx.memory_id,
@@ -206,16 +207,6 @@ impl IntermediateType {
                 );
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {}
-            IntermediateType::IVector(_) => {
-                builder.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            }
         }
     }
 
@@ -302,7 +293,7 @@ impl IntermediateType {
                         offset: 0,
                     },
                 );
-                //TODO: move this to a runtime function
+                builder.i32_const(1); // This is the length "multiplier", i.e. length * multiplier = capacity
                 IVector::copy_local_instructions(inner_type, module, builder, compilation_ctx);
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -470,6 +461,7 @@ impl IntermediateType {
                 builder.call(copy_f);
             }
             IntermediateType::IVector(inner_type) => {
+                builder.i32_const(1); // Length multiplier
                 IVector::copy_local_instructions(inner_type, module, builder, compilation_ctx);
             }
             IntermediateType::ISigner => {

@@ -44,4 +44,36 @@ public fun vec_swap(x: vector<vector<u128>>, id1: u64, id2: u64): vector<vector<
   y.swap(id1, id2);
   y
 }
+
+public fun vec_push_back(x: vector<vector<u128>>, y: vector<u128>): vector<vector<u128>> {
+  let mut z = x;
+  z.push_back(y);
+  z.push_back(y);
+  z
+}
+
+public fun vec_push_back_to_element(x: vector<vector<u128>>, y: u128): vector<vector<u128>> {
+  let mut w = x;
+  w[0].push_back(y);
+  w[0].push_back(y);
+  w
+}
+
+public fun vec_push_and_pop_back(x: vector<vector<u128>>, y: vector<u128>): vector<vector<u128>> {
+  let mut z = x;
+  z.push_back(y);
+  z.pop_back();
+  z
+}
   
+  
+public fun misc_0(x: vector<vector<u128>>, y: u128): vector<vector<u128>> {
+  let mut w = x;
+  w[0].push_back(y);
+  let mut a = w[1];
+  a.swap(0, 1);
+  a.pop_back();
+  a.push_back(y);
+  let z = vector[w[0], a];
+  z
+}
