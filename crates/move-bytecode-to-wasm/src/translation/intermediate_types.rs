@@ -794,14 +794,13 @@ impl IntermediateType {
                     | IntermediateType::IU256
                     | IntermediateType::IAddress
                     | IntermediateType::ISigner
-                    | IntermediateType::IVector(_) => {
+                    | IntermediateType::IVector(_)
+                    | IntermediateType::IStruct(_) => {
                         builder.local_get(ptr1).local_get(ptr2);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                         panic!("found reference of reference");
                     }
-
-                    Self::IStruct(_) => todo!(),
                 }
 
                 inner.load_equality_instructions(module, builder, compilation_ctx)

@@ -22,7 +22,8 @@ impl IRef {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IU128
-            | IntermediateType::IU256 => {
+            | IntermediateType::IU256
+            | IntermediateType::IStruct(_) => {
                 inner.add_unpack_instructions(
                     builder,
                     module,
@@ -70,7 +71,6 @@ impl IRef {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
-            IntermediateType::IStruct(_) => todo!(),
         }
     }
 }
@@ -90,7 +90,8 @@ impl IMutRef {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IU128
-            | IntermediateType::IU256 => {
+            | IntermediateType::IU256
+            | IntermediateType::IStruct(_) => {
                 inner.add_unpack_instructions(
                     builder,
                     module,
@@ -138,7 +139,6 @@ impl IMutRef {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
-            IntermediateType::IStruct(_) => todo!(),
         }
     }
 }
