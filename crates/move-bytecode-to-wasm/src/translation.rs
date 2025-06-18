@@ -215,6 +215,12 @@ fn map_bytecode_instruction(
             local_type.add_borrow_local_instructions(builder, local);
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
         }
+        Bytecode::MutBorrowLoc(local_id) => {
+            let local = mapped_function.function_locals[*local_id as usize];
+            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
+            local_type.add_borrow_local_instructions(builder, local);
+            types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
+        }
         Bytecode::ImmBorrowField(field_id) => {
             let struct_id = compilation_ctx
                 .fields_to_struct_map
@@ -311,115 +317,7 @@ fn map_bytecode_instruction(
 
             types_stack.push(IntermediateType::IMutRef(Box::new(field_type.clone())));
         }
-        Bytecode::MutBorrowLoc(local_id) => {
-            let local = mapped_function.function_locals[*local_id as usize];
-            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
-            local_type.add_borrow_local_instructions(builder, local);
-            types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
-        }
-        Bytecode::VecPack(signature_index, num_elements) => {
-            let inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
-            IVector::vec_pack_instructions(
-                &inner,
-                module,
-                builder,
-                compilation_ctx,
-                *num_elements as i32,
-            );
-
-            // Remove the packing values from types stack and check if the types are correct
-            let mut n = *num_elements as usize;
-            while n > 0 {
-                pop_types_stack(types_stack, &inner).unwrap();
-                n -= 1;
-            }
-
-            types_stack.push(IntermediateType::IVector(Box::new(inner)));
-        }
-        Bytecode::VecPopBack(signature_index) => {
-            let [ty] = pop_n_from_stack(types_stack);
-
-            let IntermediateType::IMutRef(mut_inner) = ty else {
-                panic!("Expected mutable reference to vector, got {:?}", ty);
-            };
-
-            let IntermediateType::IVector(vec_inner) = *mut_inner else {
-                panic!("Expected vector type inside mutable reference");
-            };
-
-            let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
-
-            if *vec_inner != expected_vec_inner {
-                panic!(
-                    "Expected vector inner type {:?}, got {:?}",
-                    expected_vec_inner, *vec_inner
-                );
-            }
-
-            match *vec_inner {
-                IntermediateType::IBool
-                | IntermediateType::IU8
-                | IntermediateType::IU16
-                | IntermediateType::IU32
-                | IntermediateType::IU128
-                | IntermediateType::IU256
-                | IntermediateType::IAddress
-                | IntermediateType::ISigner
-                | IntermediateType::IVector(_) => {
-                    let swap_f = RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
-                    builder.call(swap_f);
-                }
-                IntermediateType::IU64 => {
-                    let swap_f = RuntimeFunction::VecPopBack64.get(module, Some(compilation_ctx));
-                    builder.call(swap_f);
-                }
-                IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                    panic!("VecPopBack operation is not allowed on reference types");
-                }
-                IntermediateType::IStruct(_) => todo!(),
-            }
-
-            types_stack.push(*vec_inner);
-        }
-        Bytecode::VecSwap(signature_index) => {
-            let [id2_ty, id1_ty, ref_ty] = pop_n_from_stack(types_stack);
-
-            let IntermediateType::IU64 = id2_ty else {
-                panic!("Expected IU64, got {:?}", id2_ty);
-            };
-
-            let IntermediateType::IU64 = id1_ty else {
-                panic!("Expected IU64, got {:?}", id1_ty);
-            };
-
-            let IntermediateType::IMutRef(mut_inner) = ref_ty else {
-                panic!("Expected mutable reference to vector, got {:?}", ref_ty);
-            };
-
-            let IntermediateType::IVector(vec_inner) = *mut_inner else {
-                panic!("Expected vector type inside mutable reference");
-            };
-
-            let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
-
-            if *vec_inner != expected_vec_inner {
-                panic!(
-                    "Expected vector inner type {:?}, got {:?}",
-                    expected_vec_inner, *vec_inner
-                );
-            }
-
-            match *vec_inner {
-                IntermediateType::IU64 => {
-                    let swap_f = RuntimeFunction::VecSwap64.get(module, Some(compilation_ctx));
-                    builder.call(swap_f);
-                }
-                _ => {
-                    let swap_f = RuntimeFunction::VecSwap32.get(module, Some(compilation_ctx));
-                    builder.call(swap_f);
-                }
-            }
-        }
+        // Vector instructions
         Bytecode::VecImmBorrow(signature_index) => {
             let [t1, t2] = pop_n_from_stack(types_stack);
 
@@ -475,6 +373,140 @@ fn map_bytecode_instruction(
             IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx);
 
             types_stack.push(IntermediateType::IMutRef(Box::new(*vec_inner)));
+        }
+        Bytecode::VecPack(signature_index, num_elements) => {
+            let inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
+            IVector::vec_pack_instructions(
+                &inner,
+                module,
+                builder,
+                compilation_ctx,
+                *num_elements as i32,
+            );
+
+            // Remove the packing values from types stack and check if the types are correct
+            let mut n = *num_elements as usize;
+            while n > 0 {
+                pop_types_stack(types_stack, &inner).unwrap();
+                n -= 1;
+            }
+
+            types_stack.push(IntermediateType::IVector(Box::new(inner)));
+        }
+        Bytecode::VecPopBack(signature_index) => {
+            let [ty] = pop_n_from_stack(types_stack);
+
+            let IntermediateType::IMutRef(mut_inner) = ty else {
+                panic!("Expected mutable reference to vector, got {:?}", ty);
+            };
+
+            let IntermediateType::IVector(vec_inner) = *mut_inner else {
+                panic!("Expected vector type inside mutable reference");
+            };
+
+            let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
+
+            if *vec_inner != expected_vec_inner {
+                panic!(
+                    "Expected vector inner type {:?}, got {:?}",
+                    expected_vec_inner, *vec_inner
+                );
+            }
+
+            match *vec_inner {
+                IntermediateType::IBool
+                | IntermediateType::IU8
+                | IntermediateType::IU16
+                | IntermediateType::IU32
+                | IntermediateType::IU128
+                | IntermediateType::IU256
+                | IntermediateType::IAddress
+                | IntermediateType::ISigner
+                | IntermediateType::IVector(_) => {
+                    let pop_back_f =
+                        RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
+                    builder.call(pop_back_f);
+                }
+                IntermediateType::IU64 => {
+                    let pop_back_f =
+                        RuntimeFunction::VecPopBack64.get(module, Some(compilation_ctx));
+                    builder.call(pop_back_f);
+                }
+                IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                    panic!("VecPopBack operation is not allowed on reference types");
+                }
+                IntermediateType::IStruct(_) => todo!(),
+            }
+
+            types_stack.push(*vec_inner);
+        }
+        Bytecode::VecPushBack(signature_index) => {
+            let [elem_ty, ref_ty] = pop_n_from_stack(types_stack);
+
+            let IntermediateType::IMutRef(mut_inner) = ref_ty else {
+                panic!("Expected mutable reference to vector, got {:?}", ref_ty);
+            };
+
+            let IntermediateType::IVector(vec_inner) = *mut_inner else {
+                panic!("Expected vector type inside mutable reference");
+            };
+
+            let expected_elem_type = get_ir_for_signature_index(compilation_ctx, *signature_index);
+
+            if *vec_inner != expected_elem_type {
+                panic!(
+                    "Expected vector inner type {:?}, got {:?}",
+                    expected_elem_type, *vec_inner
+                );
+            }
+
+            if elem_ty != expected_elem_type {
+                panic!(
+                    "Expected element type {:?}, got {:?}",
+                    expected_elem_type, elem_ty
+                );
+            }
+
+            IVector::vec_push_back_instructions(&elem_ty, module, builder, compilation_ctx);
+        }
+        Bytecode::VecSwap(signature_index) => {
+            let [id2_ty, id1_ty, ref_ty] = pop_n_from_stack(types_stack);
+
+            let IntermediateType::IU64 = id2_ty else {
+                panic!("Expected IU64, got {:?}", id2_ty);
+            };
+
+            let IntermediateType::IU64 = id1_ty else {
+                panic!("Expected IU64, got {:?}", id1_ty);
+            };
+
+            let IntermediateType::IMutRef(mut_inner) = ref_ty else {
+                panic!("Expected mutable reference to vector, got {:?}", ref_ty);
+            };
+
+            let IntermediateType::IVector(vec_inner) = *mut_inner else {
+                panic!("Expected vector type inside mutable reference");
+            };
+
+            let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
+
+            if *vec_inner != expected_vec_inner {
+                panic!(
+                    "Expected vector inner type {:?}, got {:?}",
+                    expected_vec_inner, *vec_inner
+                );
+            }
+
+            match *vec_inner {
+                IntermediateType::IU64 => {
+                    let swap_f = RuntimeFunction::VecSwap64.get(module, Some(compilation_ctx));
+                    builder.call(swap_f);
+                }
+                _ => {
+                    let swap_f = RuntimeFunction::VecSwap32.get(module, Some(compilation_ctx));
+                    builder.call(swap_f);
+                }
+            }
         }
         Bytecode::VecLen(signature_index) => {
             let elem_ir_type = get_ir_for_signature_index(compilation_ctx, *signature_index);

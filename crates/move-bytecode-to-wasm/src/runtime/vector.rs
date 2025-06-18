@@ -7,6 +7,85 @@ use super::RuntimeFunction;
 use crate::CompilationContext;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
+// Increments vector length by 1
+// # Arguments:
+//    - len: (i32) length of the vector
+//    - vec ptr: (i32) reference to the vector
+pub fn increment_vec_len_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::VecIncrementLen.name().to_owned())
+        .func_body();
+
+    let ptr = module.locals.add(ValType::I32);
+    let len = module.locals.add(ValType::I32);
+
+    builder
+        .local_get(ptr)
+        .local_get(len)
+        .i32_const(1)
+        .binop(BinaryOp::I32Add)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    function.finish(vec![ptr, len], &mut module.funcs)
+}
+
+// Decrements vector length by 1
+// # Arguments:
+//    - len: (i32) length of the vector
+//    - vec ptr: (i32) reference to the vector
+pub fn decrement_vec_len_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::VecDecrementLen.name().to_owned())
+        .func_body();
+
+    let ptr = module.locals.add(ValType::I32);
+    let len = module.locals.add(ValType::I32);
+
+    // Trap if vector length == 0
+    builder
+        .local_get(len)
+        .i32_const(0)
+        .binop(BinaryOp::I32Eq)
+        .if_else(
+            None,
+            |then| {
+                then.unreachable(); // cannot pop from empty vector
+            },
+            |_| {},
+        );
+
+    builder
+        .local_get(ptr)
+        .local_get(len)
+        .i32_const(1)
+        .binop(BinaryOp::I32Sub)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    function.finish(vec![ptr, len], &mut module.funcs)
+}
+
 /// Swaps the elements at two indices in the vector. Abort the execution if any of the indice
 /// is out of bounds.
 ///
@@ -320,33 +399,11 @@ pub fn vec_pop_back_32_function(
         )
         .local_set(len);
 
-    // Trap if vector length == 0
-    builder
-        .local_get(len)
-        .i32_const(0)
-        .binop(BinaryOp::I32Eq)
-        .if_else(
-            None,
-            |then| {
-                then.unreachable(); // cannot pop from empty vector
-            },
-            |_| {},
-        );
-
-    // Vector length is reduced by 1
+    // Decrement vector length
     builder
         .local_get(ptr)
         .local_get(len)
-        .i32_const(1)
-        .binop(BinaryOp::I32Sub)
-        .store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
+        .call(RuntimeFunction::VecDecrementLen.get(module, Some(compilation_ctx)));
 
     // Update vector length
     builder
@@ -414,33 +471,11 @@ pub fn vec_pop_back_64_function(
         )
         .local_set(len);
 
-    // Trap if vector length == 0
-    builder
-        .local_get(len)
-        .i32_const(0)
-        .binop(BinaryOp::I32Eq)
-        .if_else(
-            None,
-            |then| {
-                then.unreachable(); // cannot pop from empty vector
-            },
-            |_| {},
-        );
-
-    // Vector length is reduced by 1
+    // Decrement vector length
     builder
         .local_get(ptr)
         .local_get(len)
-        .i32_const(1)
-        .binop(BinaryOp::I32Sub)
-        .store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
+        .call(RuntimeFunction::VecDecrementLen.get(module, Some(compilation_ctx)));
 
     // Update vector length
     builder
@@ -529,45 +564,31 @@ pub fn vec_borrow_function(
         block.unreachable();
     });
 
-    // Element reference
-    let elem_ref = module.locals.add(ValType::I32);
-    builder
-        .i32_const(4)
-        .call(compilation_ctx.allocator)
-        .local_tee(elem_ref);
-
-    // Pointer to element
-    let elem_ptr = module.locals.add(ValType::I32);
-    builder.vec_elem_ptr_dynamic(vec_ptr, index, size);
-    builder.local_set(elem_ptr);
-
+    // If the element is stored on the heap, we directly return vec_elem_ptr, as it is already a reference (pointer to a pointer).
+    // If the element is not on the heap, we convert the pointer returned by vec_elem_ptr into a reference by wrapping it.
     builder.local_get(is_heap).if_else(
         ValType::I32,
         |then| {
-            then.local_get(elem_ptr).load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
+            then.vec_elem_ptr_dynamic(vec_ptr, index, size);
         },
         |else_| {
-            else_.local_get(elem_ptr);
+            let elem_ref = module.locals.add(ValType::I32);
+            else_
+                .i32_const(4)
+                .call(compilation_ctx.allocator)
+                .local_tee(elem_ref)
+                .vec_elem_ptr_dynamic(vec_ptr, index, size)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .local_get(elem_ref);
         },
     );
-
-    builder.store(
-        compilation_ctx.memory_id,
-        StoreKind::I32 { atomic: false },
-        MemArg {
-            align: 0,
-            offset: 0,
-        },
-    );
-
-    builder.local_get(elem_ref);
 
     function.finish(vec![vec_ref, index, is_heap, size], &mut module.funcs)
 }

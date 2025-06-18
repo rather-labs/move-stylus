@@ -43,6 +43,8 @@ pub enum RuntimeFunction {
     VecPopBack32,
     VecPopBack64,
     VecBorrow,
+    VecIncrementLen,
+    VecDecrementLen,
 }
 
 impl RuntimeFunction {
@@ -82,6 +84,8 @@ impl RuntimeFunction {
             Self::VecPopBack32 => "vec_pop_back_32",
             Self::VecPopBack64 => "vec_pop_back_64",
             Self::VecBorrow => "vec_borrow",
+            Self::VecIncrementLen => "vec_increment_len",
+            Self::VecDecrementLen => "vec_decrement_len",
         }
     }
 
@@ -147,6 +151,12 @@ impl RuntimeFunction {
                 (Self::VecPopBack32, Some(ctx)) => vector::vec_pop_back_32_function(module, ctx),
                 (Self::VecPopBack64, Some(ctx)) => vector::vec_pop_back_64_function(module, ctx),
                 (Self::VecBorrow, Some(ctx)) => vector::vec_borrow_function(module, ctx),
+                (Self::VecIncrementLen, Some(ctx)) => {
+                    vector::increment_vec_len_function(module, ctx)
+                }
+                (Self::VecDecrementLen, Some(ctx)) => {
+                    vector::decrement_vec_len_function(module, ctx)
+                }
                 // Error
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,
