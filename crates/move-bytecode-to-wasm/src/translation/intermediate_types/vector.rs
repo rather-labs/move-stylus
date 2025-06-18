@@ -199,6 +199,10 @@ impl IVector {
         builder.i32_const(0);
         builder.local_set(index);
 
+        // Aux locals for the loop
+        let src_elem_ptr = module.locals.add(ValType::I32);
+        let dst_elem_ptr = module.locals.add(ValType::I32);
+
         builder.loop_(None, |loop_block| {
             loop_block.vec_elem_ptr(dst_ptr, index, data_size); // where to store the element
             loop_block.vec_elem_ptr(src_ptr, index, data_size); // where to read the element
@@ -236,12 +240,10 @@ impl IVector {
                             offset: 0,
                         },
                     );
-                    let src_elem_ptr = module.locals.add(ValType::I32);
                     loop_block.local_set(src_elem_ptr);
 
                     loop_block.i32_const(16);
                     loop_block.call(compilation_ctx.allocator);
-                    let dst_elem_ptr = module.locals.add(ValType::I32);
                     loop_block.local_set(dst_elem_ptr);
 
                     for i in 0..2 {
@@ -280,12 +282,10 @@ impl IVector {
                             offset: 0,
                         },
                     );
-                    let src_elem_ptr = module.locals.add(ValType::I32);
                     loop_block.local_set(src_elem_ptr);
 
                     loop_block.i32_const(32);
                     loop_block.call(compilation_ctx.allocator);
-                    let dst_elem_ptr = module.locals.add(ValType::I32);
                     loop_block.local_set(dst_elem_ptr);
 
                     for i in 0..4 {
@@ -544,7 +544,7 @@ impl IVector {
         let temp_local = module.locals.add(inner.into());
         let data_size = inner.stack_data_size() as i32;
 
-        // Set lenght
+        // Set length
         builder.i32_const(num_elements).local_set(len_local);
 
         IVector::allocate_vector_with_header(

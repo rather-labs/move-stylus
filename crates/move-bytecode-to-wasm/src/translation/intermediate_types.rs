@@ -293,7 +293,7 @@ impl IntermediateType {
                         offset: 0,
                     },
                 );
-                builder.i32_const(1); // This is the lenght "multiplier", i.e. length * multiplier = capacity
+                builder.i32_const(1); // This is the length "multiplier", i.e. length * multiplier = capacity
                 IVector::copy_local_instructions(inner_type, module, builder, compilation_ctx);
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
