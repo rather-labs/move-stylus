@@ -142,7 +142,7 @@ impl IStruct {
 
         builder.block(None, |block| {
             let block_id = block.id();
-            for (index, field) in struct_.fields.iter().rev().enumerate() {
+            for (index, field) in struct_.fields.iter().enumerate() {
                 // Offset of the field's pointer
                 let offset = index as u32 * 4;
 
