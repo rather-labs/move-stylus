@@ -36,14 +36,10 @@ impl IStruct {
         let writer_ptr = module.locals.add(ValType::I32);
         let dynamic_data_base_ptr = module.locals.add(ValType::I32);
 
-        println!(
-            "=== > {}",
-            struct_.solidity_abi_encode_size(compilation_ctx)
-        );
-
-        // block.local_get(calldata_reference_pointer).call(print_i32);
-        // block.local_get(writer_pointer).call(print_i32);
-
+        // If base_calldata_reference_ptr is some, means we are packing an struct inside a struct
+        // and that the struct is dynamic.
+        // base_calldata_reference_pointer is the reference pointer to the original value, and it
+        // is used to write the offset where the struct will be allocated in the parent struct.
         if let Some(base_calldata_reference_ptr) = base_calldata_reference_pointer {
             // Allocate memory for the packed value. Set the writer pointer at the beginning, since
             // we are going to pack the values from there
@@ -136,8 +132,9 @@ impl IStruct {
                 block.local_get(writer_pointer).call(print_i32);
             }
 
-            match field {
-                IntermediateType::IStruct(i) => {
+            if let IntermediateType::IStruct(i) = field {
+                let child_struct = compilation_ctx.get_struct_by_index(*i).unwrap();
+                if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
                     IStruct::add_pack_instructions(
                         *i,
                         block,
@@ -147,10 +144,8 @@ impl IStruct {
                         dynamic_data_base_ptr,
                         compilation_ctx,
                         Some(calldata_reference_pointer),
-                    );
-                }
-                _ => {
-                    // Pack field
+                    )
+                } else {
                     field.add_pack_instructions(
                         block,
                         module,
@@ -160,12 +155,21 @@ impl IStruct {
                         compilation_ctx,
                     );
                 }
+            } else {
+                field.add_pack_instructions(
+                    block,
+                    module,
+                    field_local,
+                    writer_ptr,
+                    dynamic_data_base_ptr,
+                    compilation_ctx,
+                );
             }
 
-            let pointer_to_update = if base_calldata_reference_pointer.is_some() {
-                writer_ptr
-            } else {
+            let pointer_to_update = if base_calldata_reference_pointer.is_none() {
                 writer_pointer
+            } else {
+                writer_ptr
             };
 
             block
