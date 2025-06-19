@@ -41,6 +41,7 @@ public struct Bazz has drop {
 // Dynamic abi struct
 public struct Bar has drop {
     q: address,
+    /*
     r: vector<u32>,
     s: vector<u128>,
     t: bool,
@@ -50,13 +51,13 @@ public struct Bar has drop {
     x: u64,
     y: u128,
     z: u256,
-    /*
-    bazz: Bazz,
     */
+    bazz: Bazz,
 }
 
 public fun echo_bar(
     q: address,
+    /*
     r: vector<u32>,
     s: vector<u128>,
     t: bool,
@@ -66,10 +67,9 @@ public fun echo_bar(
     x: u64,
     y: u128,
     z: u256,
-    /*
+    */
     ba: u16,
     bb: vector<u256>
-    */
 ): Bar {
-    Bar { q, r, s, t, u, v, w, x, y, z, /*bazz: Bazz { a: ba, b: bb } */}
+    Bar { q, /*r, s, t, u, v, w, x, y, z, */ bazz: Bazz { a: ba, b: bb } }
 }

@@ -253,6 +253,7 @@ impl Packable for IntermediateType {
                 writer_pointer,
                 calldata_reference_pointer,
                 compilation_ctx,
+                None,
             ),
         }
     }

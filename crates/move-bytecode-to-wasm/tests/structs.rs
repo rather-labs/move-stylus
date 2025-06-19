@@ -338,6 +338,7 @@ mod struct_packing {
 
         struct Bar {
             address q;
+            /*
             uint32[] r;
             uint128[] s;
             bool t;
@@ -347,13 +348,12 @@ mod struct_packing {
             uint64 x;
             uint128 y;
             uint256 z;
-            /*
-            Bazz bazz;
             */
+            Bazz bazz;
         }
 
         function echoFoo(address q, bool t, uint8 u, uint16 v, uint32 w, uint64 x, uint128 y, uint256 z, uint16 ba, uint128 bb) external returns (Foo);
-        function echoBar(address q, uint32[] r, uint128[] s, bool t, uint8 u, uint16 v, uint32 w, uint64 x, uint128 y, uint256 z, /*uint16 ba, uint256[] bb*/) external returns (Bar bar);
+        function echoBar(address q, /*uint32[] r, uint128[] s, bool t, uint8 u, uint16 v, uint32 w, uint64 x, uint128 y, uint256 z, */uint16 ba, uint256[] bb) external returns (Bar bar);
     }
 
     #[rstest]
@@ -385,6 +385,7 @@ mod struct_packing {
     #[case(echoBarCall::new(
         (
             address!("0xcafe000000000000000000000000000000007357"),
+            /*
             vec![1, 2, u32::MAX],
             vec![1, 2, u128::MAX],
             true,
@@ -394,7 +395,7 @@ mod struct_packing {
             u64::MAX,
             u128::MAX,
             U256::MAX,
-            /*
+            */
             42,
             vec![
                 U256::from(9),
@@ -402,10 +403,10 @@ mod struct_packing {
                 U256::from(7),
                 U256::from(6)
             ]
-            */
         )),
         Bar {
             q: address!("0xcafe000000000000000000000000000000007357"),
+            /*
             r: vec![1, 2, u32::MAX],
             s: vec![1, 2, u128::MAX],
             t: true,
@@ -415,7 +416,7 @@ mod struct_packing {
             x: u64::MAX,
             y: u128::MAX,
             z: U256::MAX,
-            /*
+            */
             bazz: Bazz {
                 a: 42,
                 b: vec![
@@ -425,7 +426,6 @@ mod struct_packing {
                     U256::from(6)
                 ]
             }
-            */
         }
     )]
     fn test_struct_packing<T: SolCall, V: SolValue>(
