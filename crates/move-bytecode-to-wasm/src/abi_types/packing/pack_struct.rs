@@ -34,6 +34,7 @@ impl IStruct {
         let reference_value = module.locals.add(ValType::I32);
 
         let writer_ptr = module.locals.add(ValType::I32);
+        let dynamic_data_base_ptr = module.locals.add(ValType::I32);
 
         println!(
             "=== > {}",
@@ -49,7 +50,8 @@ impl IStruct {
             block
                 .i32_const(struct_.solidity_abi_encode_size(compilation_ctx) as i32)
                 .call(compilation_ctx.allocator)
-                .local_tee(writer_ptr);
+                .local_tee(writer_ptr)
+                .local_tee(dynamic_data_base_ptr);
 
             // The pointer in the packed data must be relative to the calldata_reference_pointer,
             // so we substract calldata_reference_pointer from the writer_pointer
@@ -124,6 +126,9 @@ impl IStruct {
 
             if base_calldata_reference_pointer.is_none() {
                 block.local_get(writer_pointer).local_set(writer_ptr);
+                block
+                    .local_get(calldata_reference_pointer)
+                    .local_set(dynamic_data_base_ptr);
             }
 
             if base_calldata_reference_pointer.is_some() {
@@ -139,7 +144,7 @@ impl IStruct {
                         module,
                         field_local,
                         writer_ptr,
-                        writer_ptr,
+                        dynamic_data_base_ptr,
                         compilation_ctx,
                         Some(calldata_reference_pointer),
                     );
@@ -151,7 +156,7 @@ impl IStruct {
                         module,
                         field_local,
                         writer_ptr,
-                        calldata_reference_pointer,
+                        dynamic_data_base_ptr,
                         compilation_ctx,
                     );
                 }
