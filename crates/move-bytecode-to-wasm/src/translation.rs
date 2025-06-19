@@ -236,7 +236,7 @@ fn map_bytecode_instruction(
             match types_stack.pop() {
                 Some(IntermediateType::IRef(inner)) => {
                     assert!(
-                        matches!(inner.as_ref(), IntermediateType::IStruct(i) if *i == struct_.index() as usize),
+                        matches!(inner.as_ref(), IntermediateType::IStruct(i) if *i == struct_.index()),
                         "expected struct with index {} in types struct, got {inner:?}",
                         struct_.index()
                     );
@@ -284,7 +284,7 @@ fn map_bytecode_instruction(
             match types_stack.pop() {
                 Some(IntermediateType::IMutRef(inner)) => {
                     assert!(
-                        matches!(inner.as_ref(), IntermediateType::IStruct(i) if *i == struct_.index() as usize),
+                        matches!(inner.as_ref(), IntermediateType::IStruct(i) if *i == struct_.index()),
                         "expected struct with index {} in types struct, got {inner:?}",
                         struct_.index()
                     );
@@ -1070,7 +1070,7 @@ fn map_bytecode_instruction(
 
             let val_32 = module.locals.add(ValType::I32);
             let val_64 = module.locals.add(ValType::I64);
-            let mut offset = 0;
+            let mut offset = struct_.heap_size;
 
             builder
                 .i32_const(struct_.heap_size as i32)
@@ -1078,6 +1078,7 @@ fn map_bytecode_instruction(
                 .local_set(pointer);
 
             for pack_type in struct_.fields.iter().rev() {
+                offset -= 4;
                 match types_stack.pop() {
                     Some(t) if &t == pack_type => {
                         match pack_type {
@@ -1133,8 +1134,6 @@ fn map_bytecode_instruction(
                             StoreKind::I32 { atomic: false },
                             MemArg { align: 0, offset },
                         );
-
-                        offset += 4;
                     }
                     Some(t) => panic!("expected {pack_type:?} in types stack, found {t:?}"),
                     None => panic!("types stack is empty, expected type {types_stack:?}"),
@@ -1143,9 +1142,7 @@ fn map_bytecode_instruction(
 
             builder.local_get(pointer);
 
-            types_stack.push(IntermediateType::IStruct(
-                struct_definition_index.0 as usize,
-            ));
+            types_stack.push(IntermediateType::IStruct(struct_definition_index.0));
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }

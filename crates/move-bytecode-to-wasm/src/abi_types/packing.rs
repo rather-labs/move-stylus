@@ -261,7 +261,7 @@ impl Packable for IntermediateType {
             IntermediateType::IVector(_) => 32,
             IntermediateType::IRef(inner) => inner.encoded_size(),
             IntermediateType::IMutRef(inner) => inner.encoded_size(),
-            IntermediateType::IStruct(_) => 32, // TODO: Struct - not sure about this
+            IntermediateType::IStruct(_) => 32,
         }
     }
 }

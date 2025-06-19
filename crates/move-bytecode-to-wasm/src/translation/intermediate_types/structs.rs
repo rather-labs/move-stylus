@@ -81,21 +81,21 @@ impl IStruct {
     ) -> Self {
         let mut heap_size = 0;
         let mut field_offsets = HashMap::new();
-        for (index, _) in fields.iter().rev() {
+        let mut ir_fields = vec![];
+        for (index, field) in fields {
             if let Some(idx) = index {
-                field_offsets.insert(*idx, heap_size);
+                field_offsets.insert(idx, heap_size);
             }
+            ir_fields.push(field);
             heap_size += 4;
         }
-
-        let fields = fields.into_iter().map(|(_, t)| t).collect();
 
         Self {
             struct_definition_index: index,
             heap_size,
             field_offsets,
             fields_types,
-            fields,
+            fields: ir_fields,
         }
     }
 
@@ -103,12 +103,12 @@ impl IStruct {
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
-        index: usize,
+        index: u16,
     ) {
         let struct_ = compilation_ctx
             .module_structs
             .iter()
-            .find(|s| s.index() == index as u16)
+            .find(|s| s.index() == index)
             .unwrap_or_else(|| panic!("struct with index {index} not found"));
 
         let s1_ptr = module.locals.add(ValType::I32);
@@ -142,7 +142,7 @@ impl IStruct {
 
         builder.block(None, |block| {
             let block_id = block.id();
-            for (index, field) in struct_.fields.iter().rev().enumerate() {
+            for (index, field) in struct_.fields.iter().enumerate() {
                 // Offset of the field's pointer
                 let offset = index as u32 * 4;
 
@@ -183,5 +183,55 @@ impl IStruct {
 
     pub fn index(&self) -> u16 {
         self.struct_definition_index.0
+    }
+
+    /// According to the formal specification of the encoding, a tuple (T1,...,Tk) is dynamic if
+    /// Ti is dynamic for some 1 <= i <= k.
+    ///
+    /// Structs are encoded as a tuple of its fields, so, if any field is dynamic, then the whole
+    /// struct is dynamic.
+    ///
+    /// According to documentation, dynamic types are:
+    /// - bytes
+    /// - string
+    /// - T[] for any T
+    /// - T[k] for any dynamic T and any k >= 0
+    /// - (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k
+    ///
+    /// For more information:
+    /// https://docs.soliditylang.org/en/develop/abi-spec.html#formal-specification-of-the-encoding
+    pub fn solidity_abi_encode_is_dynamic(&self, compilation_ctx: &CompilationContext) -> bool {
+        for field in &self.fields {
+            match field {
+                IntermediateType::IBool
+                | IntermediateType::IU8
+                | IntermediateType::IU16
+                | IntermediateType::IU32
+                | IntermediateType::IU64
+                | IntermediateType::IU128
+                | IntermediateType::IU256
+                | IntermediateType::IAddress => continue,
+                IntermediateType::IVector(_) => return true,
+                IntermediateType::IStruct(index) => {
+                    let struct_ = compilation_ctx
+                        .module_structs
+                        .iter()
+                        .find(|s| s.index() == *index)
+                        .unwrap_or_else(|| panic!("struct that with index {index} not found"));
+
+                    if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
+                        continue;
+                    } else {
+                        return false;
+                    }
+                }
+                IntermediateType::ISigner => panic!("signer is not abi econdable"),
+                IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                    panic!("found reference inside struct")
+                }
+            }
+        }
+
+        false
     }
 }

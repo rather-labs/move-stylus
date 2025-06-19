@@ -40,7 +40,7 @@ pub enum IntermediateType {
     IRef(Box<IntermediateType>),
     IMutRef(Box<IntermediateType>),
     // The usize is the struct's index in the compilation context's vector of declared structs
-    IStruct(usize),
+    IStruct(u16),
 }
 
 impl IntermediateType {
@@ -786,14 +786,13 @@ impl IntermediateType {
                     | IntermediateType::IU256
                     | IntermediateType::IAddress
                     | IntermediateType::ISigner
-                    | IntermediateType::IVector(_) => {
+                    | IntermediateType::IVector(_)
+                    | IntermediateType::IStruct(_) => {
                         builder.local_get(ptr1).local_get(ptr2);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                         panic!("found reference of reference");
                     }
-
-                    Self::IStruct(_) => todo!(),
                 }
 
                 inner.load_equality_instructions(module, builder, compilation_ctx)

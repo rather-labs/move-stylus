@@ -419,7 +419,8 @@ impl IVector {
                     }
                     t @ (IntermediateType::IU128
                     | IntermediateType::IU256
-                    | IntermediateType::IAddress) => {
+                    | IntermediateType::IAddress
+                    | IntermediateType::IStruct(_)) => {
                         let vec_equality_heap_type_f_id =
                             RuntimeFunction::VecEqualityHeapType.get(module, Some(compilation_ctx));
 
@@ -522,7 +523,6 @@ impl IVector {
                     IntermediateType::ISigner => {
                         panic!("should not be possible to have a vector of signers")
                     }
-                    IntermediateType::IStruct(_) => todo!(),
                 }
             },
             |else_| {
@@ -920,7 +920,8 @@ mod tests {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::ISigner
-            | IntermediateType::IVector(_) => {
+            | IntermediateType::IVector(_)
+            | IntermediateType::IStruct(_) => {
                 let swap_f =
                     RuntimeFunction::VecPopBack32.get(&mut raw_module, Some(&compilation_ctx));
                 builder.call(swap_f);
@@ -933,7 +934,6 @@ mod tests {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("VecPopBack operation is not allowed on reference types");
             }
-            IntermediateType::IStruct(_) => todo!(),
         }
 
         if inner_type == IntermediateType::IU64 {

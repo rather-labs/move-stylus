@@ -67,7 +67,7 @@ pub struct CompilationContext<'a> {
 }
 
 pub enum UserDefinedType {
-    Struct(usize),
+    Struct(u16),
     Enum(usize),
 }
 
@@ -122,7 +122,7 @@ pub fn translate_package(
                 .iter()
                 .position(|s| s.struct_handle == idx)
             {
-                datatype_handles_map.insert(idx, UserDefinedType::Struct(position))
+                datatype_handles_map.insert(idx, UserDefinedType::Struct(position as u16))
             } else if let Some(position) = root_compiled_module
                 .enum_defs()
                 .iter()
@@ -293,6 +293,7 @@ pub fn translate_package(
                     *function_id,
                     &mapped_function.name,
                     &mapped_function.signature,
+                    &compilation_ctx,
                 ));
             }
         }
