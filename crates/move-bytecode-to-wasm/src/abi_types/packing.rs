@@ -274,7 +274,37 @@ impl Packable for IntermediateType {
             IntermediateType::IMutRef(inner) => inner.encoded_size(compilation_ctx),
             IntermediateType::IStruct(index) => {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
-                struct_.solidity_abi_encode_size(compilation_ctx) as usize
+                let mut size = 0;
+                for field in &struct_.fields {
+                    match field {
+                        IntermediateType::IBool
+                        | IntermediateType::IU8
+                        | IntermediateType::IU16
+                        | IntermediateType::IU32
+                        | IntermediateType::IU64
+                        | IntermediateType::IU128
+                        | IntermediateType::IU256
+                        | IntermediateType::IAddress
+                        | IntermediateType::IVector(_) => {
+                            size += field.encoded_size(compilation_ctx);
+                        }
+                        IntermediateType::IStruct(index) => {
+                            let child_struct = compilation_ctx.get_struct_by_index(*index).unwrap();
+
+                            if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
+                                size += 32;
+                            } else {
+                                size += field.encoded_size(compilation_ctx);
+                            }
+                        }
+                        IntermediateType::ISigner => panic!("signer is not abi econdable"),
+                        IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                            panic!("found reference inside struct")
+                        }
+                    }
+                }
+
+                size
             }
         }
     }
