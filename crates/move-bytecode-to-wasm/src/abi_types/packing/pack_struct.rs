@@ -23,8 +23,6 @@ impl IStruct {
         compilation_ctx: &CompilationContext,
         base_calldata_reference_pointer: Option<LocalId>,
     ) {
-        let print_i32 = module.imports.get_func("", "print_i32").unwrap();
-
         let struct_ = compilation_ctx.get_struct_by_index(index).unwrap();
         let val_32 = module.locals.add(ValType::I32);
         let val_64 = module.locals.add(ValType::I64);
@@ -117,16 +115,11 @@ impl IStruct {
             // dynamically, so, we can set data_ptr as the writer pointer and the
             // inner_data_reference as the root reference pointer
             if base_calldata_reference_pointer.is_none() {
-                block.i32_const(1).call(print_i32);
                 block.local_get(writer_pointer).local_set(data_ptr);
                 block
                     .local_get(calldata_reference_pointer)
                     .local_set(inner_data_reference);
-            } else {
-                block.i32_const(2).call(print_i32);
             }
-
-            block.local_get(writer_pointer).call(print_i32);
 
             // If the field to pack is a struct, it will be packed dynamically, that means, in the
             // current offset of writer pointer, we are going to write the offset where we can find
