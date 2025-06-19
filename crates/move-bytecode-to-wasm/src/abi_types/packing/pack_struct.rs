@@ -21,6 +21,7 @@ impl IStruct {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
+        base_calldata_reference_pointer: Option<LocalId>,
     ) {
         let print_memory_from = module.imports.get_func("", "print_memory_from").unwrap();
         let print_i32 = module.imports.get_func("", "print_i32").unwrap();
@@ -29,8 +30,10 @@ impl IStruct {
         let val_32 = module.locals.add(ValType::I32);
         let val_64 = module.locals.add(ValType::I64);
         let struct_ptr = local;
+        let reference_value = module.locals.add(ValType::I32);
 
         let writer_ptr = module.locals.add(ValType::I32);
+        let dynamic_data_ptr = module.locals.add(ValType::I32);
 
         println!(
             "=== > {}",
@@ -39,6 +42,33 @@ impl IStruct {
 
         block.local_get(calldata_reference_pointer).call(print_i32);
         block.local_get(writer_pointer).call(print_i32);
+
+        if let Some(base_calldata_reference_ptr) = base_calldata_reference_pointer {
+            // Allocate memory for the packed value. Set the writer pointer at the beginning, since
+            // we are going to pack the values from there
+            block
+                .i32_const(struct_.solidity_abi_encode_size(compilation_ctx) as i32)
+                .call(compilation_ctx.allocator)
+                .local_tee(writer_pointer);
+
+            // The pointer in the packed data must be relative to the calldata_reference_pointer,
+            // so we substract calldata_reference_pointer from the writer_pointer
+            block
+                .local_get(base_calldata_reference_ptr)
+                .binop(BinaryOp::I32Sub)
+                .local_set(reference_value);
+
+            // The result is saved where calldata_reference_pointer is pointing at, the value will
+            // be the address where the struct  values are packed, using as origin
+            // calldata_reference_pointer
+            pack_i32_type_instructions(
+                block,
+                module,
+                compilation_ctx.memory_id,
+                reference_value,
+                writer_pointer,
+            );
+        }
 
         // Load the value to be written in the calldata, if it is a stack value we need to double
         // reference a pointer, otherwise we read the pointer and leave the stack value in the
@@ -86,18 +116,34 @@ impl IStruct {
                 }
             };
 
-            block.local_get(writer_pointer).local_set(writer_ptr);
-
             block.local_get(writer_ptr).call(print_i32);
-            // Pack field
-            field.add_pack_instructions(
-                block,
-                module,
-                field_local,
-                writer_ptr,
-                calldata_reference_pointer,
-                compilation_ctx,
-            );
+
+            block.local_get(writer_pointer).local_set(writer_ptr);
+            match field {
+                IntermediateType::IStruct(i) => {
+                    IStruct::add_pack_instructions(
+                        *i,
+                        block,
+                        module,
+                        field_local,
+                        writer_ptr,
+                        writer_ptr,
+                        compilation_ctx,
+                        Some(calldata_reference_pointer),
+                    );
+                }
+                _ => {
+                    // Pack field
+                    field.add_pack_instructions(
+                        block,
+                        module,
+                        field_local,
+                        writer_ptr,
+                        calldata_reference_pointer,
+                        compilation_ctx,
+                    );
+                }
+            }
 
             block.local_get(writer_ptr).call(print_i32);
 
