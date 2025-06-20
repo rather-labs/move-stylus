@@ -210,12 +210,7 @@ impl IStruct {
                 IntermediateType::IVector(_) => return true,
                 IntermediateType::IStruct(index) => {
                     let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
-
-                    if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                        continue;
-                    } else {
-                        return false;
-                    }
+                    return struct_.solidity_abi_encode_is_dynamic(compilation_ctx);
                 }
                 IntermediateType::ISigner => panic!("signer is not abi econdable"),
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {

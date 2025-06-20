@@ -218,6 +218,12 @@ impl IStruct {
 
             offset += 4;
         }
+        // Advance reader pointer after processing struct
+        builder
+            .local_get(reader_pointer)
+            .i32_const(32)
+            .binop(BinaryOp::I32Add)
+            .local_set(reader_pointer);
 
         builder.local_get(struct_ptr);
     }

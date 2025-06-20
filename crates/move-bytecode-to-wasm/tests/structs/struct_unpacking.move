@@ -51,9 +51,10 @@ public struct Bar has drop {
     y: u128,
     z: u256,
     bazz: Bazz,
+    baz: Baz,
 }
 
-public fun echo_bar(bar: Bar): (address, vector<u32>, vector<u128>, bool, u8, u16, u32, u64, u128, u256, u16, vector<u256>) {
+public fun echo_bar(bar: Bar): (address, vector<u32>, vector<u128>, bool, u8, u16, u32, u64, u128, u256, u16, vector<u256>, u16, u128) {
     (
         bar.q,
         bar.r,
@@ -67,5 +68,7 @@ public fun echo_bar(bar: Bar): (address, vector<u32>, vector<u128>, bool, u8, u1
         bar.z,
         bar.bazz.a,
         bar.bazz.b,
+        bar.baz.a,
+        bar.baz.b,
     )
 }
