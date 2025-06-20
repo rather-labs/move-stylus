@@ -209,10 +209,11 @@ mod struct_unpacking {
             uint128 y;
             uint256 z;
             Bazz bazz;
+            Baz baz;
         }
 
         function echoFoo(Foo foo) external returns (address, bool, uint8, uint16, uint32, uint64, uint128, uint256, uint16, uint128);
-        function echoBar(Bar bar) external returns (address, uint32[], uint128[], bool, uint8, uint16, uint32, uint64, uint128, uint256, uint16, uint256[]);
+        function echoBar(Bar bar) external returns (address, uint32[], uint128[], bool, uint8, uint16, uint32, uint64, uint128, uint256, uint16, uint256[], uint16, uint128);
     }
 
     #[rstest]
@@ -256,12 +257,10 @@ mod struct_unpacking {
             bazz: Bazz {
                 a: 42,
                 b: vec![
-                    U256::from(9),
-                    U256::from(8),
-                    U256::from(7),
-                    U256::from(6)
+                    U256::MAX,
                 ]
-            }
+            },
+            baz: Baz { a: 111, b: 1111111111 }
         },)),
         (
             address!("0xcafe000000000000000000000000000000007357"),
@@ -276,11 +275,10 @@ mod struct_unpacking {
             U256::MAX,
             42,
             vec![
-                U256::from(9),
-                U256::from(8),
-                U256::from(7),
-                U256::from(6)
-            ]
+                U256::MAX,
+            ],
+            111,
+            1111111111,
         )
     )]
     fn test_struct_unpacking<T: SolCall, V: SolValue>(
@@ -348,10 +346,26 @@ mod struct_packing {
             uint128 y;
             uint256 z;
             Bazz bazz;
+            Baz baz;
         }
 
         function echoFoo(address q, bool t, uint8 u, uint16 v, uint32 w, uint64 x, uint128 y, uint256 z, uint16 ba, uint128 bb) external returns (Foo);
-        function echoBar(address q, uint32[] r, uint128[] s, bool t, uint8 u, uint16 v, uint32 w, uint64 x, uint128 y, uint256 z, uint16 ba, uint256[] bb) external returns (Bar bar);
+        function echoBar(
+            address q,
+            uint32[] r,
+            uint128[] s,
+            bool t,
+            uint8 u,
+            uint16 v,
+            uint32 w,
+            uint64 x,
+            uint128 y,
+            uint256 z,
+            uint16 ba,
+            uint256[] bb,
+            uint16 bba,
+            uint128 bbb
+        ) external returns (Bar bar);
     }
 
     #[rstest]
@@ -394,11 +408,13 @@ mod struct_packing {
             U256::MAX,
             42,
             vec![
-                U256::from(9),
+                U256::MAX,
                 U256::from(8),
                 U256::from(7),
                 U256::from(6)
-            ]
+            ],
+            111,
+            1111111111,
         )),
         Bar {
             q: address!("0xcafe000000000000000000000000000000007357"),
@@ -414,12 +430,13 @@ mod struct_packing {
             bazz: Bazz {
                 a: 42,
                 b: vec![
-                    U256::from(9),
+                    U256::MAX,
                     U256::from(8),
                     U256::from(7),
                     U256::from(6)
                 ]
-            }
+            },
+            baz: Baz { a: 111, b: 1111111111 },
         }
     )]
     fn test_struct_packing<T: SolCall, V: SolValue>(
