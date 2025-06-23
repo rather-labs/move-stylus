@@ -40,6 +40,30 @@ pub trait Packable {
         compilation_ctx: &CompilationContext,
     );
 
+    // TODO: Continue explanation.
+    /// Adds the instructions to pack the value into memory according to Solidity's ABI encoding.
+    ///
+    /// The writer pointer is the pointer to the memory where the value will be written, should be incremented
+    /// on each write.
+    ///
+    /// The calldata reference pointer is the pointer to the start of the calldata portion
+    /// in order to calculate the params offset. Should never be modified internally.
+    ///
+    /// This function forces the dynamic encoding (pointer to the location of packed values +
+    /// packed values). It is useful for types that can be encoded as dynamic or static depending
+    /// on the context (for example, if a function returns a dynamic struct alone, it will has to
+    /// be unpacked
+    #[allow(clippy::too_many_arguments)]
+    fn add_pack_instructions_dynamic(
+        &self,
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        local: LocalId,
+        writer_pointer: LocalId,
+        calldata_reference_pointer: LocalId,
+        compilation_ctx: &CompilationContext,
+    );
+
     /// Adds the instructions to load the value into a local variable.
     /// This is used to reverse the order of the stack before packing
     ///
@@ -53,6 +77,19 @@ pub trait Packable {
 
     /// Returns the ABI encoded size of the type
     fn encoded_size(&self, compilation_ctx: &CompilationContext) -> usize;
+
+    /// Returns true if the type to be encoded is dynamic
+    ///
+    /// According to documentation, dynamic types are:
+    /// - bytes
+    /// - string
+    /// - T[] for any T
+    /// - T[k] for any dynamic T and any k >= 0
+    /// - (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k
+    ///
+    /// For more information:
+    /// https://docs.soliditylang.org/en/develop/abi-spec.html#formal-specification-of-the-encoding
+    fn is_dynamic(&self, compilation_ctx: &CompilationContext) -> bool;
 }
 
 /// Builds the instructions to pack WASM return values into memory according to Solidity's ABI encoding.
@@ -75,6 +112,9 @@ pub fn build_pack_instructions<T: Packable>(
         return;
     }
 
+    // Indicates if the function returns multiple values
+    let returns_multiple_values = function_return_signature.len() > 1;
+
     // We need to load all return types into locals in order to reverse the read order
     // Otherwise they would be popped in reverse order
     let mut locals = Vec::new();
@@ -82,13 +122,18 @@ pub fn build_pack_instructions<T: Packable>(
     for signature_token in function_return_signature.iter().rev() {
         let local = signature_token.add_load_local_instructions(builder, module);
         locals.push(local);
-        args_size += signature_token.encoded_size(compilation_ctx);
+
+        // TODO add why this
+        args_size += if returns_multiple_values && signature_token.is_dynamic(compilation_ctx) {
+            32
+        } else {
+            signature_token.encoded_size(compilation_ctx)
+        };
     }
     locals.reverse();
 
     let pointer = module.locals.add(ValType::I32);
     let writer_pointer = module.locals.add(ValType::I32);
-    let calldata_reference_pointer = module.locals.add(ValType::I32);
 
     // Allocate memory for the first level arguments
     builder.i32_const(args_size as i32);
@@ -99,23 +144,41 @@ pub fn build_pack_instructions<T: Packable>(
     builder.local_set(writer_pointer);
 
     for (local, signature_token) in locals.iter().zip(function_return_signature.iter()) {
+        let calldata_reference_pointer = module.locals.add(ValType::I32);
         // Copy the reference just to be safe in case in internal function modifies it
         builder.local_get(pointer);
         builder.local_set(calldata_reference_pointer);
 
-        signature_token.add_pack_instructions(
-            builder,
-            module,
-            *local,
-            writer_pointer,
-            calldata_reference_pointer,
-            compilation_ctx,
-        );
+        // TODO Explain this
+        if returns_multiple_values && signature_token.is_dynamic(compilation_ctx) {
+            signature_token.add_pack_instructions_dynamic(
+                builder,
+                module,
+                *local,
+                writer_pointer,
+                calldata_reference_pointer,
+                compilation_ctx,
+            );
 
-        builder.local_get(writer_pointer);
-        builder.i32_const(signature_token.encoded_size(compilation_ctx) as i32);
-        builder.binop(BinaryOp::I32Add);
-        builder.local_set(writer_pointer);
+            builder.local_get(writer_pointer);
+            builder.i32_const(32);
+            builder.binop(BinaryOp::I32Add);
+            builder.local_set(writer_pointer);
+        } else {
+            signature_token.add_pack_instructions(
+                builder,
+                module,
+                *local,
+                writer_pointer,
+                calldata_reference_pointer,
+                compilation_ctx,
+            );
+
+            builder.local_get(writer_pointer);
+            builder.i32_const(signature_token.encoded_size(compilation_ctx) as i32);
+            builder.binop(BinaryOp::I32Add);
+            builder.local_set(writer_pointer);
+        }
     }
 
     builder.local_get(pointer); // This will remain in the stack as return value
@@ -258,6 +321,37 @@ impl Packable for IntermediateType {
         }
     }
 
+    fn add_pack_instructions_dynamic(
+        &self,
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        local: LocalId,
+        writer_pointer: LocalId,
+        calldata_reference_pointer: LocalId,
+        compilation_ctx: &CompilationContext,
+    ) {
+        match self {
+            IntermediateType::IStruct(index) => IStruct::add_pack_instructions(
+                *index,
+                builder,
+                module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                compilation_ctx,
+                Some(calldata_reference_pointer),
+            ),
+            _ => self.add_pack_instructions(
+                builder,
+                module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                compilation_ctx,
+            ),
+        }
+    }
+
     fn encoded_size(&self, compilation_ctx: &CompilationContext) -> usize {
         match self {
             IntermediateType::IBool => sol_data::Bool::ENCODED_SIZE.unwrap(),
@@ -305,6 +399,28 @@ impl Packable for IntermediateType {
                 }
 
                 size
+            }
+        }
+    }
+
+    fn is_dynamic(&self, compilation_ctx: &CompilationContext) -> bool {
+        match self {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress => false,
+            IntermediateType::IVector(_) => true,
+            IntermediateType::IStruct(index) => {
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                struct_.solidity_abi_encode_is_dynamic(compilation_ctx)
+            }
+            IntermediateType::ISigner => panic!("signer is not abi econdable"),
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                panic!("found reference inside struct")
             }
         }
     }

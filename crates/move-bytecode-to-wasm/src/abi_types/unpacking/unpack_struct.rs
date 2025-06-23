@@ -229,6 +229,7 @@ impl IStruct {
         } else {
             struct_.solidity_abi_encode_size(compilation_ctx) as i32
         };
+
         builder
             .local_get(reader_pointer)
             .i32_const(advancement)
