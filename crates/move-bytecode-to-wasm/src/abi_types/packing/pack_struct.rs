@@ -23,15 +23,6 @@ impl IStruct {
         compilation_ctx: &CompilationContext,
         base_calldata_reference_pointer: Option<LocalId>,
     ) {
-        let print_i32 = module.imports.get_func("", "print_i32").unwrap();
-        block.i32_const(222222).call(print_i32);
-        block.local_get(calldata_reference_pointer).call(print_i32);
-        block.local_get(writer_pointer).call(print_i32);
-        block
-            .local_get(base_calldata_reference_pointer.unwrap())
-            .call(print_i32);
-        block.i32_const(222222).call(print_i32);
-
         let struct_ = compilation_ctx.get_struct_by_index(index).unwrap();
         let val_32 = module.locals.add(ValType::I32);
         let val_64 = module.locals.add(ValType::I64);
@@ -54,8 +45,6 @@ impl IStruct {
                 .call(compilation_ctx.allocator)
                 .local_tee(data_ptr)
                 .local_tee(inner_data_reference);
-
-            block.local_get(data_ptr).call(print_i32);
 
             // The pointer in the packed data must be relative to the calldata_reference_pointer,
             // so we substract calldata_reference_pointer from the writer_pointer

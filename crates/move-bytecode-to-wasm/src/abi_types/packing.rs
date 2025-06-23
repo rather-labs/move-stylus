@@ -330,16 +330,8 @@ impl Packable for IntermediateType {
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) {
-        let print_i32 = module.imports.get_func("", "print_i32").unwrap();
-
         match self {
             IntermediateType::IStruct(index) => {
-                builder.i32_const(111111).call(print_i32);
-                builder
-                    .local_get(calldata_reference_pointer)
-                    .call(print_i32);
-                builder.local_get(writer_pointer).call(print_i32);
-                builder.i32_const(111111).call(print_i32);
                 IStruct::add_pack_instructions(
                     *index,
                     builder,
@@ -422,15 +414,14 @@ impl Packable for IntermediateType {
             | IntermediateType::IU64
             | IntermediateType::IU128
             | IntermediateType::IU256
-            | IntermediateType::IAddress => false,
+            | IntermediateType::IAddress
+            | IntermediateType::ISigner
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => false,
             IntermediateType::IVector(_) => true,
             IntermediateType::IStruct(index) => {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
                 struct_.solidity_abi_encode_is_dynamic(compilation_ctx)
-            }
-            IntermediateType::ISigner => panic!("signer is not abi econdable"),
-            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                panic!("found reference inside struct")
             }
         }
     }
