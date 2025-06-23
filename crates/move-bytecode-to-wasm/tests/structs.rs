@@ -175,17 +175,14 @@ mod struct_packing_unpacking {
     }
 
     sol! {
-        /*
         struct Baz {
             uint16 a;
             uint128 b;
         }
 
-        */
         struct Foo {
-            // address q;
+            address q;
             bool t;
-            /*
             uint8 u;
             uint16 v;
             uint32 w;
@@ -193,10 +190,8 @@ mod struct_packing_unpacking {
             uint128 y;
             uint256 z;
             Baz baz;
-            */
         }
 
-        /*
         struct Bazz {
             uint16 a;
             uint256[] b;
@@ -275,13 +270,11 @@ mod struct_packing_unpacking {
         ) external returns (Bar bar);
         function packUnpackStatic(Foo foo) external returns (Foo);
         function packUnpackDynamic(Bar bar) external returns (Bar);
-        */
         function packUnpackBetweenValsStatic(
             bool v1,
             Foo foo,
             uint128[] v4
         ) external returns (bool, Foo, uint128[]);
-        /*
         function packUnpackBetweenValsDynamic(
             bool v1,
             uint32[] v2,
@@ -289,11 +282,9 @@ mod struct_packing_unpacking {
             bool v3,
             uint128[] v4
         ) external returns (bool, Bar, uint128[]);
-        */
     }
 
     #[rstest]
-    /*
     #[case(echoFooUnpackCall::new(
         (Foo {
             q: address!("0xcafe000000000000000000000000000000007357"),
@@ -499,14 +490,12 @@ mod struct_packing_unpacking {
             baz: Baz { a: 111, b: 1111111111 },
         }
     )]
-    */
     #[case(packUnpackBetweenValsStaticCall::new(
         (
             true,
             Foo {
-                // q: address!("0xcafe000000000000000000000000000000007357"),
+                q: address!("0xcafe000000000000000000000000000000007357"),
                 t: true,
-                /*
                 u: 255,
                 v: u16::MAX,
                 w: u32::MAX,
@@ -514,16 +503,14 @@ mod struct_packing_unpacking {
                 y: u128::MAX,
                 z: U256::MAX,
                 baz: Baz { a: 42, b: 4242}
-                */
             },
             vec![7,8,9,10,11],
         )),
         (
             true,
             Foo {
-                // q: address!("0xcafe000000000000000000000000000000007357"),
+                q: address!("0xcafe000000000000000000000000000000007357"),
                 t: true,
-                /*
                 u: 255,
                 v: u16::MAX,
                 w: u32::MAX,
@@ -531,11 +518,9 @@ mod struct_packing_unpacking {
                 y: u128::MAX,
                 z: U256::MAX,
                 baz: Baz { a: 42, b: 4242}
-                */
             },
             vec![7,8,9,10,11],
     ))]
-    /*
     #[case(packUnpackBetweenValsDynamicCall::new(
         (
             true,
@@ -591,7 +576,6 @@ mod struct_packing_unpacking {
             },
             vec![7,8,9,10,11],
     ))]
-    */
     fn test_struct_packing_unpacking<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

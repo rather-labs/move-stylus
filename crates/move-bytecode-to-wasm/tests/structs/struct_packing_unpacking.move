@@ -2,9 +2,8 @@ module 0x00::struct_packing_unpacking;
 
 // Static abi struct
 public struct Foo has drop {
-    // q: address,
+    q: address,
     t: bool,
-    /*
     u: u8,
     v: u16,
     w: u32,
@@ -12,10 +11,8 @@ public struct Foo has drop {
     y: u128,
     z: u256,
     baz: Baz,
-    */
 }
 
-/*
 // Dynamic abi struct
 public struct Bar has drop {
     q: address,
@@ -144,16 +141,14 @@ public fun pack_unpack_dynamic(bar: Bar): Bar {
         baz: Baz { a: bar.baz.a, b: bar.baz.b },
     }
 }
-*/
 
 // This tests the packing/unpacking with the struct between other values
 public fun pack_unpack_between_vals_static(v1: bool, foo: Foo, v4: vector<u128>): (bool, Foo, vector<u128>) {
     (
         v1,
         Foo {
-            // q: foo.q,
+            q: foo.q,
             t: foo.t,
-            /*
             u: foo.u,
             v: foo.v,
             w: foo.w,
@@ -161,13 +156,11 @@ public fun pack_unpack_between_vals_static(v1: bool, foo: Foo, v4: vector<u128>)
             y: foo.y,
             z: foo.z,
             baz: Baz { a: foo.baz.a, b: foo.baz.b },
-            */
         },
         v4
     )
 }
 
-/*
 public fun pack_unpack_between_vals_dynamic(v1: bool, _v2: vector<u32>, bar: Bar, _v3: bool, v4: vector<u128>): (bool, Bar, vector<u128>) {
     (
         v1,
@@ -188,4 +181,3 @@ public fun pack_unpack_between_vals_dynamic(v1: bool, _v2: vector<u32>, bar: Bar
         v4
     )
 }
-*&
