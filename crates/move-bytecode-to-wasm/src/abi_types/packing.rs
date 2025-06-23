@@ -134,6 +134,7 @@ pub fn build_pack_instructions<T: Packable>(
 
     let pointer = module.locals.add(ValType::I32);
     let writer_pointer = module.locals.add(ValType::I32);
+    let calldata_reference_pointer = module.locals.add(ValType::I32);
 
     // Allocate memory for the first level arguments
     builder.i32_const(args_size as i32);
@@ -144,7 +145,6 @@ pub fn build_pack_instructions<T: Packable>(
     builder.local_set(writer_pointer);
 
     for (local, signature_token) in locals.iter().zip(function_return_signature.iter()) {
-        let calldata_reference_pointer = module.locals.add(ValType::I32);
         // Copy the reference just to be safe in case in internal function modifies it
         builder.local_get(pointer);
         builder.local_set(calldata_reference_pointer);
@@ -338,7 +338,7 @@ impl Packable for IntermediateType {
                     module,
                     local,
                     writer_pointer,
-                    writer_pointer,
+                    calldata_reference_pointer,
                     compilation_ctx,
                     Some(calldata_reference_pointer),
                 );
