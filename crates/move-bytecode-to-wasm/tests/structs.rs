@@ -160,14 +160,14 @@ mod struct_mut_fields {
     }
 }
 
-mod struct_unpacking {
+mod struct_packing_unpacking {
     use super::*;
 
     #[fixture]
     #[once]
     fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "struct_unpacking";
-        const SOURCE_PATH: &str = "tests/structs/struct_unpacking.move";
+        const MODULE_NAME: &str = "struct_packing_unpacking";
+        const SOURCE_PATH: &str = "tests/structs/struct_packing_unpacking.move";
 
         let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
 
@@ -212,12 +212,66 @@ mod struct_unpacking {
             Baz baz;
         }
 
-        function echoFoo(Foo foo) external returns (address, bool, uint8, uint16, uint32, uint64, uint128, uint256, uint16, uint128);
-        function echoBar(Bar bar) external returns (address, uint32[], uint128[], bool, uint8, uint16, uint32, uint64, uint128, uint256, uint16, uint256[], uint16, uint128);
+        function echoFooUnpack(Foo foo) external returns (
+            address,
+            bool,
+            uint8,
+            uint16,
+            uint32,
+            uint64,
+            uint128,
+            uint256,
+            uint16,
+            uint128
+        );
+        function echoBarUnpack(Bar bar) external returns (
+            address,
+            uint32[],
+            uint128[],
+            bool,
+            uint8,
+            uint16,
+            uint32,
+            uint64,
+            uint128,
+            uint256,
+            uint16,
+            uint256[],
+            uint16,
+            uint128
+        );
+        function echoFooPack(
+            address q,
+            bool t,
+            uint8 u,
+            uint16 v,
+            uint32 w,
+            uint64 x,
+            uint128 y,
+            uint256 z,
+            uint16 ba,
+            uint128 bb
+        ) external returns (Foo);
+        function echoBarPack(
+            address q,
+            uint32[] r,
+            uint128[] s,
+            bool t,
+            uint8 u,
+            uint16 v,
+            uint32 w,
+            uint64 x,
+            uint128 y,
+            uint256 z,
+            uint16 ba,
+            uint256[] bb,
+            uint16 bba,
+            uint128 bbb
+        ) external returns (Bar bar);
     }
 
     #[rstest]
-    #[case(echoFooCall::new(
+    #[case(echoFooUnpackCall::new(
         (Foo {
             q: address!("0xcafe000000000000000000000000000000007357"),
             t: true,
@@ -242,7 +296,7 @@ mod struct_unpacking {
             4242,
         )
     )]
-    #[case(echoBarCall::new(
+    #[case(echoBarUnpackCall::new(
         (Bar {
             q: address!("0xcafe000000000000000000000000000000007357"),
             r: vec![1, 2, u32::MAX],
@@ -295,81 +349,9 @@ mod struct_unpacking {
         )
         .unwrap();
     }
-}
-
-mod struct_packing {
-    use super::*;
-
-    #[fixture]
-    #[once]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "struct_packing";
-        const SOURCE_PATH: &str = "tests/structs/struct_packing.move";
-
-        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
-
-    sol! {
-        struct Baz {
-            uint16 a;
-            uint128 b;
-        }
-
-        struct Foo {
-            address q;
-            bool t;
-            uint8 u;
-            uint16 v;
-            uint32 w;
-            uint64 x;
-            uint128 y;
-            uint256 z;
-            Baz baz;
-        }
-
-        struct Bazz {
-            uint16 a;
-            uint256[] b;
-        }
-
-        struct Bar {
-            address q;
-            uint32[] r;
-            uint128[] s;
-            bool t;
-            uint8 u;
-            uint16 v;
-            uint32 w;
-            uint64 x;
-            uint128 y;
-            uint256 z;
-            Bazz bazz;
-            Baz baz;
-        }
-
-        function echoFoo(address q, bool t, uint8 u, uint16 v, uint32 w, uint64 x, uint128 y, uint256 z, uint16 ba, uint128 bb) external returns (Foo);
-        function echoBar(
-            address q,
-            uint32[] r,
-            uint128[] s,
-            bool t,
-            uint8 u,
-            uint16 v,
-            uint32 w,
-            uint64 x,
-            uint128 y,
-            uint256 z,
-            uint16 ba,
-            uint256[] bb,
-            uint16 bba,
-            uint128 bbb
-        ) external returns (Bar bar);
-    }
 
     #[rstest]
-    #[case(echoFooCall::new(
+    #[case(echoFooPackCall::new(
         (
             address!("0xcafe000000000000000000000000000000007357"),
             true,
@@ -394,7 +376,7 @@ mod struct_packing {
             baz: Baz { a: 42, b: 4242}
         }
     )]
-    #[case(echoBarCall::new(
+    #[case(echoBarPackCall::new(
         (
             address!("0xcafe000000000000000000000000000000007357"),
             vec![1, 2, u32::MAX],
