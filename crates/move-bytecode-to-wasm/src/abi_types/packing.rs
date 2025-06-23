@@ -137,17 +137,19 @@ pub fn build_pack_instructions<T: Packable>(
     let calldata_reference_pointer = module.locals.add(ValType::I32);
 
     // Allocate memory for the first level arguments
-    builder.i32_const(args_size as i32);
-    builder.call(compilation_ctx.allocator);
-    builder.local_tee(pointer);
+    builder
+        .i32_const(args_size as i32)
+        .call(compilation_ctx.allocator)
+        .local_tee(pointer);
 
     // Store the writer pointer
     builder.local_set(writer_pointer);
 
     for (local, signature_token) in locals.iter().zip(function_return_signature.iter()) {
         // Copy the reference just to be safe in case in internal function modifies it
-        builder.local_get(pointer);
-        builder.local_set(calldata_reference_pointer);
+        builder
+            .local_get(pointer)
+            .local_set(calldata_reference_pointer);
 
         // TODO Explain this
         if returns_multiple_values && signature_token.is_dynamic(compilation_ctx) {
@@ -160,10 +162,11 @@ pub fn build_pack_instructions<T: Packable>(
                 compilation_ctx,
             );
 
-            builder.local_get(writer_pointer);
-            builder.i32_const(32);
-            builder.binop(BinaryOp::I32Add);
-            builder.local_set(writer_pointer);
+            builder
+                .local_get(writer_pointer)
+                .i32_const(32)
+                .binop(BinaryOp::I32Add)
+                .local_set(writer_pointer);
         } else {
             signature_token.add_pack_instructions(
                 builder,
@@ -174,20 +177,24 @@ pub fn build_pack_instructions<T: Packable>(
                 compilation_ctx,
             );
 
-            builder.local_get(writer_pointer);
-            builder.i32_const(signature_token.encoded_size(compilation_ctx) as i32);
-            builder.binop(BinaryOp::I32Add);
-            builder.local_set(writer_pointer);
+            builder
+                .local_get(writer_pointer)
+                .i32_const(signature_token.encoded_size(compilation_ctx) as i32)
+                .binop(BinaryOp::I32Add)
+                .local_set(writer_pointer);
         }
     }
 
-    builder.local_get(pointer); // This will remain in the stack as return value
-
-    // use the allocator to get a pointer to the end of the calldata
-    builder.i32_const(0);
-    builder.call(compilation_ctx.allocator);
+    // This will remain in the stack as return value
     builder.local_get(pointer);
-    builder.binop(BinaryOp::I32Sub);
+
+    // Use the allocator to get a pointer to the end of the calldata
+    builder
+        .i32_const(0)
+        .call(compilation_ctx.allocator)
+        .local_get(pointer)
+        .binop(BinaryOp::I32Sub);
+
     // The value remaining in the stack is the length of the encoded data
 }
 
