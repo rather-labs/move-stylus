@@ -88,6 +88,10 @@ pub fn build_pack_instructions<T: Packable>(
 
     let pointer = module.locals.add(ValType::I32);
     let writer_pointer = module.locals.add(ValType::I32);
+    let calldata_reference_pointer = module.locals.add(ValType::I32);
+
+    let print_i32 = module.imports.get_func("", "print_i32").unwrap();
+    let print_separator = module.imports.get_func("", "print_separator").unwrap();
 
     // Allocate memory for the first level arguments
     builder.i32_const(args_size as i32);
@@ -98,10 +102,16 @@ pub fn build_pack_instructions<T: Packable>(
     builder.local_set(writer_pointer);
 
     for (local, signature_token) in locals.iter().zip(function_return_signature.iter()) {
+        builder.call(print_separator);
         // Copy the reference just to be safe in case in internal function modifies it
-        let calldata_reference_pointer = module.locals.add(ValType::I32);
         builder.local_get(pointer);
         builder.local_set(calldata_reference_pointer);
+
+        builder.local_get(pointer).call(print_i32);
+        builder
+            .local_get(calldata_reference_pointer)
+            .call(print_i32);
+        builder.local_get(writer_pointer).call(print_i32);
 
         signature_token.add_pack_instructions(
             builder,
@@ -113,9 +123,12 @@ pub fn build_pack_instructions<T: Packable>(
         );
 
         builder.local_get(writer_pointer);
+        println!("---> {}", signature_token.encoded_size(compilation_ctx));
         builder.i32_const(signature_token.encoded_size(compilation_ctx) as i32);
         builder.binop(BinaryOp::I32Add);
         builder.local_set(writer_pointer);
+
+        builder.local_get(writer_pointer).call(print_i32);
     }
 
     builder.local_get(pointer); // This will remain in the stack as return value

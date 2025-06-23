@@ -29,9 +29,12 @@ impl IStruct {
         let struct_ptr = local;
         let reference_value = module.locals.add(ValType::I32);
 
+        let writer_ptr = module.locals.add(ValType::I32);
+
         let data_ptr = module.locals.add(ValType::I32);
         let inner_data_reference = module.locals.add(ValType::I32);
 
+        block.local_get(writer_pointer).local_set(writer_ptr);
         // If base_calldata_reference_ptr is Some(_), means we are packing an struct inside a
         // struct and that the struct is dynamic.
         // base_calldata_reference_pointer is the reference pointer to the original value, and it
@@ -178,5 +181,12 @@ impl IStruct {
                 .binop(BinaryOp::I32Add)
                 .local_set(pointer_to_update);
         }
+
+        // Advance the pointer after processing the struct
+        block
+            // .i32_const(32)
+            .local_get(writer_ptr)
+            // .binop(BinaryOp::I32Add)
+            .local_set(writer_pointer);
     }
 }
