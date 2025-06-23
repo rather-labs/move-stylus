@@ -268,6 +268,8 @@ mod struct_packing_unpacking {
             uint16 bba,
             uint128 bbb
         ) external returns (Bar bar);
+        function packUnpackStatic(Foo foo) external returns (Foo);
+        function packUnpackDynamic(Bar bar) external returns (Bar);
     }
 
     #[rstest]
@@ -335,21 +337,6 @@ mod struct_packing_unpacking {
             1111111111,
         )
     )]
-    fn test_struct_unpacking<T: SolCall, V: SolValue>(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] call_data: T,
-        #[case] expected_result: V,
-    ) where
-        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
-    {
-        run_test(
-            runtime,
-            call_data.abi_encode(),
-            expected_result.abi_encode_params(),
-        )
-        .unwrap();
-    }
-
     #[rstest]
     #[case(echoFooPackCall::new(
         (
@@ -421,7 +408,77 @@ mod struct_packing_unpacking {
             baz: Baz { a: 111, b: 1111111111 },
         }
     )]
-    fn test_struct_packing<T: SolCall, V: SolValue>(
+    #[case(packUnpackStaticCall::new(
+        (Foo {
+            q: address!("0xcafe000000000000000000000000000000007357"),
+            t: true,
+            u: 255,
+            v: u16::MAX,
+            w: u32::MAX,
+            x: u64::MAX,
+            y: u128::MAX,
+            z: U256::MAX,
+            baz: Baz { a: 42, b: 4242}
+        },)),
+        Foo {
+            q: address!("0xcafe000000000000000000000000000000007357"),
+            t: true,
+            u: 255,
+            v: u16::MAX,
+            w: u32::MAX,
+            x: u64::MAX,
+            y: u128::MAX,
+            z: U256::MAX,
+            baz: Baz { a: 42, b: 4242}
+        }
+    )]
+    #[case(packUnpackDynamicCall::new(
+        (Bar {
+            q: address!("0xcafe000000000000000000000000000000007357"),
+            r: vec![1, 2, u32::MAX],
+            s: vec![1, 2, u128::MAX],
+            t: true,
+            u: 255,
+            v: u16::MAX,
+            w: u32::MAX,
+            x: u64::MAX,
+            y: u128::MAX,
+            z: U256::MAX,
+            bazz: Bazz {
+                a: 42,
+                b: vec![
+                    U256::MAX,
+                    U256::from(8),
+                    U256::from(7),
+                    U256::from(6)
+                ]
+            },
+            baz: Baz { a: 111, b: 1111111111 },
+        },)),
+        Bar {
+            q: address!("0xcafe000000000000000000000000000000007357"),
+            r: vec![1, 2, u32::MAX],
+            s: vec![1, 2, u128::MAX],
+            t: true,
+            u: 255,
+            v: u16::MAX,
+            w: u32::MAX,
+            x: u64::MAX,
+            y: u128::MAX,
+            z: U256::MAX,
+            bazz: Bazz {
+                a: 42,
+                b: vec![
+                    U256::MAX,
+                    U256::from(8),
+                    U256::from(7),
+                    U256::from(6)
+                ]
+            },
+            baz: Baz { a: 111, b: 1111111111 },
+        }
+    )]
+    fn test_struct_packing_unpacking<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,

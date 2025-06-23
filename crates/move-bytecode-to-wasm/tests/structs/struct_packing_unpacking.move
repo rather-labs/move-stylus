@@ -108,3 +108,37 @@ public fun echo_bar_unpack(bar: Bar): (address, vector<u32>, vector<u128>, bool,
         bar.baz.b,
     )
 }
+
+
+public fun pack_unpack_static(foo: Foo): Foo {
+    Foo {
+        q: foo.q,
+        t: foo.t,
+        u: foo.u,
+        v: foo.v,
+        w: foo.w,
+        x: foo.x,
+        y: foo.y,
+        z: foo.z,
+        baz: Baz { a: foo.baz.a, b: foo.baz.b },
+    }
+}
+
+public fun pack_unpack_dynamic(bar: Bar): Bar {
+    Bar {
+        q: bar.q,
+        r: bar.r,
+        s: bar.s,
+        t: bar.t,
+        u: bar.u,
+        v: bar.v,
+        w: bar.w,
+        x: bar.x,
+        y: bar.y,
+        z: bar.z,
+        bazz: Bazz { a: bar.bazz.a, b: bar.bazz.b },
+        baz: Baz { a: bar.baz.a, b: bar.baz.b },
+    }
+}
+
+
