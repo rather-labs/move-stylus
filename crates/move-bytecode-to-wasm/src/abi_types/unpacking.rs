@@ -54,26 +54,13 @@ pub fn build_unpack_instructions<T: Unpackable>(
     let reader_pointer = module.locals.add(ValType::I32);
     let calldata_reader_pointer = module.locals.add(ValType::I32);
 
-    let print_i32 = module.imports.get_func("", "print_i32").unwrap();
-    let print_memory_from = module.imports.get_func("", "print_memory_from").unwrap();
-    let print_separator = module.imports.get_func("", "print_separator").unwrap();
-
     function_builder.local_get(args_pointer);
     function_builder.local_tee(reader_pointer);
     function_builder.local_set(calldata_reader_pointer);
 
-    function_builder
-        .local_get(args_pointer)
-        .call(print_memory_from);
-
     // The ABI encoded params are always a tuple
     // Static types are stored in-place, but dynamic types are referenced to the call data
     for signature_token in function_arguments_signature.iter() {
-        function_builder
-            .local_get(calldata_reader_pointer)
-            .call(print_i32);
-        function_builder.local_get(reader_pointer).call(print_i32);
-
         signature_token.add_unpack_instructions(
             function_builder,
             module,
@@ -81,13 +68,6 @@ pub fn build_unpack_instructions<T: Unpackable>(
             calldata_reader_pointer,
             compilation_ctx,
         );
-
-        function_builder
-            .local_get(calldata_reader_pointer)
-            .call(print_i32);
-        function_builder.local_get(reader_pointer).call(print_i32);
-
-        function_builder.call(print_separator);
     }
 }
 

@@ -330,17 +330,27 @@ impl Packable for IntermediateType {
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) {
+        let print_i32 = module.imports.get_func("", "print_i32").unwrap();
+
         match self {
-            IntermediateType::IStruct(index) => IStruct::add_pack_instructions(
-                *index,
-                builder,
-                module,
-                local,
-                writer_pointer,
-                calldata_reference_pointer,
-                compilation_ctx,
-                Some(calldata_reference_pointer),
-            ),
+            IntermediateType::IStruct(index) => {
+                builder.i32_const(111111).call(print_i32);
+                builder
+                    .local_get(calldata_reference_pointer)
+                    .call(print_i32);
+                builder.local_get(writer_pointer).call(print_i32);
+                builder.i32_const(111111).call(print_i32);
+                IStruct::add_pack_instructions(
+                    *index,
+                    builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    writer_pointer,
+                    compilation_ctx,
+                    Some(calldata_reference_pointer),
+                );
+            }
             _ => self.add_pack_instructions(
                 builder,
                 module,
