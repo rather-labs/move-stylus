@@ -29,12 +29,13 @@ impl IStruct {
         let struct_ptr = local;
         let reference_value = module.locals.add(ValType::I32);
 
-        let writer_ptr = module.locals.add(ValType::I32);
+        // let writer_ptr = module.locals.add(ValType::I32);
 
         let data_ptr = module.locals.add(ValType::I32);
         let inner_data_reference = module.locals.add(ValType::I32);
 
-        block.local_get(writer_pointer).local_set(writer_ptr);
+        // block.local_get(writer_pointer).local_set(writer_ptr);
+        //
         // If base_calldata_reference_ptr is Some(_), means we are packing an struct inside a
         // struct and that the struct is dynamic.
         // base_calldata_reference_pointer is the reference pointer to the original value, and it
@@ -66,6 +67,8 @@ impl IStruct {
                 reference_value,
                 writer_pointer,
             );
+        } else {
+            block.local_get(writer_pointer).local_set(data_ptr);
         }
 
         // Load the value to be written in the calldata, if it is a stack value we need to double
@@ -118,7 +121,7 @@ impl IStruct {
             // dynamically, so, we can set data_ptr as the writer pointer and the
             // inner_data_reference as the root reference pointer
             if base_calldata_reference_pointer.is_none() {
-                block.local_get(writer_pointer).local_set(data_ptr);
+                // block.local_get(writer_pointer).local_set(data_ptr);
                 block
                     .local_get(calldata_reference_pointer)
                     .local_set(inner_data_reference);
@@ -163,6 +166,7 @@ impl IStruct {
                 );
             }
 
+            /*
             // If base_calldata_reference_pointer is none, we are packing the struct in place, so
             // we move the writer_pointer, otherwise, we allocated memory to pack it somewhere else
             // (because it is dynamic), data_ptr is the offset where data will be written.
@@ -170,23 +174,25 @@ impl IStruct {
                 writer_pointer
             } else {
                 data_ptr
-            };
+            };*/
 
             // Add 32 to the pointer_to_update. If it is a static field it will occupy 32 bytes, if
             // it is a dynamic field, the offset pointing to where to find the values will be
             // written, also occuping 32 bytes.
             block
                 .i32_const(32)
-                .local_get(pointer_to_update)
+                .local_get(data_ptr)
                 .binop(BinaryOp::I32Add)
-                .local_set(pointer_to_update);
+                .local_set(data_ptr);
         }
 
+        /*
         // Advance the pointer after processing the struct
         block
             // .i32_const(32)
             .local_get(writer_ptr)
             // .binop(BinaryOp::I32Add)
             .local_set(writer_pointer);
+        */
     }
 }
