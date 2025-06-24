@@ -51,7 +51,7 @@ use super::IntermediateType;
 use move_binary_format::file_format::{FieldHandleIndex, StructDefinitionIndex};
 use walrus::{
     InstrSeqBuilder, Module, ValType,
-    ir::{LoadKind, MemArg},
+    ir::{LoadKind, MemArg, StoreKind},
 };
 
 #[derive(Debug)]
@@ -175,6 +175,123 @@ impl IStruct {
         });
 
         builder.local_get(result);
+    }
+
+    pub fn copy_local_instructions(
+        &self,
+        module: &mut Module,
+        builder: &mut InstrSeqBuilder,
+        compilation_ctx: &CompilationContext,
+    ) {
+        let original_struct_ptr = module.locals.add(ValType::I32);
+        let ptr = module.locals.add(ValType::I32);
+
+        let val_32 = module.locals.add(ValType::I32);
+        let val_64 = module.locals.add(ValType::I64);
+        let ptr_to_data = module.locals.add(ValType::I32);
+
+        builder.local_set(original_struct_ptr);
+
+        // Allocate space for the new struct
+        builder
+            .i32_const(self.heap_size as i32)
+            .call(compilation_ctx.allocator)
+            .local_set(ptr);
+
+        let mut offset = 0;
+        for field in &self.fields {
+            match field {
+                // Stack values: create a middle pointer to save the actual value
+                IntermediateType::IBool
+                | IntermediateType::IU8
+                | IntermediateType::IU16
+                | IntermediateType::IU32
+                | IntermediateType::IU64 => {
+                    let data_size = field.stack_data_size();
+                    let (val, load_kind, store_kind) = if data_size == 8 {
+                        (
+                            val_64,
+                            LoadKind::I64 { atomic: false },
+                            StoreKind::I64 { atomic: false },
+                        )
+                    } else {
+                        (
+                            val_32,
+                            LoadKind::I32 { atomic: false },
+                            StoreKind::I32 { atomic: false },
+                        )
+                    };
+
+                    // Load intermediate pointer and value
+                    builder
+                        .local_get(original_struct_ptr)
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg { align: 0, offset },
+                        )
+                        .load(
+                            compilation_ctx.memory_id,
+                            load_kind,
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_set(val);
+
+                    // Create a pointer for the value
+                    builder
+                        .i32_const(data_size as i32)
+                        .call(compilation_ctx.allocator)
+                        .local_tee(ptr_to_data);
+
+                    // Store the actual value behind the middle_ptr
+                    builder.local_get(val).store(
+                        compilation_ctx.memory_id,
+                        store_kind,
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                }
+                IntermediateType::IU128
+                | IntermediateType::IU256
+                | IntermediateType::IAddress
+                | IntermediateType::ISigner
+                | IntermediateType::IVector(_)
+                | IntermediateType::IStruct(_) => {
+                    // Load intermediate pointer
+                    builder
+                        .local_get(original_struct_ptr)
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg { align: 0, offset },
+                        )
+                        .local_set(ptr_to_data);
+
+                    field.copy_local_instructions(module, builder, compilation_ctx, ptr_to_data);
+
+                    builder.local_set(ptr_to_data);
+                }
+                IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                    panic!("references inside structs not allowed")
+                }
+            }
+
+            // Store the middle pointer in the place of the struct field
+            builder.local_get(ptr).local_get(ptr_to_data).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg { align: 0, offset },
+            );
+
+            offset += 4;
+        }
+
+        builder.local_get(ptr);
     }
 
     pub fn index(&self) -> u16 {
