@@ -612,8 +612,8 @@ mod struct_copy {
         struct Foo {
             address q;
             uint32[] r;
-            /*
             uint128[] s;
+            /*
             bool t;
             uint8 u;
             uint16 v;
@@ -644,8 +644,8 @@ mod struct_copy {
         (Foo {
             q: address!("0xcafe000000000000000000000000000000007357"),
             r: vec![1, 2, u32::MAX],
-            /*
             s: vec![1, 2, u128::MAX],
+            /*
             t: true,
             u: 255,
             v: u16::MAX,
@@ -669,8 +669,8 @@ mod struct_copy {
         Foo {
             q: address!("0xcafe000000000000000000000000000000007357"),
             r: vec![1, 2, u32::MAX],
-            /*
             s: vec![1, 2, u128::MAX],
+            /*
             t: true,
             u: 255,
             v: u16::MAX,
@@ -693,8 +693,8 @@ mod struct_copy {
         Foo {
             q: address!("0x00000000000000000000000000000000deadbeef"),
             r: vec![0, 3, 0, 3, 4, 5, 6],
-            /*
             s: vec![6, 5, 4, 3, 0, 3, 0],
+            /*
             t: false,
             u: 42,
             v: 4242,

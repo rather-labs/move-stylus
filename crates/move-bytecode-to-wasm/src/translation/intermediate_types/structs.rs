@@ -185,6 +185,7 @@ impl IStruct {
     ) {
         let print_i32 = module.imports.get_func("", "print_i32").unwrap();
         let print_mf = module.imports.get_func("", "print_memory_from").unwrap();
+        let print_s = module.imports.get_func("", "print_separator").unwrap();
 
         let original_struct_ptr = module.locals.add(ValType::I32);
         let ptr = module.locals.add(ValType::I32);
@@ -290,13 +291,16 @@ impl IStruct {
                     builder.local_get(ptr_to_data).call(print_mf);
 
                     field.copy_local_instructions(module, builder, compilation_ctx, ptr_to_data);
-
                     builder.local_set(ptr_to_data);
+
+                    builder.local_get(ptr_to_data).call(print_mf);
                 }
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                     panic!("references inside structs not allowed")
                 }
             }
+
+            builder.call(print_s);
 
             // Store the middle pointer in the place of the struct field
             builder.local_get(ptr).local_get(ptr_to_data).store(
