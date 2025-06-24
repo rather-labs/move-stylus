@@ -125,7 +125,7 @@ impl IStruct {
             // Allocate memory for the packed value. Set the data_ptr the beginning, since
             // we are going to pack the values from there
             block
-                .i32_const(struct_.solidity_abi_encode_size(compilation_ctx) as i32)
+                .i32_const(IntermediateType::IStruct(index).encoded_size(compilation_ctx) as i32)
                 .call(compilation_ctx.allocator)
                 .local_tee(data_ptr)
                 .local_tee(inner_data_reference);

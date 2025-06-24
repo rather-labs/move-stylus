@@ -72,6 +72,7 @@ use walrus::{
 
 use crate::{
     CompilationContext,
+    abi_types::packing::Packable,
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
@@ -227,7 +228,7 @@ impl IStruct {
         let advancement = if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
             32
         } else {
-            struct_.solidity_abi_encode_size(compilation_ctx) as i32
+            IntermediateType::IStruct(index).encoded_size(compilation_ctx) as i32
         };
 
         builder
