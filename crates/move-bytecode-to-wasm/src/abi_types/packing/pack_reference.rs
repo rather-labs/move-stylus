@@ -178,7 +178,7 @@ mod tests {
         func_body.local_set(local);
 
         // Allocate calldata (where to write)
-        func_body.i32_const(ref_type.encoded_size() as i32);
+        func_body.i32_const(ref_type.encoded_size(&compilation_ctx) as i32);
         func_body.call(allocator);
         func_body.local_tee(writer_pointer);
         func_body.local_set(calldata_reference_pointer);

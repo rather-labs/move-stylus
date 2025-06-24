@@ -10,6 +10,7 @@ use crate::{
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         signer::ISigner,
+        structs::IStruct,
         vector::IVector,
     },
 };
@@ -17,6 +18,7 @@ use crate::{
 mod pack_heap_int;
 mod pack_native_int;
 mod pack_reference;
+mod pack_struct;
 mod pack_vector;
 
 pub trait Packable {
@@ -38,6 +40,34 @@ pub trait Packable {
         compilation_ctx: &CompilationContext,
     );
 
+    /// Adds the instructions to pack the value into memory according to Solidity's ABI encoding.
+    ///
+    /// The writer pointer is the pointer to the memory where the value will be written, should be
+    /// incremented on each write.
+    ///
+    /// The calldata reference pointer is the pointer to the start of the calldata portion
+    /// in order to calculate the params offset. Should never be modified internally.
+    ///
+    /// This function forces the dynamic encoding (pointer to the location of packed values +
+    /// packed values). It is useful for types that can be encoded as dynamic or static depending
+    /// on the context.
+    ///
+    /// For example, given a struct `Foo` that can be encoded dynamically (because it contains one
+    /// or more values that are dynamically encoded).
+    /// - If `Foo` is returned in a function that returns multiple values `(v1, v2, .., Foo, .., vn)`,
+    ///   `Foo` must be encoded dynamically, because it a tuple member.
+    /// - If `Foo` is the only return value in a function, it should be encoded statically.
+    #[allow(clippy::too_many_arguments)]
+    fn add_pack_instructions_dynamic(
+        &self,
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        local: LocalId,
+        writer_pointer: LocalId,
+        calldata_reference_pointer: LocalId,
+        compilation_ctx: &CompilationContext,
+    );
+
     /// Adds the instructions to load the value into a local variable.
     /// This is used to reverse the order of the stack before packing
     ///
@@ -50,7 +80,20 @@ pub trait Packable {
     ) -> LocalId;
 
     /// Returns the ABI encoded size of the type
-    fn encoded_size(&self) -> usize;
+    fn encoded_size(&self, compilation_ctx: &CompilationContext) -> usize;
+
+    /// Returns true if the type to be encoded is dynamic
+    ///
+    /// According to documentation, dynamic types are:
+    /// - bytes
+    /// - string
+    /// - T[] for any T
+    /// - T[k] for any dynamic T and any k >= 0
+    /// - (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k
+    ///
+    /// For more information:
+    /// https://docs.soliditylang.org/en/develop/abi-spec.html#formal-specification-of-the-encoding
+    fn is_dynamic(&self, compilation_ctx: &CompilationContext) -> bool;
 }
 
 /// Builds the instructions to pack WASM return values into memory according to Solidity's ABI encoding.
@@ -73,6 +116,9 @@ pub fn build_pack_instructions<T: Packable>(
         return;
     }
 
+    // Indicates if the function returns multiple values
+    let returns_multiple_values = function_return_signature.len() > 1;
+
     // We need to load all return types into locals in order to reverse the read order
     // Otherwise they would be popped in reverse order
     let mut locals = Vec::new();
@@ -80,49 +126,87 @@ pub fn build_pack_instructions<T: Packable>(
     for signature_token in function_return_signature.iter().rev() {
         let local = signature_token.add_load_local_instructions(builder, module);
         locals.push(local);
-        args_size += signature_token.encoded_size();
+
+        // If the function returns multiple values, those values will be encoded as a tuple. By
+        // definition, a tuple T is dynamic (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k.
+        // The encode size for a dynamically encoded field inside a dynamically encoded tuple is
+        // just 32 bytes (the value is the offset to where the values are packed)
+        args_size += if returns_multiple_values && signature_token.is_dynamic(compilation_ctx) {
+            32
+        } else {
+            signature_token.encoded_size(compilation_ctx)
+        };
     }
     locals.reverse();
 
     let pointer = module.locals.add(ValType::I32);
     let writer_pointer = module.locals.add(ValType::I32);
+    let calldata_reference_pointer = module.locals.add(ValType::I32);
 
     // Allocate memory for the first level arguments
-    builder.i32_const(args_size as i32);
-    builder.call(compilation_ctx.allocator);
-    builder.local_tee(pointer);
+    builder
+        .i32_const(args_size as i32)
+        .call(compilation_ctx.allocator)
+        .local_tee(pointer);
 
     // Store the writer pointer
     builder.local_set(writer_pointer);
 
     for (local, signature_token) in locals.iter().zip(function_return_signature.iter()) {
         // Copy the reference just to be safe in case in internal function modifies it
-        let calldata_reference_pointer = module.locals.add(ValType::I32);
-        builder.local_get(pointer);
-        builder.local_set(calldata_reference_pointer);
+        builder
+            .local_get(pointer)
+            .local_set(calldata_reference_pointer);
 
-        signature_token.add_pack_instructions(
-            builder,
-            module,
-            *local,
-            writer_pointer,
-            calldata_reference_pointer,
-            compilation_ctx,
-        );
+        // If the function returns multiple values, those values will be encoded as a tuple. By
+        // definition, a tuple T is dynamic (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k.
+        // Given that the return tuple is encoded dynamically, for the values that are dynamic
+        // inside the tuple, we must force a dynamic encoding.
+        if returns_multiple_values && signature_token.is_dynamic(compilation_ctx) {
+            signature_token.add_pack_instructions_dynamic(
+                builder,
+                module,
+                *local,
+                writer_pointer,
+                calldata_reference_pointer,
+                compilation_ctx,
+            );
 
-        builder.local_get(writer_pointer);
-        builder.i32_const(signature_token.encoded_size() as i32);
-        builder.binop(BinaryOp::I32Add);
-        builder.local_set(writer_pointer);
+            // A dynamic value will only save the offset to where the values are located, so, we
+            // just use 32 bytes
+            builder
+                .local_get(writer_pointer)
+                .i32_const(32)
+                .binop(BinaryOp::I32Add)
+                .local_set(writer_pointer);
+        } else {
+            signature_token.add_pack_instructions(
+                builder,
+                module,
+                *local,
+                writer_pointer,
+                calldata_reference_pointer,
+                compilation_ctx,
+            );
+
+            builder
+                .local_get(writer_pointer)
+                .i32_const(signature_token.encoded_size(compilation_ctx) as i32)
+                .binop(BinaryOp::I32Add)
+                .local_set(writer_pointer);
+        }
     }
 
-    builder.local_get(pointer); // This will remain in the stack as return value
-
-    // use the allocator to get a pointer to the end of the calldata
-    builder.i32_const(0);
-    builder.call(compilation_ctx.allocator);
+    // This will remain in the stack as return value
     builder.local_get(pointer);
-    builder.binop(BinaryOp::I32Sub);
+
+    // Use the allocator to get a pointer to the end of the calldata
+    builder
+        .i32_const(0)
+        .call(compilation_ctx.allocator)
+        .local_get(pointer)
+        .binop(BinaryOp::I32Sub);
+
     // The value remaining in the stack is the length of the encoded data
 }
 
@@ -243,11 +327,53 @@ impl Packable for IntermediateType {
                 calldata_reference_pointer,
                 compilation_ctx,
             ),
-            IntermediateType::IStruct(_) => todo!(),
+            IntermediateType::IStruct(index) => IStruct::add_pack_instructions(
+                *index,
+                builder,
+                module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                compilation_ctx,
+                None,
+            ),
         }
     }
 
-    fn encoded_size(&self) -> usize {
+    fn add_pack_instructions_dynamic(
+        &self,
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        local: LocalId,
+        writer_pointer: LocalId,
+        calldata_reference_pointer: LocalId,
+        compilation_ctx: &CompilationContext,
+    ) {
+        match self {
+            IntermediateType::IStruct(index) => {
+                IStruct::add_pack_instructions(
+                    *index,
+                    builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    compilation_ctx,
+                    Some(calldata_reference_pointer),
+                );
+            }
+            _ => self.add_pack_instructions(
+                builder,
+                module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                compilation_ctx,
+            ),
+        }
+    }
+
+    fn encoded_size(&self, compilation_ctx: &CompilationContext) -> usize {
         match self {
             IntermediateType::IBool => sol_data::Bool::ENCODED_SIZE.unwrap(),
             IntermediateType::IU8 => sol_data::Uint::<8>::ENCODED_SIZE.unwrap(),
@@ -259,9 +385,63 @@ impl Packable for IntermediateType {
             IntermediateType::IAddress => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::ISigner => sol_data::Address::ENCODED_SIZE.unwrap(),
             IntermediateType::IVector(_) => 32,
-            IntermediateType::IRef(inner) => inner.encoded_size(),
-            IntermediateType::IMutRef(inner) => inner.encoded_size(),
-            IntermediateType::IStruct(_) => 32,
+            IntermediateType::IRef(inner) => inner.encoded_size(compilation_ctx),
+            IntermediateType::IMutRef(inner) => inner.encoded_size(compilation_ctx),
+            IntermediateType::IStruct(index) => {
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let mut size = 0;
+                for field in &struct_.fields {
+                    match field {
+                        IntermediateType::IBool
+                        | IntermediateType::IU8
+                        | IntermediateType::IU16
+                        | IntermediateType::IU32
+                        | IntermediateType::IU64
+                        | IntermediateType::IU128
+                        | IntermediateType::IU256
+                        | IntermediateType::IAddress
+                        | IntermediateType::IVector(_) => {
+                            size += field.encoded_size(compilation_ctx);
+                        }
+                        IntermediateType::IStruct(index) => {
+                            let child_struct = compilation_ctx.get_struct_by_index(*index).unwrap();
+
+                            if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
+                                size += 32;
+                            } else {
+                                size += field.encoded_size(compilation_ctx);
+                            }
+                        }
+                        IntermediateType::ISigner => panic!("signer is not abi econdable"),
+                        IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                            panic!("found reference inside struct")
+                        }
+                    }
+                }
+
+                size
+            }
+        }
+    }
+
+    fn is_dynamic(&self, compilation_ctx: &CompilationContext) -> bool {
+        match self {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress
+            | IntermediateType::ISigner
+            | IntermediateType::IRef(_)
+            | IntermediateType::IMutRef(_) => false,
+            IntermediateType::IVector(_) => true,
+            IntermediateType::IStruct(index) => {
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                struct_.solidity_abi_encode_is_dynamic(compilation_ctx)
+            }
         }
     }
 }

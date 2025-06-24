@@ -72,6 +72,7 @@ use walrus::{
 
 use crate::{
     CompilationContext,
+    abi_types::packing::Packable,
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
@@ -87,11 +88,7 @@ impl IStruct {
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) {
-        let struct_ = compilation_ctx
-            .module_structs
-            .iter()
-            .find(|s| s.index() == index)
-            .unwrap_or_else(|| panic!("struct that with index {index} not found"));
+        let struct_ = compilation_ctx.get_struct_by_index(index).unwrap();
 
         let struct_ptr = module.locals.add(ValType::I32);
         let val_32 = module.locals.add(ValType::I32);
@@ -222,6 +219,23 @@ impl IStruct {
 
             offset += 4;
         }
+
+        // Advance reader pointer after processing struct.
+        // If it is a static struct, the pointer must be advanced the size of the tuple that
+        // represents the struct.
+        // If it is a dynamic struct, we just need to advance the pointer 32 bytes because in the
+        // argument's place there is only a pointer to where the values of the struct are packed
+        let advancement = if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
+            32
+        } else {
+            IntermediateType::IStruct(index).encoded_size(compilation_ctx) as i32
+        };
+
+        builder
+            .local_get(reader_pointer)
+            .i32_const(advancement)
+            .binop(BinaryOp::I32Add)
+            .local_set(reader_pointer);
 
         builder.local_get(struct_ptr);
     }

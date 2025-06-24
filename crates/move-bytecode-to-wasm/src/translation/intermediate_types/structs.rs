@@ -105,11 +105,7 @@ impl IStruct {
         compilation_ctx: &CompilationContext,
         index: u16,
     ) {
-        let struct_ = compilation_ctx
-            .module_structs
-            .iter()
-            .find(|s| s.index() == index)
-            .unwrap_or_else(|| panic!("struct with index {index} not found"));
+        let struct_ = compilation_ctx.get_struct_by_index(index).unwrap();
 
         let s1_ptr = module.locals.add(ValType::I32);
         let s2_ptr = module.locals.add(ValType::I32);
@@ -213,17 +209,8 @@ impl IStruct {
                 | IntermediateType::IAddress => continue,
                 IntermediateType::IVector(_) => return true,
                 IntermediateType::IStruct(index) => {
-                    let struct_ = compilation_ctx
-                        .module_structs
-                        .iter()
-                        .find(|s| s.index() == *index)
-                        .unwrap_or_else(|| panic!("struct that with index {index} not found"));
-
-                    if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                        continue;
-                    } else {
-                        return false;
-                    }
+                    let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                    return struct_.solidity_abi_encode_is_dynamic(compilation_ctx);
                 }
                 IntermediateType::ISigner => panic!("signer is not abi econdable"),
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {

@@ -7,7 +7,6 @@ use crate::{
 };
 
 impl IVector {
-    #[allow(clippy::too_many_arguments)]
     pub fn add_pack_instructions(
         inner: &IntermediateType,
         block: &mut InstrSeqBuilder,
@@ -29,7 +28,7 @@ impl IVector {
 
         // Allocate memory for the packed value, this will be allocate at the end of calldata
         block.local_get(length);
-        block.i32_const(inner.encoded_size() as i32); // The size of each element
+        block.i32_const(inner.encoded_size(compilation_ctx) as i32); // The size of each element
         block.binop(BinaryOp::I32Mul);
         block.i32_const(32); // The size of the length value itself
         block.binop(BinaryOp::I32Add);
@@ -109,7 +108,7 @@ impl IVector {
 
             // increment data pointer
             loop_block.local_get(data_pointer);
-            loop_block.i32_const(inner.encoded_size() as i32);
+            loop_block.i32_const(inner.encoded_size(compilation_ctx) as i32);
             loop_block.binop(BinaryOp::I32Add);
             loop_block.local_set(data_pointer);
 
@@ -158,7 +157,7 @@ mod tests {
         func_body.call(alloc_function);
         func_body.local_set(local);
 
-        func_body.i32_const(int_type.encoded_size() as i32);
+        func_body.i32_const(int_type.encoded_size(&compilation_ctx) as i32);
         func_body.call(alloc_function);
         func_body.local_tee(writer_pointer);
         func_body.local_set(calldata_reference_pointer);
