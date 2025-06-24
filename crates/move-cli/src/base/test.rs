@@ -139,6 +139,7 @@ pub enum UnitTestResult {
     Failure,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn run_move_unit_tests<W: Write + Send>(
     pkg_path: &Path,
     mut build_config: move_package::BuildConfig,
