@@ -1,3 +1,87 @@
+//! According to the formal specification of the encoding, a tuple (T1,...,Tk) is dynamic if
+//! Ti is dynamic for some 1 <= i <= k.
+//!
+//! Since structs are encoded as tuples of their fields, a struct is also considered dynamic
+//! if any of its fields is dynamic.
+//!
+//! Based on the ABI specification, the following types are considered dynamic:
+//! - bytes
+//! - string
+//! - T[] for any T
+//! - T[k] for any dynamic T and any k >= 0
+//! - (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k
+//!
+//! For example, the following Move's struct:
+//!
+//! public struct Foo has drop {
+//!    x: u8,
+//!    y: vector<u32>,
+//!    z: vector<u128>,
+//! }
+//!
+//! Is equivalent to the following struct in Solidity:
+//!
+//! struct Foo {
+//!     uint8 x;
+//!     uint32[] y;
+//!     uint128[] z;
+//! }
+//!
+//! Given that the struct contains vectors, it becomes a dynamic. This means that the first encoded
+//! value of this struct will be a number pointing to where the values are packed in the calldata.
+//!
+//! If we call a function that returns Foo with the following fields:
+//! Foo {
+//!     x: 254,
+//!     y: [1, 2, u32::MAX],
+//!     z: [1, 2, u128::MAX],
+//! }
+//!
+//! If the function only returns Foo, the struct will be statically exapnded as a tuple. The
+//! encoded data will be:
+//!
+//! bytes   0..31    32..63   64..95
+//!       [  254  ,    96   ,   224  , [3,1,2,u32::MAX], [3,1,2,u128::MAX]]
+//!           x       ptr_y    ptr_z   ▲                 ▲
+//!                    │         │     │                 │
+//!                    └─────────┼─────┘                 │
+//!                              └───────────────────────┘
+//! where
+//!  - x: 254 packed as uint8 (32 bytes)
+//!
+//!  - ptr_y: where the y's vector values are packed. It is relative to where the tuple starts
+//!    96 = len(x) + len(ptr_y) + len(ptr_z) = 32 + 32 + 32
+//!
+//!  - ptr_z: where the z's vector values are packed. It is relative to where the tuple starts.
+//!    224 = len(x) + len(ptr_y) + len(ptr_z) + y_data = 32 + 32 + 32 + 128.
+//!    y_data has length 128 because it contains its length (32 bytes) and 3 elements (3 x 32bytes)
+//!
+//!
+//! If the function returns Foo along with other values, for example, (u16, Foo, vector<128>) where
+//! the u16 is 42 and the vector<u128> is [1,2,3]. The encoded data will be:
+//!
+//! The encoded data will be:
+//! bytes   0..31   32..63   64..95       96..n             n..
+//!       [  42   ,   96  ,    n   ,  foo_packed_data , vector_packed_data ]
+//!          u16    ptr_foo  ptr_vec        ▲                  ▲
+//!                    │        │           │                  │
+//!                    └────────┼───────────┘                  │
+//!                             └──────────────────────────────┘
+//!
+//! where:
+//!
+//!  - u16: The actual value of the u16 field
+//!
+//!  - ptr_foo: where Foo's values are packed. It is relative to where the tuple starts
+//!    96 = len(x) + len(ptr_foo) + len(ptr_vec) = 32 + 32 + 32
+//!
+//!  - ptr_vec: where vector<u128> values are packed
+//!
+//! If a struct does not contain any dynamic fields, all its fields are encoded inline, packed
+//! contiguously without any offset or pointer.
+//!
+//! For more information:
+//! https://docs.soliditylang.org/en/develop/abi-spec.html#formal-specification-of-the-encodinguse walrus::{
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg},

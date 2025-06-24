@@ -40,19 +40,23 @@ pub trait Packable {
         compilation_ctx: &CompilationContext,
     );
 
-    // TODO: Continue explanation.
     /// Adds the instructions to pack the value into memory according to Solidity's ABI encoding.
     ///
-    /// The writer pointer is the pointer to the memory where the value will be written, should be incremented
-    /// on each write.
+    /// The writer pointer is the pointer to the memory where the value will be written, should be
+    /// incremented on each write.
     ///
     /// The calldata reference pointer is the pointer to the start of the calldata portion
     /// in order to calculate the params offset. Should never be modified internally.
     ///
     /// This function forces the dynamic encoding (pointer to the location of packed values +
     /// packed values). It is useful for types that can be encoded as dynamic or static depending
-    /// on the context (for example, if a function returns a dynamic struct alone, it will has to
-    /// be unpacked
+    /// on the context.
+    ///
+    /// For example, given a struct `Foo` that can be encoded dynamically (because it contains one
+    /// or more values that are dynamically encoded).
+    /// - If `Foo` is returned in a function that returns multiple values `(v1, v2, .., Foo, .., vn)`,
+    ///   `Foo` must be encoded dynamically, because it a tuple member.
+    /// - If `Foo` is the only return value in a function, it should be encoded statically.
     #[allow(clippy::too_many_arguments)]
     fn add_pack_instructions_dynamic(
         &self,
@@ -123,7 +127,10 @@ pub fn build_pack_instructions<T: Packable>(
         let local = signature_token.add_load_local_instructions(builder, module);
         locals.push(local);
 
-        // TODO add why this
+        // If the function returns multiple values, those values will be encoded as a tuple. By
+        // definition, a tuple T is dynamic (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k.
+        // The encode size for a dynamically encoded field inside a dynamically encoded tuple is
+        // just 32 bytes (the value is the offset to where the values are packed)
         args_size += if returns_multiple_values && signature_token.is_dynamic(compilation_ctx) {
             32
         } else {
@@ -151,7 +158,10 @@ pub fn build_pack_instructions<T: Packable>(
             .local_get(pointer)
             .local_set(calldata_reference_pointer);
 
-        // TODO Explain this
+        // If the function returns multiple values, those values will be encoded as a tuple. By
+        // definition, a tuple T is dynamic (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k.
+        // Given that the return tuple is encoded dynamically, for the values that are dynamic
+        // inside the tuple, we must force a dynamic encoding.
         if returns_multiple_values && signature_token.is_dynamic(compilation_ctx) {
             signature_token.add_pack_instructions_dynamic(
                 builder,
@@ -162,6 +172,8 @@ pub fn build_pack_instructions<T: Packable>(
                 compilation_ctx,
             );
 
+            // A dynamic value will only save the offset to where the values are located, so, we
+            // just use 32 bytes
             builder
                 .local_get(writer_pointer)
                 .i32_const(32)
