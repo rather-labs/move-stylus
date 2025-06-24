@@ -1054,7 +1054,7 @@ mod tests {
             .get_global(&mut store, "global_next_free_memory_pointer")
             .unwrap();
 
-        let vector_pointer: i32 = entrypoint.call(&mut store, ()).unwrap();
+        let _vector_pointer: i32 = entrypoint.call(&mut store, ()).unwrap();
 
         let global_next_free_memory_pointer = global_next_free_memory_pointer
             .get(&mut store)
@@ -1166,7 +1166,7 @@ mod tests {
         .concat();
 
         let expected_push_bytes = [
-            5u32.to_le_bytes().as_slice(),
+            6u32.to_le_bytes().as_slice(),
             8u32.to_le_bytes().as_slice(),
             1u32.to_le_bytes().as_slice(),
             0u32.to_le_bytes().as_slice(),
@@ -1192,6 +1192,12 @@ mod tests {
 
         test_vector(&data, IntermediateType::IBool, &expected_bytes);
         test_vector_copy(&data, IntermediateType::IBool, &expected_bytes);
+        test_vector_push_back(
+            &data,
+            &element_bytes,
+            IntermediateType::IBool,
+            &expected_push_bytes,
+        );
         test_vector_pop_back(&data, IntermediateType::IBool, &expected_pop_bytes, 0);
         test_vector_swap(&data, IntermediateType::IBool, &expected_swap_bytes, 0, 1);
     }
