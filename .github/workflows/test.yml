@@ -17,5 +17,7 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - name: Build
       run: cargo build --all-targets
+    - name: Check style and warnings
+      run: .githooks/pre-commit
     - name: Run tests
       run: cargo test --verbose
