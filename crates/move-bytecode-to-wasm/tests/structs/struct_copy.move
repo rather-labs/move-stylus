@@ -4,7 +4,6 @@ public struct Foo has drop, copy {
     q: address,
     r: vector<u32>,
     s: vector<u128>,
-    /*
     t: bool,
     u: u8,
     v: u16,
@@ -12,6 +11,7 @@ public struct Foo has drop, copy {
     x: u64,
     y: u128,
     z: u256,
+    /*
     bar: Bar,
     baz: Baz,
     */
@@ -35,7 +35,6 @@ public fun structCopy(foo: Foo): (Foo, Foo) {
     foo_2.q = @0xdeadbeef;
     foo_2.r = vector[0, 3, 0, 3, 4, 5, 6];
     foo_2.s = vector[6, 5, 4, 3, 0, 3, 0];
-    /*
     foo_2.t = false;
     foo_2.u = 42;
     foo_2.v = 4242;
@@ -43,6 +42,7 @@ public fun structCopy(foo: Foo): (Foo, Foo) {
     foo_2.x = 42424242;
     foo_2.y = 4242424242;
     foo_2.z = 424242424242;
+    /*
     foo_2.bar.a = 42;
     foo_2.bar.b = 4242;
     foo_2.baz.a = 4242;

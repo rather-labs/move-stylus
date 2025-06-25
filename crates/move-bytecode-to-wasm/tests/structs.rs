@@ -613,7 +613,6 @@ mod struct_copy {
             address q;
             uint32[] r;
             uint128[] s;
-            /*
             bool t;
             uint8 u;
             uint16 v;
@@ -621,6 +620,7 @@ mod struct_copy {
             uint64 x;
             uint128 y;
             uint256 z;
+            /*
             Bar bar;
             Baz baz;
             */
@@ -645,7 +645,6 @@ mod struct_copy {
             q: address!("0xcafe000000000000000000000000000000007357"),
             r: vec![1, 2, u32::MAX],
             s: vec![1, 2, u128::MAX],
-            /*
             t: true,
             u: 255,
             v: u16::MAX,
@@ -653,6 +652,7 @@ mod struct_copy {
             x: u64::MAX,
             y: u128::MAX,
             z: U256::MAX,
+            /*
             bar: Bar { a: u16::MAX, b: u128::MAX },
             baz: Baz {
                 a: 42,
@@ -670,7 +670,6 @@ mod struct_copy {
             q: address!("0xcafe000000000000000000000000000000007357"),
             r: vec![1, 2, u32::MAX],
             s: vec![1, 2, u128::MAX],
-            /*
             t: true,
             u: 255,
             v: u16::MAX,
@@ -678,6 +677,7 @@ mod struct_copy {
             x: u64::MAX,
             y: u128::MAX,
             z: U256::MAX,
+            /*
             bar: Bar { a: u16::MAX, b: u128::MAX },
             baz: Baz {
                 a: 42,
@@ -694,7 +694,6 @@ mod struct_copy {
             q: address!("0x00000000000000000000000000000000deadbeef"),
             r: vec![0, 3, 0, 3, 4, 5, 6],
             s: vec![6, 5, 4, 3, 0, 3, 0],
-            /*
             t: false,
             u: 42,
             v: 4242,
@@ -702,6 +701,7 @@ mod struct_copy {
             x: 42424242,
             y: 4242424242,
             z: U256::from(424242424242_u128),
+            /*
             bar: Bar { a: 42, b: 4242 },
             baz: Baz {
                 a: 4242,

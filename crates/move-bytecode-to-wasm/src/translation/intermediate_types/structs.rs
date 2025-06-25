@@ -272,11 +272,7 @@ impl IStruct {
                         },
                     );
                 }
-                IntermediateType::IU128
-                | IntermediateType::IU256
-                | IntermediateType::IAddress
-                | IntermediateType::ISigner
-                | IntermediateType::IStruct(_) => {
+                IntermediateType::IStruct(_) => {
                     // Load intermediate pointer
                     builder
                         .local_get(original_struct_ptr)
@@ -295,7 +291,11 @@ impl IStruct {
 
                     builder.local_set(ptr_to_data);
                 }
-                IntermediateType::IVector(_) => {
+                IntermediateType::IAddress
+                | IntermediateType::ISigner
+                | IntermediateType::IU128
+                | IntermediateType::IU256
+                | IntermediateType::IVector(_) => {
                     // Load intermediate pointer
                     builder
                         .local_get(original_struct_ptr)
