@@ -298,6 +298,14 @@ impl IntermediateType {
             }
             IntermediateType::IStruct(index) => {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
                 struct_.copy_local_instructions(module, builder, compilation_ctx);
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {

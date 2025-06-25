@@ -194,17 +194,7 @@ impl IStruct {
         let val_64 = module.locals.add(ValType::I64);
         let ptr_to_data = module.locals.add(ValType::I32);
 
-        builder
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_set(original_struct_ptr);
-
+        builder.local_set(original_struct_ptr);
         builder.local_get(original_struct_ptr).call(print_mf);
 
         // Allocate space for the new struct
@@ -272,26 +262,8 @@ impl IStruct {
                         },
                     );
                 }
-                IntermediateType::IStruct(_) => {
-                    // Load intermediate pointer
-                    builder
-                        .local_get(original_struct_ptr)
-                        .load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg { align: 0, offset },
-                        )
-                        .local_set(ptr_to_data);
-
-                    builder.local_get(ptr_to_data).call(print_mf);
-
-                    field.copy_local_instructions(module, builder, compilation_ctx, ptr_to_data);
-
-                    builder.local_get(ptr_to_data).call(print_mf);
-
-                    builder.local_set(ptr_to_data);
-                }
-                IntermediateType::IAddress
+                IntermediateType::IStruct(_)
+                | IntermediateType::IAddress
                 | IntermediateType::ISigner
                 | IntermediateType::IU128
                 | IntermediateType::IU256
