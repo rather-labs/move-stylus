@@ -11,10 +11,8 @@ public struct Foo has drop, copy {
     x: u64,
     y: u128,
     z: u256,
-    /*
     bar: Bar,
     baz: Baz,
-    */
 }
 
 // Static abi sub-struct
@@ -42,12 +40,10 @@ public fun structCopy(foo: Foo): (Foo, Foo) {
     foo_2.x = 42424242;
     foo_2.y = 4242424242;
     foo_2.z = 424242424242;
-    /*
     foo_2.bar.a = 42;
     foo_2.bar.b = 4242;
     foo_2.baz.a = 4242;
-    foo_2.baz.b = vector[3, 1, 4, 1, 5, 9, 2];
-    */
+    foo_2.baz.b = vector[3];
 
     (foo, foo_2)
 }

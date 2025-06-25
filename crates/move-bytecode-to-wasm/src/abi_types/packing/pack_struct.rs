@@ -116,10 +116,6 @@ impl IStruct {
         let data_ptr = module.locals.add(ValType::I32);
         let inner_data_reference = module.locals.add(ValType::I32);
 
-        /*
-        let print_i32 = module.imports.get_func("", "print_i32").unwrap();
-        let print_s = module.imports.get_func("", "print_separator").unwrap();
-        */
         // If base_calldata_reference_ptr is Some(_), means we are packing an struct inside a
         // struct and that the struct is dynamic.
         // base_calldata_reference_pointer is the reference pointer to the original value, and it
@@ -134,23 +130,12 @@ impl IStruct {
                 .local_tee(data_ptr)
                 .local_tee(inner_data_reference);
 
-            /*
-                        block.i32_const(1111111).call(print_i32);
-                        block.local_get(data_ptr).call(print_i32);
-                        block.local_get(inner_data_reference).call(print_i32);
-                        block.local_get(base_calldata_reference_ptr).call(print_i32);
-            */
             // The pointer in the packed data must be relative to the calldata_reference_pointer,
             // so we substract calldata_reference_pointer from the writer_pointer
             block
                 .local_get(base_calldata_reference_ptr)
                 .binop(BinaryOp::I32Sub)
                 .local_set(reference_value);
-
-            /*
-            block.local_get(reference_value).call(print_i32);
-            block.i32_const(111111111).call(print_i32);
-            */
 
             // The result is saved where calldata_reference_pointer is pointing at, the value will
             // be the address where the struct  values are packed, using as origin
@@ -223,6 +208,13 @@ impl IStruct {
             // If the field to pack is a struct, it will be packed dynamically, that means, in the
             // current offset of writer pointer, we are going to write the offset where we can find
             // the struct
+            //
+            // regarding advancement variable
+            // If it is a static struct, the pointer must be advanced the size of the tuple that
+            // represents the struct.
+            // If it is a dynamic struct, we just need to advance the pointer 32 bytes because in the
+            // argument's place there is only a pointer to where the values of the struct are packed
+            // Otherwise we advance 32
             let advancement = if let IntermediateType::IStruct(i) = field {
                 let child_struct = compilation_ctx.get_struct_by_index(*i).unwrap();
                 if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
@@ -261,9 +253,6 @@ impl IStruct {
                 );
                 32
             };
-
-            // block.i32_const(index as i32).call(print_i32);
-            // block.local_get(data_ptr).call(print_i32);
 
             // Add 32 to the data_ptr. If it is a static field it will occupy 32 bytes, if
             // it is a dynamic field, the offset pointing to where to find the values will be

@@ -593,7 +593,6 @@ mod struct_packing_unpacking {
 }
 
 mod struct_copy {
-    use std::u128;
 
     use super::*;
 
@@ -620,10 +619,8 @@ mod struct_copy {
             uint64 x;
             uint128 y;
             uint256 z;
-            /*
             Bar bar;
             Baz baz;
-            */
         }
 
         struct Bar {
@@ -652,18 +649,16 @@ mod struct_copy {
             x: u64::MAX,
             y: u128::MAX,
             z: U256::MAX,
-            /*
-            bar: Bar { a: u16::MAX, b: u128::MAX },
+            bar: Bar {
+                a: u16::MAX - 1,
+                b: u128::MAX
+            },
             baz: Baz {
                 a: 42,
                 b: vec![
                     U256::MAX,
-                    U256::from(8),
-                    U256::from(7),
-                    U256::from(6)
                 ]
             },
-            */
         },)),
         (
         Foo {
@@ -677,18 +672,16 @@ mod struct_copy {
             x: u64::MAX,
             y: u128::MAX,
             z: U256::MAX,
-            /*
-            bar: Bar { a: u16::MAX, b: u128::MAX },
+            bar: Bar {
+                a: u16::MAX - 1,
+                b: u128::MAX
+            },
             baz: Baz {
                 a: 42,
                 b: vec![
                     U256::MAX,
-                    U256::from(8),
-                    U256::from(7),
-                    U256::from(6)
                 ]
             },
-            */
         },
         Foo {
             q: address!("0x00000000000000000000000000000000deadbeef"),
@@ -701,21 +694,16 @@ mod struct_copy {
             x: 42424242,
             y: 4242424242,
             z: U256::from(424242424242_u128),
-            /*
-            bar: Bar { a: 42, b: 4242 },
+            bar: Bar {
+                a: 42,
+                b: 4242
+            },
             baz: Baz {
                 a: 4242,
                 b: vec![
                     U256::from(3),
-                    U256::from(1),
-                    U256::from(4),
-                    U256::from(1),
-                    U256::from(5),
-                    U256::from(9),
-                    U256::from(2),
                 ]
             },
-            */
         }
     ))]
     fn test_struct_copy<T: SolCall, V: SolValue>(
