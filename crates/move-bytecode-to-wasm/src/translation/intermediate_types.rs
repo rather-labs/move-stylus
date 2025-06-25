@@ -475,6 +475,10 @@ impl IntermediateType {
                 builder.i32_const(1); // Length multiplier
                 IVector::copy_local_instructions(inner_type, module, builder, compilation_ctx);
             }
+            IntermediateType::IStruct(index) => {
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                IStruct::copy_local_instructions(struct_, module, builder, compilation_ctx);
+            }
             IntermediateType::ISigner => {
                 // Signer type is read-only, we push the pointer only
             }
@@ -578,21 +582,19 @@ impl IntermediateType {
                     );
                 }
             }
-            IntermediateType::IVector(_) => {
+            // We just update the intermediate pointer, since the new values are already allocated
+            // in memory
+            IntermediateType::IVector(_) | IntermediateType::IStruct(_) => {
                 // Since the memory needed for vectors might differ, we don't overwrite it.
                 // We update the inner pointer to point to the location where the new vector is already allocated.
                 let src_ptr = module.locals.add(ValType::I32);
                 let ref_ptr = module.locals.add(ValType::I32);
 
                 // Swap pointers order in the stack
-                builder
-                    .local_set(ref_ptr)
-                    .local_set(src_ptr)
-                    .local_get(ref_ptr)
-                    .local_get(src_ptr);
+                builder.swap(ref_ptr, src_ptr);
 
                 // Store src_ptr at ref_ptr
-                // Now the inner pointer is updated to point to the new vector
+                // Now the inner pointer is updated to point to the new vector/struct
                 builder.store(
                     compilation_ctx.memory_id,
                     StoreKind::I32 { atomic: false },
@@ -605,7 +607,10 @@ impl IntermediateType {
             IntermediateType::ISigner => {
                 panic!("This type cannot be mutated: {:?}", self);
             }
-            _ => unreachable!(),
+            // TODO: Is this ok?
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                panic!("Cannot mutate a reference of a reference: {:?}", self);
+            }
         }
     }
 

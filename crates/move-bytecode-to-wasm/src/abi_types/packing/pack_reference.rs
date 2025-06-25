@@ -21,6 +21,7 @@ impl IRef {
         match inner {
             // Heap types: just forward the pointer
             IntermediateType::IVector(_)
+            | IntermediateType::IStruct(_)
             | IntermediateType::ISigner
             | IntermediateType::IU128
             | IntermediateType::IU256
@@ -72,7 +73,6 @@ impl IRef {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
-            IntermediateType::IStruct(_) => todo!(),
         }
     }
 }
@@ -94,7 +94,8 @@ impl IMutRef {
             | IntermediateType::ISigner
             | IntermediateType::IU128
             | IntermediateType::IU256
-            | IntermediateType::IAddress => {
+            | IntermediateType::IAddress
+            | IntermediateType::IStruct(_) => {
                 inner.add_pack_instructions(
                     builder,
                     module,
@@ -142,7 +143,6 @@ impl IMutRef {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
-            IntermediateType::IStruct(_) => todo!(),
         }
     }
 }
