@@ -276,7 +276,6 @@ impl IStruct {
                 | IntermediateType::IU256
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
-                | IntermediateType::IVector(_)
                 | IntermediateType::IStruct(_) => {
                     // Load intermediate pointer
                     builder
@@ -291,16 +290,27 @@ impl IStruct {
                     builder.local_get(ptr_to_data).call(print_mf);
 
                     field.copy_local_instructions(module, builder, compilation_ctx, ptr_to_data);
-                    builder.local_set(ptr_to_data);
 
                     builder.local_get(ptr_to_data).call(print_mf);
+
+                    builder.local_set(ptr_to_data);
+                }
+                IntermediateType::IVector(_) => {
+                    // Load intermediate pointer
+                    builder
+                        .local_get(original_struct_ptr)
+                        .i32_const(offset as i32)
+                        .binop(walrus::ir::BinaryOp::I32Add)
+                        .local_set(ptr_to_data);
+
+                    field.copy_local_instructions(module, builder, compilation_ctx, ptr_to_data);
+
+                    builder.local_set(ptr_to_data);
                 }
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                     panic!("references inside structs not allowed")
                 }
             }
-
-            builder.call(print_s);
 
             // Store the middle pointer in the place of the struct field
             builder.local_get(ptr).local_get(ptr_to_data).store(
