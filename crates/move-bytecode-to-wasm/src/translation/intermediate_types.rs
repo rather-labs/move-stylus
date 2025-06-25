@@ -296,13 +296,24 @@ impl IntermediateType {
                 builder.i32_const(1); // This is the length "multiplier", i.e. length * multiplier = capacity
                 IVector::copy_local_instructions(inner_type, module, builder, compilation_ctx);
             }
+            IntermediateType::IStruct(index) => {
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+                struct_.copy_local_instructions(module, builder, compilation_ctx);
+            }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 // Nothing to be done, pointer is already correct
             }
             IntermediateType::ISigner => {
                 panic!(r#"trying to introduce copy instructions for "signer" type"#)
             }
-            IntermediateType::IStruct(_) => todo!(),
         }
     }
 
