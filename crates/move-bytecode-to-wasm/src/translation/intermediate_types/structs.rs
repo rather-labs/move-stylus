@@ -51,7 +51,7 @@ use super::IntermediateType;
 use move_binary_format::file_format::{FieldHandleIndex, StructDefinitionIndex};
 use walrus::{
     InstrSeqBuilder, Module, ValType,
-    ir::{LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 #[derive(Debug)]
@@ -183,9 +183,11 @@ impl IStruct {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
     ) {
+        /*
         let print_i32 = module.imports.get_func("", "print_i32").unwrap();
         let print_mf = module.imports.get_func("", "print_memory_from").unwrap();
         let print_s = module.imports.get_func("", "print_separator").unwrap();
+        */
 
         let original_struct_ptr = module.locals.add(ValType::I32);
         let ptr = module.locals.add(ValType::I32);
@@ -195,14 +197,12 @@ impl IStruct {
         let ptr_to_data = module.locals.add(ValType::I32);
 
         builder.local_set(original_struct_ptr);
-        builder.local_get(original_struct_ptr).call(print_mf);
 
         // Allocate space for the new struct
         builder
             .i32_const(self.heap_size as i32)
             .call(compilation_ctx.allocator)
             .local_set(ptr);
-        builder.local_get(ptr).call(print_i32);
 
         let mut offset = 0;
         for field in &self.fields {
@@ -272,7 +272,7 @@ impl IStruct {
                     builder
                         .local_get(original_struct_ptr)
                         .i32_const(offset as i32)
-                        .binop(walrus::ir::BinaryOp::I32Add)
+                        .binop(BinaryOp::I32Add)
                         .local_set(ptr_to_data);
 
                     field.copy_local_instructions(module, builder, compilation_ctx, ptr_to_data);
@@ -330,7 +330,9 @@ impl IStruct {
                 IntermediateType::IVector(_) => return true,
                 IntermediateType::IStruct(index) => {
                     let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
-                    return struct_.solidity_abi_encode_is_dynamic(compilation_ctx);
+                    if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
+                        return true;
+                    }
                 }
                 IntermediateType::ISigner => panic!("signer is not abi econdable"),
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {

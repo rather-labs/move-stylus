@@ -12,10 +12,15 @@ pub fn pack_i32_type_instructions(
     local: LocalId,
     writer_pointer: LocalId,
 ) {
+    // let print_i32 = module.imports.get_func("", "print_i32").unwrap();
+    // let print_s = module.imports.get_func("", "print_separator").unwrap();
+
     block.local_get(writer_pointer);
+    // block.local_get(writer_pointer).call(print_i32);
 
     // Load the local value to the stack
     block.local_get(local);
+    // block.local_get(local).call(print_i32);
 
     // Little-endian to Big-endian
     let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
@@ -30,6 +35,8 @@ pub fn pack_i32_type_instructions(
             offset: 28,
         },
     );
+
+    // block.call(print_s);
 }
 
 pub fn pack_i64_type_instructions(

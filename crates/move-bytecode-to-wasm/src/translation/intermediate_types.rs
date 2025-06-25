@@ -297,6 +297,7 @@ impl IntermediateType {
                 IVector::copy_local_instructions(inner_type, module, builder, compilation_ctx);
             }
             IntermediateType::IStruct(index) => {
+                println!("copying struct {index}");
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
                 builder.load(
                     compilation_ctx.memory_id,
