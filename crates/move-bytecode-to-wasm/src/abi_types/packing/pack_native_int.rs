@@ -30,8 +30,6 @@ pub fn pack_i32_type_instructions(
             offset: 28,
         },
     );
-
-    // block.call(print_s);
 }
 
 pub fn pack_i64_type_instructions(

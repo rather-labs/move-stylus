@@ -593,7 +593,6 @@ mod struct_packing_unpacking {
 }
 
 mod struct_copy {
-
     use super::*;
 
     #[fixture]

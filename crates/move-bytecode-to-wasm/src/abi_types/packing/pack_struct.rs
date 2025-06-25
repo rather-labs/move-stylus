@@ -208,13 +208,6 @@ impl IStruct {
             // If the field to pack is a struct, it will be packed dynamically, that means, in the
             // current offset of writer pointer, we are going to write the offset where we can find
             // the struct
-            //
-            // regarding advancement variable
-            // If it is a static struct, the pointer must be advanced the size of the tuple that
-            // represents the struct.
-            // If it is a dynamic struct, we just need to advance the pointer 32 bytes because in the
-            // argument's place there is only a pointer to where the values of the struct are packed
-            // Otherwise we advance 32
             let advancement = if let IntermediateType::IStruct(i) = field {
                 let child_struct = compilation_ctx.get_struct_by_index(*i).unwrap();
                 if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
@@ -254,9 +247,16 @@ impl IStruct {
                 32
             };
 
-            // Add 32 to the data_ptr. If it is a static field it will occupy 32 bytes, if
-            // it is a dynamic field, the offset pointing to where to find the values will be
-            // written, also occuping 32 bytes.
+            // The value of advacement depends on the following conditions:
+            // - If the field we are encoding is a static struct, the pointer must be advanced the size
+            //   of the tuple that represents the struct.
+            // - If the field we are encoding is a dynamic struct, we just need to advance the pointer
+            //   32 bytes because in the argument's place there is only a pointer to where the
+            //   struct's values are packed
+            // - If it is not a struct:
+            //   - If it is a static field it will occupy 32 bytes,
+            //   - if it is a dynamic field, the offset pointing to where to find the values will be
+            //     written, also occuping 32 bytes.
             block
                 .i32_const(advancement as i32)
                 .local_get(data_ptr)

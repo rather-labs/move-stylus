@@ -183,12 +183,6 @@ impl IStruct {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
     ) {
-        /*
-        let print_i32 = module.imports.get_func("", "print_i32").unwrap();
-        let print_mf = module.imports.get_func("", "print_memory_from").unwrap();
-        let print_s = module.imports.get_func("", "print_separator").unwrap();
-        */
-
         let original_struct_ptr = module.locals.add(ValType::I32);
         let ptr = module.locals.add(ValType::I32);
 
