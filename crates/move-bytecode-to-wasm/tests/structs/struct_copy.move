@@ -47,3 +47,23 @@ public fun structCopy(foo: Foo): (Foo, Foo) {
 
     (foo, foo_2)
 }
+
+public fun structCopy2(): (Foo, Foo) {
+    let foo_1 = Foo {
+        q: @0xdeadbeef,
+        r : vector[0, 3, 0, 3, 4, 5, 6],
+        s : vector[6, 5, 4, 3, 0, 3, 0],
+        t : false,
+        u : 42,
+        v : 4242,
+        w : 424242,
+        x : 42424242,
+        y : 4242424242,
+        z : 424242424242,
+        bar: Bar { a: 42, b: 4242 },
+        baz: Baz { a: 4242, b: vector[3] },
+    };
+
+    let foo_2 = foo_1;
+    (foo_1, foo_2)
+}
