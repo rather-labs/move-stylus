@@ -11,10 +11,8 @@ public struct Foo has drop, copy {
     x: u64,
     y: u128,
     z: u256,
-    /*
     bar: Bar,
     baz: Baz,
-    */
 }
 
 // Static abi sub-struct
@@ -56,7 +54,6 @@ public fun get_literal(): vector<Foo> {
         x : 142424242,
         y : 14242424242,
         z : 1424242424242,
-        /*
         bar: Bar { a: 142, b: 14242 },
         baz: Baz { a: 14242, b: vector[1] },
       },
@@ -87,7 +84,6 @@ public fun get_literal(): vector<Foo> {
         z : 3424242424242,
         bar: Bar { a: 342, b: 34242 },
         baz: Baz { a: 34242, b: vector[3] },
-        */
       },
   ]
 }

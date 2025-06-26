@@ -1715,7 +1715,6 @@ mod vec_struct {
         struct Foo {
             address q;
             uint32[] r;
-            /*
             uint128[] s;
             bool t;
             uint8 u;
@@ -1726,7 +1725,6 @@ mod vec_struct {
             uint256 z;
             Bar bar;
             Baz baz;
-            */
         }
 
         struct Bar {
@@ -1758,7 +1756,6 @@ mod vec_struct {
         */
     );
 
-    /*
     fn get_foo_vector() -> Vec<Foo> {
         vec![
             Foo {
@@ -1814,19 +1811,33 @@ mod vec_struct {
             },
         ]
     }
-    */
 
     #[rstest]
     /*
     #[case(getConstantCall::new(()), vec![1u128, 2u128, 3u128])]
     #[case(getConstantLocalCall::new(()), vec![1u128, 2u128, 3u128])]
     */
-    // #[case(getLiteralCall::new(()), get_foo_vector())]
+    #[case(getLiteralCall::new(()), get_foo_vector())]
+    /*
     #[case(getLiteralCall::new(()),
         vec![Foo {
             q: address!("0x00000000000000000000000000000001deadbeef"),
-            r: vec![u32::MAX]
+            r: vec![1, 3, 0, 3, 4, 5, 6],
+            s: vec![1, 5, 4, 3, 0, 3, 0],
+            t: true,
+            u: 41,
+            v: 14242,
+            w: 1424242,
+            x: 142424242,
+            y: 14242424242,
+            z: U256::from(1424242424242_u128),
+            bar: Bar { a: 142, b: 14242 },
+            baz: Baz {
+                a: 14242,
+                b: vec![U256::from(1)],
+            },
        }])]
+    */
     /*
     #[case(getCopiedLocalCall::new(()), vec![1u128, 2u128, 3u128])]
     #[case(echoCall::new((vec![1u128, 2u128, 3u128],)), vec![1u128, 2u128, 3u128])]
