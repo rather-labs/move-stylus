@@ -327,9 +327,20 @@ impl IVector {
                     loop_block.i32_const(1); // We dont increase the capacity of nested vectors
                     IVector::copy_local_instructions(inner_, module, loop_block, compilation_ctx);
                 }
-                _ => {
-                    panic!("Unsupported vector type");
+                IntermediateType::IStruct(index) => {
+                    loop_block.load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                    let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                    struct_.copy_local_instructions(module, loop_block, compilation_ctx);
                 }
+                t => panic!("unssuported vector type {t:?}"),
             }
 
             // === Store result from stack into memory ===
