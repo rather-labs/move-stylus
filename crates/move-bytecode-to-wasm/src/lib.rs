@@ -296,7 +296,7 @@ pub fn translate_package_cli(package: CompiledPackage, rerooted_path: &Path) {
     }
 }
 
-// #[cfg(feature = "inject-host-debug-fns")]
+#[cfg(feature = "inject-host-debug-fns")]
 #[macro_export]
 macro_rules! declare_host_debug_functions {
     ($module: ident) => {
