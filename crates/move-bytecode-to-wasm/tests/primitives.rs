@@ -1695,3 +1695,167 @@ mod vec_vec_128 {
         .unwrap();
     }
 }
+
+mod vec_struct {
+    use super::*;
+
+    const MODULE_NAME: &str = "vec_struct";
+    const SOURCE_PATH: &str = "tests/primitives/vec_struct.move";
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+
+        struct Foo {
+            address q;
+            uint32[] r;
+            /*
+            uint128[] s;
+            bool t;
+            uint8 u;
+            uint16 v;
+            uint32 w;
+            uint64 x;
+            uint128 y;
+            uint256 z;
+            Bar bar;
+            Baz baz;
+            */
+        }
+
+        struct Bar {
+            uint16 a;
+            uint128 b;
+        }
+
+        struct Baz {
+            uint16 a;
+            uint256[] b;
+        }
+
+        /*
+        function getConstant() external returns (uint128[]);
+        function getConstantLocal() external returns (uint128[]);
+        */
+        function getLiteral() external returns (Foo[]);
+        /*
+        function getCopiedLocal() external returns (uint128[]);
+        function echo(uint128[] x) external returns (uint128[]);
+        function vecFromInt(uint128 x, uint128 y) external returns (uint128[]);
+        function vecFromVec(uint128[] x, uint128[] y) external returns (uint128[][]);
+        function vecFromVecAndInt(uint128[] x, uint128 y) external returns (uint128[][]);
+        function vecLen(uint128[] x) external returns (uint64);
+        function vecPopBack(uint128[] x) external returns (uint128[]);
+        function vecSwap(uint128[] x, uint64 id1, uint64 id2) external returns (uint128[]);
+        function vecPushBack(uint128[] x, uint128 y) external returns (uint128[]);
+        function vecPushAndPopBack(uint128[] x, uint128 y) external returns (uint128[]);
+        */
+    );
+
+    /*
+    fn get_foo_vector() -> Vec<Foo> {
+        vec![
+            Foo {
+                q: address!("0x00000000000000000000000000000001deadbeef"),
+                r: vec![1, 3, 0, 3, 4, 5, 6],
+                s: vec![1, 5, 4, 3, 0, 3, 0],
+                t: true,
+                u: 41,
+                v: 14242,
+                w: 1424242,
+                x: 142424242,
+                y: 14242424242,
+                z: U256::from(1424242424242_u128),
+                bar: Bar { a: 142, b: 14242 },
+                baz: Baz {
+                    a: 14242,
+                    b: vec![U256::from(1)],
+                },
+            },
+            Foo {
+                q: address!("0x00000000000000000000000000000002deadbeef"),
+                r: vec![2, 3, 0, 3, 4, 5, 6],
+                s: vec![2, 5, 4, 3, 0, 3, 0],
+                t: true,
+                u: 42,
+                v: 24242,
+                w: 2424242,
+                x: 242424242,
+                y: 24242424242,
+                z: U256::from(2424242424242_u128),
+                bar: Bar { a: 242, b: 24242 },
+                baz: Baz {
+                    a: 24242,
+                    b: vec![U256::from(2)],
+                },
+            },
+            Foo {
+                q: address!("0x00000000000000000000000000000003deadbeef"),
+                r: vec![3, 3, 0, 3, 4, 5, 6],
+                s: vec![3, 5, 4, 3, 0, 3, 0],
+                t: true,
+                u: 43,
+                v: 34242,
+                w: 3424242,
+                x: 342424242,
+                y: 34242424242,
+                z: U256::from(3424242424242_u128),
+                bar: Bar { a: 342, b: 34242 },
+                baz: Baz {
+                    a: 34242,
+                    b: vec![U256::from(3)],
+                },
+            },
+        ]
+    }
+    */
+
+    #[rstest]
+    /*
+    #[case(getConstantCall::new(()), vec![1u128, 2u128, 3u128])]
+    #[case(getConstantLocalCall::new(()), vec![1u128, 2u128, 3u128])]
+    */
+    // #[case(getLiteralCall::new(()), get_foo_vector())]
+    #[case(getLiteralCall::new(()),
+        vec![Foo {
+            q: address!("0x00000000000000000000000000000001deadbeef"),
+            r: vec![u32::MAX]
+       }])]
+    /*
+    #[case(getCopiedLocalCall::new(()), vec![1u128, 2u128, 3u128])]
+    #[case(echoCall::new((vec![1u128, 2u128, 3u128],)), vec![1u128, 2u128, 3u128])]
+    #[case(vecFromIntCall::new((1u128, 2u128)), vec![1u128, 2u128, 1u128])]
+    #[case(vecFromVecCall::new((vec![1u128, 2u128, 3u128], vec![4u128, 5u128, 6u128])), vec![vec![1u128, 2u128, 3u128], vec![4u128, 5u128, 6u128]])]
+    #[case(vecFromVecAndIntCall::new((vec![1u128, 2u128, 3u128], 4u128)), vec![vec![1u128, 2u128, 3u128], vec![4u128, 4u128]])]
+    #[case(vecLenCall::new((vec![1u128, 2u128, 3u128],)), (3u64,))]
+    #[case(vecPopBackCall::new((vec![1u128, 2u128, 3u128],)), vec![1u128])]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(vecPopBackCall::new((vec![],)), ((),))]
+    #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
+    #[case(vecSwapCall::new((vec![1u128, 2u128, 3u128], 0u64, 3u64)), ((),))]
+    #[case(vecSwapCall::new((vec![1u128, 2u128, 3u128], 0u64, 1u64)), vec![2u128, 1u128, 3u128])]
+    #[case(vecSwapCall::new((vec![1u128, 2u128, 3u128], 0u64, 2u64)), vec![3u128, 2u128, 1u128])]
+    #[case(vecPushBackCall::new((vec![1u128, 2u128, 3u128], 4u128)), vec![1u128, 2u128, 3u128, 4u128, 4u128])]
+    #[case(vecPushAndPopBackCall::new((vec![1u128, 2u128, 3u128], 4u128)), vec![1u128, 2u128, 3u128])]
+    */
+    fn test_vec_struct<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode_params(),
+        )
+        .unwrap();
+    }
+}

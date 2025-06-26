@@ -332,6 +332,7 @@ impl IntermediateType {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
+            | IntermediateType::IStruct(_)
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
@@ -367,8 +368,6 @@ impl IntermediateType {
 
                 local
             }
-
-            IntermediateType::IStruct(_) => todo!(),
         }
     }
 

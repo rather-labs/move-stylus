@@ -422,6 +422,7 @@ fn map_bytecode_instruction(
                 | IntermediateType::IU256
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
+                | IntermediateType::IStruct(_)
                 | IntermediateType::IVector(_) => {
                     let pop_back_f =
                         RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
@@ -435,7 +436,6 @@ fn map_bytecode_instruction(
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                     panic!("VecPopBack operation is not allowed on reference types");
                 }
-                IntermediateType::IStruct(_) => todo!(),
             }
 
             types_stack.push(*vec_inner);

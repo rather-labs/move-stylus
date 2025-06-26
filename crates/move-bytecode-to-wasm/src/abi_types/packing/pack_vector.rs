@@ -26,9 +26,15 @@ impl IVector {
             compilation_ctx.memory_id,
         );
 
+        let inner_encoded_size = if inner.is_dynamic(compilation_ctx) {
+            32
+        } else {
+            inner.encoded_size(compilation_ctx) as i32
+        };
+
         // Allocate memory for the packed value, this will be allocate at the end of calldata
         block.local_get(length);
-        block.i32_const(inner.encoded_size(compilation_ctx) as i32); // The size of each element
+        block.i32_const(inner_encoded_size); // The size of each element
         block.binop(BinaryOp::I32Mul);
         block.i32_const(32); // The size of the length value itself
         block.binop(BinaryOp::I32Add);
@@ -91,14 +97,25 @@ impl IVector {
                 compilation_ctx.memory_id,
             );
 
-            inner.add_pack_instructions(
-                loop_block,
-                module,
-                inner_local,
-                data_pointer,
-                inner_data_reference,
-                compilation_ctx,
-            );
+            if inner.is_dynamic(compilation_ctx) {
+                inner.add_pack_instructions_dynamic(
+                    loop_block,
+                    module,
+                    inner_local,
+                    data_pointer,
+                    inner_data_reference,
+                    compilation_ctx,
+                );
+            } else {
+                inner.add_pack_instructions(
+                    loop_block,
+                    module,
+                    inner_local,
+                    data_pointer,
+                    inner_data_reference,
+                    compilation_ctx,
+                );
+            }
 
             // increment the local to point to next first value
             loop_block.local_get(local);
@@ -108,7 +125,7 @@ impl IVector {
 
             // increment data pointer
             loop_block.local_get(data_pointer);
-            loop_block.i32_const(inner.encoded_size(compilation_ctx) as i32);
+            loop_block.i32_const(inner_encoded_size);
             loop_block.binop(BinaryOp::I32Add);
             loop_block.local_set(data_pointer);
 

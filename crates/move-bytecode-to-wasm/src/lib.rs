@@ -295,3 +295,16 @@ pub fn translate_package_cli(package: CompiledPackage, rerooted_path: &Path) {
         .expect("Failed to write WAT file");
     }
 }
+
+// #[cfg(feature = "inject-host-debug-fns")]
+#[macro_export]
+macro_rules! declare_host_debug_functions {
+    ($module: ident) => {
+        (
+            $module.imports.get_func("", "print_i32").unwrap(),
+            $module.imports.get_func("", "print_memory_from").unwrap(),
+            $module.imports.get_func("", "print_separator").unwrap(),
+            $module.imports.get_func("", "print_u128").unwrap(),
+        )
+    };
+}
