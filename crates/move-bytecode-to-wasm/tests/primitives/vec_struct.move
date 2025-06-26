@@ -27,19 +27,6 @@ public struct Baz has drop, copy {
     b: vector<u256>,
 }
 
-/*
-const VECTOR_AS_CONST: vector<u64> = vector[1u64, 2u64, 3u64];
-
-public fun get_constant(): vector<u64> {
-  VECTOR_AS_CONST
-}
-
-public fun get_constant_local(): vector<u64> {
-  let x: vector<u64> = VECTOR_AS_CONST;
-  x
-}
-*/
-
 // Forces the compiler to store literals on locals
 public fun get_literal(): vector<Foo> {
   vector[
@@ -157,14 +144,6 @@ public fun vec_from_vec_and_struct(x: vector<Foo>, y: Foo): vector<vector<Foo>> 
   let z = vector[x, vector[y, y]];
   z
 }
-
-
-/*
-public fun ref(x: vector<Foo>): vector<Foo> {
-  let y = &x;
-  *y
-}
-*/
 
 public fun vec_len(x: vector<Foo>): u64 {
   x.length()

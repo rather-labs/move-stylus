@@ -1737,10 +1737,6 @@ mod vec_struct {
             uint256[] b;
         }
 
-        /*
-        function getConstant() external returns (uint128[]);
-        function getConstantLocal() external returns (uint128[]);
-        */
         function getLiteral() external returns (Foo[]);
         function getCopiedLocal() external returns (Foo[]);
         function echo(Foo[] x) external returns (Foo[]);
@@ -1831,10 +1827,6 @@ mod vec_struct {
     }
 
     #[rstest]
-    /*
-    #[case(getConstantCall::new(()), vec![1u128, 2u128, 3u128])]
-    #[case(getConstantLocalCall::new(()), vec![1u128, 2u128, 3u128])]
-    */
     #[case(getLiteralCall::new(()), get_foo_vector())]
     #[case(getCopiedLocalCall::new(()), get_foo_vector())]
     #[case(echoCall::new((get_foo_vector(),)), get_foo_vector())]
