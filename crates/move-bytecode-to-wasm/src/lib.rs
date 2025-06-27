@@ -173,8 +173,16 @@ pub fn translate_package(
                     // Look for the concrete intermediate type of this instance
 
                     let intermediate_type = match &field.signature.0 {
-                        SignatureToken::TypeParameter(index) => {
-                            todo!();
+                        SignatureToken::TypeParameter(concrete_type_idx) => {
+                            let struct_instantiation_types = &root_compiled_module.signatures()
+                                [struct_instance.type_parameters.0 as usize];
+                            let concrete_type =
+                                &struct_instantiation_types.0[*concrete_type_idx as usize];
+                            IntermediateType::try_from_signature_token(
+                                concrete_type,
+                                &datatype_handles_map,
+                            )
+                            .unwrap()
                         }
                         signature_type => IntermediateType::try_from_signature_token(
                             signature_type,
