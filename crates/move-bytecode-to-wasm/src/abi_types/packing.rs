@@ -1,5 +1,7 @@
 use alloy_sol_types::{SolType, sol_data};
-use move_binary_format::file_format::{StructDefInstantiationIndex, StructDefinitionIndex};
+use move_binary_format::file_format::{
+    FieldHandleIndex, FieldInstantiationIndex, StructDefInstantiationIndex, StructDefinitionIndex,
+};
 use pack_native_int::{pack_i32_type_instructions, pack_i64_type_instructions};
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
 
@@ -330,7 +332,8 @@ impl Packable for IntermediateType {
                 compilation_ctx,
             ),
             IntermediateType::IStruct(index) => {
-                IStruct::<StructDefinitionIndex>::add_pack_instructions(
+                // TODO Replace index by get struct
+                IStruct::<StructDefinitionIndex, FieldHandleIndex>::add_pack_instructions(
                     *index,
                     builder,
                     module,
@@ -342,7 +345,8 @@ impl Packable for IntermediateType {
                 )
             }
             IntermediateType::IGenericStructInstance(index) => {
-                IStruct::<StructDefInstantiationIndex>::add_pack_instructions(
+                // TODO Replace index by get struct
+                IStruct::<StructDefInstantiationIndex, FieldInstantiationIndex>::add_pack_instructions(
                     *index,
                     builder,
                     module,
@@ -367,7 +371,8 @@ impl Packable for IntermediateType {
     ) {
         match self {
             IntermediateType::IStruct(index) => {
-                IStruct::<StructDefinitionIndex>::add_pack_instructions(
+                // TODO: Pass diretly struct
+                IStruct::<StructDefinitionIndex, FieldHandleIndex>::add_pack_instructions(
                     *index,
                     builder,
                     module,
@@ -379,7 +384,8 @@ impl Packable for IntermediateType {
                 );
             }
             IntermediateType::IGenericStructInstance(index) => {
-                IStruct::<StructDefInstantiationIndex>::add_pack_instructions(
+                // TODO: Pass diretly struct
+                IStruct::<StructDefInstantiationIndex, FieldInstantiationIndex>::add_pack_instructions(
                     *index,
                     builder,
                     module,

@@ -8,8 +8,8 @@ use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
 use move_binary_format::file_format::{
-    DatatypeHandleIndex, Signature, SignatureToken, StructDefInstantiationIndex,
-    StructDefinitionIndex,
+    DatatypeHandleIndex, FieldHandleIndex, FieldInstantiationIndex, Signature, SignatureToken,
+    StructDefInstantiationIndex, StructDefinitionIndex,
 };
 use simple_integers::{IU8, IU16, IU32, IU64};
 use structs::IStruct;
@@ -780,17 +780,18 @@ impl IntermediateType {
                 builder.i32_const(1);
             }
             Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner),
-            Self::IStruct(index) => {
-                IStruct::<StructDefinitionIndex>::equality(builder, module, compilation_ctx, *index)
-            }
-            Self::IGenericStructInstance(index) => {
-                IStruct::<StructDefInstantiationIndex>::equality(
-                    builder,
-                    module,
-                    compilation_ctx,
-                    *index,
-                )
-            }
+            Self::IStruct(index) => IStruct::<StructDefinitionIndex, FieldHandleIndex>::equality(
+                builder,
+                module,
+                compilation_ctx,
+                *index,
+            ),
+            Self::IGenericStructInstance(index) => IStruct::<
+                StructDefInstantiationIndex,
+                FieldInstantiationIndex,
+            >::equality(
+                builder, module, compilation_ctx, *index
+            ),
             Self::IRef(inner) | Self::IMutRef(inner) => {
                 let ptr1 = module.locals.add(ValType::I32);
                 let ptr2 = module.locals.add(ValType::I32);

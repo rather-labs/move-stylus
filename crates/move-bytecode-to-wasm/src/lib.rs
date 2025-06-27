@@ -4,8 +4,8 @@ use abi_types::public_function::PublicFunction;
 use compilation_context::UserDefinedGenericType;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use move_binary_format::file_format::{
-    DatatypeHandleIndex, FieldHandleIndex, SignatureToken, StructDefInstantiationIndex,
-    StructDefinitionIndex, Visibility,
+    DatatypeHandleIndex, FieldHandleIndex, FieldInstantiationIndex, SignatureToken,
+    StructDefInstantiationIndex, StructDefinitionIndex, Visibility,
 };
 use move_binary_format::internals::ModuleIndex;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
@@ -122,7 +122,7 @@ pub fn translate_package(
         }
 
         // Module's structs
-        let mut module_structs: Vec<IStruct<StructDefinitionIndex>> = vec![];
+        let mut module_structs: Vec<IStruct<StructDefinitionIndex, FieldHandleIndex>> = vec![];
         let mut fields_to_struct_map = HashMap::new();
         'str_defs_loop: for (index, struct_def) in
             root_compiled_module.struct_defs().iter().enumerate()
@@ -175,8 +175,10 @@ pub fn translate_package(
 
         // Process generic structs
 
-        let mut module_generic_structs: Vec<IStruct<StructDefInstantiationIndex>> = vec![];
-        let mut fields_to_struct_map = HashMap::new();
+        let mut module_generic_structs: Vec<
+            IStruct<StructDefInstantiationIndex, FieldInstantiationIndex>,
+        > = vec![];
+        let mut generic_fields_to_struct_map = HashMap::new();
         for (index, struct_instance) in root_compiled_module
             .struct_instantiations()
             .iter()
@@ -187,7 +189,7 @@ pub fn translate_package(
 
             let struct_index = StructDefinitionIndex::new(struct_instance.def.0);
             let generic_struct_index = StructDefInstantiationIndex::new(index as u16);
-            let mut fields_map = HashMap::new();
+            let mut generic_fields_map = HashMap::new();
             let mut all_fields = Vec::new();
 
             if let Some(fields) = generic_struct_definition.fields() {
@@ -220,16 +222,18 @@ pub fn translate_package(
                         .field_handles()
                         .iter()
                         .position(|f| f.field == field_index as u16 && f.owner == struct_index)
-                        .map(|i| FieldHandleIndex::new(i as u16));
+                        .map(|i| FieldInstantiationIndex::new(i as u16));
 
+                    // TODO: Check this...
                     // If field_index is None means the field is never referenced in the code
                     if let Some(field_index) = field_index {
-                        let res = fields_map.insert(field_index, intermediate_type.clone());
+                        let res = generic_fields_map.insert(field_index, intermediate_type.clone());
                         assert!(
                             res.is_none(),
                             "there was an error creating a field in struct {struct_index}, field with index {field_index} already exist"
                         );
-                        let res = fields_to_struct_map.insert(field_index, struct_index);
+                        let res =
+                            generic_fields_to_struct_map.insert(field_index, generic_struct_index);
                         assert!(
                             res.is_none(),
                             "there was an error mapping field {field_index} to struct {struct_index}, already mapped"
@@ -241,7 +245,11 @@ pub fn translate_package(
                 }
             }
 
-            module_generic_structs.push(IStruct::new(generic_struct_index, all_fields, fields_map));
+            module_generic_structs.push(IStruct::new(
+                generic_struct_index,
+                all_fields,
+                generic_fields_map,
+            ));
         }
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
@@ -346,6 +354,7 @@ pub fn translate_package(
             datatype_handles_map: &datatype_handles_map,
             datatype_handles_generics_instances_map: &datatype_handles_generics_instances_map,
             fields_to_struct_map: &fields_to_struct_map,
+            generic_fields_to_struct_map: &generic_fields_to_struct_map,
             memory_id,
             allocator: allocator_func,
         };

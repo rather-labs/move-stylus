@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::translation::intermediate_types::{IntermediateType, structs::IStruct};
 use move_binary_format::file_format::{
-    Constant, DatatypeHandleIndex, FieldHandleIndex, Signature, SignatureToken,
-    StructDefInstantiationIndex, StructDefinitionIndex,
+    Constant, DatatypeHandleIndex, FieldHandleIndex, FieldInstantiationIndex, Signature,
+    SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex,
 };
 use walrus::{FunctionId, MemoryId};
 
@@ -11,7 +11,6 @@ pub enum UserDefinedType {
     Struct(u16),
     Enum(usize),
 }
-
 pub enum UserDefinedGenericType {
     Struct(u16),
     Enum(usize),
@@ -51,14 +50,19 @@ pub struct CompilationContext<'a> {
     pub module_signatures: &'a [Signature],
 
     /// Module's structs: contains all the user defined structs
-    pub module_structs: &'a [IStruct<StructDefinitionIndex>],
+    pub module_structs: &'a [IStruct<StructDefinitionIndex, FieldHandleIndex>],
 
     /// Module's generic structs instances: contains all the user defined generic structs that were
     /// instantiated at least once with concrete types
-    pub module_generic_structs_instances: &'a [IStruct<StructDefInstantiationIndex>],
+    pub module_generic_structs_instances:
+        &'a [IStruct<StructDefInstantiationIndex, FieldInstantiationIndex>],
 
     /// Maps a field index to its corresponding struct
     pub fields_to_struct_map: &'a HashMap<FieldHandleIndex, StructDefinitionIndex>,
+
+    /// Maps a generic field index to its corresponding struct
+    pub generic_fields_to_struct_map:
+        &'a HashMap<FieldInstantiationIndex, StructDefInstantiationIndex>,
 
     /// This Hashmap maps the move's datatype handles to our internal representation of those
     /// types. The datatype handles are used interally by move to look for user defined data
@@ -81,7 +85,7 @@ impl CompilationContext<'_> {
     pub fn get_struct_by_index(
         &self,
         index: u16,
-    ) -> Result<&IStruct<StructDefinitionIndex>, CompilationContextError> {
+    ) -> Result<&IStruct<StructDefinitionIndex, FieldHandleIndex>, CompilationContextError> {
         self.module_structs
             .iter()
             .find(|s| s.index() == index)
@@ -91,7 +95,7 @@ impl CompilationContext<'_> {
     pub fn get_struct_by_field_handle_idx(
         &self,
         field_index: &FieldHandleIndex,
-    ) -> Result<&IStruct<StructDefinitionIndex>, CompilationContextError> {
+    ) -> Result<&IStruct<StructDefinitionIndex, FieldHandleIndex>, CompilationContextError> {
         let struct_id = self.fields_to_struct_map.get(field_index).ok_or(
             CompilationContextError::StructWithFieldIdxNotFound(*field_index),
         )?;
@@ -107,7 +111,7 @@ impl CompilationContext<'_> {
     pub fn get_struct_by_struct_definition_idx(
         &self,
         struct_index: &StructDefinitionIndex,
-    ) -> Result<&IStruct<StructDefinitionIndex>, CompilationContextError> {
+    ) -> Result<&IStruct<StructDefinitionIndex, FieldHandleIndex>, CompilationContextError> {
         self.module_structs
             .iter()
             .find(|s| &s.struct_definition_index == struct_index)
@@ -119,7 +123,10 @@ impl CompilationContext<'_> {
     pub fn get_generic_struct_by_struct_definition_idx(
         &self,
         struct_index: &StructDefInstantiationIndex,
-    ) -> Result<&IStruct<StructDefInstantiationIndex>, CompilationContextError> {
+    ) -> Result<
+        &IStruct<StructDefInstantiationIndex, FieldInstantiationIndex>,
+        CompilationContextError,
+    > {
         self.module_generic_structs_instances
             .iter()
             .find(|s| &s.struct_definition_index == struct_index)

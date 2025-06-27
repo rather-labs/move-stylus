@@ -43,27 +43,31 @@
 //! Because fields are always accessed via references, using pointers uniformly (even for simple
 //! values) simplifies the implementation, reduces special-case logic, and ensures consistent
 //! field management across all types.
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 use crate::CompilationContext;
 
 use super::IntermediateType;
-use move_binary_format::{file_format::FieldHandleIndex, internals::ModuleIndex};
+use move_binary_format::internals::ModuleIndex;
 use walrus::{
     InstrSeqBuilder, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 #[derive(Debug)]
-pub struct IStruct<I: ModuleIndex + Copy> {
+pub struct IStruct<I, FI>
+where
+    I: ModuleIndex + Copy,
+    FI: ModuleIndex + Copy + Eq + Hash,
+{
     /// Field's types ordered by index
     pub fields: Vec<IntermediateType>,
 
     /// Map between handles and fields types
-    pub fields_types: HashMap<FieldHandleIndex, IntermediateType>,
+    pub fields_types: HashMap<FI, IntermediateType>,
 
     /// Map between handles and fields offset
-    pub field_offsets: HashMap<FieldHandleIndex, u32>,
+    pub field_offsets: HashMap<FI, u32>,
 
     /// Move's struct index
     pub struct_definition_index: I,
@@ -73,11 +77,15 @@ pub struct IStruct<I: ModuleIndex + Copy> {
     pub heap_size: u32,
 }
 
-impl<I: ModuleIndex + Copy> IStruct<I> {
+impl<I, FI> IStruct<I, FI>
+where
+    I: ModuleIndex + Copy,
+    FI: ModuleIndex + Copy + Eq + Hash,
+{
     pub fn new(
         index: I,
-        fields: Vec<(Option<FieldHandleIndex>, IntermediateType)>,
-        fields_types: HashMap<FieldHandleIndex, IntermediateType>,
+        fields: Vec<(Option<FI>, IntermediateType)>,
+        fields_types: HashMap<FI, IntermediateType>,
     ) -> Self {
         let mut heap_size = 0;
         let mut field_offsets = HashMap::new();

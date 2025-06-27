@@ -118,6 +118,7 @@ macro_rules! test_compilation_context {
             datatype_handles_map: &std::collections::HashMap::new(),
             datatype_handles_generics_instances_map: &std::collections::HashMap::new(),
             fields_to_struct_map: &std::collections::HashMap::new(),
+            generic_fields_to_struct_map: &std::collections::HashMap::new(),
             memory_id: $memory_id,
             allocator: $allocator,
         }

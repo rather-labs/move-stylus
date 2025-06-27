@@ -1,4 +1,6 @@
-use move_binary_format::file_format::{StructDefInstantiationIndex, StructDefinitionIndex};
+use move_binary_format::file_format::{
+    FieldHandleIndex, FieldInstantiationIndex, StructDefInstantiationIndex, StructDefinitionIndex,
+};
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
@@ -165,8 +167,9 @@ impl Unpackable for IntermediateType {
                 calldata_reader_pointer,
                 compilation_ctx,
             ),
+            // TODO: pass directly struct to functions
             IntermediateType::IStruct(index) => {
-                IStruct::<StructDefinitionIndex>::add_unpack_instructions(
+                IStruct::<StructDefinitionIndex, FieldHandleIndex>::add_unpack_instructions(
                     *index,
                     function_builder,
                     module,
@@ -175,16 +178,17 @@ impl Unpackable for IntermediateType {
                     compilation_ctx,
                 )
             }
-            IntermediateType::IGenericStructInstance(index) => {
-                IStruct::<StructDefInstantiationIndex>::add_unpack_instructions(
-                    *index,
-                    function_builder,
-                    module,
-                    reader_pointer,
-                    calldata_reader_pointer,
-                    compilation_ctx,
-                )
-            }
+            IntermediateType::IGenericStructInstance(index) => IStruct::<
+                StructDefInstantiationIndex,
+                FieldInstantiationIndex,
+            >::add_unpack_instructions(
+                *index,
+                function_builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                compilation_ctx,
+            ),
         }
     }
 }

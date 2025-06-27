@@ -66,6 +66,7 @@
 //! For more information:
 //! https://docs.soliditylang.org/en/develop/abi-spec.html#formal-specification-of-the-encoding
 use move_binary_format::internals::ModuleIndex;
+use std::hash::Hash;
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
@@ -80,7 +81,11 @@ use crate::{
 
 use super::Unpackable;
 
-impl<I: ModuleIndex + Copy> IStruct<I> {
+impl<I, FI> IStruct<I, FI>
+where
+    I: ModuleIndex + Copy,
+    FI: ModuleIndex + Copy + Eq + Hash,
+{
     pub fn add_unpack_instructions(
         index: u16,
         builder: &mut InstrSeqBuilder,
@@ -89,6 +94,7 @@ impl<I: ModuleIndex + Copy> IStruct<I> {
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) {
+        // TODO: Generic struct case
         let struct_ = compilation_ctx.get_struct_by_index(index).unwrap();
 
         let struct_ptr = module.locals.add(ValType::I32);
@@ -229,6 +235,7 @@ impl<I: ModuleIndex + Copy> IStruct<I> {
         let advancement = if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
             32
         } else {
+            // TODO: Generic struct case
             IntermediateType::IStruct(index).encoded_size(compilation_ctx) as i32
         };
 

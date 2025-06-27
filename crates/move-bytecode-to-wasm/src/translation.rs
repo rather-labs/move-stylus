@@ -9,6 +9,7 @@ use intermediate_types::structs::IStruct;
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
 use move_binary_format::internals::ModuleIndex;
+use std::hash::Hash;
 use table::FunctionTable;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{FunctionBuilder, Module};
@@ -1082,13 +1083,16 @@ fn map_bytecode_instruction(
     }
 }
 
-fn pack_struct<I: ModuleIndex + Copy>(
-    struct_: &IStruct<I>,
+fn pack_struct<I, FI>(
+    struct_: &IStruct<I, FI>,
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     types_stack: &mut Vec<IntermediateType>,
-) {
+) where
+    I: ModuleIndex + Copy,
+    FI: ModuleIndex + Copy + Eq + Hash,
+{
     // Pointer to the struct
     let pointer = module.locals.add(ValType::I32);
     // Pointer for simple types
