@@ -2,12 +2,17 @@ use std::collections::HashMap;
 
 use crate::translation::intermediate_types::{IntermediateType, structs::IStruct};
 use move_binary_format::file_format::{
-    Constant, DatatypeHandleIndex, FieldHandleIndex, Signature, StructDefInstantiationIndex,
-    StructDefinitionIndex,
+    Constant, DatatypeHandleIndex, FieldHandleIndex, Signature, SignatureToken,
+    StructDefInstantiationIndex, StructDefinitionIndex,
 };
 use walrus::{FunctionId, MemoryId};
 
 pub enum UserDefinedType {
+    Struct(u16),
+    Enum(usize),
+}
+
+pub enum UserDefinedGenericType {
     Struct(u16),
     Enum(usize),
 }
@@ -52,10 +57,15 @@ pub struct CompilationContext<'a> {
     /// Maps a field index to its corresponding struct
     pub fields_to_struct_map: &'a HashMap<FieldHandleIndex, StructDefinitionIndex>,
 
-    // This Hashmap maps the move's datatype handles to our internal representation of those
-    // types. The datatype handles are used interally by move to look for user defined data
-    // types
+    /// This Hashmap maps the move's datatype handles to our internal representation of those
+    /// types. The datatype handles are used interally by move to look for user defined data
+    /// types
     pub datatype_handles_map: &'a HashMap<DatatypeHandleIndex, UserDefinedType>,
+
+    // This HashMap maps the move's datatype habdles to our internal representation of the
+    // instantiated generic types.
+    pub datatype_handles_generics_instances_map:
+        &'a HashMap<(DatatypeHandleIndex, Vec<SignatureToken>), UserDefinedGenericType>,
 
     /// WASM memory id
     pub memory_id: MemoryId,

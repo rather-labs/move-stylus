@@ -1,6 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
+use compilation_context::UserDefinedGenericType;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use move_binary_format::file_format::{
     DatatypeHandleIndex, FieldHandleIndex, SignatureToken, StructDefInstantiationIndex,
@@ -67,6 +68,7 @@ pub fn translate_package(
         );
 
         let mut datatype_handles_map = HashMap::new();
+        let mut datatype_handles_generics_instances_map = HashMap::new();
 
         for (index, datatype_handle) in root_compiled_module.datatype_handles().iter().enumerate() {
             let idx = DatatypeHandleIndex::new(index as u16);
@@ -77,27 +79,46 @@ pub fn translate_package(
                 root_compiled_module.datatype_handles()[idx.into_index()]
             );
 
-            let addition_result = if let Some(position) = root_compiled_module
+            if let Some(position) = root_compiled_module
                 .struct_defs()
                 .iter()
                 .position(|s| s.struct_handle == idx)
             {
-                datatype_handles_map.insert(idx, UserDefinedType::Struct(position as u16))
+                let struct_ = &root_compiled_module.struct_defs()[position];
+                if struct_
+                    .fields()
+                    .unwrap_or_default()
+                    .iter()
+                    .any(|f| matches!(f.signature.0, SignatureToken::TypeParameter(_)))
+                {
+                    for (index, generic_struct) in root_compiled_module
+                        .struct_instantiations()
+                        .iter()
+                        .enumerate()
+                    {
+                        if generic_struct.def == StructDefinitionIndex::new(position as u16) {
+                            let struct_instantiation_types = &root_compiled_module.signatures()
+                                [generic_struct.type_parameters.0 as usize]
+                                .0;
+
+                            datatype_handles_generics_instances_map.insert(
+                                (idx, struct_instantiation_types.to_vec()),
+                                UserDefinedGenericType::Struct(index as u16),
+                            );
+                        }
+                    }
+                } else {
+                    datatype_handles_map.insert(idx, UserDefinedType::Struct(position as u16));
+                }
             } else if let Some(position) = root_compiled_module
                 .enum_defs()
                 .iter()
                 .position(|e| e.enum_handle == idx)
             {
-                datatype_handles_map.insert(idx, UserDefinedType::Enum(position))
+                datatype_handles_map.insert(idx, UserDefinedType::Enum(position));
             } else {
                 panic!("datatype handle index {index} not found");
             };
-
-            assert!(
-                addition_result.is_none(),
-                "user defined data with handle {:?} already defined",
-                idx
-            );
         }
 
         // Module's structs
@@ -120,6 +141,7 @@ pub fn translate_package(
                     let intermediate_type = IntermediateType::try_from_signature_token(
                         &field.signature.0,
                         &datatype_handles_map,
+                        &datatype_handles_generics_instances_map,
                     )
                     .unwrap();
 
@@ -178,15 +200,18 @@ pub fn translate_package(
                                 [struct_instance.type_parameters.0 as usize];
                             let concrete_type =
                                 &struct_instantiation_types.0[*concrete_type_idx as usize];
+
                             IntermediateType::try_from_signature_token(
                                 concrete_type,
                                 &datatype_handles_map,
+                                &datatype_handles_generics_instances_map,
                             )
                             .unwrap()
                         }
                         signature_type => IntermediateType::try_from_signature_token(
                             signature_type,
                             &datatype_handles_map,
+                            &datatype_handles_generics_instances_map,
                         )
                         .unwrap(),
                     };
@@ -261,7 +286,13 @@ pub fn translate_package(
                 move_function_arguments
                     .0
                     .iter()
-                    .map(|s| IntermediateType::try_from_signature_token(s, &datatype_handles_map))
+                    .map(|s| {
+                        IntermediateType::try_from_signature_token(
+                            s,
+                            &datatype_handles_map,
+                            &datatype_handles_generics_instances_map,
+                        )
+                    })
                     .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
                     .unwrap(),
             );
@@ -273,7 +304,13 @@ pub fn translate_package(
                 move_function_return
                     .0
                     .iter()
-                    .map(|s| IntermediateType::try_from_signature_token(s, &datatype_handles_map))
+                    .map(|s| {
+                        IntermediateType::try_from_signature_token(
+                            s,
+                            &datatype_handles_map,
+                            &datatype_handles_generics_instances_map,
+                        )
+                    })
                     .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
                     .unwrap(),
             );
@@ -292,6 +329,7 @@ pub fn translate_package(
                 code_locals,
                 function_def,
                 &datatype_handles_map,
+                &datatype_handles_generics_instances_map,
                 &mut module,
             );
 
@@ -306,6 +344,7 @@ pub fn translate_package(
             module_structs: &module_structs,
             module_generic_structs_instances: &module_generic_structs,
             datatype_handles_map: &datatype_handles_map,
+            datatype_handles_generics_instances_map: &datatype_handles_generics_instances_map,
             fields_to_struct_map: &fields_to_struct_map,
             memory_id,
             allocator: allocator_func,

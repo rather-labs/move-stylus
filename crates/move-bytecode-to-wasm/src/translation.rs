@@ -89,6 +89,7 @@ fn map_bytecode_instruction(
             let constant_type: IntermediateType = IntermediateType::try_from_signature_token(
                 constant_type,
                 compilation_ctx.datatype_handles_map,
+                compilation_ctx.datatype_handles_generics_instances_map,
             )
             .unwrap();
 
@@ -1189,6 +1190,7 @@ fn get_ir_for_signature_index(
     IntermediateType::try_from_signature_token(
         &signature_token[0],
         compilation_ctx.datatype_handles_map,
+        compilation_ctx.datatype_handles_generics_instances_map,
     )
     .unwrap()
 }
