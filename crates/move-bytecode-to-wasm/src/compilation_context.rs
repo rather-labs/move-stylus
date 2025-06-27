@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use crate::translation::intermediate_types::{IntermediateType, structs::IStruct};
 use move_binary_format::file_format::{
-    Constant, DatatypeHandleIndex, FieldHandleIndex, Signature, StructDefinitionIndex,
+    Constant, DatatypeHandleIndex, FieldHandleIndex, Signature, StructDefInstantiationIndex,
+    StructDefinitionIndex,
 };
 use walrus::{FunctionId, MemoryId};
 
@@ -43,6 +44,10 @@ pub struct CompilationContext<'a> {
 
     /// Module's structs: contains all the user defined structs
     pub module_structs: &'a [IStruct<StructDefinitionIndex>],
+
+    /// Module's generic structs instances: contains all the user defined generic structs that were
+    /// instantiated at least once with concrete types
+    pub module_generic_structs_instances: &'a [IStruct<StructDefInstantiationIndex>],
 
     /// Maps a field index to its corresponding struct
     pub fields_to_struct_map: &'a HashMap<FieldHandleIndex, StructDefinitionIndex>,

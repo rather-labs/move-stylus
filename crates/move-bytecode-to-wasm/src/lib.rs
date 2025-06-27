@@ -304,6 +304,7 @@ pub fn translate_package(
             functions_returns: &functions_returns,
             module_signatures: &root_compiled_module.signatures,
             module_structs: &module_structs,
+            module_generic_structs_instances: &module_generic_structs,
             datatype_handles_map: &datatype_handles_map,
             fields_to_struct_map: &fields_to_struct_map,
             memory_id,
