@@ -82,6 +82,7 @@
 //!
 //! For more information:
 //! https://docs.soliditylang.org/en/develop/abi-spec.html#formal-specification-of-the-encodinguse walrus::{
+use move_binary_format::internals::ModuleIndex;
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg},
@@ -95,7 +96,7 @@ use crate::{
 
 use super::Packable;
 
-impl IStruct {
+impl<I: ModuleIndex + Copy> IStruct<I> {
     #[allow(clippy::too_many_arguments)]
     pub fn add_pack_instructions(
         index: u16,
@@ -211,7 +212,7 @@ impl IStruct {
             let advancement = if let IntermediateType::IStruct(i) = field {
                 let child_struct = compilation_ctx.get_struct_by_index(*i).unwrap();
                 if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                    IStruct::add_pack_instructions(
+                    IStruct::<I>::add_pack_instructions(
                         *i,
                         block,
                         module,
@@ -223,7 +224,7 @@ impl IStruct {
                     );
                     32
                 } else {
-                    IStruct::add_pack_instructions(
+                    IStruct::<I>::add_pack_instructions(
                         *i,
                         block,
                         module,

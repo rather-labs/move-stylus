@@ -1,4 +1,5 @@
 use alloy_sol_types::{SolType, sol_data};
+use move_binary_format::file_format::StructDefinitionIndex;
 use pack_native_int::{pack_i32_type_instructions, pack_i64_type_instructions};
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
 
@@ -327,16 +328,18 @@ impl Packable for IntermediateType {
                 calldata_reference_pointer,
                 compilation_ctx,
             ),
-            IntermediateType::IStruct(index) => IStruct::add_pack_instructions(
-                *index,
-                builder,
-                module,
-                local,
-                writer_pointer,
-                calldata_reference_pointer,
-                compilation_ctx,
-                None,
-            ),
+            IntermediateType::IStruct(index) => {
+                IStruct::<StructDefinitionIndex>::add_pack_instructions(
+                    *index,
+                    builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    compilation_ctx,
+                    None,
+                )
+            }
         }
     }
 
@@ -351,7 +354,7 @@ impl Packable for IntermediateType {
     ) {
         match self {
             IntermediateType::IStruct(index) => {
-                IStruct::add_pack_instructions(
+                IStruct::<StructDefinitionIndex>::add_pack_instructions(
                     *index,
                     builder,
                     module,

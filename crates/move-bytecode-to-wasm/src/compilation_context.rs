@@ -42,7 +42,7 @@ pub struct CompilationContext<'a> {
     pub module_signatures: &'a [Signature],
 
     /// Module's structs: contains all the user defined structs
-    pub module_structs: &'a [IStruct],
+    pub module_structs: &'a [IStruct<StructDefinitionIndex>],
 
     /// Maps a field index to its corresponding struct
     pub fields_to_struct_map: &'a HashMap<FieldHandleIndex, StructDefinitionIndex>,
@@ -60,7 +60,10 @@ pub struct CompilationContext<'a> {
 }
 
 impl CompilationContext<'_> {
-    pub fn get_struct_by_index(&self, index: u16) -> Result<&IStruct, CompilationContextError> {
+    pub fn get_struct_by_index(
+        &self,
+        index: u16,
+    ) -> Result<&IStruct<StructDefinitionIndex>, CompilationContextError> {
         self.module_structs
             .iter()
             .find(|s| s.index() == index)
@@ -70,7 +73,7 @@ impl CompilationContext<'_> {
     pub fn get_struct_by_field_handle_idx(
         &self,
         field_index: &FieldHandleIndex,
-    ) -> Result<&IStruct, CompilationContextError> {
+    ) -> Result<&IStruct<StructDefinitionIndex>, CompilationContextError> {
         let struct_id = self.fields_to_struct_map.get(field_index).ok_or(
             CompilationContextError::StructWithFieldIdxNotFound(*field_index),
         )?;
@@ -86,7 +89,7 @@ impl CompilationContext<'_> {
     pub fn get_struct_by_struct_definition_idx(
         &self,
         struct_index: &StructDefinitionIndex,
-    ) -> Result<&IStruct, CompilationContextError> {
+    ) -> Result<&IStruct<StructDefinitionIndex>, CompilationContextError> {
         self.module_structs
             .iter()
             .find(|s| &s.struct_definition_index == struct_index)

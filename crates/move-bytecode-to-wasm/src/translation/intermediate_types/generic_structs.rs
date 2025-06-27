@@ -48,14 +48,14 @@ use std::collections::HashMap;
 use crate::CompilationContext;
 
 use super::IntermediateType;
-use move_binary_format::{file_format::FieldHandleIndex, internals::ModuleIndex};
+use move_binary_format::file_format::{FieldHandleIndex, StructDefinitionIndex};
 use walrus::{
     InstrSeqBuilder, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 #[derive(Debug)]
-pub struct IStruct<I: ModuleIndex + Copy> {
+pub struct IStruct {
     /// Field's types ordered by index
     pub fields: Vec<IntermediateType>,
 
@@ -66,16 +66,16 @@ pub struct IStruct<I: ModuleIndex + Copy> {
     pub field_offsets: HashMap<FieldHandleIndex, u32>,
 
     /// Move's struct index
-    pub struct_definition_index: I,
+    pub struct_definition_index: StructDefinitionIndex,
 
     /// How much memory this struct occupies (in bytes). This will be the quantity of fields *4
     /// because we save pointers for all data types (stack or heap).
     pub heap_size: u32,
 }
 
-impl<I: ModuleIndex + Copy> IStruct<I> {
+impl IStruct {
     pub fn new(
-        index: I,
+        index: StructDefinitionIndex,
         fields: Vec<(Option<FieldHandleIndex>, IntermediateType)>,
         fields_types: HashMap<FieldHandleIndex, IntermediateType>,
     ) -> Self {
@@ -292,7 +292,7 @@ impl<I: ModuleIndex + Copy> IStruct<I> {
     }
 
     pub fn index(&self) -> u16 {
-        self.struct_definition_index.into_index() as u16
+        self.struct_definition_index.0
     }
 
     /// According to the formal specification of the encoding, a tuple (T1,...,Tk) is dynamic if

@@ -65,6 +65,7 @@
 //!
 //! For more information:
 //! https://docs.soliditylang.org/en/develop/abi-spec.html#formal-specification-of-the-encoding
+use move_binary_format::internals::ModuleIndex;
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
@@ -79,7 +80,7 @@ use crate::{
 
 use super::Unpackable;
 
-impl IStruct {
+impl<I: ModuleIndex + Copy> IStruct<I> {
     pub fn add_unpack_instructions(
         index: u16,
         builder: &mut InstrSeqBuilder,

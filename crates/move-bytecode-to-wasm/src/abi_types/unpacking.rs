@@ -1,3 +1,4 @@
+use move_binary_format::file_format::StructDefinitionIndex;
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
@@ -164,14 +165,16 @@ impl Unpackable for IntermediateType {
                 calldata_reader_pointer,
                 compilation_ctx,
             ),
-            IntermediateType::IStruct(index) => IStruct::add_unpack_instructions(
-                *index,
-                function_builder,
-                module,
-                reader_pointer,
-                calldata_reader_pointer,
-                compilation_ctx,
-            ),
+            IntermediateType::IStruct(index) => {
+                IStruct::<StructDefinitionIndex>::add_unpack_instructions(
+                    *index,
+                    function_builder,
+                    module,
+                    reader_pointer,
+                    calldata_reader_pointer,
+                    compilation_ctx,
+                )
+            }
         }
     }
 }

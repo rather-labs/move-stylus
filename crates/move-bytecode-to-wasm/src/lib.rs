@@ -3,7 +3,8 @@ use std::{collections::HashMap, path::Path};
 use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use move_binary_format::file_format::{
-    DatatypeHandleIndex, FieldHandleIndex, StructDefinitionIndex, Visibility,
+    DatatypeHandleIndex, FieldHandleIndex, SignatureToken, StructDefInstantiationIndex,
+    StructDefinitionIndex, Visibility,
 };
 use move_binary_format::internals::ModuleIndex;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
@@ -100,14 +101,22 @@ pub fn translate_package(
         }
 
         // Module's structs
-        let mut module_structs: Vec<IStruct> = vec![];
+        let mut module_structs: Vec<IStruct<StructDefinitionIndex>> = vec![];
         let mut fields_to_struct_map = HashMap::new();
-        for (index, struct_def) in root_compiled_module.struct_defs().iter().enumerate() {
+        'str_defs_loop: for (index, struct_def) in
+            root_compiled_module.struct_defs().iter().enumerate()
+        {
             let struct_index = StructDefinitionIndex::new(index as u16);
             let mut fields_map = HashMap::new();
             let mut all_fields = Vec::new();
             if let Some(fields) = struct_def.fields() {
                 for (field_index, field) in fields.iter().enumerate() {
+                    // If the struct contains a generic field, we continue the outer loop. Generic
+                    // structs are processed in other place
+                    if let &SignatureToken::TypeParameter(_) = &field.signature.0 {
+                        continue 'str_defs_loop;
+                    }
+
                     let intermediate_type = IntermediateType::try_from_signature_token(
                         &field.signature.0,
                         &datatype_handles_map,
@@ -140,6 +149,66 @@ pub fn translate_package(
             }
 
             module_structs.push(IStruct::new(struct_index, all_fields, fields_map));
+        }
+
+        // Process generic structs
+
+        let mut module_generic_structs: Vec<IStruct<StructDefInstantiationIndex>> = vec![];
+        let mut fields_to_struct_map = HashMap::new();
+        for (index, struct_instance) in root_compiled_module
+            .struct_instantiations()
+            .iter()
+            .enumerate()
+        {
+            let generic_struct_definition =
+                &root_compiled_module.struct_defs()[struct_instance.def.0 as usize];
+
+            let struct_index = StructDefinitionIndex::new(struct_instance.def.0);
+            let generic_struct_index = StructDefInstantiationIndex::new(index as u16);
+            let mut fields_map = HashMap::new();
+            let mut all_fields = Vec::new();
+
+            if let Some(fields) = generic_struct_definition.fields() {
+                for (field_index, field) in fields.iter().enumerate() {
+                    // Look for the concrete intermediate type of this instance
+
+                    let intermediate_type = match &field.signature.0 {
+                        SignatureToken::TypeParameter(index) => {
+                            todo!();
+                        }
+                        signature_type => IntermediateType::try_from_signature_token(
+                            signature_type,
+                            &datatype_handles_map,
+                        )
+                        .unwrap(),
+                    };
+
+                    let field_index = root_compiled_module
+                        .field_handles()
+                        .iter()
+                        .position(|f| f.field == field_index as u16 && f.owner == struct_index)
+                        .map(|i| FieldHandleIndex::new(i as u16));
+
+                    // If field_index is None means the field is never referenced in the code
+                    if let Some(field_index) = field_index {
+                        let res = fields_map.insert(field_index, intermediate_type.clone());
+                        assert!(
+                            res.is_none(),
+                            "there was an error creating a field in struct {struct_index}, field with index {field_index} already exist"
+                        );
+                        let res = fields_to_struct_map.insert(field_index, struct_index);
+                        assert!(
+                            res.is_none(),
+                            "there was an error mapping field {field_index} to struct {struct_index}, already mapped"
+                        );
+                        all_fields.push((Some(field_index), intermediate_type));
+                    } else {
+                        all_fields.push((None, intermediate_type));
+                    }
+                }
+            }
+
+            module_generic_structs.push(IStruct::new(generic_struct_index, all_fields, fields_map));
         }
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
