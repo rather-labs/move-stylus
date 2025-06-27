@@ -431,7 +431,8 @@ impl IVector {
                     t @ (IntermediateType::IU128
                     | IntermediateType::IU256
                     | IntermediateType::IAddress
-                    | IntermediateType::IStruct(_)) => {
+                    | IntermediateType::IStruct(_)
+                    | IntermediateType::IGenericStructInstance(_)) => {
                         let vec_equality_heap_type_f_id =
                             RuntimeFunction::VecEqualityHeapType.get(module, Some(compilation_ctx));
 
@@ -616,7 +617,8 @@ impl IVector {
             | IntermediateType::IU256
             | IntermediateType::ISigner
             | IntermediateType::IAddress
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => {
                 builder.call(downcast_f);
                 builder.i32_const(1);
             }

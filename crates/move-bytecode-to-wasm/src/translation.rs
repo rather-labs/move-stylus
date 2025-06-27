@@ -423,6 +423,7 @@ fn map_bytecode_instruction(
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
                 | IntermediateType::IStruct(_)
+                | IntermediateType::IGenericStructInstance(_)
                 | IntermediateType::IVector(_) => {
                     let pop_back_f =
                         RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
@@ -1117,7 +1118,8 @@ fn map_bytecode_instruction(
                             | IntermediateType::IAddress
                             | IntermediateType::ISigner
                             | IntermediateType::IVector(_)
-                            | IntermediateType::IStruct(_) => {
+                            | IntermediateType::IStruct(_)
+                            | IntermediateType::IGenericStructInstance(_) => {
                                 builder.local_set(ptr_to_data);
                             }
                             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {

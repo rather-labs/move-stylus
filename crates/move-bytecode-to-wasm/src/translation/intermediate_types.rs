@@ -8,7 +8,8 @@ use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
 use move_binary_format::file_format::{
-    DatatypeHandleIndex, Signature, SignatureToken, StructDefinitionIndex,
+    DatatypeHandleIndex, Signature, SignatureToken, StructDefInstantiationIndex,
+    StructDefinitionIndex,
 };
 use simple_integers::{IU8, IU16, IU32, IU64};
 use structs::IStruct;
@@ -43,6 +44,7 @@ pub enum IntermediateType {
     IMutRef(Box<IntermediateType>),
     // The usize is the struct's index in the compilation context's vector of declared structs
     IStruct(u16),
+    IGenericStructInstance(u16),
 }
 
 impl IntermediateType {
@@ -61,7 +63,8 @@ impl IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_) => 4,
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => 4,
         }
     }
 
@@ -140,7 +143,9 @@ impl IntermediateType {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("cannot load a constant for a reference type");
             }
-            IntermediateType::IStruct(_) => panic!("structs can't be loaded as constants"),
+            IntermediateType::IStruct(_) | IntermediateType::IGenericStructInstance(_) => {
+                panic!("structs can't be loaded as constants")
+            }
         }
     }
 
@@ -198,7 +203,8 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => {
                 builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -310,6 +316,7 @@ impl IntermediateType {
                 );
                 struct_.copy_local_instructions(module, builder, compilation_ctx);
             }
+            IntermediateType::IGenericStructInstance(_) => todo!(),
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 // Nothing to be done, pointer is already correct
             }
@@ -335,6 +342,7 @@ impl IntermediateType {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_)
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
@@ -392,7 +400,8 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -417,7 +426,8 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IAddress
             | IntermediateType::IVector(_)
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => {
                 builder.local_get(local);
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -480,6 +490,7 @@ impl IntermediateType {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
                 IStruct::copy_local_instructions(struct_, module, builder, compilation_ctx);
             }
+            IntermediateType::IGenericStructInstance(_) => todo!(),
             IntermediateType::ISigner => {
                 // Signer type is read-only, we push the pointer only
             }
@@ -585,7 +596,9 @@ impl IntermediateType {
             }
             // We just update the intermediate pointer, since the new values are already allocated
             // in memory
-            IntermediateType::IVector(_) | IntermediateType::IStruct(_) => {
+            IntermediateType::IVector(_)
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => {
                 // Since the memory needed for vectors might differ, we don't overwrite it.
                 // We update the inner pointer to point to the location where the new vector is already allocated.
                 let src_ptr = module.locals.add(ValType::I32);
@@ -693,7 +706,8 @@ impl IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => {
                 let ptr = module.locals.add(ValType::I32);
                 builder
                     .local_set(ptr)
@@ -738,6 +752,14 @@ impl IntermediateType {
             Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner),
             Self::IStruct(index) => {
                 IStruct::<StructDefinitionIndex>::equality(builder, module, compilation_ctx, *index)
+            }
+            Self::IGenericStructInstance(index) => {
+                IStruct::<StructDefInstantiationIndex>::equality(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    *index,
+                )
             }
             Self::IRef(inner) | Self::IMutRef(inner) => {
                 let ptr1 = module.locals.add(ValType::I32);
@@ -806,7 +828,8 @@ impl IntermediateType {
                     | IntermediateType::IAddress
                     | IntermediateType::ISigner
                     | IntermediateType::IVector(_)
-                    | IntermediateType::IStruct(_) => {
+                    | IntermediateType::IStruct(_)
+                    | IntermediateType::IGenericStructInstance(_) => {
                         builder.local_get(ptr1).local_get(ptr2);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -845,7 +868,8 @@ impl IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_) => false,
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => false,
         }
     }
 }
@@ -865,7 +889,8 @@ impl From<&IntermediateType> for ValType {
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_) => ValType::I32,
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => ValType::I32,
         }
     }
 }

@@ -1,5 +1,5 @@
 use alloy_sol_types::{SolType, sol_data};
-use move_binary_format::file_format::StructDefinitionIndex;
+use move_binary_format::file_format::{StructDefInstantiationIndex, StructDefinitionIndex};
 use pack_native_int::{pack_i32_type_instructions, pack_i64_type_instructions};
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
 
@@ -229,7 +229,8 @@ impl Packable for IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -340,6 +341,18 @@ impl Packable for IntermediateType {
                     None,
                 )
             }
+            IntermediateType::IGenericStructInstance(index) => {
+                IStruct::<StructDefInstantiationIndex>::add_pack_instructions(
+                    *index,
+                    builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    compilation_ctx,
+                    None,
+                )
+            }
         }
     }
 
@@ -355,6 +368,18 @@ impl Packable for IntermediateType {
         match self {
             IntermediateType::IStruct(index) => {
                 IStruct::<StructDefinitionIndex>::add_pack_instructions(
+                    *index,
+                    builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    compilation_ctx,
+                    Some(calldata_reference_pointer),
+                );
+            }
+            IntermediateType::IGenericStructInstance(index) => {
+                IStruct::<StructDefInstantiationIndex>::add_pack_instructions(
                     *index,
                     builder,
                     module,
@@ -390,6 +415,7 @@ impl Packable for IntermediateType {
             IntermediateType::IVector(_) => 32,
             IntermediateType::IRef(inner) => inner.encoded_size(compilation_ctx),
             IntermediateType::IMutRef(inner) => inner.encoded_size(compilation_ctx),
+            IntermediateType::IGenericStructInstance(_) => todo!(),
             IntermediateType::IStruct(index) => {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
                 let mut size = 0;
@@ -406,6 +432,7 @@ impl Packable for IntermediateType {
                         | IntermediateType::IVector(_) => {
                             size += field.encoded_size(compilation_ctx);
                         }
+                        IntermediateType::IGenericStructInstance(_) => todo!(),
                         IntermediateType::IStruct(index) => {
                             let child_struct = compilation_ctx.get_struct_by_index(*index).unwrap();
 
@@ -445,6 +472,8 @@ impl Packable for IntermediateType {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
                 struct_.solidity_abi_encode_is_dynamic(compilation_ctx)
             }
+
+            IntermediateType::IGenericStructInstance(_) => todo!(),
         }
     }
 }
