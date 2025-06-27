@@ -934,6 +934,7 @@ mod tests {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
+            | IntermediateType::IGenericStructInstance(_)
             | IntermediateType::IStruct(_) => {
                 let swap_f =
                     RuntimeFunction::VecPopBack32.get(&mut raw_module, Some(&compilation_ctx));
