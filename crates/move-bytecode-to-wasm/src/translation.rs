@@ -9,6 +9,7 @@ use intermediate_types::structs::IStruct;
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
 use move_binary_format::internals::ModuleIndex;
+use std::fmt::Display;
 use std::hash::Hash;
 use table::FunctionTable;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
@@ -245,33 +246,29 @@ fn map_bytecode_instruction(
                 ),
             }
 
-            let Some(field_type) = struct_.fields_types.get(field_id) else {
-                panic!(
-                    "{field_id} not found in {}",
-                    struct_.struct_definition_index
-                )
-            };
+            struct_borrow_field(struct_, field_id, builder, compilation_ctx, types_stack);
+        }
+        Bytecode::ImmBorrowFieldGeneric(field_id) => {
+            let struct_ = compilation_ctx
+                .get_generic_struct_by_field_handle_idx(field_id)
+                .unwrap();
 
-            let Some(field_offset) = struct_.field_offsets.get(field_id) else {
-                panic!(
-                    "{field_id} offset not found in {}",
-                    struct_.struct_definition_index
-                )
-            };
+            // Check if in the types stack we have the correct type
+            match types_stack.pop() {
+                Some(IntermediateType::IRef(inner)) => {
+                    assert!(
+                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i) if *i == struct_.index()),
+                        "expected struct with index {} in types struct, got {inner:?}",
+                        struct_.index()
+                    );
+                }
+                t => panic!(
+                    "types stack error: expected struct with index {} got {t:?}",
+                    struct_.index()
+                ),
+            }
 
-            builder
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .i32_const(*field_offset as i32)
-                .binop(BinaryOp::I32Add);
-
-            types_stack.push(IntermediateType::IRef(Box::new(field_type.clone())));
+            struct_borrow_field(struct_, field_id, builder, compilation_ctx, types_stack);
         }
         Bytecode::MutBorrowField(field_id) => {
             let struct_ = compilation_ctx
@@ -1081,6 +1078,45 @@ fn map_bytecode_instruction(
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
+}
+
+fn struct_borrow_field<I, FI>(
+    struct_: &IStruct<I, FI>,
+    field_id: &FI,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    types_stack: &mut Vec<IntermediateType>,
+) where
+    I: ModuleIndex + Copy + Display,
+    FI: ModuleIndex + Copy + Eq + Hash + Display,
+{
+    let Some(field_type) = struct_.fields_types.get(field_id) else {
+        panic!(
+            "{field_id} not found in {}",
+            struct_.struct_definition_index
+        )
+    };
+
+    let Some(field_offset) = struct_.field_offsets.get(field_id) else {
+        panic!(
+            "{field_id} offset not found in {}",
+            struct_.struct_definition_index
+        )
+    };
+
+    builder
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .i32_const(*field_offset as i32)
+        .binop(BinaryOp::I32Add);
+
+    types_stack.push(IntermediateType::IRef(Box::new(field_type.clone())));
 }
 
 fn pack_struct<I, FI>(

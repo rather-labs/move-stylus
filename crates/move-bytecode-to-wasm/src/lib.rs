@@ -218,6 +218,7 @@ pub fn translate_package(
                         .unwrap(),
                     };
 
+                    // TODO: Check, we should use root_compiled_module.field_instantations
                     let field_index = root_compiled_module
                         .field_handles()
                         .iter()

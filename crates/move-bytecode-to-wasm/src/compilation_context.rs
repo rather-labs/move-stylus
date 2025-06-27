@@ -28,6 +28,9 @@ pub enum CompilationContextError {
     #[error("struct with field id {0:?} not found in compilation context")]
     StructWithDefinitionIdxNotFound(StructDefinitionIndex),
 
+    #[error("struct with generic field instance id {0:?} not found in compilation context")]
+    GenericStructWithFieldIdxNotFound(FieldInstantiationIndex),
+
     #[error("generic struct instance with field id {0:?} not found in compilation context")]
     GenericStructWithDefinitionIdxNotFound(StructDefInstantiationIndex),
 }
@@ -117,6 +120,25 @@ impl CompilationContext<'_> {
             .find(|s| &s.struct_definition_index == struct_index)
             .ok_or(CompilationContextError::StructWithDefinitionIdxNotFound(
                 *struct_index,
+            ))
+    }
+
+    pub fn get_generic_struct_by_field_handle_idx(
+        &self,
+        field_index: &FieldInstantiationIndex,
+    ) -> Result<
+        &IStruct<StructDefInstantiationIndex, FieldInstantiationIndex>,
+        CompilationContextError,
+    > {
+        let struct_id = self.generic_fields_to_struct_map.get(field_index).ok_or(
+            CompilationContextError::GenericStructWithFieldIdxNotFound(*field_index),
+        )?;
+
+        self.module_generic_structs_instances
+            .iter()
+            .find(|s| &s.struct_definition_index == struct_id)
+            .ok_or(CompilationContextError::GenericStructWithFieldIdxNotFound(
+                *field_index,
             ))
     }
 
