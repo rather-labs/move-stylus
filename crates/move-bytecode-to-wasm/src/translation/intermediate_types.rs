@@ -140,7 +140,7 @@ impl IntermediateType {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("cannot load a constant for a reference type");
             }
-            IntermediateType::IStruct(_) => todo!(),
+            IntermediateType::IStruct(_) => panic!("structs can't be loaded as constants"),
         }
     }
 
