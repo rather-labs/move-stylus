@@ -20,7 +20,7 @@ public struct Foo<T> has drop {
     z: u256,
 }
 
-public fun echo_bool(a: bool): bool {
+public fun echo_bool(a: bool): (bool, bool) {
     let foo = Foo {
         g: a,
         p: Bar { n: 42, o: 4242 },
@@ -36,18 +36,18 @@ public fun echo_bool(a: bool): bool {
         z: 6,
     };
 
-    foo.g
+    (foo.g, foo.t)
 }
 
-/*
-public fun echo_u8(a: u8): u8 {
+public fun echo_u8(a: u8): (u8, u8) {
     let foo = Foo {
+        g: a,
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
         r: vector[1],
         s: vector[1],
         t: true,
-        u: a,
+        u: 255,
         v: 1,
         w: 2,
         x: 3,
@@ -55,9 +55,10 @@ public fun echo_u8(a: u8): u8 {
         z: 5,
     };
 
-    foo.u
+    (foo.g, foo.u)
 }
 
+/*
 public fun echo_u16(a: u16): u16 {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },

@@ -785,15 +785,16 @@ mod generic_struct_fields {
     }
     sol!(
         #[allow(missing_docs)]
-        function echoBool(bool a) external returns (bool);
+        function echoBool(bool a) external returns (bool, bool);
+        function echoU8(uint8 a) external returns (uint8, uint8);
     );
 
     #[rstest]
-    #[case(echoBoolCall::new((true,)), (true,))]
-    #[case(echoBoolCall::new((false,)), (false,))]
+    #[case(echoBoolCall::new((true,)), (true, true))]
+    #[case(echoBoolCall::new((false,)), (false, true))]
+    #[case(echoU8Call::new((255,)), (255,255))]
+    #[case(echoU8Call::new((1,)), (1,255))]
     /*
-    #[case(echoU8Call::new((255,)), (255,))]
-    #[case(echoU8Call::new((1,)), (1,))]
     #[case(echoU16Call::new((u16::MAX,)), (u16::MAX,))]
     #[case(echoU16Call::new((1,)), (1,))]
     #[case(echoU32Call::new((u32::MAX,)), (u32::MAX,))]

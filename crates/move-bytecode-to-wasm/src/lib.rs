@@ -9,7 +9,9 @@ use move_binary_format::file_format::{
 };
 use move_binary_format::internals::ModuleIndex;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
-use translation::intermediate_types::structs::IStruct;
+use translation::intermediate_types::structs::{
+    IStruct, IStructConcrete, IStructGenericInstantiation,
+};
 use translation::{
     functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
     translate_function,
@@ -122,7 +124,7 @@ pub fn translate_package(
         }
 
         // Module's structs
-        let mut module_structs: Vec<IStruct<StructDefinitionIndex, FieldHandleIndex>> = vec![];
+        let mut module_structs: Vec<IStructConcrete> = vec![];
         let mut fields_to_struct_map = HashMap::new();
         'str_defs_loop: for (index, struct_def) in
             root_compiled_module.struct_defs().iter().enumerate()
@@ -174,10 +176,7 @@ pub fn translate_package(
         }
 
         // Process generic structs
-
-        let mut module_generic_structs: Vec<
-            IStruct<StructDefInstantiationIndex, FieldInstantiationIndex>,
-        > = vec![];
+        let mut module_generic_structs: Vec<IStructGenericInstantiation> = vec![];
         let mut generic_fields_to_struct_map = HashMap::new();
         for (index, struct_instance) in root_compiled_module
             .struct_instantiations()
@@ -195,7 +194,6 @@ pub fn translate_package(
             if let Some(fields) = generic_struct_definition.fields() {
                 for (field_index, field) in fields.iter().enumerate() {
                     // Look for the concrete intermediate type of this instance
-
                     let intermediate_type = match &field.signature.0 {
                         SignatureToken::TypeParameter(concrete_type_idx) => {
                             let struct_instantiation_types = &root_compiled_module.signatures()
@@ -218,28 +216,39 @@ pub fn translate_package(
                         .unwrap(),
                     };
 
-                    // TODO: Check, we should use root_compiled_module.field_instantations
-                    let field_index = root_compiled_module
-                        .field_handles()
+                    let generic_field_index = root_compiled_module
+                        .field_instantiations()
                         .iter()
-                        .position(|f| f.field == field_index as u16 && f.owner == struct_index)
+                        .position(|f| {
+                            let field_handle =
+                                &root_compiled_module.field_handles()[f.handle.into_index()];
+                            let struct_def_instantiation = &root_compiled_module
+                                .struct_instantiations()[generic_struct_index.into_index()];
+
+                            // Filter which generic field we are processing inside the struct
+                            field_handle.field == field_index as u16
+                                // Link it with the generic struct definition
+                                && field_handle.owner == struct_index
+                                // Link it with the struct instantiation using the signature
+                                && struct_def_instantiation.type_parameters == f.type_parameters
+                        })
                         .map(|i| FieldInstantiationIndex::new(i as u16));
 
-                    // TODO: Check this...
                     // If field_index is None means the field is never referenced in the code
-                    if let Some(field_index) = field_index {
-                        let res = generic_fields_map.insert(field_index, intermediate_type.clone());
+                    if let Some(generic_field_index) = generic_field_index {
+                        let res = generic_fields_map
+                            .insert(generic_field_index, intermediate_type.clone());
                         assert!(
                             res.is_none(),
-                            "there was an error creating a field in struct {struct_index}, field with index {field_index} already exist"
+                            "there was an error creating a field in struct instantiation {generic_struct_index}, field with index {generic_field_index} already exist"
                         );
-                        let res =
-                            generic_fields_to_struct_map.insert(field_index, generic_struct_index);
+                        let res = generic_fields_to_struct_map
+                            .insert(generic_field_index, generic_struct_index);
                         assert!(
                             res.is_none(),
-                            "there was an error mapping field {field_index} to struct {struct_index}, already mapped"
+                            "there was an error mapping field {generic_field_index} to struct {struct_index}, already mapped"
                         );
-                        all_fields.push((Some(field_index), intermediate_type));
+                        all_fields.push((Some(generic_field_index), intermediate_type));
                     } else {
                         all_fields.push((None, intermediate_type));
                     }

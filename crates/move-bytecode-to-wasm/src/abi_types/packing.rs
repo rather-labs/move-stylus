@@ -1,7 +1,4 @@
 use alloy_sol_types::{SolType, sol_data};
-use move_binary_format::file_format::{
-    FieldHandleIndex, FieldInstantiationIndex, StructDefInstantiationIndex, StructDefinitionIndex,
-};
 use pack_native_int::{pack_i32_type_instructions, pack_i64_type_instructions};
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
 
@@ -13,7 +10,7 @@ use crate::{
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         signer::ISigner,
-        structs::{IStruct, IStructConcrete, IStructGenericInstantiation},
+        structs::{IStructConcrete, IStructGenericInstantiation},
         vector::IVector,
     },
 };
