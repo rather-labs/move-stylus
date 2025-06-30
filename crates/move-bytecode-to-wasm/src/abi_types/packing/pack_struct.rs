@@ -82,6 +82,8 @@
 //!
 //! For more information:
 //! https://docs.soliditylang.org/en/develop/abi-spec.html#formal-specification-of-the-encodinguse walrus::{
+use move_binary_format::internals::ModuleIndex;
+use std::hash::Hash;
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg},
@@ -95,7 +97,11 @@ use crate::{
 
 use super::Packable;
 
-impl IStruct {
+impl<I, FI> IStruct<I, FI>
+where
+    I: ModuleIndex + Copy,
+    FI: ModuleIndex + Copy + Eq + Hash,
+{
     #[allow(clippy::too_many_arguments)]
     pub fn add_pack_instructions(
         index: u16,
@@ -208,10 +214,11 @@ impl IStruct {
             // If the field to pack is a struct, it will be packed dynamically, that means, in the
             // current offset of writer pointer, we are going to write the offset where we can find
             // the struct
+            // TODO: Generic struct case
             let advancement = if let IntermediateType::IStruct(i) = field {
                 let child_struct = compilation_ctx.get_struct_by_index(*i).unwrap();
                 if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                    IStruct::add_pack_instructions(
+                    IStruct::<I, FI>::add_pack_instructions(
                         *i,
                         block,
                         module,
@@ -223,7 +230,7 @@ impl IStruct {
                     );
                     32
                 } else {
-                    IStruct::add_pack_instructions(
+                    IStruct::<I, FI>::add_pack_instructions(
                         *i,
                         block,
                         module,

@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
 use crate::{
-    CompilationContext, UserDefinedType, runtime::RuntimeFunction,
-    wasm_builder_extensions::WasmBuilderExtension,
+    CompilationContext, UserDefinedType, compilation_context::UserDefinedGenericType,
+    runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension,
 };
 use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
 use move_binary_format::file_format::{DatatypeHandleIndex, Signature, SignatureToken};
 use simple_integers::{IU8, IU16, IU32, IU64};
-use structs::IStruct;
+use structs::{IStruct, IStructConcrete, IStructGenericInstantiation};
 use vector::IVector;
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
@@ -41,6 +41,7 @@ pub enum IntermediateType {
     IMutRef(Box<IntermediateType>),
     // The usize is the struct's index in the compilation context's vector of declared structs
     IStruct(u16),
+    IGenericStructInstance(u16),
 }
 
 impl IntermediateType {
@@ -59,13 +60,18 @@ impl IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_) => 4,
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => 4,
         }
     }
 
     pub fn try_from_signature_token(
         value: &SignatureToken,
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+        handles_generics_instances_map: &HashMap<
+            (DatatypeHandleIndex, Vec<SignatureToken>),
+            UserDefinedGenericType,
+        >,
     ) -> Result<Self, anyhow::Error> {
         match value {
             SignatureToken::Bool => Ok(Self::IBool),
@@ -78,15 +84,27 @@ impl IntermediateType {
             SignatureToken::Address => Ok(Self::IAddress),
             SignatureToken::Signer => Ok(Self::ISigner),
             SignatureToken::Vector(token) => {
-                let itoken = Self::try_from_signature_token(token.as_ref(), handles_map)?;
+                let itoken = Self::try_from_signature_token(
+                    token.as_ref(),
+                    handles_map,
+                    handles_generics_instances_map,
+                )?;
                 Ok(IntermediateType::IVector(Box::new(itoken)))
             }
             SignatureToken::Reference(token) => {
-                let itoken = Self::try_from_signature_token(token.as_ref(), handles_map)?;
+                let itoken = Self::try_from_signature_token(
+                    token.as_ref(),
+                    handles_map,
+                    handles_generics_instances_map,
+                )?;
                 Ok(IntermediateType::IRef(Box::new(itoken)))
             }
             SignatureToken::MutableReference(token) => {
-                let itoken = Self::try_from_signature_token(token.as_ref(), handles_map)?;
+                let itoken = Self::try_from_signature_token(
+                    token.as_ref(),
+                    handles_map,
+                    handles_generics_instances_map,
+                )?;
                 Ok(IntermediateType::IMutRef(Box::new(itoken)))
             }
             SignatureToken::Datatype(index) => {
@@ -94,6 +112,20 @@ impl IntermediateType {
                     Ok(match udt {
                         UserDefinedType::Struct(i) => IntermediateType::IStruct(*i),
                         UserDefinedType::Enum(_) => todo!(),
+                    })
+                } else {
+                    Err(anyhow::anyhow!(
+                        "No user defined data with handler index: {index:?} found"
+                    ))
+                }
+            }
+            SignatureToken::DatatypeInstantiation(index) => {
+                if let Some(udt) = handles_generics_instances_map.get(index) {
+                    Ok(match udt {
+                        UserDefinedGenericType::Struct(i) => {
+                            IntermediateType::IGenericStructInstance(*i)
+                        }
+                        UserDefinedGenericType::Enum(_) => todo!(),
                     })
                 } else {
                     Err(anyhow::anyhow!(
@@ -138,7 +170,9 @@ impl IntermediateType {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("cannot load a constant for a reference type");
             }
-            IntermediateType::IStruct(_) => panic!("structs can't be loaded as constants"),
+            IntermediateType::IStruct(_) | IntermediateType::IGenericStructInstance(_) => {
+                panic!("structs can't be loaded as constants")
+            }
         }
     }
 
@@ -196,7 +230,8 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => {
                 builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -308,6 +343,7 @@ impl IntermediateType {
                 );
                 struct_.copy_local_instructions(module, builder, compilation_ctx);
             }
+            IntermediateType::IGenericStructInstance(_) => todo!(),
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 // Nothing to be done, pointer is already correct
             }
@@ -333,6 +369,7 @@ impl IntermediateType {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_)
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
@@ -390,7 +427,8 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -415,7 +453,8 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IAddress
             | IntermediateType::IVector(_)
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => {
                 builder.local_get(local);
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -478,6 +517,7 @@ impl IntermediateType {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
                 IStruct::copy_local_instructions(struct_, module, builder, compilation_ctx);
             }
+            IntermediateType::IGenericStructInstance(_) => todo!(),
             IntermediateType::ISigner => {
                 // Signer type is read-only, we push the pointer only
             }
@@ -583,7 +623,9 @@ impl IntermediateType {
             }
             // We just update the intermediate pointer, since the new values are already allocated
             // in memory
-            IntermediateType::IVector(_) | IntermediateType::IStruct(_) => {
+            IntermediateType::IVector(_)
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => {
                 // Since the memory needed for vectors might differ, we don't overwrite it.
                 // We update the inner pointer to point to the location where the new vector is already allocated.
                 let src_ptr = module.locals.add(ValType::I32);
@@ -691,7 +733,8 @@ impl IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => {
                 let ptr = module.locals.add(ValType::I32);
                 builder
                     .local_set(ptr)
@@ -734,7 +777,12 @@ impl IntermediateType {
                 builder.i32_const(1);
             }
             Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner),
-            Self::IStruct(index) => IStruct::equality(builder, module, compilation_ctx, *index),
+            Self::IStruct(index) => {
+                IStructConcrete::equality(builder, module, compilation_ctx, *index)
+            }
+            Self::IGenericStructInstance(index) => {
+                IStructGenericInstantiation::equality(builder, module, compilation_ctx, *index)
+            }
             Self::IRef(inner) | Self::IMutRef(inner) => {
                 let ptr1 = module.locals.add(ValType::I32);
                 let ptr2 = module.locals.add(ValType::I32);
@@ -802,7 +850,8 @@ impl IntermediateType {
                     | IntermediateType::IAddress
                     | IntermediateType::ISigner
                     | IntermediateType::IVector(_)
-                    | IntermediateType::IStruct(_) => {
+                    | IntermediateType::IStruct(_)
+                    | IntermediateType::IGenericStructInstance(_) => {
                         builder.local_get(ptr1).local_get(ptr2);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -841,7 +890,8 @@ impl IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_) => false,
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => false,
         }
     }
 }
@@ -861,7 +911,8 @@ impl From<&IntermediateType> for ValType {
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IStruct(_) => ValType::I32,
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => ValType::I32,
         }
     }
 }
@@ -882,11 +933,21 @@ impl ISignature {
         arguments: &Signature,
         returns: &Signature,
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+        handles_generics_instances_map: &HashMap<
+            (DatatypeHandleIndex, Vec<SignatureToken>),
+            UserDefinedGenericType,
+        >,
     ) -> Self {
         let arguments = arguments
             .0
             .iter()
-            .map(|token| IntermediateType::try_from_signature_token(token, handles_map))
+            .map(|token| {
+                IntermediateType::try_from_signature_token(
+                    token,
+                    handles_map,
+                    handles_generics_instances_map,
+                )
+            })
             .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
             // TODO: unwrap
             .unwrap();
@@ -894,7 +955,13 @@ impl ISignature {
         let returns = returns
             .0
             .iter()
-            .map(|token| IntermediateType::try_from_signature_token(token, handles_map))
+            .map(|token| {
+                IntermediateType::try_from_signature_token(
+                    token,
+                    handles_map,
+                    handles_generics_instances_map,
+                )
+            })
             .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
             // TODO: unwrap
             .unwrap();

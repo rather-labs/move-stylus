@@ -23,7 +23,8 @@ impl IRef {
             | IntermediateType::ISigner
             | IntermediateType::IU128
             | IntermediateType::IU256
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => {
                 inner.add_unpack_instructions(
                     builder,
                     module,
@@ -91,7 +92,8 @@ impl IMutRef {
             | IntermediateType::ISigner
             | IntermediateType::IU128
             | IntermediateType::IU256
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_) => {
                 inner.add_unpack_instructions(
                     builder,
                     module,

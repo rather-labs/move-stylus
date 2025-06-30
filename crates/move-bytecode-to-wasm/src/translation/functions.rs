@@ -1,12 +1,17 @@
 use std::collections::HashMap;
 
-use move_binary_format::file_format::{DatatypeHandleIndex, FunctionDefinition, Signature};
+use move_binary_format::file_format::{
+    DatatypeHandleIndex, FunctionDefinition, Signature, SignatureToken,
+};
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
     ir::{LoadKind, MemArg, StoreKind},
 };
 
-use crate::{CompilationContext, UserDefinedType, translation::intermediate_types::ISignature};
+use crate::{
+    CompilationContext, UserDefinedType, compilation_context::UserDefinedGenericType,
+    translation::intermediate_types::ISignature,
+};
 
 use super::intermediate_types::IntermediateType;
 
@@ -20,6 +25,7 @@ pub struct MappedFunction {
 }
 
 impl MappedFunction {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: String,
         move_args: &Signature,
@@ -27,6 +33,10 @@ impl MappedFunction {
         move_locals: &Signature,
         move_def: FunctionDefinition,
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+        handles_generics_instances_map: &HashMap<
+            (DatatypeHandleIndex, Vec<SignatureToken>),
+            UserDefinedGenericType,
+        >,
         module: &mut Module,
     ) -> Self {
         assert!(
@@ -34,7 +44,12 @@ impl MappedFunction {
             "Acquiring global resources is not supported yet"
         );
 
-        let signature = ISignature::from_signatures(move_args, move_rets, handles_map);
+        let signature = ISignature::from_signatures(
+            move_args,
+            move_rets,
+            handles_map,
+            handles_generics_instances_map,
+        );
         let wasm_arg_types = signature.get_argument_wasm_types();
         let wasm_ret_types = signature.get_return_wasm_types();
 
@@ -49,16 +64,22 @@ impl MappedFunction {
             .map(|ty| module.locals.add(*ty))
             .collect();
 
-        let ir_arg_types = move_args
-            .0
-            .iter()
-            .map(|s| IntermediateType::try_from_signature_token(s, handles_map));
+        let ir_arg_types = move_args.0.iter().map(|s| {
+            IntermediateType::try_from_signature_token(
+                s,
+                handles_map,
+                handles_generics_instances_map,
+            )
+        });
 
         // Declared locals
-        let ir_declared_locals_types = move_locals
-            .0
-            .iter()
-            .map(|s| IntermediateType::try_from_signature_token(s, handles_map));
+        let ir_declared_locals_types = move_locals.0.iter().map(|s| {
+            IntermediateType::try_from_signature_token(
+                s,
+                handles_map,
+                handles_generics_instances_map,
+            )
+        });
 
         let wasm_declared_locals = ir_declared_locals_types
             .clone()

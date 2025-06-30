@@ -5,8 +5,12 @@ use functions::{
 use intermediate_types::IntermediateType;
 use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
+use intermediate_types::structs::IStruct;
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
+use move_binary_format::internals::ModuleIndex;
+use std::fmt::Display;
+use std::hash::Hash;
 use table::FunctionTable;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{FunctionBuilder, Module};
@@ -89,6 +93,7 @@ fn map_bytecode_instruction(
             let constant_type: IntermediateType = IntermediateType::try_from_signature_token(
                 constant_type,
                 compilation_ctx.datatype_handles_map,
+                compilation_ctx.datatype_handles_generics_instances_map,
             )
             .unwrap();
 
@@ -241,33 +246,29 @@ fn map_bytecode_instruction(
                 ),
             }
 
-            let Some(field_type) = struct_.fields_types.get(field_id) else {
-                panic!(
-                    "{field_id} not found in {}",
-                    struct_.struct_definition_index
-                )
-            };
+            struct_borrow_field(struct_, field_id, builder, compilation_ctx, types_stack);
+        }
+        Bytecode::ImmBorrowFieldGeneric(field_id) => {
+            let struct_ = compilation_ctx
+                .get_generic_struct_by_field_handle_idx(field_id)
+                .unwrap();
 
-            let Some(field_offset) = struct_.field_offsets.get(field_id) else {
-                panic!(
-                    "{field_id} offset not found in {}",
-                    struct_.struct_definition_index
-                )
-            };
+            // Check if in the types stack we have the correct type
+            match types_stack.pop() {
+                Some(IntermediateType::IRef(inner)) => {
+                    assert!(
+                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i) if *i == struct_.index()),
+                        "expected struct with index {} in types struct, got {inner:?}",
+                        struct_.index()
+                    );
+                }
+                t => panic!(
+                    "types stack error: expected struct with index {} got {t:?}",
+                    struct_.index()
+                ),
+            }
 
-            builder
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .i32_const(*field_offset as i32)
-                .binop(BinaryOp::I32Add);
-
-            types_stack.push(IntermediateType::IRef(Box::new(field_type.clone())));
+            struct_borrow_field(struct_, field_id, builder, compilation_ctx, types_stack);
         }
         Bytecode::MutBorrowField(field_id) => {
             let struct_ = compilation_ctx
@@ -423,6 +424,7 @@ fn map_bytecode_instruction(
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
                 | IntermediateType::IStruct(_)
+                | IntermediateType::IGenericStructInstance(_)
                 | IntermediateType::IVector(_) => {
                     let pop_back_f =
                         RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
@@ -1059,89 +1061,153 @@ fn map_bytecode_instruction(
                 .get_struct_by_struct_definition_idx(struct_definition_index)
                 .unwrap();
 
-            // Pointer to the struct
-            let pointer = module.locals.add(ValType::I32);
-            // Pointer for simple types
-            let ptr_to_data = module.locals.add(ValType::I32);
-
-            let val_32 = module.locals.add(ValType::I32);
-            let val_64 = module.locals.add(ValType::I64);
-            let mut offset = struct_.heap_size;
-
-            builder
-                .i32_const(struct_.heap_size as i32)
-                .call(compilation_ctx.allocator)
-                .local_set(pointer);
-
-            for pack_type in struct_.fields.iter().rev() {
-                offset -= 4;
-                match types_stack.pop() {
-                    Some(t) if &t == pack_type => {
-                        match pack_type {
-                            // Stack values: create a middle pointer to save the actual value
-                            IntermediateType::IBool
-                            | IntermediateType::IU8
-                            | IntermediateType::IU16
-                            | IntermediateType::IU32
-                            | IntermediateType::IU64 => {
-                                let data_size = pack_type.stack_data_size();
-                                let (val, store_kind) = if data_size == 8 {
-                                    (val_64, StoreKind::I64 { atomic: false })
-                                } else {
-                                    (val_32, StoreKind::I32 { atomic: false })
-                                };
-
-                                // Save the actual value
-                                builder.local_set(val);
-
-                                // Create a pointer for the value
-                                builder
-                                    .i32_const(data_size as i32)
-                                    .call(compilation_ctx.allocator)
-                                    .local_tee(ptr_to_data);
-
-                                // Store the actual value behind the middle_ptr
-                                builder.local_get(val).store(
-                                    compilation_ctx.memory_id,
-                                    store_kind,
-                                    MemArg {
-                                        align: 0,
-                                        offset: 0,
-                                    },
-                                );
-                            }
-                            // Heap types: The stack data is a pointer to the value, store directly
-                            // that pointer in the struct
-                            IntermediateType::IU128
-                            | IntermediateType::IU256
-                            | IntermediateType::IAddress
-                            | IntermediateType::ISigner
-                            | IntermediateType::IVector(_)
-                            | IntermediateType::IStruct(_) => {
-                                builder.local_set(ptr_to_data);
-                            }
-                            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                                panic!("references inside structs not allowed")
-                            }
-                        };
-
-                        builder.local_get(pointer).local_get(ptr_to_data).store(
-                            compilation_ctx.memory_id,
-                            StoreKind::I32 { atomic: false },
-                            MemArg { align: 0, offset },
-                        );
-                    }
-                    Some(t) => panic!("expected {pack_type:?} in types stack, found {t:?}"),
-                    None => panic!("types stack is empty, expected type {types_stack:?}"),
-                }
-            }
-
-            builder.local_get(pointer);
+            pack_struct(struct_, module, builder, compilation_ctx, types_stack);
 
             types_stack.push(IntermediateType::IStruct(struct_definition_index.0));
         }
+        Bytecode::PackGeneric(struct_definition_index) => {
+            let struct_ = compilation_ctx
+                .get_generic_struct_by_struct_definition_idx(struct_definition_index)
+                .unwrap();
+
+            pack_struct(struct_, module, builder, compilation_ctx, types_stack);
+
+            types_stack.push(IntermediateType::IGenericStructInstance(
+                struct_definition_index.0,
+            ));
+        }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
+}
+
+fn struct_borrow_field<I, FI>(
+    struct_: &IStruct<I, FI>,
+    field_id: &FI,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    types_stack: &mut Vec<IntermediateType>,
+) where
+    I: ModuleIndex + Copy + Display,
+    FI: ModuleIndex + Copy + Eq + Hash + Display,
+{
+    let Some(field_type) = struct_.fields_types.get(field_id) else {
+        panic!(
+            "{field_id} not found in {}",
+            struct_.struct_definition_index
+        )
+    };
+
+    let Some(field_offset) = struct_.field_offsets.get(field_id) else {
+        panic!(
+            "{field_id} offset not found in {}",
+            struct_.struct_definition_index
+        )
+    };
+
+    builder
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .i32_const(*field_offset as i32)
+        .binop(BinaryOp::I32Add);
+
+    types_stack.push(IntermediateType::IRef(Box::new(field_type.clone())));
+}
+
+fn pack_struct<I, FI>(
+    struct_: &IStruct<I, FI>,
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    types_stack: &mut Vec<IntermediateType>,
+) where
+    I: ModuleIndex + Copy,
+    FI: ModuleIndex + Copy + Eq + Hash,
+{
+    // Pointer to the struct
+    let pointer = module.locals.add(ValType::I32);
+    // Pointer for simple types
+    let ptr_to_data = module.locals.add(ValType::I32);
+
+    let val_32 = module.locals.add(ValType::I32);
+    let val_64 = module.locals.add(ValType::I64);
+    let mut offset = struct_.heap_size;
+
+    builder
+        .i32_const(struct_.heap_size as i32)
+        .call(compilation_ctx.allocator)
+        .local_set(pointer);
+
+    for pack_type in struct_.fields.iter().rev() {
+        offset -= 4;
+        match types_stack.pop() {
+            Some(t) if &t == pack_type => {
+                match pack_type {
+                    // Stack values: create a middle pointer to save the actual value
+                    IntermediateType::IBool
+                    | IntermediateType::IU8
+                    | IntermediateType::IU16
+                    | IntermediateType::IU32
+                    | IntermediateType::IU64 => {
+                        let data_size = pack_type.stack_data_size();
+                        let (val, store_kind) = if data_size == 8 {
+                            (val_64, StoreKind::I64 { atomic: false })
+                        } else {
+                            (val_32, StoreKind::I32 { atomic: false })
+                        };
+
+                        // Save the actual value
+                        builder.local_set(val);
+
+                        // Create a pointer for the value
+                        builder
+                            .i32_const(data_size as i32)
+                            .call(compilation_ctx.allocator)
+                            .local_tee(ptr_to_data);
+
+                        // Store the actual value behind the middle_ptr
+                        builder.local_get(val).store(
+                            compilation_ctx.memory_id,
+                            store_kind,
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
+                    }
+                    // Heap types: The stack data is a pointer to the value, store directly
+                    // that pointer in the struct
+                    IntermediateType::IU128
+                    | IntermediateType::IU256
+                    | IntermediateType::IAddress
+                    | IntermediateType::ISigner
+                    | IntermediateType::IVector(_)
+                    | IntermediateType::IStruct(_)
+                    | IntermediateType::IGenericStructInstance(_) => {
+                        builder.local_set(ptr_to_data);
+                    }
+                    IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                        panic!("references inside structs not allowed")
+                    }
+                };
+
+                builder.local_get(pointer).local_get(ptr_to_data).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg { align: 0, offset },
+                );
+            }
+            Some(t) => panic!("expected {pack_type:?} in types stack, found {t:?}"),
+            None => panic!("types stack is empty, expected type {types_stack:?}"),
+        }
+    }
+
+    builder.local_get(pointer);
 }
 
 fn add_load_literal_heap_type_to_memory_instructions(
@@ -1187,6 +1253,7 @@ fn get_ir_for_signature_index(
     IntermediateType::try_from_signature_token(
         &signature_token[0],
         compilation_ctx.datatype_handles_map,
+        compilation_ctx.datatype_handles_generics_instances_map,
     )
     .unwrap()
 }
