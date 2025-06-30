@@ -13,7 +13,7 @@ use crate::{
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         signer::ISigner,
-        structs::IStruct,
+        structs::{IStruct, IStructConcrete, IStructGenericInstantiation},
         vector::IVector,
     },
 };
@@ -333,7 +333,7 @@ impl Packable for IntermediateType {
             ),
             IntermediateType::IStruct(index) => {
                 // TODO Replace index by get struct
-                IStruct::<StructDefinitionIndex, FieldHandleIndex>::add_pack_instructions(
+                IStructConcrete::add_pack_instructions(
                     *index,
                     builder,
                     module,
@@ -346,7 +346,7 @@ impl Packable for IntermediateType {
             }
             IntermediateType::IGenericStructInstance(index) => {
                 // TODO Replace index by get struct
-                IStruct::<StructDefInstantiationIndex, FieldInstantiationIndex>::add_pack_instructions(
+                IStructGenericInstantiation::add_pack_instructions(
                     *index,
                     builder,
                     module,
@@ -372,7 +372,7 @@ impl Packable for IntermediateType {
         match self {
             IntermediateType::IStruct(index) => {
                 // TODO: Pass diretly struct
-                IStruct::<StructDefinitionIndex, FieldHandleIndex>::add_pack_instructions(
+                IStructConcrete::add_pack_instructions(
                     *index,
                     builder,
                     module,
@@ -385,7 +385,7 @@ impl Packable for IntermediateType {
             }
             IntermediateType::IGenericStructInstance(index) => {
                 // TODO: Pass diretly struct
-                IStruct::<StructDefInstantiationIndex, FieldInstantiationIndex>::add_pack_instructions(
+                IStructGenericInstantiation::add_pack_instructions(
                     *index,
                     builder,
                     module,

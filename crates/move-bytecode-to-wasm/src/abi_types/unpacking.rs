@@ -1,6 +1,3 @@
-use move_binary_format::file_format::{
-    FieldHandleIndex, FieldInstantiationIndex, StructDefInstantiationIndex, StructDefinitionIndex,
-};
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
@@ -12,7 +9,7 @@ use crate::{
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         simple_integers::{IU8, IU16, IU32, IU64},
-        structs::IStruct,
+        structs::{IStructConcrete, IStructGenericInstantiation},
         vector::IVector,
     },
 };
@@ -168,8 +165,16 @@ impl Unpackable for IntermediateType {
                 compilation_ctx,
             ),
             // TODO: pass directly struct to functions
-            IntermediateType::IStruct(index) => {
-                IStruct::<StructDefinitionIndex, FieldHandleIndex>::add_unpack_instructions(
+            IntermediateType::IStruct(index) => IStructConcrete::add_unpack_instructions(
+                *index,
+                function_builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                compilation_ctx,
+            ),
+            IntermediateType::IGenericStructInstance(index) => {
+                IStructGenericInstantiation::add_unpack_instructions(
                     *index,
                     function_builder,
                     module,
@@ -178,17 +183,6 @@ impl Unpackable for IntermediateType {
                     compilation_ctx,
                 )
             }
-            IntermediateType::IGenericStructInstance(index) => IStruct::<
-                StructDefInstantiationIndex,
-                FieldInstantiationIndex,
-            >::add_unpack_instructions(
-                *index,
-                function_builder,
-                module,
-                reader_pointer,
-                calldata_reader_pointer,
-                compilation_ctx,
-            ),
         }
     }
 }

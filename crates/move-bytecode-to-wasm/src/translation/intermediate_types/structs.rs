@@ -48,12 +48,21 @@ use std::{collections::HashMap, hash::Hash};
 use crate::CompilationContext;
 
 use super::IntermediateType;
-use move_binary_format::internals::ModuleIndex;
+use move_binary_format::{
+    file_format::{
+        FieldHandleIndex, FieldInstantiationIndex, StructDefInstantiationIndex,
+        StructDefinitionIndex,
+    },
+    internals::ModuleIndex,
+};
 use walrus::{
     InstrSeqBuilder, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
+pub type IStructConcrete = IStruct<StructDefinitionIndex, FieldHandleIndex>;
+pub type IStructGenericInstantiation =
+    IStruct<StructDefInstantiationIndex, FieldInstantiationIndex>;
 #[derive(Debug)]
 pub struct IStruct<I, FI>
 where
