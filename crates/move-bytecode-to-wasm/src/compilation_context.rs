@@ -124,10 +124,8 @@ impl CompilationContext<'_> {
     pub fn get_generic_struct_by_field_handle_idx(
         &self,
         field_index: &FieldInstantiationIndex,
-    ) -> Result<
-        &IStruct<StructDefInstantiationIndex, FieldInstantiationIndex>,
-        CompilationContextError,
-    > {
+    ) -> Result<IStruct<StructDefinitionIndex, FieldInstantiationIndex>, CompilationContextError>
+    {
         let struct_id = self.generic_fields_to_struct_map.get(field_index).ok_or(
             CompilationContextError::GenericStructWithFieldIdxNotFound(*field_index),
         )?;
@@ -135,27 +133,65 @@ impl CompilationContext<'_> {
         let struct_instance = &self.module_generic_structs_instances[*struct_id];
         let generic_struct = &self.module_structs[struct_instance.0.0 as usize];
 
-        // TODO: instantiate generic struct and return
-        todo!()
+        let types = struct_instance
+            .1
+            .iter()
+            .map(|t| {
+                IntermediateType::try_from_signature_token(
+                    t,
+                    &self.datatype_handles_map,
+                    &HashMap::new(), // TODO: pass the generics map if needed
+                )
+            })
+            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+            .unwrap();
+
+        Ok(generic_struct.instantiate(&types))
     }
 
     pub fn get_generic_struct_by_struct_definition_idx(
         &self,
         struct_index: &StructDefInstantiationIndex,
-    ) -> Result<
-        &IStruct<StructDefInstantiationIndex, FieldInstantiationIndex>,
-        CompilationContextError,
-    > {
+    ) -> Result<IStruct<StructDefinitionIndex, FieldInstantiationIndex>, CompilationContextError>
+    {
         let struct_instance = &self.module_generic_structs_instances[struct_index.0 as usize];
         let generic_struct = &self.module_structs[struct_instance.0.0 as usize];
 
-        // TODO: instantiate generic struct and return
-        todo!()
-        /*
-        self.module_generic_structs_instances
+        let types = struct_instance
+            .1
             .iter()
-            .find(|s| &s.struct_definition_index == struct_index)
-            .ok_or(CompilationContextError::GenericStructWithDefinitionIdxNotFound(*struct_index))
-            */
+            .map(|t| {
+                IntermediateType::try_from_signature_token(
+                    t,
+                    &self.datatype_handles_map,
+                    &HashMap::new(), // TODO: pass the generics map if needed
+                )
+            })
+            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+            .unwrap();
+
+        Ok(generic_struct.instantiate(&types))
+    }
+
+    pub fn get_generic_struct_types_instances(
+        &self,
+        struct_index: &StructDefInstantiationIndex,
+    ) -> Result<Vec<IntermediateType>, CompilationContextError> {
+        let struct_instance = &self.module_generic_structs_instances[struct_index.0 as usize];
+
+        let types = struct_instance
+            .1
+            .iter()
+            .map(|t| {
+                IntermediateType::try_from_signature_token(
+                    t,
+                    &self.datatype_handles_map,
+                    &HashMap::new(), // TODO: pass the generics map if needed
+                )
+            })
+            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+            .unwrap();
+
+        Ok(types)
     }
 }

@@ -268,7 +268,7 @@ fn map_bytecode_instruction(
                 ),
             }
 
-            struct_borrow_field(struct_, field_id, builder, compilation_ctx, types_stack);
+            struct_borrow_field(&struct_, field_id, builder, compilation_ctx, types_stack);
         }
         Bytecode::MutBorrowField(field_id) => {
             let struct_ = compilation_ctx
@@ -312,7 +312,7 @@ fn map_bytecode_instruction(
                 ),
             }
 
-            struct_mut_borrow_field(struct_, field_id, builder, compilation_ctx, types_stack);
+            struct_mut_borrow_field(&struct_, field_id, builder, compilation_ctx, types_stack);
         }
         // Vector instructions
         Bytecode::VecImmBorrow(signature_index) => {
@@ -1068,9 +1068,12 @@ fn map_bytecode_instruction(
             let struct_ = compilation_ctx
                 .get_generic_struct_by_struct_definition_idx(struct_definition_index)
                 .unwrap();
-            let types = todo!("Handle generic struct packing");
 
-            pack_struct(struct_, module, builder, compilation_ctx, types_stack);
+            pack_struct(&struct_, module, builder, compilation_ctx, types_stack);
+
+            let types = compilation_ctx
+                .get_generic_struct_types_instances(struct_definition_index)
+                .unwrap();
 
             types_stack.push(IntermediateType::IGenericStructInstance(
                 struct_definition_index.0,
