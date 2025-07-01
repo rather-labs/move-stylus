@@ -44,8 +44,6 @@ pub fn move_signature_to_abi_selector<T: SolName>(
 
     let function_name = snake_to_camel(function_name);
 
-    println!("{}({})", function_name, parameter_strings);
-
     selector(format!("{}({})", function_name, parameter_strings))
 }
 
@@ -81,22 +79,13 @@ impl SolName for IntermediateType {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
                 let struct_instance = struct_.instantiate(types);
 
-                println!(
-                    "{:?}",
-                    struct_instance
-                        .fields
-                        .iter()
-                        .map(|field| field.sol_name(compilation_ctx))
-                        .collect::<Option<Vec<String>>>()
-                        .map(|fields| fields.join(","))
-                );
-
                 struct_instance
                     .fields
                     .iter()
                     .map(|field| field.sol_name(compilation_ctx))
                     .collect::<Option<Vec<String>>>()
                     .map(|fields| fields.join(","))
+                    .map(|fields| format!("({fields})"))
             }
             IntermediateType::ISigner => None,
             IntermediateType::ITypeParameter(_) => None,

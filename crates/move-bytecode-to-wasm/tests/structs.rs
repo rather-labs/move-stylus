@@ -940,15 +940,28 @@ mod generic_struct_packing_unpacking {
             address q;
         }
 
-        function test(Foo foo) external returns (
-            uint32,
-            address,
-        );
+        struct Bar {
+            uint32 g;
+            address q;
+        }
+
+        function test(Foo foo) external returns (uint32,address);
+        function test2(Bar bar) external returns (uint32,address);
     }
 
     #[rstest]
     #[case(testCall::new(
         (Foo {
+            g: 424242,
+            q: address!("0xcafe000000000000000000000000000000007357"),
+        },)),
+        (
+            424242,
+            address!("0xcafe000000000000000000000000000000007357"),
+        )
+    )]
+    #[case(test2Call::new(
+        (Bar {
             g: 424242,
             q: address!("0xcafe000000000000000000000000000000007357"),
         },)),

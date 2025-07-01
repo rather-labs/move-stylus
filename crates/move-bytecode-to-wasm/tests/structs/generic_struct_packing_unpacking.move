@@ -13,3 +13,16 @@ public fun test(foo: Foo<u32>): (u32, address) {
     )
 }
 
+
+// Static abi struct
+public struct Bar has drop {
+    g: u32,
+    q: address,
+}
+
+public fun test2(foo: Bar): (u32, address) {
+    (
+        foo.g,
+        foo.q,
+    )
+}
