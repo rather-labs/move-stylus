@@ -75,7 +75,17 @@ impl SolName for IntermediateType {
                     .map(|fields| fields.join(","))
                     .map(|fields| format!("({fields})"))
             }
-            IntermediateType::IGenericStructInstance(_, _) => todo!(),
+            IntermediateType::IGenericStructInstance(index, types) => {
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_instance = struct_.instantiate(types);
+
+                struct_instance
+                    .fields
+                    .iter()
+                    .map(|field| field.sol_name(compilation_ctx))
+                    .collect::<Option<Vec<String>>>()
+                    .map(|fields| fields.join(","))
+            }
             IntermediateType::ISigner => None,
             IntermediateType::ITypeParameter(_) => None,
         }

@@ -51,6 +51,7 @@ pub struct CompilationContext<'a> {
     /// Module's structs: contains all the user defined structs
     pub module_structs: &'a [IStruct],
 
+    // TODO: Check if this field is needed
     /// Module's generic structs instances: contains all the user defined generic structs instances
     /// with its corresponding types
     pub module_generic_structs_instances: &'a [(StructDefinitionIndex, Vec<SignatureToken>)],

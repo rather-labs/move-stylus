@@ -72,7 +72,6 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    abi_types::packing::Packable,
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
@@ -81,16 +80,13 @@ use super::Unpackable;
 
 impl IStruct {
     pub fn add_unpack_instructions(
-        index: u16,
+        &self,
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) {
-        // TODO: Generic struct case
-        let struct_ = compilation_ctx.get_struct_by_index(index).unwrap();
-
         let struct_ptr = module.locals.add(ValType::I32);
         let val_32 = module.locals.add(ValType::I32);
         let val_64 = module.locals.add(ValType::I64);
@@ -103,7 +99,7 @@ impl IStruct {
         let calldata_ptr = module.locals.add(ValType::I32);
 
         // In a dynamic struct, the first value is where the values are packed in the calldata
-        if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
+        if self.solidity_abi_encode_is_dynamic(compilation_ctx) {
             // Big-endian to Little-endian
             let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
 
@@ -158,12 +154,12 @@ impl IStruct {
 
         // Allocate space for the struct
         builder
-            .i32_const(struct_.heap_size as i32)
+            .i32_const(self.heap_size as i32)
             .call(compilation_ctx.allocator)
             .local_set(struct_ptr);
 
         let mut offset = 0;
-        for field in &struct_.fields {
+        for field in &self.fields {
             // Unpack field
             field.add_unpack_instructions(
                 builder,
@@ -226,11 +222,10 @@ impl IStruct {
         // represents the struct.
         // If it is a dynamic struct, we just need to advance the pointer 32 bytes because in the
         // argument's place there is only a pointer to where the values of the struct are packed
-        let advancement = if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
+        let advancement = if self.solidity_abi_encode_is_dynamic(compilation_ctx) {
             32
         } else {
-            // TODO: Generic struct case
-            IntermediateType::IStruct(index).encoded_size(compilation_ctx) as i32
+            self.solidity_abi_encode_size(compilation_ctx) as i32
         };
 
         builder

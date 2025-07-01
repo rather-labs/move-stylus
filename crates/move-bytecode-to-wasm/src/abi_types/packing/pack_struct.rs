@@ -98,7 +98,7 @@ use super::Packable;
 impl IStruct {
     #[allow(clippy::too_many_arguments)]
     pub fn add_pack_instructions(
-        index: u16,
+        &self,
         block: &mut InstrSeqBuilder,
         module: &mut Module,
         local: LocalId,
@@ -107,7 +107,6 @@ impl IStruct {
         compilation_ctx: &CompilationContext,
         base_calldata_reference_pointer: Option<LocalId>,
     ) {
-        let struct_ = compilation_ctx.get_struct_by_index(index).unwrap();
         let val_32 = module.locals.add(ValType::I32);
         let val_64 = module.locals.add(ValType::I64);
         let struct_ptr = local;
@@ -125,7 +124,7 @@ impl IStruct {
             // Allocate memory for the packed value. Set the data_ptr the beginning, since
             // we are going to pack the values from there
             block
-                .i32_const(IntermediateType::IStruct(index).encoded_size(compilation_ctx) as i32)
+                .i32_const(self.solidity_abi_encode_size(compilation_ctx) as i32)
                 .call(compilation_ctx.allocator)
                 .local_tee(data_ptr)
                 .local_tee(inner_data_reference);
@@ -154,7 +153,7 @@ impl IStruct {
         // Load the value to be written in the calldata, if it is a stack value we need to double
         // reference a pointer, otherwise we read the pointer and leave the stack value in the
         // stack
-        for (index, field) in struct_.fields.iter().enumerate() {
+        for (index, field) in self.fields.iter().enumerate() {
             // Load field's intermediate pointer
             block.local_get(struct_ptr).load(
                 compilation_ctx.memory_id,
@@ -208,44 +207,72 @@ impl IStruct {
             // If the field to pack is a struct, it will be packed dynamically, that means, in the
             // current offset of writer pointer, we are going to write the offset where we can find
             // the struct
-            // TODO: Generic struct case
-            let advancement = if let IntermediateType::IStruct(i) = field {
-                let child_struct = compilation_ctx.get_struct_by_index(*i).unwrap();
-                if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                    IStruct::add_pack_instructions(
-                        *i,
+            let advancement = match field {
+                IntermediateType::IStruct(index) => {
+                    let child_struct = compilation_ctx.get_struct_by_index(*index).unwrap();
+                    if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
+                        child_struct.add_pack_instructions(
+                            block,
+                            module,
+                            field_local,
+                            data_ptr,
+                            inner_data_reference,
+                            compilation_ctx,
+                            Some(inner_data_reference),
+                        );
+                        32
+                    } else {
+                        child_struct.add_pack_instructions(
+                            block,
+                            module,
+                            field_local,
+                            data_ptr,
+                            inner_data_reference,
+                            compilation_ctx,
+                            None,
+                        );
+                        field.encoded_size(compilation_ctx)
+                    }
+                }
+                IntermediateType::IGenericStructInstance(index, types) => {
+                    let child_struct = compilation_ctx.get_struct_by_index(*index).unwrap();
+                    let child_struct_instance = child_struct.instantiate(types);
+
+                    if child_struct_instance.solidity_abi_encode_is_dynamic(compilation_ctx) {
+                        child_struct_instance.add_pack_instructions(
+                            block,
+                            module,
+                            field_local,
+                            data_ptr,
+                            inner_data_reference,
+                            compilation_ctx,
+                            Some(inner_data_reference),
+                        );
+                        32
+                    } else {
+                        child_struct_instance.add_pack_instructions(
+                            block,
+                            module,
+                            field_local,
+                            data_ptr,
+                            inner_data_reference,
+                            compilation_ctx,
+                            None,
+                        );
+                        field.encoded_size(compilation_ctx)
+                    }
+                }
+                _ => {
+                    field.add_pack_instructions(
                         block,
                         module,
                         field_local,
                         data_ptr,
                         inner_data_reference,
                         compilation_ctx,
-                        Some(inner_data_reference),
                     );
                     32
-                } else {
-                    IStruct::add_pack_instructions(
-                        *i,
-                        block,
-                        module,
-                        field_local,
-                        data_ptr,
-                        inner_data_reference,
-                        compilation_ctx,
-                        None,
-                    );
-                    field.encoded_size(compilation_ctx)
                 }
-            } else {
-                field.add_pack_instructions(
-                    block,
-                    module,
-                    field_local,
-                    data_ptr,
-                    inner_data_reference,
-                    compilation_ctx,
-                );
-                32
             };
 
             // The value of advacement depends on the following conditions:

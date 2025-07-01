@@ -10,7 +10,6 @@ use crate::{
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         signer::ISigner,
-        structs::IStruct,
         vector::IVector,
     },
 };
@@ -332,9 +331,8 @@ impl Packable for IntermediateType {
                 compilation_ctx,
             ),
             IntermediateType::IStruct(index) => {
-                // TODO Replace index by get struct
-                IStruct::add_pack_instructions(
-                    *index,
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                struct_.add_pack_instructions(
                     builder,
                     module,
                     local,
@@ -344,10 +342,10 @@ impl Packable for IntermediateType {
                     None,
                 )
             }
-            IntermediateType::IGenericStructInstance(index, _types) => {
-                // TODO Replace index by get struct
-                IStruct::add_pack_instructions(
-                    *index,
+            IntermediateType::IGenericStructInstance(index, types) => {
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_instance = struct_.instantiate(types);
+                struct_instance.add_pack_instructions(
                     builder,
                     module,
                     local,
@@ -374,9 +372,8 @@ impl Packable for IntermediateType {
     ) {
         match self {
             IntermediateType::IStruct(index) => {
-                // TODO: Pass diretly struct
-                IStruct::add_pack_instructions(
-                    *index,
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                struct_.add_pack_instructions(
                     builder,
                     module,
                     local,
@@ -386,10 +383,10 @@ impl Packable for IntermediateType {
                     Some(calldata_reference_pointer),
                 );
             }
-            IntermediateType::IGenericStructInstance(index, _types) => {
-                // TODO: Pass diretly struct
-                IStruct::add_pack_instructions(
-                    *index,
+            IntermediateType::IGenericStructInstance(index, types) => {
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_instance = struct_.instantiate(types);
+                struct_instance.add_pack_instructions(
                     builder,
                     module,
                     local,
@@ -424,44 +421,14 @@ impl Packable for IntermediateType {
             IntermediateType::IVector(_) => 32,
             IntermediateType::IRef(inner) => inner.encoded_size(compilation_ctx),
             IntermediateType::IMutRef(inner) => inner.encoded_size(compilation_ctx),
-            IntermediateType::IGenericStructInstance(_, _) => todo!(),
+            IntermediateType::IGenericStructInstance(index, types) => {
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_instance = struct_.instantiate(types);
+                struct_instance.solidity_abi_encode_size(compilation_ctx)
+            }
             IntermediateType::IStruct(index) => {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
-                let mut size = 0;
-                for field in &struct_.fields {
-                    match field {
-                        IntermediateType::IBool
-                        | IntermediateType::IU8
-                        | IntermediateType::IU16
-                        | IntermediateType::IU32
-                        | IntermediateType::IU64
-                        | IntermediateType::IU128
-                        | IntermediateType::IU256
-                        | IntermediateType::IAddress
-                        | IntermediateType::IVector(_) => {
-                            size += field.encoded_size(compilation_ctx);
-                        }
-                        IntermediateType::IGenericStructInstance(_, _) => todo!(),
-                        IntermediateType::IStruct(index) => {
-                            let child_struct = compilation_ctx.get_struct_by_index(*index).unwrap();
-
-                            if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                                size += 32;
-                            } else {
-                                size += field.encoded_size(compilation_ctx);
-                            }
-                        }
-                        IntermediateType::ISigner => panic!("signer is not abi econdable"),
-                        IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                            panic!("found reference inside struct")
-                        }
-                        IntermediateType::ITypeParameter(_) => {
-                            panic!("found generic type parameter inside struct");
-                        }
-                    }
-                }
-
-                size
+                struct_.solidity_abi_encode_size(compilation_ctx)
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("can't know the size of a generic type parameter at compile time");
