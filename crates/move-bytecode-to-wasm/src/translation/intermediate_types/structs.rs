@@ -364,4 +364,53 @@ where
 
         false
     }
+
+    pub fn instantiate(
+        &self,
+        types: &[IntermediateType],
+    ) -> IStruct<StructDefinitionIndex, FieldInstantiationIndex> {
+        let fields = self
+            .fields
+            .iter()
+            .map(|f| {
+                if let IntermediateType::ITypeParameter(index) = f {
+                    types[*index as usize].clone()
+                } else {
+                    f.clone()
+                }
+            })
+            .collect();
+
+        let fields_types = self
+            .fields_types
+            .iter()
+            .map(|(k, v)| {
+                let key = FieldInstantiationIndex::new(k.into_index() as u16);
+                if let IntermediateType::ITypeParameter(index) = v {
+                    (key, types[*index as usize].clone())
+                } else {
+                    (key, v.clone())
+                }
+            })
+            .collect();
+
+        let field_offsets = self
+            .field_offsets
+            .iter()
+            .map(|(k, v)| {
+                let key = FieldInstantiationIndex::new(k.into_index() as u16);
+                (key, *v)
+            })
+            .collect();
+
+        IStruct::<StructDefinitionIndex, FieldInstantiationIndex> {
+            fields,
+            fields_types,
+            field_offsets,
+            struct_definition_index: StructDefinitionIndex::new(
+                self.struct_definition_index.into_index() as u16,
+            ),
+            heap_size: self.heap_size,
+        }
+    }
 }
