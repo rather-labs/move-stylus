@@ -75,8 +75,9 @@ impl SolName for IntermediateType {
                     .map(|fields| fields.join(","))
                     .map(|fields| format!("({fields})"))
             }
-            IntermediateType::IGenericStructInstance(_) => todo!(),
+            IntermediateType::IGenericStructInstance(_, _) => todo!(),
             IntermediateType::ISigner => None,
+            IntermediateType::ITypeParameter(_) => None,
         }
     }
 }

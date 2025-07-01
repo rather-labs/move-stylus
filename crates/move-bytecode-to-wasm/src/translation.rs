@@ -7,10 +7,7 @@ use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::structs::IStruct;
 use intermediate_types::{simple_integers::IU8, vector::IVector};
-use move_binary_format::file_format::{Bytecode, SignatureIndex};
-use move_binary_format::internals::ModuleIndex;
-use std::fmt::Display;
-use std::hash::Hash;
+use move_binary_format::file_format::{Bytecode, FieldHandleIndex, SignatureIndex};
 use table::FunctionTable;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{FunctionBuilder, Module};
@@ -93,7 +90,6 @@ fn map_bytecode_instruction(
             let constant_type: IntermediateType = IntermediateType::try_from_signature_token(
                 constant_type,
                 compilation_ctx.datatype_handles_map,
-                compilation_ctx.datatype_handles_generics_instances_map,
             )
             .unwrap();
 
@@ -253,11 +249,16 @@ fn map_bytecode_instruction(
                 .get_generic_struct_by_field_handle_idx(field_id)
                 .unwrap();
 
+            let struct_field_id = compilation_ctx
+                .instantiated_fields_to_generic_fields
+                .get(field_id)
+                .unwrap();
+
             // Check if in the types stack we have the correct type
             match types_stack.pop() {
                 Some(IntermediateType::IRef(inner)) => {
                     assert!(
-                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i) if *i == struct_.index()),
+                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i, _ ) if *i == struct_.index()),
                         "expected struct with index {} in types struct, got {inner:?}",
                         struct_.index()
                     );
@@ -268,7 +269,13 @@ fn map_bytecode_instruction(
                 ),
             }
 
-            struct_borrow_field(struct_, field_id, builder, compilation_ctx, types_stack);
+            struct_borrow_field(
+                &struct_,
+                struct_field_id,
+                builder,
+                compilation_ctx,
+                types_stack,
+            );
         }
         Bytecode::MutBorrowField(field_id) => {
             let struct_ = compilation_ctx
@@ -297,11 +304,16 @@ fn map_bytecode_instruction(
                 .get_generic_struct_by_field_handle_idx(field_id)
                 .unwrap();
 
+            let struct_field_id = compilation_ctx
+                .instantiated_fields_to_generic_fields
+                .get(field_id)
+                .unwrap();
+
             // Check if in the types stack we have the correct type
             match types_stack.pop() {
                 Some(IntermediateType::IMutRef(inner)) => {
                     assert!(
-                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i) if *i == struct_.index()),
+                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i, _) if *i == struct_.index()),
                         "expected struct with index {} in types struct, got {inner:?}",
                         struct_.index()
                     );
@@ -312,7 +324,13 @@ fn map_bytecode_instruction(
                 ),
             }
 
-            struct_mut_borrow_field(struct_, field_id, builder, compilation_ctx, types_stack);
+            struct_mut_borrow_field(
+                &struct_,
+                struct_field_id,
+                builder,
+                compilation_ctx,
+                types_stack,
+            );
         }
         // Vector instructions
         Bytecode::VecImmBorrow(signature_index) => {
@@ -420,7 +438,7 @@ fn map_bytecode_instruction(
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
                 | IntermediateType::IStruct(_)
-                | IntermediateType::IGenericStructInstance(_)
+                | IntermediateType::IGenericStructInstance(_, _)
                 | IntermediateType::IVector(_) => {
                     let pop_back_f =
                         RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
@@ -433,6 +451,9 @@ fn map_bytecode_instruction(
                 }
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                     panic!("VecPopBack operation is not allowed on reference types");
+                }
+                IntermediateType::ITypeParameter(_) => {
+                    panic!("can't perform VecPopBack on type parameters");
                 }
             }
 
@@ -1066,26 +1087,27 @@ fn map_bytecode_instruction(
                 .get_generic_struct_by_struct_definition_idx(struct_definition_index)
                 .unwrap();
 
-            pack_struct(struct_, module, builder, compilation_ctx, types_stack);
+            pack_struct(&struct_, module, builder, compilation_ctx, types_stack);
 
-            types_stack.push(IntermediateType::IGenericStructInstance(
-                struct_definition_index.0,
-            ));
+            let idx = compilation_ctx
+                .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
+            let types = compilation_ctx
+                .get_generic_struct_types_instances(struct_definition_index)
+                .unwrap();
+
+            types_stack.push(IntermediateType::IGenericStructInstance(idx, types));
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
 }
 
-fn struct_borrow_field<I, FI>(
-    struct_: &IStruct<I, FI>,
-    field_id: &FI,
+fn struct_borrow_field(
+    struct_: &IStruct,
+    field_id: &FieldHandleIndex,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     types_stack: &mut Vec<IntermediateType>,
-) where
-    I: ModuleIndex + Copy + Display,
-    FI: ModuleIndex + Copy + Eq + Hash + Display,
-{
+) {
     let Some(field_type) = struct_.fields_types.get(field_id) else {
         panic!(
             "{field_id} not found in {}",
@@ -1115,26 +1137,23 @@ fn struct_borrow_field<I, FI>(
     types_stack.push(IntermediateType::IRef(Box::new(field_type.clone())));
 }
 
-fn struct_mut_borrow_field<I, FI>(
-    struct_: &IStruct<I, FI>,
-    field_id: &FI,
+fn struct_mut_borrow_field(
+    struct_: &IStruct,
+    field_id: &FieldHandleIndex,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     types_stack: &mut Vec<IntermediateType>,
-) where
-    I: ModuleIndex + Copy + Display,
-    FI: ModuleIndex + Copy + Eq + Hash + Display,
-{
+) {
     let Some(field_type) = struct_.fields_types.get(field_id) else {
         panic!(
-            "{field_id} not found in {}",
+            "{field_id:?} not found in {}",
             struct_.struct_definition_index
         )
     };
 
     let Some(field_offset) = struct_.field_offsets.get(field_id) else {
         panic!(
-            "{field_id} offset not found in {}",
+            "{field_id:?} offset not found in {}",
             struct_.struct_definition_index
         )
     };
@@ -1154,16 +1173,13 @@ fn struct_mut_borrow_field<I, FI>(
     types_stack.push(IntermediateType::IMutRef(Box::new(field_type.clone())));
 }
 
-fn pack_struct<I, FI>(
-    struct_: &IStruct<I, FI>,
+fn pack_struct(
+    struct_: &IStruct,
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     types_stack: &mut Vec<IntermediateType>,
-) where
-    I: ModuleIndex + Copy,
-    FI: ModuleIndex + Copy + Eq + Hash,
-{
+) {
     // Pointer to the struct
     let pointer = module.locals.add(ValType::I32);
     // Pointer for simple types
@@ -1223,11 +1239,14 @@ fn pack_struct<I, FI>(
                     | IntermediateType::ISigner
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct(_)
-                    | IntermediateType::IGenericStructInstance(_) => {
+                    | IntermediateType::IGenericStructInstance(_, _) => {
                         builder.local_set(ptr_to_data);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                         panic!("references inside structs not allowed")
+                    }
+                    IntermediateType::ITypeParameter(_) => {
+                        panic!("found type parameter when packing struct, expected type instance");
                     }
                 };
 
@@ -1288,7 +1307,6 @@ fn get_ir_for_signature_index(
     IntermediateType::try_from_signature_token(
         &signature_token[0],
         compilation_ctx.datatype_handles_map,
-        compilation_ctx.datatype_handles_generics_instances_map,
     )
     .unwrap()
 }

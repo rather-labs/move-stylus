@@ -432,7 +432,7 @@ impl IVector {
                     | IntermediateType::IU256
                     | IntermediateType::IAddress
                     | IntermediateType::IStruct(_)
-                    | IntermediateType::IGenericStructInstance(_)) => {
+                    | IntermediateType::IGenericStructInstance(_, _)) => {
                         let vec_equality_heap_type_f_id =
                             RuntimeFunction::VecEqualityHeapType.get(module, Some(compilation_ctx));
 
@@ -535,6 +535,9 @@ impl IVector {
                     IntermediateType::ISigner => {
                         panic!("should not be possible to have a vector of signers")
                     }
+                    IntermediateType::ITypeParameter(_) => {
+                        panic!("Can not check the equality of a vector of type parameters, expected a concrete type");
+                    }
                 }
             },
             |else_| {
@@ -618,9 +621,12 @@ impl IVector {
             | IntermediateType::ISigner
             | IntermediateType::IAddress
             | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_) => {
+            | IntermediateType::IGenericStructInstance(_, _) => {
                 builder.call(downcast_f);
                 builder.i32_const(1);
+            }
+            IntermediateType::ITypeParameter(_) => {
+                panic!("Can not borrow generic type parameters, expected a concrete type");
             }
         }
 
@@ -934,7 +940,7 @@ mod tests {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IGenericStructInstance(_)
+            | IntermediateType::IGenericStructInstance(_, _)
             | IntermediateType::IStruct(_) => {
                 let swap_f =
                     RuntimeFunction::VecPopBack32.get(&mut raw_module, Some(&compilation_ctx));
@@ -947,6 +953,9 @@ mod tests {
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("VecPopBack operation is not allowed on reference types");
+            }
+            IntermediateType::ITypeParameter(_) => {
+                panic!("Can not pop back a vector of type parameters, expected a concrete type");
             }
         }
 

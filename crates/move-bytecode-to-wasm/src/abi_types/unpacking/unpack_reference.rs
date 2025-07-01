@@ -24,7 +24,7 @@ impl IRef {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_) => {
+            | IntermediateType::IGenericStructInstance(_, _) => {
                 inner.add_unpack_instructions(
                     builder,
                     module,
@@ -71,6 +71,9 @@ impl IRef {
 
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
+            }
+            IntermediateType::ITypeParameter(_) => {
+                panic!("Can not unpack generic type parameter");
             }
         }
     }
@@ -93,7 +96,7 @@ impl IMutRef {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_) => {
+            | IntermediateType::IGenericStructInstance(_, _) => {
                 inner.add_unpack_instructions(
                     builder,
                     module,
@@ -140,6 +143,9 @@ impl IMutRef {
 
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
+            }
+            IntermediateType::ITypeParameter(_) => {
+                panic!("Can not unpack generic type parameter");
             }
         }
     }

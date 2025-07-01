@@ -22,7 +22,7 @@ impl IRef {
             // Heap types: just forward the pointer
             IntermediateType::IVector(_)
             | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_)
+            | IntermediateType::IGenericStructInstance(_, _)
             | IntermediateType::ISigner
             | IntermediateType::IU128
             | IntermediateType::IU256
@@ -74,6 +74,9 @@ impl IRef {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
+            IntermediateType::ITypeParameter(_) => {
+                panic!("Can not pack generic type parameter");
+            }
         }
     }
 }
@@ -97,7 +100,7 @@ impl IMutRef {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_) => {
+            | IntermediateType::IGenericStructInstance(_, _) => {
                 inner.add_pack_instructions(
                     builder,
                     module,
@@ -144,6 +147,9 @@ impl IMutRef {
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
+            }
+            IntermediateType::ITypeParameter(_) => {
+                panic!("Can not pack generic type parameter");
             }
         }
     }

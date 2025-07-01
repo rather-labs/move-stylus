@@ -10,7 +10,7 @@ use crate::{
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         signer::ISigner,
-        structs::{IStructConcrete, IStructGenericInstantiation},
+        structs::IStruct,
         vector::IVector,
     },
 };
@@ -229,7 +229,7 @@ impl Packable for IntermediateType {
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
             | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_) => {
+            | IntermediateType::IGenericStructInstance(_, _) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -238,6 +238,9 @@ impl Packable for IntermediateType {
                 let local = module.locals.add(ValType::I64);
                 builder.local_set(local);
                 local
+            }
+            IntermediateType::ITypeParameter(_) => {
+                panic!("Can not pack generic type parameter");
             }
         }
     }
@@ -330,7 +333,7 @@ impl Packable for IntermediateType {
             ),
             IntermediateType::IStruct(index) => {
                 // TODO Replace index by get struct
-                IStructConcrete::add_pack_instructions(
+                IStruct::add_pack_instructions(
                     *index,
                     builder,
                     module,
@@ -341,9 +344,9 @@ impl Packable for IntermediateType {
                     None,
                 )
             }
-            IntermediateType::IGenericStructInstance(index) => {
+            IntermediateType::IGenericStructInstance(index, _types) => {
                 // TODO Replace index by get struct
-                IStructGenericInstantiation::add_pack_instructions(
+                IStruct::add_pack_instructions(
                     *index,
                     builder,
                     module,
@@ -353,6 +356,9 @@ impl Packable for IntermediateType {
                     compilation_ctx,
                     None,
                 )
+            }
+            IntermediateType::ITypeParameter(_) => {
+                panic!("Can not pack generic type parameter");
             }
         }
     }
@@ -369,7 +375,7 @@ impl Packable for IntermediateType {
         match self {
             IntermediateType::IStruct(index) => {
                 // TODO: Pass diretly struct
-                IStructConcrete::add_pack_instructions(
+                IStruct::add_pack_instructions(
                     *index,
                     builder,
                     module,
@@ -380,9 +386,9 @@ impl Packable for IntermediateType {
                     Some(calldata_reference_pointer),
                 );
             }
-            IntermediateType::IGenericStructInstance(index) => {
+            IntermediateType::IGenericStructInstance(index, _types) => {
                 // TODO: Pass diretly struct
-                IStructGenericInstantiation::add_pack_instructions(
+                IStruct::add_pack_instructions(
                     *index,
                     builder,
                     module,
@@ -418,7 +424,7 @@ impl Packable for IntermediateType {
             IntermediateType::IVector(_) => 32,
             IntermediateType::IRef(inner) => inner.encoded_size(compilation_ctx),
             IntermediateType::IMutRef(inner) => inner.encoded_size(compilation_ctx),
-            IntermediateType::IGenericStructInstance(_) => todo!(),
+            IntermediateType::IGenericStructInstance(_, _) => todo!(),
             IntermediateType::IStruct(index) => {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
                 let mut size = 0;
@@ -435,7 +441,7 @@ impl Packable for IntermediateType {
                         | IntermediateType::IVector(_) => {
                             size += field.encoded_size(compilation_ctx);
                         }
-                        IntermediateType::IGenericStructInstance(_) => todo!(),
+                        IntermediateType::IGenericStructInstance(_, _) => todo!(),
                         IntermediateType::IStruct(index) => {
                             let child_struct = compilation_ctx.get_struct_by_index(*index).unwrap();
 
@@ -449,10 +455,16 @@ impl Packable for IntermediateType {
                         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                             panic!("found reference inside struct")
                         }
+                        IntermediateType::ITypeParameter(_) => {
+                            panic!("found generic type parameter inside struct");
+                        }
                     }
                 }
 
                 size
+            }
+            IntermediateType::ITypeParameter(_) => {
+                panic!("can't know the size of a generic type parameter at compile time");
             }
         }
     }
@@ -476,7 +488,10 @@ impl Packable for IntermediateType {
                 struct_.solidity_abi_encode_is_dynamic(compilation_ctx)
             }
 
-            IntermediateType::IGenericStructInstance(_) => todo!(),
+            IntermediateType::IGenericStructInstance(_, _) => todo!(),
+            IntermediateType::ITypeParameter(_) => {
+                panic!("Can not check if generic type parameter is dynamic at compile time");
+            }
         }
     }
 }
