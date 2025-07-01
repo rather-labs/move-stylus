@@ -9,7 +9,6 @@ use crate::{
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         simple_integers::{IU8, IU16, IU32, IU64},
-        structs::IStruct,
         vector::IVector,
     },
 };
@@ -164,18 +163,21 @@ impl Unpackable for IntermediateType {
                 calldata_reader_pointer,
                 compilation_ctx,
             ),
-            // TODO: pass directly struct to functions
-            IntermediateType::IStruct(index) => IStruct::add_unpack_instructions(
-                *index,
-                function_builder,
-                module,
-                reader_pointer,
-                calldata_reader_pointer,
-                compilation_ctx,
-            ),
-            IntermediateType::IGenericStructInstance(index, _types) => {
-                IStruct::add_unpack_instructions(
-                    *index,
+            IntermediateType::IStruct(index) => {
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+
+                struct_.add_unpack_instructions(
+                    function_builder,
+                    module,
+                    reader_pointer,
+                    calldata_reader_pointer,
+                    compilation_ctx,
+                );
+            }
+            IntermediateType::IGenericStructInstance(index, types) => {
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_instance = struct_.instantiate(types);
+                struct_instance.add_unpack_instructions(
                     function_builder,
                     module,
                     reader_pointer,

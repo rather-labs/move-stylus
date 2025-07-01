@@ -160,7 +160,12 @@ pub fn translate_package(
         {
             instantiated_fields_to_generic_fields.insert(
                 FieldInstantiationIndex::new(index as u16),
-                field_instance.handle,
+                (
+                    field_instance.handle,
+                    root_compiled_module.signatures()[field_instance.type_parameters.0 as usize]
+                        .0
+                        .clone(),
+                ),
             );
         }
 

@@ -245,14 +245,31 @@ fn map_bytecode_instruction(
             struct_borrow_field(struct_, field_id, builder, compilation_ctx, types_stack);
         }
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
-            let struct_ = compilation_ctx
-                .get_generic_struct_by_field_handle_idx(field_id)
-                .unwrap();
-
-            let struct_field_id = compilation_ctx
+            let (struct_field_id, instantiation_types) = compilation_ctx
                 .instantiated_fields_to_generic_fields
                 .get(field_id)
                 .unwrap();
+
+            let struct_ = if let Ok(struct_) =
+                compilation_ctx.get_generic_struct_by_field_handle_idx(field_id)
+            {
+                struct_
+            } else {
+                let generic_stuct = compilation_ctx
+                    .get_struct_by_field_handle_idx(struct_field_id)
+                    .unwrap();
+                let instantiation_types = instantiation_types
+                    .iter()
+                    .map(|t| {
+                        IntermediateType::try_from_signature_token(
+                            t,
+                            compilation_ctx.datatype_handles_map,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, anyhow::Error>>()
+                    .unwrap();
+                generic_stuct.instantiate(&instantiation_types)
+            };
 
             // Check if in the types stack we have the correct type
             match types_stack.pop() {
@@ -300,14 +317,31 @@ fn map_bytecode_instruction(
             struct_mut_borrow_field(struct_, field_id, builder, compilation_ctx, types_stack);
         }
         Bytecode::MutBorrowFieldGeneric(field_id) => {
-            let struct_ = compilation_ctx
-                .get_generic_struct_by_field_handle_idx(field_id)
-                .unwrap();
-
-            let struct_field_id = compilation_ctx
+            let (struct_field_id, instantiation_types) = compilation_ctx
                 .instantiated_fields_to_generic_fields
                 .get(field_id)
                 .unwrap();
+
+            let struct_ = if let Ok(struct_) =
+                compilation_ctx.get_generic_struct_by_field_handle_idx(field_id)
+            {
+                struct_
+            } else {
+                let generic_stuct = compilation_ctx
+                    .get_struct_by_field_handle_idx(struct_field_id)
+                    .unwrap();
+                let instantiation_types = instantiation_types
+                    .iter()
+                    .map(|t| {
+                        IntermediateType::try_from_signature_token(
+                            t,
+                            compilation_ctx.datatype_handles_map,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, anyhow::Error>>()
+                    .unwrap();
+                generic_stuct.instantiate(&instantiation_types)
+            };
 
             // Check if in the types stack we have the correct type
             match types_stack.pop() {
