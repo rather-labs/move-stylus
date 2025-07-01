@@ -73,7 +73,7 @@ pub struct CompilationContext<'a> {
     /// FieldInstantiationIndex(0) and a FieldInstantiationIndex(1) both for the `x` field, but the
     /// index inside the struct is 0 in both cases.
     pub instantiated_fields_to_generic_fields:
-        &'a HashMap<FieldInstantiationIndex, FieldHandleIndex>,
+        &'a HashMap<FieldInstantiationIndex, (FieldHandleIndex, Vec<SignatureToken>)>,
 
     /// This Hashmap maps the move's datatype handles to our internal representation of those
     /// types. The datatype handles are used interally by move to look for user defined data
