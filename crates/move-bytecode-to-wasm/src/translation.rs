@@ -7,11 +7,7 @@ use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::structs::IStruct;
 use intermediate_types::{simple_integers::IU8, vector::IVector};
-use move_binary_format::file_format::{
-    Bytecode, FieldHandleIndex, SignatureIndex, StructDefinitionIndex,
-};
-use move_binary_format::internals::ModuleIndex;
-use std::hash::Hash;
+use move_binary_format::file_format::{Bytecode, FieldHandleIndex, SignatureIndex};
 use table::FunctionTable;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{FunctionBuilder, Module};
@@ -258,13 +254,11 @@ fn map_bytecode_instruction(
                 .get(field_id)
                 .unwrap();
 
-            println!("2 {field_id:?}");
-
             // Check if in the types stack we have the correct type
             match types_stack.pop() {
                 Some(IntermediateType::IRef(inner)) => {
                     assert!(
-                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i, types) if *i == struct_.index()),
+                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i, _ ) if *i == struct_.index()),
                         "expected struct with index {} in types struct, got {inner:?}",
                         struct_.index()
                     );
@@ -319,7 +313,7 @@ fn map_bytecode_instruction(
             match types_stack.pop() {
                 Some(IntermediateType::IMutRef(inner)) => {
                     assert!(
-                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i, types) if *i == struct_.index()),
+                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i, _) if *i == struct_.index()),
                         "expected struct with index {} in types struct, got {inner:?}",
                         struct_.index()
                     );
@@ -1108,7 +1102,7 @@ fn map_bytecode_instruction(
 }
 
 fn struct_borrow_field(
-    struct_: &IStruct<StructDefinitionIndex, FieldHandleIndex>,
+    struct_: &IStruct,
     field_id: &FieldHandleIndex,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
@@ -1144,7 +1138,7 @@ fn struct_borrow_field(
 }
 
 fn struct_mut_borrow_field(
-    struct_: &IStruct<StructDefinitionIndex, FieldHandleIndex>,
+    struct_: &IStruct,
     field_id: &FieldHandleIndex,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
@@ -1179,16 +1173,13 @@ fn struct_mut_borrow_field(
     types_stack.push(IntermediateType::IMutRef(Box::new(field_type.clone())));
 }
 
-fn pack_struct<I, FI>(
-    struct_: &IStruct<I, FI>,
+fn pack_struct(
+    struct_: &IStruct,
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     types_stack: &mut Vec<IntermediateType>,
-) where
-    I: ModuleIndex + Copy,
-    FI: ModuleIndex + Copy + Eq + Hash,
-{
+) {
     // Pointer to the struct
     let pointer = module.locals.add(ValType::I32);
     // Pointer for simple types

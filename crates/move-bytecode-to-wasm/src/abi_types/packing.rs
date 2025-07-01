@@ -10,7 +10,7 @@ use crate::{
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         signer::ISigner,
-        structs::{IStructConcrete, IStructGenericInstantiation},
+        structs::IStruct,
         vector::IVector,
     },
 };
@@ -333,7 +333,7 @@ impl Packable for IntermediateType {
             ),
             IntermediateType::IStruct(index) => {
                 // TODO Replace index by get struct
-                IStructConcrete::add_pack_instructions(
+                IStruct::add_pack_instructions(
                     *index,
                     builder,
                     module,
@@ -346,7 +346,7 @@ impl Packable for IntermediateType {
             }
             IntermediateType::IGenericStructInstance(index, types) => {
                 // TODO Replace index by get struct
-                IStructGenericInstantiation::add_pack_instructions(
+                IStruct::add_pack_instructions(
                     *index,
                     builder,
                     module,
@@ -375,7 +375,7 @@ impl Packable for IntermediateType {
         match self {
             IntermediateType::IStruct(index) => {
                 // TODO: Pass diretly struct
-                IStructConcrete::add_pack_instructions(
+                IStruct::add_pack_instructions(
                     *index,
                     builder,
                     module,
@@ -388,7 +388,7 @@ impl Packable for IntermediateType {
             }
             IntermediateType::IGenericStructInstance(index, types) => {
                 // TODO: Pass diretly struct
-                IStructGenericInstantiation::add_pack_instructions(
+                IStruct::add_pack_instructions(
                     *index,
                     builder,
                     module,

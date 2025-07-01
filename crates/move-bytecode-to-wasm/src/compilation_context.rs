@@ -53,7 +53,7 @@ pub struct CompilationContext<'a> {
     pub module_signatures: &'a [Signature],
 
     /// Module's structs: contains all the user defined structs
-    pub module_structs: &'a [IStruct<StructDefinitionIndex, FieldHandleIndex>],
+    pub module_structs: &'a [IStruct],
 
     /// Module's generic structs instances: contains all the user defined generic structs instances
     /// with its corresponding types
@@ -92,10 +92,7 @@ pub struct CompilationContext<'a> {
 }
 
 impl CompilationContext<'_> {
-    pub fn get_struct_by_index(
-        &self,
-        index: u16,
-    ) -> Result<&IStruct<StructDefinitionIndex, FieldHandleIndex>, CompilationContextError> {
+    pub fn get_struct_by_index(&self, index: u16) -> Result<&IStruct, CompilationContextError> {
         self.module_structs
             .iter()
             .find(|s| s.index() == index)
@@ -105,7 +102,7 @@ impl CompilationContext<'_> {
     pub fn get_struct_by_field_handle_idx(
         &self,
         field_index: &FieldHandleIndex,
-    ) -> Result<&IStruct<StructDefinitionIndex, FieldHandleIndex>, CompilationContextError> {
+    ) -> Result<&IStruct, CompilationContextError> {
         let struct_id = self.fields_to_struct_map.get(field_index).ok_or(
             CompilationContextError::StructWithFieldIdxNotFound(*field_index),
         )?;
@@ -121,7 +118,7 @@ impl CompilationContext<'_> {
     pub fn get_struct_by_struct_definition_idx(
         &self,
         struct_index: &StructDefinitionIndex,
-    ) -> Result<&IStruct<StructDefinitionIndex, FieldHandleIndex>, CompilationContextError> {
+    ) -> Result<&IStruct, CompilationContextError> {
         self.module_structs
             .iter()
             .find(|s| &s.struct_definition_index == struct_index)
@@ -133,7 +130,7 @@ impl CompilationContext<'_> {
     pub fn get_generic_struct_by_field_handle_idx(
         &self,
         field_index: &FieldInstantiationIndex,
-    ) -> Result<IStruct<StructDefinitionIndex, FieldHandleIndex>, CompilationContextError> {
+    ) -> Result<IStruct, CompilationContextError> {
         let struct_id = self.generic_fields_to_struct_map.get(field_index).ok_or(
             CompilationContextError::GenericStructWithFieldIdxNotFound(*field_index),
         )?;
@@ -154,7 +151,7 @@ impl CompilationContext<'_> {
     pub fn get_generic_struct_by_struct_definition_idx(
         &self,
         struct_index: &StructDefInstantiationIndex,
-    ) -> Result<IStruct<StructDefinitionIndex, FieldHandleIndex>, CompilationContextError> {
+    ) -> Result<IStruct, CompilationContextError> {
         let struct_instance = &self.module_generic_structs_instances[struct_index.0 as usize];
         let generic_struct = &self.module_structs[struct_instance.0.0 as usize];
 

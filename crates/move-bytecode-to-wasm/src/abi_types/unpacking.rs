@@ -9,7 +9,7 @@ use crate::{
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         simple_integers::{IU8, IU16, IU32, IU64},
-        structs::{IStructConcrete, IStructGenericInstantiation},
+        structs::IStruct,
         vector::IVector,
     },
 };
@@ -165,7 +165,7 @@ impl Unpackable for IntermediateType {
                 compilation_ctx,
             ),
             // TODO: pass directly struct to functions
-            IntermediateType::IStruct(index) => IStructConcrete::add_unpack_instructions(
+            IntermediateType::IStruct(index) => IStruct::add_unpack_instructions(
                 *index,
                 function_builder,
                 module,
@@ -174,7 +174,7 @@ impl Unpackable for IntermediateType {
                 compilation_ctx,
             ),
             IntermediateType::IGenericStructInstance(index, types) => {
-                IStructGenericInstantiation::add_unpack_instructions(
+                IStruct::add_unpack_instructions(
                     *index,
                     function_builder,
                     module,

@@ -43,16 +43,13 @@
 //! Because fields are always accessed via references, using pointers uniformly (even for simple
 //! values) simplifies the implementation, reduces special-case logic, and ensures consistent
 //! field management across all types.
-use std::{collections::HashMap, hash::Hash};
+use std::collections::HashMap;
 
 use crate::CompilationContext;
 
 use super::IntermediateType;
 use move_binary_format::{
-    file_format::{
-        FieldHandleIndex, FieldInstantiationIndex, StructDefInstantiationIndex,
-        StructDefinitionIndex,
-    },
+    file_format::{FieldHandleIndex, StructDefinitionIndex},
     internals::ModuleIndex,
 };
 use walrus::{
@@ -60,41 +57,30 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-pub type IStructConcrete = IStruct<StructDefinitionIndex, FieldHandleIndex>;
-pub type IStructGenericInstantiation =
-    IStruct<StructDefInstantiationIndex, FieldInstantiationIndex>;
 #[derive(Debug)]
-pub struct IStruct<I, FI>
-where
-    I: ModuleIndex + Copy,
-    FI: ModuleIndex + Copy + Eq + Hash,
-{
+pub struct IStruct {
     /// Field's types ordered by index
     pub fields: Vec<IntermediateType>,
 
     /// Map between handles and fields types
-    pub fields_types: HashMap<FI, IntermediateType>,
+    pub fields_types: HashMap<FieldHandleIndex, IntermediateType>,
 
     /// Map between handles and fields offset
-    pub field_offsets: HashMap<FI, u32>,
+    pub field_offsets: HashMap<FieldHandleIndex, u32>,
 
     /// Move's struct index
-    pub struct_definition_index: I,
+    pub struct_definition_index: StructDefinitionIndex,
 
     /// How much memory this struct occupies (in bytes). This will be the quantity of fields *4
     /// because we save pointers for all data types (stack or heap).
     pub heap_size: u32,
 }
 
-impl<I, FI> IStruct<I, FI>
-where
-    I: ModuleIndex + Copy,
-    FI: ModuleIndex + Copy + Eq + Hash + std::fmt::Debug,
-{
+impl IStruct {
     pub fn new(
-        index: I,
-        fields: Vec<(Option<FI>, IntermediateType)>,
-        fields_types: HashMap<FI, IntermediateType>,
+        index: StructDefinitionIndex,
+        fields: Vec<(Option<FieldHandleIndex>, IntermediateType)>,
+        fields_types: HashMap<FieldHandleIndex, IntermediateType>,
     ) -> Self {
         let mut heap_size = 0;
         let mut field_offsets = HashMap::new();
@@ -365,10 +351,7 @@ where
         false
     }
 
-    pub fn instantiate(
-        &self,
-        types: &[IntermediateType],
-    ) -> IStruct<StructDefinitionIndex, FieldHandleIndex> {
+    pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
         let fields = self
             .fields
             .iter()
@@ -400,7 +383,7 @@ where
             .map(|(k, v)| (FieldHandleIndex::new(k.into_index() as u16), *v))
             .collect();
 
-        IStruct::<StructDefinitionIndex, FieldHandleIndex> {
+        Self {
             fields,
             fields_types,
             field_offsets,

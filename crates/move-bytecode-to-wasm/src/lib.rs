@@ -8,7 +8,7 @@ use move_binary_format::file_format::{
 };
 use move_binary_format::internals::ModuleIndex;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
-use translation::intermediate_types::structs::{IStruct, IStructConcrete};
+use translation::intermediate_types::structs::IStruct;
 use translation::{
     functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
     translate_function,
@@ -165,7 +165,7 @@ pub fn translate_package(
         }
 
         // Module's structs
-        let mut module_structs: Vec<IStructConcrete> = vec![];
+        let mut module_structs: Vec<IStruct> = vec![];
         let mut fields_to_struct_map = HashMap::new();
         for (index, struct_def) in root_compiled_module.struct_defs().iter().enumerate() {
             let struct_index = StructDefinitionIndex::new(index as u16);
