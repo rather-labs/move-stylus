@@ -62,9 +62,8 @@ pub struct CompilationContext<'a> {
     /// Maps a field index to its corresponding struct
     pub fields_to_struct_map: &'a HashMap<FieldHandleIndex, StructDefinitionIndex>,
 
-    /// Maps a generic field index to its corresponding struct
-    pub generic_fields_to_struct_map:
-        &'a HashMap<FieldInstantiationIndex, StructDefInstantiationIndex>,
+    /// Maps a generic field index to its corresponding struct in module_generic_structs_instances
+    pub generic_fields_to_struct_map: &'a HashMap<FieldInstantiationIndex, usize>,
 
     /// This Hashmap maps the move's datatype handles to our internal representation of those
     /// types. The datatype handles are used interally by move to look for user defined data
@@ -133,12 +132,11 @@ impl CompilationContext<'_> {
             CompilationContextError::GenericStructWithFieldIdxNotFound(*field_index),
         )?;
 
-        self.module_generic_structs_instances
-            .iter()
-            .find(|s| &s.struct_definition_index == struct_id)
-            .ok_or(CompilationContextError::GenericStructWithFieldIdxNotFound(
-                *field_index,
-            ))
+        let struct_instance = &self.module_generic_structs_instances[*struct_id];
+        let generic_struct = &self.module_structs[struct_instance.0.0 as usize];
+
+        // TODO: instantiate generic struct and return
+        todo!()
     }
 
     pub fn get_generic_struct_by_struct_definition_idx(
@@ -148,9 +146,16 @@ impl CompilationContext<'_> {
         &IStruct<StructDefInstantiationIndex, FieldInstantiationIndex>,
         CompilationContextError,
     > {
+        let struct_instance = &self.module_generic_structs_instances[struct_index.0 as usize];
+        let generic_struct = &self.module_structs[struct_instance.0.0 as usize];
+
+        // TODO: instantiate generic struct and return
+        todo!()
+        /*
         self.module_generic_structs_instances
             .iter()
             .find(|s| &s.struct_definition_index == struct_index)
             .ok_or(CompilationContextError::GenericStructWithDefinitionIdxNotFound(*struct_index))
+            */
     }
 }

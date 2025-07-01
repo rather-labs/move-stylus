@@ -86,32 +86,7 @@ pub fn translate_package(
                 .iter()
                 .position(|s| s.struct_handle == idx)
             {
-                let struct_ = &root_compiled_module.struct_defs()[position];
-                if struct_
-                    .fields()
-                    .unwrap_or_default()
-                    .iter()
-                    .any(|f| matches!(f.signature.0, SignatureToken::TypeParameter(_)))
-                {
-                    for (index, generic_struct) in root_compiled_module
-                        .struct_instantiations()
-                        .iter()
-                        .enumerate()
-                    {
-                        if generic_struct.def == StructDefinitionIndex::new(position as u16) {
-                            let struct_instantiation_types = &root_compiled_module.signatures()
-                                [generic_struct.type_parameters.0 as usize]
-                                .0;
-
-                            datatype_handles_generics_instances_map.insert(
-                                (idx, struct_instantiation_types.to_vec()),
-                                UserDefinedGenericType::Struct(index as u16),
-                            );
-                        }
-                    }
-                } else {
-                    datatype_handles_map.insert(idx, UserDefinedType::Struct(position as u16));
-                }
+                datatype_handles_map.insert(idx, UserDefinedType::Struct(position as u16));
             } else if let Some(position) = root_compiled_module
                 .enum_defs()
                 .iter()
@@ -121,6 +96,62 @@ pub fn translate_package(
             } else {
                 panic!("datatype handle index {index} not found");
             };
+        }
+
+        // Process generic strucs
+        let mut module_generic_structs_instances = vec![];
+        let mut generic_fields_to_struct_map = HashMap::new();
+
+        for (index, struct_instance) in root_compiled_module
+            .struct_instantiations()
+            .iter()
+            .enumerate()
+        {
+            // Map the struct instantiation to the generic struct definition and the instantiation
+            // types. The index in the array will match the PackGeneric(index) instruction
+            let struct_instantiation_types =
+                &root_compiled_module.signatures()[struct_instance.type_parameters.0 as usize].0;
+
+            module_generic_structs_instances
+                .push((struct_instance.def, struct_instantiation_types.clone()));
+
+            // Process the mapping of generic fields to structs instantiations
+            let generic_struct_definition =
+                &root_compiled_module.struct_defs()[struct_instance.def.0 as usize];
+
+            let struct_index = StructDefinitionIndex::new(struct_instance.def.0);
+            let generic_struct_index = StructDefInstantiationIndex::new(index as u16);
+
+            if let Some(fields) = generic_struct_definition.fields() {
+                for (field_index, _) in fields.iter().enumerate() {
+                    let generic_field_index = root_compiled_module
+                        .field_instantiations()
+                        .iter()
+                        .position(|f| {
+                            let field_handle =
+                                &root_compiled_module.field_handles()[f.handle.into_index()];
+                            let struct_def_instantiation = &root_compiled_module
+                                .struct_instantiations()[generic_struct_index.into_index()];
+
+                            // Filter which generic field we are processing inside the struct
+                            field_handle.field == field_index as u16
+                                // Link it with the generic struct definition
+                                && field_handle.owner == struct_index
+                                // Link it with the struct instantiation using the signature
+                                && struct_def_instantiation.type_parameters == f.type_parameters
+                        })
+                        .map(|i| FieldInstantiationIndex::new(i as u16));
+
+                    // If field_index is None means the field is never referenced in the code
+                    if let Some(generic_field_index) = generic_field_index {
+                        let res = generic_fields_to_struct_map.insert(generic_field_index, index);
+                        assert!(
+                            res.is_none(),
+                            "there was an error mapping field {generic_field_index} to struct {struct_index}, already mapped"
+                        );
+                    }
+                }
+            }
         }
 
         // Module's structs
@@ -165,93 +196,6 @@ pub fn translate_package(
             }
 
             module_structs.push(IStruct::new(struct_index, all_fields, fields_map));
-        }
-
-        // Process generic structs
-        let mut module_generic_structs: Vec<IStructGenericInstantiation> = vec![];
-        let mut generic_fields_to_struct_map = HashMap::new();
-        for (index, struct_instance) in root_compiled_module
-            .struct_instantiations()
-            .iter()
-            .enumerate()
-        {
-            let generic_struct_definition =
-                &root_compiled_module.struct_defs()[struct_instance.def.0 as usize];
-
-            let struct_index = StructDefinitionIndex::new(struct_instance.def.0);
-            let generic_struct_index = StructDefInstantiationIndex::new(index as u16);
-            let mut generic_fields_map = HashMap::new();
-            let mut all_fields = Vec::new();
-
-            if let Some(fields) = generic_struct_definition.fields() {
-                for (field_index, field) in fields.iter().enumerate() {
-                    // Look for the concrete intermediate type of this instance
-                    let intermediate_type = match &field.signature.0 {
-                        SignatureToken::TypeParameter(concrete_type_idx) => {
-                            let struct_instantiation_types = &root_compiled_module.signatures()
-                                [struct_instance.type_parameters.0 as usize];
-                            let concrete_type =
-                                &struct_instantiation_types.0[*concrete_type_idx as usize];
-
-                            IntermediateType::try_from_signature_token(
-                                concrete_type,
-                                &datatype_handles_map,
-                                &datatype_handles_generics_instances_map,
-                            )
-                            .unwrap()
-                        }
-                        signature_type => IntermediateType::try_from_signature_token(
-                            signature_type,
-                            &datatype_handles_map,
-                            &datatype_handles_generics_instances_map,
-                        )
-                        .unwrap(),
-                    };
-
-                    let generic_field_index = root_compiled_module
-                        .field_instantiations()
-                        .iter()
-                        .position(|f| {
-                            let field_handle =
-                                &root_compiled_module.field_handles()[f.handle.into_index()];
-                            let struct_def_instantiation = &root_compiled_module
-                                .struct_instantiations()[generic_struct_index.into_index()];
-
-                            // Filter which generic field we are processing inside the struct
-                            field_handle.field == field_index as u16
-                                // Link it with the generic struct definition
-                                && field_handle.owner == struct_index
-                                // Link it with the struct instantiation using the signature
-                                && struct_def_instantiation.type_parameters == f.type_parameters
-                        })
-                        .map(|i| FieldInstantiationIndex::new(i as u16));
-
-                    // If field_index is None means the field is never referenced in the code
-                    if let Some(generic_field_index) = generic_field_index {
-                        let res = generic_fields_map
-                            .insert(generic_field_index, intermediate_type.clone());
-                        assert!(
-                            res.is_none(),
-                            "there was an error creating a field in struct instantiation {generic_struct_index}, field with index {generic_field_index} already exist"
-                        );
-                        let res = generic_fields_to_struct_map
-                            .insert(generic_field_index, generic_struct_index);
-                        assert!(
-                            res.is_none(),
-                            "there was an error mapping field {generic_field_index} to struct {struct_index}, already mapped"
-                        );
-                        all_fields.push((Some(generic_field_index), intermediate_type));
-                    } else {
-                        all_fields.push((None, intermediate_type));
-                    }
-                }
-            }
-
-            module_generic_structs.push(IStruct::new(
-                generic_struct_index,
-                all_fields,
-                generic_fields_map,
-            ));
         }
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
@@ -352,7 +296,7 @@ pub fn translate_package(
             functions_returns: &functions_returns,
             module_signatures: &root_compiled_module.signatures,
             module_structs: &module_structs,
-            module_generic_structs_instances: &module_generic_structs,
+            module_generic_structs_instances: &module_generic_structs_instances,
             datatype_handles_map: &datatype_handles_map,
             datatype_handles_generics_instances_map: &datatype_handles_generics_instances_map,
             fields_to_struct_map: &fields_to_struct_map,
