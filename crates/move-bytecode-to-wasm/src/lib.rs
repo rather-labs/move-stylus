@@ -126,20 +126,12 @@ pub fn translate_package(
         // Module's structs
         let mut module_structs: Vec<IStructConcrete> = vec![];
         let mut fields_to_struct_map = HashMap::new();
-        'str_defs_loop: for (index, struct_def) in
-            root_compiled_module.struct_defs().iter().enumerate()
-        {
+        for (index, struct_def) in root_compiled_module.struct_defs().iter().enumerate() {
             let struct_index = StructDefinitionIndex::new(index as u16);
             let mut fields_map = HashMap::new();
             let mut all_fields = Vec::new();
             if let Some(fields) = struct_def.fields() {
                 for (field_index, field) in fields.iter().enumerate() {
-                    // If the struct contains a generic field, we continue the outer loop. Generic
-                    // structs are processed in other place
-                    if let &SignatureToken::TypeParameter(_) = &field.signature.0 {
-                        continue 'str_defs_loop;
-                    }
-
                     let intermediate_type = IntermediateType::try_from_signature_token(
                         &field.signature.0,
                         &datatype_handles_map,

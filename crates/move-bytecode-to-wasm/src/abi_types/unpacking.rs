@@ -173,7 +173,7 @@ impl Unpackable for IntermediateType {
                 calldata_reader_pointer,
                 compilation_ctx,
             ),
-            IntermediateType::IGenericStructInstance(index) => {
+            IntermediateType::IGenericStructInstance(index, types) => {
                 IStructGenericInstantiation::add_unpack_instructions(
                     *index,
                     function_builder,
@@ -182,6 +182,9 @@ impl Unpackable for IntermediateType {
                     calldata_reader_pointer,
                     compilation_ctx,
                 )
+            }
+            IntermediateType::ITypeParameter(_) => {
+                panic!("Can not unpack generic type parameter");
             }
         }
     }

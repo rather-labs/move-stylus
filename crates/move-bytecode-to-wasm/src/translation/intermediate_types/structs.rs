@@ -274,7 +274,7 @@ where
                     );
                 }
                 IntermediateType::IStruct(_)
-                | IntermediateType::IGenericStructInstance(_)
+                | IntermediateType::IGenericStructInstance(_, _)
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
                 | IntermediateType::IU128
@@ -293,6 +293,11 @@ where
                 }
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                     panic!("references inside structs not allowed")
+                }
+                IntermediateType::ITypeParameter(_) => {
+                    panic!(
+                        "Trying to copy a type parameter inside a struct, expected a concrete type"
+                    );
                 }
             }
 
@@ -346,10 +351,13 @@ where
                         return true;
                     }
                 }
-                IntermediateType::IGenericStructInstance(_) => todo!(),
+                IntermediateType::IGenericStructInstance(_, _) => todo!(),
                 IntermediateType::ISigner => panic!("signer is not abi econdable"),
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                     panic!("found reference inside struct")
+                }
+                IntermediateType::ITypeParameter(_) => {
+                    panic!("Can not know if a type parameter is dynamic, expected a concrete type");
                 }
             }
         }

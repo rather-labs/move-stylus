@@ -257,7 +257,7 @@ fn map_bytecode_instruction(
             match types_stack.pop() {
                 Some(IntermediateType::IRef(inner)) => {
                     assert!(
-                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i) if *i == struct_.index()),
+                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i, types) if *i == struct_.index()),
                         "expected struct with index {} in types struct, got {inner:?}",
                         struct_.index()
                     );
@@ -301,7 +301,7 @@ fn map_bytecode_instruction(
             match types_stack.pop() {
                 Some(IntermediateType::IMutRef(inner)) => {
                     assert!(
-                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i) if *i == struct_.index()),
+                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i, types) if *i == struct_.index()),
                         "expected struct with index {} in types struct, got {inner:?}",
                         struct_.index()
                     );
@@ -420,7 +420,7 @@ fn map_bytecode_instruction(
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
                 | IntermediateType::IStruct(_)
-                | IntermediateType::IGenericStructInstance(_)
+                | IntermediateType::IGenericStructInstance(_, _)
                 | IntermediateType::IVector(_) => {
                     let pop_back_f =
                         RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
@@ -433,6 +433,9 @@ fn map_bytecode_instruction(
                 }
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                     panic!("VecPopBack operation is not allowed on reference types");
+                }
+                IntermediateType::ITypeParameter(_) => {
+                    panic!("can't perform VecPopBack on type parameters");
                 }
             }
 
@@ -1065,11 +1068,13 @@ fn map_bytecode_instruction(
             let struct_ = compilation_ctx
                 .get_generic_struct_by_struct_definition_idx(struct_definition_index)
                 .unwrap();
+            let types = todo!("Handle generic struct packing");
 
             pack_struct(struct_, module, builder, compilation_ctx, types_stack);
 
             types_stack.push(IntermediateType::IGenericStructInstance(
                 struct_definition_index.0,
+                types,
             ));
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
@@ -1223,11 +1228,14 @@ fn pack_struct<I, FI>(
                     | IntermediateType::ISigner
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct(_)
-                    | IntermediateType::IGenericStructInstance(_) => {
+                    | IntermediateType::IGenericStructInstance(_, _) => {
                         builder.local_set(ptr_to_data);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                         panic!("references inside structs not allowed")
+                    }
+                    IntermediateType::ITypeParameter(_) => {
+                        panic!("found type parameter when packing struct, expected type instance");
                     }
                 };
 

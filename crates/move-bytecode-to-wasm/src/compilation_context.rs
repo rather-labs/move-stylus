@@ -55,10 +55,9 @@ pub struct CompilationContext<'a> {
     /// Module's structs: contains all the user defined structs
     pub module_structs: &'a [IStruct<StructDefinitionIndex, FieldHandleIndex>],
 
-    /// Module's generic structs instances: contains all the user defined generic structs that were
-    /// instantiated at least once with concrete types
-    pub module_generic_structs_instances:
-        &'a [IStruct<StructDefInstantiationIndex, FieldInstantiationIndex>],
+    /// Module's generic structs instances: contains all the user defined generic structs instances
+    /// with its corresponding types
+    pub module_generic_structs_instances: &'a [(StructDefinitionIndex, Vec<SignatureToken>)],
 
     /// Maps a field index to its corresponding struct
     pub fields_to_struct_map: &'a HashMap<FieldHandleIndex, StructDefinitionIndex>,
