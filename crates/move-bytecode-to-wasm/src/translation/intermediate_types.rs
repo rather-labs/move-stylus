@@ -350,7 +350,19 @@ impl IntermediateType {
                 );
                 struct_.copy_local_instructions(module, builder, compilation_ctx);
             }
-            IntermediateType::IGenericStructInstance(_, _) => todo!(),
+            IntermediateType::IGenericStructInstance(index, types) => {
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_instance = struct_.instantiate(types);
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+                struct_instance.copy_local_instructions(module, builder, compilation_ctx);
+            }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 // Nothing to be done, pointer is already correct
             }
@@ -536,7 +548,16 @@ impl IntermediateType {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
                 IStruct::copy_local_instructions(struct_, module, builder, compilation_ctx);
             }
-            IntermediateType::IGenericStructInstance(_, _) => todo!(),
+            IntermediateType::IGenericStructInstance(index, types) => {
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_instance = struct_.instantiate(types);
+                IStruct::copy_local_instructions(
+                    &struct_instance,
+                    module,
+                    builder,
+                    compilation_ctx,
+                );
+            }
             IntermediateType::ISigner => {
                 // Signer type is read-only, we push the pointer only
             }

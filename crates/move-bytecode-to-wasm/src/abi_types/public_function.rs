@@ -78,6 +78,7 @@ impl<'a> PublicFunction<'a> {
         emit_log_function: FunctionId,
         compilation_ctx: &CompilationContext,
     ) {
+        println!("{:?}", self.function_selector);
         router_builder.block(None, |block| {
             let block_id = block.id();
 

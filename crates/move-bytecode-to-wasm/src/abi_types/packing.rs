@@ -454,8 +454,11 @@ impl Packable for IntermediateType {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
                 struct_.solidity_abi_encode_is_dynamic(compilation_ctx)
             }
-
-            IntermediateType::IGenericStructInstance(_, _) => todo!(),
+            IntermediateType::IGenericStructInstance(index, types) => {
+                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_instance = struct_.instantiate(types);
+                struct_instance.solidity_abi_encode_is_dynamic(compilation_ctx)
+            }
             IntermediateType::ITypeParameter(_) => {
                 panic!("Can not check if generic type parameter is dynamic at compile time");
             }
