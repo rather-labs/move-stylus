@@ -115,9 +115,9 @@ public fun echo_bar_unpack(bar: Bar<vector<u32>>): (vector<u32>, address, vector
     )
 }
 
-/*
-public fun pack_unpack_static(foo: Foo): Foo {
+public fun pack_unpack_static(foo: Foo<u32>): Foo<u32> {
     Foo {
+        g: foo.g,
         q: foo.q,
         t: foo.t,
         u: foo.u,
@@ -130,8 +130,9 @@ public fun pack_unpack_static(foo: Foo): Foo {
     }
 }
 
-public fun pack_unpack_dynamic(bar: Bar): Bar {
+public fun pack_unpack_dynamic(bar: Bar<vector<u32>>): Bar<vector<u32>> {
     Bar {
+        g: bar.g,
         q: bar.q,
         r: bar.r,
         s: bar.s,
@@ -148,10 +149,11 @@ public fun pack_unpack_dynamic(bar: Bar): Bar {
 }
 
 // This tests the packing/unpacking with the struct between other values
-public fun pack_unpack_between_vals_static(v1: bool, foo: Foo, v4: vector<u128>): (bool, Foo, vector<u128>) {
+public fun pack_unpack_between_vals_static(v1: bool, foo: Foo<u32>, v4: vector<u128>): (bool, Foo<u32>, vector<u128>) {
     (
         v1,
         Foo {
+            g: foo.g,
             q: foo.q,
             t: foo.t,
             u: foo.u,
@@ -166,10 +168,11 @@ public fun pack_unpack_between_vals_static(v1: bool, foo: Foo, v4: vector<u128>)
     )
 }
 
-public fun pack_unpack_between_vals_dynamic(v1: bool, _v2: vector<u32>, bar: Bar, _v3: bool, v4: vector<u128>): (bool, Bar, vector<u128>) {
+public fun pack_unpack_between_vals_dynamic(v1: bool, _v2: vector<u32>, bar: Bar<vector<u32>>, _v3: bool, v4: vector<u128>): (bool, Bar<vector<u32>>, vector<u128>) {
     (
         v1,
         Bar {
+            g: bar.g,
             q: bar.q,
             r: bar.r,
             s: bar.s,
@@ -186,4 +189,3 @@ public fun pack_unpack_between_vals_dynamic(v1: bool, _v2: vector<u32>, bar: Bar
         v4
     )
 }
-*/

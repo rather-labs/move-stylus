@@ -1033,7 +1033,6 @@ mod generic_struct_packing_unpacking {
             uint16 bba,
             uint128 bbb
         ) external returns (Bar bar);
-        /*
         function packUnpackStatic(Foo foo) external returns (Foo);
         function packUnpackDynamic(Bar bar) external returns (Bar);
         function packUnpackBetweenValsStatic(
@@ -1048,7 +1047,6 @@ mod generic_struct_packing_unpacking {
             bool v3,
             uint128[] v4
         ) external returns (bool, Bar, uint128[]);
-        */
     }
 
     #[rstest]
@@ -1195,9 +1193,9 @@ mod generic_struct_packing_unpacking {
             baz: Baz { a: 111, b: 1111111111 },
         }
     )]
-    /*
     #[case(packUnpackStaticCall::new(
         (Foo {
+            g: 424242,
             q: address!("0xcafe000000000000000000000000000000007357"),
             t: true,
             u: 255,
@@ -1209,6 +1207,7 @@ mod generic_struct_packing_unpacking {
             baz: Baz { a: 42, b: 4242}
         },)),
         Foo {
+            g: 424242,
             q: address!("0xcafe000000000000000000000000000000007357"),
             t: true,
             u: 255,
@@ -1222,6 +1221,7 @@ mod generic_struct_packing_unpacking {
     )]
     #[case(packUnpackDynamicCall::new(
         (Bar {
+            g: vec![4242, 424242],
             q: address!("0xcafe000000000000000000000000000000007357"),
             r: vec![1, 2, u32::MAX],
             s: vec![1, 2, u128::MAX],
@@ -1244,6 +1244,7 @@ mod generic_struct_packing_unpacking {
             baz: Baz { a: 111, b: 1111111111 },
         },)),
         Bar {
+            g: vec![4242, 424242],
             q: address!("0xcafe000000000000000000000000000000007357"),
             r: vec![1, 2, u32::MAX],
             s: vec![1, 2, u128::MAX],
@@ -1270,6 +1271,7 @@ mod generic_struct_packing_unpacking {
         (
             true,
             Foo {
+                g: 424242,
                 q: address!("0xcafe000000000000000000000000000000007357"),
                 t: true,
                 u: 255,
@@ -1285,6 +1287,7 @@ mod generic_struct_packing_unpacking {
         (
             true,
             Foo {
+                g: 424242,
                 q: address!("0xcafe000000000000000000000000000000007357"),
                 t: true,
                 u: 255,
@@ -1302,6 +1305,7 @@ mod generic_struct_packing_unpacking {
             true,
             vec![1,2,3,4,5],
             Bar {
+                g: vec![4242, 424242],
                 q: address!("0xcafe000000000000000000000000000000007357"),
                 r: vec![1, 2, u32::MAX],
                 s: vec![1, 2, u128::MAX],
@@ -1329,6 +1333,7 @@ mod generic_struct_packing_unpacking {
         (
             true,
             Bar {
+                g: vec![4242, 424242],
                 q: address!("0xcafe000000000000000000000000000000007357"),
                 r: vec![1, 2, u32::MAX],
                 s: vec![1, 2, u128::MAX],
@@ -1352,7 +1357,6 @@ mod generic_struct_packing_unpacking {
             },
             vec![7,8,9,10,11],
     ))]
-    */
     fn test_generic_struct_packing_unpacking<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
