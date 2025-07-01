@@ -1,17 +1,14 @@
 use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
-use compilation_context::UserDefinedGenericType;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use move_binary_format::file_format::{
-    DatatypeHandleIndex, FieldHandleIndex, FieldInstantiationIndex, SignatureToken,
-    StructDefInstantiationIndex, StructDefinitionIndex, Visibility,
+    DatatypeHandleIndex, FieldHandleIndex, FieldInstantiationIndex, StructDefInstantiationIndex,
+    StructDefinitionIndex, Visibility,
 };
 use move_binary_format::internals::ModuleIndex;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
-use translation::intermediate_types::structs::{
-    IStruct, IStructConcrete, IStructGenericInstantiation,
-};
+use translation::intermediate_types::structs::{IStruct, IStructConcrete};
 use translation::{
     functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
     translate_function,
@@ -70,7 +67,6 @@ pub fn translate_package(
         );
 
         let mut datatype_handles_map = HashMap::new();
-        let mut datatype_handles_generics_instances_map = HashMap::new();
 
         for (index, datatype_handle) in root_compiled_module.datatype_handles().iter().enumerate() {
             let idx = DatatypeHandleIndex::new(index as u16);
@@ -154,6 +150,20 @@ pub fn translate_package(
             }
         }
 
+        let mut instantiated_fields_to_generic_fields = HashMap::new();
+
+        // Map instantiated struct fields to indexes of generic fields
+        for (index, field_instance) in root_compiled_module
+            .field_instantiations()
+            .iter()
+            .enumerate()
+        {
+            instantiated_fields_to_generic_fields.insert(
+                FieldInstantiationIndex::new(index as u16),
+                field_instance.handle,
+            );
+        }
+
         // Module's structs
         let mut module_structs: Vec<IStructConcrete> = vec![];
         let mut fields_to_struct_map = HashMap::new();
@@ -166,7 +176,6 @@ pub fn translate_package(
                     let intermediate_type = IntermediateType::try_from_signature_token(
                         &field.signature.0,
                         &datatype_handles_map,
-                        &datatype_handles_generics_instances_map,
                     )
                     .unwrap();
 
@@ -240,13 +249,7 @@ pub fn translate_package(
                 move_function_arguments
                     .0
                     .iter()
-                    .map(|s| {
-                        IntermediateType::try_from_signature_token(
-                            s,
-                            &datatype_handles_map,
-                            &datatype_handles_generics_instances_map,
-                        )
-                    })
+                    .map(|s| IntermediateType::try_from_signature_token(s, &datatype_handles_map))
                     .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
                     .unwrap(),
             );
@@ -258,13 +261,7 @@ pub fn translate_package(
                 move_function_return
                     .0
                     .iter()
-                    .map(|s| {
-                        IntermediateType::try_from_signature_token(
-                            s,
-                            &datatype_handles_map,
-                            &datatype_handles_generics_instances_map,
-                        )
-                    })
+                    .map(|s| IntermediateType::try_from_signature_token(s, &datatype_handles_map))
                     .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
                     .unwrap(),
             );
@@ -283,7 +280,6 @@ pub fn translate_package(
                 code_locals,
                 function_def,
                 &datatype_handles_map,
-                &datatype_handles_generics_instances_map,
                 &mut module,
             );
 
@@ -298,9 +294,9 @@ pub fn translate_package(
             module_structs: &module_structs,
             module_generic_structs_instances: &module_generic_structs_instances,
             datatype_handles_map: &datatype_handles_map,
-            datatype_handles_generics_instances_map: &datatype_handles_generics_instances_map,
             fields_to_struct_map: &fields_to_struct_map,
             generic_fields_to_struct_map: &generic_fields_to_struct_map,
+            instantiated_fields_to_generic_fields: &instantiated_fields_to_generic_fields,
             memory_id,
             allocator: allocator_func,
         };

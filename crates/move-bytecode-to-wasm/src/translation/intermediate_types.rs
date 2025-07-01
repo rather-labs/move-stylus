@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{
-    CompilationContext, UserDefinedType, compilation_context::UserDefinedGenericType,
-    runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension,
+    CompilationContext, UserDefinedType, runtime::RuntimeFunction,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 use address::IAddress;
 use boolean::IBool;
@@ -79,10 +79,6 @@ impl IntermediateType {
     pub fn try_from_signature_token(
         value: &SignatureToken,
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-        handles_generics_instances_map: &HashMap<
-            (DatatypeHandleIndex, Vec<SignatureToken>),
-            UserDefinedGenericType,
-        >,
     ) -> Result<Self, anyhow::Error> {
         match value {
             SignatureToken::Bool => Ok(Self::IBool),
@@ -95,27 +91,15 @@ impl IntermediateType {
             SignatureToken::Address => Ok(Self::IAddress),
             SignatureToken::Signer => Ok(Self::ISigner),
             SignatureToken::Vector(token) => {
-                let itoken = Self::try_from_signature_token(
-                    token.as_ref(),
-                    handles_map,
-                    handles_generics_instances_map,
-                )?;
+                let itoken = Self::try_from_signature_token(token.as_ref(), handles_map)?;
                 Ok(IntermediateType::IVector(Box::new(itoken)))
             }
             SignatureToken::Reference(token) => {
-                let itoken = Self::try_from_signature_token(
-                    token.as_ref(),
-                    handles_map,
-                    handles_generics_instances_map,
-                )?;
+                let itoken = Self::try_from_signature_token(token.as_ref(), handles_map)?;
                 Ok(IntermediateType::IRef(Box::new(itoken)))
             }
             SignatureToken::MutableReference(token) => {
-                let itoken = Self::try_from_signature_token(
-                    token.as_ref(),
-                    handles_map,
-                    handles_generics_instances_map,
-                )?;
+                let itoken = Self::try_from_signature_token(token.as_ref(), handles_map)?;
                 Ok(IntermediateType::IMutRef(Box::new(itoken)))
             }
             SignatureToken::Datatype(index) => {
@@ -135,13 +119,7 @@ impl IntermediateType {
                     let types = index
                         .1
                         .iter()
-                        .map(|t| {
-                            Self::try_from_signature_token(
-                                t,
-                                handles_map,
-                                handles_generics_instances_map,
-                            )
-                        })
+                        .map(|t| Self::try_from_signature_token(t, handles_map))
                         .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()?;
 
                     Ok(match udt {
@@ -995,21 +973,11 @@ impl ISignature {
         arguments: &Signature,
         returns: &Signature,
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-        handles_generics_instances_map: &HashMap<
-            (DatatypeHandleIndex, Vec<SignatureToken>),
-            UserDefinedGenericType,
-        >,
     ) -> Self {
         let arguments = arguments
             .0
             .iter()
-            .map(|token| {
-                IntermediateType::try_from_signature_token(
-                    token,
-                    handles_map,
-                    handles_generics_instances_map,
-                )
-            })
+            .map(|token| IntermediateType::try_from_signature_token(token, handles_map))
             .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
             // TODO: unwrap
             .unwrap();
@@ -1017,13 +985,7 @@ impl ISignature {
         let returns = returns
             .0
             .iter()
-            .map(|token| {
-                IntermediateType::try_from_signature_token(
-                    token,
-                    handles_map,
-                    handles_generics_instances_map,
-                )
-            })
+            .map(|token| IntermediateType::try_from_signature_token(token, handles_map))
             .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
             // TODO: unwrap
             .unwrap();

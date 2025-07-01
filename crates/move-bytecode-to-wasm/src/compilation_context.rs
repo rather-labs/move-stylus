@@ -65,15 +65,24 @@ pub struct CompilationContext<'a> {
     /// Maps a generic field index to its corresponding struct in module_generic_structs_instances
     pub generic_fields_to_struct_map: &'a HashMap<FieldInstantiationIndex, usize>,
 
+    /// Maps a field instantiation index to its corresponding index inside the struct.
+    /// field instantiation indexes are unique per struct instantiation, so, for example if we have
+    /// the following struct:
+    /// ```move
+    /// struct S<T> {
+    ///    x: T,
+    /// }
+    /// ```
+    /// And we instantiate it with `S<u64>`, and `S<bool>`, the we will have a
+    /// FieldInstantiationIndex(0) and a FieldInstantiationIndex(1) both for the `x` field, but the
+    /// index inside the strict is 0 in both cases.
+    pub instantiated_fields_to_generic_fields:
+        &'a HashMap<FieldInstantiationIndex, FieldHandleIndex>,
+
     /// This Hashmap maps the move's datatype handles to our internal representation of those
     /// types. The datatype handles are used interally by move to look for user defined data
     /// types
     pub datatype_handles_map: &'a HashMap<DatatypeHandleIndex, UserDefinedType>,
-
-    // This HashMap maps the move's datatype habdles to our internal representation of the
-    // instantiated generic types.
-    pub datatype_handles_generics_instances_map:
-        &'a HashMap<(DatatypeHandleIndex, Vec<SignatureToken>), UserDefinedGenericType>,
 
     /// WASM memory id
     pub memory_id: MemoryId,
@@ -124,8 +133,7 @@ impl CompilationContext<'_> {
     pub fn get_generic_struct_by_field_handle_idx(
         &self,
         field_index: &FieldInstantiationIndex,
-    ) -> Result<IStruct<StructDefinitionIndex, FieldInstantiationIndex>, CompilationContextError>
-    {
+    ) -> Result<IStruct<StructDefinitionIndex, FieldHandleIndex>, CompilationContextError> {
         let struct_id = self.generic_fields_to_struct_map.get(field_index).ok_or(
             CompilationContextError::GenericStructWithFieldIdxNotFound(*field_index),
         )?;
@@ -136,13 +144,7 @@ impl CompilationContext<'_> {
         let types = struct_instance
             .1
             .iter()
-            .map(|t| {
-                IntermediateType::try_from_signature_token(
-                    t,
-                    self.datatype_handles_map,
-                    &HashMap::new(), // TODO: pass the generics map if needed
-                )
-            })
+            .map(|t| IntermediateType::try_from_signature_token(t, self.datatype_handles_map))
             .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
             .unwrap();
 
@@ -152,21 +154,14 @@ impl CompilationContext<'_> {
     pub fn get_generic_struct_by_struct_definition_idx(
         &self,
         struct_index: &StructDefInstantiationIndex,
-    ) -> Result<IStruct<StructDefinitionIndex, FieldInstantiationIndex>, CompilationContextError>
-    {
+    ) -> Result<IStruct<StructDefinitionIndex, FieldHandleIndex>, CompilationContextError> {
         let struct_instance = &self.module_generic_structs_instances[struct_index.0 as usize];
         let generic_struct = &self.module_structs[struct_instance.0.0 as usize];
 
         let types = struct_instance
             .1
             .iter()
-            .map(|t| {
-                IntermediateType::try_from_signature_token(
-                    t,
-                    self.datatype_handles_map,
-                    &HashMap::new(), // TODO: pass the generics map if needed
-                )
-            })
+            .map(|t| IntermediateType::try_from_signature_token(t, self.datatype_handles_map))
             .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
             .unwrap();
 
@@ -182,13 +177,7 @@ impl CompilationContext<'_> {
         let types = struct_instance
             .1
             .iter()
-            .map(|t| {
-                IntermediateType::try_from_signature_token(
-                    t,
-                    self.datatype_handles_map,
-                    &HashMap::new(), // TODO: pass the generics map if needed
-                )
-            })
+            .map(|t| IntermediateType::try_from_signature_token(t, self.datatype_handles_map))
             .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
             .unwrap();
 

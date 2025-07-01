@@ -7,9 +7,10 @@ use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::structs::IStruct;
 use intermediate_types::{simple_integers::IU8, vector::IVector};
-use move_binary_format::file_format::{Bytecode, SignatureIndex};
+use move_binary_format::file_format::{
+    Bytecode, FieldHandleIndex, SignatureIndex, StructDefinitionIndex,
+};
 use move_binary_format::internals::ModuleIndex;
-use std::fmt::Display;
 use std::hash::Hash;
 use table::FunctionTable;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
@@ -93,7 +94,6 @@ fn map_bytecode_instruction(
             let constant_type: IntermediateType = IntermediateType::try_from_signature_token(
                 constant_type,
                 compilation_ctx.datatype_handles_map,
-                compilation_ctx.datatype_handles_generics_instances_map,
             )
             .unwrap();
 
@@ -253,6 +253,13 @@ fn map_bytecode_instruction(
                 .get_generic_struct_by_field_handle_idx(field_id)
                 .unwrap();
 
+            let struct_field_id = compilation_ctx
+                .instantiated_fields_to_generic_fields
+                .get(field_id)
+                .unwrap();
+
+            println!("2 {field_id:?}");
+
             // Check if in the types stack we have the correct type
             match types_stack.pop() {
                 Some(IntermediateType::IRef(inner)) => {
@@ -268,7 +275,13 @@ fn map_bytecode_instruction(
                 ),
             }
 
-            struct_borrow_field(&struct_, field_id, builder, compilation_ctx, types_stack);
+            struct_borrow_field(
+                &struct_,
+                struct_field_id,
+                builder,
+                compilation_ctx,
+                types_stack,
+            );
         }
         Bytecode::MutBorrowField(field_id) => {
             let struct_ = compilation_ctx
@@ -297,6 +310,11 @@ fn map_bytecode_instruction(
                 .get_generic_struct_by_field_handle_idx(field_id)
                 .unwrap();
 
+            let struct_field_id = compilation_ctx
+                .instantiated_fields_to_generic_fields
+                .get(field_id)
+                .unwrap();
+
             // Check if in the types stack we have the correct type
             match types_stack.pop() {
                 Some(IntermediateType::IMutRef(inner)) => {
@@ -312,7 +330,13 @@ fn map_bytecode_instruction(
                 ),
             }
 
-            struct_mut_borrow_field(&struct_, field_id, builder, compilation_ctx, types_stack);
+            struct_mut_borrow_field(
+                &struct_,
+                struct_field_id,
+                builder,
+                compilation_ctx,
+                types_stack,
+            );
         }
         // Vector instructions
         Bytecode::VecImmBorrow(signature_index) => {
@@ -1083,16 +1107,13 @@ fn map_bytecode_instruction(
     }
 }
 
-fn struct_borrow_field<I, FI>(
-    struct_: &IStruct<I, FI>,
-    field_id: &FI,
+fn struct_borrow_field(
+    struct_: &IStruct<StructDefinitionIndex, FieldHandleIndex>,
+    field_id: &FieldHandleIndex,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     types_stack: &mut Vec<IntermediateType>,
-) where
-    I: ModuleIndex + Copy + Display,
-    FI: ModuleIndex + Copy + Eq + Hash + Display,
-{
+) {
     let Some(field_type) = struct_.fields_types.get(field_id) else {
         panic!(
             "{field_id} not found in {}",
@@ -1122,26 +1143,23 @@ fn struct_borrow_field<I, FI>(
     types_stack.push(IntermediateType::IRef(Box::new(field_type.clone())));
 }
 
-fn struct_mut_borrow_field<I, FI>(
-    struct_: &IStruct<I, FI>,
-    field_id: &FI,
+fn struct_mut_borrow_field(
+    struct_: &IStruct<StructDefinitionIndex, FieldHandleIndex>,
+    field_id: &FieldHandleIndex,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     types_stack: &mut Vec<IntermediateType>,
-) where
-    I: ModuleIndex + Copy + Display,
-    FI: ModuleIndex + Copy + Eq + Hash + Display,
-{
+) {
     let Some(field_type) = struct_.fields_types.get(field_id) else {
         panic!(
-            "{field_id} not found in {}",
+            "{field_id:?} not found in {}",
             struct_.struct_definition_index
         )
     };
 
     let Some(field_offset) = struct_.field_offsets.get(field_id) else {
         panic!(
-            "{field_id} offset not found in {}",
+            "{field_id:?} offset not found in {}",
             struct_.struct_definition_index
         )
     };
@@ -1298,7 +1316,6 @@ fn get_ir_for_signature_index(
     IntermediateType::try_from_signature_token(
         &signature_token[0],
         compilation_ctx.datatype_handles_map,
-        compilation_ctx.datatype_handles_generics_instances_map,
     )
     .unwrap()
 }

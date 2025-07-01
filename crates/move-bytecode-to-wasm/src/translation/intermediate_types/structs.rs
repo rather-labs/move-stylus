@@ -89,7 +89,7 @@ where
 impl<I, FI> IStruct<I, FI>
 where
     I: ModuleIndex + Copy,
-    FI: ModuleIndex + Copy + Eq + Hash,
+    FI: ModuleIndex + Copy + Eq + Hash + std::fmt::Debug,
 {
     pub fn new(
         index: I,
@@ -368,7 +368,7 @@ where
     pub fn instantiate(
         &self,
         types: &[IntermediateType],
-    ) -> IStruct<StructDefinitionIndex, FieldInstantiationIndex> {
+    ) -> IStruct<StructDefinitionIndex, FieldHandleIndex> {
         let fields = self
             .fields
             .iter()
@@ -385,7 +385,7 @@ where
             .fields_types
             .iter()
             .map(|(k, v)| {
-                let key = FieldInstantiationIndex::new(k.into_index() as u16);
+                let key = FieldHandleIndex::new(k.into_index() as u16);
                 if let IntermediateType::ITypeParameter(index) = v {
                     (key, types[*index as usize].clone())
                 } else {
@@ -397,13 +397,10 @@ where
         let field_offsets = self
             .field_offsets
             .iter()
-            .map(|(k, v)| {
-                let key = FieldInstantiationIndex::new(k.into_index() as u16);
-                (key, *v)
-            })
+            .map(|(k, v)| (FieldHandleIndex::new(k.into_index() as u16), *v))
             .collect();
 
-        IStruct::<StructDefinitionIndex, FieldInstantiationIndex> {
+        IStruct::<StructDefinitionIndex, FieldHandleIndex> {
             fields,
             fields_types,
             field_offsets,
