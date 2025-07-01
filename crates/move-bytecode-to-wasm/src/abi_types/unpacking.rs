@@ -173,7 +173,7 @@ impl Unpackable for IntermediateType {
                 calldata_reader_pointer,
                 compilation_ctx,
             ),
-            IntermediateType::IGenericStructInstance(index, types) => {
+            IntermediateType::IGenericStructInstance(index, _types) => {
                 IStruct::add_unpack_instructions(
                     *index,
                     function_builder,

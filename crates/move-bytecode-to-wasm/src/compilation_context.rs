@@ -71,7 +71,7 @@ pub struct CompilationContext<'a> {
     /// ```
     /// And we instantiate it with `S<u64>`, and `S<bool>`, the we will have a
     /// FieldInstantiationIndex(0) and a FieldInstantiationIndex(1) both for the `x` field, but the
-    /// index inside the strict is 0 in both cases.
+    /// index inside the struct is 0 in both cases.
     pub instantiated_fields_to_generic_fields:
         &'a HashMap<FieldInstantiationIndex, FieldHandleIndex>,
 

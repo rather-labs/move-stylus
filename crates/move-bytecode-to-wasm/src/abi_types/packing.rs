@@ -344,7 +344,7 @@ impl Packable for IntermediateType {
                     None,
                 )
             }
-            IntermediateType::IGenericStructInstance(index, types) => {
+            IntermediateType::IGenericStructInstance(index, _types) => {
                 // TODO Replace index by get struct
                 IStruct::add_pack_instructions(
                     *index,
@@ -386,7 +386,7 @@ impl Packable for IntermediateType {
                     Some(calldata_reference_pointer),
                 );
             }
-            IntermediateType::IGenericStructInstance(index, types) => {
+            IntermediateType::IGenericStructInstance(index, _types) => {
                 // TODO: Pass diretly struct
                 IStruct::add_pack_instructions(
                     *index,
