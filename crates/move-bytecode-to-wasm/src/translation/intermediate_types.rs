@@ -39,16 +39,17 @@ pub enum IntermediateType {
     IVector(Box<IntermediateType>),
     IRef(Box<IntermediateType>),
     IMutRef(Box<IntermediateType>),
-    // The usize is the struct's index in the compilation context's vector of declared structs
+    /// The usize is the struct's index in the compilation context's vector of declared structs
     IStruct(u16),
+
     /// Type parameter, used for generic enums and structs
     /// The u16 is the index of the type parameter in the signature
     ITypeParameter(u16),
+
     /// The usize is the index of the generic struct.
     /// The Vec<IntermediateType> is the list of types we are going to instantiate the generic
     /// struct with.
     IGenericStructInstance(u16, Vec<IntermediateType>),
-    // IGenericStructInstance(u16), //, Vec<IntermediateType>),
 }
 
 impl IntermediateType {
@@ -130,12 +131,24 @@ impl IntermediateType {
                 }
             }
             SignatureToken::DatatypeInstantiation(index) => {
-                if let Some(udt) = handles_generics_instances_map.get(index) {
+                if let Some(udt) = handles_map.get(&index.0) {
+                    let types = index
+                        .1
+                        .iter()
+                        .map(|t| {
+                            Self::try_from_signature_token(
+                                t,
+                                handles_map,
+                                handles_generics_instances_map,
+                            )
+                        })
+                        .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()?;
+
                     Ok(match udt {
-                        UserDefinedGenericType::Struct(i) => {
-                            todo!();
+                        UserDefinedType::Struct(i) => {
+                            IntermediateType::IGenericStructInstance(*i, types)
                         }
-                        UserDefinedGenericType::Enum(_) => todo!(),
+                        UserDefinedType::Enum(_) => todo!(),
                     })
                 } else {
                     Err(anyhow::anyhow!(

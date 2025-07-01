@@ -1071,14 +1071,13 @@ fn map_bytecode_instruction(
 
             pack_struct(&struct_, module, builder, compilation_ctx, types_stack);
 
+            let idx = compilation_ctx
+                .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
             let types = compilation_ctx
                 .get_generic_struct_types_instances(struct_definition_index)
                 .unwrap();
 
-            types_stack.push(IntermediateType::IGenericStructInstance(
-                struct_definition_index.0,
-                types,
-            ));
+            types_stack.push(IntermediateType::IGenericStructInstance(idx, types));
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }

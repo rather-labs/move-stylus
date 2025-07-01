@@ -139,7 +139,7 @@ impl CompilationContext<'_> {
             .map(|t| {
                 IntermediateType::try_from_signature_token(
                     t,
-                    &self.datatype_handles_map,
+                    self.datatype_handles_map,
                     &HashMap::new(), // TODO: pass the generics map if needed
                 )
             })
@@ -163,7 +163,7 @@ impl CompilationContext<'_> {
             .map(|t| {
                 IntermediateType::try_from_signature_token(
                     t,
-                    &self.datatype_handles_map,
+                    self.datatype_handles_map,
                     &HashMap::new(), // TODO: pass the generics map if needed
                 )
             })
@@ -185,7 +185,7 @@ impl CompilationContext<'_> {
             .map(|t| {
                 IntermediateType::try_from_signature_token(
                     t,
-                    &self.datatype_handles_map,
+                    self.datatype_handles_map,
                     &HashMap::new(), // TODO: pass the generics map if needed
                 )
             })
@@ -193,5 +193,13 @@ impl CompilationContext<'_> {
             .unwrap();
 
         Ok(types)
+    }
+
+    pub fn get_generic_struct_idx_by_struct_definition_idx(
+        &self,
+        struct_index: &StructDefInstantiationIndex,
+    ) -> u16 {
+        let struct_instance = &self.module_generic_structs_instances[struct_index.0 as usize];
+        struct_instance.0.0
     }
 }
