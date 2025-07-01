@@ -11,10 +11,6 @@ pub enum UserDefinedType {
     Struct(u16),
     Enum(usize),
 }
-pub enum UserDefinedGenericType {
-    Struct(u16),
-    Enum(usize),
-}
 
 #[derive(Debug, thiserror::Error)]
 #[allow(clippy::enum_variant_names)]
