@@ -80,15 +80,6 @@ pub enum TypesStackError {
         expected: &'static str,
         found: IntermediateType,
     },
-
-    #[error(
-        "unable to perform \"{operation:?}\" on types {operand1:?} and {operand2:?}, expected the same type"
-    )]
-    OperationTypeMismatch {
-        operand1: IntermediateType,
-        operand2: IntermediateType,
-        operation: Bytecode,
-    },
 }
 
 macro_rules! match_n_types {
@@ -105,4 +96,3 @@ macro_rules! match_n_types {
 }
 
 pub(crate) use match_n_types;
-use move_binary_format::file_format::Bytecode;
