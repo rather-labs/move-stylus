@@ -224,9 +224,7 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
         }
         Bytecode::ImmBorrowField(field_id) => {
-            let struct_ = compilation_ctx
-                .get_struct_by_field_handle_idx(field_id)
-                .unwrap();
+            let struct_ = compilation_ctx.get_struct_by_field_handle_idx(field_id)?;
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
@@ -263,9 +261,8 @@ fn map_bytecode_instruction(
             {
                 struct_
             } else {
-                let generic_stuct = compilation_ctx
-                    .get_struct_by_field_handle_idx(struct_field_id)
-                    .unwrap();
+                let generic_stuct =
+                    compilation_ctx.get_struct_by_field_handle_idx(struct_field_id)?;
 
                 generic_stuct.instantiate(&instantiation_types)
             };
@@ -284,9 +281,7 @@ fn map_bytecode_instruction(
             );
         }
         Bytecode::MutBorrowField(field_id) => {
-            let struct_ = compilation_ctx
-                .get_struct_by_field_handle_idx(field_id)
-                .unwrap();
+            let struct_ = compilation_ctx.get_struct_by_field_handle_idx(field_id)?;
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
@@ -323,9 +318,8 @@ fn map_bytecode_instruction(
             {
                 struct_
             } else {
-                let generic_stuct = compilation_ctx
-                    .get_struct_by_field_handle_idx(struct_field_id)
-                    .unwrap();
+                let generic_stuct =
+                    compilation_ctx.get_struct_by_field_handle_idx(struct_field_id)?;
                 generic_stuct.instantiate(&instantiation_types)
             };
 
@@ -618,32 +612,32 @@ fn map_bytecode_instruction(
             );
         }
         Bytecode::CastU8 => {
-            let original_type = types_stack.pop().unwrap();
+            let original_type = types_stack.pop()?;
             IU8::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU8);
         }
         Bytecode::CastU16 => {
-            let original_type = types_stack.pop().unwrap();
+            let original_type = types_stack.pop()?;
             IU16::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU16);
         }
         Bytecode::CastU32 => {
-            let original_type = types_stack.pop().unwrap();
+            let original_type = types_stack.pop()?;
             IU32::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU32);
         }
         Bytecode::CastU64 => {
-            let original_type = types_stack.pop().unwrap();
+            let original_type = types_stack.pop()?;
             IU64::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU64);
         }
         Bytecode::CastU128 => {
-            let original_type = types_stack.pop().unwrap();
+            let original_type = types_stack.pop()?;
             IU128::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU128);
         }
         Bytecode::CastU256 => {
-            let original_type = types_stack.pop().unwrap();
+            let original_type = types_stack.pop()?;
             IU256::cast_from(builder, module, original_type, compilation_ctx);
             types_stack.push(IntermediateType::IU256);
         }
@@ -1126,9 +1120,8 @@ fn map_bytecode_instruction(
             types_stack.push(t);
         }
         Bytecode::Pack(struct_definition_index) => {
-            let struct_ = compilation_ctx
-                .get_struct_by_struct_definition_idx(struct_definition_index)
-                .unwrap();
+            let struct_ =
+                compilation_ctx.get_struct_by_struct_definition_idx(struct_definition_index)?;
 
             bytecodes::structs::pack(struct_, module, builder, compilation_ctx, types_stack)?;
 
@@ -1136,16 +1129,14 @@ fn map_bytecode_instruction(
         }
         Bytecode::PackGeneric(struct_definition_index) => {
             let struct_ = compilation_ctx
-                .get_generic_struct_by_struct_definition_idx(struct_definition_index)
-                .unwrap();
+                .get_generic_struct_by_struct_definition_idx(struct_definition_index)?;
 
             bytecodes::structs::pack(&struct_, module, builder, compilation_ctx, types_stack)?;
 
             let idx = compilation_ctx
                 .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
-            let types = compilation_ctx
-                .get_generic_struct_types_instances(struct_definition_index)
-                .unwrap();
+            let types =
+                compilation_ctx.get_generic_struct_types_instances(struct_definition_index)?;
 
             types_stack.push(IntermediateType::IGenericStructInstance(idx, types));
         }

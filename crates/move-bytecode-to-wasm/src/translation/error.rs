@@ -1,11 +1,16 @@
 use move_binary_format::file_format::Bytecode;
 
+use crate::compilation_context::CompilationContextError;
+
 use super::{intermediate_types::IntermediateType, types_stack::TypesStackError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum TranslationError {
     #[error("Types stack error: {0}")]
     TypesStackError(#[from] TypesStackError),
+
+    #[error("Compilation context error: {0}")]
+    CompilationContextError(#[from] CompilationContextError),
 
     #[error("types mistach: expected {expected:?} but found {found:?}")]
     TypeMismatch {
