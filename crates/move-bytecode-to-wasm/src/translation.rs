@@ -8,7 +8,7 @@ use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
 use table::FunctionTable;
-use types_stack::TypesStack;
+use types_stack::{TypesStack, TypesStackError};
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{FunctionBuilder, Module};
 use walrus::{FunctionId, InstrSeqBuilder, ValType, ir::MemArg};
@@ -67,7 +67,9 @@ pub fn translate_function(
             function_table,
             &mut types_stack,
         )
-        .expect("There was an error translating the bytecode instruction {instruction:?}");
+        .map_err(|e| {
+            panic!("There was an error translating the bytecode instruction {instruction:?}\n{e}")
+        })?;
     }
 
     let function_id = function.finish(entry.function.arg_locals.clone(), &mut module.funcs);
@@ -151,7 +153,7 @@ fn map_bytecode_instruction(
         Bytecode::Call(function_handle_index) => {
             // Consume from the types stack the arguments that will be used by the function call
             let arguments = &compilation_ctx.functions_arguments[function_handle_index.0 as usize];
-            for (i, argument) in arguments.iter().enumerate().rev() {
+            for argument in arguments.iter().rev() {
                 types_stack.pop_expecting(argument)?;
 
                 if let IntermediateType::IMutRef(_) | IntermediateType::IRef(_) = argument {
@@ -245,6 +247,17 @@ fn map_bytecode_instruction(
                 .get(field_id)
                 .unwrap();
 
+            let instantiation_types = instantiation_types
+                .iter()
+                .map(|t| {
+                    IntermediateType::try_from_signature_token(
+                        t,
+                        compilation_ctx.datatype_handles_map,
+                    )
+                })
+                .collect::<Result<Vec<_>, anyhow::Error>>()
+                .unwrap();
+
             let struct_ = if let Ok(struct_) =
                 compilation_ctx.get_generic_struct_by_field_handle_idx(field_id)
             {
@@ -253,22 +266,13 @@ fn map_bytecode_instruction(
                 let generic_stuct = compilation_ctx
                     .get_struct_by_field_handle_idx(struct_field_id)
                     .unwrap();
-                let instantiation_types = instantiation_types
-                    .iter()
-                    .map(|t| {
-                        IntermediateType::try_from_signature_token(
-                            t,
-                            compilation_ctx.datatype_handles_map,
-                        )
-                    })
-                    .collect::<Result<Vec<_>, anyhow::Error>>()
-                    .unwrap();
+
                 generic_stuct.instantiate(&instantiation_types)
             };
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
-                IntermediateType::IGenericStructInstance(struct_.index(), struct_.fields),
+                IntermediateType::IGenericStructInstance(struct_.index(), instantiation_types),
             )))?;
 
             bytecodes::structs::borrow_field(
@@ -303,6 +307,17 @@ fn map_bytecode_instruction(
                 .get(field_id)
                 .unwrap();
 
+            let instantiation_types = instantiation_types
+                .iter()
+                .map(|t| {
+                    IntermediateType::try_from_signature_token(
+                        t,
+                        compilation_ctx.datatype_handles_map,
+                    )
+                })
+                .collect::<Result<Vec<_>, anyhow::Error>>()
+                .unwrap();
+
             let struct_ = if let Ok(struct_) =
                 compilation_ctx.get_generic_struct_by_field_handle_idx(field_id)
             {
@@ -311,22 +326,12 @@ fn map_bytecode_instruction(
                 let generic_stuct = compilation_ctx
                     .get_struct_by_field_handle_idx(struct_field_id)
                     .unwrap();
-                let instantiation_types = instantiation_types
-                    .iter()
-                    .map(|t| {
-                        IntermediateType::try_from_signature_token(
-                            t,
-                            compilation_ctx.datatype_handles_map,
-                        )
-                    })
-                    .collect::<Result<Vec<_>, anyhow::Error>>()
-                    .unwrap();
                 generic_stuct.instantiate(&instantiation_types)
             };
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
-                IntermediateType::IGenericStructInstance(struct_.index(), struct_.fields),
+                IntermediateType::IGenericStructInstance(struct_.index(), instantiation_types),
             )))?;
 
             bytecodes::structs::mut_borrow_field(
@@ -566,39 +571,34 @@ fn map_bytecode_instruction(
             inner.add_read_ref_instructions(builder, module, compilation_ctx);
             types_stack.push(*inner);
         }
-        Bytecode::WriteRef => match (types_stack.pop(), types_stack.pop()) {
-            (Some(IntermediateType::IMutRef(inner)), Some(value_type)) => {
-                if *inner == value_type {
-                    inner.add_write_ref_instructions(module, builder, compilation_ctx);
-                } else {
-                    panic!(
-                        "WriteRef type mismatch: expected value of type {:?}, got {:?}",
-                        inner, value_type
-                    );
-                }
-            }
-            (Some(other), Some(_)) => {
-                panic!("WriteRef expected a mutable reference, got {:?}", other);
-            }
-            _ => panic!("Type stack underflow on WriteRef"),
-        },
-        Bytecode::FreezeRef => {
-            let ref_type = types_stack
-                .pop()
-                .expect("FreezeRef expects a reference on the stack");
+        Bytecode::WriteRef => {
+            let [iref, value_type] = types_stack.pop_n_from_stack()?;
 
-            match ref_type {
-                IntermediateType::IMutRef(inner) => {
-                    types_stack.push(IntermediateType::IRef(inner.clone()));
-                }
-                _ => panic!("FreezeRef expected a mutable reference, got {:?}", ref_type),
+            types_stack::match_n_types!((IntermediateType::IMutRef(inner), "IMutRef", iref));
+
+            if *inner == value_type {
+                inner.add_write_ref_instructions(module, builder, compilation_ctx);
+            } else {
+                Err(TranslationError::TypeMismatch {
+                    expected: *inner,
+                    found: value_type,
+                })?;
             }
+        }
+        Bytecode::FreezeRef => {
+            let ref_type = types_stack.pop()?;
+
+            types_stack::match_n_types!((
+                IntermediateType::IMutRef(inner),
+                "mutable reference",
+                ref_type
+            ));
+
+            types_stack.push(IntermediateType::IRef(inner.clone()));
         }
         Bytecode::Pop => {
             builder.drop();
-            types_stack
-                .pop()
-                .unwrap_or_else(|| panic!("error dropping from types stack: types stack is empty"));
+            types_stack.pop()?;
         }
         // TODO: ensure this is the last instruction in the move code
         Bytecode::Ret => {
@@ -610,10 +610,8 @@ fn map_bytecode_instruction(
             );
 
             // Remove the return values from types stack and check if the types are correct
-            for (i, return_type) in mapped_function.signature.returns.iter().rev().enumerate() {
-                if let Err(e) = pop_types_stack(types_stack, return_type) {
-                    panic!("Function return type mismatch at index {i}: {e}");
-                }
+            for return_type in mapped_function.signature.returns.iter().rev() {
+                types_stack.pop_expecting(return_type)?;
             }
 
             // Stack types should be empty
@@ -653,57 +651,64 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IU256);
         }
         Bytecode::Add => {
-            let sum_type = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
-                assert_eq!(
-                    t1, t2,
-                    "types stack error: trying two add two different types {t1:?} {t2:?}"
-                );
-                t1
-            } else {
-                panic!("types stack is empty");
-            };
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
+            if t1 != t2 {
+                return Err(TypesStackError::OperationTypeMismatch {
+                    operand1: t1,
+                    operand2: t2,
+                    operation: Bytecode::Add,
+                })?;
+            }
 
-            match sum_type {
+            match t1 {
                 IntermediateType::IU8 => IU8::add(builder, module),
                 IntermediateType::IU16 => IU16::add(builder, module),
                 IntermediateType::IU32 => IU32::add(builder, module),
                 IntermediateType::IU64 => IU64::add(builder, module),
                 IntermediateType::IU128 => IU128::add(builder, module, compilation_ctx),
                 IntermediateType::IU256 => IU256::add(builder, module, compilation_ctx),
-                t => panic!("type stack error: trying to add two {t:?}"),
+                _ => Err(TranslationError::InvalidBinaryOperation {
+                    operation: Bytecode::Add,
+                    operands_types: t1,
+                })?,
             }
 
-            types_stack.push(sum_type);
+            types_stack.push(t2);
         }
         Bytecode::Sub => {
-            let sub_type = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
-                assert_eq!(
-                    t1, t2,
-                    "types stack error: trying two substract two different types {t1:?} {t2:?}"
-                );
-                t1
-            } else {
-                panic!("types stack is empty");
-            };
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
+            if t1 != t2 {
+                return Err(TypesStackError::OperationTypeMismatch {
+                    operand1: t1,
+                    operand2: t2,
+                    operation: Bytecode::Sub,
+                })?;
+            }
 
-            match sub_type {
+            match t1 {
                 IntermediateType::IU8 => IU8::sub(builder, module),
                 IntermediateType::IU16 => IU16::sub(builder, module),
                 IntermediateType::IU32 => IU32::sub(builder, module),
                 IntermediateType::IU64 => IU64::sub(builder, module),
                 IntermediateType::IU128 => IU128::sub(builder, module, compilation_ctx),
                 IntermediateType::IU256 => IU256::sub(builder, module, compilation_ctx),
-                t => panic!("type stack error: trying to substract two {t:?}"),
+                _ => Err(TranslationError::InvalidBinaryOperation {
+                    operation: Bytecode::Sub,
+                    operands_types: t1,
+                })?,
             }
 
-            types_stack.push(sub_type);
+            types_stack.push(t2);
         }
         Bytecode::Mul => {
-            let [t1, t2] = pop_n_from_stack(types_stack);
-            assert_eq!(
-                t1, t2,
-                "types stack error: trying to multiply two different types {t1:?} {t2:?}"
-            );
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
+            if t1 != t2 {
+                return Err(TypesStackError::OperationTypeMismatch {
+                    operand1: t1,
+                    operand2: t2,
+                    operation: Bytecode::Mul,
+                })?;
+            }
 
             match t1 {
                 IntermediateType::IU8 => IU8::mul(builder, module),
@@ -712,17 +717,23 @@ fn map_bytecode_instruction(
                 IntermediateType::IU64 => IU64::mul(builder, module),
                 IntermediateType::IU128 => IU128::mul(builder, module, compilation_ctx),
                 IntermediateType::IU256 => IU256::mul(builder, module, compilation_ctx),
-                t => panic!("type stack error: trying to multiply two {t:?}"),
+                _ => Err(TranslationError::InvalidBinaryOperation {
+                    operation: Bytecode::Mul,
+                    operands_types: t1,
+                })?,
             }
 
-            types_stack.push(t1);
+            types_stack.push(t2);
         }
         Bytecode::Div => {
-            let [t1, t2] = pop_n_from_stack(types_stack);
-            assert_eq!(
-                t1, t2,
-                "types stack error: trying to divide two different types {t1:?} {t2:?}"
-            );
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
+            if t1 != t2 {
+                return Err(TypesStackError::OperationTypeMismatch {
+                    operand1: t1,
+                    operand2: t2,
+                    operation: Bytecode::Div,
+                })?;
+            }
 
             match t1 {
                 IntermediateType::IU8 => IU8::div(builder),
@@ -731,17 +742,23 @@ fn map_bytecode_instruction(
                 IntermediateType::IU64 => IU64::div(builder),
                 IntermediateType::IU128 => IU128::div(builder, module, compilation_ctx),
                 IntermediateType::IU256 => IU256::div(builder, module, compilation_ctx),
-                t => panic!("type stack error: trying to divide two {t:?}"),
+                _ => Err(TranslationError::InvalidBinaryOperation {
+                    operation: Bytecode::Div,
+                    operands_types: t1,
+                })?,
             }
 
-            types_stack.push(t1);
+            types_stack.push(t2);
         }
         Bytecode::Lt => {
-            let [t1, t2] = pop_n_from_stack(types_stack);
-            assert_eq!(
-                t1, t2,
-                "types stack error: trying to compare two different types {t1:?} {t2:?}"
-            );
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
+            if t1 != t2 {
+                return Err(TypesStackError::OperationTypeMismatch {
+                    operand1: t1,
+                    operand2: t2,
+                    operation: Bytecode::Lt,
+                })?;
+            }
 
             match t1 {
                 IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
@@ -760,17 +777,23 @@ fn map_bytecode_instruction(
 
                     builder.i32_const(IU256::HEAP_SIZE).call(less_than_f);
                 }
-                _ => panic!("trying to compare two {t1:?}"),
+                _ => Err(TranslationError::InvalidBinaryOperation {
+                    operation: Bytecode::Lt,
+                    operands_types: t1,
+                })?,
             }
 
             types_stack.push(IntermediateType::IBool);
         }
         Bytecode::Le => {
-            let [t1, t2] = pop_n_from_stack(types_stack);
-            assert_eq!(
-                t1, t2,
-                "types stack error: trying to compare two different types {t1:?} {t2:?}"
-            );
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
+            if t1 != t2 {
+                return Err(TypesStackError::OperationTypeMismatch {
+                    operand1: t1,
+                    operand2: t2,
+                    operation: Bytecode::Le,
+                })?;
+            }
 
             match t1 {
                 IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
@@ -807,17 +830,23 @@ fn map_bytecode_instruction(
                         .call(less_than_f)
                         .negate();
                 }
-                _ => panic!("trying to compare two {t1:?}"),
+                _ => Err(TranslationError::InvalidBinaryOperation {
+                    operation: Bytecode::Le,
+                    operands_types: t1,
+                })?,
             }
 
             types_stack.push(IntermediateType::IBool);
         }
         Bytecode::Gt => {
-            let [t1, t2] = pop_n_from_stack(types_stack);
-            assert_eq!(
-                t1, t2,
-                "types stack error: trying to compare two different types {t1:?} {t2:?}"
-            );
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
+            if t1 != t2 {
+                return Err(TypesStackError::OperationTypeMismatch {
+                    operand1: t1,
+                    operand2: t2,
+                    operation: Bytecode::Gt,
+                })?;
+            }
 
             match t1 {
                 IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
@@ -850,17 +879,23 @@ fn map_bytecode_instruction(
                         .i32_const(IU256::HEAP_SIZE)
                         .call(less_than_f);
                 }
-                _ => panic!("trying to compare two {t1:?}"),
+                _ => Err(TranslationError::InvalidBinaryOperation {
+                    operation: Bytecode::Gt,
+                    operands_types: t1,
+                })?,
             }
 
             types_stack.push(IntermediateType::IBool);
         }
         Bytecode::Ge => {
-            let [t1, t2] = pop_n_from_stack(types_stack);
-            assert_eq!(
-                t1, t2,
-                "types stack error: trying to compare two different types {t1:?} {t2:?}"
-            );
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
+            if t1 != t2 {
+                return Err(TypesStackError::OperationTypeMismatch {
+                    operand1: t1,
+                    operand2: t2,
+                    operation: Bytecode::Ge,
+                })?;
+            }
 
             match t1 {
                 IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
@@ -888,17 +923,23 @@ fn map_bytecode_instruction(
                         .call(less_than_f)
                         .negate();
                 }
-                _ => panic!("trying to compare two {t1:?}"),
+                _ => Err(TranslationError::InvalidBinaryOperation {
+                    operation: Bytecode::Ge,
+                    operands_types: t1,
+                })?,
             }
 
             types_stack.push(IntermediateType::IBool);
         }
         Bytecode::Mod => {
-            let [t1, t2] = pop_n_from_stack(types_stack);
-            assert_eq!(
-                t1, t2,
-                "types stack error: trying to mod two different types {t1:?} {t2:?}"
-            );
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
+            if t1 != t2 {
+                return Err(TypesStackError::OperationTypeMismatch {
+                    operand1: t1,
+                    operand2: t2,
+                    operation: Bytecode::Mod,
+                })?;
+            }
 
             match t1 {
                 IntermediateType::IU8 => IU8::remainder(builder),
@@ -907,61 +948,70 @@ fn map_bytecode_instruction(
                 IntermediateType::IU64 => IU64::remainder(builder),
                 IntermediateType::IU128 => IU128::remainder(builder, module, compilation_ctx),
                 IntermediateType::IU256 => IU256::remainder(builder, module, compilation_ctx),
-                t => panic!("type stack error: trying to mod two {t:?}"),
+                _ => Err(TranslationError::InvalidBinaryOperation {
+                    operation: Bytecode::Mod,
+                    operands_types: t1,
+                })?,
             }
 
-            types_stack.push(t1);
+            types_stack.push(t2);
         }
         Bytecode::Eq => {
-            let [t1, t2] = pop_n_from_stack(types_stack);
-            assert_eq!(
-                t1, t2,
-                "types stack error: trying to compare by equality two different types {t1:?} {t2:?}"
-            );
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
+            if t1 != t2 {
+                return Err(TypesStackError::OperationTypeMismatch {
+                    operand1: t1,
+                    operand2: t2,
+                    operation: Bytecode::Eq,
+                })?;
+            }
 
             t1.load_equality_instructions(module, builder, compilation_ctx);
 
             types_stack.push(IntermediateType::IBool);
         }
         Bytecode::Neq => {
-            let [t1, t2] = pop_n_from_stack(types_stack);
-            assert_eq!(
-                t1, t2,
-                "types stack error: trying to compare by equality two different types {t1:?} {t2:?}"
-            );
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
+            if t1 != t2 {
+                return Err(TypesStackError::OperationTypeMismatch {
+                    operand1: t1,
+                    operand2: t2,
+                    operation: Bytecode::Neq,
+                })?;
+            }
 
             t1.load_not_equality_instructions(module, builder, compilation_ctx);
 
             types_stack.push(IntermediateType::IBool);
         }
         Bytecode::Or => {
-            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
-            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
+            types_stack.pop_expecting(&IntermediateType::IBool)?;
+            types_stack.pop_expecting(&IntermediateType::IBool)?;
             builder.binop(BinaryOp::I32Or);
             types_stack.push(IntermediateType::IBool);
         }
         Bytecode::And => {
-            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
-            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
+            types_stack.pop_expecting(&IntermediateType::IBool)?;
+            types_stack.pop_expecting(&IntermediateType::IBool)?;
             builder.binop(BinaryOp::I32And);
             types_stack.push(IntermediateType::IBool);
         }
         Bytecode::Not => {
-            pop_types_stack(types_stack, &IntermediateType::IBool).unwrap();
+            types_stack.pop_expecting(&IntermediateType::IBool)?;
             builder.unop(UnaryOp::I32Eqz);
             types_stack.push(IntermediateType::IBool);
         }
         Bytecode::BitOr => {
-            let t = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
-                assert_eq!(
-                    t1, t2,
-                    "types stack error: trying two BitOr two different types {t1:?} {t2:?}"
-                );
-                t1
-            } else {
-                panic!("types stack is empty");
-            };
-            match t {
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
+            if t1 != t2 {
+                return Err(TypesStackError::OperationTypeMismatch {
+                    operand1: t1,
+                    operand2: t2,
+                    operation: Bytecode::BitOr,
+                })?;
+            }
+
+            match t1 {
                 IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
                     builder.binop(BinaryOp::I32Or);
                 }
@@ -974,21 +1024,25 @@ fn map_bytecode_instruction(
                 IntermediateType::IU256 => {
                     IU256::bit_or(builder, module, compilation_ctx);
                 }
-                _ => panic!("type stack error: trying to BitOr two {t:?}"),
+                _ => Err(TranslationError::InvalidBinaryOperation {
+                    operation: Bytecode::BitOr,
+                    operands_types: t1,
+                })?,
             }
-            types_stack.push(t);
+
+            types_stack.push(t2);
         }
         Bytecode::BitAnd => {
-            let t = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
-                assert_eq!(
-                    t1, t2,
-                    "types stack error: trying two BitOr two different types {t1:?} {t2:?}"
-                );
-                t1
-            } else {
-                panic!("types stack is empty");
-            };
-            match t {
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
+            if t1 != t2 {
+                return Err(TypesStackError::OperationTypeMismatch {
+                    operand1: t1,
+                    operand2: t2,
+                    operation: Bytecode::BitAnd,
+                })?;
+            }
+
+            match t1 {
                 IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
                     builder.binop(BinaryOp::I32And);
                 }
@@ -1001,21 +1055,25 @@ fn map_bytecode_instruction(
                 IntermediateType::IU256 => {
                     IU256::bit_and(builder, module, compilation_ctx);
                 }
-                _ => panic!("type stack error: trying to BitOr two {t:?}"),
+                _ => Err(TranslationError::InvalidBinaryOperation {
+                    operation: Bytecode::BitAnd,
+                    operands_types: t1,
+                })?,
             }
-            types_stack.push(t);
+
+            types_stack.push(t2);
         }
         Bytecode::Xor => {
-            let t = if let (Some(t1), Some(t2)) = (types_stack.pop(), types_stack.pop()) {
-                assert_eq!(
-                    t1, t2,
-                    "types stack error: trying two BitOr two different types {t1:?} {t2:?}"
-                );
-                t1
-            } else {
-                panic!("types stack is empty");
-            };
-            match t {
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
+            if t1 != t2 {
+                return Err(TypesStackError::OperationTypeMismatch {
+                    operand1: t1,
+                    operand2: t2,
+                    operation: Bytecode::BitOr,
+                })?;
+            }
+
+            match t1 {
                 IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
                     builder.binop(BinaryOp::I32Xor);
                 }
@@ -1028,13 +1086,17 @@ fn map_bytecode_instruction(
                 IntermediateType::IU256 => {
                     IU256::bit_xor(builder, module, compilation_ctx);
                 }
-                _ => panic!("type stack error: trying to BitOr two {t:?}"),
+                _ => Err(TranslationError::InvalidBinaryOperation {
+                    operation: Bytecode::Xor,
+                    operands_types: t2,
+                })?,
             }
-            types_stack.push(t);
+
+            types_stack.push(t1);
         }
         Bytecode::Shl => {
-            pop_types_stack(types_stack, &IntermediateType::IU8).unwrap();
-            let t = types_stack.pop().unwrap();
+            types_stack.pop_expecting(&IntermediateType::IU8)?;
+            let t = types_stack.pop()?;
             match t {
                 IntermediateType::IU8 => IU8::bit_shift_left(builder, module),
                 IntermediateType::IU16 => IU16::bit_shift_left(builder, module),
@@ -1042,13 +1104,16 @@ fn map_bytecode_instruction(
                 IntermediateType::IU64 => IU64::bit_shift_left(builder, module),
                 IntermediateType::IU128 => IU128::bit_shift_left(builder, module, compilation_ctx),
                 IntermediateType::IU256 => IU256::bit_shift_left(builder, module, compilation_ctx),
-                t => panic!("type stack error: invalid type for Shl: {t:?}"),
+                _ => Err(TranslationError::InvalidOperation {
+                    operation: Bytecode::Shl,
+                    operand_type: t.clone(),
+                })?,
             }
             types_stack.push(t);
         }
         Bytecode::Shr => {
-            pop_types_stack(types_stack, &IntermediateType::IU8).unwrap();
-            let t = types_stack.pop().unwrap();
+            types_stack.pop_expecting(&IntermediateType::IU8)?;
+            let t = types_stack.pop()?;
             match t {
                 IntermediateType::IU8 => IU8::bit_shift_right(builder, module),
                 IntermediateType::IU16 => IU16::bit_shift_right(builder, module),
@@ -1056,7 +1121,10 @@ fn map_bytecode_instruction(
                 IntermediateType::IU64 => IU64::bit_shift_right(builder, module),
                 IntermediateType::IU128 => IU128::bit_shift_right(builder, module, compilation_ctx),
                 IntermediateType::IU256 => IU256::bit_shift_right(builder, module, compilation_ctx),
-                t => panic!("type stack error: invalid type for Shr: {t:?}"),
+                _ => Err(TranslationError::InvalidOperation {
+                    operation: Bytecode::Shr,
+                    operand_type: t.clone(),
+                })?,
             }
             types_stack.push(t);
         }
@@ -1065,7 +1133,7 @@ fn map_bytecode_instruction(
                 .get_struct_by_struct_definition_idx(struct_definition_index)
                 .unwrap();
 
-            bytecodes::structs::pack(struct_, module, builder, compilation_ctx, types_stack);
+            bytecodes::structs::pack(struct_, module, builder, compilation_ctx, types_stack)?;
 
             types_stack.push(IntermediateType::IStruct(struct_definition_index.0));
         }
@@ -1074,7 +1142,7 @@ fn map_bytecode_instruction(
                 .get_generic_struct_by_struct_definition_idx(struct_definition_index)
                 .unwrap();
 
-            bytecodes::structs::pack(&struct_, module, builder, compilation_ctx, types_stack);
+            bytecodes::structs::pack(&struct_, module, builder, compilation_ctx, types_stack)?;
 
             let idx = compilation_ctx
                 .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
@@ -1084,7 +1152,9 @@ fn map_bytecode_instruction(
 
             types_stack.push(IntermediateType::IGenericStructInstance(idx, types));
         }
-        _ => panic!("Unsupported instruction: {:?}", instruction),
+        b => Err(TranslationError::UnssuportedOperation {
+            operation: b.clone(),
+        })?,
     }
 
     Ok(())

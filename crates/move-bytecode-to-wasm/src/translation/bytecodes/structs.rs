@@ -7,6 +7,7 @@ use walrus::{
 use crate::{
     CompilationContext,
     translation::{
+        TranslationError,
         intermediate_types::{IntermediateType, structs::IStruct},
         types_stack::TypesStack,
     },
@@ -100,7 +101,7 @@ pub fn pack(
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     types_stack: &mut TypesStack,
-) {
+) -> Result<(), TranslationError> {
     // Pointer to the struct
     let pointer = module.locals.add(ValType::I32);
     // Pointer for simple types
@@ -117,8 +118,8 @@ pub fn pack(
 
     for pack_type in struct_.fields.iter().rev() {
         offset -= 4;
-        match types_stack.pop() {
-            Some(t) if &t == pack_type => {
+        match types_stack.pop()? {
+            t if &t == pack_type => {
                 match pack_type {
                     // Stack values: create a middle pointer to save the actual value
                     IntermediateType::IBool
@@ -177,10 +178,14 @@ pub fn pack(
                     MemArg { align: 0, offset },
                 );
             }
-            Some(t) => panic!("expected {pack_type:?} in types stack, found {t:?}"),
-            None => panic!("types stack is empty, expected type {pack_type:?}"),
+            t => Err(TranslationError::TypeMismatch {
+                expected: pack_type.clone(),
+                found: t,
+            })?,
         }
     }
 
     builder.local_get(pointer);
+
+    Ok(())
 }
