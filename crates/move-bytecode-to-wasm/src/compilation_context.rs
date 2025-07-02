@@ -51,7 +51,6 @@ pub struct CompilationContext<'a> {
     /// Module's structs: contains all the user defined structs
     pub module_structs: &'a [IStruct],
 
-    // TODO: Check if this field is needed
     /// Module's generic structs instances: contains all the user defined generic structs instances
     /// with its corresponding types
     pub module_generic_structs_instances: &'a [(StructDefinitionIndex, Vec<SignatureToken>)],
@@ -63,7 +62,7 @@ pub struct CompilationContext<'a> {
     pub generic_fields_to_struct_map: &'a HashMap<FieldInstantiationIndex, usize>,
 
     /// Maps a field instantiation index to its corresponding index inside the struct.
-    /// field instantiation indexes are unique per struct instantiation, so, for example if we have
+    /// Field instantiation indexes are unique per struct instantiation, so, for example if we have
     /// the following struct:
     /// ```move
     /// struct S<T> {
@@ -73,6 +72,10 @@ pub struct CompilationContext<'a> {
     /// And we instantiate it with `S<u64>`, and `S<bool>`, the we will have a
     /// FieldInstantiationIndex(0) and a FieldInstantiationIndex(1) both for the `x` field, but the
     /// index inside the struct is 0 in both cases.
+    ///
+    /// We also map the concrete types of the instantiated generic struct where this field
+    /// instantiuation belongs to. This is needed because there are situations where we need to
+    /// intantiate the struct only with the field instantiation index and no other information.
     pub instantiated_fields_to_generic_fields:
         &'a HashMap<FieldInstantiationIndex, (FieldHandleIndex, Vec<SignatureToken>)>,
 
