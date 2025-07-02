@@ -73,7 +73,7 @@ impl IRef {
                 panic!("Inner type cannot be a reference!");
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("Can not unpack generic type parameter");
+                panic!("cannot unpack generic type parameter");
             }
         }
     }
@@ -145,7 +145,7 @@ impl IMutRef {
                 panic!("Inner type cannot be a reference!");
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("Can not unpack generic type parameter");
+                panic!("cannot unpack generic type parameter");
             }
         }
     }

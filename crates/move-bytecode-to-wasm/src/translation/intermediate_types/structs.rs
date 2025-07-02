@@ -350,7 +350,7 @@ impl IStruct {
                     panic!("found reference inside struct")
                 }
                 IntermediateType::ITypeParameter(_) => {
-                    panic!("Can not know if a type parameter is dynamic, expected a concrete type");
+                    panic!("cannot know if a type parameter is dynamic, expected a concrete type");
                 }
             }
         }
@@ -398,7 +398,7 @@ impl IStruct {
                     panic!("found reference inside struct")
                 }
                 IntermediateType::ITypeParameter(_) => {
-                    panic!("Can not know a type parameter's size, expected a concrete type");
+                    panic!("cannot know a type parameter's size, expected a concrete type");
                 }
             }
         }
