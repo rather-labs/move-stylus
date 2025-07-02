@@ -337,7 +337,7 @@ fn map_bytecode_instruction(
         Bytecode::VecImmBorrow(signature_index) => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
 
-            types_stack::match_n_types!(
+            types_stack::match_types!(
                 (IntermediateType::IU64, "u64", t1),
                 (IntermediateType::IRef(ref_inner), "vector reference", t2),
                 (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
@@ -362,7 +362,7 @@ fn map_bytecode_instruction(
         Bytecode::VecMutBorrow(signature_index) => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
 
-            types_stack::match_n_types!(
+            types_stack::match_types!(
                 (IntermediateType::IU64, "u64", t1),
                 (
                     IntermediateType::IMutRef(ref_inner),
@@ -414,7 +414,7 @@ fn map_bytecode_instruction(
         Bytecode::VecPopBack(signature_index) => {
             let ty = types_stack.pop()?;
 
-            types_stack::match_n_types!(
+            types_stack::match_types!(
                 (
                     IntermediateType::IMutRef(ref_inner),
                     "mutable vector reference",
@@ -471,7 +471,7 @@ fn map_bytecode_instruction(
         Bytecode::VecPushBack(signature_index) => {
             let [elem_ty, ref_ty] = types_stack.pop_n_from_stack()?;
 
-            types_stack::match_n_types!(
+            types_stack::match_types!(
                 (
                     IntermediateType::IMutRef(mut_inner),
                     "mutable vector reference",
@@ -504,7 +504,7 @@ fn map_bytecode_instruction(
         Bytecode::VecSwap(signature_index) => {
             let [id2_ty, id1_ty, ref_ty] = types_stack.pop_n_from_stack()?;
 
-            types_stack::match_n_types!(
+            types_stack::match_types!(
                 (IntermediateType::IU64, "u64", id2_ty),
                 (IntermediateType::IU64, "u64", id1_ty),
                 (
@@ -572,7 +572,7 @@ fn map_bytecode_instruction(
         Bytecode::ReadRef => {
             let ref_type = types_stack.pop()?;
 
-            types_stack::match_n_types!((
+            types_stack::match_types!((
                 (IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner)),
                 "IRef or IMutRef",
                 ref_type
@@ -584,7 +584,7 @@ fn map_bytecode_instruction(
         Bytecode::WriteRef => {
             let [iref, value_type] = types_stack.pop_n_from_stack()?;
 
-            types_stack::match_n_types!((IntermediateType::IMutRef(inner), "IMutRef", iref));
+            types_stack::match_types!((IntermediateType::IMutRef(inner), "IMutRef", iref));
 
             if *inner == value_type {
                 inner.add_write_ref_instructions(module, builder, compilation_ctx);
@@ -598,7 +598,7 @@ fn map_bytecode_instruction(
         Bytecode::FreezeRef => {
             let ref_type = types_stack.pop()?;
 
-            types_stack::match_n_types!((
+            types_stack::match_types!((
                 IntermediateType::IMutRef(inner),
                 "mutable reference",
                 ref_type

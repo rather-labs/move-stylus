@@ -82,7 +82,7 @@ pub enum TypesStackError {
     },
 }
 
-macro_rules! match_n_types {
+macro_rules! match_types {
     ($(($expected_pattern: pat, $expected_type: expr, $variable: expr)),*) => {
         $(
             let $expected_pattern = $variable else {
@@ -95,4 +95,4 @@ macro_rules! match_n_types {
     };
 }
 
-pub(crate) use match_n_types;
+pub(crate) use match_types;
