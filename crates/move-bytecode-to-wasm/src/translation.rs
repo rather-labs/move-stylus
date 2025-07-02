@@ -8,7 +8,7 @@ use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
 use table::FunctionTable;
-use types_stack::{TypesStack, TypesStackError};
+use types_stack::TypesStack;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{FunctionBuilder, Module};
 use walrus::{FunctionId, InstrSeqBuilder, ValType, ir::MemArg};
@@ -355,10 +355,10 @@ fn map_bytecode_instruction(
             let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
             if *vec_inner != expected_vec_inner {
-                panic!(
-                    "Expected vector inner type {:?}, got {:?}",
-                    expected_vec_inner, *vec_inner
-                );
+                return Err(TranslationError::TypeMismatch {
+                    expected: expected_vec_inner,
+                    found: *vec_inner,
+                });
             }
 
             IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx);
@@ -381,10 +381,10 @@ fn map_bytecode_instruction(
             let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
             if *vec_inner != expected_vec_inner {
-                panic!(
-                    "Expected vector inner type {:?}, got {:?}",
-                    expected_vec_inner, *vec_inner
-                );
+                return Err(TranslationError::TypeMismatch {
+                    expected: expected_vec_inner,
+                    found: *vec_inner,
+                });
             }
 
             IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx);
@@ -425,10 +425,10 @@ fn map_bytecode_instruction(
             let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
             if *vec_inner != expected_vec_inner {
-                panic!(
-                    "Expected vector inner type {:?}, got {:?}",
-                    expected_vec_inner, *vec_inner
-                );
+                return Err(TranslationError::TypeMismatch {
+                    expected: expected_vec_inner,
+                    found: *vec_inner,
+                });
             }
 
             match *vec_inner {
@@ -452,11 +452,13 @@ fn map_bytecode_instruction(
                         RuntimeFunction::VecPopBack64.get(module, Some(compilation_ctx));
                     builder.call(pop_back_f);
                 }
-                IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                    panic!("VecPopBack operation is not allowed on reference types");
-                }
-                IntermediateType::ITypeParameter(_) => {
-                    panic!("can't perform VecPopBack on type parameters");
+                IntermediateType::ITypeParameter(_)
+                | IntermediateType::IRef(_)
+                | IntermediateType::IMutRef(_) => {
+                    return Err(TranslationError::InvalidOperation {
+                        operation: instruction.clone(),
+                        operand_type: *vec_inner,
+                    });
                 }
             }
 
@@ -477,17 +479,17 @@ fn map_bytecode_instruction(
             let expected_elem_type = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
             if *vec_inner != expected_elem_type {
-                panic!(
-                    "Expected vector inner type {:?}, got {:?}",
-                    expected_elem_type, *vec_inner
-                );
+                return Err(TranslationError::TypeMismatch {
+                    expected: expected_elem_type,
+                    found: *vec_inner,
+                });
             }
 
             if elem_ty != expected_elem_type {
-                panic!(
-                    "Expected element type {:?}, got {:?}",
-                    expected_elem_type, elem_ty
-                );
+                return Err(TranslationError::TypeMismatch {
+                    expected: expected_elem_type,
+                    found: elem_ty,
+                });
             }
 
             IVector::vec_push_back_instructions(&elem_ty, module, builder, compilation_ctx);
@@ -509,10 +511,10 @@ fn map_bytecode_instruction(
             let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
             if *vec_inner != expected_vec_inner {
-                panic!(
-                    "Expected vector inner type {:?}, got {:?}",
-                    expected_vec_inner, *vec_inner
-                );
+                return Err(TranslationError::TypeMismatch {
+                    expected: expected_vec_inner,
+                    found: *vec_inner,
+                });
             }
 
             match *vec_inner {
@@ -529,14 +531,9 @@ fn map_bytecode_instruction(
         Bytecode::VecLen(signature_index) => {
             let elem_ir_type = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
-            let ir_type = IntermediateType::IVector(Box::new(elem_ir_type.clone()));
-
-            let ty = types_stack.pop()?;
-            types_stack::match_n_types!((
-                IntermediateType::IRef(actual_type),
-                "vector reference",
-                ty
-            ));
+            types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
+                IntermediateType::IVector(Box::new(elem_ir_type)),
+            )))?;
 
             builder
                 .load(
@@ -653,11 +650,11 @@ fn map_bytecode_instruction(
         Bytecode::Add => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
             if t1 != t2 {
-                return Err(TypesStackError::OperationTypeMismatch {
+                return Err(TranslationError::OperationTypeMismatch {
                     operand1: t1,
                     operand2: t2,
                     operation: Bytecode::Add,
-                })?;
+                });
             }
 
             match t1 {
@@ -678,11 +675,11 @@ fn map_bytecode_instruction(
         Bytecode::Sub => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
             if t1 != t2 {
-                return Err(TypesStackError::OperationTypeMismatch {
+                return Err(TranslationError::OperationTypeMismatch {
                     operand1: t1,
                     operand2: t2,
                     operation: Bytecode::Sub,
-                })?;
+                });
             }
 
             match t1 {
@@ -703,11 +700,11 @@ fn map_bytecode_instruction(
         Bytecode::Mul => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
             if t1 != t2 {
-                return Err(TypesStackError::OperationTypeMismatch {
+                return Err(TranslationError::OperationTypeMismatch {
                     operand1: t1,
                     operand2: t2,
                     operation: Bytecode::Mul,
-                })?;
+                });
             }
 
             match t1 {
@@ -728,11 +725,11 @@ fn map_bytecode_instruction(
         Bytecode::Div => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
             if t1 != t2 {
-                return Err(TypesStackError::OperationTypeMismatch {
+                return Err(TranslationError::OperationTypeMismatch {
                     operand1: t1,
                     operand2: t2,
                     operation: Bytecode::Div,
-                })?;
+                });
             }
 
             match t1 {
@@ -753,11 +750,11 @@ fn map_bytecode_instruction(
         Bytecode::Lt => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
             if t1 != t2 {
-                return Err(TypesStackError::OperationTypeMismatch {
+                return Err(TranslationError::OperationTypeMismatch {
                     operand1: t1,
                     operand2: t2,
                     operation: Bytecode::Lt,
-                })?;
+                });
             }
 
             match t1 {
@@ -788,11 +785,11 @@ fn map_bytecode_instruction(
         Bytecode::Le => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
             if t1 != t2 {
-                return Err(TypesStackError::OperationTypeMismatch {
+                return Err(TranslationError::OperationTypeMismatch {
                     operand1: t1,
                     operand2: t2,
                     operation: Bytecode::Le,
-                })?;
+                });
             }
 
             match t1 {
@@ -841,11 +838,11 @@ fn map_bytecode_instruction(
         Bytecode::Gt => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
             if t1 != t2 {
-                return Err(TypesStackError::OperationTypeMismatch {
+                return Err(TranslationError::OperationTypeMismatch {
                     operand1: t1,
                     operand2: t2,
                     operation: Bytecode::Gt,
-                })?;
+                });
             }
 
             match t1 {
@@ -890,11 +887,11 @@ fn map_bytecode_instruction(
         Bytecode::Ge => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
             if t1 != t2 {
-                return Err(TypesStackError::OperationTypeMismatch {
+                return Err(TranslationError::OperationTypeMismatch {
                     operand1: t1,
                     operand2: t2,
                     operation: Bytecode::Ge,
-                })?;
+                });
             }
 
             match t1 {
@@ -934,11 +931,11 @@ fn map_bytecode_instruction(
         Bytecode::Mod => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
             if t1 != t2 {
-                return Err(TypesStackError::OperationTypeMismatch {
+                return Err(TranslationError::OperationTypeMismatch {
                     operand1: t1,
                     operand2: t2,
                     operation: Bytecode::Mod,
-                })?;
+                });
             }
 
             match t1 {
@@ -959,11 +956,11 @@ fn map_bytecode_instruction(
         Bytecode::Eq => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
             if t1 != t2 {
-                return Err(TypesStackError::OperationTypeMismatch {
+                return Err(TranslationError::OperationTypeMismatch {
                     operand1: t1,
                     operand2: t2,
                     operation: Bytecode::Eq,
-                })?;
+                });
             }
 
             t1.load_equality_instructions(module, builder, compilation_ctx);
@@ -973,11 +970,11 @@ fn map_bytecode_instruction(
         Bytecode::Neq => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
             if t1 != t2 {
-                return Err(TypesStackError::OperationTypeMismatch {
+                return Err(TranslationError::OperationTypeMismatch {
                     operand1: t1,
                     operand2: t2,
                     operation: Bytecode::Neq,
-                })?;
+                });
             }
 
             t1.load_not_equality_instructions(module, builder, compilation_ctx);
@@ -1004,11 +1001,11 @@ fn map_bytecode_instruction(
         Bytecode::BitOr => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
             if t1 != t2 {
-                return Err(TypesStackError::OperationTypeMismatch {
+                return Err(TranslationError::OperationTypeMismatch {
                     operand1: t1,
                     operand2: t2,
                     operation: Bytecode::BitOr,
-                })?;
+                });
             }
 
             match t1 {
@@ -1035,11 +1032,11 @@ fn map_bytecode_instruction(
         Bytecode::BitAnd => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
             if t1 != t2 {
-                return Err(TypesStackError::OperationTypeMismatch {
+                return Err(TranslationError::OperationTypeMismatch {
                     operand1: t1,
                     operand2: t2,
                     operation: Bytecode::BitAnd,
-                })?;
+                });
             }
 
             match t1 {
@@ -1066,11 +1063,11 @@ fn map_bytecode_instruction(
         Bytecode::Xor => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
             if t1 != t2 {
-                return Err(TypesStackError::OperationTypeMismatch {
+                return Err(TranslationError::OperationTypeMismatch {
                     operand1: t1,
                     operand2: t2,
                     operation: Bytecode::BitOr,
-                })?;
+                });
             }
 
             match t1 {
