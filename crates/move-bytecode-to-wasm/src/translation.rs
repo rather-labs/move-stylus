@@ -5,21 +5,18 @@ use functions::{
 use intermediate_types::IntermediateType;
 use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
-use intermediate_types::structs::IStruct;
 use intermediate_types::{simple_integers::IU8, vector::IVector};
-use move_binary_format::file_format::{Bytecode, FieldHandleIndex, SignatureIndex};
+use move_binary_format::file_format::{Bytecode, SignatureIndex};
 use table::FunctionTable;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{FunctionBuilder, Module};
-use walrus::{
-    FunctionId, InstrSeqBuilder, ValType,
-    ir::{MemArg, StoreKind},
-};
+use walrus::{FunctionId, InstrSeqBuilder, ValType, ir::MemArg};
 
 use crate::CompilationContext;
 use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
+pub(crate) mod bytecodes;
 pub mod functions;
 /// The types in this module represent an intermediate Rust representation of Move types
 /// that is used to generate the WASM code.
@@ -128,7 +125,7 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IU64);
         }
         Bytecode::LdU128(literal) => {
-            add_load_literal_heap_type_to_memory_instructions(
+            bytecodes::constants::load_literal_heap_type_to_memory(
                 module,
                 builder,
                 compilation_ctx,
@@ -137,7 +134,7 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IU128);
         }
         Bytecode::LdU256(literal) => {
-            add_load_literal_heap_type_to_memory_instructions(
+            bytecodes::constants::load_literal_heap_type_to_memory(
                 module,
                 builder,
                 compilation_ctx,
@@ -242,7 +239,13 @@ fn map_bytecode_instruction(
                 ),
             }
 
-            struct_borrow_field(struct_, field_id, builder, compilation_ctx, types_stack);
+            bytecodes::structs::borrow_field(
+                struct_,
+                field_id,
+                builder,
+                compilation_ctx,
+                types_stack,
+            );
         }
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = compilation_ctx
@@ -286,7 +289,7 @@ fn map_bytecode_instruction(
                 ),
             }
 
-            struct_borrow_field(
+            bytecodes::structs::borrow_field(
                 &struct_,
                 struct_field_id,
                 builder,
@@ -314,7 +317,13 @@ fn map_bytecode_instruction(
                 ),
             }
 
-            struct_mut_borrow_field(struct_, field_id, builder, compilation_ctx, types_stack);
+            bytecodes::structs::mut_borrow_field(
+                struct_,
+                field_id,
+                builder,
+                compilation_ctx,
+                types_stack,
+            );
         }
         Bytecode::MutBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = compilation_ctx
@@ -358,7 +367,7 @@ fn map_bytecode_instruction(
                 ),
             }
 
-            struct_mut_borrow_field(
+            bytecodes::structs::mut_borrow_field(
                 &struct_,
                 struct_field_id,
                 builder,
@@ -1112,7 +1121,7 @@ fn map_bytecode_instruction(
                 .get_struct_by_struct_definition_idx(struct_definition_index)
                 .unwrap();
 
-            pack_struct(struct_, module, builder, compilation_ctx, types_stack);
+            bytecodes::structs::pack(struct_, module, builder, compilation_ctx, types_stack);
 
             types_stack.push(IntermediateType::IStruct(struct_definition_index.0));
         }
@@ -1121,7 +1130,7 @@ fn map_bytecode_instruction(
                 .get_generic_struct_by_struct_definition_idx(struct_definition_index)
                 .unwrap();
 
-            pack_struct(&struct_, module, builder, compilation_ctx, types_stack);
+            bytecodes::structs::pack(&struct_, module, builder, compilation_ctx, types_stack);
 
             let idx = compilation_ctx
                 .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
@@ -1133,203 +1142,6 @@ fn map_bytecode_instruction(
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
-}
-
-fn struct_borrow_field(
-    struct_: &IStruct,
-    field_id: &FieldHandleIndex,
-    builder: &mut InstrSeqBuilder,
-    compilation_ctx: &CompilationContext,
-    types_stack: &mut Vec<IntermediateType>,
-) {
-    let Some(field_type) = struct_.fields_types.get(field_id) else {
-        panic!(
-            "{field_id} not found in {}",
-            struct_.struct_definition_index
-        )
-    };
-
-    let Some(field_offset) = struct_.field_offsets.get(field_id) else {
-        panic!(
-            "{field_id} offset not found in {}",
-            struct_.struct_definition_index
-        )
-    };
-
-    builder
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .i32_const(*field_offset as i32)
-        .binop(BinaryOp::I32Add);
-
-    types_stack.push(IntermediateType::IRef(Box::new(field_type.clone())));
-}
-
-fn struct_mut_borrow_field(
-    struct_: &IStruct,
-    field_id: &FieldHandleIndex,
-    builder: &mut InstrSeqBuilder,
-    compilation_ctx: &CompilationContext,
-    types_stack: &mut Vec<IntermediateType>,
-) {
-    let Some(field_type) = struct_.fields_types.get(field_id) else {
-        panic!(
-            "{field_id:?} not found in {}",
-            struct_.struct_definition_index
-        )
-    };
-
-    let Some(field_offset) = struct_.field_offsets.get(field_id) else {
-        panic!(
-            "{field_id:?} offset not found in {}",
-            struct_.struct_definition_index
-        )
-    };
-
-    builder
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .i32_const(*field_offset as i32)
-        .binop(BinaryOp::I32Add);
-
-    types_stack.push(IntermediateType::IMutRef(Box::new(field_type.clone())));
-}
-
-fn pack_struct(
-    struct_: &IStruct,
-    module: &mut Module,
-    builder: &mut InstrSeqBuilder,
-    compilation_ctx: &CompilationContext,
-    types_stack: &mut Vec<IntermediateType>,
-) {
-    // Pointer to the struct
-    let pointer = module.locals.add(ValType::I32);
-    // Pointer for simple types
-    let ptr_to_data = module.locals.add(ValType::I32);
-
-    let val_32 = module.locals.add(ValType::I32);
-    let val_64 = module.locals.add(ValType::I64);
-    let mut offset = struct_.heap_size;
-
-    builder
-        .i32_const(struct_.heap_size as i32)
-        .call(compilation_ctx.allocator)
-        .local_set(pointer);
-
-    for pack_type in struct_.fields.iter().rev() {
-        offset -= 4;
-        match types_stack.pop() {
-            Some(t) if &t == pack_type => {
-                match pack_type {
-                    // Stack values: create a middle pointer to save the actual value
-                    IntermediateType::IBool
-                    | IntermediateType::IU8
-                    | IntermediateType::IU16
-                    | IntermediateType::IU32
-                    | IntermediateType::IU64 => {
-                        let data_size = pack_type.stack_data_size();
-                        let (val, store_kind) = if data_size == 8 {
-                            (val_64, StoreKind::I64 { atomic: false })
-                        } else {
-                            (val_32, StoreKind::I32 { atomic: false })
-                        };
-
-                        // Save the actual value
-                        builder.local_set(val);
-
-                        // Create a pointer for the value
-                        builder
-                            .i32_const(data_size as i32)
-                            .call(compilation_ctx.allocator)
-                            .local_tee(ptr_to_data);
-
-                        // Store the actual value behind the middle_ptr
-                        builder.local_get(val).store(
-                            compilation_ctx.memory_id,
-                            store_kind,
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-                    }
-                    // Heap types: The stack data is a pointer to the value, store directly
-                    // that pointer in the struct
-                    IntermediateType::IU128
-                    | IntermediateType::IU256
-                    | IntermediateType::IAddress
-                    | IntermediateType::ISigner
-                    | IntermediateType::IVector(_)
-                    | IntermediateType::IStruct(_)
-                    | IntermediateType::IGenericStructInstance(_, _) => {
-                        builder.local_set(ptr_to_data);
-                    }
-                    IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                        panic!("references inside structs not allowed")
-                    }
-                    IntermediateType::ITypeParameter(_) => {
-                        panic!("found type parameter when packing struct, expected type instance");
-                    }
-                };
-
-                builder.local_get(pointer).local_get(ptr_to_data).store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg { align: 0, offset },
-                );
-            }
-            Some(t) => panic!("expected {pack_type:?} in types stack, found {t:?}"),
-            None => panic!("types stack is empty, expected type {types_stack:?}"),
-        }
-    }
-
-    builder.local_get(pointer);
-}
-
-fn add_load_literal_heap_type_to_memory_instructions(
-    module: &mut Module,
-    builder: &mut InstrSeqBuilder,
-    compilation_ctx: &CompilationContext,
-    bytes: &[u8],
-) {
-    let pointer = module.locals.add(ValType::I32);
-
-    builder.i32_const(bytes.len() as i32);
-    builder.call(compilation_ctx.allocator);
-    builder.local_set(pointer);
-
-    let mut offset = 0;
-
-    while offset < bytes.len() {
-        builder.local_get(pointer);
-        builder.i64_const(i64::from_le_bytes(
-            bytes[offset..offset + 8].try_into().unwrap(),
-        ));
-        builder.store(
-            compilation_ctx.memory_id,
-            StoreKind::I64 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: offset as u32,
-            },
-        );
-
-        offset += 8;
-    }
-
-    builder.local_get(pointer);
 }
 
 // Gets the IntermediateType for a given signature index
