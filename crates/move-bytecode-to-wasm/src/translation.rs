@@ -6,7 +6,7 @@ use intermediate_types::IntermediateType;
 use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
-use move_binary_format::file_format::{Bytecode, SignatureIndex};
+use move_binary_format::file_format::Bytecode;
 use table::FunctionTable;
 use types_stack::TypesStack;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
@@ -346,7 +346,10 @@ fn map_bytecode_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
             );
 
-            let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
+            let expected_vec_inner = bytecodes::vectors::get_inner_type_from_signature(
+                signature_index,
+                compilation_ctx,
+            )?;
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -372,7 +375,10 @@ fn map_bytecode_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
             );
 
-            let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
+            let expected_vec_inner = bytecodes::vectors::get_inner_type_from_signature(
+                signature_index,
+                compilation_ctx,
+            )?;
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -386,7 +392,11 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IMutRef(Box::new(*vec_inner)));
         }
         Bytecode::VecPack(signature_index, num_elements) => {
-            let inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
+            let inner = bytecodes::vectors::get_inner_type_from_signature(
+                signature_index,
+                compilation_ctx,
+            )?;
+
             IVector::vec_pack_instructions(
                 &inner,
                 module,
@@ -416,7 +426,10 @@ fn map_bytecode_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
             );
 
-            let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
+            let expected_vec_inner = bytecodes::vectors::get_inner_type_from_signature(
+                signature_index,
+                compilation_ctx,
+            )?;
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -470,7 +483,10 @@ fn map_bytecode_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *mut_inner)
             );
 
-            let expected_elem_type = get_ir_for_signature_index(compilation_ctx, *signature_index);
+            let expected_elem_type = bytecodes::vectors::get_inner_type_from_signature(
+                signature_index,
+                compilation_ctx,
+            )?;
 
             if *vec_inner != expected_elem_type {
                 return Err(TranslationError::TypeMismatch {
@@ -502,7 +518,10 @@ fn map_bytecode_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *mut_inner)
             );
 
-            let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
+            let expected_vec_inner = bytecodes::vectors::get_inner_type_from_signature(
+                signature_index,
+                compilation_ctx,
+            )?;
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -523,7 +542,10 @@ fn map_bytecode_instruction(
             }
         }
         Bytecode::VecLen(signature_index) => {
-            let elem_ir_type = get_ir_for_signature_index(compilation_ctx, *signature_index);
+            let elem_ir_type = bytecodes::vectors::get_inner_type_from_signature(
+                signature_index,
+                compilation_ctx,
+            )?;
 
             types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
                 IntermediateType::IVector(Box::new(elem_ir_type)),
@@ -1146,17 +1168,4 @@ fn map_bytecode_instruction(
     }
 
     Ok(())
-}
-
-// Gets the IntermediateType for a given signature index
-fn get_ir_for_signature_index(
-    compilation_ctx: &CompilationContext,
-    signature_index: SignatureIndex,
-) -> IntermediateType {
-    let signature_token = &compilation_ctx.module_signatures[signature_index.0 as usize].0;
-    IntermediateType::try_from_signature_token(
-        &signature_token[0],
-        compilation_ctx.datatype_handles_map,
-    )
-    .unwrap()
 }

@@ -1,4 +1,4 @@
-use move_binary_format::file_format::Bytecode;
+use move_binary_format::file_format::{Bytecode, SignatureIndex};
 
 use crate::compilation_context::CompilationContextError;
 
@@ -41,4 +41,16 @@ pub enum TranslationError {
         operand2: IntermediateType,
         operation: Bytecode,
     },
+
+    #[error(
+        "the signature index {signature_index:?} does not point to a valid signature for this operation, it contains {number:?} types but only one is expected"
+    )]
+    VectorInnerTypeNumberError {
+        signature_index: SignatureIndex,
+        number: usize,
+    },
+
+    // TODO: identify concrete errors and add its corresponding enum variant
+    #[error("unknown error: {0}")]
+    Unknown(#[from] anyhow::Error),
 }

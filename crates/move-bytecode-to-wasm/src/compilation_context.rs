@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 
 use crate::translation::intermediate_types::{IntermediateType, structs::IStruct};
-use move_binary_format::file_format::{
-    Constant, DatatypeHandleIndex, FieldHandleIndex, FieldInstantiationIndex, Signature,
-    SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex,
+use move_binary_format::{
+    file_format::{
+        Constant, DatatypeHandleIndex, FieldHandleIndex, FieldInstantiationIndex, Signature,
+        SignatureIndex, SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex,
+    },
+    internals::ModuleIndex,
 };
 use walrus::{FunctionId, MemoryId};
 
@@ -29,6 +32,9 @@ pub enum CompilationContextError {
 
     #[error("generic struct instance with field id {0:?} not found in compilation context")]
     GenericStructWithDefinitionIdxNotFound(StructDefInstantiationIndex),
+
+    #[error("signature with signature index {0:?} not found in compilation context")]
+    SignatureNotFound(SignatureIndex),
 }
 
 /// Compilation context
@@ -187,5 +193,15 @@ impl CompilationContext<'_> {
     ) -> u16 {
         let struct_instance = &self.module_generic_structs_instances[struct_index.0 as usize];
         struct_instance.0.0
+    }
+
+    pub fn get_signatures_by_index(
+        &self,
+        index: SignatureIndex,
+    ) -> Result<&Vec<SignatureToken>, CompilationContextError> {
+        self.module_signatures
+            .get(index.into_index())
+            .map(|s| &s.0)
+            .ok_or(CompilationContextError::SignatureNotFound(index))
     }
 }
