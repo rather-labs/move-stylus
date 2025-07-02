@@ -6,7 +6,10 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    translation::intermediate_types::{IntermediateType, structs::IStruct},
+    translation::{
+        intermediate_types::{IntermediateType, structs::IStruct},
+        types_stack::TypesStack,
+    },
 };
 
 /// Borrows a field of a struct.
@@ -17,7 +20,7 @@ pub fn borrow_field(
     field_id: &FieldHandleIndex,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
-    types_stack: &mut Vec<IntermediateType>,
+    types_stack: &mut TypesStack,
 ) {
     let Some(field_type) = struct_.fields_types.get(field_id) else {
         panic!(
@@ -56,7 +59,7 @@ pub fn mut_borrow_field(
     field_id: &FieldHandleIndex,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
-    types_stack: &mut Vec<IntermediateType>,
+    types_stack: &mut TypesStack,
 ) {
     let Some(field_type) = struct_.fields_types.get(field_id) else {
         panic!(
@@ -96,7 +99,7 @@ pub fn pack(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
-    types_stack: &mut Vec<IntermediateType>,
+    types_stack: &mut TypesStack,
 ) {
     // Pointer to the struct
     let pointer = module.locals.add(ValType::I32);
@@ -175,7 +178,7 @@ pub fn pack(
                 );
             }
             Some(t) => panic!("expected {pack_type:?} in types stack, found {t:?}"),
-            None => panic!("types stack is empty, expected type {types_stack:?}"),
+            None => panic!("types stack is empty, expected type {pack_type:?}"),
         }
     }
 

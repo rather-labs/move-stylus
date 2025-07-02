@@ -8,6 +8,7 @@ use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
 use table::FunctionTable;
+use types_stack::TypesStack;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{FunctionBuilder, Module};
 use walrus::{FunctionId, InstrSeqBuilder, ValType, ir::MemArg};
@@ -17,11 +18,14 @@ use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
 pub(crate) mod bytecodes;
+pub mod error;
 pub mod functions;
 /// The types in this module represent an intermediate Rust representation of Move types
 /// that is used to generate the WASM code.
 pub mod intermediate_types;
 pub mod table;
+pub(crate) mod types_stack;
+pub use error::TranslationError;
 
 pub fn translate_function(
     module: &mut Module,
@@ -51,7 +55,7 @@ pub fn translate_function(
 
     let code = &entry.get_move_code_unit().unwrap().code;
 
-    let mut types_stack = Vec::new();
+    let mut types_stack = TypesStack::new();
 
     for instruction in code {
         map_bytecode_instruction(
@@ -62,7 +66,8 @@ pub fn translate_function(
             module,
             function_table,
             &mut types_stack,
-        );
+        )
+        .expect("There was an error translating the bytecode instruction {instruction:?}");
     }
 
     let function_id = function.finish(entry.function.arg_locals.clone(), &mut module.funcs);
@@ -76,8 +81,8 @@ fn map_bytecode_instruction(
     mapped_function: &MappedFunction,
     module: &mut Module,
     function_table: &FunctionTable,
-    types_stack: &mut Vec<IntermediateType>,
-) {
+    types_stack: &mut TypesStack,
+) -> Result<(), TranslationError> {
     match instruction {
         // Load a fixed constant
         Bytecode::LdConst(global_index) => {
@@ -147,9 +152,8 @@ fn map_bytecode_instruction(
             // Consume from the types stack the arguments that will be used by the function call
             let arguments = &compilation_ctx.functions_arguments[function_handle_index.0 as usize];
             for (i, argument) in arguments.iter().enumerate().rev() {
-                if let Err(e) = pop_types_stack(types_stack, argument) {
-                    panic!("Called function signature arguments mismatch at index {i}: {e}");
-                }
+                types_stack.pop_expecting(argument)?;
+
                 if let IntermediateType::IMutRef(_) | IntermediateType::IRef(_) = argument {
                     builder.load(
                         compilation_ctx.memory_id,
@@ -178,9 +182,7 @@ fn map_bytecode_instruction(
             );
             // Insert in the stack types the types returned by the function (if any)
             let return_types = &compilation_ctx.functions_returns[function_handle_index.0 as usize];
-            for return_type in return_types {
-                types_stack.push(return_type.clone());
-            }
+            types_stack.append(return_types);
         }
         // Locals
         Bytecode::StLoc(local_id) => {
@@ -192,7 +194,7 @@ fn map_bytecode_instruction(
             } else {
                 local_type.box_local_instructions(module, builder, compilation_ctx, local);
             }
-            pop_types_stack(types_stack, local_type).unwrap();
+            types_stack.pop_expecting(local_type)?;
         }
         Bytecode::MoveLoc(local_id) => {
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
@@ -225,19 +227,9 @@ fn map_bytecode_instruction(
                 .unwrap();
 
             // Check if in the types stack we have the correct type
-            match types_stack.pop() {
-                Some(IntermediateType::IRef(inner)) => {
-                    assert!(
-                        matches!(inner.as_ref(), IntermediateType::IStruct(i) if *i == struct_.index()),
-                        "expected struct with index {} in types struct, got {inner:?}",
-                        struct_.index()
-                    );
-                }
-                t => panic!(
-                    "types stack error: expected struct with index {} got {t:?}",
-                    struct_.index()
-                ),
-            }
+            types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
+                IntermediateType::IStruct(struct_.index()),
+            )))?;
 
             bytecodes::structs::borrow_field(
                 struct_,
@@ -275,19 +267,9 @@ fn map_bytecode_instruction(
             };
 
             // Check if in the types stack we have the correct type
-            match types_stack.pop() {
-                Some(IntermediateType::IRef(inner)) => {
-                    assert!(
-                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i, _ ) if *i == struct_.index()),
-                        "expected struct with index {} in types struct, got {inner:?}",
-                        struct_.index()
-                    );
-                }
-                t => panic!(
-                    "types stack error: expected struct with index {} got {t:?}",
-                    struct_.index()
-                ),
-            }
+            types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
+                IntermediateType::IGenericStructInstance(struct_.index(), struct_.fields),
+            )))?;
 
             bytecodes::structs::borrow_field(
                 &struct_,
@@ -303,19 +285,9 @@ fn map_bytecode_instruction(
                 .unwrap();
 
             // Check if in the types stack we have the correct type
-            match types_stack.pop() {
-                Some(IntermediateType::IMutRef(inner)) => {
-                    assert!(
-                        matches!(inner.as_ref(), IntermediateType::IStruct(i) if *i == struct_.index()),
-                        "expected struct with index {} in types struct, got {inner:?}",
-                        struct_.index()
-                    );
-                }
-                t => panic!(
-                    "types stack error: expected struct with index {} got {t:?}",
-                    struct_.index()
-                ),
-            }
+            types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
+                IntermediateType::IStruct(struct_.index()),
+            )))?;
 
             bytecodes::structs::mut_borrow_field(
                 struct_,
@@ -353,19 +325,9 @@ fn map_bytecode_instruction(
             };
 
             // Check if in the types stack we have the correct type
-            match types_stack.pop() {
-                Some(IntermediateType::IMutRef(inner)) => {
-                    assert!(
-                        matches!(inner.as_ref(), IntermediateType::IGenericStructInstance(i, _) if *i == struct_.index()),
-                        "expected struct with index {} in types struct, got {inner:?}",
-                        struct_.index()
-                    );
-                }
-                t => panic!(
-                    "types stack error: expected struct with index {} got {t:?}",
-                    struct_.index()
-                ),
-            }
+            types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
+                IntermediateType::IGenericStructInstance(struct_.index(), struct_.fields),
+            )))?;
 
             bytecodes::structs::mut_borrow_field(
                 &struct_,
@@ -377,19 +339,13 @@ fn map_bytecode_instruction(
         }
         // Vector instructions
         Bytecode::VecImmBorrow(signature_index) => {
-            let [t1, t2] = pop_n_from_stack(types_stack);
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
 
-            let IntermediateType::IU64 = t1 else {
-                panic!("Expected IU64, got {t1:?}");
-            };
-
-            let IntermediateType::IRef(ref_inner) = t2 else {
-                panic!("Expected a reference to a vector, got {t2:?}");
-            };
-
-            let IntermediateType::IVector(vec_inner) = *ref_inner else {
-                panic!("Expected a vector, found {:?}", ref_inner);
-            };
+            types_stack::match_n_types!(
+                (IntermediateType::IU64, "u64", t1),
+                (IntermediateType::IRef(ref_inner), "vector reference", t2),
+                (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
+            );
 
             let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
@@ -405,19 +361,17 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IRef(Box::new(*vec_inner)));
         }
         Bytecode::VecMutBorrow(signature_index) => {
-            let [t1, t2] = pop_n_from_stack(types_stack);
+            let [t1, t2] = types_stack.pop_n_from_stack()?;
 
-            let IntermediateType::IU64 = t1 else {
-                panic!("Expected IU64, got {t1:?}");
-            };
-
-            let IntermediateType::IMutRef(ref_inner) = t2 else {
-                panic!("Expected a mutable reference to a vector, got {t2:?}");
-            };
-
-            let IntermediateType::IVector(vec_inner) = *ref_inner else {
-                panic!("Expected a vector, found {:?}", ref_inner);
-            };
+            types_stack::match_n_types!(
+                (IntermediateType::IU64, "u64", t1),
+                (
+                    IntermediateType::IMutRef(ref_inner),
+                    "mutable vector reference",
+                    t2
+                ),
+                (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
+            );
 
             let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
@@ -445,22 +399,23 @@ fn map_bytecode_instruction(
             // Remove the packing values from types stack and check if the types are correct
             let mut n = *num_elements as usize;
             while n > 0 {
-                pop_types_stack(types_stack, &inner).unwrap();
+                types_stack.pop_expecting(&inner)?;
                 n -= 1;
             }
 
             types_stack.push(IntermediateType::IVector(Box::new(inner)));
         }
         Bytecode::VecPopBack(signature_index) => {
-            let [ty] = pop_n_from_stack(types_stack);
+            let ty = types_stack.pop()?;
 
-            let IntermediateType::IMutRef(mut_inner) = ty else {
-                panic!("Expected mutable reference to vector, got {:?}", ty);
-            };
-
-            let IntermediateType::IVector(vec_inner) = *mut_inner else {
-                panic!("Expected vector type inside mutable reference");
-            };
+            types_stack::match_n_types!(
+                (
+                    IntermediateType::IMutRef(ref_inner),
+                    "mutable vector reference",
+                    ty
+                ),
+                (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
+            );
 
             let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
@@ -503,15 +458,16 @@ fn map_bytecode_instruction(
             types_stack.push(*vec_inner);
         }
         Bytecode::VecPushBack(signature_index) => {
-            let [elem_ty, ref_ty] = pop_n_from_stack(types_stack);
+            let [elem_ty, ref_ty] = types_stack.pop_n_from_stack()?;
 
-            let IntermediateType::IMutRef(mut_inner) = ref_ty else {
-                panic!("Expected mutable reference to vector, got {:?}", ref_ty);
-            };
-
-            let IntermediateType::IVector(vec_inner) = *mut_inner else {
-                panic!("Expected vector type inside mutable reference");
-            };
+            types_stack::match_n_types!(
+                (
+                    IntermediateType::IMutRef(mut_inner),
+                    "mutable vector reference",
+                    ref_ty
+                ),
+                (IntermediateType::IVector(vec_inner), "vector", *mut_inner)
+            );
 
             let expected_elem_type = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
@@ -532,23 +488,18 @@ fn map_bytecode_instruction(
             IVector::vec_push_back_instructions(&elem_ty, module, builder, compilation_ctx);
         }
         Bytecode::VecSwap(signature_index) => {
-            let [id2_ty, id1_ty, ref_ty] = pop_n_from_stack(types_stack);
+            let [id2_ty, id1_ty, ref_ty] = types_stack.pop_n_from_stack()?;
 
-            let IntermediateType::IU64 = id2_ty else {
-                panic!("Expected IU64, got {:?}", id2_ty);
-            };
-
-            let IntermediateType::IU64 = id1_ty else {
-                panic!("Expected IU64, got {:?}", id1_ty);
-            };
-
-            let IntermediateType::IMutRef(mut_inner) = ref_ty else {
-                panic!("Expected mutable reference to vector, got {:?}", ref_ty);
-            };
-
-            let IntermediateType::IVector(vec_inner) = *mut_inner else {
-                panic!("Expected vector type inside mutable reference");
-            };
+            types_stack::match_n_types!(
+                (IntermediateType::IU64, "u64", id2_ty),
+                (IntermediateType::IU64, "u64", id1_ty),
+                (
+                    IntermediateType::IMutRef(mut_inner),
+                    "mutable vector reference",
+                    ref_ty
+                ),
+                (IntermediateType::IVector(vec_inner), "vector", *mut_inner)
+            );
 
             let expected_vec_inner = get_ir_for_signature_index(compilation_ctx, *signature_index);
 
@@ -575,18 +526,12 @@ fn map_bytecode_instruction(
 
             let ir_type = IntermediateType::IVector(Box::new(elem_ir_type.clone()));
 
-            match types_stack.pop() {
-                Some(IntermediateType::IRef(actual_type)) => {
-                    if *actual_type != ir_type {
-                        panic!(
-                            "Type mismatch: expected &vector<{:?}> but got &{:?}",
-                            elem_ir_type, actual_type
-                        );
-                    }
-                }
-                Some(t) => panic!("Expected &vector<_>, got {:?}", t),
-                None => panic!("Type stack underflow"),
-            }
+            let ty = types_stack.pop()?;
+            types_stack::match_n_types!((
+                IntermediateType::IRef(actual_type),
+                "vector reference",
+                ty
+            ));
 
             builder
                 .load(
@@ -610,17 +555,16 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IU64);
         }
         Bytecode::ReadRef => {
-            let ref_type = types_stack
-                .pop()
-                .expect("ReadRef expects a reference on the stack");
+            let ref_type = types_stack.pop()?;
 
-            match ref_type {
-                IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
-                    inner.add_read_ref_instructions(builder, module, compilation_ctx);
-                    types_stack.push(*inner);
-                }
-                _ => panic!("ReadRef expected a IRef type but got: {:?}", ref_type),
-            }
+            types_stack::match_n_types!((
+                (IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner)),
+                "IRef or IMutRef",
+                ref_type
+            ));
+
+            inner.add_read_ref_instructions(builder, module, compilation_ctx);
+            types_stack.push(*inner);
         }
         Bytecode::WriteRef => match (types_stack.pop(), types_stack.pop()) {
             (Some(IntermediateType::IMutRef(inner)), Some(value_type)) => {
@@ -1142,6 +1086,8 @@ fn map_bytecode_instruction(
         }
         _ => panic!("Unsupported instruction: {:?}", instruction),
     }
+
+    Ok(())
 }
 
 // Gets the IntermediateType for a given signature index
@@ -1155,36 +1101,4 @@ fn get_ir_for_signature_index(
         compilation_ctx.datatype_handles_map,
     )
     .unwrap()
-}
-
-fn pop_types_stack(
-    types_stack: &mut Vec<IntermediateType>,
-    expected_type: &IntermediateType,
-) -> Result<()> {
-    let Some(ty) = types_stack.pop() else {
-        anyhow::bail!(
-            "error popping types stack: expected {expected_type:?} but types stack is empty"
-        );
-    };
-    anyhow::ensure!(
-        ty == *expected_type,
-        "expected {expected_type:?} and found {ty:?}"
-    );
-    Ok(())
-}
-
-fn pop_n_from_stack<const N: usize>(
-    types_stack: &mut Vec<IntermediateType>,
-) -> [IntermediateType; N] {
-    // We use IU8 as placeholder, it gets replaced on the for loop
-    let mut res = [const { IntermediateType::IU8 }; N];
-    (0..N).for_each(|i| {
-        if let Some(t) = types_stack.pop() {
-            res[i] = t;
-        } else {
-            panic!("expected {N} elements in types stack");
-        }
-    });
-
-    res
 }
