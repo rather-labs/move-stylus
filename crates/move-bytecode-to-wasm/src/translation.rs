@@ -94,8 +94,7 @@ fn map_bytecode_instruction(
             let constant_type: IntermediateType = IntermediateType::try_from_signature_token(
                 constant_type,
                 compilation_ctx.datatype_handles_map,
-            )
-            .unwrap();
+            )?;
 
             constant_type.load_constant_instructions(module, builder, &mut data, compilation_ctx);
 
@@ -253,8 +252,7 @@ fn map_bytecode_instruction(
                         compilation_ctx.datatype_handles_map,
                     )
                 })
-                .collect::<Result<Vec<_>, anyhow::Error>>()
-                .unwrap();
+                .collect::<Result<Vec<_>, anyhow::Error>>()?;
 
             let struct_ = if let Ok(struct_) =
                 compilation_ctx.get_generic_struct_by_field_handle_idx(field_id)
@@ -310,8 +308,7 @@ fn map_bytecode_instruction(
                         compilation_ctx.datatype_handles_map,
                     )
                 })
-                .collect::<Result<Vec<_>, anyhow::Error>>()
-                .unwrap();
+                .collect::<Result<Vec<_>, anyhow::Error>>()?;
 
             let struct_ = if let Ok(struct_) =
                 compilation_ctx.get_generic_struct_by_field_handle_idx(field_id)
