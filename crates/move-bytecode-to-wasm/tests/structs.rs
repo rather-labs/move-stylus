@@ -676,10 +676,15 @@ mod struct_pack_unpack {
             uint16,
             uint32,
             uint64,
+            (uint128,uint256),
+            (uint16,uint128)
+        );
+        function echoFooUnpackIgnoreFields(Foo foo) external returns (
+            address,
+            uint8,
+            uint32,
             uint128,
-            uint256,
-            uint16,
-            uint128
+            (uint16,uint128)
         );
         function echoBarUnpack(Bar bar) external returns (
             address,
@@ -696,6 +701,14 @@ mod struct_pack_unpack {
             uint256[],
             uint16,
             uint128
+        );
+        function echoBarUnpackIgnoreFields(Bar bar) external returns (
+            address,
+            uint128[],
+            uint8,
+            uint32,
+            uint128,
+            (uint16,uint256[]),
         );
     }
 
@@ -788,6 +801,26 @@ mod struct_pack_unpack {
             Baz { a: 42, b: 4242},
         )
     )]
+    #[case(echoFooUnpackIgnoreFieldsCall::new(
+        (Foo {
+            q: address!("0xcafe000000000000000000000000000000007357"),
+            t: true,
+            u: 255,
+            v: u16::MAX,
+            w: u32::MAX,
+            x: u64::MAX,
+            y: u128::MAX,
+            z: U256::MAX,
+            baz: Baz { a: 42, b: 4242}
+        },)),
+        (
+            address!("0xcafe000000000000000000000000000000007357"),
+            255,
+            u32::MAX,
+            u128::MAX,
+            Baz { a: 42, b: 4242},
+        )
+    )]
     #[case(echoBarUnpackCall::new(
         (Bar {
             q: address!("0xcafe000000000000000000000000000000007357"),
@@ -826,6 +859,40 @@ mod struct_pack_unpack {
                 ]
             },
             Baz { a: 111, b: 1111111111 }
+        )
+    )]
+    #[case(echoBarUnpackIgnoreFieldsCall::new(
+        (Bar {
+            q: address!("0xcafe000000000000000000000000000000007357"),
+            r: vec![1, 2, u32::MAX],
+            s: vec![1, 2, u128::MAX],
+            t: true,
+            u: 255,
+            v: u16::MAX,
+            w: u32::MAX,
+            x: u64::MAX,
+            y: u128::MAX,
+            z: U256::MAX,
+            bazz: Bazz {
+                a: 42,
+                b: vec![
+                    U256::MAX,
+                ]
+            },
+            baz: Baz { a: 111, b: 1111111111 }
+        },)),
+        (
+            address!("0xcafe000000000000000000000000000000007357"),
+            vec![1, 2, u128::MAX],
+            255,
+            u32::MAX,
+            u128::MAX,
+            Bazz {
+                a: 42,
+                b: vec![
+                    U256::MAX,
+                ]
+            },
         )
     )]
     fn test_struct_pack_unpack<T: SolCall, V: SolValue>(
@@ -1714,10 +1781,15 @@ mod generic_struct_pack_unpack {
             uint16,
             uint32,
             uint64,
-            uint128,
-            uint256,
+            (uint128,uint256),
+            (uint16,uint128)
+        );
+        function echoFooUnpackIgnoreFields(Foo foo) external returns (
+            uint32,
+            bool,
             uint16,
-            uint128
+            uint64,
+            uint256,
         );
         function echoBarUnpack(Bar bar) external returns (
             uint32[],
@@ -1731,10 +1803,17 @@ mod generic_struct_pack_unpack {
             uint64,
             uint128,
             uint256,
+            (uint16,uint256[]),
+            (uint16,uint128)
+        );
+        function echoBarUnpackIgnoreFields(Bar bar) external returns (
+            uint32[],
+            uint32[],
+            bool,
             uint16,
-            uint256[],
-            uint16,
-            uint128
+            uint64,
+            uint256,
+            (uint16,uint128)
         );
     }
 
@@ -1833,6 +1912,27 @@ mod generic_struct_pack_unpack {
             Baz { a: 42, b: 4242},
         )
     )]
+    #[case(echoFooUnpackIgnoreFieldsCall::new(
+        (Foo {
+            g: 424242,
+            q: address!("0xcafe000000000000000000000000000000007357"),
+            t: true,
+            u: 255,
+            v: u16::MAX,
+            w: u32::MAX,
+            x: u64::MAX,
+            y: u128::MAX,
+            z: U256::MAX,
+            baz: Baz { a: 42, b: 4242}
+        },)),
+        (
+            424242,
+            true,
+            u16::MAX,
+            u64::MAX,
+            U256::MAX,
+        )
+    )]
     #[case(echoBarUnpackCall::new(
         (Bar {
             g: vec![4242, 424242],
@@ -1872,6 +1972,37 @@ mod generic_struct_pack_unpack {
                     U256::MAX,
                 ]
             },
+            Baz { a: 111, b: 1111111111 }
+        )
+    )]
+    #[case(echoBarUnpackIgnoreFieldsCall::new(
+        (Bar {
+            g: vec![4242, 424242],
+            q: address!("0xcafe000000000000000000000000000000007357"),
+            r: vec![1, 2, u32::MAX],
+            s: vec![1, 2, u128::MAX],
+            t: true,
+            u: 255,
+            v: u16::MAX,
+            w: u32::MAX,
+            x: u64::MAX,
+            y: u128::MAX,
+            z: U256::MAX,
+            bazz: Bazz {
+                a: 42,
+                b: vec![
+                    U256::MAX,
+                ]
+            },
+            baz: Baz { a: 111, b: 1111111111 }
+        },)),
+        (
+            vec![4242, 424242],
+            vec![1, 2, u32::MAX],
+            true,
+            u16::MAX,
+            u64::MAX,
+            U256::MAX,
             Baz { a: 111, b: 1111111111 }
         )
     )]

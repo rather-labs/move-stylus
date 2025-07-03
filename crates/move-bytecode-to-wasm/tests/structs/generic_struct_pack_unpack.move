@@ -58,7 +58,18 @@ public fun echo_foo_unpack(foo: Foo<u32>): (u32, address, bool, u8, u16, u32, u6
     ( g, q, t, u, v, w, x, y, z, baz )
 }
 
+public fun echo_foo_unpack_ignore_fields(foo: Foo<u32>): (u32, bool, u16, u64, u256) {
+    let Foo { g, q: _, t, u: _, v, w: _, x, y: _, z, baz: _ } = foo;
+    ( g, t, v, x, z )
+}
+
 public fun echo_bar_unpack(bar: Bar<vector<u32>>): (vector<u32>, address, vector<u32>, vector<u128>, bool, u8, u16, u32, u64, u128, u256, Bazz, Baz) {
     let Bar { g, q, r, s, t, u, v, w, x, y, z, bazz, baz } = bar;
     ( g, q, r, s, t, u, v, w, x, y, z, bazz, baz )
 }
+
+public fun echo_bar_unpack_ignore_fields(bar: Bar<vector<u32>>): (vector<u32>, vector<u32>, bool, u16, u64, u256, Baz) {
+    let Bar { g, q: _, r, s: _, t, u: _, v, w: _, x, y: _, z, bazz: _, baz } = bar;
+    ( g, r, t, v, x, z, baz )
+}
+
