@@ -30,12 +30,14 @@ public struct Bar has drop {
 }
 
 // Static abi sub-struct
+#[allow(unused_field)]
 public struct Baz has drop {
     a: u16,
     b: u128,
 }
 
 // Dynamic abi substruct
+#[allow(unused_field)]
 public struct Bazz has drop {
     a: u16,
     b: vector<u256>,
@@ -44,4 +46,9 @@ public struct Bazz has drop {
 public fun echo_foo_unpack(foo: Foo): (address, bool, u8, u16, u32, u64, u128, u256, Baz) {
     let Foo { q, t, u, v, w, x, y, z, baz } = foo;
     ( q, t, u, v, w, x, y, z, baz )
+}
+
+public fun echo_bar_unpack(bar: Bar): (address, vector<u32>, vector<u128>, bool, u8, u16, u32, u64, u128, u256, Bazz, Baz) {
+    let Bar { q, r, s, t, u, v, w, x, y, z, bazz, baz } = bar;
+    ( q, r, s, t, u, v, w, x, y, z, bazz, baz )
 }

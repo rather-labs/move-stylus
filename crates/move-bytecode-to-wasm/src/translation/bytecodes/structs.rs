@@ -267,7 +267,5 @@ pub fn unpack(
         offset += 4;
     }
 
-    builder.local_get(pointer);
-
     Ok(())
 }
