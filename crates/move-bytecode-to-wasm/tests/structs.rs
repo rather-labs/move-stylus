@@ -160,14 +160,14 @@ mod struct_mut_fields {
     }
 }
 
-mod struct_packing_unpacking {
+mod struct_abi_packing_unpacking {
     use super::*;
 
     #[fixture]
     #[once]
     fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "struct_packing_unpacking";
-        const SOURCE_PATH: &str = "tests/structs/struct_packing_unpacking.move";
+        const MODULE_NAME: &str = "struct_abi_packing_unpacking";
+        const SOURCE_PATH: &str = "tests/structs/struct_packing_abi_unpacking.move";
 
         let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
 
@@ -1171,14 +1171,14 @@ mod generic_struct_mut_fields {
     }
 }
 
-mod generic_struct_packing_unpacking {
+mod generic_struct_abi_packing_unpacking {
     use super::*;
 
     #[fixture]
     #[once]
     fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "generic_struct_packing_unpacking";
-        const SOURCE_PATH: &str = "tests/structs/generic_struct_packing_unpacking.move";
+        const MODULE_NAME: &str = "generic_struct_abi_packing_unpacking";
+        const SOURCE_PATH: &str = "tests/structs/generic_struct_abi_packing_unpacking.move";
 
         let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
 
@@ -1609,7 +1609,7 @@ mod generic_struct_packing_unpacking {
             },
             vec![7,8,9,10,11],
     ))]
-    fn test_generic_struct_packing_unpacking<T: SolCall, V: SolValue>(
+    fn test_generic_struct_abi_packing_unpacking<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
