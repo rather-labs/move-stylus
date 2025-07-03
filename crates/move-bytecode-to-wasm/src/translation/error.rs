@@ -50,6 +50,17 @@ pub enum TranslationError {
         number: usize,
     },
 
+    #[error("found reference inside struct with index {struct_index}")]
+    FoundReferenceInsideStruct { struct_index: u16 },
+
+    #[error(
+        "found type parameter inside struct with index {struct_index} and type parameter index {type_parameter_index}"
+    )]
+    FoundTypeParameterInsideStruct {
+        struct_index: u16,
+        type_parameter_index: u16,
+    },
+
     // TODO: identify concrete errors and add its corresponding enum variant
     #[error("unknown error: {0}")]
     Unknown(#[from] anyhow::Error),
