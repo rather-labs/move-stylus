@@ -408,25 +408,6 @@ impl IStruct {
 
     /// Replaces all type parameters in the struct with the provided types.
     pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
-        let generic_type_count = self
-            .fields
-            .iter()
-            .filter(|f| matches!(f, IntermediateType::ITypeParameter(_)))
-            .count();
-
-        if generic_type_count == 0 {
-            panic!("Trying to instantiate a non generic struct",);
-        }
-
-        // Check that the number of types matches the number of type parameters in the struct
-        if types.len() != generic_type_count {
-            panic!(
-                "Expected {} types to instantiate struct, got {}",
-                self.fields.len(),
-                generic_type_count
-            );
-        }
-
         let fields = self
             .fields
             .iter()
