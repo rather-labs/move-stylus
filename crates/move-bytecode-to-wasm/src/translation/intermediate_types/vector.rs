@@ -536,7 +536,7 @@ impl IVector {
                         panic!("should not be possible to have a vector of signers")
                     }
                     IntermediateType::ITypeParameter(_) => {
-                        panic!("Can not check the equality of a vector of type parameters, expected a concrete type");
+                        panic!("cannot check the equality of a vector of type parameters, expected a concrete type");
                     }
                 }
             },
@@ -626,7 +626,7 @@ impl IVector {
                 builder.i32_const(1);
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("Can not borrow generic type parameters, expected a concrete type");
+                panic!("cannot borrow generic type parameters, expected a concrete type");
             }
         }
 
@@ -955,7 +955,7 @@ mod tests {
                 panic!("VecPopBack operation is not allowed on reference types");
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("Can not pop back a vector of type parameters, expected a concrete type");
+                panic!("cannot pop back a vector of type parameters, expected a concrete type");
             }
         }
 

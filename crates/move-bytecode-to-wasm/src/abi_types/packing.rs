@@ -239,7 +239,7 @@ impl Packable for IntermediateType {
                 local
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("Can not pack generic type parameter");
+                panic!("cannot pack generic type parameter");
             }
         }
     }
@@ -356,7 +356,7 @@ impl Packable for IntermediateType {
                 )
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("Can not pack generic type parameter");
+                panic!("cannot pack generic type parameter");
             }
         }
     }
@@ -460,7 +460,7 @@ impl Packable for IntermediateType {
                 struct_instance.solidity_abi_encode_is_dynamic(compilation_ctx)
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("Can not check if generic type parameter is dynamic at compile time");
+                panic!("cannot check if generic type parameter is dynamic at compile time");
             }
         }
     }

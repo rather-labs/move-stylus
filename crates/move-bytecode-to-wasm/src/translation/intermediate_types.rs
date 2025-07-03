@@ -247,7 +247,7 @@ impl IntermediateType {
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {}
             IntermediateType::ITypeParameter(_) => {
-                panic!("can not move a type parameter, expected a concrete type");
+                panic!("cannot move a type parameter, expected a concrete type");
             }
         }
     }
@@ -370,7 +370,7 @@ impl IntermediateType {
                 panic!(r#"trying to introduce copy instructions for "signer" type"#)
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("can not copy a type parameter, expected a concrete type");
+                panic!("cannot copy a type parameter, expected a concrete type");
             }
         }
     }
@@ -428,7 +428,7 @@ impl IntermediateType {
                 local
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("can not load a type parameter, expected a concrete type");
+                panic!("cannot load a type parameter, expected a concrete type");
             }
         }
     }
@@ -464,7 +464,7 @@ impl IntermediateType {
                 local
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("can not load a type parameter, expected a concrete type");
+                panic!("cannot load a type parameter, expected a concrete type");
             }
         }
     }
@@ -489,7 +489,7 @@ impl IntermediateType {
                 panic!("Cannot ImmBorrowLoc on a reference type");
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("can not borrow a type parameter, expected a concrete type");
+                panic!("cannot borrow a type parameter, expected a concrete type");
             }
         }
     }
@@ -693,7 +693,7 @@ impl IntermediateType {
                 panic!("Cannot mutate a reference of a reference: {:?}", self);
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("Can not write to a type parameter, expected a concrete type");
+                panic!("cannot write to a type parameter, expected a concrete type");
             }
         }
     }
@@ -795,7 +795,7 @@ impl IntermediateType {
                     );
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("can not box a type parameter, expected a concrete type");
+                panic!("cannot box a type parameter, expected a concrete type");
             }
         }
     }
@@ -944,7 +944,7 @@ impl IntermediateType {
             | IntermediateType::IGenericStructInstance(_, _) => false,
             IntermediateType::ITypeParameter(_) => {
                 panic!(
-                    "can not check if a type parameter is a stack type, expected a concrete type"
+                    "cannot check if a type parameter is a stack type, expected a concrete type"
                 );
             }
         }
@@ -969,7 +969,7 @@ impl From<&IntermediateType> for ValType {
             | IntermediateType::IStruct(_)
             | IntermediateType::IGenericStructInstance(_, _) => ValType::I32,
             IntermediateType::ITypeParameter(_) => {
-                panic!("can not convert a type parameter to a wasm type, expected a concrete type");
+                panic!("cannot convert a type parameter to a wasm type, expected a concrete type");
             }
         }
     }
