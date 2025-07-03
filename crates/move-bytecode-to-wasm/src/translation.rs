@@ -1159,6 +1159,27 @@ fn map_bytecode_instruction(
 
             types_stack.push(IntermediateType::IGenericStructInstance(idx, types));
         }
+        Bytecode::Unpack(struct_definition_index) => {
+            types_stack.pop_expecting(&IntermediateType::IStruct(struct_definition_index.0))?;
+
+            let struct_ =
+                compilation_ctx.get_struct_by_struct_definition_idx(struct_definition_index)?;
+
+            bytecodes::structs::unpack(struct_, module, builder, compilation_ctx, types_stack)?;
+        }
+        Bytecode::UnpackGeneric(struct_definition_index) => {
+            let idx = compilation_ctx
+                .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
+            let types =
+                compilation_ctx.get_generic_struct_types_instances(struct_definition_index)?;
+
+            types_stack.pop_expecting(&IntermediateType::IGenericStructInstance(idx, types))?;
+
+            let struct_ = compilation_ctx
+                .get_generic_struct_by_struct_definition_idx(struct_definition_index)?;
+
+            bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
+        }
         b => Err(TranslationError::UnssuportedOperation {
             operation: b.clone(),
         })?,

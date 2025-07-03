@@ -165,10 +165,15 @@ pub fn pack(
                         builder.local_set(ptr_to_data);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                        panic!("references inside structs not allowed")
+                        return Err(TranslationError::FoundReferenceInsideStruct {
+                            struct_index: struct_.index(),
+                        });
                     }
-                    IntermediateType::ITypeParameter(_) => {
-                        panic!("found type parameter when packing struct, expected type instance");
+                    IntermediateType::ITypeParameter(index) => {
+                        return Err(TranslationError::FoundTypeParameterInsideStruct {
+                            struct_index: struct_.index(),
+                            type_parameter_index: *index,
+                        });
                     }
                 };
 
@@ -186,6 +191,81 @@ pub fn pack(
     }
 
     builder.local_get(pointer);
+
+    Ok(())
+}
+
+/// Unpack an struct.
+///
+/// This function is used with Pack and PackGeneric bytecodes to allocate memory for a struct and
+/// save its fields into the allocated memory.
+pub fn unpack(
+    struct_: &IStruct,
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    types_stack: &mut TypesStack,
+) -> Result<(), TranslationError> {
+    // Pointer to the struct
+    let pointer = module.locals.add(ValType::I32);
+    let mut offset = 0;
+
+    builder.local_set(pointer);
+
+    for field in &struct_.fields {
+        // Load the middle pointer
+        builder.local_get(pointer).load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg { align: 0, offset },
+        );
+
+        match field {
+            // Stack values: load in stack the actual value from the middle pointer
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64 => {
+                // Load the actual value
+                builder.load(
+                    compilation_ctx.memory_id,
+                    if field.stack_data_size() == 8 {
+                        LoadKind::I64 { atomic: false }
+                    } else {
+                        LoadKind::I32 { atomic: false }
+                    },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+            // Heap types: The stack data is a pointer to the value is loaded at the beginning of
+            // the loop
+            IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress
+            | IntermediateType::ISigner
+            | IntermediateType::IVector(_)
+            | IntermediateType::IStruct(_)
+            | IntermediateType::IGenericStructInstance(_, _) => {}
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                return Err(TranslationError::FoundReferenceInsideStruct {
+                    struct_index: struct_.index(),
+                });
+            }
+            IntermediateType::ITypeParameter(index) => {
+                return Err(TranslationError::FoundTypeParameterInsideStruct {
+                    struct_index: struct_.index(),
+                    type_parameter_index: *index,
+                });
+            }
+        }
+
+        types_stack.push(field.clone());
+        offset += 4;
+    }
 
     Ok(())
 }
