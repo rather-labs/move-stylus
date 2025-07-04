@@ -252,7 +252,7 @@ pub fn translate_package(
                 }
             }
 
-            module_enums.push(IEnum::new(index as u16, variants));
+            module_enums.push(IEnum::new(index as u16, variants).unwrap());
         }
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();

@@ -1180,6 +1180,13 @@ fn map_bytecode_instruction(
 
             bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
         }
+
+        //**
+        // Enums
+        //**
+        Bytecode::PackVariant(index) => {
+            let enum_ = compilation_ctx.get_enum_by_variant_handle_idx(index)?;
+        }
         b => Err(TranslationError::UnssuportedOperation {
             operation: b.clone(),
         })?,

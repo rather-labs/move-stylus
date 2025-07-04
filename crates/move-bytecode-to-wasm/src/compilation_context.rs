@@ -36,6 +36,12 @@ pub enum CompilationContextError {
 
     #[error("signature with signature index {0:?} not found in compilation context")]
     SignatureNotFound(SignatureIndex),
+
+    #[error("enum with index {0} not found in compilation context")]
+    EnumNotFound(u16),
+
+    #[error("enum with enum id {0} not found in compilation context")]
+    EnumWithVariantIdxNotFound(u16),
 }
 
 /// Compilation context
@@ -210,5 +216,19 @@ impl CompilationContext<'_> {
             .get(index.into_index())
             .map(|s| &s.0)
             .ok_or(CompilationContextError::SignatureNotFound(index))
+    }
+
+    pub fn get_enum_by_variant_handle_idx(
+        &self,
+        idx: &VariantHandleIndex,
+    ) -> Result<&IEnum, CompilationContextError> {
+        let enum_id = self
+            .variants_to_enum_map
+            .get(idx)
+            .ok_or(CompilationContextError::EnumWithVariantIdxNotFound(idx.0))?;
+
+        self.module_enums
+            .get(*enum_id)
+            .ok_or(CompilationContextError::EnumNotFound(*enum_id as u16))
     }
 }
