@@ -529,6 +529,7 @@ impl IVector {
 
                         then.local_get(res);
                     }
+                    IntermediateType::IEnum(_, _) => todo!(),
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                         panic!("vector of rereferences found")
                     }
@@ -628,6 +629,7 @@ impl IVector {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot borrow generic type parameters, expected a concrete type");
             }
+            IntermediateType::IEnum(_, _) => todo!(),
         }
 
         builder.i32_const(inner.stack_data_size() as i32);
@@ -957,6 +959,7 @@ mod tests {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pop back a vector of type parameters, expected a concrete type");
             }
+            IntermediateType::IEnum(_, _) => todo!(),
         }
 
         if inner_type == IntermediateType::IU64 {

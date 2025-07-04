@@ -185,6 +185,7 @@ impl Unpackable for IntermediateType {
                     compilation_ctx,
                 )
             }
+            IntermediateType::IEnum(_, _) => todo!(),
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot unpack generic type parameter");
             }

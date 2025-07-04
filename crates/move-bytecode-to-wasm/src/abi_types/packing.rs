@@ -241,6 +241,7 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
             }
+            IntermediateType::IEnum(_, _) => todo!(),
         }
     }
 
@@ -355,6 +356,7 @@ impl Packable for IntermediateType {
                     None,
                 )
             }
+            IntermediateType::IEnum(_, _) => todo!(),
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
             }
@@ -433,6 +435,7 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("can't know the size of a generic type parameter at compile time");
             }
+            IntermediateType::IEnum(_, _) => todo!(),
         }
     }
 
@@ -462,6 +465,7 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot check if generic type parameter is dynamic at compile time");
             }
+            IntermediateType::IEnum(_, _) => todo!(),
         }
     }
 }

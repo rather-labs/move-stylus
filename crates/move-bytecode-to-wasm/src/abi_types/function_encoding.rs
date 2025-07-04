@@ -89,6 +89,7 @@ impl SolName for IntermediateType {
             }
             IntermediateType::ISigner => None,
             IntermediateType::ITypeParameter(_) => None,
+            IntermediateType::IEnum(_, _) => todo!(),
         }
     }
 }

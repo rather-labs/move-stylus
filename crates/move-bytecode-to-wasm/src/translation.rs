@@ -464,6 +464,7 @@ fn map_bytecode_instruction(
                         operand_type: *vec_inner,
                     });
                 }
+                IntermediateType::IEnum(_, _) => todo!(),
             }
 
             types_stack.push(*vec_inner);
@@ -1197,6 +1198,8 @@ fn map_bytecode_instruction(
                 compilation_ctx,
                 types_stack,
             )?;
+
+            types_stack.push(IntermediateType::IEnum(enum_.index, index_inside_enum));
         }
         b => Err(TranslationError::UnssuportedOperation {
             operation: b.clone(),
