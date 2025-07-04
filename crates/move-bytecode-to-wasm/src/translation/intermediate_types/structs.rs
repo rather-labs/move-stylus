@@ -71,8 +71,10 @@ pub struct IStruct {
     /// Move's struct index
     pub struct_definition_index: StructDefinitionIndex,
 
-    /// How much memory this struct occupies (in bytes). This will be the quantity of fields *4
+    /// How much memory this struct occupies (in bytes). This will be the quantity of fields * 4
     /// because we save pointers for all data types (stack or heap).
+    /// This does not take in account how much space the actual data takes, just the pointers to
+    /// them.
     pub heap_size: u32,
 }
 

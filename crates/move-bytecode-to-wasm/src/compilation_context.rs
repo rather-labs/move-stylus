@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use crate::translation::intermediate_types::{IntermediateType, enums::IEnum, structs::IStruct};
 use move_binary_format::{
     file_format::{
-        Constant, DatatypeHandleIndex, FieldDefinition, FieldHandleIndex, FieldInstantiationIndex,
-        Signature, SignatureIndex, SignatureToken, StructDefInstantiationIndex,
-        StructDefinitionIndex,
+        Constant, DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex,
+        FieldInstantiationIndex, Signature, SignatureIndex, SignatureToken,
+        StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
     },
     internals::ModuleIndex,
 };
@@ -58,9 +58,6 @@ pub struct CompilationContext<'a> {
     /// Module's structs: contains all the user defined structs
     pub module_structs: &'a [IStruct],
 
-    /// Module's enums: contains all the user defined enums
-    pub module_enums: &'a [IEnum],
-
     /// Module's generic structs instances: contains all the user defined generic structs instances
     /// with its corresponding types
     pub module_generic_structs_instances: &'a [(StructDefinitionIndex, Vec<SignatureToken>)],
@@ -88,6 +85,12 @@ pub struct CompilationContext<'a> {
     /// intantiate the struct only with the field instantiation index and no other information.
     pub instantiated_fields_to_generic_fields:
         &'a HashMap<FieldInstantiationIndex, (FieldHandleIndex, Vec<SignatureToken>)>,
+
+    /// Module's enums: contains all the user defined enums
+    pub module_enums: &'a [IEnum],
+
+    /// Maps a enum's variant index to its corresponding enum
+    pub variants_to_enum_map: &'a HashMap<VariantHandleIndex, usize>,
 
     /// This Hashmap maps the move's datatype handles to our internal representation of those
     /// types. The datatype handles are used interally by move to look for user defined data

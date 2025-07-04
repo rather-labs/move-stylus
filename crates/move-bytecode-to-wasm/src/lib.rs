@@ -4,7 +4,7 @@ use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use move_binary_format::file_format::{
     DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex, FieldInstantiationIndex,
-    StructDefInstantiationIndex, StructDefinitionIndex, Visibility,
+    StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex, Visibility,
 };
 use move_binary_format::internals::ModuleIndex;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
@@ -210,8 +210,12 @@ pub fn translate_package(
 
         // Module's enums
         let mut module_enums = vec![];
+        let mut variants_to_enum_map = HashMap::new();
         for (index, enum_def) in root_compiled_module.enum_defs().iter().enumerate() {
+            let enum_index = EnumDefinitionIndex::new(index as u16);
             let mut variants = Vec::new();
+
+            // Process variants
             for (variant_index, variant) in enum_def.variants.iter().enumerate() {
                 let fields = variant
                     .fields
@@ -230,12 +234,27 @@ pub fn translate_package(
                     index as u16,
                     fields,
                 ));
+
+                // Process handles
+                let variant_index = root_compiled_module
+                    .variant_handles()
+                    .iter()
+                    .position(|v| v.variant == variant_index as u16 && v.enum_def == enum_index)
+                    .map(|i| VariantHandleIndex(i as u16));
+
+                // If field_index is None means the field is never referenced in the code
+                if let Some(variant_index) = variant_index {
+                    let res = variants_to_enum_map.insert(variant_index, index);
+                    assert!(
+                        res.is_none(),
+                        "there was an error creating a variant in struct {variant_index}, variant with index {variant_index} already exist"
+                    );
+                }
             }
 
             module_enums.push(IEnum::new(index as u16, variants));
         }
 
-        println!("{module_enums:#?}");
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
 
         if cfg!(feature = "inject-host-debug-fns") {
@@ -321,11 +340,12 @@ pub fn translate_package(
             functions_returns: &functions_returns,
             module_signatures: &root_compiled_module.signatures,
             module_structs: &module_structs,
-            module_enums: &module_enums,
             module_generic_structs_instances: &module_generic_structs_instances,
             datatype_handles_map: &datatype_handles_map,
             fields_to_struct_map: &fields_to_struct_map,
             generic_fields_to_struct_map: &generic_fields_to_struct_map,
+            module_enums: &module_enums,
+            variants_to_enum_map: &variants_to_enum_map,
             instantiated_fields_to_generic_fields: &instantiated_fields_to_generic_fields,
             memory_id,
             allocator: allocator_func,
