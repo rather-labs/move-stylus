@@ -58,8 +58,7 @@ pub enum IntermediateType {
     /// Intermediate enum representation
     ///
     /// The first u16 is the enum's index in the compilation context.
-    /// The second is de enum's variant index within the enum
-    IEnum(u16, u16),
+    IEnum(u16),
 }
 
 impl IntermediateType {
@@ -79,11 +78,11 @@ impl IntermediateType {
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
             | IntermediateType::IStruct(_)
+            | IntermediateType::IEnum(_)
             | IntermediateType::IGenericStructInstance(_, _) => 4,
             IntermediateType::ITypeParameter(_) => {
                 panic!("type parameter does not have a known stack data size at compile time")
             }
-            IntermediateType::IEnum(_, _) => todo!(),
         }
     }
 
@@ -117,7 +116,7 @@ impl IntermediateType {
                 if let Some(udt) = handles_map.get(index) {
                     Ok(match udt {
                         UserDefinedType::Struct(i) => IntermediateType::IStruct(*i),
-                        UserDefinedType::Enum(_) => todo!(),
+                        UserDefinedType::Enum(i) => IntermediateType::IEnum(*i as u16),
                     })
                 } else {
                     Err(anyhow::anyhow!(
@@ -188,7 +187,7 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("can't load a type parameter as a constant, expected a concrete type");
             }
-            IntermediateType::IEnum(_, _) => todo!(),
+            IntermediateType::IEnum(_) => todo!(),
         }
     }
 
@@ -261,7 +260,7 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot move a type parameter, expected a concrete type");
             }
-            IntermediateType::IEnum(_, _) => todo!(),
+            IntermediateType::IEnum(_) => todo!(),
         }
     }
 
@@ -385,7 +384,7 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot copy a type parameter, expected a concrete type");
             }
-            IntermediateType::IEnum(_, _) => todo!(),
+            IntermediateType::IEnum(_) => todo!(),
         }
     }
 
@@ -444,7 +443,7 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot load a type parameter, expected a concrete type");
             }
-            IntermediateType::IEnum(_, _) => todo!(),
+            IntermediateType::IEnum(_) => todo!(),
         }
     }
 
@@ -468,6 +467,7 @@ impl IntermediateType {
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
             | IntermediateType::IStruct(_)
+            | IntermediateType::IEnum(_)
             | IntermediateType::IGenericStructInstance(_, _) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
@@ -481,7 +481,6 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot load a type parameter, expected a concrete type");
             }
-            IntermediateType::IEnum(_, _) => todo!(),
         }
     }
 
@@ -507,7 +506,7 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot borrow a type parameter, expected a concrete type");
             }
-            IntermediateType::IEnum(_, _) => todo!(),
+            IntermediateType::IEnum(_) => todo!(),
         }
     }
 
@@ -578,7 +577,7 @@ impl IntermediateType {
             IntermediateType::ISigner => {
                 // Signer type is read-only, we push the pointer only
             }
-            IntermediateType::IEnum(_, _) => todo!(),
+            IntermediateType::IEnum(_) => todo!(),
             _ => panic!("Unsupported ReadRef type: {:?}", self),
         }
     }
@@ -713,7 +712,7 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot write to a type parameter, expected a concrete type");
             }
-            IntermediateType::IEnum(_, _) => todo!(),
+            IntermediateType::IEnum(_) => todo!(),
         }
     }
 
@@ -816,7 +815,7 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot box a type parameter, expected a concrete type");
             }
-            IntermediateType::IEnum(_, _) => todo!(),
+            IntermediateType::IEnum(_) => todo!(),
         }
     }
 
@@ -847,7 +846,7 @@ impl IntermediateType {
             Self::IGenericStructInstance(index, _) => {
                 IStruct::equality(builder, module, compilation_ctx, *index)
             }
-            Self::IEnum(_, _) => todo!(),
+            Self::IEnum(_) => todo!(),
             Self::IRef(inner) | Self::IMutRef(inner) => {
                 let ptr1 = module.locals.add(ValType::I32);
                 let ptr2 = module.locals.add(ValType::I32);
@@ -925,7 +924,7 @@ impl IntermediateType {
                     IntermediateType::ITypeParameter(_) => {
                         panic!("Cannot compare a type parameter, expected a concrete type");
                     }
-                    IntermediateType::IEnum(_, _) => todo!(),
+                    IntermediateType::IEnum(_) => todo!(),
                 }
 
                 inner.load_equality_instructions(module, builder, compilation_ctx)
@@ -969,7 +968,7 @@ impl IntermediateType {
                     "cannot check if a type parameter is a stack type, expected a concrete type"
                 );
             }
-            IntermediateType::IEnum(_, _) => todo!(),
+            IntermediateType::IEnum(_) => todo!(),
         }
     }
 }
@@ -994,7 +993,7 @@ impl From<&IntermediateType> for ValType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot convert a type parameter to a wasm type, expected a concrete type");
             }
-            IntermediateType::IEnum(_, _) => todo!(),
+            IntermediateType::IEnum(_) => todo!(),
         }
     }
 }

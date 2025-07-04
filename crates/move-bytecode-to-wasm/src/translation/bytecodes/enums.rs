@@ -116,7 +116,7 @@ pub fn pack_variant(
                             variant_index,
                         });
                     }
-                    IntermediateType::IEnum(_, _) => todo!(),
+                    IntermediateType::IEnum(_) => todo!(),
                 };
             }
             t => Err(TranslationError::TypeMismatch {

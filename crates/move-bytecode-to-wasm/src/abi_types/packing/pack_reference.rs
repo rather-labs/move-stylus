@@ -77,7 +77,7 @@ impl IRef {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
             }
-            IntermediateType::IEnum(_, _) => todo!(),
+            IntermediateType::IEnum(_) => todo!(),
         }
     }
 }
@@ -146,7 +146,7 @@ impl IMutRef {
                     compilation_ctx,
                 );
             }
-            IntermediateType::IEnum(_, _) => todo!(),
+            IntermediateType::IEnum(_) => todo!(),
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }

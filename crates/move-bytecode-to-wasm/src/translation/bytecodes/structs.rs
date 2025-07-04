@@ -175,7 +175,7 @@ pub fn pack(
                             type_parameter_index: *index,
                         });
                     }
-                    IntermediateType::IEnum(_, _) => todo!(),
+                    IntermediateType::IEnum(_) => todo!(),
                 };
 
                 builder.local_get(pointer).local_get(ptr_to_data).store(
@@ -262,7 +262,7 @@ pub fn unpack(
                     type_parameter_index: *index,
                 });
             }
-            IntermediateType::IEnum(_, _) => todo!(),
+            IntermediateType::IEnum(_) => todo!(),
         }
 
         types_stack.push(field.clone());

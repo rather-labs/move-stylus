@@ -291,7 +291,7 @@ impl IStruct {
                         "Trying to copy a type parameter inside a struct, expected a concrete type"
                     );
                 }
-                IntermediateType::IEnum(_, _) => todo!(),
+                IntermediateType::IEnum(_) => todo!(),
             }
 
             // Store the middle pointer in the place of the struct field
@@ -359,7 +359,7 @@ impl IStruct {
                 IntermediateType::ITypeParameter(_) => {
                     panic!("cannot know if a type parameter is dynamic, expected a concrete type");
                 }
-                IntermediateType::IEnum(_, _) => todo!(),
+                IntermediateType::IEnum(_) => todo!(),
             }
         }
 
@@ -408,7 +408,7 @@ impl IStruct {
                 IntermediateType::ITypeParameter(_) => {
                     panic!("cannot know a type parameter's size, expected a concrete type");
                 }
-                IntermediateType::IEnum(_, _) => todo!(),
+                IntermediateType::IEnum(_) => todo!(),
             }
         }
 
