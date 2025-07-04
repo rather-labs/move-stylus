@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
-use crate::translation::intermediate_types::{IntermediateType, structs::IStruct};
+use crate::translation::intermediate_types::{IntermediateType, enums::IEnum, structs::IStruct};
 use move_binary_format::{
     file_format::{
-        Constant, DatatypeHandleIndex, FieldHandleIndex, FieldInstantiationIndex, Signature,
-        SignatureIndex, SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex,
+        Constant, DatatypeHandleIndex, FieldDefinition, FieldHandleIndex, FieldInstantiationIndex,
+        Signature, SignatureIndex, SignatureToken, StructDefInstantiationIndex,
+        StructDefinitionIndex,
     },
     internals::ModuleIndex,
 };
@@ -56,6 +57,9 @@ pub struct CompilationContext<'a> {
 
     /// Module's structs: contains all the user defined structs
     pub module_structs: &'a [IStruct],
+
+    /// Module's enums: contains all the user defined enums
+    pub module_enums: &'a [IEnum],
 
     /// Module's generic structs instances: contains all the user defined generic structs instances
     /// with its corresponding types

@@ -18,6 +18,7 @@ use walrus::{
 
 pub mod address;
 pub mod boolean;
+pub mod enums;
 pub mod heap_integers;
 pub mod reference;
 pub mod signer;

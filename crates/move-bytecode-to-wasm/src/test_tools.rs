@@ -114,6 +114,7 @@ macro_rules! test_compilation_context {
             functions_returns: &[],
             module_signatures: &[],
             module_structs: &[],
+            module_enums: &[],
             module_generic_structs_instances: &[],
             datatype_handles_map: &std::collections::HashMap::new(),
             fields_to_struct_map: &std::collections::HashMap::new(),

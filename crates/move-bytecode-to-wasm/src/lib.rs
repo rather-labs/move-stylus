@@ -3,11 +3,12 @@ use std::{collections::HashMap, path::Path};
 use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use move_binary_format::file_format::{
-    DatatypeHandleIndex, FieldHandleIndex, FieldInstantiationIndex, StructDefInstantiationIndex,
-    StructDefinitionIndex, Visibility,
+    DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex, FieldInstantiationIndex,
+    StructDefInstantiationIndex, StructDefinitionIndex, Visibility,
 };
 use move_binary_format::internals::ModuleIndex;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
+use translation::intermediate_types::enums::{IEnum, IEnumVariant};
 use translation::intermediate_types::structs::IStruct;
 use translation::{
     functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
@@ -60,11 +61,6 @@ pub fn translate_package(
     for root_compiled_module in root_compiled_units {
         let module_name = root_compiled_module.unit.name.to_string();
         let root_compiled_module = root_compiled_module.unit.module;
-
-        assert!(
-            root_compiled_module.enum_defs.is_empty(),
-            "Enums are not supported yet"
-        );
 
         let mut datatype_handles_map = HashMap::new();
 
@@ -212,6 +208,34 @@ pub fn translate_package(
             module_structs.push(IStruct::new(struct_index, all_fields, fields_map));
         }
 
+        // Module's enums
+        let mut module_enums = vec![];
+        for (index, enum_def) in root_compiled_module.enum_defs().iter().enumerate() {
+            let mut variants = Vec::new();
+            for (variant_index, variant) in enum_def.variants.iter().enumerate() {
+                let fields = variant
+                    .fields
+                    .iter()
+                    .map(|f| {
+                        IntermediateType::try_from_signature_token(
+                            &f.signature.0,
+                            &datatype_handles_map,
+                        )
+                    })
+                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .unwrap();
+
+                variants.push(IEnumVariant::new(
+                    variant_index as u16,
+                    index as u16,
+                    fields,
+                ));
+            }
+
+            module_enums.push(IEnum::new(index as u16, variants));
+        }
+
+        println!("{module_enums:#?}");
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
 
         if cfg!(feature = "inject-host-debug-fns") {
@@ -297,6 +321,7 @@ pub fn translate_package(
             functions_returns: &functions_returns,
             module_signatures: &root_compiled_module.signatures,
             module_structs: &module_structs,
+            module_enums: &module_enums,
             module_generic_structs_instances: &module_generic_structs_instances,
             datatype_handles_map: &datatype_handles_map,
             fields_to_struct_map: &fields_to_struct_map,
