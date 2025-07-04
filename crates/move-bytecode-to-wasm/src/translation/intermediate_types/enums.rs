@@ -1,11 +1,6 @@
 use crate::translation::TranslationError;
 
-use super::{
-    IntermediateType,
-    address::IAddress,
-    heap_integers::{IU128, IU256},
-    signer::ISigner,
-};
+use super::IntermediateType;
 
 #[derive(Debug)]
 pub struct IEnumVariant {

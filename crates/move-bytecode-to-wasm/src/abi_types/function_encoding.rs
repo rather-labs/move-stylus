@@ -51,7 +51,9 @@ impl SolName for IntermediateType {
     fn sol_name(&self, compilation_ctx: &CompilationContext) -> Option<String> {
         match self {
             IntermediateType::IBool => Some(sol_data::Bool::SOL_NAME.to_string()),
-            IntermediateType::IU8 => Some(sol_data::Uint::<8>::SOL_NAME.to_string()),
+            IntermediateType::IU8 | IntermediateType::IEnum(_) => {
+                Some(sol_data::Uint::<8>::SOL_NAME.to_string())
+            }
             IntermediateType::IU16 => Some(sol_data::Uint::<16>::SOL_NAME.to_string()),
             IntermediateType::IU32 => Some(sol_data::Uint::<32>::SOL_NAME.to_string()),
             IntermediateType::IU64 => Some(sol_data::Uint::<64>::SOL_NAME.to_string()),
@@ -89,7 +91,6 @@ impl SolName for IntermediateType {
             }
             IntermediateType::ISigner => None,
             IntermediateType::ITypeParameter(_) => None,
-            IntermediateType::IEnum(_) => todo!(),
         }
     }
 }

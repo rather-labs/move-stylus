@@ -254,6 +254,6 @@ impl CompilationContext<'_> {
     pub fn get_enum_by_index(&self, index: u16) -> Result<&IEnum, CompilationContextError> {
         self.module_enums
             .get(index as usize)
-            .ok_or(CompilationContextError::EnumNotFound(index as u16))
+            .ok_or(CompilationContextError::EnumNotFound(index))
     }
 }

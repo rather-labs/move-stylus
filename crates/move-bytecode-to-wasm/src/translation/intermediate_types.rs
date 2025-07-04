@@ -246,7 +246,8 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_, _) => {
+            | IntermediateType::IGenericStructInstance(_, _)
+            | IntermediateType::IEnum(_) => {
                 builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -260,7 +261,6 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot move a type parameter, expected a concrete type");
             }
-            IntermediateType::IEnum(_) => todo!(),
         }
     }
 
@@ -795,7 +795,8 @@ impl IntermediateType {
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
             | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_, _) => {
+            | IntermediateType::IGenericStructInstance(_, _)
+            | IntermediateType::IEnum(_) => {
                 let ptr = module.locals.add(ValType::I32);
                 builder
                     .local_set(ptr)
@@ -815,7 +816,6 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot box a type parameter, expected a concrete type");
             }
-            IntermediateType::IEnum(_) => todo!(),
         }
     }
 
@@ -989,11 +989,11 @@ impl From<&IntermediateType> for ValType {
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
             | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_, _) => ValType::I32,
+            | IntermediateType::IGenericStructInstance(_, _)
+            | IntermediateType::IEnum(_) => ValType::I32,
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot convert a type parameter to a wasm type, expected a concrete type");
             }
-            IntermediateType::IEnum(_) => todo!(),
         }
     }
 }

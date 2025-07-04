@@ -17,3 +17,7 @@ public fun pack_2(): SimpleEnum {
 public fun pack_3(): SimpleEnum {
     SimpleEnum::Three
 }
+
+public fun pack_unpack(x:  SimpleEnum): SimpleEnum {
+    x
+}

@@ -45,12 +45,16 @@ mod enum_abi_packing_unpacking {
         function pack1() external returns (SimpleEnum);
         function pack2() external returns (SimpleEnum);
         function pack3() external returns (SimpleEnum);
+        function packUnpack(SimpleEnum s) external returns (SimpleEnum);
     }
 
     #[rstest]
-    #[case(pack1Call::new(()), (0,))]
-    #[case(pack2Call::new(()), (1,))]
-    #[case(pack3Call::new(()), (2,))]
+    #[case(pack1Call::new(()), (SimpleEnum::One,))]
+    #[case(pack2Call::new(()), (SimpleEnum::Two,))]
+    #[case(pack3Call::new(()), (SimpleEnum::Three,))]
+    #[case(packUnpackCall::new((SimpleEnum::One,)), (SimpleEnum::One,))]
+    #[case(packUnpackCall::new((SimpleEnum::Two,)), (SimpleEnum::Two,))]
+    #[case(packUnpackCall::new((SimpleEnum::Three,)), (SimpleEnum::Three,))]
     fn test_enum_abi_packing_unpacking<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
