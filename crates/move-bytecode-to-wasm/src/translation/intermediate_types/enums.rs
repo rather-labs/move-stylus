@@ -76,34 +76,19 @@ impl IEnum {
             let mut variant_size = 0;
             for field in &variant.fields {
                 variant_size += match field {
-                    // For numbers and addresses, we directly save them
-                    IntermediateType::IBool
-                    | IntermediateType::IU8
-                    | IntermediateType::IU16
-                    | IntermediateType::IU32 => 4,
-                    IntermediateType::IU64 => 8,
-                    IntermediateType::IU128 => IU128::HEAP_SIZE,
-                    IntermediateType::IU256 => IU256::HEAP_SIZE,
-                    IntermediateType::IAddress => IAddress::HEAP_SIZE,
-                    IntermediateType::ISigner => ISigner::HEAP_SIZE,
-
-                    // For vectors and structs, we save a pointer to them
-                    IntermediateType::IVector(_)
-                    | IntermediateType::IStruct(_)
-                    | IntermediateType::IGenericStructInstance(_, _) => 4,
-
                     IntermediateType::ITypeParameter(_) => return Ok(None),
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                         return Err(TranslationError::FoundReferenceInsideEnum {
                             enum_index: variant.belongs_to,
                         });
                     }
+                    _ => field.stack_data_size(),
                 };
 
                 size = std::cmp::max(size, variant_size);
             }
         }
 
-        Ok(Some(size as u32 + 4))
+        Ok(Some(size + 4))
     }
 }

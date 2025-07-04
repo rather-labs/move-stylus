@@ -1,6 +1,7 @@
 use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
+use compilation_context::VariantData;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use move_binary_format::file_format::{
     DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex, FieldInstantiationIndex,
@@ -236,15 +237,21 @@ pub fn translate_package(
                 ));
 
                 // Process handles
-                let variant_index = root_compiled_module
+                let variant_handle_index = root_compiled_module
                     .variant_handles()
                     .iter()
                     .position(|v| v.variant == variant_index as u16 && v.enum_def == enum_index)
                     .map(|i| VariantHandleIndex(i as u16));
 
                 // If field_index is None means the field is never referenced in the code
-                if let Some(variant_index) = variant_index {
-                    let res = variants_to_enum_map.insert(variant_index, index);
+                if let Some(variant_handle_index) = variant_handle_index {
+                    let res = variants_to_enum_map.insert(
+                        variant_handle_index,
+                        VariantData {
+                            enum_index: index,
+                            index_inside_enum: variant_index,
+                        },
+                    );
                     assert!(
                         res.is_none(),
                         "there was an error creating a variant in struct {variant_index}, variant with index {variant_index} already exist"

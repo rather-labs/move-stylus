@@ -1186,6 +1186,17 @@ fn map_bytecode_instruction(
         //**
         Bytecode::PackVariant(index) => {
             let enum_ = compilation_ctx.get_enum_by_variant_handle_idx(index)?;
+            let index_inside_enum =
+                compilation_ctx.get_variant_position_by_variant_handle_idx(index)?;
+
+            bytecodes::enums::pack_variant(
+                enum_,
+                index_inside_enum,
+                module,
+                builder,
+                compilation_ctx,
+                types_stack,
+            )?;
         }
         b => Err(TranslationError::UnssuportedOperation {
             operation: b.clone(),

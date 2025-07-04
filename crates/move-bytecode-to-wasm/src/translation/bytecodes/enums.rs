@@ -32,7 +32,6 @@ pub fn pack_variant(
 
     let val_32 = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
-    let mut offset = enum_.heap_size;
 
     let heap_size = enum_
         .heap_size
@@ -93,18 +92,24 @@ pub fn pack_variant(
                     IntermediateType::IU128
                     | IntermediateType::IU256
                     | IntermediateType::IAddress
-                    | IntermediateType::ISigner => {}
-                    IntermediateType::IVector(_)
+                    | IntermediateType::ISigner
+                    | IntermediateType::IVector(_)
                     | IntermediateType::IStruct(_)
                     | IntermediateType::IGenericStructInstance(_, _) => {
                         builder.local_set(ptr_to_data);
+
+                        // Directly write the pointer to the data
+                        builder.local_get(pointer).local_get(ptr_to_data).store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I32 { atomic: false },
+                            MemArg { align: 0, offset },
+                        );
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                         return Err(TranslationError::FoundReferenceInsideEnum {
                             enum_index: enum_.index,
                         });
                     }
-                    // TODO: Maybe add type parameter index to error
                     IntermediateType::ITypeParameter(_) => {
                         return Err(TranslationError::FoundTypeParameterInsideEnumVariant {
                             enum_index: enum_.index,
@@ -112,12 +117,6 @@ pub fn pack_variant(
                         });
                     }
                 };
-
-                builder.local_get(pointer).local_get(ptr_to_data).store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg { align: 0, offset },
-                );
             }
             t => Err(TranslationError::TypeMismatch {
                 expected: pack_type.clone(),

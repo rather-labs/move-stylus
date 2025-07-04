@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use crate::translation::intermediate_types::{IntermediateType, enums::IEnum, structs::IStruct};
 use move_binary_format::{
     file_format::{
-        Constant, DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex,
-        FieldInstantiationIndex, Signature, SignatureIndex, SignatureToken,
-        StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
+        Constant, DatatypeHandleIndex, FieldHandleIndex, FieldInstantiationIndex, Signature,
+        SignatureIndex, SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex,
+        VariantHandleIndex,
     },
     internals::ModuleIndex,
 };
@@ -42,6 +42,11 @@ pub enum CompilationContextError {
 
     #[error("enum with enum id {0} not found in compilation context")]
     EnumWithVariantIdxNotFound(u16),
+}
+
+pub struct VariantData {
+    pub enum_index: usize,
+    pub index_inside_enum: usize,
 }
 
 /// Compilation context
@@ -95,8 +100,8 @@ pub struct CompilationContext<'a> {
     /// Module's enums: contains all the user defined enums
     pub module_enums: &'a [IEnum],
 
-    /// Maps a enum's variant index to its corresponding enum
-    pub variants_to_enum_map: &'a HashMap<VariantHandleIndex, usize>,
+    /// Maps a enum's variant index to its corresponding enum and position inside the enum
+    pub variants_to_enum_map: &'a HashMap<VariantHandleIndex, VariantData>,
 
     /// This Hashmap maps the move's datatype handles to our internal representation of those
     /// types. The datatype handles are used interally by move to look for user defined data
@@ -222,13 +227,27 @@ impl CompilationContext<'_> {
         &self,
         idx: &VariantHandleIndex,
     ) -> Result<&IEnum, CompilationContextError> {
-        let enum_id = self
+        let VariantData { enum_index, .. } = self
             .variants_to_enum_map
             .get(idx)
             .ok_or(CompilationContextError::EnumWithVariantIdxNotFound(idx.0))?;
 
         self.module_enums
-            .get(*enum_id)
-            .ok_or(CompilationContextError::EnumNotFound(*enum_id as u16))
+            .get(*enum_index)
+            .ok_or(CompilationContextError::EnumNotFound(*enum_index as u16))
+    }
+
+    pub fn get_variant_position_by_variant_handle_idx(
+        &self,
+        idx: &VariantHandleIndex,
+    ) -> Result<u16, CompilationContextError> {
+        let VariantData {
+            index_inside_enum, ..
+        } = self
+            .variants_to_enum_map
+            .get(idx)
+            .ok_or(CompilationContextError::EnumWithVariantIdxNotFound(idx.0))?;
+
+        Ok(*index_inside_enum as u16)
     }
 }
