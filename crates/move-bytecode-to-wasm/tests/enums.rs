@@ -69,4 +69,13 @@ mod enum_abi_packing_unpacking {
         )
         .unwrap();
     }
+
+    #[test]
+    #[should_panic(expected = "wasm trap: wasm `unreachable` instruction executed")]
+    fn test_enum_abi_unpacking_out_of_bounds() {
+        // Calldata with non-extistant enum member 4
+        let call_data = [packUnpackCall::SELECTOR.to_vec(), (4,).abi_encode_params()].concat();
+        let runtime = runtime();
+        runtime.call_entrypoint(call_data).unwrap();
+    }
 }

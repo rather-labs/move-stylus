@@ -428,6 +428,7 @@ impl Packable for IntermediateType {
     fn encoded_size(&self, compilation_ctx: &CompilationContext) -> usize {
         match self {
             IntermediateType::IBool => sol_data::Bool::ENCODED_SIZE.unwrap(),
+            // According to the official documentation, enum types are encoded as uint8
             IntermediateType::IU8 | IntermediateType::IEnum(_) => {
                 sol_data::Uint::<8>::ENCODED_SIZE.unwrap()
             }
