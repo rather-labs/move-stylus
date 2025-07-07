@@ -43,7 +43,7 @@ impl IEnum {
                 |_| {},
             );
 
-        // The enuum should occupy only 4 bytes since only the variant number is saved
+        // The enum should occupy only 4 bytes since only the variant number is saved
         block
             .i32_const(4)
             .call(compilation_ctx.allocator)

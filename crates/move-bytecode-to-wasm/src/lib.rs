@@ -243,7 +243,7 @@ pub fn translate_package(
                     .position(|v| v.variant == variant_index as u16 && v.enum_def == enum_index)
                     .map(|i| VariantHandleIndex(i as u16));
 
-                // If field_index is None means the field is never referenced in the code
+                // If variant_handle_index is None means the field is never referenced in the code
                 if let Some(variant_handle_index) = variant_handle_index {
                     let res = variants_to_enum_map.insert(
                         variant_handle_index,

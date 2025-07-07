@@ -1,3 +1,19 @@
+//! Represents an enum type in Move
+//!
+//! The struct memory layout is composed of two parts:
+//! - The first 4 bytes are the enum variant value.
+//! - The rest bytes can vary depending on which variant is currently saved in memory. After the
+//!   first 4 bytes the vairant's fields will be encoded contigously.
+//!
+//! The size that the enum will occupy in memory depends on its variants. This will be 4 bytes for
+//! the variant index plus the size of the variant that occupies most space in memory.
+//!
+//! If a variant contains a dynamic type, it does not take in account how much space the actual data of
+//! the variant occupies because we can't know it (such as vector, the size can change depending on how
+//! many elements the vector has), in that case we save just the pointers to them.
+//!
+//! For stack types the data is saved in-place, for heap-types we just save the pointer to the
+//! data.
 use crate::translation::TranslationError;
 
 use super::IntermediateType;
