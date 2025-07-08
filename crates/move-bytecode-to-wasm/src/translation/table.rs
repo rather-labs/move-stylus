@@ -1,4 +1,5 @@
 use move_abstract_interpreter::control_flow_graph::ControlFlowGraph;
+use relooper::reloop;
 use std::collections::BTreeMap;
 
 use anyhow::Result;
@@ -26,6 +27,17 @@ pub struct TableEntry {
 impl TableEntry {
     pub fn get_move_code_unit(&self) -> Option<&CodeUnit> {
         let code_unit = self.function.function_definition.code.as_ref().unwrap();
+        let test: &dyn ControlFlowGraph =
+            &VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
+
+        let nodes: Vec<(u16, Vec<u16>)> = test
+            .blocks()
+            .into_iter()
+            .map(|b| (b, test.successors(b).to_vec()))
+            .collect();
+
+        println!("========> {nodes:?}");
+
         let test: BTreeMap<_, _> = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables)
             .blocks()
             .into_iter()
@@ -34,6 +46,9 @@ impl TableEntry {
             .collect();
 
         println!("AAAAAAAAAAAAAAAAAAAAAA \n{:#?}", test);
+
+        let relooped = reloop(nodes, 0);
+        println!("RELOOPED {relooped:#?}");
 
         self.function.function_definition.code.as_ref()
     }

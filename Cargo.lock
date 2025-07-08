@@ -3209,6 +3209,7 @@ dependencies = [
  "move-binary-format",
  "move-package",
  "move-packages-build",
+ "relooper",
  "rstest",
  "thiserror 2.0.12",
  "walrus",
@@ -4711,6 +4712,16 @@ name = "relative-path"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
+
+[[package]]
+name = "relooper"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efae3de559cde28a2580a0cd4bb80e6a3100e3ebeb390c0d9f82c9cd4cedf118"
+dependencies = [
+ "fnv",
+ "petgraph 0.5.1",
+]
 
 [[package]]
 name = "reqwest"
