@@ -1,6 +1,6 @@
 use move_abstract_interpreter::control_flow_graph::ControlFlowGraph;
 use relooper::{ShapedBlock, reloop};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use anyhow::Result;
 use move_abstract_interpreter::control_flow_graph::VMControlFlowGraph;
@@ -27,14 +27,14 @@ pub struct TableEntry {
 impl TableEntry {
     pub fn get_move_code_unit(&self) -> Option<&CodeUnit> {
         let code_unit = self.function.function_definition.code.as_ref().unwrap();
-        let test: VMControlFlowGraph =
+        let control_flow_graph: VMControlFlowGraph =
             VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
 
-        test.display();
-        let nodes: Vec<(u16, Vec<u16>)> = (&test as &dyn ControlFlowGraph)
+        control_flow_graph.display();
+        let nodes: Vec<(u16, Vec<u16>)> = (&control_flow_graph as &dyn ControlFlowGraph)
             .blocks()
             .into_iter()
-            .map(|b| (b, test.successors(b).to_vec()))
+            .map(|b| (b, control_flow_graph.successors(b).to_vec()))
             .collect();
 
         println!("========> {nodes:?}");
@@ -48,28 +48,29 @@ impl TableEntry {
                     .collect();
         println!("AAAAAAAAAAAAAAAAAAAAAA \n{:#?}", test);
         */
-        let nodes2: Vec<&[Bytecode]> = (&test as &dyn ControlFlowGraph)
+        let blocks = (&control_flow_graph as &dyn ControlFlowGraph)
             .blocks()
             .into_iter()
-            .map(|b| (b, test.next_block(b)))
+            .map(|b| (b, control_flow_graph.next_block(b)));
+
+        let labelled_blocks: HashMap<u16, &[Bytecode]> = blocks
             .map(|(start, finish)| {
                 let finish = if let Some(finish) = finish {
                     finish as usize
                 } else {
                     code_unit.code.len()
                 };
-                &code_unit.code[start as usize..finish]
+                (start, &code_unit.code[start as usize..finish])
             })
             .collect();
 
-        println!("{nodes2:?}");
+        println!("{labelled_blocks:?}");
 
         let relooped = reloop(nodes, 0);
 
         process_reloop(&relooped, 0);
 
         println!("RELOOPED {relooped:#?}");
-        println!("{nodes2:?}");
 
         self.function.function_definition.code.as_ref()
     }
