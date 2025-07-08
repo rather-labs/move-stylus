@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use anyhow::Result;
 use move_abstract_interpreter::control_flow_graph::VMControlFlowGraph;
-use move_binary_format::file_format::{CodeUnit, FunctionHandleIndex};
+use move_binary_format::file_format::{Bytecode, CodeUnit, FunctionHandleIndex};
 use walrus::{ConstExpr, ElementKind, FunctionId, Module, TableId, TypeId, ValType, ir::Value};
 
 use super::functions::MappedFunction;
@@ -39,20 +39,37 @@ impl TableEntry {
 
         println!("========> {nodes:?}");
 
-        let test: BTreeMap<_, _> = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables)
+        /*
+                let test: BTreeMap<_, _> = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables)
+                    .blocks()
+                    .into_iter()
+                    .enumerate()
+                    .map(|(block_number, pc_start)| (pc_start, block_number))
+                    .collect();
+        println!("AAAAAAAAAAAAAAAAAAAAAA \n{:#?}", test);
+        */
+        let nodes2: Vec<&[Bytecode]> = (&test as &dyn ControlFlowGraph)
             .blocks()
             .into_iter()
-            .enumerate()
-            .map(|(block_number, pc_start)| (pc_start, block_number))
+            .map(|b| (b, test.next_block(b)))
+            .map(|(start, finish)| {
+                let finish = if let Some(finish) = finish {
+                    finish as usize
+                } else {
+                    code_unit.code.len()
+                };
+                &code_unit.code[start as usize..finish]
+            })
             .collect();
 
-        println!("AAAAAAAAAAAAAAAAAAAAAA \n{:#?}", test);
+        println!("{nodes2:?}");
 
         let relooped = reloop(nodes, 0);
 
         process_reloop(&relooped, 0);
 
         println!("RELOOPED {relooped:#?}");
+        println!("{nodes2:?}");
 
         self.function.function_definition.code.as_ref()
     }
