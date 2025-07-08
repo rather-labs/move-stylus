@@ -1,5 +1,5 @@
 use move_abstract_interpreter::control_flow_graph::ControlFlowGraph;
-use relooper::reloop;
+use relooper::{ShapedBlock, reloop};
 use std::collections::BTreeMap;
 
 use anyhow::Result;
@@ -27,10 +27,11 @@ pub struct TableEntry {
 impl TableEntry {
     pub fn get_move_code_unit(&self) -> Option<&CodeUnit> {
         let code_unit = self.function.function_definition.code.as_ref().unwrap();
-        let test: &dyn ControlFlowGraph =
-            &VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
+        let test: VMControlFlowGraph =
+            VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
 
-        let nodes: Vec<(u16, Vec<u16>)> = test
+        test.display();
+        let nodes: Vec<(u16, Vec<u16>)> = (&test as &dyn ControlFlowGraph)
             .blocks()
             .into_iter()
             .map(|b| (b, test.successors(b).to_vec()))
@@ -48,9 +49,47 @@ impl TableEntry {
         println!("AAAAAAAAAAAAAAAAAAAAAA \n{:#?}", test);
 
         let relooped = reloop(nodes, 0);
+
+        process_reloop(&relooped, 0);
+
         println!("RELOOPED {relooped:#?}");
 
         self.function.function_definition.code.as_ref()
+    }
+}
+
+/*
+
+[[instrseq_b0, left [ [instrseq_b4, left], [instrseq_b7, left]], [instrseq_b9, left]]
+
+block0
+  tiene multiple? si -> espero al final y creo metabloque
+  no -> vomito codigo
+    hay left? -> brancheo con los bloques generados
+    no -> no hago nada
+
+b4 ->
+*/
+
+fn process_reloop(shaped_block: &ShapedBlock<u16>, depth: usize) {
+    match shaped_block {
+        ShapedBlock::Simple(simple_block) => {
+            println!("D {: <1}: block {}", depth, simple_block.label);
+            if let Some(ref immediate) = simple_block.immediate {
+                process_reloop(immediate, depth + 1);
+            }
+
+            if let Some(ref next) = simple_block.next {
+                process_reloop(next, depth + 1);
+            }
+        }
+        ShapedBlock::Loop(loop_block) => todo!(),
+        ShapedBlock::Multiple(multiple_block) => {
+            println!("D {depth} parent - multiple block");
+            for block in &multiple_block.handled {
+                process_reloop(&block.inner, depth + 1);
+            }
+        }
     }
 }
 
