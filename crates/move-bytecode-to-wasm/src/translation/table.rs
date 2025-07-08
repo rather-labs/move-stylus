@@ -1,4 +1,8 @@
+use move_abstract_interpreter::control_flow_graph::ControlFlowGraph;
+use std::collections::BTreeMap;
+
 use anyhow::Result;
+use move_abstract_interpreter::control_flow_graph::VMControlFlowGraph;
 use move_binary_format::file_format::{CodeUnit, FunctionHandleIndex};
 use walrus::{ConstExpr, ElementKind, FunctionId, Module, TableId, TypeId, ValType, ir::Value};
 
@@ -21,6 +25,16 @@ pub struct TableEntry {
 
 impl TableEntry {
     pub fn get_move_code_unit(&self) -> Option<&CodeUnit> {
+        let code_unit = self.function.function_definition.code.as_ref().unwrap();
+        let test: BTreeMap<_, _> = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables)
+            .blocks()
+            .into_iter()
+            .enumerate()
+            .map(|(block_number, pc_start)| (pc_start, block_number))
+            .collect();
+
+        println!("AAAAAAAAAAAAAAAAAAAAAA \n{:#?}", test);
+
         self.function.function_definition.code.as_ref()
     }
 }

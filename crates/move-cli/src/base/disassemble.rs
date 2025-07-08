@@ -74,11 +74,12 @@ impl Disassemble {
                     )
                 } else {
                     let d = Disassembler::from_unit(&unit.unit);
+                    println!("\n BBBBBBBBBBBBBBB {:#?}", unit);
                     let (disassemble_string, bcode_map) = d.disassemble_with_source_map()?;
                     if bytecode_map {
-                        println!("{}", serialize_to_json_string(&bcode_map)?);
+                        println!("==========> {}", serialize_to_json_string(&bcode_map)?);
                     }
-                    println!("{}", disassemble_string);
+                    println!("--> {}", disassemble_string);
                     if debug {
                         println!("\n{:#?}", &unit.unit.module)
                     }
