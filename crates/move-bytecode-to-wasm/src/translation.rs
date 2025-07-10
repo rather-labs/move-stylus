@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::io::Empty;
+
 use anyhow::Result;
 use functions::{
     MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
@@ -6,12 +9,15 @@ use intermediate_types::IntermediateType;
 use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
+use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::file_format::Bytecode;
+use relooper::{ShapedBlock, reloop};
 use table::FunctionTable;
 use types_stack::TypesStack;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{FunctionBuilder, Module};
 use walrus::{FunctionId, InstrSeqBuilder, ValType, ir::MemArg};
+use wasmparser::types;
 
 use crate::CompilationContext;
 use crate::runtime::RuntimeFunction;
@@ -55,6 +61,51 @@ pub fn translate_function(
 
     let code = &entry.get_move_code_unit().unwrap().code;
 
+    let code_unit = &entry.get_move_code_unit().unwrap();
+
+    let control_flow_graph: VMControlFlowGraph =
+        VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
+
+    let nodes: Vec<(u16, Vec<u16>)> = (&control_flow_graph as &dyn ControlFlowGraph)
+        .blocks()
+        .into_iter()
+        .map(|b| (b, control_flow_graph.successors(b).to_vec()))
+        .collect();
+
+    let blocks = (&control_flow_graph as &dyn ControlFlowGraph)
+        .blocks()
+        .into_iter()
+        .map(|b| (b, control_flow_graph.next_block(b)));
+
+    let labelled_blocks: HashMap<u16, (&[Bytecode], TypesStack)> = blocks
+        .map(|(start, finish)| {
+            let finish = if let Some(finish) = finish {
+                finish as usize
+            } else {
+                code_unit.code.len()
+            };
+            let mut b = builder.dangling_instr_seq(None);
+            let code = &code_unit.code[start as usize..finish];
+            let mut ts = TypesStack::new();
+            for instruction in code {
+                map_bytecode_instruction(
+                    instruction,
+                    compilation_ctx,
+                    &mut b,
+                    &entry.function,
+                    module,
+                    function_table,
+                    &mut ts,
+                )
+                .unwrap();
+            }
+            println!("{start} {ts:?}");
+            (start, (&code_unit.code[start as usize..finish], ts))
+        })
+        .collect();
+
+    let relooped = reloop(nodes, 0);
+
     let mut types_stack = TypesStack::new();
 
     for instruction in code {
@@ -74,6 +125,73 @@ pub fn translate_function(
 
     let function_id = function.finish(entry.function.arg_locals.clone(), &mut module.funcs);
     Ok(function_id)
+}
+
+#[derive(Debug, Clone)]
+enum Flow {
+    Empty,
+    Block(TypesStack, u16),
+    BlockSequence(Vec<Flow>),
+    Loop(TypesStack, Box<Flow>),
+    IfElse(TypesStack, Box<Flow>, Box<Flow>),
+}
+
+impl Flow {
+    fn get_types_stack(&self) -> TypesStack {
+        match self {
+            Flow::Block(types_stack, _) => types_stack.clone(),
+            Flow::BlockSequence(blocks) => TypesStack(blocks.iter().fold(vec![], |acc, f| {
+                [acc, f.get_types_stack().0.clone()].concat()
+            })),
+            Flow::Loop(types_stack, _) => types_stack.clone(),
+            Flow::IfElse(types_stack, _, _) => types_stack.clone(),
+            Flow::Empty => TypesStack::new(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match &self {
+            Self::Empty => true,
+            _ => false,
+        }
+    }
+}
+
+fn process_reloop(
+    shaped_block: &ShapedBlock<u16>,
+    blocks: &HashMap<u16, (&[Bytecode], TypesStack)>,
+) -> Flow {
+    match shaped_block {
+        ShapedBlock::Simple(simple_block) => {
+            // Process the block
+            let block = blocks.get(&simple_block.label).unwrap();
+            let b = Flow::Block(block.1, simple_block.label);
+
+            // Process nested blocks
+            let inner = simple_block
+                .immediate
+                .map(|i| process_reloop(&i, blocks))
+                .unwrap_or(Flow::Empty);
+
+            let next = simple_block
+                .next
+                .map(|n| process_reloop(&n, blocks))
+                .unwrap_or(Flow::Empty);
+
+            if !inner.is_empty() || !next.is_empty() {
+                Flow::BlockSequence(vec![b, inner, next])
+            } else {
+                b
+            }
+        }
+        ShapedBlock::Loop(loop_block) => todo!(),
+        ShapedBlock::Multiple(multiple_block) => {
+            let mut blocks = vec![];
+            for block in &multiple_block.handled {
+                blocks.push(process_reloop(&block.inner, blocks));
+            }
+        }
+    }
 }
 
 fn map_bytecode_instruction(
@@ -1180,6 +1298,10 @@ fn map_bytecode_instruction(
 
             bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
         }
+        Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => {
+            types_stack.pop_expecting(&IntermediateType::IBool)?;
+        }
+        Bytecode::Branch(_) => (),
         b => Err(TranslationError::UnssuportedOperation {
             operation: b.clone(),
         })?,

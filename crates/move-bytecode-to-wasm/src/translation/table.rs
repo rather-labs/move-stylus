@@ -27,51 +27,52 @@ pub struct TableEntry {
 impl TableEntry {
     pub fn get_move_code_unit(&self) -> Option<&CodeUnit> {
         let code_unit = self.function.function_definition.code.as_ref().unwrap();
-        let control_flow_graph: VMControlFlowGraph =
-            VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
-
-        control_flow_graph.display();
-        let nodes: Vec<(u16, Vec<u16>)> = (&control_flow_graph as &dyn ControlFlowGraph)
-            .blocks()
-            .into_iter()
-            .map(|b| (b, control_flow_graph.successors(b).to_vec()))
-            .collect();
-
-        println!("========> {nodes:?}");
-
         /*
-                let test: BTreeMap<_, _> = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables)
+                let control_flow_graph: VMControlFlowGraph =
+                    VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
+
+                control_flow_graph.display();
+                let nodes: Vec<(u16, Vec<u16>)> = (&control_flow_graph as &dyn ControlFlowGraph)
                     .blocks()
                     .into_iter()
-                    .enumerate()
-                    .map(|(block_number, pc_start)| (pc_start, block_number))
+                    .map(|b| (b, control_flow_graph.successors(b).to_vec()))
                     .collect();
-        println!("AAAAAAAAAAAAAAAAAAAAAA \n{:#?}", test);
+
+                println!("========> {nodes:?}");
+
+                /*
+                        let test: BTreeMap<_, _> = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables)
+                            .blocks()
+                            .into_iter()
+                            .enumerate()
+                            .map(|(block_number, pc_start)| (pc_start, block_number))
+                            .collect();
+                println!("AAAAAAAAAAAAAAAAAAAAAA \n{:#?}", test);
+                */
+                let blocks = (&control_flow_graph as &dyn ControlFlowGraph)
+                    .blocks()
+                    .into_iter()
+                    .map(|b| (b, control_flow_graph.next_block(b)));
+
+                let labelled_blocks: HashMap<u16, &[Bytecode]> = blocks
+                    .map(|(start, finish)| {
+                        let finish = if let Some(finish) = finish {
+                            finish as usize
+                        } else {
+                            code_unit.code.len()
+                        };
+                        (start, &code_unit.code[start as usize..finish])
+                    })
+                    .collect();
+
+                println!("{labelled_blocks:?}");
+
+                let relooped = reloop(nodes, 0);
+
+                process_reloop(&relooped, 0);
+
+                println!("RELOOPED {relooped:#?}");
         */
-        let blocks = (&control_flow_graph as &dyn ControlFlowGraph)
-            .blocks()
-            .into_iter()
-            .map(|b| (b, control_flow_graph.next_block(b)));
-
-        let labelled_blocks: HashMap<u16, &[Bytecode]> = blocks
-            .map(|(start, finish)| {
-                let finish = if let Some(finish) = finish {
-                    finish as usize
-                } else {
-                    code_unit.code.len()
-                };
-                (start, &code_unit.code[start as usize..finish])
-            })
-            .collect();
-
-        println!("{labelled_blocks:?}");
-
-        let relooped = reloop(nodes, 0);
-
-        process_reloop(&relooped, 0);
-
-        println!("RELOOPED {relooped:#?}");
-
         self.function.function_definition.code.as_ref()
     }
 }

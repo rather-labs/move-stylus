@@ -1,6 +1,7 @@
 use super::intermediate_types::IntermediateType;
 
-pub struct TypesStack(Vec<IntermediateType>);
+#[derive(Debug, Clone)]
+pub struct TypesStack(pub Vec<IntermediateType>);
 
 type Result<T> = std::result::Result<T, TypesStackError>;
 
