@@ -6,6 +6,7 @@ use crate::{
         IntermediateType,
         address::IAddress,
         boolean::IBool,
+        enums::IEnum,
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         simple_integers::{IU8, IU16, IU32, IU64},
@@ -13,6 +14,7 @@ use crate::{
     },
 };
 
+mod unpack_enum;
 mod unpack_heap_int;
 mod unpack_native_int;
 mod unpack_reference;
@@ -182,6 +184,21 @@ impl Unpackable for IntermediateType {
                     module,
                     reader_pointer,
                     calldata_reader_pointer,
+                    compilation_ctx,
+                )
+            }
+            IntermediateType::IEnum(enum_index) => {
+                let enum_ = compilation_ctx.get_enum_by_index(*enum_index).unwrap();
+                if !enum_.is_simple {
+                    panic!(
+                        "cannot abi unpack enum with index {enum_index}, it contains at least one variant with fields"
+                    );
+                }
+                IEnum::add_unpack_instructions(
+                    enum_,
+                    function_builder,
+                    module,
+                    reader_pointer,
                     compilation_ctx,
                 )
             }

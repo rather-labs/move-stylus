@@ -1,13 +1,15 @@
 use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
+use compilation_context::VariantData;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use move_binary_format::file_format::{
-    DatatypeHandleIndex, FieldHandleIndex, FieldInstantiationIndex, StructDefInstantiationIndex,
-    StructDefinitionIndex, Visibility,
+    DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex, FieldInstantiationIndex,
+    StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex, Visibility,
 };
 use move_binary_format::internals::ModuleIndex;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
+use translation::intermediate_types::enums::{IEnum, IEnumVariant};
 use translation::intermediate_types::structs::IStruct;
 use translation::{
     functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
@@ -60,11 +62,6 @@ pub fn translate_package(
     for root_compiled_module in root_compiled_units {
         let module_name = root_compiled_module.unit.name.to_string();
         let root_compiled_module = root_compiled_module.unit.module;
-
-        assert!(
-            root_compiled_module.enum_defs.is_empty(),
-            "Enums are not supported yet"
-        );
 
         let mut datatype_handles_map = HashMap::new();
 
@@ -212,6 +209,59 @@ pub fn translate_package(
             module_structs.push(IStruct::new(struct_index, all_fields, fields_map));
         }
 
+        // Module's enums
+        let mut module_enums = vec![];
+        let mut variants_to_enum_map = HashMap::new();
+        for (index, enum_def) in root_compiled_module.enum_defs().iter().enumerate() {
+            let enum_index = EnumDefinitionIndex::new(index as u16);
+            let mut variants = Vec::new();
+
+            // Process variants
+            for (variant_index, variant) in enum_def.variants.iter().enumerate() {
+                let fields = variant
+                    .fields
+                    .iter()
+                    .map(|f| {
+                        IntermediateType::try_from_signature_token(
+                            &f.signature.0,
+                            &datatype_handles_map,
+                        )
+                    })
+                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .unwrap();
+
+                variants.push(IEnumVariant::new(
+                    variant_index as u16,
+                    index as u16,
+                    fields,
+                ));
+
+                // Process handles
+                let variant_handle_index = root_compiled_module
+                    .variant_handles()
+                    .iter()
+                    .position(|v| v.variant == variant_index as u16 && v.enum_def == enum_index)
+                    .map(|i| VariantHandleIndex(i as u16));
+
+                // If variant_handle_index is None means the field is never referenced in the code
+                if let Some(variant_handle_index) = variant_handle_index {
+                    let res = variants_to_enum_map.insert(
+                        variant_handle_index,
+                        VariantData {
+                            enum_index: index,
+                            index_inside_enum: variant_index,
+                        },
+                    );
+                    assert!(
+                        res.is_none(),
+                        "there was an error creating a variant in struct {variant_index}, variant with index {variant_index} already exist"
+                    );
+                }
+            }
+
+            module_enums.push(IEnum::new(index as u16, variants).unwrap());
+        }
+
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
 
         if cfg!(feature = "inject-host-debug-fns") {
@@ -301,6 +351,8 @@ pub fn translate_package(
             datatype_handles_map: &datatype_handles_map,
             fields_to_struct_map: &fields_to_struct_map,
             generic_fields_to_struct_map: &generic_fields_to_struct_map,
+            module_enums: &module_enums,
+            variants_to_enum_map: &variants_to_enum_map,
             instantiated_fields_to_generic_fields: &instantiated_fields_to_generic_fields,
             memory_id,
             allocator: allocator_func,

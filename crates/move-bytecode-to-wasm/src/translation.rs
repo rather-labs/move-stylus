@@ -464,6 +464,7 @@ fn map_bytecode_instruction(
                         operand_type: *vec_inner,
                     });
                 }
+                IntermediateType::IEnum(_) => todo!(),
             }
 
             types_stack.push(*vec_inner);
@@ -1179,6 +1180,26 @@ fn map_bytecode_instruction(
                 .get_generic_struct_by_struct_definition_idx(struct_definition_index)?;
 
             bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
+        }
+
+        //**
+        // Enums
+        //**
+        Bytecode::PackVariant(index) => {
+            let enum_ = compilation_ctx.get_enum_by_variant_handle_idx(index)?;
+            let index_inside_enum =
+                compilation_ctx.get_variant_position_by_variant_handle_idx(index)?;
+
+            bytecodes::enums::pack_variant(
+                enum_,
+                index_inside_enum,
+                module,
+                builder,
+                compilation_ctx,
+                types_stack,
+            )?;
+
+            types_stack.push(IntermediateType::IEnum(enum_.index));
         }
         b => Err(TranslationError::UnssuportedOperation {
             operation: b.clone(),

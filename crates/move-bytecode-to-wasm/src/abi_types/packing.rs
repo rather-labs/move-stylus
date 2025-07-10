@@ -7,6 +7,7 @@ use crate::{
     translation::intermediate_types::{
         IntermediateType,
         address::IAddress,
+        enums::IEnum,
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         signer::ISigner,
@@ -14,6 +15,7 @@ use crate::{
     },
 };
 
+mod pack_enum;
 mod pack_heap_int;
 mod pack_native_int;
 mod pack_reference;
@@ -228,7 +230,8 @@ impl Packable for IntermediateType {
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
             | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_, _) => {
+            | IntermediateType::IGenericStructInstance(_, _)
+            | IntermediateType::IEnum(_) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -355,6 +358,21 @@ impl Packable for IntermediateType {
                     None,
                 )
             }
+            IntermediateType::IEnum(enum_index) => {
+                let enum_ = compilation_ctx.get_enum_by_index(*enum_index).unwrap();
+                if !enum_.is_simple {
+                    panic!(
+                        "cannot abi pack enum with index {enum_index}, it contains at least one variant with fields"
+                    );
+                }
+                IEnum::add_pack_instructions(
+                    builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    compilation_ctx,
+                )
+            }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
             }
@@ -410,7 +428,10 @@ impl Packable for IntermediateType {
     fn encoded_size(&self, compilation_ctx: &CompilationContext) -> usize {
         match self {
             IntermediateType::IBool => sol_data::Bool::ENCODED_SIZE.unwrap(),
-            IntermediateType::IU8 => sol_data::Uint::<8>::ENCODED_SIZE.unwrap(),
+            // According to the official documentation, enum types are encoded as uint8
+            IntermediateType::IU8 | IntermediateType::IEnum(_) => {
+                sol_data::Uint::<8>::ENCODED_SIZE.unwrap()
+            }
             IntermediateType::IU16 => sol_data::Uint::<16>::ENCODED_SIZE.unwrap(),
             IntermediateType::IU32 => sol_data::Uint::<32>::ENCODED_SIZE.unwrap(),
             IntermediateType::IU64 => sol_data::Uint::<64>::ENCODED_SIZE.unwrap(),
@@ -462,6 +483,7 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot check if generic type parameter is dynamic at compile time");
             }
+            IntermediateType::IEnum(_) => todo!(),
         }
     }
 }

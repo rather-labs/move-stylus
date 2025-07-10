@@ -71,8 +71,14 @@ pub struct IStruct {
     /// Move's struct index
     pub struct_definition_index: StructDefinitionIndex,
 
-    /// How much memory this struct occupies (in bytes). This will be the quantity of fields *4
-    /// because we save pointers for all data types (stack or heap).
+    /// How much memory this struct occupies (in bytes).
+    ///
+    /// This will be the quantity of fields * 4 because we save pointers for all data types (stack
+    /// or heap).
+    ///
+    /// This does not take in account how much space the actual data occupies because we can't know
+    /// it (if the struct contains dynamic data such as vector, the size can change depending on how
+    /// many elements the vector has), just the pointers to them.
     pub heap_size: u32,
 }
 
@@ -285,6 +291,7 @@ impl IStruct {
                         "Trying to copy a type parameter inside a struct, expected a concrete type"
                     );
                 }
+                IntermediateType::IEnum(_) => todo!(),
             }
 
             // Store the middle pointer in the place of the struct field
@@ -352,6 +359,7 @@ impl IStruct {
                 IntermediateType::ITypeParameter(_) => {
                     panic!("cannot know if a type parameter is dynamic, expected a concrete type");
                 }
+                IntermediateType::IEnum(_) => todo!(),
             }
         }
 
@@ -400,6 +408,7 @@ impl IStruct {
                 IntermediateType::ITypeParameter(_) => {
                     panic!("cannot know a type parameter's size, expected a concrete type");
                 }
+                IntermediateType::IEnum(_) => todo!(),
             }
         }
 
