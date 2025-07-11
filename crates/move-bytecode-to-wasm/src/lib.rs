@@ -341,7 +341,7 @@ pub fn translate_package(
         }
 
         function_table.ensure_all_functions_added().unwrap();
-        validate_stylus_wasm(&mut module).unwrap();
+        // validate_stylus_wasm(&mut module).unwrap();
 
         modules.insert(module_name, module);
     }

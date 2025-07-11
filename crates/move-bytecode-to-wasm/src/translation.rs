@@ -12,9 +12,9 @@ use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::file_format::Bytecode;
 use relooper::{ShapedBlock, reloop};
-use table::FunctionTable;
+use table::{FunctionTable, TableEntry};
 use types_stack::TypesStack;
-use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
+use walrus::ir::{BinaryOp, Block, LoadKind, UnaryOp};
 use walrus::{FunctionBuilder, Module};
 use walrus::{FunctionId, InstrSeqBuilder, ValType, ir::MemArg};
 use wasmparser::types;
@@ -105,9 +105,23 @@ pub fn translate_function(
         .collect();
 
     let relooped = reloop(nodes, 0);
+    let processed = process_reloop(&relooped, &labelled_blocks);
+    println!("{processed:#?}");
 
     let mut types_stack = TypesStack::new();
 
+    process_flow(
+        compilation_ctx,
+        &mut builder,
+        module,
+        function_table,
+        &mut types_stack,
+        &processed,
+        &labelled_blocks,
+        entry,
+    );
+
+    /*
     for instruction in code {
         map_bytecode_instruction(
             instruction,
@@ -121,19 +135,125 @@ pub fn translate_function(
         .map_err(|e| {
             panic!("There was an error translating the bytecode instruction {instruction:?}\n{e}")
         })?;
-    }
+    }*/
 
     let function_id = function.finish(entry.function.arg_locals.clone(), &mut module.funcs);
     Ok(function_id)
 }
 
+fn process_flow(
+    compilation_ctx: &CompilationContext,
+    builder: &mut InstrSeqBuilder,
+    module: &mut Module,
+    function_table: &FunctionTable,
+    types_stack: &mut TypesStack,
+    flow: &Flow,
+    labelled_blocks: &HashMap<u16, (&[Bytecode], TypesStack)>,
+    entry: &TableEntry,
+) {
+    match flow {
+        Flow::Block(_, label) => {
+            println!("entered block {label}");
+            let instructions = labelled_blocks.get(label).unwrap().0;
+            for instruction in instructions {
+                map_bytecode_instruction(
+                    instruction,
+                    compilation_ctx,
+                    builder,
+                    &entry.function,
+                    module,
+                    function_table,
+                    types_stack,
+                )
+                .unwrap()
+            }
+        }
+        Flow::BlockSequence(flows) => {
+            println!("entered block sequence");
+            for f in flows {
+                process_flow(
+                    compilation_ctx,
+                    builder,
+                    module,
+                    function_table,
+                    types_stack,
+                    f,
+                    labelled_blocks,
+                    entry,
+                );
+            }
+        }
+        Flow::Loop(_, flow) => {
+            println!("entered loop");
+            builder.loop_(None, |loop_| {
+                let loop_id = loop_.id();
+                process_flow(
+                    compilation_ctx,
+                    loop_,
+                    module,
+                    function_table,
+                    types_stack,
+                    flow,
+                    labelled_blocks,
+                    entry,
+                );
+                loop_.br(loop_id);
+            });
+        }
+        Flow::IfElse(_, flow, flow1) => {
+            println!("entered if else");
+            if matches!(flow.as_ref(), Flow::Empty) && !matches!(flow1.as_ref(), Flow::Empty) {
+            } else {
+                let mut then = builder.dangling_instr_seq(None);
+                let then_id = then.id();
+                if !matches!(flow.as_ref(), Flow::Empty) {
+                    process_flow(
+                        compilation_ctx,
+                        &mut then,
+                        module,
+                        function_table,
+                        types_stack,
+                        flow,
+                        labelled_blocks,
+                        entry,
+                    );
+                }
+                let mut else_ = builder.dangling_instr_seq(None);
+                let else_id = else_.id();
+                if !matches!(flow1.as_ref(), Flow::Empty) {
+                    process_flow(
+                        compilation_ctx,
+                        &mut else_,
+                        module,
+                        function_table,
+                        types_stack,
+                        flow1,
+                        labelled_blocks,
+                        entry,
+                    );
+                }
+                builder.if_else(
+                    None,
+                    |then| {
+                        then.instr(Block { seq: then_id });
+                    },
+                    |else_| {
+                        else_.instr(Block { seq: else_id });
+                    },
+                );
+            }
+        }
+        Flow::Empty => (),
+    }
+}
+
 #[derive(Debug, Clone)]
 enum Flow {
-    Empty,
     Block(TypesStack, u16),
     BlockSequence(Vec<Flow>),
     Loop(TypesStack, Box<Flow>),
     IfElse(TypesStack, Box<Flow>, Box<Flow>),
+    Empty,
 }
 
 impl Flow {
@@ -150,10 +270,7 @@ impl Flow {
     }
 
     pub fn is_empty(&self) -> bool {
-        match &self {
-            Self::Empty => true,
-            _ => false,
-        }
+        matches!(&self, Self::Empty)
     }
 }
 
@@ -165,17 +282,19 @@ fn process_reloop(
         ShapedBlock::Simple(simple_block) => {
             // Process the block
             let block = blocks.get(&simple_block.label).unwrap();
-            let b = Flow::Block(block.1, simple_block.label);
+            let b = Flow::Block(block.1.clone(), simple_block.label);
 
             // Process nested blocks
             let inner = simple_block
                 .immediate
-                .map(|i| process_reloop(&i, blocks))
+                .as_ref()
+                .map(|i| process_reloop(i, blocks))
                 .unwrap_or(Flow::Empty);
 
             let next = simple_block
                 .next
-                .map(|n| process_reloop(&n, blocks))
+                .as_ref()
+                .map(|n| process_reloop(n, blocks))
                 .unwrap_or(Flow::Empty);
 
             if !inner.is_empty() || !next.is_empty() {
@@ -184,12 +303,30 @@ fn process_reloop(
                 b
             }
         }
-        ShapedBlock::Loop(loop_block) => todo!(),
-        ShapedBlock::Multiple(multiple_block) => {
-            let mut blocks = vec![];
-            for block in &multiple_block.handled {
-                blocks.push(process_reloop(&block.inner, blocks));
+        ShapedBlock::Loop(loop_block) => {
+            let inner = process_reloop(&loop_block.inner, blocks);
+
+            if let Some(ref next) = loop_block.next {
+                let next = process_reloop(next, blocks);
+                Flow::BlockSequence(vec![inner, next])
+            } else {
+                Flow::Loop(inner.get_types_stack(), Box::new(inner))
             }
+        }
+        ShapedBlock::Multiple(multiple_block) => {
+            if multiple_block.handled.len() > 2 {
+                panic!("more than 2");
+            }
+            let mut processed_blocks = vec![];
+            for block in &multiple_block.handled {
+                processed_blocks.push(process_reloop(&block.inner, blocks));
+            }
+
+            Flow::IfElse(
+                processed_blocks[0].get_types_stack(),
+                Box::new(processed_blocks.pop().unwrap_or(Flow::Empty)),
+                Box::new(processed_blocks.pop().unwrap_or(Flow::Empty)),
+            )
         }
     }
 }
