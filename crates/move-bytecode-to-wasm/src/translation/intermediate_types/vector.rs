@@ -340,7 +340,7 @@ impl IVector {
                     let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
                     struct_.copy_local_instructions(module, loop_block, compilation_ctx);
                 }
-                t => panic!("unssuported vector type {t:?}"),
+                t => panic!("unsupported vector type {t:?}"),
             }
 
             // === Store result from stack into memory ===

@@ -1,7 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::Empty;
 
 use anyhow::Result;
+use flow::{Flow, FlowBuilder};
 use functions::{
     MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
 };
@@ -11,7 +12,6 @@ use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::file_format::Bytecode;
-use relooper::{ShapedBlock, reloop};
 use table::{FunctionTable, TableEntry};
 use types_stack::TypesStack;
 use walrus::ir::{BinaryOp, Block, LoadKind, UnaryOp};
@@ -25,6 +25,7 @@ use crate::wasm_builder_extensions::WasmBuilderExtension;
 
 pub(crate) mod bytecodes;
 pub mod error;
+pub(crate) mod flow;
 pub mod functions;
 /// The types in this module represent an intermediate Rust representation of Move types
 /// that is used to generate the WASM code.
@@ -59,104 +60,42 @@ pub fn translate_function(
         .get(index)
         .ok_or(anyhow::anyhow!("index {index} not found in function table"))?;
 
-    let code = &entry.get_move_code_unit().unwrap().code;
-
     let code_unit = &entry.get_move_code_unit().unwrap();
 
-    let control_flow_graph: VMControlFlowGraph =
-        VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
+    let flow_builder = FlowBuilder::new(code_unit, compilation_ctx, &entry.function);
 
-    let nodes: Vec<(u16, Vec<u16>)> = (&control_flow_graph as &dyn ControlFlowGraph)
-        .blocks()
-        .into_iter()
-        .map(|b| (b, control_flow_graph.successors(b).to_vec()))
-        .collect();
-
-    let blocks = (&control_flow_graph as &dyn ControlFlowGraph)
-        .blocks()
-        .into_iter()
-        .map(|b| (b, control_flow_graph.next_block(b)));
-
-    let labelled_blocks: HashMap<u16, (&[Bytecode], TypesStack)> = blocks
-        .map(|(start, finish)| {
-            let finish = if let Some(finish) = finish {
-                finish as usize
-            } else {
-                code_unit.code.len()
-            };
-            let mut b = builder.dangling_instr_seq(None);
-            let code = &code_unit.code[start as usize..finish];
-            let mut ts = TypesStack::new();
-            for instruction in code {
-                map_bytecode_instruction(
-                    instruction,
-                    compilation_ctx,
-                    &mut b,
-                    &entry.function,
-                    module,
-                    function_table,
-                    &mut ts,
-                )
-                .unwrap();
-            }
-            println!("{start} {ts:?}");
-            (start, (&code_unit.code[start as usize..finish], ts))
-        })
-        .collect();
-
-    let relooped = reloop(nodes, 0);
-    let processed = process_reloop(&relooped, &labelled_blocks);
-    println!("{processed:#?}");
+    let flow = flow_builder.flow;
+    println!("{flow:#?}");
 
     let mut types_stack = TypesStack::new();
 
-    process_flow(
+    translate_flow(
         compilation_ctx,
         &mut builder,
         module,
         function_table,
         &mut types_stack,
-        &processed,
-        &labelled_blocks,
+        &flow,
         entry,
     );
-
-    /*
-    for instruction in code {
-        map_bytecode_instruction(
-            instruction,
-            compilation_ctx,
-            &mut builder,
-            &entry.function,
-            module,
-            function_table,
-            &mut types_stack,
-        )
-        .map_err(|e| {
-            panic!("There was an error translating the bytecode instruction {instruction:?}\n{e}")
-        })?;
-    }*/
 
     let function_id = function.finish(entry.function.arg_locals.clone(), &mut module.funcs);
     Ok(function_id)
 }
 
-fn process_flow(
+fn translate_flow(
     compilation_ctx: &CompilationContext,
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
     function_table: &FunctionTable,
     types_stack: &mut TypesStack,
     flow: &Flow,
-    labelled_blocks: &HashMap<u16, (&[Bytecode], TypesStack)>,
     entry: &TableEntry,
 ) {
     match flow {
-        Flow::Block(_, label) => {
-            println!("entered block {label}");
-            let instructions = labelled_blocks.get(label).unwrap().0;
+        Flow::Simple { instructions, .. } => {
             for instruction in instructions {
-                map_bytecode_instruction(
+                translate_instruction(
                     instruction,
                     compilation_ctx,
                     builder,
@@ -165,70 +104,63 @@ fn process_flow(
                     function_table,
                     types_stack,
                 )
-                .unwrap()
+                .unwrap();
             }
         }
-        Flow::BlockSequence(flows) => {
-            println!("entered block sequence");
+        Flow::Sequence(flows) => {
             for f in flows {
-                process_flow(
+                translate_flow(
                     compilation_ctx,
                     builder,
                     module,
                     function_table,
                     types_stack,
                     f,
-                    labelled_blocks,
                     entry,
                 );
             }
         }
         Flow::Loop(_, flow) => {
-            println!("entered loop");
             builder.loop_(None, |loop_| {
                 let loop_id = loop_.id();
-                process_flow(
+                translate_flow(
                     compilation_ctx,
                     loop_,
                     module,
                     function_table,
                     types_stack,
                     flow,
-                    labelled_blocks,
                     entry,
                 );
                 loop_.br(loop_id);
             });
         }
-        Flow::IfElse(_, flow, flow1) => {
-            println!("entered if else");
-            if matches!(flow.as_ref(), Flow::Empty) && !matches!(flow1.as_ref(), Flow::Empty) {
+        Flow::IfElse(_, iflow, eflow) => {
+            if matches!(iflow.as_ref(), Flow::Empty) && !matches!(eflow.as_ref(), Flow::Empty) {
             } else {
                 let mut then = builder.dangling_instr_seq(None);
                 let then_id = then.id();
-                if !matches!(flow.as_ref(), Flow::Empty) {
-                    process_flow(
+                if !matches!(iflow.as_ref(), Flow::Empty) {
+                    translate_flow(
                         compilation_ctx,
                         &mut then,
                         module,
                         function_table,
                         types_stack,
-                        flow,
-                        labelled_blocks,
+                        iflow,
                         entry,
                     );
                 }
                 let mut else_ = builder.dangling_instr_seq(None);
                 let else_id = else_.id();
-                if !matches!(flow1.as_ref(), Flow::Empty) {
-                    process_flow(
+                if !matches!(eflow.as_ref(), Flow::Empty) {
+                    translate_flow(
                         compilation_ctx,
                         &mut else_,
                         module,
                         function_table,
                         types_stack,
-                        flow1,
-                        labelled_blocks,
+                        eflow,
                         entry,
                     );
                 }
@@ -247,91 +179,7 @@ fn process_flow(
     }
 }
 
-#[derive(Debug, Clone)]
-enum Flow {
-    Block(TypesStack, u16),
-    BlockSequence(Vec<Flow>),
-    Loop(TypesStack, Box<Flow>),
-    IfElse(TypesStack, Box<Flow>, Box<Flow>),
-    Empty,
-}
-
-impl Flow {
-    fn get_types_stack(&self) -> TypesStack {
-        match self {
-            Flow::Block(types_stack, _) => types_stack.clone(),
-            Flow::BlockSequence(blocks) => TypesStack(blocks.iter().fold(vec![], |acc, f| {
-                [acc, f.get_types_stack().0.clone()].concat()
-            })),
-            Flow::Loop(types_stack, _) => types_stack.clone(),
-            Flow::IfElse(types_stack, _, _) => types_stack.clone(),
-            Flow::Empty => TypesStack::new(),
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        matches!(&self, Self::Empty)
-    }
-}
-
-fn process_reloop(
-    shaped_block: &ShapedBlock<u16>,
-    blocks: &HashMap<u16, (&[Bytecode], TypesStack)>,
-) -> Flow {
-    match shaped_block {
-        ShapedBlock::Simple(simple_block) => {
-            // Process the block
-            let block = blocks.get(&simple_block.label).unwrap();
-            let b = Flow::Block(block.1.clone(), simple_block.label);
-
-            // Process nested blocks
-            let inner = simple_block
-                .immediate
-                .as_ref()
-                .map(|i| process_reloop(i, blocks))
-                .unwrap_or(Flow::Empty);
-
-            let next = simple_block
-                .next
-                .as_ref()
-                .map(|n| process_reloop(n, blocks))
-                .unwrap_or(Flow::Empty);
-
-            if !inner.is_empty() || !next.is_empty() {
-                Flow::BlockSequence(vec![b, inner, next])
-            } else {
-                b
-            }
-        }
-        ShapedBlock::Loop(loop_block) => {
-            let inner = process_reloop(&loop_block.inner, blocks);
-
-            if let Some(ref next) = loop_block.next {
-                let next = process_reloop(next, blocks);
-                Flow::BlockSequence(vec![inner, next])
-            } else {
-                Flow::Loop(inner.get_types_stack(), Box::new(inner))
-            }
-        }
-        ShapedBlock::Multiple(multiple_block) => {
-            if multiple_block.handled.len() > 2 {
-                panic!("more than 2");
-            }
-            let mut processed_blocks = vec![];
-            for block in &multiple_block.handled {
-                processed_blocks.push(process_reloop(&block.inner, blocks));
-            }
-
-            Flow::IfElse(
-                processed_blocks[0].get_types_stack(),
-                Box::new(processed_blocks.pop().unwrap_or(Flow::Empty)),
-                Box::new(processed_blocks.pop().unwrap_or(Flow::Empty)),
-            )
-        }
-    }
-}
-
-fn map_bytecode_instruction(
+fn translate_instruction(
     instruction: &Bytecode,
     compilation_ctx: &CompilationContext,
     builder: &mut InstrSeqBuilder,
@@ -874,15 +722,10 @@ fn map_bytecode_instruction(
                 compilation_ctx,
             );
 
-            // Remove the return values from types stack and check if the types are correct
-            for return_type in mapped_function.signature.returns.iter().rev() {
-                types_stack.pop_expecting(return_type)?;
-            }
-
-            // Stack types should be empty
+            // We dont pop the return values from the stack, we just check if the types match
             assert!(
-                types_stack.is_empty(),
-                "types stack is not empty after return"
+                types_stack.0.ends_with(&mapped_function.signature.returns),
+                "types stack does not match function return types"
             );
         }
         Bytecode::CastU8 => {
@@ -1439,7 +1282,7 @@ fn map_bytecode_instruction(
             types_stack.pop_expecting(&IntermediateType::IBool)?;
         }
         Bytecode::Branch(_) => (),
-        b => Err(TranslationError::UnssuportedOperation {
+        b => Err(TranslationError::UnsupportedOperation {
             operation: b.clone(),
         })?,
     }
