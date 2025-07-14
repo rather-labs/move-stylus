@@ -1,8 +1,8 @@
 use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
-use compilation_context::VariantData;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
+use compilation_context::{ModuleData, VariantData};
 use move_binary_format::file_format::{
     DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex, FieldInstantiationIndex,
     StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex, Visibility,
@@ -342,18 +342,20 @@ pub fn translate_package(
         }
 
         let compilation_ctx = CompilationContext {
-            constants: &root_compiled_module.constant_pool,
-            functions_arguments: &functions_arguments,
-            functions_returns: &functions_returns,
-            module_signatures: &root_compiled_module.signatures,
-            module_structs: &module_structs,
-            module_generic_structs_instances: &module_generic_structs_instances,
-            datatype_handles_map: &datatype_handles_map,
-            fields_to_struct_map: &fields_to_struct_map,
-            generic_fields_to_struct_map: &generic_fields_to_struct_map,
-            module_enums: &module_enums,
-            variants_to_enum_map: &variants_to_enum_map,
-            instantiated_fields_to_generic_fields: &instantiated_fields_to_generic_fields,
+            root_module_data: ModuleData {
+                constants: &root_compiled_module.constant_pool,
+                functions_arguments: &functions_arguments,
+                functions_returns: &functions_returns,
+                module_signatures: &root_compiled_module.signatures,
+                module_structs: &module_structs,
+                module_generic_structs_instances: &module_generic_structs_instances,
+                datatype_handles_map: &datatype_handles_map,
+                fields_to_struct_map: &fields_to_struct_map,
+                generic_fields_to_struct_map: &generic_fields_to_struct_map,
+                module_enums: &module_enums,
+                variants_to_enum_map: &variants_to_enum_map,
+                instantiated_fields_to_generic_fields: &instantiated_fields_to_generic_fields,
+            },
             memory_id,
             allocator: allocator_func,
         };

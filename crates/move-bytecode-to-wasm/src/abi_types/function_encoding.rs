@@ -189,7 +189,7 @@ mod tests {
             HashMap::new(),
         );
         let module_structs = vec![struct_1, struct_2];
-        compilation_ctx.module_structs = &module_structs;
+        compilation_ctx.root_module_data.module_structs = &module_structs;
 
         let signature: &[IntermediateType] = &[
             IntermediateType::IStruct(0),
