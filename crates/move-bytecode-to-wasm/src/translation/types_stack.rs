@@ -5,6 +5,7 @@ use crate::translation::TranslationError;
 use crate::translation::bytecodes::vectors;
 use crate::translation::intermediate_types::IntermediateType;
 use move_binary_format::file_format::Bytecode;
+use walrus::ValType;
 
 #[derive(Debug, Clone)]
 pub struct TypesStack(pub Vec<IntermediateType>);
@@ -60,10 +61,15 @@ impl TypesStack {
         Ok(res)
     }
 
+    pub fn to_val_types(&self) -> Vec<ValType> {
+        self.0.iter().map(ValType::from).collect()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
+    // TODO: check error handling
     pub fn process_instruction(
         &mut self,
         instruction: &Bytecode,
@@ -633,6 +639,155 @@ impl TypesStack {
                 self.pop_expecting(&IntermediateType::IU8)?;
                 let t = self.pop()?;
                 self.push(t);
+            }
+            Bytecode::Pack(struct_definition_index) => {
+                let struct_ =
+                    compilation_ctx.get_struct_by_struct_definition_idx(struct_definition_index)?;
+
+                // Check the types on the stack
+                for expected_type in struct_.fields.iter().rev() {
+                    let found_type = self.pop()?;
+
+                    match (&found_type, expected_type) {
+                        (a, b) if a == b => match b {
+                            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                                return Err(TypesStackError::Translation(Box::new(
+                                    TranslationError::FoundReferenceInsideStruct {
+                                        struct_index: struct_.index(),
+                                    },
+                                )));
+                            }
+                            IntermediateType::ITypeParameter(index) => {
+                                return Err(TypesStackError::Translation(Box::new(
+                                    TranslationError::FoundTypeParameterInsideStruct {
+                                        struct_index: struct_.index(),
+                                        type_parameter_index: *index,
+                                    },
+                                )));
+                            }
+                            _ => {} // OK
+                        },
+                        _ => {
+                            return Err(TypesStackError::Translation(Box::new(
+                                TranslationError::TypeMismatch {
+                                    expected: expected_type.clone(),
+                                    found: found_type,
+                                },
+                            )));
+                        }
+                    }
+                }
+
+                // Push the packed struct type onto the stack
+                self.push(IntermediateType::IStruct(struct_definition_index.0));
+            }
+            Bytecode::PackGeneric(struct_definition_index) => {
+                let struct_ = compilation_ctx
+                    .get_generic_struct_by_struct_definition_idx(struct_definition_index)?;
+
+                // Check the types on the stack
+                for expected_type in struct_.fields.iter().rev() {
+                    let found_type = self.pop()?;
+
+                    match (&found_type, expected_type) {
+                        (a, b) if a == b => match b {
+                            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                                return Err(TypesStackError::Translation(Box::new(
+                                    TranslationError::FoundReferenceInsideStruct {
+                                        struct_index: struct_.index(),
+                                    },
+                                )));
+                            }
+                            IntermediateType::ITypeParameter(index) => {
+                                return Err(TypesStackError::Translation(Box::new(
+                                    TranslationError::FoundTypeParameterInsideStruct {
+                                        struct_index: struct_.index(),
+                                        type_parameter_index: *index,
+                                    },
+                                )));
+                            }
+                            _ => {} // OK
+                        },
+                        _ => {
+                            return Err(TypesStackError::Translation(Box::new(
+                                TranslationError::TypeMismatch {
+                                    expected: expected_type.clone(),
+                                    found: found_type,
+                                },
+                            )));
+                        }
+                    }
+                }
+
+                let idx = compilation_ctx
+                    .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
+                let types =
+                    compilation_ctx.get_generic_struct_types_instances(struct_definition_index)?;
+
+                self.push(IntermediateType::IGenericStructInstance(idx, types));
+            }
+            Bytecode::Unpack(struct_definition_index) => {
+                self.pop_expecting(&IntermediateType::IStruct(struct_definition_index.0))?;
+
+                let struct_ =
+                    compilation_ctx.get_struct_by_struct_definition_idx(struct_definition_index)?;
+
+                for field in &struct_.fields {
+                    match field {
+                        IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                            return Err(TypesStackError::Translation(Box::new(
+                                TranslationError::FoundReferenceInsideStruct {
+                                    struct_index: struct_.index(),
+                                },
+                            )));
+                        }
+                        IntermediateType::ITypeParameter(index) => {
+                            return Err(TypesStackError::Translation(Box::new(
+                                TranslationError::FoundTypeParameterInsideStruct {
+                                    struct_index: struct_.index(),
+                                    type_parameter_index: *index,
+                                },
+                            )));
+                        }
+                        _ => {
+                            self.push(field.clone());
+                        }
+                    }
+                }
+            }
+            Bytecode::UnpackGeneric(struct_definition_index) => {
+                let idx = compilation_ctx
+                    .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
+                let types =
+                    compilation_ctx.get_generic_struct_types_instances(struct_definition_index)?;
+
+                self.pop_expecting(&IntermediateType::IGenericStructInstance(idx, types))?;
+
+                let struct_ = compilation_ctx
+                    .get_generic_struct_by_struct_definition_idx(struct_definition_index)?;
+
+                for field in &struct_.fields {
+                    match field {
+                        IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                            return Err(TypesStackError::Translation(Box::new(
+                                TranslationError::FoundReferenceInsideStruct {
+                                    struct_index: struct_.index(),
+                                },
+                            )));
+                        }
+                        IntermediateType::ITypeParameter(index) => {
+                            return Err(TypesStackError::Translation(Box::new(
+                                TranslationError::FoundTypeParameterInsideStruct {
+                                    struct_index: struct_.index(),
+                                    type_parameter_index: *index,
+                                },
+                            )));
+                        }
+                        _ => {
+                            self.push(field.clone());
+                        }
+                    }
+                }
             }
             // Control flows
             Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => {

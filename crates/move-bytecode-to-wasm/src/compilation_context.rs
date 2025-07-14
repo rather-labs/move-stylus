@@ -8,6 +8,7 @@ use move_binary_format::{
     },
     internals::ModuleIndex,
 };
+use walrus::ir::InstrSeqId;
 use walrus::{FunctionId, MemoryId};
 
 pub enum UserDefinedType {

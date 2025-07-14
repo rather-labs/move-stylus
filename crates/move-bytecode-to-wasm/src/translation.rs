@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::io::Empty;
 
 use anyhow::Result;
-use flow::{Flow, FlowBuilder};
+use flow::Flow;
 use functions::{
     MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
 };
@@ -12,11 +12,11 @@ use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::file_format::Bytecode;
+use relooper::BranchMode;
 use table::{FunctionTable, TableEntry};
 use types_stack::TypesStack;
-use walrus::ir::{BinaryOp, Block, LoadKind, UnaryOp};
-use walrus::{FunctionBuilder, Module};
-use walrus::{FunctionId, InstrSeqBuilder, ValType, ir::MemArg};
+use walrus::ir::{BinaryOp, Block, InstrSeqId, InstrSeqType, LoadKind, UnaryOp};
+use walrus::{FunctionBuilder, FunctionId, InstrSeqBuilder, Module, ValType, ir::MemArg};
 use wasmparser::types;
 
 use crate::CompilationContext;
@@ -62,12 +62,11 @@ pub fn translate_function(
 
     let code_unit = &entry.get_move_code_unit().unwrap();
 
-    let flow_builder = FlowBuilder::new(code_unit, compilation_ctx, &entry.function);
-
-    let flow = flow_builder.flow;
+    let flow = Flow::new(code_unit, compilation_ctx, &entry.function);
     println!("{flow:#?}");
 
     let mut types_stack = TypesStack::new();
+    let mut loop_targets: HashMap<u16, InstrSeqId> = HashMap::new();
 
     translate_flow(
         compilation_ctx,
@@ -76,6 +75,7 @@ pub fn translate_function(
         function_table,
         &mut types_stack,
         &flow,
+        &mut loop_targets,
         entry,
     );
 
@@ -83,6 +83,8 @@ pub fn translate_function(
     Ok(function_id)
 }
 
+// TODO: check we are setting result types correctly
+// Why do we need to register the return type with the module?
 fn translate_flow(
     compilation_ctx: &CompilationContext,
     builder: &mut InstrSeqBuilder,
@@ -90,21 +92,50 @@ fn translate_flow(
     function_table: &FunctionTable,
     types_stack: &mut TypesStack,
     flow: &Flow,
+    loop_targets: &mut HashMap<u16, InstrSeqId>,
     entry: &TableEntry,
 ) {
     match flow {
-        Flow::Simple { instructions, .. } => {
+        Flow::Simple {
+            instructions,
+            branches,
+            ..
+        } => {
             for instruction in instructions {
-                translate_instruction(
-                    instruction,
-                    compilation_ctx,
-                    builder,
-                    &entry.function,
-                    module,
-                    function_table,
-                    types_stack,
-                )
-                .unwrap();
+                match instruction {
+                    Bytecode::Branch(code_offset) => {
+                        if let Some(branch_mode) = branches.get(code_offset) {
+                            // TODO: WTF are multi branch modes?
+                            let loop_id = match branch_mode {
+                                BranchMode::LoopContinue(id)
+                                | BranchMode::LoopContinueIntoMulti(id) => Some(id),
+                                _ => None,
+                            };
+
+                            if let Some(loop_id) = loop_id {
+                                if let Some(target_block_id) = loop_targets.get(loop_id) {
+                                    builder.br(*target_block_id);
+                                } else {
+                                    panic!("Loop target not found for loop_id: {}", loop_id);
+                                }
+                            }
+                        }
+                    }
+
+                    _ => {
+                        translate_instruction(
+                            instruction,
+                            compilation_ctx,
+                            builder,
+                            &entry.function,
+                            module,
+                            function_table,
+                            types_stack,
+                            loop_targets,
+                        )
+                        .unwrap();
+                    }
+                }
             }
         }
         Flow::Sequence(flows) => {
@@ -116,64 +147,88 @@ fn translate_flow(
                     function_table,
                     types_stack,
                     f,
+                    loop_targets,
                     entry,
                 );
             }
         }
-        Flow::Loop(_, flow) => {
-            builder.loop_(None, |loop_| {
-                let loop_id = loop_.id();
+        Flow::Loop {
+            types_stack,
+            loop_id,
+            body,
+        } => {
+            let ty = InstrSeqType::new(&mut module.types, &[], &types_stack.to_val_types());
+
+            // TODO: Consider enclosing the loop within a block to facilitate mapping LoopBreak branch modes for exiting the loop.
+            builder.loop_(ty, |loop_| {
+           
+                // loop_targets maps the relooper-assigned loop id to the loop's instruction sequence id.
+                loop_targets.insert(*loop_id, loop_.id());
+
                 translate_flow(
                     compilation_ctx,
                     loop_,
                     module,
                     function_table,
-                    types_stack,
-                    flow,
+                    &mut types_stack.clone(),
+                    &*body,
+                    loop_targets,
                     entry,
                 );
-                loop_.br(loop_id);
             });
         }
-        Flow::IfElse(_, iflow, eflow) => {
-            if matches!(iflow.as_ref(), Flow::Empty) && !matches!(eflow.as_ref(), Flow::Empty) {
-            } else {
-                let mut then = builder.dangling_instr_seq(None);
-                let then_id = then.id();
-                if !matches!(iflow.as_ref(), Flow::Empty) {
-                    translate_flow(
-                        compilation_ctx,
-                        &mut then,
-                        module,
-                        function_table,
-                        types_stack,
-                        iflow,
-                        entry,
-                    );
-                }
-                let mut else_ = builder.dangling_instr_seq(None);
-                let else_id = else_.id();
-                if !matches!(eflow.as_ref(), Flow::Empty) {
-                    translate_flow(
-                        compilation_ctx,
-                        &mut else_,
-                        module,
-                        function_table,
-                        types_stack,
-                        eflow,
-                        entry,
-                    );
-                }
-                builder.if_else(
-                    None,
-                    |then| {
-                        then.instr(Block { seq: then_id });
-                    },
-                    |else_| {
-                        else_.instr(Block { seq: else_id });
-                    },
+        // TODO: currently we are wrapping the instructions within each [if, else] branch in a block, which is redundant.
+        // If possible, it would be great to avoid this. 
+        Flow::IfElse {
+            types_stack,
+            then_body,
+            else_body,
+        } => {
+            let then_id = {
+                let mut then_seq = builder.dangling_instr_seq(None);
+                translate_flow(
+                    compilation_ctx,
+                    &mut then_seq,
+                    module,
+                    function_table,
+                    &mut types_stack.clone(),
+                    &*then_body,
+                    loop_targets,
+                    entry,
                 );
-            }
+                then_seq.id()
+            };
+
+            let else_id = {
+                let mut else_seq = builder.dangling_instr_seq(None);
+                translate_flow(
+                    compilation_ctx,
+                    &mut else_seq,
+                    module,
+                    function_table,
+                    &mut types_stack.clone(),
+                    &*else_body,
+                    loop_targets,
+                    entry,
+                );
+                else_seq.id()
+            };
+
+            let ty = InstrSeqType::new(
+                &mut module.types,
+                &[],
+                &flow.get_types_stack().to_val_types(),
+            );
+
+            builder.if_else(
+                ty,
+                |then| {
+                    then.instr(Block { seq: then_id });
+                },
+                |else_| {
+                    else_.instr(Block { seq: else_id });
+                },
+            );
         }
         Flow::Empty => (),
     }
@@ -187,6 +242,7 @@ fn translate_instruction(
     module: &mut Module,
     function_table: &FunctionTable,
     types_stack: &mut TypesStack,
+    loop_targets: &HashMap<u16, InstrSeqId>,
 ) -> Result<(), TranslationError> {
     match instruction {
         // Load a fixed constant
@@ -1278,10 +1334,7 @@ fn translate_instruction(
 
             bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
         }
-        Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => {
-            types_stack.pop_expecting(&IntermediateType::IBool)?;
-        }
-        Bytecode::Branch(_) => (),
+        Bytecode::BrTrue(_) | Bytecode::BrFalse(_) | Bytecode::Branch(_) => {}
         b => Err(TranslationError::UnsupportedOperation {
             operation: b.clone(),
         })?,

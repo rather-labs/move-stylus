@@ -3,32 +3,44 @@ use crate::MappedFunction;
 use crate::translation::TypesStack;
 use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::file_format::{Bytecode, CodeUnit};
-use relooper::{ShapedBlock, reloop};
+use relooper::{BranchMode, ShapedBlock, reloop};
 use std::collections::HashMap;
+use walrus::ir::InstrSeqId;
 
 #[derive(Debug, Clone)]
 pub enum Flow {
     Simple {
-        types_stack: TypesStack,
         label: u16,
-        instructions: Vec<Bytecode>, // <- NEW
+        types_stack: TypesStack,
+        instructions: Vec<Bytecode>,
+        branches: HashMap<u16, BranchMode>,
     },
     Sequence(Vec<Flow>),
-    Loop(TypesStack, Box<Flow>),
-    IfElse(TypesStack, Box<Flow>, Box<Flow>),
+    Loop {
+        loop_id: u16,
+        types_stack: TypesStack,
+        body: Box<Flow>,
+    },
+    IfElse {
+        types_stack: TypesStack,
+        then_body: Box<Flow>,
+        else_body: Box<Flow>,
+    },
     Empty,
 }
 
+// TODO: check how we are building up the types stack
 impl Flow {
     pub fn get_types_stack(&self) -> TypesStack {
         match self {
             Flow::Simple { types_stack, .. } => types_stack.clone(),
-            // im not sure if concat is correct here!
+            // TODO: is concat correct here?
+            // concat instructions and then build the types stack!
             Flow::Sequence(blocks) => TypesStack(blocks.iter().fold(vec![], |acc, f| {
                 [acc, f.get_types_stack().0.clone()].concat()
             })),
-            Flow::Loop(types_stack, _) => types_stack.clone(),
-            Flow::IfElse(types_stack, _, _) => types_stack.clone(),
+            Flow::Loop { types_stack, .. } => types_stack.clone(),
+            Flow::IfElse { types_stack, .. } => types_stack.clone(),
             Flow::Empty => TypesStack::new(),
         }
     }
@@ -36,23 +48,17 @@ impl Flow {
     pub fn is_empty(&self) -> bool {
         matches!(&self, Self::Empty)
     }
-}
 
-pub struct FlowBuilder {
-    pub cfg: VMControlFlowGraph,
-    pub relooped: ShapedBlock<u16>,
-    pub blocks: HashMap<u16, (Vec<Bytecode>, TypesStack)>,
-    pub flow: Flow,
-}
-
-impl FlowBuilder {
     pub fn new(
         code_unit: &CodeUnit,
         compilation_ctx: &CompilationContext,
         mapped_function: &MappedFunction,
     ) -> Self {
+        // Create the control flow graph from the code unit
         let cfg = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
 
+        // Reloop the control flow graph. This transforms the cfg into a structured object
+        // The relooped cfg is composed of ShapedBlocks
         let relooped = {
             let nodes: Vec<(u16, Vec<u16>)> = (&cfg as &dyn ControlFlowGraph)
                 .blocks()
@@ -62,7 +68,12 @@ impl FlowBuilder {
             *relooper::reloop(nodes, 0)
         };
 
-        let blocks: HashMap<u16, (Vec<Bytecode>, TypesStack)> = (&cfg as &dyn ControlFlowGraph)
+        println!("relooped: {relooped:#?}");
+
+        // Context for each block within the control flow graph
+        // This context maps the block's starting index to its corresponding bytecode instructions and the expected types stack after the block's execution
+        // TODO: is it okey to calculate the types stack in the cfg instead of the relooped cfg?
+        let blocks_ctx: HashMap<u16, (Vec<Bytecode>, TypesStack)> = (&cfg as &dyn ControlFlowGraph)
             .blocks()
             .into_iter()
             .map(|b| {
@@ -80,69 +91,82 @@ impl FlowBuilder {
             })
             .collect();
 
-        let flow = Self::to_flow(&relooped, &blocks);
-
-        Self {
-            cfg,
-            relooped,
-            blocks,
-            flow,
-        }
+        let mut flow = Flow::Empty;
+        flow.build(&relooped, &blocks_ctx)
     }
 
-    fn to_flow(
-        relooped_cfg: &ShapedBlock<u16>,
-        blocks: &HashMap<u16, (Vec<Bytecode>, TypesStack)>,
+    fn build(
+        &mut self,
+        shaped_block: &ShapedBlock<u16>,
+        blocks_ctx: &HashMap<u16, (Vec<Bytecode>, TypesStack)>,
     ) -> Flow {
-        match relooped_cfg {
+        match shaped_block {
             ShapedBlock::Simple(simple_block) => {
-                let block = blocks.get(&simple_block.label).unwrap();
+                let block_ctx = blocks_ctx.get(&simple_block.label).unwrap();
                 let b = Flow::Simple {
-                    types_stack: block.1.clone(),
+                    types_stack: block_ctx.1.clone(),
                     label: simple_block.label,
-                    instructions: block.0.clone(),
+                    instructions: block_ctx.0.clone(),
+                    branches: simple_block
+                        .branches
+                        .iter()
+                        .map(|(k, v)| (*k, *v))
+                        .collect(),
                 };
 
-                let inner = simple_block
+                // This are blocks immediately dominated by the current block
+                let immediate_blocks = simple_block
                     .immediate
                     .as_ref()
-                    .map(|i| Self::to_flow(i, blocks))
+                    .map(|b| self.build(b, blocks_ctx))
                     .unwrap_or(Flow::Empty);
 
-                let next = simple_block
+                // Next block follows the current one, in the graph this represents an edge
+                let next_block = simple_block
                     .next
                     .as_ref()
-                    .map(|n| Self::to_flow(n, blocks))
+                    .map(|b| self.build(b, blocks_ctx))
                     .unwrap_or(Flow::Empty);
 
-                if !inner.is_empty() || !next.is_empty() {
-                    Flow::Sequence(vec![b, inner, next])
+                // revisit this part
+                if !immediate_blocks.is_empty() || !next_block.is_empty() {
+                    Flow::Sequence(vec![b, immediate_blocks, next_block])
                 } else {
                     b
                 }
             }
             ShapedBlock::Loop(loop_block) => {
-                let inner = Self::to_flow(&loop_block.inner, blocks);
-                if let Some(ref next) = loop_block.next {
-                    let next = Self::to_flow(next, blocks);
-                    Flow::Sequence(vec![inner, next])
+                let inner_block = self.build(&loop_block.inner, blocks_ctx);
+
+                let loop_flow = Flow::Loop {
+                    types_stack: inner_block.get_types_stack(),
+                    loop_id: loop_block.loop_id,
+                    body: Box::new(inner_block),
+                };
+                if let Some(next_block) = &loop_block.next {
+                    let next_flow = self.build(next_block, blocks_ctx);
+                    Flow::Sequence(vec![loop_flow, next_flow])
                 } else {
-                    Flow::Loop(inner.get_types_stack(), Box::new(inner))
+                    loop_flow
                 }
             }
             ShapedBlock::Multiple(multiple_block) => {
                 if multiple_block.handled.len() > 2 {
-                    panic!("more than 2 branches not supported");
+                    panic!("Found ShapedBlock::Multiple with more than 2 branches.");
                 }
-                let mut processed = multiple_block
+                let mut handled_blocks = multiple_block
                     .handled
                     .iter()
-                    .map(|b| Self::to_flow(&b.inner, blocks))
+                    .map(|b| self.build(&b.inner, blocks_ctx))
                     .collect::<Vec<_>>();
 
-                let else_ = processed.pop().unwrap_or(Flow::Empty);
-                let if_ = processed.pop().unwrap_or(Flow::Empty);
-                Flow::IfElse(else_.get_types_stack(), Box::new(if_), Box::new(else_))
+                let else_ = handled_blocks.pop().unwrap_or(Flow::Empty);
+                let if_ = handled_blocks.pop().unwrap_or(Flow::Empty);
+                Flow::IfElse {
+                    types_stack: else_.get_types_stack(),
+                    then_body: Box::new(if_),
+                    else_body: Box::new(else_),
+                }
             }
         }
     }
