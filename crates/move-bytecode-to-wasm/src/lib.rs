@@ -1,9 +1,9 @@
 use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
-use compilation_context::ModuleData;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
-use move_binary_format::file_format::Visibility;
+use compilation_context::{ModuleData, ModuleId};
+use move_binary_format::file_format::{ModuleHandle, Visibility};
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
 use translation::translate_function;
 use walrus::{Module, ValType};
@@ -54,22 +54,30 @@ pub fn translate_package(
         let module_name = root_compiled_module.unit.name.to_string();
         let root_compiled_module = root_compiled_module.unit.module;
 
-        /*
         let mut deps_data: HashMap<ModuleId, ModuleData> = HashMap::new();
-        for dependency_module in root_compiled_module.module_handles() {
-            let (id, data) = CompilationContext::process_dependency_module(
-                dependency_module,
-                &root_compiled_module,
-            );
-            let insertion = deps_data.insert(id, data);
+        for dependency in root_compiled_module.immediate_dependencies() {
+            let module_id = ModuleId::Address {
+                namespace: dependency.name().to_string(),
+                address: **dependency.address(),
+            };
+
+            let module = package
+                .deps_compiled_units
+                .iter()
+                .find(|(name, _)| name.as_str() == dependency.name().as_str())
+                .map(|(_, module)| module)
+                .unwrap_or_else(|| panic!("could not find dependency {}", dependency.name()));
+
+            println!("DEP {} {:#?}", dependency.name(), module.unit.module);
+
+            /*
             assert!(
                 insertion.is_none(),
                 "processed the same dep twice in different contexts"
-            );
+            );*/
         }
 
-        println!("{deps_data:#?}");
-        */
+        // println!("{deps_data:#?}");
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
         inject_debug_fns(&mut module);
