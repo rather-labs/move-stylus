@@ -3206,6 +3206,7 @@ dependencies = [
  "alloy-sol-types",
  "anyhow",
  "move-binary-format",
+ "move-core-types",
  "move-package",
  "move-packages-build",
  "rstest",

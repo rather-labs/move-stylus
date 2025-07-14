@@ -424,7 +424,12 @@ impl ModuleData {
                     .unwrap(),
             );
 
-            let code_locals = &move_module.signature_at(function_def.code.as_ref().unwrap().locals);
+            // Code can be empty (for example in native functions)
+            let code_locals = if let Some(code) = function_def.code.as_ref() {
+                &move_module.signature_at(code.locals).0
+            } else {
+                &vec![]
+            };
 
             let function_name = move_module.identifier_at(function_handle.name).to_string();
 

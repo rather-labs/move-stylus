@@ -4,7 +4,10 @@ use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use compilation_context::{ModuleData, ModuleId};
 use move_binary_format::file_format::{ModuleHandle, Visibility};
-use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
+use move_package::{
+    compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
+    source_package::parsed_manifest::PackageName,
+};
 use translation::translate_function;
 use walrus::{Module, ValType};
 use wasm_validation::validate_stylus_wasm;
@@ -34,7 +37,6 @@ pub fn translate_package(
     package: CompiledPackage,
     module_name: Option<String>,
 ) -> HashMap<String, Module> {
-    // println!("==============> {:#?}", &package.deps_compiled_units);
     let root_compiled_units: Vec<CompiledUnitWithSource> = if let Some(module_name) = module_name {
         package
             .root_compiled_units
@@ -58,47 +60,14 @@ pub fn translate_package(
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
         inject_debug_fns(&mut module);
 
+        // Process the dependency tree
         let mut deps_data: HashMap<ModuleId, ModuleData> = HashMap::new();
-        for dependency in root_compiled_module.immediate_dependencies() {
-            let module_id = ModuleId::Dependency {
-                package: dependency.name().to_string(),
-                address: **dependency.address(),
-            };
-
-            /*
-            package
-                .deps_compiled_units
-                .iter()
-                .for_each(|(name, module)| {
-                    println!(
-                        "\n\n =================== \n{name}\n{}\n{:?}\n{}",
-                        module.unit.name(),
-                        module.unit.package_name(),
-                        module.unit.address
-                    );
-                });
-            */
-
-            let dependency_module = package
-                .deps_compiled_units
-                .iter()
-                .find(|(_, module)| {
-                    module.unit.name().as_str() == dependency.name().as_str()
-                        && module.unit.address.into_bytes() == **dependency.address()
-                })
-                .map(|(_, module)| module)
-                .unwrap_or_else(|| panic!("could not find dependency {}", dependency.name()));
-
-            let (dependency_module_data, dependency_fn_table) =
-                ModuleData::build_module_data(&dependency_module.unit.module, &mut module);
-
-            let processed_dependency = deps_data.insert(module_id, dependency_module_data);
-
-            assert!(
-                processed_dependency.is_none(),
-                "processed the same dep twice in different contexts"
-            );
-        }
+        process_dependency_tree(
+            &mut deps_data,
+            &package.deps_compiled_units,
+            &root_compiled_module.immediate_dependencies(),
+            &mut module,
+        );
 
         println!("{deps_data:#?}");
 
@@ -186,6 +155,65 @@ macro_rules! declare_host_debug_functions {
             $module.imports.get_func("", "print_u128").unwrap(),
         )
     };
+}
+
+pub fn process_dependency_tree(
+    dependencies_data: &mut HashMap<ModuleId, ModuleData>,
+    deps_compiled_units: &[(PackageName, CompiledUnitWithSource)],
+    dependencies: &[move_core_types::language_storage::ModuleId],
+    module: &mut Module,
+) {
+    for dependency in dependencies {
+        println!("processing dependency {}...", dependency.name());
+        let module_id = ModuleId::Dependency {
+            package: dependency.name().to_string(),
+            address: **dependency.address(),
+        };
+
+        /*
+        package
+            .deps_compiled_units
+            .iter()
+            .for_each(|(name, module)| {
+                println!(
+                    "\n\n =================== \n{name}\n{}\n{:?}\n{}",
+                    module.unit.name(),
+                    module.unit.package_name(),
+                    module.unit.address
+                );
+            });
+        */
+
+        let dependency_module = deps_compiled_units
+            .iter()
+            .find(|(_, module)| {
+                module.unit.name().as_str() == dependency.name().as_str()
+                    && module.unit.address.into_bytes() == **dependency.address()
+            })
+            .map(|(_, module)| module)
+            .unwrap_or_else(|| panic!("could not find dependency {}", dependency.name()));
+
+        let dependency_module = &dependency_module.unit.module;
+
+        if !dependency_module.immediate_dependencies().is_empty() {
+            process_dependency_tree(
+                dependencies_data,
+                deps_compiled_units,
+                &dependency_module.immediate_dependencies(),
+                module,
+            );
+        }
+
+        let (dependency_module_data, _dependency_fn_table) =
+            ModuleData::build_module_data(dependency_module, module);
+
+        let processed_dependency = dependencies_data.insert(module_id, dependency_module_data);
+
+        assert!(
+            processed_dependency.is_none(),
+            "processed the same dep twice in different contexts"
+        );
+    }
 }
 
 fn inject_debug_fns(module: &mut walrus::Module) {
