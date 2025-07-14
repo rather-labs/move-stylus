@@ -19,7 +19,7 @@ public struct TxContext has drop {
     /// The address of the user that signed the current transaction
     sender: address,
     /// Hash of the current transaction
-    tx_hash: vector<u8>,
+    //tx_hash: vector<u8>,
     /// The current epoch number
     epoch: u64,
     /// Timestamp that the epoch started at
@@ -38,9 +38,9 @@ native fun native_sender(): address;
 
 /// Return the transaction digest (hash of transaction inputs).
 /// Please do not use as a source of randomness.
-public fun digest(self: &TxContext): &vector<u8> {
-    &self.tx_hash
-}
+// public fun digest(self: &TxContext): &vector<u8> {
+//    &self.tx_hash
+// }
 
 /// Return the current epoch
 public fun epoch(_self: &TxContext): u64 {
@@ -54,10 +54,12 @@ public fun epoch_timestamp_ms(_self: &TxContext): u64 {
 }
 native fun native_epoch_timestamp_ms(): u64;
 
+/*
 /// Return the adress of the transaction sponsor or `None` if there was no sponsor.
 public fun sponsor(_self: &TxContext): Option<address> {
     option_sponsor()
 }
+*/
 
 /// Create an `address` that has not been used. As it is an object address, it will never
 /// occur as the address for a user.
@@ -99,6 +101,7 @@ public fun gas_budget(_self: &TxContext): u64 {
 // native function to retrieve gas budget, currently not exposed
 native fun native_gas_budget(): u64;
 
+/*
 #[test_only]
 /// Create a `TxContext` for testing. All fields can be provided.
 public fun create(
@@ -251,3 +254,4 @@ native fun replace(
 #[allow(unused_function)]
 /// Native function for deriving an ID via hash(tx_hash || ids_created)
 native fun derive_id(tx_hash: vector<u8>, ids_created: u64): address;
+*/
