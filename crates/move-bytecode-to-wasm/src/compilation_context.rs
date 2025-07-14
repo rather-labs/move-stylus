@@ -13,7 +13,7 @@ use move_binary_format::{
     CompiledModule,
     file_format::{
         Constant, DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex,
-        FieldInstantiationIndex, ModuleHandle, Signature, SignatureIndex, SignatureToken,
+        FieldInstantiationIndex, Signature, SignatureIndex, SignatureToken,
         StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
     },
     internals::ModuleIndex,
@@ -163,8 +163,8 @@ impl CompilationContext<'_> {
     }
     */
 
-    pub fn process_datatype_handles<'a>(
-        module: &'a CompiledModule,
+    pub fn process_datatype_handles(
+        module: &CompiledModule,
     ) -> HashMap<DatatypeHandleIndex, UserDefinedType> {
         let mut datatype_handles_map = HashMap::new();
 
@@ -258,7 +258,7 @@ impl CompilationContext<'_> {
             // Map the struct instantiation to the generic struct definition and the instantiation
             // types. The index in the array will match the PackGeneric(index) instruction
             let struct_instantiation_types =
-                &module.signatures()[struct_instance.type_parameters.0 as usize].0;
+                &module.signature_at(struct_instance.type_parameters).0;
 
             module_generic_structs_instances
                 .push((struct_instance.def, struct_instantiation_types.clone()));
@@ -275,9 +275,9 @@ impl CompilationContext<'_> {
                         .field_instantiations()
                         .iter()
                         .position(|f| {
-                            let field_handle = &module.field_handles()[f.handle.into_index()];
+                            let field_handle = &module.field_handle_at(f.handle);
                             let struct_def_instantiation =
-                                &module.struct_instantiations()[generic_struct_index.into_index()];
+                                &module.struct_instantiation_at(generic_struct_index);
 
                             // Filter which generic field we are processing inside the struct
                             field_handle.field == field_index as u16
@@ -324,76 +324,6 @@ impl CompilationContext<'_> {
             );
         }
         instantiated_fields_to_generic_fields
-    }
-
-    pub fn process_function_definitions(
-        move_module: &CompiledModule,
-        wasm_module: &mut walrus::Module,
-        datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-    ) -> (
-        FunctionTable,
-        Vec<Vec<IntermediateType>>,
-        Vec<Vec<IntermediateType>>,
-    ) {
-        // Return types of functions in intermediate types. Used to fill the stack type
-        let mut functions_returns = Vec::new();
-        let mut functions_arguments = Vec::new();
-
-        // Function table
-        let function_table_id = wasm_module
-            .tables
-            .add_local(false, 0, None, RefType::Funcref);
-        let mut function_table = FunctionTable::new(function_table_id);
-
-        for (function_def, function_handle) in move_module
-            .function_defs()
-            .iter()
-            .zip(move_module.function_handles.iter())
-        {
-            let move_function_arguments =
-                &move_module.signatures[function_handle.parameters.0 as usize];
-
-            functions_arguments.push(
-                move_function_arguments
-                    .0
-                    .iter()
-                    .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-                    .unwrap(),
-            );
-
-            let move_function_return = &move_module.signatures[function_handle.return_.0 as usize];
-
-            functions_returns.push(
-                move_function_return
-                    .0
-                    .iter()
-                    .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-                    .unwrap(),
-            );
-
-            let code_locals =
-                &move_module.signatures[function_def.code.as_ref().unwrap().locals.0 as usize];
-
-            let function_name =
-                move_module.identifiers[function_handle.name.0 as usize].to_string();
-
-            let function_handle_index = function_def.function;
-            let mapped_function = MappedFunction::new(
-                function_name,
-                move_function_arguments,
-                move_function_return,
-                code_locals,
-                function_def.clone(), // TODO: check clone
-                datatype_handles_map,
-                wasm_module,
-            );
-
-            function_table.add(wasm_module, mapped_function, function_handle_index);
-        }
-
-        (function_table, functions_arguments, functions_returns)
     }
 
     pub fn process_concrete_enums(
@@ -454,6 +384,72 @@ impl CompilationContext<'_> {
         }
 
         (module_enums, variants_to_enum_map)
+    }
+    pub fn process_function_definitions(
+        move_module: &CompiledModule,
+        wasm_module: &mut walrus::Module,
+        datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+    ) -> (
+        FunctionTable,
+        Vec<Vec<IntermediateType>>,
+        Vec<Vec<IntermediateType>>,
+    ) {
+        // Return types of functions in intermediate types. Used to fill the stack type
+        let mut functions_returns = Vec::new();
+        let mut functions_arguments = Vec::new();
+
+        // Function table
+        let function_table_id = wasm_module
+            .tables
+            .add_local(false, 0, None, RefType::Funcref);
+        let mut function_table = FunctionTable::new(function_table_id);
+
+        for (function_def, function_handle) in move_module
+            .function_defs()
+            .iter()
+            .zip(move_module.function_handles.iter())
+        {
+            let move_function_arguments = &move_module.signature_at(function_handle.parameters);
+
+            functions_arguments.push(
+                move_function_arguments
+                    .0
+                    .iter()
+                    .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
+                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .unwrap(),
+            );
+
+            let move_function_return = &move_module.signature_at(function_handle.return_);
+
+            functions_returns.push(
+                move_function_return
+                    .0
+                    .iter()
+                    .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
+                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .unwrap(),
+            );
+
+            let code_locals = &move_module.signature_at(function_def.code.as_ref().unwrap().locals);
+
+            let function_name = move_module.identifier_at(function_handle.name).to_string();
+
+            let function_handle_index = function_def.function;
+            let mapped_function = MappedFunction::new(
+                function_name,
+                move_function_arguments,
+                move_function_return,
+                code_locals,
+                function_def.clone(), // TODO: check clone
+                datatype_handles_map,
+                wasm_module,
+            );
+
+            function_table.add(wasm_module, mapped_function, function_handle_index);
+        }
+
+        (function_table, functions_arguments, functions_returns)
     }
 
     pub fn get_struct_by_index(&self, index: u16) -> Result<&IStruct, CompilationContextError> {
