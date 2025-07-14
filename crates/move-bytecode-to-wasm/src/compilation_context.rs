@@ -1,9 +1,13 @@
 use std::collections::HashMap;
 
-use crate::translation::intermediate_types::{
-    IntermediateType,
-    enums::{IEnum, IEnumVariant},
-    structs::IStruct,
+use crate::translation::{
+    functions::MappedFunction,
+    intermediate_types::{
+        IntermediateType,
+        enums::{IEnum, IEnumVariant},
+        structs::IStruct,
+    },
+    table::FunctionTable,
 };
 use move_binary_format::{
     CompiledModule,
@@ -14,7 +18,7 @@ use move_binary_format::{
     },
     internals::ModuleIndex,
 };
-use walrus::{FunctionId, MemoryId};
+use walrus::{FunctionId, MemoryId, RefType};
 
 #[derive(Debug)]
 pub enum UserDefinedType {
@@ -320,6 +324,76 @@ impl CompilationContext<'_> {
             );
         }
         instantiated_fields_to_generic_fields
+    }
+
+    pub fn process_function_definitions(
+        move_module: &CompiledModule,
+        wasm_module: &mut walrus::Module,
+        datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+    ) -> (
+        FunctionTable,
+        Vec<Vec<IntermediateType>>,
+        Vec<Vec<IntermediateType>>,
+    ) {
+        // Return types of functions in intermediate types. Used to fill the stack type
+        let mut functions_returns = Vec::new();
+        let mut functions_arguments = Vec::new();
+
+        // Function table
+        let function_table_id = wasm_module
+            .tables
+            .add_local(false, 0, None, RefType::Funcref);
+        let mut function_table = FunctionTable::new(function_table_id);
+
+        for (function_def, function_handle) in move_module
+            .function_defs()
+            .iter()
+            .zip(move_module.function_handles.iter())
+        {
+            let move_function_arguments =
+                &move_module.signatures[function_handle.parameters.0 as usize];
+
+            functions_arguments.push(
+                move_function_arguments
+                    .0
+                    .iter()
+                    .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
+                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .unwrap(),
+            );
+
+            let move_function_return = &move_module.signatures[function_handle.return_.0 as usize];
+
+            functions_returns.push(
+                move_function_return
+                    .0
+                    .iter()
+                    .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
+                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .unwrap(),
+            );
+
+            let code_locals =
+                &move_module.signatures[function_def.code.as_ref().unwrap().locals.0 as usize];
+
+            let function_name =
+                move_module.identifiers[function_handle.name.0 as usize].to_string();
+
+            let function_handle_index = function_def.function;
+            let mapped_function = MappedFunction::new(
+                function_name,
+                move_function_arguments,
+                move_function_return,
+                code_locals,
+                function_def.clone(), // TODO: check clone
+                datatype_handles_map,
+                wasm_module,
+            );
+
+            function_table.add(wasm_module, mapped_function, function_handle_index);
+        }
+
+        (function_table, functions_arguments, functions_returns)
     }
 
     pub fn process_concrete_enums(

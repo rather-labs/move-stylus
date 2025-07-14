@@ -124,62 +124,12 @@ pub fn translate_package(
             module.add_import_func("", "print_address", func_ty);
         }
 
-        // Return types of functions in intermediate types. Used to fill the stack type
-        let mut functions_returns = Vec::new();
-        let mut functions_arguments = Vec::new();
-
-        // Function table
-        let function_table_id = module.tables.add_local(false, 0, None, RefType::Funcref);
-        let mut function_table = FunctionTable::new(function_table_id);
-
-        for (function_def, function_handle) in root_compiled_module
-            .function_defs
-            .into_iter()
-            .zip(root_compiled_module.function_handles.iter())
-        {
-            let move_function_arguments =
-                &root_compiled_module.signatures[function_handle.parameters.0 as usize];
-
-            functions_arguments.push(
-                move_function_arguments
-                    .0
-                    .iter()
-                    .map(|s| IntermediateType::try_from_signature_token(s, &datatype_handles_map))
-                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-                    .unwrap(),
-            );
-
-            let move_function_return =
-                &root_compiled_module.signatures[function_handle.return_.0 as usize];
-
-            functions_returns.push(
-                move_function_return
-                    .0
-                    .iter()
-                    .map(|s| IntermediateType::try_from_signature_token(s, &datatype_handles_map))
-                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-                    .unwrap(),
-            );
-
-            let code_locals = &root_compiled_module.signatures
-                [function_def.code.as_ref().unwrap().locals.0 as usize];
-
-            let function_name =
-                root_compiled_module.identifiers[function_handle.name.0 as usize].to_string();
-
-            let function_handle_index = function_def.function;
-            let mapped_function = MappedFunction::new(
-                function_name,
-                move_function_arguments,
-                move_function_return,
-                code_locals,
-                function_def,
-                &datatype_handles_map,
+        let (mut function_table, functions_arguments, functions_returns) =
+            CompilationContext::process_function_definitions(
+                &root_compiled_module,
                 &mut module,
+                &datatype_handles_map,
             );
-
-            function_table.add(&mut module, mapped_function, function_handle_index);
-        }
 
         let compilation_ctx = CompilationContext {
             root_module_data: ModuleData {
