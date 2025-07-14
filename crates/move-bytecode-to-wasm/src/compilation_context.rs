@@ -1,19 +1,37 @@
 use std::collections::HashMap;
 
-use crate::translation::intermediate_types::{IntermediateType, enums::IEnum, structs::IStruct};
+use crate::translation::intermediate_types::{
+    IntermediateType,
+    enums::{IEnum, IEnumVariant},
+    structs::IStruct,
+};
 use move_binary_format::{
+    CompiledModule,
     file_format::{
-        Constant, DatatypeHandleIndex, FieldHandleIndex, FieldInstantiationIndex, Signature,
-        SignatureIndex, SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex,
-        VariantHandleIndex,
+        Constant, DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex,
+        FieldInstantiationIndex, ModuleHandle, Signature, SignatureIndex, SignatureToken,
+        StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
     },
     internals::ModuleIndex,
 };
 use walrus::{FunctionId, MemoryId};
 
+#[derive(Debug)]
 pub enum UserDefinedType {
     Struct(u16),
     Enum(usize),
+}
+
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub enum ModuleId {
+    /// Module we are currently compiling.
+    Root,
+
+    /// Dependency module identified by an address.
+    Address {
+        address: [u8; 32],
+        namespace: String,
+    },
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -44,11 +62,13 @@ pub enum CompilationContextError {
     EnumWithVariantIdxNotFound(u16),
 }
 
+#[derive(Debug)]
 pub struct VariantData {
     pub enum_index: usize,
     pub index_inside_enum: usize,
 }
 
+#[derive(Debug)]
 pub struct ModuleData<'a> {
     /// Move's connstant pool
     pub constants: &'a [Constant],
@@ -113,6 +133,8 @@ pub struct CompilationContext<'a> {
     /// Data of the module we are currently compiling
     pub root_module_data: ModuleData<'a>,
 
+    pub deps_data: HashMap<ModuleId, ModuleData<'a>>,
+
     /// WASM memory id
     pub memory_id: MemoryId,
 
@@ -121,6 +143,245 @@ pub struct CompilationContext<'a> {
 }
 
 impl CompilationContext<'_> {
+    ///  Creates a ModuleData for a module dependency. Each dependency is identified by an address
+    ///  and, under that address there can be defined several namespaces.
+    /*
+    pub fn process_dependency_module<'a>(
+        module_handle: &ModuleHandle,
+        root_module: &'a CompiledModule,
+    ) -> (ModuleId, ModuleData<'a>) {
+        let ModuleHandle { address, name } = module_handle;
+
+        let module_id = ModuleId::Address {
+            namespace: root_module.identifier_at(*name).to_string(),
+            address: root_module.address_identifier_at(*address).into_bytes(),
+        };
+    }
+    */
+
+    pub fn process_datatype_handles<'a>(
+        module: &'a CompiledModule,
+    ) -> HashMap<DatatypeHandleIndex, UserDefinedType> {
+        let mut datatype_handles_map = HashMap::new();
+
+        for (index, datatype_handle) in module.datatype_handles().iter().enumerate() {
+            let idx = DatatypeHandleIndex::new(index as u16);
+
+            // Assert the index we constructed is ok
+            assert_eq!(datatype_handle, module.datatype_handle_at(idx));
+
+            if let Some(position) = module
+                .struct_defs()
+                .iter()
+                .position(|s| s.struct_handle == idx)
+            {
+                datatype_handles_map.insert(idx, UserDefinedType::Struct(position as u16));
+            } else if let Some(position) =
+                module.enum_defs().iter().position(|e| e.enum_handle == idx)
+            {
+                datatype_handles_map.insert(idx, UserDefinedType::Enum(position));
+            } else {
+                panic!("datatype handle index {index} not found");
+            };
+        }
+
+        datatype_handles_map
+    }
+
+    pub fn process_concrete_structs(
+        module: &CompiledModule,
+        datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+    ) -> (
+        Vec<IStruct>,
+        HashMap<FieldHandleIndex, StructDefinitionIndex>,
+    ) {
+        // Module's structs
+        let mut module_structs: Vec<IStruct> = vec![];
+        let mut fields_to_struct_map = HashMap::new();
+        for (index, struct_def) in module.struct_defs().iter().enumerate() {
+            let struct_index = StructDefinitionIndex::new(index as u16);
+            let mut fields_map = HashMap::new();
+            let mut all_fields = Vec::new();
+            if let Some(fields) = struct_def.fields() {
+                for (field_index, field) in fields.iter().enumerate() {
+                    let intermediate_type = IntermediateType::try_from_signature_token(
+                        &field.signature.0,
+                        datatype_handles_map,
+                    )
+                    .unwrap();
+
+                    let field_index = module
+                        .field_handles()
+                        .iter()
+                        .position(|f| f.field == field_index as u16 && f.owner == struct_index)
+                        .map(|i| FieldHandleIndex::new(i as u16));
+
+                    // If field_index is None means the field is never referenced in the code
+                    if let Some(field_index) = field_index {
+                        let res = fields_map.insert(field_index, intermediate_type.clone());
+                        assert!(
+                            res.is_none(),
+                            "there was an error creating a field in struct {struct_index}, field with index {field_index} already exist"
+                        );
+                        let res = fields_to_struct_map.insert(field_index, struct_index);
+                        assert!(
+                            res.is_none(),
+                            "there was an error mapping field {field_index} to struct {struct_index}, already mapped"
+                        );
+                        all_fields.push((Some(field_index), intermediate_type));
+                    } else {
+                        all_fields.push((None, intermediate_type));
+                    }
+                }
+            }
+
+            module_structs.push(IStruct::new(struct_index, all_fields, fields_map));
+        }
+
+        (module_structs, fields_to_struct_map)
+    }
+
+    pub fn process_generic_structs(
+        module: &CompiledModule,
+    ) -> (
+        Vec<(StructDefinitionIndex, Vec<SignatureToken>)>,
+        HashMap<FieldInstantiationIndex, usize>,
+    ) {
+        let mut module_generic_structs_instances = vec![];
+        let mut generic_fields_to_struct_map = HashMap::new();
+
+        for (index, struct_instance) in module.struct_instantiations().iter().enumerate() {
+            // Map the struct instantiation to the generic struct definition and the instantiation
+            // types. The index in the array will match the PackGeneric(index) instruction
+            let struct_instantiation_types =
+                &module.signatures()[struct_instance.type_parameters.0 as usize].0;
+
+            module_generic_structs_instances
+                .push((struct_instance.def, struct_instantiation_types.clone()));
+
+            // Process the mapping of generic fields to structs instantiations
+            let generic_struct_definition = &module.struct_defs()[struct_instance.def.0 as usize];
+
+            let struct_index = StructDefinitionIndex::new(struct_instance.def.0);
+            let generic_struct_index = StructDefInstantiationIndex::new(index as u16);
+
+            if let Some(fields) = generic_struct_definition.fields() {
+                for (field_index, _) in fields.iter().enumerate() {
+                    let generic_field_index = module
+                        .field_instantiations()
+                        .iter()
+                        .position(|f| {
+                            let field_handle = &module.field_handles()[f.handle.into_index()];
+                            let struct_def_instantiation =
+                                &module.struct_instantiations()[generic_struct_index.into_index()];
+
+                            // Filter which generic field we are processing inside the struct
+                            field_handle.field == field_index as u16
+                                // Link it with the generic struct definition
+                                && field_handle.owner == struct_index
+                                // Link it with the struct instantiation using the signature
+                                && struct_def_instantiation.type_parameters == f.type_parameters
+                        })
+                        .map(|i| FieldInstantiationIndex::new(i as u16));
+
+                    // If field_index is None means the field is never referenced in the code
+                    if let Some(generic_field_index) = generic_field_index {
+                        let res = generic_fields_to_struct_map.insert(generic_field_index, index);
+                        assert!(
+                            res.is_none(),
+                            "there was an error mapping field {generic_field_index} to struct {struct_index}, already mapped"
+                        );
+                    }
+                }
+            }
+        }
+
+        (
+            module_generic_structs_instances,
+            generic_fields_to_struct_map,
+        )
+    }
+
+    pub fn process_generic_field_instances(
+        module: &CompiledModule,
+    ) -> HashMap<FieldInstantiationIndex, (FieldHandleIndex, Vec<SignatureToken>)> {
+        // Map instantiated struct fields to indexes of generic fields
+        let mut instantiated_fields_to_generic_fields = HashMap::new();
+        for (index, field_instance) in module.field_instantiations().iter().enumerate() {
+            instantiated_fields_to_generic_fields.insert(
+                FieldInstantiationIndex::new(index as u16),
+                (
+                    field_instance.handle,
+                    module
+                        .signature_at(field_instance.type_parameters)
+                        .0
+                        .clone(),
+                ),
+            );
+        }
+        instantiated_fields_to_generic_fields
+    }
+
+    pub fn process_concrete_enums(
+        module: &CompiledModule,
+        datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+    ) -> (Vec<IEnum>, HashMap<VariantHandleIndex, VariantData>) {
+        // Module's enums
+        let mut module_enums = vec![];
+        let mut variants_to_enum_map = HashMap::new();
+        for (index, enum_def) in module.enum_defs().iter().enumerate() {
+            let enum_index = EnumDefinitionIndex::new(index as u16);
+            let mut variants = Vec::new();
+
+            // Process variants
+            for (variant_index, variant) in enum_def.variants.iter().enumerate() {
+                let fields = variant
+                    .fields
+                    .iter()
+                    .map(|f| {
+                        IntermediateType::try_from_signature_token(
+                            &f.signature.0,
+                            datatype_handles_map,
+                        )
+                    })
+                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .unwrap();
+
+                variants.push(IEnumVariant::new(
+                    variant_index as u16,
+                    index as u16,
+                    fields,
+                ));
+
+                // Process handles
+                let variant_handle_index = module
+                    .variant_handles()
+                    .iter()
+                    .position(|v| v.variant == variant_index as u16 && v.enum_def == enum_index)
+                    .map(|i| VariantHandleIndex(i as u16));
+
+                // If variant_handle_index is None means the field is never referenced in the code
+                if let Some(variant_handle_index) = variant_handle_index {
+                    let res = variants_to_enum_map.insert(
+                        variant_handle_index,
+                        VariantData {
+                            enum_index: index,
+                            index_inside_enum: variant_index,
+                        },
+                    );
+                    assert!(
+                        res.is_none(),
+                        "there was an error creating a variant in struct {variant_index}, variant with index {variant_index} already exist"
+                    );
+                }
+            }
+
+            module_enums.push(IEnum::new(index as u16, variants).unwrap());
+        }
+
+        (module_enums, variants_to_enum_map)
+    }
+
     pub fn get_struct_by_index(&self, index: u16) -> Result<&IStruct, CompilationContextError> {
         self.root_module_data
             .module_structs

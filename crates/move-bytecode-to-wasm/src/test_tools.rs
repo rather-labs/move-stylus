@@ -123,6 +123,7 @@ macro_rules! test_compilation_context {
                 module_enums: &[],
                 variants_to_enum_map: &std::collections::HashMap::new(),
             },
+            deps_data: std::collections::HashMap::new(),
             memory_id: $memory_id,
             allocator: $allocator,
         }
