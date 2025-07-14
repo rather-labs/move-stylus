@@ -20,8 +20,17 @@ use walrus::RefType;
 
 #[derive(Debug)]
 pub enum UserDefinedType {
+    /// Struct defined in this module
     Struct(u16),
+
+    /// Enum defined in this module
     Enum(usize),
+
+    /// Data type defined outside this module
+    ExternalData {
+        module: ModuleId,
+        identifier: String,
+    },
 }
 
 #[derive(Debug)]
@@ -97,22 +106,6 @@ pub enum ModuleId {
 }
 
 impl ModuleData {
-    //  Creates a ModuleData for a module dependency. Each dependency is identified by an address
-    //  and, under that address there can be defined several namespaces.
-    /*
-    pub fn process_dependency_module<'a>(
-        module_handle: &ModuleHandle,
-        root_module: &'a CompiledModule,
-    ) -> (ModuleId, ModuleData<'a>) {
-        let ModuleHandle { address, name } = module_handle;
-
-        let module_id = ModuleId::Address {
-            namespace: root_module.identifier_at(*name).to_string(),
-            address: root_module.address_identifier_at(*address).into_bytes(),
-        };
-    }
-    */
-
     pub fn build_module_data(
         move_module: &CompiledModule,
         wasm_module: &mut walrus::Module,
@@ -166,19 +159,36 @@ impl ModuleData {
             // Assert the index we constructed is ok
             assert_eq!(datatype_handle, module.datatype_handle_at(idx));
 
-            if let Some(position) = module
-                .struct_defs()
-                .iter()
-                .position(|s| s.struct_handle == idx)
-            {
-                datatype_handles_map.insert(idx, UserDefinedType::Struct(position as u16));
-            } else if let Some(position) =
-                module.enum_defs().iter().position(|e| e.enum_handle == idx)
-            {
-                datatype_handles_map.insert(idx, UserDefinedType::Enum(position));
+            // Check if the datatype is constructed in this module.
+            if datatype_handle.module == module.self_handle_idx() {
+                if let Some(position) = module
+                    .struct_defs()
+                    .iter()
+                    .position(|s| s.struct_handle == idx)
+                {
+                    datatype_handles_map.insert(idx, UserDefinedType::Struct(position as u16));
+                } else if let Some(position) =
+                    module.enum_defs().iter().position(|e| e.enum_handle == idx)
+                {
+                    datatype_handles_map.insert(idx, UserDefinedType::Enum(position));
+                } else {
+                    panic!("datatype handle index {index} not found");
+                };
             } else {
-                panic!("datatype handle index {index} not found");
-            };
+                let datatype_module = module.module_handle_at(datatype_handle.module);
+                let module_id = ModuleId::Dependency {
+                    address: **module.address_identifier_at(datatype_module.address),
+                    package: module.identifier_at(datatype_module.name).to_string(),
+                };
+
+                datatype_handles_map.insert(
+                    idx,
+                    UserDefinedType::ExternalData {
+                        module: module_id,
+                        identifier: module.identifier_at(datatype_handle.name).to_string(),
+                    },
+                );
+            }
         }
 
         datatype_handles_map

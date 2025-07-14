@@ -117,6 +117,10 @@ impl IntermediateType {
                     Ok(match udt {
                         UserDefinedType::Struct(i) => IntermediateType::IStruct(*i),
                         UserDefinedType::Enum(i) => IntermediateType::IEnum(*i as u16),
+                        UserDefinedType::ExternalData {
+                            module: _,
+                            identifier: _,
+                        } => todo!(),
                     })
                 } else {
                     Err(anyhow::anyhow!(
@@ -137,6 +141,10 @@ impl IntermediateType {
                             IntermediateType::IGenericStructInstance(*i, types)
                         }
                         UserDefinedType::Enum(_) => todo!(),
+                        UserDefinedType::ExternalData {
+                            module: _,
+                            identifier: _,
+                        } => todo!(),
                     })
                 } else {
                     Err(anyhow::anyhow!(
