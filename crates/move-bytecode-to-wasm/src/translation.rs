@@ -161,7 +161,6 @@ fn translate_flow(
 
             // TODO: Consider enclosing the loop within a block to facilitate mapping LoopBreak branch modes for exiting the loop.
             builder.loop_(ty, |loop_| {
-           
                 // loop_targets maps the relooper-assigned loop id to the loop's instruction sequence id.
                 loop_targets.insert(*loop_id, loop_.id());
 
@@ -178,7 +177,7 @@ fn translate_flow(
             });
         }
         // TODO: currently we are wrapping the instructions within each [if, else] branch in a block, which is redundant.
-        // If possible, it would be great to avoid this. 
+        // If possible, it would be great to avoid this.
         Flow::IfElse {
             types_stack,
             then_body,

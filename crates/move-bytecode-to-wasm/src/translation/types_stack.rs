@@ -155,6 +155,22 @@ impl TypesStack {
                 self.pop_expecting(&IntermediateType::IRef(Box::new(
                     IntermediateType::IStruct(struct_.index()),
                 )))?;
+
+                let Some(field_type) = struct_.fields_types.get(field_id) else {
+                    panic!(
+                        "{field_id} not found in {}",
+                        struct_.struct_definition_index
+                    )
+                };
+
+                let Some(field_offset) = struct_.field_offsets.get(field_id) else {
+                    panic!(
+                        "{field_id} offset not found in {}",
+                        struct_.struct_definition_index
+                    )
+                };
+
+                self.push(IntermediateType::IRef(Box::new(field_type.clone())));
             }
             Bytecode::ImmBorrowFieldGeneric(field_id) => {
                 let (struct_field_id, instantiation_types) = compilation_ctx
@@ -188,6 +204,22 @@ impl TypesStack {
                 self.pop_expecting(&IntermediateType::IRef(Box::new(
                     IntermediateType::IGenericStructInstance(struct_.index(), instantiation_types),
                 )))?;
+
+                let Some(field_type) = struct_.fields_types.get(struct_field_id) else {
+                    panic!(
+                        "{field_id} not found in {}",
+                        struct_.struct_definition_index
+                    )
+                };
+
+                let Some(field_offset) = struct_.field_offsets.get(struct_field_id) else {
+                    panic!(
+                        "{field_id} offset not found in {}",
+                        struct_.struct_definition_index
+                    )
+                };
+
+                self.push(IntermediateType::IRef(Box::new(field_type.clone())));
             }
             Bytecode::MutBorrowField(field_id) => {
                 let struct_ = compilation_ctx
@@ -198,6 +230,22 @@ impl TypesStack {
                 self.pop_expecting(&IntermediateType::IMutRef(Box::new(
                     IntermediateType::IStruct(struct_.index()),
                 )))?;
+
+                let Some(field_type) = struct_.fields_types.get(field_id) else {
+                    panic!(
+                        "{field_id:?} not found in {}",
+                        struct_.struct_definition_index
+                    )
+                };
+
+                let Some(field_offset) = struct_.field_offsets.get(field_id) else {
+                    panic!(
+                        "{field_id:?} offset not found in {}",
+                        struct_.struct_definition_index
+                    )
+                };
+
+                self.push(IntermediateType::IMutRef(Box::new(field_type.clone())));
             }
             Bytecode::MutBorrowFieldGeneric(field_id) => {
                 let (struct_field_id, instantiation_types) = compilation_ctx
@@ -231,6 +279,22 @@ impl TypesStack {
                 self.pop_expecting(&IntermediateType::IMutRef(Box::new(
                     IntermediateType::IGenericStructInstance(struct_.index(), instantiation_types),
                 )))?;
+
+                let Some(field_type) = struct_.fields_types.get(struct_field_id) else {
+                    panic!(
+                        "{field_id:?} not found in {}",
+                        struct_.struct_definition_index
+                    )
+                };
+            
+                let Some(field_offset) = struct_.field_offsets.get(struct_field_id) else {
+                    panic!(
+                        "{field_id:?} offset not found in {}",
+                        struct_.struct_definition_index
+                    )
+                };
+            
+                self.push(IntermediateType::IMutRef(Box::new(field_type.clone())));
             }
             // Vector instructions
             Bytecode::VecImmBorrow(signature_index) => {
