@@ -1,21 +1,12 @@
 use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
+use compilation_context::ModuleData;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
-use compilation_context::{ModuleData, ModuleId, VariantData};
-use move_binary_format::file_format::{
-    DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex, FieldInstantiationIndex,
-    StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex, Visibility,
-};
-use move_binary_format::internals::ModuleIndex;
+use move_binary_format::file_format::Visibility;
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
-use translation::intermediate_types::enums::{IEnum, IEnumVariant};
-use translation::intermediate_types::structs::IStruct;
-use translation::{
-    functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
-    translate_function,
-};
-use walrus::{Module, RefType, ValType};
+use translation::translate_function;
+use walrus::{Module, ValType};
 use wasm_validation::validate_stylus_wasm;
 
 pub(crate) mod abi_types;
@@ -80,72 +71,14 @@ pub fn translate_package(
         println!("{deps_data:#?}");
         */
 
-        let datatype_handles_map =
-            CompilationContext::process_datatype_handles(&root_compiled_module);
-
-        // Process generic strucs
-        let (module_generic_structs_instances, generic_fields_to_struct_map) =
-            CompilationContext::process_generic_structs(&root_compiled_module);
-
-        let instantiated_fields_to_generic_fields =
-            CompilationContext::process_generic_field_instances(&root_compiled_module);
-
-        // Module's structs
-        let (module_structs, fields_to_struct_map) = CompilationContext::process_concrete_structs(
-            &root_compiled_module,
-            &datatype_handles_map,
-        );
-
-        // Module's enums
-        let (module_enums, variants_to_enum_map) = CompilationContext::process_concrete_enums(
-            &root_compiled_module,
-            &datatype_handles_map,
-        );
-
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
+        inject_debug_fns(&mut module);
 
-        let (mut function_table, functions_arguments, functions_returns) =
-            CompilationContext::process_function_definitions(
-                &root_compiled_module,
-                &mut module,
-                &datatype_handles_map,
-            );
-
-        if cfg!(feature = "inject-host-debug-fns") {
-            let func_ty = module.types.add(&[ValType::I32], &[]);
-            module.add_import_func("", "print_i32", func_ty);
-
-            let func_ty = module.types.add(&[ValType::I32], &[]);
-            module.add_import_func("", "print_memory_from", func_ty);
-
-            let func_ty = module.types.add(&[ValType::I64], &[]);
-            module.add_import_func("", "print_i64", func_ty);
-
-            let func_ty = module.types.add(&[ValType::I32], &[]);
-            module.add_import_func("", "print_u128", func_ty);
-
-            let func_ty = module.types.add(&[], &[]);
-            module.add_import_func("", "print_separator", func_ty);
-
-            let func_ty = module.types.add(&[ValType::I32], &[]);
-            module.add_import_func("", "print_address", func_ty);
-        }
+        let (root_module_data, mut function_table) =
+            ModuleData::build_module_data(&root_compiled_module, &mut module);
 
         let compilation_ctx = CompilationContext {
-            root_module_data: ModuleData {
-                constants: &root_compiled_module.constant_pool,
-                functions_arguments: &functions_arguments,
-                functions_returns: &functions_returns,
-                module_signatures: &root_compiled_module.signatures,
-                module_structs: &module_structs,
-                module_generic_structs_instances: &module_generic_structs_instances,
-                datatype_handles_map: &datatype_handles_map,
-                fields_to_struct_map: &fields_to_struct_map,
-                generic_fields_to_struct_map: &generic_fields_to_struct_map,
-                module_enums: &module_enums,
-                variants_to_enum_map: &variants_to_enum_map,
-                instantiated_fields_to_generic_fields: &instantiated_fields_to_generic_fields,
-            },
+            root_module_data,
             deps_data: HashMap::new(),
             memory_id,
             allocator: allocator_func,
@@ -225,4 +158,26 @@ macro_rules! declare_host_debug_functions {
             $module.imports.get_func("", "print_u128").unwrap(),
         )
     };
+}
+
+fn inject_debug_fns(module: &mut walrus::Module) {
+    if cfg!(feature = "inject-host-debug-fns") {
+        let func_ty = module.types.add(&[ValType::I32], &[]);
+        module.add_import_func("", "print_i32", func_ty);
+
+        let func_ty = module.types.add(&[ValType::I32], &[]);
+        module.add_import_func("", "print_memory_from", func_ty);
+
+        let func_ty = module.types.add(&[ValType::I64], &[]);
+        module.add_import_func("", "print_i64", func_ty);
+
+        let func_ty = module.types.add(&[ValType::I32], &[]);
+        module.add_import_func("", "print_u128", func_ty);
+
+        let func_ty = module.types.add(&[], &[]);
+        module.add_import_func("", "print_separator", func_ty);
+
+        let func_ty = module.types.add(&[ValType::I32], &[]);
+        module.add_import_func("", "print_address", func_ty);
+    }
 }

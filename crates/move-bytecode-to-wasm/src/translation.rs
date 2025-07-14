@@ -93,7 +93,7 @@ fn map_bytecode_instruction(
             let constant_type = &constant.type_;
             let constant_type: IntermediateType = IntermediateType::try_from_signature_token(
                 constant_type,
-                compilation_ctx.root_module_data.datatype_handles_map,
+                &compilation_ctx.root_module_data.datatype_handles_map,
             )?;
 
             constant_type.load_constant_instructions(module, builder, &mut data, compilation_ctx);
@@ -253,7 +253,7 @@ fn map_bytecode_instruction(
                 .map(|t| {
                     IntermediateType::try_from_signature_token(
                         t,
-                        compilation_ctx.root_module_data.datatype_handles_map,
+                        &compilation_ctx.root_module_data.datatype_handles_map,
                     )
                 })
                 .collect::<Result<Vec<_>, anyhow::Error>>()?;
@@ -310,7 +310,7 @@ fn map_bytecode_instruction(
                 .map(|t| {
                     IntermediateType::try_from_signature_token(
                         t,
-                        compilation_ctx.root_module_data.datatype_handles_map,
+                        &compilation_ctx.root_module_data.datatype_handles_map,
                     )
                 })
                 .collect::<Result<Vec<_>, anyhow::Error>>()?;

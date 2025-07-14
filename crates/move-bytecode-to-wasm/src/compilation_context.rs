@@ -18,11 +18,11 @@ use walrus::{FunctionId, MemoryId};
 ///
 /// Functions are processed in order. To access function information (i.e: arguments or return
 /// arguments we must know the index of it)
-pub struct CompilationContext<'a> {
+pub struct CompilationContext {
     /// Data of the module we are currently compiling
-    pub root_module_data: ModuleData<'a>,
+    pub root_module_data: ModuleData,
 
-    pub deps_data: HashMap<ModuleId, ModuleData<'a>>,
+    pub deps_data: HashMap<ModuleId, ModuleData>,
 
     /// WASM memory id
     pub memory_id: MemoryId,
@@ -31,7 +31,7 @@ pub struct CompilationContext<'a> {
     pub allocator: FunctionId,
 }
 
-impl CompilationContext<'_> {
+impl CompilationContext {
     pub fn get_struct_by_index(&self, index: u16) -> Result<&IStruct, CompilationContextError> {
         self.root_module_data
             .module_structs
@@ -95,7 +95,7 @@ impl CompilationContext<'_> {
             .map(|t| {
                 IntermediateType::try_from_signature_token(
                     t,
-                    self.root_module_data.datatype_handles_map,
+                    &self.root_module_data.datatype_handles_map,
                 )
             })
             .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
@@ -118,7 +118,7 @@ impl CompilationContext<'_> {
             .map(|t| {
                 IntermediateType::try_from_signature_token(
                     t,
-                    self.root_module_data.datatype_handles_map,
+                    &self.root_module_data.datatype_handles_map,
                 )
             })
             .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
@@ -140,7 +140,7 @@ impl CompilationContext<'_> {
             .map(|t| {
                 IntermediateType::try_from_signature_token(
                     t,
-                    self.root_module_data.datatype_handles_map,
+                    &self.root_module_data.datatype_handles_map,
                 )
             })
             .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()

@@ -30,32 +30,32 @@ pub struct VariantData {
     pub index_inside_enum: usize,
 }
 
-#[derive(Debug)]
-pub struct ModuleData<'a> {
+#[derive(Debug, Default)]
+pub struct ModuleData {
     /// Move's connstant pool
-    pub constants: &'a [Constant],
+    pub constants: Vec<Constant>,
 
     /// Module's functions arguments.
-    pub functions_arguments: &'a [Vec<IntermediateType>],
+    pub functions_arguments: Vec<Vec<IntermediateType>>,
 
     /// Module's functions Returns.
-    pub functions_returns: &'a [Vec<IntermediateType>],
+    pub functions_returns: Vec<Vec<IntermediateType>>,
 
     /// Module's signatures
-    pub module_signatures: &'a [Signature],
+    pub module_signatures: Vec<Signature>,
 
     /// Module's structs: contains all the user defined structs
-    pub module_structs: &'a [IStruct],
+    pub module_structs: Vec<IStruct>,
 
     /// Module's generic structs instances: contains all the user defined generic structs instances
     /// with its corresponding types
-    pub module_generic_structs_instances: &'a [(StructDefinitionIndex, Vec<SignatureToken>)],
+    pub module_generic_structs_instances: Vec<(StructDefinitionIndex, Vec<SignatureToken>)>,
 
     /// Maps a field index to its corresponding struct
-    pub fields_to_struct_map: &'a HashMap<FieldHandleIndex, StructDefinitionIndex>,
+    pub fields_to_struct_map: HashMap<FieldHandleIndex, StructDefinitionIndex>,
 
     /// Maps a generic field index to its corresponding struct in module_generic_structs_instances
-    pub generic_fields_to_struct_map: &'a HashMap<FieldInstantiationIndex, usize>,
+    pub generic_fields_to_struct_map: HashMap<FieldInstantiationIndex, usize>,
 
     /// Maps a field instantiation index to its corresponding index inside the struct.
     /// Field instantiation indexes are unique per struct instantiation, so, for example if we have
@@ -73,18 +73,18 @@ pub struct ModuleData<'a> {
     /// instantiuation belongs to. This is needed because there are situations where we need to
     /// intantiate the struct only with the field instantiation index and no other information.
     pub instantiated_fields_to_generic_fields:
-        &'a HashMap<FieldInstantiationIndex, (FieldHandleIndex, Vec<SignatureToken>)>,
+        HashMap<FieldInstantiationIndex, (FieldHandleIndex, Vec<SignatureToken>)>,
 
     /// Module's enums: contains all the user defined enums
-    pub module_enums: &'a [IEnum],
+    pub module_enums: Vec<IEnum>,
 
     /// Maps a enum's variant index to its corresponding enum and position inside the enum
-    pub variants_to_enum_map: &'a HashMap<VariantHandleIndex, VariantData>,
+    pub variants_to_enum_map: HashMap<VariantHandleIndex, VariantData>,
 
     /// This Hashmap maps the move's datatype handles to our internal representation of those
     /// types. The datatype handles are used interally by move to look for user defined data
     /// types
-    pub datatype_handles_map: &'a HashMap<DatatypeHandleIndex, UserDefinedType>,
+    pub datatype_handles_map: HashMap<DatatypeHandleIndex, UserDefinedType>,
 }
 
 #[derive(PartialEq, Eq, Hash, Debug)]
@@ -99,7 +99,7 @@ pub enum ModuleId {
     },
 }
 
-impl ModuleData<'_> {
+impl ModuleData {
     //  Creates a ModuleData for a module dependency. Each dependency is identified by an address
     //  and, under that address there can be defined several namespaces.
     /*
@@ -119,7 +119,7 @@ impl ModuleData<'_> {
     pub fn build_module_data(
         move_module: &CompiledModule,
         wasm_module: &mut walrus::Module,
-    ) -> Self {
+    ) -> (Self, FunctionTable) {
         let datatype_handles_map = Self::process_datatype_handles(move_module);
 
         let (module_generic_structs_instances, generic_fields_to_struct_map) =
@@ -136,23 +136,26 @@ impl ModuleData<'_> {
         let (module_enums, variants_to_enum_map) =
             Self::process_concrete_enums(move_module, &datatype_handles_map);
 
-        let (mut function_table, functions_arguments, functions_returns) =
+        let (function_table, functions_arguments, functions_returns) =
             Self::process_function_definitions(move_module, wasm_module, &datatype_handles_map);
 
-        ModuleData {
-            constants: &move_module.constant_pool,
-            functions_arguments: &functions_arguments,
-            functions_returns: &functions_returns,
-            module_signatures: &move_module.signatures,
-            module_structs: &module_structs,
-            module_generic_structs_instances: &module_generic_structs_instances,
-            datatype_handles_map: &datatype_handles_map,
-            fields_to_struct_map: &fields_to_struct_map,
-            generic_fields_to_struct_map: &generic_fields_to_struct_map,
-            module_enums: &module_enums,
-            variants_to_enum_map: &variants_to_enum_map,
-            instantiated_fields_to_generic_fields: &instantiated_fields_to_generic_fields,
-        }
+        (
+            ModuleData {
+                constants: move_module.constant_pool.clone(), // TODO: Clone
+                functions_arguments,
+                functions_returns,
+                module_signatures: move_module.signatures.clone(),
+                module_structs,
+                module_generic_structs_instances,
+                datatype_handles_map,
+                fields_to_struct_map,
+                generic_fields_to_struct_map,
+                module_enums,
+                variants_to_enum_map,
+                instantiated_fields_to_generic_fields,
+            },
+            function_table,
+        )
     }
 
     fn process_datatype_handles(
