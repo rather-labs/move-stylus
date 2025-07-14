@@ -104,6 +104,13 @@ pub fn translate_package(
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
 
+        let (mut function_table, functions_arguments, functions_returns) =
+            CompilationContext::process_function_definitions(
+                &root_compiled_module,
+                &mut module,
+                &datatype_handles_map,
+            );
+
         if cfg!(feature = "inject-host-debug-fns") {
             let func_ty = module.types.add(&[ValType::I32], &[]);
             module.add_import_func("", "print_i32", func_ty);
@@ -123,13 +130,6 @@ pub fn translate_package(
             let func_ty = module.types.add(&[ValType::I32], &[]);
             module.add_import_func("", "print_address", func_ty);
         }
-
-        let (mut function_table, functions_arguments, functions_returns) =
-            CompilationContext::process_function_definitions(
-                &root_compiled_module,
-                &mut module,
-                &datatype_handles_map,
-            );
 
         let compilation_ctx = CompilationContext {
             root_module_data: ModuleData {
