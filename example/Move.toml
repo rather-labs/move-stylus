@@ -2,5 +2,8 @@
 name = "example"
 edition = "2024"
 
+[dependencies]
+Sui = { local = "../sui-framework/" }
+
 [addresses]
 hello_world = "0x0"

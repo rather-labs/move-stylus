@@ -93,10 +93,7 @@ pub enum ModuleId {
     Root,
 
     /// Dependency module identified by an address.
-    Address {
-        address: [u8; 32],
-        namespace: String,
-    },
+    Dependency { address: [u8; 32], package: String },
 }
 
 impl ModuleData {

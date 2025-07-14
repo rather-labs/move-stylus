@@ -34,6 +34,7 @@ pub fn translate_package(
     package: CompiledPackage,
     module_name: Option<String>,
 ) -> HashMap<String, Module> {
+    // println!("==============> {:#?}", &package.deps_compiled_units);
     let root_compiled_units: Vec<CompiledUnitWithSource> = if let Some(module_name) = module_name {
         package
             .root_compiled_units
@@ -54,33 +55,52 @@ pub fn translate_package(
         let module_name = root_compiled_module.unit.name.to_string();
         let root_compiled_module = root_compiled_module.unit.module;
 
+        let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
+        inject_debug_fns(&mut module);
+
         let mut deps_data: HashMap<ModuleId, ModuleData> = HashMap::new();
         for dependency in root_compiled_module.immediate_dependencies() {
-            let module_id = ModuleId::Address {
-                namespace: dependency.name().to_string(),
+            let module_id = ModuleId::Dependency {
+                package: dependency.name().to_string(),
                 address: **dependency.address(),
             };
 
-            let module = package
+            /*
+            package
                 .deps_compiled_units
                 .iter()
-                .find(|(name, _)| name.as_str() == dependency.name().as_str())
+                .for_each(|(name, module)| {
+                    println!(
+                        "\n\n =================== \n{name}\n{}\n{:?}\n{}",
+                        module.unit.name(),
+                        module.unit.package_name(),
+                        module.unit.address
+                    );
+                });
+            */
+
+            let dependency_module = package
+                .deps_compiled_units
+                .iter()
+                .find(|(_, module)| {
+                    module.unit.name().as_str() == dependency.name().as_str()
+                        && module.unit.address.into_bytes() == **dependency.address()
+                })
                 .map(|(_, module)| module)
                 .unwrap_or_else(|| panic!("could not find dependency {}", dependency.name()));
 
-            println!("DEP {} {:#?}", dependency.name(), module.unit.module);
+            let (dependency_module_data, dependency_fn_table) =
+                ModuleData::build_module_data(&dependency_module.unit.module, &mut module);
 
-            /*
+            let processed_dependency = deps_data.insert(module_id, dependency_module_data);
+
             assert!(
-                insertion.is_none(),
+                processed_dependency.is_none(),
                 "processed the same dep twice in different contexts"
-            );*/
+            );
         }
 
-        // println!("{deps_data:#?}");
-
-        let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
-        inject_debug_fns(&mut module);
+        println!("{deps_data:#?}");
 
         let (root_module_data, mut function_table) =
             ModuleData::build_module_data(&root_compiled_module, &mut module);
