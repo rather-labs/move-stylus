@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::Path};
 use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use compilation_context::{ModuleData, ModuleId};
-use move_binary_format::file_format::{ModuleHandle, Visibility};
+use move_binary_format::file_format::Visibility;
 use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
     source_package::parsed_manifest::PackageName,

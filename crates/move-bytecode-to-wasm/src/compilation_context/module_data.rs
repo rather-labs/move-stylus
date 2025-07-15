@@ -256,6 +256,7 @@ impl ModuleData {
         (module_structs, fields_to_struct_map)
     }
 
+    #[allow(clippy::type_complexity)]
     fn process_generic_structs(
         module: &CompiledModule,
     ) -> (
