@@ -96,22 +96,22 @@ impl TypesStack {
             Bytecode::LdTrue => {
                 self.push(IntermediateType::IBool);
             }
-            Bytecode::LdU8(literal) => {
+            Bytecode::LdU8(_) => {
                 self.push(IntermediateType::IU8);
             }
-            Bytecode::LdU16(literal) => {
+            Bytecode::LdU16(_) => {
                 self.push(IntermediateType::IU16);
             }
-            Bytecode::LdU32(literal) => {
+            Bytecode::LdU32(_) => {
                 self.push(IntermediateType::IU32);
             }
-            Bytecode::LdU64(literal) => {
+            Bytecode::LdU64(_) => {
                 self.push(IntermediateType::IU64);
             }
-            Bytecode::LdU128(literal) => {
+            Bytecode::LdU128(_) => {
                 self.push(IntermediateType::IU128);
             }
-            Bytecode::LdU256(literal) => {
+            Bytecode::LdU256(_) => {
                 self.push(IntermediateType::IU256);
             }
             // Function calls
@@ -164,13 +164,6 @@ impl TypesStack {
                     )
                 };
 
-                let Some(field_offset) = struct_.field_offsets.get(field_id) else {
-                    panic!(
-                        "{field_id} offset not found in {}",
-                        struct_.struct_definition_index
-                    )
-                };
-
                 self.push(IntermediateType::IRef(Box::new(field_type.clone())));
             }
             Bytecode::ImmBorrowFieldGeneric(field_id) => {
@@ -213,13 +206,6 @@ impl TypesStack {
                     )
                 };
 
-                let Some(field_offset) = struct_.field_offsets.get(struct_field_id) else {
-                    panic!(
-                        "{field_id} offset not found in {}",
-                        struct_.struct_definition_index
-                    )
-                };
-
                 self.push(IntermediateType::IRef(Box::new(field_type.clone())));
             }
             Bytecode::MutBorrowField(field_id) => {
@@ -235,13 +221,6 @@ impl TypesStack {
                 let Some(field_type) = struct_.fields_types.get(field_id) else {
                     panic!(
                         "{field_id:?} not found in {}",
-                        struct_.struct_definition_index
-                    )
-                };
-
-                let Some(field_offset) = struct_.field_offsets.get(field_id) else {
-                    panic!(
-                        "{field_id:?} offset not found in {}",
                         struct_.struct_definition_index
                     )
                 };
@@ -284,13 +263,6 @@ impl TypesStack {
                 let Some(field_type) = struct_.fields_types.get(struct_field_id) else {
                     panic!(
                         "{field_id:?} not found in {}",
-                        struct_.struct_definition_index
-                    )
-                };
-
-                let Some(field_offset) = struct_.field_offsets.get(struct_field_id) else {
-                    panic!(
-                        "{field_id:?} offset not found in {}",
                         struct_.struct_definition_index
                     )
                 };
@@ -463,9 +435,9 @@ impl TypesStack {
                 self.push(*inner);
             }
             Bytecode::WriteRef => {
-                let [iref, value_type] = self.pop_n_from_stack()?;
+                let [iref, _] = self.pop_n_from_stack()?;
 
-                match_types!((IntermediateType::IMutRef(inner), "IMutRef", iref));
+                match_types!((IntermediateType::IMutRef(_), "IMutRef", iref));
             }
             Bytecode::FreezeRef => {
                 let ref_type = self.pop()?;
@@ -490,27 +462,27 @@ impl TypesStack {
                 );
             }
             Bytecode::CastU8 => {
-                let original_type = self.pop()?;
+                self.pop()?;
                 self.push(IntermediateType::IU8);
             }
             Bytecode::CastU16 => {
-                let original_type = self.pop()?;
+                self.pop()?;
                 self.push(IntermediateType::IU16);
             }
             Bytecode::CastU32 => {
-                let original_type = self.pop()?;
+                self.pop()?;
                 self.push(IntermediateType::IU32);
             }
             Bytecode::CastU64 => {
-                let original_type = self.pop()?;
+                self.pop()?;
                 self.push(IntermediateType::IU64);
             }
             Bytecode::CastU128 => {
-                let original_type = self.pop()?;
+                self.pop()?;
                 self.push(IntermediateType::IU128);
             }
             Bytecode::CastU256 => {
-                let original_type = self.pop()?;
+                self.pop()?;
                 self.push(IntermediateType::IU256);
             }
             Bytecode::Add => {

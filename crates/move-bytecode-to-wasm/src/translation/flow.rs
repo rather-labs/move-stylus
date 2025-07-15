@@ -3,9 +3,8 @@ use crate::MappedFunction;
 use crate::translation::TypesStack;
 use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::file_format::{Bytecode, CodeUnit};
-use relooper::{BranchMode, ShapedBlock, reloop};
+use relooper::{BranchMode, ShapedBlock};
 use std::collections::HashMap;
-use walrus::ir::InstrSeqId;
 
 #[derive(Debug, Clone)]
 pub enum Flow {

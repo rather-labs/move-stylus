@@ -1,10 +1,5 @@
-use move_abstract_interpreter::control_flow_graph::ControlFlowGraph;
-use relooper::{ShapedBlock, reloop};
-use std::collections::{BTreeMap, HashMap};
-
 use anyhow::Result;
-use move_abstract_interpreter::control_flow_graph::VMControlFlowGraph;
-use move_binary_format::file_format::{Bytecode, CodeUnit, FunctionHandleIndex};
+use move_binary_format::file_format::{CodeUnit, FunctionHandleIndex};
 use walrus::{ConstExpr, ElementKind, FunctionId, Module, TableId, TypeId, ValType, ir::Value};
 
 use super::functions::MappedFunction;

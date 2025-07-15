@@ -1,38 +1,36 @@
-use std::collections::{BTreeMap, HashMap};
-use std::io::Empty;
+use std::collections::HashMap;
 
 use anyhow::Result;
-use flow::Flow;
-use functions::{
-    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
-};
-use intermediate_types::IntermediateType;
-use intermediate_types::heap_integers::{IU128, IU256};
-use intermediate_types::simple_integers::{IU16, IU32, IU64};
-use intermediate_types::{simple_integers::IU8, vector::IVector};
-use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::file_format::Bytecode;
 use relooper::BranchMode;
-use table::{FunctionTable, TableEntry};
-use types_stack::TypesStack;
-use walrus::ir::{BinaryOp, Block, InstrSeqId, InstrSeqType, LoadKind, UnaryOp};
-use walrus::{FunctionBuilder, FunctionId, InstrSeqBuilder, Module, ValType, ir::MemArg};
-use wasmparser::types;
+use walrus::ir::{Block, InstrSeqId, InstrSeqType, LoadKind, MemArg, BinaryOp, UnaryOp};
+use walrus::{FunctionBuilder, FunctionId, InstrSeqBuilder, Module, ValType};
 
 use crate::CompilationContext;
 use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
+use flow::Flow;
+use functions::{MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return};
+use intermediate_types::IntermediateType;
+use intermediate_types::heap_integers::{IU128, IU256};
+use intermediate_types::simple_integers::{IU16, IU32, IU64, IU8};
+use intermediate_types::vector::IVector;
+use table::{FunctionTable, TableEntry};
+use types_stack::TypesStack;
+
+pub use error::TranslationError;
+
 pub(crate) mod bytecodes;
-pub mod error;
+pub(crate) mod types_stack;
 pub(crate) mod flow;
-pub mod functions;
+
 /// The types in this module represent an intermediate Rust representation of Move types
 /// that is used to generate the WASM code.
 pub mod intermediate_types;
 pub mod table;
-pub(crate) mod types_stack;
-pub use error::TranslationError;
+pub mod error;
+pub mod functions;
 
 pub fn translate_function(
     module: &mut Module,
@@ -65,7 +63,10 @@ pub fn translate_function(
     let flow = Flow::new(code_unit, compilation_ctx, &entry.function);
     println!("{flow:#?}");
 
+    // Type stack for the current function.
+    // It is filled recursively, meaning parent nodes to inherit types left by child nodes on the stack.
     let mut types_stack = TypesStack::new();
+    // Loop targets maps the relooper-assigned loop id to the loop's instruction sequence id.
     let mut loop_targets: HashMap<u16, InstrSeqId> = HashMap::new();
 
     translate_flow(
@@ -84,7 +85,6 @@ pub fn translate_function(
 }
 
 // TODO: check we are setting result types correctly
-// Why do we need to register the return type with the module?
 fn translate_flow(
     compilation_ctx: &CompilationContext,
     builder: &mut InstrSeqBuilder,
@@ -176,7 +176,7 @@ fn translate_flow(
                 );
             });
         }
-        // TODO: currently we are wrapping the instructions within each [if, else] branch in a block, which is redundant.
+        // TODO: currently we are wrapping the instructions within each [if, else] branch in a block, which is not desired but required by walrus.
         // If possible, it would be great to avoid this.
         Flow::IfElse {
             types_stack,
@@ -185,8 +185,9 @@ fn translate_flow(
         } => {
             let result_types = flow.get_types_stack().to_val_types();
             let ty = InstrSeqType::new(&mut module.types, &[], &result_types);
-
+            
             let then_id = {
+                // The block wrapping the then body needs to have the same return type as the if else block
                 let mut then_seq = builder.dangling_instr_seq(ty);
                 translate_flow(
                     compilation_ctx,
@@ -202,6 +203,7 @@ fn translate_flow(
             };
 
             let else_id = {
+                // The block wrapping the else body needs to have the same return type as the if else block
                 let mut else_seq = builder.dangling_instr_seq(ty);
                 translate_flow(
                     compilation_ctx,
@@ -216,6 +218,7 @@ fn translate_flow(
                 else_seq.id()
             };
 
+            // Finally we create the if else block
             builder.if_else(
                 ty,
                 |then| {
