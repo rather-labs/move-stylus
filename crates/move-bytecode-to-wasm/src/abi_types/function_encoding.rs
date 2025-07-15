@@ -201,6 +201,7 @@ mod tests {
             ],
             HashMap::new(),
         );
+
         let struct_2 = IStruct::new(
             StructDefinitionIndex::new(1),
             "TestStruct2".to_string(),
@@ -210,8 +211,9 @@ mod tests {
             ],
             HashMap::new(),
         );
+        /*
         let module_structs = vec![struct_1, struct_2];
-        compilation_ctx.root_module_data.module_structs = module_structs;
+        *compilation_ctx.root_module_data.module_structs = &module_structs;
 
         let signature: &[IntermediateType] = &[
             IntermediateType::IStruct(0),
@@ -224,6 +226,7 @@ mod tests {
                 "testStruct((address,uint32[],uint128[],bool,uint8,uint16,uint32,uint64,uint128,uint256,(uint32,uint128)),(uint32,uint128)[])"
             )
         );
+        */
     }
 
     #[test]

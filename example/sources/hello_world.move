@@ -1,6 +1,8 @@
-module 0x01::hello_world;
+module hello_world::hello_world;
 
 use sui::tx_context::TxContext;
+use hello_world::other_mod::Test;
+use hello_world::another_mod::AnotherTest;
 
 //  TODO: Add support for native functions
 //  native public fun emit_log(ptr: u32, len: u32, topic: u32);
@@ -39,5 +41,13 @@ public fun sum64(x: u64, y: u64): u64 {
 }
 
 public fun test(ctx: &TxContext): u8 {
+    42
+}
+
+public fun test2(ctx: &Test): u8 {
+    42
+}
+
+public fun test3(ctx: &AnotherTest): u8 {
     42
 }

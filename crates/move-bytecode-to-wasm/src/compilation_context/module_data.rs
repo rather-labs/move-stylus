@@ -99,7 +99,7 @@ pub struct ModuleData {
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum ModuleId {
     /// Module we are currently compiling.
-    Root,
+    Root { package: String },
 
     /// Dependency module identified by an address.
     Dependency { address: [u8; 32], package: String },
