@@ -2,7 +2,8 @@ use alloy_primitives::keccak256;
 use alloy_sol_types::{SolType, sol_data};
 
 use crate::{
-    CompilationContext, translation::intermediate_types::IntermediateType, utils::snake_to_camel,
+    CompilationContext, compilation_context::ExternalModuleData,
+    translation::intermediate_types::IntermediateType, utils::snake_to_camel,
 };
 
 pub type AbiFunctionSelector = [u8; 4];
@@ -92,7 +93,23 @@ impl SolName for IntermediateType {
             }
             IntermediateType::ISigner => None,
             IntermediateType::ITypeParameter(_) => None,
-            IntermediateType::IExternalUserData { .. } => todo!(),
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } => {
+                let external_data = compilation_ctx.get_external_module_data(module_id, identifier);
+
+                match external_data {
+                    ExternalModuleData::Struct(istruct) => istruct
+                        .fields
+                        .iter()
+                        .map(|field| field.sol_name(compilation_ctx))
+                        .collect::<Option<Vec<String>>>()
+                        .map(|fields| fields.join(","))
+                        .map(|fields| format!("({fields})")),
+                    ExternalModuleData::Enum(ienum) => todo!(),
+                }
+            }
         }
     }
 }
@@ -160,6 +177,7 @@ mod tests {
 
         let struct_1 = IStruct::new(
             StructDefinitionIndex::new(0),
+            "TestStruct".to_string(),
             vec![
                 (None, IntermediateType::IAddress),
                 (
@@ -183,6 +201,7 @@ mod tests {
         );
         let struct_2 = IStruct::new(
             StructDefinitionIndex::new(1),
+            "TestStruct2".to_string(),
             vec![
                 (None, IntermediateType::IU32),
                 (None, IntermediateType::IU128),

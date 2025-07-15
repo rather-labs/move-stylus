@@ -14,6 +14,13 @@ use move_binary_format::{
 use std::collections::HashMap;
 use walrus::{FunctionId, MemoryId};
 
+type Result<T> = std::result::Result<T, CompilationContextError>;
+
+pub enum ExternalModuleData<'a> {
+    Struct(&'a IStruct),
+    Enum(&'a IEnum),
+}
+
 /// Compilation context
 ///
 /// Functions are processed in order. To access function information (i.e: arguments or return
@@ -32,7 +39,27 @@ pub struct CompilationContext {
 }
 
 impl CompilationContext {
-    pub fn get_struct_by_index(&self, index: u16) -> Result<&IStruct, CompilationContextError> {
+    pub fn get_external_module_data(
+        &self,
+        module_id: &ModuleId,
+        identifier: &str,
+    ) -> ExternalModuleData {
+        println!("{module_id:?}");
+        println!("{:#?}", self.deps_data.keys());
+        let module = self.deps_data.get(module_id).unwrap();
+
+        if let Some(struct_) = module
+            .module_structs
+            .iter()
+            .find(|s| s.identifier == identifier)
+        {
+            ExternalModuleData::Struct(struct_)
+        } else {
+            todo!("enum case and empty case")
+        }
+    }
+
+    pub fn get_struct_by_index(&self, index: u16) -> Result<&IStruct> {
         self.root_module_data
             .module_structs
             .iter()
@@ -43,7 +70,7 @@ impl CompilationContext {
     pub fn get_struct_by_field_handle_idx(
         &self,
         field_index: &FieldHandleIndex,
-    ) -> Result<&IStruct, CompilationContextError> {
+    ) -> Result<&IStruct> {
         let struct_id = self
             .root_module_data
             .fields_to_struct_map
@@ -64,7 +91,7 @@ impl CompilationContext {
     pub fn get_struct_by_struct_definition_idx(
         &self,
         struct_index: &StructDefinitionIndex,
-    ) -> Result<&IStruct, CompilationContextError> {
+    ) -> Result<&IStruct> {
         self.root_module_data
             .module_structs
             .iter()
@@ -77,7 +104,7 @@ impl CompilationContext {
     pub fn get_generic_struct_by_field_handle_idx(
         &self,
         field_index: &FieldInstantiationIndex,
-    ) -> Result<IStruct, CompilationContextError> {
+    ) -> Result<IStruct> {
         let struct_id = self
             .root_module_data
             .generic_fields_to_struct_map
@@ -98,7 +125,7 @@ impl CompilationContext {
                     &self.root_module_data.datatype_handles_map,
                 )
             })
-            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+            .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
             .unwrap();
 
         Ok(generic_struct.instantiate(&types))
@@ -107,7 +134,7 @@ impl CompilationContext {
     pub fn get_generic_struct_by_struct_definition_idx(
         &self,
         struct_index: &StructDefInstantiationIndex,
-    ) -> Result<IStruct, CompilationContextError> {
+    ) -> Result<IStruct> {
         let struct_instance =
             &self.root_module_data.module_generic_structs_instances[struct_index.0 as usize];
         let generic_struct = &self.root_module_data.module_structs[struct_instance.0.0 as usize];
@@ -121,7 +148,7 @@ impl CompilationContext {
                     &self.root_module_data.datatype_handles_map,
                 )
             })
-            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+            .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
             .unwrap();
 
         Ok(generic_struct.instantiate(&types))
@@ -130,7 +157,7 @@ impl CompilationContext {
     pub fn get_generic_struct_types_instances(
         &self,
         struct_index: &StructDefInstantiationIndex,
-    ) -> Result<Vec<IntermediateType>, CompilationContextError> {
+    ) -> Result<Vec<IntermediateType>> {
         let struct_instance =
             &self.root_module_data.module_generic_structs_instances[struct_index.0 as usize];
 
@@ -143,7 +170,7 @@ impl CompilationContext {
                     &self.root_module_data.datatype_handles_map,
                 )
             })
-            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+            .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
             .unwrap();
 
         Ok(types)
@@ -158,10 +185,7 @@ impl CompilationContext {
         struct_instance.0.0
     }
 
-    pub fn get_signatures_by_index(
-        &self,
-        index: SignatureIndex,
-    ) -> Result<&Vec<SignatureToken>, CompilationContextError> {
+    pub fn get_signatures_by_index(&self, index: SignatureIndex) -> Result<&Vec<SignatureToken>> {
         self.root_module_data
             .module_signatures
             .get(index.into_index())
@@ -169,10 +193,7 @@ impl CompilationContext {
             .ok_or(CompilationContextError::SignatureNotFound(index))
     }
 
-    pub fn get_enum_by_variant_handle_idx(
-        &self,
-        idx: &VariantHandleIndex,
-    ) -> Result<&IEnum, CompilationContextError> {
+    pub fn get_enum_by_variant_handle_idx(&self, idx: &VariantHandleIndex) -> Result<&IEnum> {
         let VariantData { enum_index, .. } = self
             .root_module_data
             .variants_to_enum_map
@@ -188,7 +209,7 @@ impl CompilationContext {
     pub fn get_variant_position_by_variant_handle_idx(
         &self,
         idx: &VariantHandleIndex,
-    ) -> Result<u16, CompilationContextError> {
+    ) -> Result<u16> {
         let VariantData {
             index_inside_enum, ..
         } = self
@@ -200,7 +221,7 @@ impl CompilationContext {
         Ok(*index_inside_enum as u16)
     }
 
-    pub fn get_enum_by_index(&self, index: u16) -> Result<&IEnum, CompilationContextError> {
+    pub fn get_enum_by_index(&self, index: u16) -> Result<&IEnum> {
         self.root_module_data
             .module_enums
             .get(index as usize)

@@ -78,7 +78,7 @@ pub fn translate_package(
 
         let compilation_ctx = CompilationContext {
             root_module_data,
-            deps_data: HashMap::new(),
+            deps_data,
             memory_id,
             allocator: allocator_func,
         };

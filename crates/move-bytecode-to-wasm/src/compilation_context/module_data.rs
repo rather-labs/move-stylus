@@ -241,7 +241,16 @@ impl ModuleData {
                 }
             }
 
-            module_structs.push(IStruct::new(struct_index, all_fields, fields_map));
+            let identifier = module
+                .identifier_at(module.datatype_handle_at(struct_def.struct_handle).name)
+                .to_string();
+
+            module_structs.push(IStruct::new(
+                struct_index,
+                identifier,
+                all_fields,
+                fields_map,
+            ));
         }
 
         (module_structs, fields_to_struct_map)
