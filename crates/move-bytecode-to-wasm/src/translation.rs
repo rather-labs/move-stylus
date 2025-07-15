@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 use move_binary_format::file_format::Bytecode;
 use relooper::BranchMode;
-use walrus::ir::{Block, InstrSeqId, InstrSeqType, LoadKind, MemArg, BinaryOp, UnaryOp};
+use walrus::ir::{BinaryOp, Block, InstrSeqId, InstrSeqType, LoadKind, MemArg, UnaryOp};
 use walrus::{FunctionBuilder, FunctionId, InstrSeqBuilder, Module, ValType};
 
 use crate::CompilationContext;
@@ -11,10 +11,12 @@ use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
 use flow::Flow;
-use functions::{MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return};
+use functions::{
+    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
+};
 use intermediate_types::IntermediateType;
 use intermediate_types::heap_integers::{IU128, IU256};
-use intermediate_types::simple_integers::{IU16, IU32, IU64, IU8};
+use intermediate_types::simple_integers::{IU8, IU16, IU32, IU64};
 use intermediate_types::vector::IVector;
 use table::{FunctionTable, TableEntry};
 use types_stack::TypesStack;
@@ -22,15 +24,15 @@ use types_stack::TypesStack;
 pub use error::TranslationError;
 
 pub(crate) mod bytecodes;
-pub(crate) mod types_stack;
 pub(crate) mod flow;
+pub(crate) mod types_stack;
 
+pub mod error;
+pub mod functions;
 /// The types in this module represent an intermediate Rust representation of Move types
 /// that is used to generate the WASM code.
 pub mod intermediate_types;
 pub mod table;
-pub mod error;
-pub mod functions;
 
 pub fn translate_function(
     module: &mut Module,
@@ -185,7 +187,7 @@ fn translate_flow(
         } => {
             let result_types = flow.get_types_stack().to_val_types();
             let ty = InstrSeqType::new(&mut module.types, &[], &result_types);
-            
+
             let then_id = {
                 // The block wrapping the then body needs to have the same return type as the if else block
                 let mut then_seq = builder.dangling_instr_seq(ty);
