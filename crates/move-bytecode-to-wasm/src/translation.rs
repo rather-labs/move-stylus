@@ -449,6 +449,7 @@ fn map_bytecode_instruction(
                 | IntermediateType::IU256
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
+                | IntermediateType::IExternalUserData { .. }
                 | IntermediateType::IStruct(_)
                 | IntermediateType::IGenericStructInstance(_, _)
                 | IntermediateType::IVector(_) => {

@@ -96,7 +96,7 @@ pub struct ModuleData {
     pub datatype_handles_map: HashMap<DatatypeHandleIndex, UserDefinedType>,
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum ModuleId {
     /// Module we are currently compiling.
     Root,

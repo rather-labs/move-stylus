@@ -92,6 +92,7 @@ impl SolName for IntermediateType {
             }
             IntermediateType::ISigner => None,
             IntermediateType::ITypeParameter(_) => None,
+            IntermediateType::IExternalUserData { .. } => todo!(),
         }
     }
 }

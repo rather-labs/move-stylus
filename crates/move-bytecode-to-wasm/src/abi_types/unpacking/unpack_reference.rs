@@ -76,6 +76,7 @@ impl IRef {
                 panic!("cannot unpack generic type parameter");
             }
             IntermediateType::IEnum(_) => todo!(),
+            IntermediateType::IExternalUserData { .. } => todo!(),
         }
     }
 }
@@ -149,6 +150,7 @@ impl IMutRef {
                 panic!("cannot unpack generic type parameter");
             }
             IntermediateType::IEnum(_) => todo!(),
+            IntermediateType::IExternalUserData { .. } => todo!(),
         }
     }
 }

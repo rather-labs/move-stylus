@@ -292,6 +292,7 @@ impl IStruct {
                     );
                 }
                 IntermediateType::IEnum(_) => todo!(),
+                IntermediateType::IExternalUserData { .. } => todo!(),
             }
 
             // Store the middle pointer in the place of the struct field
@@ -360,6 +361,7 @@ impl IStruct {
                     panic!("cannot know if a type parameter is dynamic, expected a concrete type");
                 }
                 IntermediateType::IEnum(_) => todo!(),
+                IntermediateType::IExternalUserData { .. } => todo!(),
             }
         }
 
@@ -409,6 +411,7 @@ impl IStruct {
                     panic!("cannot know a type parameter's size, expected a concrete type");
                 }
                 IntermediateType::IEnum(_) => todo!(),
+                IntermediateType::IExternalUserData { .. } => todo!(),
             }
         }
 

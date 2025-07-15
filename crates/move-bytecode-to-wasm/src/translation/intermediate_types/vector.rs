@@ -340,6 +340,8 @@ impl IVector {
                     let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
                     struct_.copy_local_instructions(module, loop_block, compilation_ctx);
                 }
+
+                IntermediateType::IExternalUserData { .. } => todo!(),
                 t => panic!("unssuported vector type {t:?}"),
             }
 
@@ -539,6 +541,7 @@ impl IVector {
                     IntermediateType::ITypeParameter(_) => {
                         panic!("cannot check the equality of a vector of type parameters, expected a concrete type");
                     }
+                IntermediateType::IExternalUserData { .. } => todo!(),
                 }
             },
             |else_| {
@@ -630,6 +633,7 @@ impl IVector {
                 panic!("cannot borrow generic type parameters, expected a concrete type");
             }
             IntermediateType::IEnum(_) => todo!(),
+            IntermediateType::IExternalUserData { .. } => todo!(),
         }
 
         builder.i32_const(inner.stack_data_size() as i32);
@@ -960,6 +964,7 @@ mod tests {
                 panic!("cannot pop back a vector of type parameters, expected a concrete type");
             }
             IntermediateType::IEnum(_) => todo!(),
+            IntermediateType::IExternalUserData { .. } => todo!(),
         }
 
         if inner_type == IntermediateType::IU64 {
