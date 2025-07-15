@@ -70,6 +70,7 @@ impl TypesStack {
     }
 
     // TODO: check error handling
+    // TODO: extract repeated logic into functions
     pub fn process_instruction(
         &mut self,
         instruction: &Bytecode,
@@ -286,14 +287,14 @@ impl TypesStack {
                         struct_.struct_definition_index
                     )
                 };
-            
+
                 let Some(field_offset) = struct_.field_offsets.get(struct_field_id) else {
                     panic!(
                         "{field_id:?} offset not found in {}",
                         struct_.struct_definition_index
                     )
                 };
-            
+
                 self.push(IntermediateType::IMutRef(Box::new(field_type.clone())));
             }
             // Vector instructions

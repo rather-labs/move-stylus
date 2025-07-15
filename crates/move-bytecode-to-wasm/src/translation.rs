@@ -183,8 +183,11 @@ fn translate_flow(
             then_body,
             else_body,
         } => {
+            let result_types = flow.get_types_stack().to_val_types();
+            let ty = InstrSeqType::new(&mut module.types, &[], &result_types);
+
             let then_id = {
-                let mut then_seq = builder.dangling_instr_seq(None);
+                let mut then_seq = builder.dangling_instr_seq(ty);
                 translate_flow(
                     compilation_ctx,
                     &mut then_seq,
@@ -199,7 +202,7 @@ fn translate_flow(
             };
 
             let else_id = {
-                let mut else_seq = builder.dangling_instr_seq(None);
+                let mut else_seq = builder.dangling_instr_seq(ty);
                 translate_flow(
                     compilation_ctx,
                     &mut else_seq,
@@ -212,12 +215,6 @@ fn translate_flow(
                 );
                 else_seq.id()
             };
-
-            let ty = InstrSeqType::new(
-                &mut module.types,
-                &[],
-                &flow.get_types_stack().to_val_types(),
-            );
 
             builder.if_else(
                 ty,
