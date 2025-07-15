@@ -69,8 +69,6 @@ pub fn translate_package(
             &mut module,
         );
 
-        // println!("{deps_data:#?}");
-
         println!("compiling module...");
 
         let (root_module_data, mut function_table) =

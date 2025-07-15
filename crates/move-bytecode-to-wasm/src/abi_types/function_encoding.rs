@@ -2,8 +2,10 @@ use alloy_primitives::keccak256;
 use alloy_sol_types::{SolType, sol_data};
 
 use crate::{
-    CompilationContext, compilation_context::ExternalModuleData,
-    translation::intermediate_types::IntermediateType, utils::snake_to_camel,
+    CompilationContext,
+    compilation_context::ExternalModuleData,
+    translation::intermediate_types::{IntermediateType, structs::IStruct},
+    utils::snake_to_camel,
 };
 
 pub type AbiFunctionSelector = [u8; 4];
@@ -70,26 +72,13 @@ impl SolName for IntermediateType {
                 .map(|sol_n| format!("{sol_n}[]")),
             IntermediateType::IStruct(index) => {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
-
-                struct_
-                    .fields
-                    .iter()
-                    .map(|field| field.sol_name(compilation_ctx))
-                    .collect::<Option<Vec<String>>>()
-                    .map(|fields| fields.join(","))
-                    .map(|fields| format!("({fields})"))
+                Self::struct_fields_sol_name(struct_, compilation_ctx)
             }
             IntermediateType::IGenericStructInstance(index, types) => {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
                 let struct_instance = struct_.instantiate(types);
 
-                struct_instance
-                    .fields
-                    .iter()
-                    .map(|field| field.sol_name(compilation_ctx))
-                    .collect::<Option<Vec<String>>>()
-                    .map(|fields| fields.join(","))
-                    .map(|fields| format!("({fields})"))
+                Self::struct_fields_sol_name(&struct_instance, compilation_ctx)
             }
             IntermediateType::ISigner => None,
             IntermediateType::ITypeParameter(_) => None,
@@ -98,19 +87,30 @@ impl SolName for IntermediateType {
                 identifier,
             } => {
                 let external_data = compilation_ctx.get_external_module_data(module_id, identifier);
-
                 match external_data {
-                    ExternalModuleData::Struct(istruct) => istruct
-                        .fields
-                        .iter()
-                        .map(|field| field.sol_name(compilation_ctx))
-                        .collect::<Option<Vec<String>>>()
-                        .map(|fields| fields.join(","))
-                        .map(|fields| format!("({fields})")),
-                    ExternalModuleData::Enum(ienum) => todo!(),
+                    ExternalModuleData::Struct(istruct) => {
+                        Self::struct_fields_sol_name(istruct, compilation_ctx)
+                    }
+                    ExternalModuleData::Enum(_ienum) => todo!(),
                 }
             }
         }
+    }
+}
+
+impl IntermediateType {
+    #[inline]
+    fn struct_fields_sol_name(
+        struct_: &IStruct,
+        compilation_ctx: &CompilationContext,
+    ) -> Option<String> {
+        struct_
+            .fields
+            .iter()
+            .map(|field| field.sol_name(compilation_ctx))
+            .collect::<Option<Vec<String>>>()
+            .map(|fields| fields.join(","))
+            .map(|fields| format!("({fields})"))
     }
 }
 

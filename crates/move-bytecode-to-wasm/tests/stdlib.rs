@@ -6,7 +6,9 @@ mod common;
 /// Bytecode.
 /// We can't translate it to WASM yet so it should panic!
 #[test]
-#[should_panic(expected = "datatype handle index 0 not found")]
+#[should_panic(
+    expected = "cannot convert a type parameter to a wasm type, expected a concrete type"
+)]
 fn test_use_stdlib() {
     const MODULE_NAME: &str = "use_stdlib";
     const SOURCE_PATH: &str = "tests/stdlib/use_stdlib.move";
