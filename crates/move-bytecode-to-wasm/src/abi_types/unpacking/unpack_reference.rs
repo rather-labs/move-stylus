@@ -81,7 +81,9 @@ impl IRef {
                 module_id,
                 identifier,
             } => {
-                let external_data = compilation_ctx.get_external_module_data(module_id, identifier);
+                let external_data = compilation_ctx
+                    .get_external_module_data(module_id, identifier)
+                    .unwrap();
 
                 match external_data {
                     ExternalModuleData::Struct(istruct) => {

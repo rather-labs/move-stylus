@@ -157,6 +157,9 @@ macro_rules! declare_host_debug_functions {
     };
 }
 
+/// This functions process the dependency tree for the root module.
+///
+/// It builds `ModuleData` for every module in the dependency tree and saves it in a HashMap.
 pub fn process_dependency_tree(
     dependencies_data: &mut HashMap<ModuleId, ModuleData>,
     deps_compiled_units: &[(PackageName, CompiledUnitWithSource)],
@@ -170,20 +173,12 @@ pub fn process_dependency_tree(
             address: **dependency.address(),
         };
 
-        /*
-        package
-            .deps_compiled_units
-            .iter()
-            .for_each(|(name, module)| {
-                println!(
-                    "\n\n =================== \n{name}\n{}\n{:?}\n{}",
-                    module.unit.name(),
-                    module.unit.package_name(),
-                    module.unit.address
-                );
-            });
-        */
+        // If the HashMap contains the key, we already processed that dependency
+        if dependencies_data.contains_key(&module_id) {
+            continue;
+        }
 
+        // Find the dependency inside Move's compiled package
         let dependency_module = deps_compiled_units
             .iter()
             .find(|(_, module)| {
@@ -195,6 +190,7 @@ pub fn process_dependency_tree(
 
         let dependency_module = &dependency_module.unit.module;
 
+        // If the the dependency has dependency, we process them first
         if !dependency_module.immediate_dependencies().is_empty() {
             process_dependency_tree(
                 dependencies_data,

@@ -43,17 +43,17 @@ impl CompilationContext {
         &self,
         module_id: &ModuleId,
         identifier: &str,
-    ) -> ExternalModuleData {
-        println!("{module_id:?}");
-        println!("{:#?}", self.deps_data.keys());
-        let module = self.deps_data.get(module_id).unwrap();
+    ) -> Result<ExternalModuleData> {
+        let module = self.deps_data.get(module_id).ok_or(
+            CompilationContextError::ExternalModuleNotFound(module_id.clone()),
+        )?;
 
         if let Some(struct_) = module
             .module_structs
             .iter()
             .find(|s| s.identifier == identifier)
         {
-            ExternalModuleData::Struct(struct_)
+            Ok(ExternalModuleData::Struct(struct_))
         } else {
             todo!("enum case and empty case")
         }

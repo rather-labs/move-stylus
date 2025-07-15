@@ -3,6 +3,8 @@ use move_binary_format::file_format::{
     StructDefinitionIndex,
 };
 
+use super::ModuleId;
+
 #[derive(Debug, thiserror::Error)]
 #[allow(clippy::enum_variant_names)]
 pub enum CompilationContextError {
@@ -29,4 +31,7 @@ pub enum CompilationContextError {
 
     #[error("enum with enum id {0} not found in compilation context")]
     EnumWithVariantIdxNotFound(u16),
+
+    #[error("external module {0:?} not found")]
+    ExternalModuleNotFound(ModuleId),
 }

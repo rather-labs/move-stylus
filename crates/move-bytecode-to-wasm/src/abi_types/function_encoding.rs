@@ -86,7 +86,9 @@ impl SolName for IntermediateType {
                 module_id,
                 identifier,
             } => {
-                let external_data = compilation_ctx.get_external_module_data(module_id, identifier);
+                let external_data = compilation_ctx
+                    .get_external_module_data(module_id, identifier)
+                    .unwrap();
                 match external_data {
                     ExternalModuleData::Struct(istruct) => {
                         Self::struct_fields_sol_name(istruct, compilation_ctx)
