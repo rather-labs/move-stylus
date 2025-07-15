@@ -97,12 +97,9 @@ pub struct ModuleData {
 }
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
-pub enum ModuleId {
-    /// Module we are currently compiling.
-    Root { package: String },
-
-    /// Dependency module identified by an address.
-    Dependency { address: [u8; 32], package: String },
+pub struct ModuleId {
+    pub address: [u8; 32],
+    pub package: String,
 }
 
 impl ModuleData {
@@ -176,7 +173,7 @@ impl ModuleData {
                 };
             } else {
                 let datatype_module = module.module_handle_at(datatype_handle.module);
-                let module_id = ModuleId::Dependency {
+                let module_id = ModuleId {
                     address: **module.address_identifier_at(datatype_module.address),
                     package: module.identifier_at(datatype_module.name).to_string(),
                 };

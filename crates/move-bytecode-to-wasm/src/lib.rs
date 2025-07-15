@@ -75,7 +75,8 @@ pub fn translate_package(
         let (root_module_data, mut function_table) =
             ModuleData::build_module_data(&root_compiled_module, &mut module);
 
-        let root_module_id = ModuleId::Root {
+        let root_module_id = ModuleId {
+            address: **root_compiled_module.address(),
             package: module_name.clone(),
         };
         modules_data.insert(root_module_id.clone(), root_module_data);
@@ -174,12 +175,10 @@ pub fn process_dependency_tree(
 ) {
     for dependency in dependencies {
         println!("\tprocessing dependency {}...", dependency.name());
-        let module_id = ModuleId::Dependency {
+        let module_id = ModuleId {
             package: dependency.name().to_string(),
             address: **dependency.address(),
         };
-
-        println!("{module_id:?}");
 
         // If the HashMap contains the key, we already processed that dependency
         if dependencies_data.contains_key(&module_id) {
