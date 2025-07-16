@@ -1,21 +1,15 @@
 use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
-use compilation_context::VariantData;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
-use move_binary_format::file_format::{
-    DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex, FieldInstantiationIndex,
-    StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex, Visibility,
+use compilation_context::{ModuleData, ModuleId};
+use move_binary_format::file_format::Visibility;
+use move_package::{
+    compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
+    source_package::parsed_manifest::PackageName,
 };
-use move_binary_format::internals::ModuleIndex;
-use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
-use translation::intermediate_types::enums::{IEnum, IEnumVariant};
-use translation::intermediate_types::structs::IStruct;
-use translation::{
-    functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionTable,
-    translate_function,
-};
-use walrus::{Module, RefType, ValType};
+use translation::translate_function;
+use walrus::{Module, ValType};
 use wasm_validation::validate_stylus_wasm;
 
 pub(crate) mod abi_types;
@@ -63,297 +57,26 @@ pub fn translate_package(
         let module_name = root_compiled_module.unit.name.to_string();
         let root_compiled_module = root_compiled_module.unit.module;
 
-        let mut datatype_handles_map = HashMap::new();
-
-        for (index, datatype_handle) in root_compiled_module.datatype_handles().iter().enumerate() {
-            let idx = DatatypeHandleIndex::new(index as u16);
-
-            // Assert the index we constructed is ok
-            assert_eq!(
-                *datatype_handle,
-                root_compiled_module.datatype_handles()[idx.into_index()]
-            );
-
-            if let Some(position) = root_compiled_module
-                .struct_defs()
-                .iter()
-                .position(|s| s.struct_handle == idx)
-            {
-                datatype_handles_map.insert(idx, UserDefinedType::Struct(position as u16));
-            } else if let Some(position) = root_compiled_module
-                .enum_defs()
-                .iter()
-                .position(|e| e.enum_handle == idx)
-            {
-                datatype_handles_map.insert(idx, UserDefinedType::Enum(position));
-            } else {
-                panic!("datatype handle index {index} not found");
-            };
-        }
-
-        // Process generic strucs
-        let mut module_generic_structs_instances = vec![];
-        let mut generic_fields_to_struct_map = HashMap::new();
-
-        for (index, struct_instance) in root_compiled_module
-            .struct_instantiations()
-            .iter()
-            .enumerate()
-        {
-            // Map the struct instantiation to the generic struct definition and the instantiation
-            // types. The index in the array will match the PackGeneric(index) instruction
-            let struct_instantiation_types =
-                &root_compiled_module.signatures()[struct_instance.type_parameters.0 as usize].0;
-
-            module_generic_structs_instances
-                .push((struct_instance.def, struct_instantiation_types.clone()));
-
-            // Process the mapping of generic fields to structs instantiations
-            let generic_struct_definition =
-                &root_compiled_module.struct_defs()[struct_instance.def.0 as usize];
-
-            let struct_index = StructDefinitionIndex::new(struct_instance.def.0);
-            let generic_struct_index = StructDefInstantiationIndex::new(index as u16);
-
-            if let Some(fields) = generic_struct_definition.fields() {
-                for (field_index, _) in fields.iter().enumerate() {
-                    let generic_field_index = root_compiled_module
-                        .field_instantiations()
-                        .iter()
-                        .position(|f| {
-                            let field_handle =
-                                &root_compiled_module.field_handles()[f.handle.into_index()];
-                            let struct_def_instantiation = &root_compiled_module
-                                .struct_instantiations()[generic_struct_index.into_index()];
-
-                            // Filter which generic field we are processing inside the struct
-                            field_handle.field == field_index as u16
-                                // Link it with the generic struct definition
-                                && field_handle.owner == struct_index
-                                // Link it with the struct instantiation using the signature
-                                && struct_def_instantiation.type_parameters == f.type_parameters
-                        })
-                        .map(|i| FieldInstantiationIndex::new(i as u16));
-
-                    // If field_index is None means the field is never referenced in the code
-                    if let Some(generic_field_index) = generic_field_index {
-                        let res = generic_fields_to_struct_map.insert(generic_field_index, index);
-                        assert!(
-                            res.is_none(),
-                            "there was an error mapping field {generic_field_index} to struct {struct_index}, already mapped"
-                        );
-                    }
-                }
-            }
-        }
-
-        let mut instantiated_fields_to_generic_fields = HashMap::new();
-
-        // Map instantiated struct fields to indexes of generic fields
-        for (index, field_instance) in root_compiled_module
-            .field_instantiations()
-            .iter()
-            .enumerate()
-        {
-            instantiated_fields_to_generic_fields.insert(
-                FieldInstantiationIndex::new(index as u16),
-                (
-                    field_instance.handle,
-                    root_compiled_module.signatures()[field_instance.type_parameters.0 as usize]
-                        .0
-                        .clone(),
-                ),
-            );
-        }
-
-        // Module's structs
-        let mut module_structs: Vec<IStruct> = vec![];
-        let mut fields_to_struct_map = HashMap::new();
-        for (index, struct_def) in root_compiled_module.struct_defs().iter().enumerate() {
-            let struct_index = StructDefinitionIndex::new(index as u16);
-            let mut fields_map = HashMap::new();
-            let mut all_fields = Vec::new();
-            if let Some(fields) = struct_def.fields() {
-                for (field_index, field) in fields.iter().enumerate() {
-                    let intermediate_type = IntermediateType::try_from_signature_token(
-                        &field.signature.0,
-                        &datatype_handles_map,
-                    )
-                    .unwrap();
-
-                    let field_index = root_compiled_module
-                        .field_handles()
-                        .iter()
-                        .position(|f| f.field == field_index as u16 && f.owner == struct_index)
-                        .map(|i| FieldHandleIndex::new(i as u16));
-
-                    // If field_index is None means the field is never referenced in the code
-                    if let Some(field_index) = field_index {
-                        let res = fields_map.insert(field_index, intermediate_type.clone());
-                        assert!(
-                            res.is_none(),
-                            "there was an error creating a field in struct {struct_index}, field with index {field_index} already exist"
-                        );
-                        let res = fields_to_struct_map.insert(field_index, struct_index);
-                        assert!(
-                            res.is_none(),
-                            "there was an error mapping field {field_index} to struct {struct_index}, already mapped"
-                        );
-                        all_fields.push((Some(field_index), intermediate_type));
-                    } else {
-                        all_fields.push((None, intermediate_type));
-                    }
-                }
-            }
-
-            module_structs.push(IStruct::new(struct_index, all_fields, fields_map));
-        }
-
-        // Module's enums
-        let mut module_enums = vec![];
-        let mut variants_to_enum_map = HashMap::new();
-        for (index, enum_def) in root_compiled_module.enum_defs().iter().enumerate() {
-            let enum_index = EnumDefinitionIndex::new(index as u16);
-            let mut variants = Vec::new();
-
-            // Process variants
-            for (variant_index, variant) in enum_def.variants.iter().enumerate() {
-                let fields = variant
-                    .fields
-                    .iter()
-                    .map(|f| {
-                        IntermediateType::try_from_signature_token(
-                            &f.signature.0,
-                            &datatype_handles_map,
-                        )
-                    })
-                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-                    .unwrap();
-
-                variants.push(IEnumVariant::new(
-                    variant_index as u16,
-                    index as u16,
-                    fields,
-                ));
-
-                // Process handles
-                let variant_handle_index = root_compiled_module
-                    .variant_handles()
-                    .iter()
-                    .position(|v| v.variant == variant_index as u16 && v.enum_def == enum_index)
-                    .map(|i| VariantHandleIndex(i as u16));
-
-                // If variant_handle_index is None means the field is never referenced in the code
-                if let Some(variant_handle_index) = variant_handle_index {
-                    let res = variants_to_enum_map.insert(
-                        variant_handle_index,
-                        VariantData {
-                            enum_index: index,
-                            index_inside_enum: variant_index,
-                        },
-                    );
-                    assert!(
-                        res.is_none(),
-                        "there was an error creating a variant in struct {variant_index}, variant with index {variant_index} already exist"
-                    );
-                }
-            }
-
-            module_enums.push(IEnum::new(index as u16, variants).unwrap());
-        }
-
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
+        inject_debug_fns(&mut module);
 
-        if cfg!(feature = "inject-host-debug-fns") {
-            let func_ty = module.types.add(&[ValType::I32], &[]);
-            module.add_import_func("", "print_i32", func_ty);
+        // Process the dependency tree
+        let mut deps_data: HashMap<ModuleId, ModuleData> = HashMap::new();
+        process_dependency_tree(
+            &mut deps_data,
+            &package.deps_compiled_units,
+            &root_compiled_module.immediate_dependencies(),
+            &mut module,
+        );
 
-            let func_ty = module.types.add(&[ValType::I32], &[]);
-            module.add_import_func("", "print_memory_from", func_ty);
+        println!("compiling module...");
 
-            let func_ty = module.types.add(&[ValType::I64], &[]);
-            module.add_import_func("", "print_i64", func_ty);
-
-            let func_ty = module.types.add(&[ValType::I32], &[]);
-            module.add_import_func("", "print_u128", func_ty);
-
-            let func_ty = module.types.add(&[], &[]);
-            module.add_import_func("", "print_separator", func_ty);
-
-            let func_ty = module.types.add(&[ValType::I32], &[]);
-            module.add_import_func("", "print_address", func_ty);
-        }
-
-        // Return types of functions in intermediate types. Used to fill the stack type
-        let mut functions_returns = Vec::new();
-        let mut functions_arguments = Vec::new();
-
-        // Function table
-        let function_table_id = module.tables.add_local(false, 0, None, RefType::Funcref);
-        let mut function_table = FunctionTable::new(function_table_id);
-
-        for (function_def, function_handle) in root_compiled_module
-            .function_defs
-            .into_iter()
-            .zip(root_compiled_module.function_handles.iter())
-        {
-            let move_function_arguments =
-                &root_compiled_module.signatures[function_handle.parameters.0 as usize];
-
-            functions_arguments.push(
-                move_function_arguments
-                    .0
-                    .iter()
-                    .map(|s| IntermediateType::try_from_signature_token(s, &datatype_handles_map))
-                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-                    .unwrap(),
-            );
-
-            let move_function_return =
-                &root_compiled_module.signatures[function_handle.return_.0 as usize];
-
-            functions_returns.push(
-                move_function_return
-                    .0
-                    .iter()
-                    .map(|s| IntermediateType::try_from_signature_token(s, &datatype_handles_map))
-                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-                    .unwrap(),
-            );
-
-            let code_locals = &root_compiled_module.signatures
-                [function_def.code.as_ref().unwrap().locals.0 as usize];
-
-            let function_name =
-                root_compiled_module.identifiers[function_handle.name.0 as usize].to_string();
-
-            let function_handle_index = function_def.function;
-            let mapped_function = MappedFunction::new(
-                function_name,
-                move_function_arguments,
-                move_function_return,
-                code_locals,
-                function_def,
-                &datatype_handles_map,
-                &mut module,
-            );
-
-            function_table.add(&mut module, mapped_function, function_handle_index);
-        }
+        let (root_module_data, mut function_table) =
+            ModuleData::build_module_data(&root_compiled_module, &mut module);
 
         let compilation_ctx = CompilationContext {
-            constants: &root_compiled_module.constant_pool,
-            functions_arguments: &functions_arguments,
-            functions_returns: &functions_returns,
-            module_signatures: &root_compiled_module.signatures,
-            module_structs: &module_structs,
-            module_generic_structs_instances: &module_generic_structs_instances,
-            datatype_handles_map: &datatype_handles_map,
-            fields_to_struct_map: &fields_to_struct_map,
-            generic_fields_to_struct_map: &generic_fields_to_struct_map,
-            module_enums: &module_enums,
-            variants_to_enum_map: &variants_to_enum_map,
-            instantiated_fields_to_generic_fields: &instantiated_fields_to_generic_fields,
+            root_module_data,
+            deps_data,
             memory_id,
             allocator: allocator_func,
         };
@@ -432,4 +155,81 @@ macro_rules! declare_host_debug_functions {
             $module.imports.get_func("", "print_u128").unwrap(),
         )
     };
+}
+
+/// This functions process the dependency tree for the root module.
+///
+/// It builds `ModuleData` for every module in the dependency tree and saves it in a HashMap.
+pub fn process_dependency_tree(
+    dependencies_data: &mut HashMap<ModuleId, ModuleData>,
+    deps_compiled_units: &[(PackageName, CompiledUnitWithSource)],
+    dependencies: &[move_core_types::language_storage::ModuleId],
+    module: &mut Module,
+) {
+    for dependency in dependencies {
+        println!("processing dependency {}...", dependency.name());
+        let module_id = ModuleId::Dependency {
+            package: dependency.name().to_string(),
+            address: **dependency.address(),
+        };
+
+        // If the HashMap contains the key, we already processed that dependency
+        if dependencies_data.contains_key(&module_id) {
+            continue;
+        }
+
+        // Find the dependency inside Move's compiled package
+        let dependency_module = deps_compiled_units
+            .iter()
+            .find(|(_, module)| {
+                module.unit.name().as_str() == dependency.name().as_str()
+                    && module.unit.address.into_bytes() == **dependency.address()
+            })
+            .map(|(_, module)| module)
+            .unwrap_or_else(|| panic!("could not find dependency {}", dependency.name()));
+
+        let dependency_module = &dependency_module.unit.module;
+
+        // If the the dependency has dependency, we process them first
+        if !dependency_module.immediate_dependencies().is_empty() {
+            process_dependency_tree(
+                dependencies_data,
+                deps_compiled_units,
+                &dependency_module.immediate_dependencies(),
+                module,
+            );
+        }
+
+        let (dependency_module_data, _dependency_fn_table) =
+            ModuleData::build_module_data(dependency_module, module);
+
+        let processed_dependency = dependencies_data.insert(module_id, dependency_module_data);
+
+        assert!(
+            processed_dependency.is_none(),
+            "processed the same dep twice in different contexts"
+        );
+    }
+}
+
+fn inject_debug_fns(module: &mut walrus::Module) {
+    if cfg!(feature = "inject-host-debug-fns") {
+        let func_ty = module.types.add(&[ValType::I32], &[]);
+        module.add_import_func("", "print_i32", func_ty);
+
+        let func_ty = module.types.add(&[ValType::I32], &[]);
+        module.add_import_func("", "print_memory_from", func_ty);
+
+        let func_ty = module.types.add(&[ValType::I64], &[]);
+        module.add_import_func("", "print_i64", func_ty);
+
+        let func_ty = module.types.add(&[ValType::I32], &[]);
+        module.add_import_func("", "print_u128", func_ty);
+
+        let func_ty = module.types.add(&[], &[]);
+        module.add_import_func("", "print_separator", func_ty);
+
+        let func_ty = module.types.add(&[ValType::I32], &[]);
+        module.add_import_func("", "print_address", func_ty);
+    }
 }

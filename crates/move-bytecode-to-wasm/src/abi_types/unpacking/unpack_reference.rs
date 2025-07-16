@@ -1,5 +1,6 @@
 use super::Unpackable;
 use crate::CompilationContext;
+use crate::compilation_context::ExternalModuleData;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::reference::{IMutRef, IRef};
 use walrus::{
@@ -76,6 +77,27 @@ impl IRef {
                 panic!("cannot unpack generic type parameter");
             }
             IntermediateType::IEnum(_) => todo!(),
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } => {
+                let external_data = compilation_ctx
+                    .get_external_module_data(module_id, identifier)
+                    .unwrap();
+
+                match external_data {
+                    ExternalModuleData::Struct(istruct) => {
+                        istruct.add_unpack_instructions(
+                            builder,
+                            module,
+                            reader_pointer,
+                            calldata_reader_pointer,
+                            compilation_ctx,
+                        );
+                    }
+                    ExternalModuleData::Enum(_ienum) => todo!(),
+                }
+            }
         }
     }
 }
@@ -149,6 +171,7 @@ impl IMutRef {
                 panic!("cannot unpack generic type parameter");
             }
             IntermediateType::IEnum(_) => todo!(),
+            IntermediateType::IExternalUserData { .. } => todo!(),
         }
     }
 }

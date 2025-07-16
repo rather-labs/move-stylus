@@ -202,6 +202,7 @@ impl Unpackable for IntermediateType {
                     compilation_ctx,
                 )
             }
+            IntermediateType::IExternalUserData { .. } => todo!(),
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot unpack generic type parameter");
             }

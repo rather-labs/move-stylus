@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use move_binary_format::file_format::{DatatypeHandleIndex, FunctionDefinition, Signature};
+use move_binary_format::file_format::{
+    DatatypeHandleIndex, FunctionDefinition, Signature, SignatureToken,
+};
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
     ir::{LoadKind, MemArg, StoreKind},
@@ -25,7 +27,7 @@ impl MappedFunction {
         name: String,
         move_args: &Signature,
         move_rets: &Signature,
-        move_locals: &Signature,
+        move_locals: &[SignatureToken],
         move_def: FunctionDefinition,
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         module: &mut Module,
@@ -57,7 +59,6 @@ impl MappedFunction {
 
         // Declared locals
         let ir_declared_locals_types = move_locals
-            .0
             .iter()
             .map(|s| IntermediateType::try_from_signature_token(s, handles_map));
 

@@ -59,6 +59,9 @@ use walrus::{
 
 #[derive(Debug)]
 pub struct IStruct {
+    /// Struct identifier
+    pub identifier: String,
+
     /// Field's types ordered by index
     pub fields: Vec<IntermediateType>,
 
@@ -85,6 +88,7 @@ pub struct IStruct {
 impl IStruct {
     pub fn new(
         index: StructDefinitionIndex,
+        identifier: String,
         fields: Vec<(Option<FieldHandleIndex>, IntermediateType)>,
         fields_types: HashMap<FieldHandleIndex, IntermediateType>,
     ) -> Self {
@@ -101,6 +105,7 @@ impl IStruct {
 
         Self {
             struct_definition_index: index,
+            identifier,
             heap_size,
             field_offsets,
             fields_types,
@@ -292,6 +297,7 @@ impl IStruct {
                     );
                 }
                 IntermediateType::IEnum(_) => todo!(),
+                IntermediateType::IExternalUserData { .. } => todo!(),
             }
 
             // Store the middle pointer in the place of the struct field
@@ -360,6 +366,7 @@ impl IStruct {
                     panic!("cannot know if a type parameter is dynamic, expected a concrete type");
                 }
                 IntermediateType::IEnum(_) => todo!(),
+                IntermediateType::IExternalUserData { .. } => todo!(),
             }
         }
 
@@ -409,6 +416,7 @@ impl IStruct {
                     panic!("cannot know a type parameter's size, expected a concrete type");
                 }
                 IntermediateType::IEnum(_) => todo!(),
+                IntermediateType::IExternalUserData { .. } => todo!(),
             }
         }
 
@@ -450,6 +458,7 @@ impl IStruct {
 
         Self {
             fields,
+            identifier: self.identifier.clone(),
             fields_types,
             field_offsets,
             struct_definition_index: StructDefinitionIndex::new(
