@@ -61,6 +61,7 @@ test = "0x0"
 }
 
 // TODO: rename to translate_test_module
+#[allow(dead_code)]
 /// Translates a single test module
 pub fn translate_test_package(path: &str, module_name: &str) -> Module {
     let build_config = BuildConfig {
@@ -95,6 +96,7 @@ pub fn translate_test_package(path: &str, module_name: &str) -> Module {
 }
 
 // TODO: rename to translate_test_complete_package when translate_test_package is renamed
+#[allow(dead_code)]
 /// Translates a complete package. It outputs all the corresponding wasm modules
 pub fn translate_test_complete_package(path: &str) -> HashMap<String, Module> {
     let build_config = BuildConfig {
