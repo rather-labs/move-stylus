@@ -99,7 +99,7 @@ pub struct ModuleData {
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct ModuleId {
     pub address: [u8; 32],
-    pub package: String,
+    pub module_name: String,
 }
 
 impl ModuleData {
@@ -175,7 +175,7 @@ impl ModuleData {
                 let datatype_module = module.module_handle_at(datatype_handle.module);
                 let module_id = ModuleId {
                     address: **module.address_identifier_at(datatype_module.address),
-                    package: module.identifier_at(datatype_module.name).to_string(),
+                    module_name: module.identifier_at(datatype_module.name).to_string(),
                 };
 
                 datatype_handles_map.insert(

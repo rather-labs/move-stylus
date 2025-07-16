@@ -55,6 +55,7 @@ pub fn translate_package(
     let mut modules = HashMap::new();
     // Contains the module data for all the root package and its dependencies
     let mut modules_data: HashMap<ModuleId, ModuleData> = HashMap::new();
+
     for root_compiled_module in root_compiled_units {
         let module_name = root_compiled_module.unit.name.to_string();
         let root_compiled_module = root_compiled_module.unit.module;
@@ -77,7 +78,7 @@ pub fn translate_package(
 
         let root_module_id = ModuleId {
             address: **root_compiled_module.address(),
-            package: module_name.clone(),
+            module_name: module_name.clone(),
         };
         modules_data.insert(root_module_id.clone(), root_module_data);
 
@@ -174,9 +175,13 @@ pub fn process_dependency_tree(
     module: &mut Module,
 ) {
     for dependency in dependencies {
-        println!("\tprocessing dependency {}...", dependency.name());
+        println!(
+            "\tprocessing dependency {}:{}...",
+            dependency.address(),
+            dependency.name()
+        );
         let module_id = ModuleId {
-            package: dependency.name().to_string(),
+            module_name: dependency.name().to_string(),
             address: **dependency.address(),
         };
 
