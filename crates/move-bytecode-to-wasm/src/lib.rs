@@ -53,6 +53,7 @@ pub fn translate_package(
     );
 
     let mut modules = HashMap::new();
+
     // Contains the module data for all the root package and its dependencies
     let mut modules_data: HashMap<ModuleId, ModuleData> = HashMap::new();
 
