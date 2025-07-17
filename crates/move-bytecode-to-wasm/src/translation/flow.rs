@@ -91,12 +91,10 @@ impl Flow {
             })
             .collect();
 
-        let mut flow = Flow::Empty;
-        flow.build(&relooped, &blocks_ctx)
+        Self::build(&relooped, &blocks_ctx)
     }
 
     fn build(
-        &mut self,
         shaped_block: &ShapedBlock<u16>,
         blocks_ctx: &HashMap<u16, (Vec<Bytecode>, TypesStack)>,
     ) -> Flow {
@@ -118,14 +116,14 @@ impl Flow {
                 let immediate_blocks = simple_block
                     .immediate
                     .as_ref()
-                    .map(|b| self.build(b, blocks_ctx))
+                    .map(|b| Self::build(b, blocks_ctx))
                     .unwrap_or(Flow::Empty);
 
                 // Next block follows the current one, in the graph this represents an edge
                 let next_block = simple_block
                     .next
                     .as_ref()
-                    .map(|b| self.build(b, blocks_ctx))
+                    .map(|b| Self::build(b, blocks_ctx))
                     .unwrap_or(Flow::Empty);
 
                 // Revisit this part. We are flattening a nested structure into a sequence, is it always correct?
@@ -144,7 +142,7 @@ impl Flow {
                 }
             }
             ShapedBlock::Loop(loop_block) => {
-                let inner_block = self.build(&loop_block.inner, blocks_ctx);
+                let inner_block = Self::build(&loop_block.inner, blocks_ctx);
 
                 let loop_flow = Flow::Loop {
                     types_stack: inner_block.get_types_stack(),
@@ -154,7 +152,7 @@ impl Flow {
 
                 // Here too, we put the next block in the sequence if it exists
                 if let Some(next_block) = &loop_block.next {
-                    let next_flow = self.build(next_block, blocks_ctx);
+                    let next_flow = Self::build(next_block, blocks_ctx);
                     Flow::Sequence(vec![loop_flow, next_flow])
                 } else {
                     loop_flow
@@ -168,11 +166,11 @@ impl Flow {
 
                 match multiple_block.handled.len() {
                     // If there is a single branch, then instead of creating an if/else flow with an empty arm, we just build the flow from the only handled block.
-                    1 => self.build(&multiple_block.handled[0].inner, blocks_ctx),
+                    1 => Self::build(&multiple_block.handled[0].inner, blocks_ctx),
                     // If there are two branches, we create an if/else flow with the two handled blocks.
                     2 => {
-                        let then_arm = self.build(&multiple_block.handled[0].inner, blocks_ctx);
-                        let else_arm = self.build(&multiple_block.handled[1].inner, blocks_ctx);
+                        let then_arm = Self::build(&multiple_block.handled[0].inner, blocks_ctx);
+                        let else_arm = Self::build(&multiple_block.handled[1].inner, blocks_ctx);
 
                         let then_types = then_arm.get_types_stack();
                         let else_types = else_arm.get_types_stack();
