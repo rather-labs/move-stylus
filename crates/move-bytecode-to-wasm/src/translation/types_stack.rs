@@ -316,7 +316,7 @@ impl TypesStack {
                 } else {
                     let generic_stuct = compilation_ctx
                         .get_struct_by_field_handle_idx(struct_field_id)
-                        .map_err(|e| TypesStackError::Compilation(e))?;
+                        .map_err(TypesStackError::Compilation)?;
                     generic_stuct.instantiate(&instantiation_types)
                 };
 

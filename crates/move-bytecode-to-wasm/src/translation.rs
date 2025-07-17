@@ -114,7 +114,7 @@ fn translate_flow(
                 translate_branching_instruction(instruction, branches, loop_targets, builder);
                 translate_instruction(
                     instruction,
-                    &ctx.compilation_ctx,
+                    ctx.compilation_ctx,
                     builder,
                     &ctx.entry.function,
                     module,
@@ -126,7 +126,7 @@ fn translate_flow(
         }
         Flow::Sequence(flows) => {
             for f in flows {
-                translate_flow(&ctx, builder, module, types_stack, f, loop_targets);
+                translate_flow(ctx, builder, module, types_stack, f, loop_targets);
             }
         }
         Flow::Loop {
@@ -141,11 +141,11 @@ fn translate_flow(
                 loop_targets.insert(*loop_id, loop_.id());
 
                 translate_flow(
-                    &ctx,
+                    ctx,
                     loop_,
                     module,
                     &mut types_stack.clone(),
-                    &*body,
+                    body,
                     loop_targets,
                 );
             });
@@ -167,7 +167,7 @@ fn translate_flow(
                 let then_id = {
                     let mut then_seq = builder.dangling_instr_seq(ty);
                     translate_flow(
-                        &ctx,
+                        ctx,
                         &mut then_seq,
                         module,
                         &mut types_stack.clone(),
@@ -180,7 +180,7 @@ fn translate_flow(
                 let else_id = {
                     let mut else_seq = builder.dangling_instr_seq(ty);
                     translate_flow(
-                        &ctx,
+                        ctx,
                         &mut else_seq,
                         module,
                         &mut types_stack.clone(),
@@ -206,7 +206,7 @@ fn translate_flow(
                 let then_id = {
                     let mut then_seq = builder.dangling_instr_seq(None);
                     translate_flow(
-                        &ctx,
+                        ctx,
                         &mut then_seq,
                         module,
                         &mut types_stack.clone(),
@@ -222,7 +222,7 @@ fn translate_flow(
                 });
 
                 translate_flow(
-                    &ctx,
+                    ctx,
                     builder,
                     module,
                     &mut types_stack.clone(),
@@ -236,7 +236,7 @@ fn translate_flow(
                 let else_id = {
                     let mut else_seq = builder.dangling_instr_seq(None);
                     translate_flow(
-                        &ctx,
+                        ctx,
                         &mut else_seq,
                         module,
                         &mut types_stack.clone(),
@@ -253,7 +253,7 @@ fn translate_flow(
                 });
 
                 translate_flow(
-                    &ctx,
+                    ctx,
                     builder,
                     module,
                     &mut types_stack.clone(),
