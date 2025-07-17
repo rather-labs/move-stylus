@@ -175,7 +175,7 @@ fn translate_flow(
                         module,
                         function_table,
                         &mut types_stack.clone(),
-                        &*then_body,
+                        then_body,
                         loop_targets,
                         entry,
                     );
@@ -190,7 +190,7 @@ fn translate_flow(
                         module,
                         function_table,
                         &mut types_stack.clone(),
-                        &*else_body,
+                        else_body,
                         loop_targets,
                         entry,
                     );
@@ -218,7 +218,7 @@ fn translate_flow(
                         module,
                         function_table,
                         &mut types_stack.clone(),
-                        &*then_body,
+                        then_body,
                         loop_targets,
                         entry,
                     );
@@ -236,7 +236,7 @@ fn translate_flow(
                     module,
                     function_table,
                     &mut types_stack.clone(),
-                    &*else_body,
+                    else_body,
                     loop_targets,
                     entry,
                 );
@@ -252,7 +252,7 @@ fn translate_flow(
                         module,
                         function_table,
                         &mut types_stack.clone(),
-                        &*else_body,
+                        else_body,
                         loop_targets,
                         entry,
                     );
@@ -271,7 +271,7 @@ fn translate_flow(
                     module,
                     function_table,
                     &mut types_stack.clone(),
-                    &*then_body,
+                    then_body,
                     loop_targets,
                     entry,
                 );
