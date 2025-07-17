@@ -452,6 +452,11 @@ impl ModuleData {
             .iter()
             .zip(move_module.function_handles.iter())
         {
+            assert!(
+                function_def.acquires_global_resources.is_empty(),
+                "Acquiring global resources is not supported yet"
+            );
+
             let move_function_arguments = &move_module.signature_at(function_handle.parameters);
             println!("===> {function_handle:?}");
 
@@ -485,12 +490,13 @@ impl ModuleData {
             let function_name = move_module.identifier_at(function_handle.name).to_string();
 
             let function_handle_index = function_def.function;
+
             let mapped_function = MappedFunction::new(
                 function_name,
                 move_function_arguments,
                 move_function_return,
                 code_locals,
-                function_def.clone(), // TODO: check clone
+                function_def,
                 datatype_handles_map,
                 wasm_module,
             );

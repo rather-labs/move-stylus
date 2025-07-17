@@ -6,7 +6,7 @@ use intermediate_types::IntermediateType;
 use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
-use move_binary_format::file_format::Bytecode;
+use move_binary_format::file_format::{Bytecode, CodeUnit};
 use table::FunctionTable;
 use types_stack::TypesStack;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
@@ -14,7 +14,6 @@ use walrus::{FunctionBuilder, Module};
 use walrus::{FunctionId, InstrSeqBuilder, ValType, ir::MemArg};
 
 use crate::CompilationContext;
-use crate::compilation_context::ModuleId;
 use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
@@ -33,13 +32,14 @@ pub fn translate_function(
     index: usize,
     compilation_ctx: &CompilationContext,
     function_table: &mut FunctionTable,
+    move_bytecode: &CodeUnit,
 ) -> Result<FunctionId> {
     let entry = function_table
         .get_mut(index)
         .ok_or(anyhow::anyhow!("index {index} not found in function table"))?;
 
     anyhow::ensure!(
-        entry.get_move_code_unit().unwrap().jump_tables.is_empty(),
+        move_bytecode.jump_tables.is_empty(),
         "Jump tables are not supported yet"
     );
 
@@ -54,11 +54,9 @@ pub fn translate_function(
         .get(index)
         .ok_or(anyhow::anyhow!("index {index} not found in function table"))?;
 
-    let code = &entry.get_move_code_unit().unwrap().code;
-
     let mut types_stack = TypesStack::new();
 
-    for instruction in code {
+    for instruction in &move_bytecode.code {
         map_bytecode_instruction(
             instruction,
             compilation_ctx,

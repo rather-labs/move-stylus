@@ -42,7 +42,7 @@ public struct TxContext has drop {
 
 // native fun native_sender();
 // native fun native_sender(): address;
-fun native_sender()native_sender: address {
+fun native_sender(): address {
     @0x7357
 }
 

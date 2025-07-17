@@ -3,7 +3,6 @@ use std::{collections::HashMap, path::Path};
 use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use compilation_context::{ModuleData, ModuleId};
-use move_binary_format::file_format::Visibility;
 use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
     source_package::parsed_manifest::PackageName,
@@ -95,9 +94,28 @@ pub fn translate_package(
         let mut function_ids = Vec::new();
 
         for index in 0..function_table.len() {
-            let function_id =
-                translate_function(&mut module, index, &compilation_ctx, &mut function_table)
-                    .unwrap();
+            let function_handle_idx = function_table.get(index).unwrap().function_handle_index;
+            let function_name = root_compiled_module.identifier_at(
+                root_compiled_module
+                    .function_handle_at(function_handle_idx)
+                    .name,
+            );
+
+            let (_, function_definition) = root_compiled_module
+                .find_function_def_by_name(function_name.as_str())
+                .unwrap();
+
+            let move_bytecode = function_definition.code.as_ref().unwrap();
+
+            let function_id = translate_function(
+                &mut module,
+                index,
+                &compilation_ctx,
+                &mut function_table,
+                move_bytecode,
+            )
+            .unwrap();
+
             function_ids.push(function_id);
         }
 
@@ -105,7 +123,7 @@ pub fn translate_package(
             let entry = function_table.get(index).unwrap();
             let mapped_function = &entry.function;
 
-            if mapped_function.function_definition.visibility == Visibility::Public {
+            if mapped_function.is_entry {
                 public_functions.push(PublicFunction::new(
                     *function_id,
                     &mapped_function.name,

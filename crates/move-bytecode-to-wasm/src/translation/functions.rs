@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use move_binary_format::file_format::{
-    DatatypeHandleIndex, FunctionDefinition, Signature, SignatureToken,
+    DatatypeHandleIndex, FunctionDefinition, Signature, SignatureToken, Visibility,
 };
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
@@ -15,10 +15,12 @@ use super::intermediate_types::IntermediateType;
 pub struct MappedFunction {
     pub name: String,
     pub signature: ISignature,
-    pub function_definition: FunctionDefinition,
     pub function_locals: Vec<LocalId>,
     pub function_locals_ir: Vec<IntermediateType>,
     pub arg_locals: Vec<LocalId>,
+
+    /// Flag that tells us if the function can be used as an entrypoint
+    pub is_entry: bool,
 }
 
 impl MappedFunction {
@@ -28,15 +30,10 @@ impl MappedFunction {
         move_args: &Signature,
         move_rets: &Signature,
         move_locals: &[SignatureToken],
-        move_def: FunctionDefinition,
+        function_definition: &FunctionDefinition,
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         module: &mut Module,
     ) -> Self {
-        assert!(
-            move_def.acquires_global_resources.is_empty(),
-            "Acquiring global resources is not supported yet"
-        );
-
         let signature = ISignature::from_signatures(move_args, move_rets, handles_map);
         let wasm_arg_types = signature.get_argument_wasm_types();
         let wasm_ret_types = signature.get_return_wasm_types();
@@ -86,10 +83,11 @@ impl MappedFunction {
         Self {
             name,
             signature,
-            function_definition: move_def,
             function_locals: local_variables,
             function_locals_ir: local_variables_type,
             arg_locals: wasm_arg_locals,
+            // TODO: change to function_definition.is_entry
+            is_entry: function_definition.visibility == Visibility::Public,
         }
     }
 
