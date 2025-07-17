@@ -453,6 +453,7 @@ impl ModuleData {
             .zip(move_module.function_handles.iter())
         {
             let move_function_arguments = &move_module.signature_at(function_handle.parameters);
+            println!("===> {function_handle:?}");
 
             functions_arguments.push(
                 move_function_arguments

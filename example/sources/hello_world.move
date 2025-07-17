@@ -7,6 +7,7 @@ use hello_world::another_mod::AnotherTest;
 //  TODO: Add support for native functions
 //  native public fun emit_log(ptr: u32, len: u32, topic: u32);
 
+/*
 public fun cast_u8(x: u16): u8 {
     x as u8
 }
@@ -39,11 +40,14 @@ public fun sum32(x: u32, y: u32): u32 {
 public fun sum64(x: u64, y: u64): u64 {
     x + y
 }
+*/
 
-public fun test(ctx: &TxContext): u8 {
-    42
+public fun test(ctx: &TxContext): address {
+    ctx.sender()
+    // ctx.sender
 }
 
+/*
 public fun test2(ctx: &Test): u8 {
     42
 }
@@ -51,3 +55,4 @@ public fun test2(ctx: &Test): u8 {
 public fun test3(ctx: &AnotherTest): u8 {
     42
 }
+*/

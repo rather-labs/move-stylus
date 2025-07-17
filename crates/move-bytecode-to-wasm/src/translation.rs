@@ -14,6 +14,7 @@ use walrus::{FunctionBuilder, Module};
 use walrus::{FunctionId, InstrSeqBuilder, ValType, ir::MemArg};
 
 use crate::CompilationContext;
+use crate::compilation_context::ModuleId;
 use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
