@@ -8,7 +8,10 @@ use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
     source_package::parsed_manifest::PackageName,
 };
-use translation::{table::FunctionTable, translate_function};
+use translation::{
+    table::{FunctionId, FunctionTable},
+    translate_function,
+};
 use walrus::{Module, RefType, ValType};
 use wasm_validation::validate_stylus_wasm;
 
@@ -26,6 +29,9 @@ mod wasm_validation;
 
 #[cfg(test)]
 mod test_tools;
+
+pub type GlobalFunctionTable<'move_package> =
+    HashMap<FunctionId, &'move_package FunctionDefinition>;
 
 pub fn translate_single_module(package: CompiledPackage, module_name: &str) -> Module {
     let mut modules = translate_package(package, Some(module_name.to_string()));
@@ -59,7 +65,7 @@ pub fn translate_package(
 
     // Contains all a reference for all functions definitions in case we need to process them and
     // statically link them
-    let mut function_definitions: HashMap<ModuleId, &FunctionDefinition> = HashMap::new();
+    let mut function_definitions: GlobalFunctionTable = HashMap::new();
 
     // TODO: a lot of cloenes, we must create a symbol pool
     for root_compiled_module in &root_compiled_units {
@@ -206,7 +212,7 @@ pub fn process_dependency_tree<'move_package>(
     dependencies_data: &mut HashMap<ModuleId, ModuleData>,
     deps_compiled_units: &'move_package [(PackageName, CompiledUnitWithSource)],
     dependencies: &[move_core_types::language_storage::ModuleId],
-    function_definitions: &mut HashMap<ModuleId, &'move_package FunctionDefinition>,
+    function_definitions: &mut GlobalFunctionTable<'move_package>,
 ) {
     for dependency in dependencies {
         let module_id = ModuleId {

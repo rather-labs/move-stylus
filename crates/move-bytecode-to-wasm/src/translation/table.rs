@@ -1,14 +1,25 @@
 use anyhow::Result;
 use move_binary_format::file_format::FunctionHandleIndex;
-use walrus::{ConstExpr, ElementKind, FunctionId, Module, TableId, TypeId, ValType, ir::Value};
+use walrus::{
+    ConstExpr, ElementKind, FunctionId as WasmFunctionId, Module, TableId, TypeId, ValType,
+    ir::Value,
+};
 
 use crate::compilation_context::ModuleId;
 
 use super::functions::MappedFunction;
 
+/// Identifies a function inside a module
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+pub struct FunctionId {
+    pub identifier: String,
+
+    pub module_id: ModuleId,
+}
+
 pub struct TableEntry {
     pub index: i32,
-    pub module_id: ModuleId,
+    pub function_id: FunctionId,
     pub function: MappedFunction,
     pub function_handle_index: FunctionHandleIndex,
     pub type_id: TypeId,
@@ -39,7 +50,7 @@ impl FunctionTable {
     pub fn add(
         &mut self,
         module: &mut Module,
-        module_id: ModuleId,
+        function_id: FunctionId,
         function: MappedFunction,
         function_handle_index: FunctionHandleIndex,
     ) {
@@ -55,7 +66,7 @@ impl FunctionTable {
         let index = self.entries.len() as i32;
         self.entries.push(TableEntry {
             index,
-            module_id,
+            function_id,
             function,
             type_id,
             params,
@@ -72,7 +83,7 @@ impl FunctionTable {
         &mut self,
         module: &mut Module,
         index: usize,
-        function_id: FunctionId,
+        function_id: WasmFunctionId,
     ) -> anyhow::Result<()> {
         let entry = self
             .entries

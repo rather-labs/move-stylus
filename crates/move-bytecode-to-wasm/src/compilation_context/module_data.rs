@@ -1,11 +1,14 @@
-use crate::translation::{
-    functions::{DependencyMappedFunction, MappedFunction},
-    intermediate_types::{
-        IntermediateType,
-        enums::{IEnum, IEnumVariant},
-        structs::IStruct,
+use crate::{
+    GlobalFunctionTable,
+    translation::{
+        functions::{DependencyMappedFunction, MappedFunction},
+        intermediate_types::{
+            IntermediateType,
+            enums::{IEnum, IEnumVariant},
+            structs::IStruct,
+        },
+        table::{FunctionId, FunctionTable},
     },
-    table::FunctionTable,
 };
 use move_binary_format::{
     CompiledModule,
@@ -132,12 +135,12 @@ impl Display for ModuleId {
 }
 
 impl ModuleData {
-    pub fn build_module_data<'move_module>(
+    pub fn build_module_data<'move_package>(
         module_id: ModuleId,
-        move_module: &'move_module CompiledModule,
+        move_module: &'move_package CompiledModule,
         wasm_module: &mut walrus::Module,
         function_table: &mut FunctionTable,
-        functions_definitions: &mut HashMap<ModuleId, &'move_module FunctionDefinition>,
+        function_definitions: &mut GlobalFunctionTable<'move_package>,
     ) -> Self {
         let datatype_handles_map = Self::process_datatype_handles(move_module);
 
@@ -161,7 +164,7 @@ impl ModuleData {
             wasm_module,
             function_table,
             &datatype_handles_map,
-            functions_definitions,
+            function_definitions,
         );
 
         ModuleData {
@@ -180,10 +183,10 @@ impl ModuleData {
         }
     }
 
-    pub fn build_dependency_module_data<'move_module>(
+    pub fn build_dependency_module_data<'move_package>(
         module_id: ModuleId,
-        move_module: &'move_module CompiledModule,
-        functions_definitions: &mut HashMap<ModuleId, &'move_module FunctionDefinition>,
+        move_module: &'move_package CompiledModule,
+        function_definitions: &mut GlobalFunctionTable<'move_package>,
     ) -> Self {
         let datatype_handles_map = Self::process_datatype_handles(move_module);
 
@@ -206,7 +209,7 @@ impl ModuleData {
                 module_id,
                 move_module,
                 &datatype_handles_map,
-                functions_definitions,
+                function_definitions,
             );
 
         ModuleData {
@@ -478,13 +481,13 @@ impl ModuleData {
         (module_enums, variants_to_enum_map)
     }
 
-    fn process_function_definitions<'move_module>(
+    fn process_function_definitions<'move_package>(
         module_id: ModuleId,
-        move_module: &'move_module CompiledModule,
+        move_module: &'move_package CompiledModule,
         wasm_module: &mut walrus::Module,
         function_table: &mut FunctionTable,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-        functions_definitions: &mut HashMap<ModuleId, &'move_module FunctionDefinition>,
+        function_definitions: &mut GlobalFunctionTable<'move_package>,
     ) -> (Vec<Vec<IntermediateType>>, Vec<Vec<IntermediateType>>) {
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
@@ -535,7 +538,7 @@ impl ModuleData {
             let function_handle_index = function_def.function;
 
             let mapped_function = MappedFunction::new(
-                function_name,
+                function_name.clone(),
                 move_function_arguments,
                 move_function_return,
                 code_locals,
@@ -544,24 +547,29 @@ impl ModuleData {
                 wasm_module,
             );
 
+            let function_id = FunctionId {
+                identifier: function_name,
+                module_id: module_id.clone(),
+            };
+
             function_table.add(
                 wasm_module,
-                module_id.clone(),
+                function_id.clone(),
                 mapped_function,
                 function_handle_index,
             );
 
-            functions_definitions.insert(module_id.clone(), function_def);
+            function_definitions.insert(function_id, function_def);
         }
 
         (functions_arguments, functions_returns)
     }
 
-    fn process_dependency_function_definitions<'move_module>(
+    fn process_dependency_function_definitions<'move_package>(
         module_id: ModuleId,
-        move_module: &'move_module CompiledModule,
+        move_module: &'move_package CompiledModule,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-        functions_definitions: &mut HashMap<ModuleId, &'move_module FunctionDefinition>,
+        function_definitions: &mut GlobalFunctionTable<'move_package>,
     ) -> (Vec<Vec<IntermediateType>>, Vec<Vec<IntermediateType>>) {
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
@@ -610,6 +618,11 @@ impl ModuleData {
 
             let function_handle_index = function_def.function;
 
+            let function_id = FunctionId {
+                identifier: function_name.clone(),
+                module_id: module_id.clone(),
+            };
+
             let mapped_function = DependencyMappedFunction::new(
                 function_name,
                 move_function_arguments,
@@ -618,7 +631,7 @@ impl ModuleData {
                 datatype_handles_map,
             );
 
-            functions_definitions.insert(module_id.clone(), function_def);
+            function_definitions.insert(function_id, function_def);
         }
 
         (functions_arguments, functions_returns)
