@@ -61,6 +61,19 @@ pub enum TranslationError {
         type_parameter_index: u16,
     },
 
+    #[error("found reference inside enum with index {enum_index}")]
+    FoundReferenceInsideEnum { enum_index: u16 },
+
+    #[error(
+        "trying to pack an enum variant using the generic enum definition with index {enum_index}"
+    )]
+    PackingGenericEnumVariant { enum_index: u16 },
+
+    #[error(
+        "found type parameter inside enum variant with index {variant_index} and enum index {enum_index}"
+    )]
+    FoundTypeParameterInsideEnumVariant { enum_index: u16, variant_index: u16 },
+
     // TODO: identify concrete errors and add its corresponding enum variant
     #[error("unknown error: {0}")]
     Unknown(#[from] anyhow::Error),

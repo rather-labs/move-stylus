@@ -109,16 +109,8 @@ pub fn inject_host_debug_functions(module: &mut Module) {
 macro_rules! test_compilation_context {
     ($memory_id: ident, $allocator: ident) => {
         $crate::CompilationContext {
-            constants: &[],
-            functions_arguments: &[],
-            functions_returns: &[],
-            module_signatures: &[],
-            module_structs: &[],
-            module_generic_structs_instances: &[],
-            datatype_handles_map: &std::collections::HashMap::new(),
-            fields_to_struct_map: &std::collections::HashMap::new(),
-            generic_fields_to_struct_map: &std::collections::HashMap::new(),
-            instantiated_fields_to_generic_fields: &std::collections::HashMap::new(),
+            root_module_data: $crate::ModuleData::default(),
+            deps_data: std::collections::HashMap::new(),
             memory_id: $memory_id,
             allocator: $allocator,
         }

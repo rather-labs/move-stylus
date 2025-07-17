@@ -2,7 +2,10 @@ use alloy_primitives::keccak256;
 use alloy_sol_types::{SolType, sol_data};
 
 use crate::{
-    CompilationContext, translation::intermediate_types::IntermediateType, utils::snake_to_camel,
+    CompilationContext,
+    compilation_context::ExternalModuleData,
+    translation::intermediate_types::{IntermediateType, structs::IStruct},
+    utils::snake_to_camel,
 };
 
 pub type AbiFunctionSelector = [u8; 4];
@@ -51,7 +54,10 @@ impl SolName for IntermediateType {
     fn sol_name(&self, compilation_ctx: &CompilationContext) -> Option<String> {
         match self {
             IntermediateType::IBool => Some(sol_data::Bool::SOL_NAME.to_string()),
-            IntermediateType::IU8 => Some(sol_data::Uint::<8>::SOL_NAME.to_string()),
+            // According to the official documentation, enum types are encoded as uint8
+            IntermediateType::IU8 | IntermediateType::IEnum(_) => {
+                Some(sol_data::Uint::<8>::SOL_NAME.to_string())
+            }
             IntermediateType::IU16 => Some(sol_data::Uint::<16>::SOL_NAME.to_string()),
             IntermediateType::IU32 => Some(sol_data::Uint::<32>::SOL_NAME.to_string()),
             IntermediateType::IU64 => Some(sol_data::Uint::<64>::SOL_NAME.to_string()),
@@ -66,30 +72,47 @@ impl SolName for IntermediateType {
                 .map(|sol_n| format!("{sol_n}[]")),
             IntermediateType::IStruct(index) => {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
-
-                struct_
-                    .fields
-                    .iter()
-                    .map(|field| field.sol_name(compilation_ctx))
-                    .collect::<Option<Vec<String>>>()
-                    .map(|fields| fields.join(","))
-                    .map(|fields| format!("({fields})"))
+                Self::struct_fields_sol_name(struct_, compilation_ctx)
             }
             IntermediateType::IGenericStructInstance(index, types) => {
                 let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
                 let struct_instance = struct_.instantiate(types);
 
-                struct_instance
-                    .fields
-                    .iter()
-                    .map(|field| field.sol_name(compilation_ctx))
-                    .collect::<Option<Vec<String>>>()
-                    .map(|fields| fields.join(","))
-                    .map(|fields| format!("({fields})"))
+                Self::struct_fields_sol_name(&struct_instance, compilation_ctx)
             }
             IntermediateType::ISigner => None,
             IntermediateType::ITypeParameter(_) => None,
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } => {
+                let external_data = compilation_ctx
+                    .get_external_module_data(module_id, identifier)
+                    .unwrap();
+                match external_data {
+                    ExternalModuleData::Struct(istruct) => {
+                        Self::struct_fields_sol_name(istruct, compilation_ctx)
+                    }
+                    ExternalModuleData::Enum(_ienum) => todo!(),
+                }
+            }
         }
+    }
+}
+
+impl IntermediateType {
+    #[inline]
+    fn struct_fields_sol_name(
+        struct_: &IStruct,
+        compilation_ctx: &CompilationContext,
+    ) -> Option<String> {
+        struct_
+            .fields
+            .iter()
+            .map(|field| field.sol_name(compilation_ctx))
+            .collect::<Option<Vec<String>>>()
+            .map(|fields| fields.join(","))
+            .map(|fields| format!("({fields})"))
     }
 }
 
@@ -156,6 +179,7 @@ mod tests {
 
         let struct_1 = IStruct::new(
             StructDefinitionIndex::new(0),
+            "TestStruct".to_string(),
             vec![
                 (None, IntermediateType::IAddress),
                 (
@@ -179,6 +203,7 @@ mod tests {
         );
         let struct_2 = IStruct::new(
             StructDefinitionIndex::new(1),
+            "TestStruct2".to_string(),
             vec![
                 (None, IntermediateType::IU32),
                 (None, IntermediateType::IU128),
@@ -186,7 +211,7 @@ mod tests {
             HashMap::new(),
         );
         let module_structs = vec![struct_1, struct_2];
-        compilation_ctx.module_structs = &module_structs;
+        compilation_ctx.root_module_data.module_structs = module_structs;
 
         let signature: &[IntermediateType] = &[
             IntermediateType::IStruct(0),

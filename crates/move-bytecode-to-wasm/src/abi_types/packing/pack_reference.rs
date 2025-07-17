@@ -77,6 +77,8 @@ impl IRef {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
             }
+            IntermediateType::IEnum(_) => todo!(),
+            IntermediateType::IExternalUserData { .. } => todo!(),
         }
     }
 }
@@ -145,12 +147,14 @@ impl IMutRef {
                     compilation_ctx,
                 );
             }
+            IntermediateType::IEnum(_) => todo!(),
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
             }
+            IntermediateType::IExternalUserData { .. } => todo!(),
         }
     }
 }

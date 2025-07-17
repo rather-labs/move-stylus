@@ -27,6 +27,6 @@ pub fn get_inner_type_from_signature(
 
     Ok(IntermediateType::try_from_signature_token(
         signature,
-        compilation_ctx.datatype_handles_map,
+        &compilation_ctx.root_module_data.datatype_handles_map,
     )?)
 }

@@ -342,12 +342,12 @@ fn translate_instruction(
     match instruction {
         // Load a fixed constant
         Bytecode::LdConst(global_index) => {
-            let constant = &compilation_ctx.constants[global_index.0 as usize];
+            let constant = &compilation_ctx.root_module_data.constants[global_index.0 as usize];
             let mut data = constant.data.clone().into_iter();
             let constant_type = &constant.type_;
             let constant_type: IntermediateType = IntermediateType::try_from_signature_token(
                 constant_type,
-                compilation_ctx.datatype_handles_map,
+                &compilation_ctx.root_module_data.datatype_handles_map,
             )?;
 
             constant_type.load_constant_instructions(module, builder, &mut data, compilation_ctx);
@@ -405,7 +405,8 @@ fn translate_instruction(
         // Function calls
         Bytecode::Call(function_handle_index) => {
             // Consume from the types stack the arguments that will be used by the function call
-            let arguments = &compilation_ctx.functions_arguments[function_handle_index.0 as usize];
+            let arguments = &compilation_ctx.root_module_data.functions_arguments
+                [function_handle_index.0 as usize];
             for argument in arguments.iter().rev() {
                 types_stack.pop_expecting(argument)?;
 
@@ -432,11 +433,13 @@ fn translate_instruction(
             add_unpack_function_return_values_instructions(
                 builder,
                 module,
-                &compilation_ctx.functions_returns[function_handle_index.0 as usize],
+                &compilation_ctx.root_module_data.functions_returns
+                    [function_handle_index.0 as usize],
                 compilation_ctx.memory_id,
             );
             // Insert in the stack types the types returned by the function (if any)
-            let return_types = &compilation_ctx.functions_returns[function_handle_index.0 as usize];
+            let return_types = &compilation_ctx.root_module_data.functions_returns
+                [function_handle_index.0 as usize];
             types_stack.append(return_types);
         }
         // Locals
@@ -494,6 +497,7 @@ fn translate_instruction(
         }
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = compilation_ctx
+                .root_module_data
                 .instantiated_fields_to_generic_fields
                 .get(field_id)
                 .unwrap();
@@ -503,7 +507,7 @@ fn translate_instruction(
                 .map(|t| {
                     IntermediateType::try_from_signature_token(
                         t,
-                        compilation_ctx.datatype_handles_map,
+                        &compilation_ctx.root_module_data.datatype_handles_map,
                     )
                 })
                 .collect::<Result<Vec<_>, anyhow::Error>>()?;
@@ -550,6 +554,7 @@ fn translate_instruction(
         }
         Bytecode::MutBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = compilation_ctx
+                .root_module_data
                 .instantiated_fields_to_generic_fields
                 .get(field_id)
                 .unwrap();
@@ -559,7 +564,7 @@ fn translate_instruction(
                 .map(|t| {
                     IntermediateType::try_from_signature_token(
                         t,
-                        compilation_ctx.datatype_handles_map,
+                        &compilation_ctx.root_module_data.datatype_handles_map,
                     )
                 })
                 .collect::<Result<Vec<_>, anyhow::Error>>()?;
@@ -698,6 +703,7 @@ fn translate_instruction(
                 | IntermediateType::IU256
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
+                | IntermediateType::IExternalUserData { .. }
                 | IntermediateType::IStruct(_)
                 | IntermediateType::IGenericStructInstance(_, _)
                 | IntermediateType::IVector(_) => {
@@ -718,6 +724,7 @@ fn translate_instruction(
                         operand_type: *vec_inner,
                     });
                 }
+                IntermediateType::IEnum(_) => todo!(),
             }
 
             types_stack.push(*vec_inner);
@@ -1431,6 +1438,27 @@ fn translate_instruction(
         }
         Bytecode::BrTrue(_) | Bytecode::BrFalse(_) | Bytecode::Branch(_) => {}
         b => Err(TranslationError::UnsupportedOperation {
+
+        //**
+        // Enums
+        //**
+        Bytecode::PackVariant(index) => {
+            let enum_ = compilation_ctx.get_enum_by_variant_handle_idx(index)?;
+            let index_inside_enum =
+                compilation_ctx.get_variant_position_by_variant_handle_idx(index)?;
+
+            bytecodes::enums::pack_variant(
+                enum_,
+                index_inside_enum,
+                module,
+                builder,
+                compilation_ctx,
+                types_stack,
+            )?;
+
+            types_stack.push(IntermediateType::IEnum(enum_.index));
+        }
+        b => Err(TranslationError::UnssuportedOperation {
             operation: b.clone(),
         })?,
     }

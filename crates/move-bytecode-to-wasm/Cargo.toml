@@ -8,6 +8,7 @@ anyhow.workspace = true
 move-package.workspace = true
 move-binary-format.workspace = true
 move-abstract-interpreter.workspace = true
+move-core-types.workspace = true
 
 alloy-primitives = "1.0.0"
 alloy-sol-types = "1.0.0"
