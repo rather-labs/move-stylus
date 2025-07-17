@@ -11,12 +11,11 @@ use move_binary_format::{
     CompiledModule,
     file_format::{
         Constant, DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex,
-        FieldInstantiationIndex, Signature, SignatureToken, StructDefInstantiationIndex,
-        StructDefinitionIndex, VariantHandleIndex,
+        FieldInstantiationIndex, FunctionDefinition, Signature, SignatureToken,
+        StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
     },
 };
 use std::{collections::HashMap, fmt::Display};
-use walrus::RefType;
 
 #[derive(Debug)]
 pub enum UserDefinedType {
@@ -133,11 +132,12 @@ impl Display for ModuleId {
 }
 
 impl ModuleData {
-    pub fn build_module_data(
+    pub fn build_module_data<'move_module>(
         module_id: ModuleId,
-        move_module: &CompiledModule,
+        move_module: &'move_module CompiledModule,
         wasm_module: &mut walrus::Module,
         function_table: &mut FunctionTable,
+        functions_definitions: &mut HashMap<ModuleId, &'move_module FunctionDefinition>,
     ) -> Self {
         let datatype_handles_map = Self::process_datatype_handles(move_module);
 
@@ -161,6 +161,7 @@ impl ModuleData {
             wasm_module,
             function_table,
             &datatype_handles_map,
+            functions_definitions,
         );
 
         ModuleData {
@@ -179,7 +180,11 @@ impl ModuleData {
         }
     }
 
-    pub fn build_dependency_module_data(move_module: &CompiledModule) -> Self {
+    pub fn build_dependency_module_data<'move_module>(
+        module_id: ModuleId,
+        move_module: &'move_module CompiledModule,
+        functions_definitions: &mut HashMap<ModuleId, &'move_module FunctionDefinition>,
+    ) -> Self {
         let datatype_handles_map = Self::process_datatype_handles(move_module);
 
         let (module_generic_structs_instances, generic_fields_to_struct_map) =
@@ -197,7 +202,12 @@ impl ModuleData {
             Self::process_concrete_enums(move_module, &datatype_handles_map);
 
         let (functions_arguments, functions_returns) =
-            Self::process_dependency_function_definitions(move_module, &datatype_handles_map);
+            Self::process_dependency_function_definitions(
+                module_id,
+                move_module,
+                &datatype_handles_map,
+                functions_definitions,
+            );
 
         ModuleData {
             constants: move_module.constant_pool.clone(), // TODO: Clone
@@ -468,12 +478,13 @@ impl ModuleData {
         (module_enums, variants_to_enum_map)
     }
 
-    fn process_function_definitions(
+    fn process_function_definitions<'move_module>(
         module_id: ModuleId,
-        move_module: &CompiledModule,
+        move_module: &'move_module CompiledModule,
         wasm_module: &mut walrus::Module,
         function_table: &mut FunctionTable,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+        functions_definitions: &mut HashMap<ModuleId, &'move_module FunctionDefinition>,
     ) -> (Vec<Vec<IntermediateType>>, Vec<Vec<IntermediateType>>) {
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
@@ -539,14 +550,18 @@ impl ModuleData {
                 mapped_function,
                 function_handle_index,
             );
+
+            functions_definitions.insert(module_id.clone(), function_def);
         }
 
         (functions_arguments, functions_returns)
     }
 
-    fn process_dependency_function_definitions(
-        move_module: &CompiledModule,
+    fn process_dependency_function_definitions<'move_module>(
+        module_id: ModuleId,
+        move_module: &'move_module CompiledModule,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+        functions_definitions: &mut HashMap<ModuleId, &'move_module FunctionDefinition>,
     ) -> (Vec<Vec<IntermediateType>>, Vec<Vec<IntermediateType>>) {
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
@@ -602,6 +617,8 @@ impl ModuleData {
                 code_locals,
                 datatype_handles_map,
             );
+
+            functions_definitions.insert(module_id.clone(), function_def);
         }
 
         (functions_arguments, functions_returns)

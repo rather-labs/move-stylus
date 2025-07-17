@@ -62,10 +62,10 @@ pub fn translate_package(
     let mut function_definitions: HashMap<ModuleId, &FunctionDefinition> = HashMap::new();
 
     // TODO: a lot of cloenes, we must create a symbol pool
-    for root_compiled_module in root_compiled_units {
+    for root_compiled_module in &root_compiled_units {
         let module_name = root_compiled_module.unit.name.to_string();
         println!("compiling module {module_name}...");
-        let root_compiled_module = root_compiled_module.unit.module;
+        let root_compiled_module = &root_compiled_module.unit.module;
 
         let root_module_id = ModuleId {
             address: root_compiled_module.address().into_bytes().into(),
@@ -84,13 +84,15 @@ pub fn translate_package(
             &mut modules_data,
             &package.deps_compiled_units,
             &root_compiled_module.immediate_dependencies(),
+            &mut function_definitions,
         );
 
         let root_module_data = ModuleData::build_module_data(
             root_module_id.clone(),
-            &root_compiled_module,
+            root_compiled_module,
             &mut module,
             &mut function_table,
+            &mut function_definitions,
         );
 
         modules_data.insert(root_module_id.clone(), root_module_data);
@@ -200,10 +202,11 @@ macro_rules! declare_host_debug_functions {
 /// This functions process the dependency tree for the root module.
 ///
 /// It builds `ModuleData` for every module in the dependency tree and saves it in a HashMap.
-pub fn process_dependency_tree(
+pub fn process_dependency_tree<'move_package>(
     dependencies_data: &mut HashMap<ModuleId, ModuleData>,
-    deps_compiled_units: &[(PackageName, CompiledUnitWithSource)],
+    deps_compiled_units: &'move_package [(PackageName, CompiledUnitWithSource)],
     dependencies: &[move_core_types::language_storage::ModuleId],
+    function_definitions: &mut HashMap<ModuleId, &'move_package FunctionDefinition>,
 ) {
     for dependency in dependencies {
         let module_id = ModuleId {
@@ -237,10 +240,15 @@ pub fn process_dependency_tree(
                 dependencies_data,
                 deps_compiled_units,
                 &dependency_module.immediate_dependencies(),
+                function_definitions,
             );
         }
 
-        let dependency_module_data = ModuleData::build_dependency_module_data(dependency_module);
+        let dependency_module_data = ModuleData::build_dependency_module_data(
+            module_id.clone(),
+            dependency_module,
+            function_definitions,
+        );
 
         let processed_dependency = dependencies_data.insert(module_id, dependency_module_data);
 
