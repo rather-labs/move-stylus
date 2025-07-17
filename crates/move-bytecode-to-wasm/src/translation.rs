@@ -105,7 +105,6 @@ fn translate_flow(
         } => {
             for instruction in instructions {
                 match instruction {
-                    // WATCH OUT, BRFALSE CAN ALSO BE USED AS A LOOP CONTINUE
                     Bytecode::Branch(code_offset)
                     | Bytecode::BrFalse(code_offset)
                     | Bytecode::BrTrue(code_offset) => {
@@ -120,14 +119,14 @@ fn translate_flow(
                             if let Some(loop_id) = loop_id {
                                 if let Some(target_block_id) = loop_targets.get(loop_id) {
                                     match instruction {
-                                        Bytecode::Branch(code_offset) => {
+                                        Bytecode::Branch(_) => {
                                             builder.br(*target_block_id);
                                         }
-                                        Bytecode::BrFalse(code_offset) => {
+                                        Bytecode::BrFalse(_) => {
                                             builder.unop(UnaryOp::I32Eqz);
                                             builder.br_if(*target_block_id);
                                         }
-                                        Bytecode::BrFalse(code_offset) => {
+                                        Bytecode::BrTrue(_) => {
                                             builder.br_if(*target_block_id);
                                         }
                                         _ => {}
@@ -148,7 +147,6 @@ fn translate_flow(
                             module,
                             function_table,
                             types_stack,
-                            loop_targets,
                         )
                         .unwrap();
                     }
@@ -335,7 +333,6 @@ fn translate_instruction(
     module: &mut Module,
     function_table: &FunctionTable,
     types_stack: &mut TypesStack,
-    loop_targets: &HashMap<u16, InstrSeqId>,
 ) -> Result<(), TranslationError> {
     match instruction {
         // Load a fixed constant
