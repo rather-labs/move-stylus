@@ -2,13 +2,14 @@ use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
-use compilation_context::{ModuleData, ModuleId};
+use compilation_context::{ModuleData, ModuleId, module_data::Address};
+use move_binary_format::file_format::FunctionDefinition;
 use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
     source_package::parsed_manifest::PackageName,
 };
-use translation::translate_function;
-use walrus::{Module, ValType};
+use translation::{table::FunctionTable, translate_function};
+use walrus::{Module, RefType, ValType};
 use wasm_validation::validate_stylus_wasm;
 
 pub(crate) mod abi_types;
@@ -56,31 +57,42 @@ pub fn translate_package(
     // Contains the module data for all the root package and its dependencies
     let mut modules_data: HashMap<ModuleId, ModuleData> = HashMap::new();
 
+    // Contains all a reference for all functions definitions in case we need to process them and
+    // statically link them
+    let mut function_definitions: HashMap<ModuleId, &FunctionDefinition> = HashMap::new();
+
     // TODO: a lot of cloenes, we must create a symbol pool
     for root_compiled_module in root_compiled_units {
         let module_name = root_compiled_module.unit.name.to_string();
+        println!("compiling module {module_name}...");
         let root_compiled_module = root_compiled_module.unit.module;
 
-        println!("compiling module {module_name}...");
+        let root_module_id = ModuleId {
+            address: root_compiled_module.address().into_bytes().into(),
+            module_name: module_name.clone(),
+        };
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
         inject_debug_fns(&mut module);
+
+        // Function table
+        let function_table_id = module.tables.add_local(false, 0, None, RefType::Funcref);
+        let mut function_table = FunctionTable::new(function_table_id);
 
         // Process the dependency tree
         process_dependency_tree(
             &mut modules_data,
             &package.deps_compiled_units,
             &root_compiled_module.immediate_dependencies(),
-            &mut module,
         );
 
-        let (root_module_data, mut function_table) =
-            ModuleData::build_module_data(&root_compiled_module, &mut module);
+        let root_module_data = ModuleData::build_module_data(
+            root_module_id.clone(),
+            &root_compiled_module,
+            &mut module,
+            &mut function_table,
+        );
 
-        let root_module_id = ModuleId {
-            address: root_compiled_module.address().into_bytes().into(),
-            module_name: module_name.clone(),
-        };
         modules_data.insert(root_module_id.clone(), root_module_data);
 
         let compilation_ctx = CompilationContext {
@@ -192,7 +204,6 @@ pub fn process_dependency_tree(
     dependencies_data: &mut HashMap<ModuleId, ModuleData>,
     deps_compiled_units: &[(PackageName, CompiledUnitWithSource)],
     dependencies: &[move_core_types::language_storage::ModuleId],
-    module: &mut Module,
 ) {
     for dependency in dependencies {
         let module_id = ModuleId {
@@ -226,12 +237,10 @@ pub fn process_dependency_tree(
                 dependencies_data,
                 deps_compiled_units,
                 &dependency_module.immediate_dependencies(),
-                module,
             );
         }
 
-        let (dependency_module_data, _dependency_fn_table) =
-            ModuleData::build_module_data(dependency_module, module);
+        let dependency_module_data = ModuleData::build_dependency_module_data(dependency_module);
 
         let processed_dependency = dependencies_data.insert(module_id, dependency_module_data);
 

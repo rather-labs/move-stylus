@@ -134,6 +134,7 @@ impl Display for ModuleId {
 
 impl ModuleData {
     pub fn build_module_data(
+        module_id: ModuleId,
         move_module: &CompiledModule,
         wasm_module: &mut walrus::Module,
         function_table: &mut FunctionTable,
@@ -155,6 +156,7 @@ impl ModuleData {
             Self::process_concrete_enums(move_module, &datatype_handles_map);
 
         let (functions_arguments, functions_returns) = Self::process_function_definitions(
+            module_id,
             move_module,
             wasm_module,
             function_table,
@@ -467,6 +469,7 @@ impl ModuleData {
     }
 
     fn process_function_definitions(
+        module_id: ModuleId,
         move_module: &CompiledModule,
         wasm_module: &mut walrus::Module,
         function_table: &mut FunctionTable,
@@ -530,7 +533,12 @@ impl ModuleData {
                 wasm_module,
             );
 
-            function_table.add(wasm_module, mapped_function, function_handle_index);
+            function_table.add(
+                wasm_module,
+                module_id.clone(),
+                mapped_function,
+                function_handle_index,
+            );
         }
 
         (functions_arguments, functions_returns)
