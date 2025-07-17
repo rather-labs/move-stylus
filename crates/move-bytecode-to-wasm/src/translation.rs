@@ -7,6 +7,7 @@ use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, CodeUnit};
+use move_binary_format::internals::ModuleIndex;
 use table::FunctionTable;
 use types_stack::TypesStack;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
@@ -27,6 +28,11 @@ pub mod table;
 pub(crate) mod types_stack;
 pub use error::TranslationError;
 
+/// Translates a move function to WASM
+///
+/// The return values are:
+/// 1. The translated WASM FunctionId
+/// 2. A list of function ids from other modules to be translated and linked.
 pub fn translate_function(
     module: &mut Module,
     index: usize,
@@ -84,6 +90,8 @@ fn map_bytecode_instruction(
     function_table: &FunctionTable,
     types_stack: &mut TypesStack,
 ) -> Result<(), TranslationError> {
+    // let mut fns_to_link = Vec::new();
+
     match instruction {
         // Load a fixed constant
         Bytecode::LdConst(global_index) => {
@@ -151,7 +159,7 @@ fn map_bytecode_instruction(
         Bytecode::Call(function_handle_index) => {
             // Consume from the types stack the arguments that will be used by the function call
             let arguments = &compilation_ctx.root_module_data.functions_arguments
-                [function_handle_index.0 as usize];
+                [function_handle_index.into_index()];
             for argument in arguments.iter().rev() {
                 types_stack.pop_expecting(argument)?;
 
@@ -167,13 +175,22 @@ fn map_bytecode_instruction(
                 }
             }
 
-            let f = function_table
-                .get_by_function_handle_index(function_handle_index)
-                .expect("function with index {function_handle_index:?} not found un table");
-
-            builder
-                .i32_const(f.index)
-                .call_indirect(f.type_id, function_table.get_table_id());
+            if let Some(f) = function_table.get_by_function_handle_index(function_handle_index) {
+                builder
+                    .i32_const(f.index)
+                    .call_indirect(f.type_id, function_table.get_table_id());
+            } else {
+                todo!()
+                /*
+                // TODO calculate index correctly. This function is not linked yet
+                let results = &compilation_ctx.root_module_data.functions_arguments
+                    [function_handle_index.into_index()];
+                let type_id = module.types.add(&arguments, &results);
+                builder
+                    .i32_const((function_table.len() + fns_to_link.len()) as i32)
+                    .call_indirect(type_id, function_table.get_table_id());
+                */
+            }
 
             add_unpack_function_return_values_instructions(
                 builder,
