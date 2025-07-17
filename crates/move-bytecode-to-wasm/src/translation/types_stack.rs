@@ -215,7 +215,7 @@ impl TypesStack {
             Bytecode::ImmBorrowField(field_id) => {
                 let struct_ = compilation_ctx
                     .get_struct_by_field_handle_idx(field_id)
-                    .map_err(|e| TypesStackError::Compilation(e))?;
+                    .map_err(TypesStackError::Compilation)?;
                 self.pop_expecting(&IntermediateType::IRef(Box::new(
                     IntermediateType::IStruct(struct_.index()),
                 )))?;
@@ -252,9 +252,9 @@ impl TypesStack {
                 {
                     struct_
                 } else {
-                    let generic_stuct =
-                        compilation_ctx.get_struct_by_field_handle_idx(struct_field_id)?;
-
+                    let generic_stuct = compilation_ctx
+                        .get_struct_by_field_handle_idx(struct_field_id)
+                        .map_err(TypesStackError::Compilation)?;
                     generic_stuct.instantiate(&instantiation_types)
                 };
 
@@ -275,7 +275,7 @@ impl TypesStack {
             Bytecode::MutBorrowField(field_id) => {
                 let struct_ = compilation_ctx
                     .get_struct_by_field_handle_idx(field_id)
-                    .map_err(|e| TypesStackError::Compilation(e))?;
+                    .map_err(TypesStackError::Compilation)?;
 
                 // Check if in the types stack we have the correct type
                 self.pop_expecting(&IntermediateType::IMutRef(Box::new(
