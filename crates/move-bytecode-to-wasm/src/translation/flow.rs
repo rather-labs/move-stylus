@@ -24,6 +24,7 @@ pub enum Flow {
         types_stack: TypesStack,
         then_body: Box<Flow>,
         else_body: Box<Flow>,
+        // br_if_target: Option<u16>,
     },
     Empty,
 }
@@ -127,11 +128,19 @@ impl Flow {
                     .map(|b| self.build(b, blocks_ctx))
                     .unwrap_or(Flow::Empty);
 
-                // revisit this part
-                if !immediate_blocks.is_empty() || !next_block.is_empty() {
-                    Flow::Sequence(vec![b, immediate_blocks, next_block])
+                // Revisit this part. We are flattening a nested structure into a sequence, is it always correct?
+                let mut seq = vec![b];
+                if !immediate_blocks.is_empty() {
+                    seq.push(immediate_blocks);
+                }
+                if !next_block.is_empty() {
+                    seq.push(next_block);
+                }
+
+                if seq.len() == 1 {
+                    seq.pop().unwrap()
                 } else {
-                    b
+                    Flow::Sequence(seq)
                 }
             }
             ShapedBlock::Loop(loop_block) => {
@@ -142,6 +151,8 @@ impl Flow {
                     loop_id: loop_block.loop_id,
                     body: Box::new(inner_block),
                 };
+
+                // Here too, we put the next block in the sequence if it exists
                 if let Some(next_block) = &loop_block.next {
                     let next_flow = self.build(next_block, blocks_ctx);
                     Flow::Sequence(vec![loop_flow, next_flow])
@@ -150,21 +161,46 @@ impl Flow {
                 }
             }
             ShapedBlock::Multiple(multiple_block) => {
-                if multiple_block.handled.len() > 2 {
-                    panic!("Found ShapedBlock::Multiple with more than 2 branches.");
-                }
-                let mut handled_blocks = multiple_block
-                    .handled
-                    .iter()
-                    .map(|b| self.build(&b.inner, blocks_ctx))
-                    .collect::<Vec<_>>();
+                // The relooper algorithm generates multiple blocks when a conditional jump is present.
+                // Based on observations, these multiple blocks typically have 1 or 2 handled blocks (branches).
+                // For instance, a Move function with a multi-branch match statement is transformed into nested multiple blocks.
+                // Alternatively, multiple blocks with a single branch can occur when there is no else condition --> while (true) { if (condition) { break } }
 
-                let else_ = handled_blocks.pop().unwrap_or(Flow::Empty);
-                let if_ = handled_blocks.pop().unwrap_or(Flow::Empty);
-                Flow::IfElse {
-                    types_stack: else_.get_types_stack(),
-                    then_body: Box::new(if_),
-                    else_body: Box::new(else_),
+                match multiple_block.handled.len() {
+                    // If there is a single branch, then instead of creating an if/else flow with an empty arm, we just build the flow from the only handled block.
+                    1 => self.build(&multiple_block.handled[0].inner, blocks_ctx),
+                    // If there are two branches, we create an if/else flow with the two handled blocks.
+                    2 => {
+                        let then_arm = self.build(&multiple_block.handled[0].inner, blocks_ctx);
+                        let else_arm = self.build(&multiple_block.handled[1].inner, blocks_ctx);
+
+                        let then_types = then_arm.get_types_stack();
+                        let else_types = else_arm.get_types_stack();
+
+                        let ty = if !then_types.is_empty()
+                            && !else_types.is_empty()
+                            && then_types != else_types
+                        {
+                            panic!(
+                                "Type stacks of if/else branches must be the same or one must be empty. If types: {:?}, Else types: {:?}",
+                                then_types, else_types
+                            );
+                        } else if !then_types.is_empty() {
+                            then_types
+                        } else {
+                            else_types // if both are empty, this returns an empty TypesStack
+                        };
+
+                        Flow::IfElse {
+                            types_stack: ty,
+                            then_body: Box::new(then_arm),
+                            else_body: Box::new(else_arm),
+                        }
+                    }
+                    _ => panic!(
+                        "Unsupported MultipleBlock with {} branches",
+                        multiple_block.handled.len()
+                    ),
                 }
             }
         }

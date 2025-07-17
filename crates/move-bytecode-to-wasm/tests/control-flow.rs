@@ -37,6 +37,11 @@ mod control_flow {
         #[allow(missing_docs)]
         function simpleLoop(uint8 x) external returns (uint8);
         function misc1(uint8 x) external returns (uint8);
+        function nestedLoop(uint8 x) external returns (uint8);
+        function loopWithBreak(uint8 x) external returns (uint8);
+        function earlyReturn(uint8 x) external returns (uint8);
+        function testMatch(uint8 x) external returns (uint8);
+        function crazyLoop(uint8 i) external returns (uint8);
     );
 
     #[rstest]
@@ -44,6 +49,18 @@ mod control_flow {
     #[case(simpleLoopCall::new((1u8,)), 1u8)]
     #[case(misc1Call::new((100u8,)), 55u8)]
     #[case(misc1Call::new((1u8,)), 42u8)]
+    #[case(nestedLoopCall::new((5u8,)), 20u8)]
+    #[case(loopWithBreakCall::new((5u8,)), 21u8)]
+    #[case(loopWithBreakCall::new((10u8,)), 66u8)]
+    #[case(earlyReturnCall::new((5u8,)), 6u8)]
+    #[case(earlyReturnCall::new((150u8,)), 255u8)]
+    #[case(testMatchCall::new((1u8,)), 44u8)]
+    #[case(testMatchCall::new((2u8,)), 55u8)]
+    #[case(testMatchCall::new((3u8,)), 66u8)]
+    #[case(testMatchCall::new((4u8,)), 0u8)]
+    #[case(crazyLoopCall::new((1u8,)), 65u8)]
+    #[case(crazyLoopCall::new((2u8,)), 63u8)]
+    #[case(crazyLoopCall::new((4u8,)), 56u8)]
     fn test_control_flow<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

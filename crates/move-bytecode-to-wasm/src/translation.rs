@@ -66,7 +66,7 @@ pub fn translate_function(
     println!("{flow:#?}");
 
     // Type stack for the current function.
-    // It is filled recursively, meaning parent nodes to inherit types left by child nodes on the stack.
+    // It is filled recursively, meaning parent nodes inherit types left by child nodes on the stack.
     let mut types_stack = TypesStack::new();
     // Loop targets maps the relooper-assigned loop id to the loop's instruction sequence id.
     let mut loop_targets: HashMap<u16, InstrSeqId> = HashMap::new();
@@ -105,7 +105,8 @@ fn translate_flow(
         } => {
             for instruction in instructions {
                 match instruction {
-                    Bytecode::Branch(code_offset) => {
+                    // WATCH OUT, BRFALSE CAN ALSO BE USED AS A LOOP CONTINUE
+                    Bytecode::Branch(code_offset) | Bytecode::BrFalse(code_offset) => {
                         if let Some(branch_mode) = branches.get(code_offset) {
                             // TODO: WTF are multi branch modes?
                             let loop_id = match branch_mode {
@@ -116,7 +117,16 @@ fn translate_flow(
 
                             if let Some(loop_id) = loop_id {
                                 if let Some(target_block_id) = loop_targets.get(loop_id) {
-                                    builder.br(*target_block_id);
+                                    match instruction {
+                                        Bytecode::Branch(code_offset) => {
+                                            builder.br(*target_block_id);
+                                        }
+                                        Bytecode::BrFalse(code_offset) => {
+                                            builder.unop(UnaryOp::I32Eqz); // i32.eqz
+                                            builder.br_if(*target_block_id);
+                                        }
+                                        _ => {}
+                                    }
                                 } else {
                                     panic!("Loop target not found for loop_id: {}", loop_id);
                                 }
@@ -162,6 +172,7 @@ fn translate_flow(
             let ty = InstrSeqType::new(&mut module.types, &[], &types_stack.to_val_types());
 
             // TODO: Consider enclosing the loop within a block to facilitate mapping LoopBreak branch modes for exiting the loop.
+            // builder.block(ty, |block| {
             builder.loop_(ty, |loop_| {
                 // loop_targets maps the relooper-assigned loop id to the loop's instruction sequence id.
                 loop_targets.insert(*loop_id, loop_.id());
@@ -177,6 +188,7 @@ fn translate_flow(
                     entry,
                 );
             });
+            // });
         }
         // TODO: currently we are wrapping the instructions within each [if, else] branch in a block, which is not desired but required by walrus.
         // If possible, it would be great to avoid this.
@@ -185,12 +197,15 @@ fn translate_flow(
             then_body,
             else_body,
         } => {
-            let result_types = flow.get_types_stack().to_val_types();
-            let ty = InstrSeqType::new(&mut module.types, &[], &result_types);
+            let then_types_stack = then_body.get_types_stack();
+            let else_types_stack = else_body.get_types_stack();
+            let then_val_types =
+                InstrSeqType::new(&mut module.types, &[], &then_types_stack.to_val_types());
+            let else_val_types =
+                InstrSeqType::new(&mut module.types, &[], &else_types_stack.to_val_types());
 
             let then_id = {
-                // The block wrapping the then body needs to have the same return type as the if else block
-                let mut then_seq = builder.dangling_instr_seq(ty);
+                let mut then_seq = builder.dangling_instr_seq(then_val_types);
                 translate_flow(
                     compilation_ctx,
                     &mut then_seq,
@@ -205,8 +220,7 @@ fn translate_flow(
             };
 
             let else_id = {
-                // The block wrapping the else body needs to have the same return type as the if else block
-                let mut else_seq = builder.dangling_instr_seq(ty);
+                let mut else_seq = builder.dangling_instr_seq(else_val_types);
                 translate_flow(
                     compilation_ctx,
                     &mut else_seq,
@@ -220,16 +234,39 @@ fn translate_flow(
                 else_seq.id()
             };
 
-            // Finally we create the if else block
-            builder.if_else(
-                ty,
-                |then| {
-                    then.instr(Block { seq: then_id });
-                },
-                |else_| {
-                    else_.instr(Block { seq: else_id });
-                },
-            );
+            if then_types_stack == else_types_stack {
+                builder.if_else(
+                    then_val_types,
+                    |then| {
+                        then.instr(Block { seq: then_id });
+                    },
+                    |else_| {
+                        else_.instr(Block { seq: else_id });
+                    },
+                );
+            } else if then_types_stack.is_empty() {
+                builder.if_else(
+                    None,
+                    |then| {
+                        then.instr(Block { seq: then_id });
+                    },
+                    |else_| {},
+                );
+                builder.instr(Block { seq: else_id });
+            } else if else_types_stack.is_empty() {
+                builder.if_else(
+                    None,
+                    |then| {},
+                    |else_| {
+                        else_.instr(Block { seq: else_id });
+                    },
+                );
+                builder.instr(Block { seq: then_id });
+            } else {
+                panic!(
+                    "Error: Mismatched types on the stack from Then and Else branches, and neither is empty."
+                );
+            }
         }
         Flow::Empty => (),
     }
