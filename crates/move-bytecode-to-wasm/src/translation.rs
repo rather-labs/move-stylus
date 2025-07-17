@@ -34,6 +34,12 @@ pub mod functions;
 pub mod intermediate_types;
 pub mod table;
 
+struct TranslateInstructionContext<'a> {
+    compilation_ctx: &'a CompilationContext,
+    function_table: &'a FunctionTable,
+    entry: &'a TableEntry,
+}
+
 pub fn translate_function(
     module: &mut Module,
     index: usize,
@@ -70,15 +76,19 @@ pub fn translate_function(
     // Loop targets maps the relooper-assigned loop id to the loop's instruction sequence id.
     let mut loop_targets: HashMap<u16, InstrSeqId> = HashMap::new();
 
-    translate_flow(
+    let ctx = TranslateInstructionContext {
         compilation_ctx,
+        function_table,
+        entry,
+    };
+
+    translate_flow(
+        &ctx,
         &mut builder,
         module,
-        function_table,
         &mut types_stack,
         &flow,
         &mut loop_targets,
-        entry,
     );
 
     let function_id = function.finish(entry.function.arg_locals.clone(), &mut module.funcs);
@@ -87,14 +97,12 @@ pub fn translate_function(
 
 // TODO: check we are setting result types correctly
 fn translate_flow(
-    compilation_ctx: &CompilationContext,
+    ctx: &TranslateInstructionContext,
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
-    function_table: &FunctionTable,
     types_stack: &mut TypesStack,
     flow: &Flow,
     loop_targets: &mut HashMap<u16, InstrSeqId>,
-    entry: &TableEntry,
 ) {
     match flow {
         Flow::Simple {
@@ -106,11 +114,11 @@ fn translate_flow(
                 translate_branching_instruction(instruction, branches, loop_targets, builder);
                 translate_instruction(
                     instruction,
-                    compilation_ctx,
+                    &ctx.compilation_ctx,
                     builder,
-                    &entry.function,
+                    &ctx.entry.function,
                     module,
-                    function_table,
+                    ctx.function_table,
                     types_stack,
                 )
                 .unwrap();
@@ -119,14 +127,12 @@ fn translate_flow(
         Flow::Sequence(flows) => {
             for f in flows {
                 translate_flow(
-                    compilation_ctx,
+                    &ctx,
                     builder,
                     module,
-                    function_table,
                     types_stack,
                     f,
                     loop_targets,
-                    entry,
                 );
             }
         }
@@ -142,14 +148,12 @@ fn translate_flow(
                 loop_targets.insert(*loop_id, loop_.id());
 
                 translate_flow(
-                    compilation_ctx,
+                    &ctx,
                     loop_,
                     module,
-                    function_table,
                     &mut types_stack.clone(),
                     &*body,
                     loop_targets,
-                    entry,
                 );
             });
         }
@@ -170,14 +174,12 @@ fn translate_flow(
                 let then_id = {
                     let mut then_seq = builder.dangling_instr_seq(ty);
                     translate_flow(
-                        compilation_ctx,
+                        &ctx,
                         &mut then_seq,
                         module,
-                        function_table,
                         &mut types_stack.clone(),
                         then_body,
                         loop_targets,
-                        entry,
                     );
                     then_seq.id()
                 };
@@ -185,14 +187,12 @@ fn translate_flow(
                 let else_id = {
                     let mut else_seq = builder.dangling_instr_seq(ty);
                     translate_flow(
-                        compilation_ctx,
+                        &ctx,
                         &mut else_seq,
                         module,
-                        function_table,
                         &mut types_stack.clone(),
                         else_body,
                         loop_targets,
-                        entry,
                     );
                     else_seq.id()
                 };
@@ -213,14 +213,12 @@ fn translate_flow(
                 let then_id = {
                     let mut then_seq = builder.dangling_instr_seq(None);
                     translate_flow(
-                        compilation_ctx,
+                        &ctx,
                         &mut then_seq,
                         module,
-                        function_table,
                         &mut types_stack.clone(),
                         then_body,
                         loop_targets,
-                        entry,
                     );
                     then_seq.id()
                 };
@@ -231,14 +229,12 @@ fn translate_flow(
                 });
 
                 translate_flow(
-                    compilation_ctx,
+                    &ctx,
                     builder,
                     module,
-                    function_table,
                     &mut types_stack.clone(),
                     else_body,
                     loop_targets,
-                    entry,
                 );
             } else if else_types_stack.is_empty() {
                 let phantom_seq = builder.dangling_instr_seq(None);
@@ -247,14 +243,12 @@ fn translate_flow(
                 let else_id = {
                     let mut else_seq = builder.dangling_instr_seq(None);
                     translate_flow(
-                        compilation_ctx,
+                        &ctx,
                         &mut else_seq,
                         module,
-                        function_table,
                         &mut types_stack.clone(),
                         else_body,
                         loop_targets,
-                        entry,
                     );
                     else_seq.id()
                 };
@@ -266,14 +260,12 @@ fn translate_flow(
                 });
 
                 translate_flow(
-                    compilation_ctx,
+                    &ctx,
                     builder,
                     module,
-                    function_table,
                     &mut types_stack.clone(),
                     then_body,
                     loop_targets,
-                    entry,
                 );
             } else {
                 panic!(
