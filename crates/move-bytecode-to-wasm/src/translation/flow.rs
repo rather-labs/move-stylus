@@ -9,7 +9,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub enum Flow {
     Simple {
-        label: u16,
+        // label: u16,
         types_stack: TypesStack,
         instructions: Vec<Bytecode>,
         branches: HashMap<u16, BranchMode>,
@@ -105,7 +105,7 @@ impl Flow {
                 let block_ctx = blocks_ctx.get(&simple_block.label).unwrap();
                 let b = Flow::Simple {
                     types_stack: block_ctx.1.clone(),
-                    label: simple_block.label,
+                    // label: simple_block.label,
                     instructions: block_ctx.0.clone(),
                     branches: simple_block
                         .branches

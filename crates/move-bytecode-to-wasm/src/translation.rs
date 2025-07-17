@@ -63,7 +63,6 @@ pub fn translate_function(
     let code_unit = &entry.get_move_code_unit().unwrap();
 
     let flow = Flow::new(code_unit, compilation_ctx, &entry.function);
-    println!("{flow:#?}");
 
     // Type stack for the current function.
     // It is filled recursively, meaning parent nodes inherit types left by child nodes on the stack.
@@ -104,53 +103,17 @@ fn translate_flow(
             ..
         } => {
             for instruction in instructions {
-                match instruction {
-                    Bytecode::Branch(code_offset)
-                    | Bytecode::BrFalse(code_offset)
-                    | Bytecode::BrTrue(code_offset) => {
-                        if let Some(branch_mode) = branches.get(code_offset) {
-                            // TODO: WTF are multi branch modes?
-                            let loop_id = match branch_mode {
-                                BranchMode::LoopContinue(id)
-                                | BranchMode::LoopContinueIntoMulti(id) => Some(id),
-                                _ => None,
-                            };
-
-                            if let Some(loop_id) = loop_id {
-                                if let Some(target_block_id) = loop_targets.get(loop_id) {
-                                    match instruction {
-                                        Bytecode::Branch(_) => {
-                                            builder.br(*target_block_id);
-                                        }
-                                        Bytecode::BrFalse(_) => {
-                                            builder.unop(UnaryOp::I32Eqz);
-                                            builder.br_if(*target_block_id);
-                                        }
-                                        Bytecode::BrTrue(_) => {
-                                            builder.br_if(*target_block_id);
-                                        }
-                                        _ => {}
-                                    }
-                                } else {
-                                    panic!("Loop target not found for loop_id: {}", loop_id);
-                                }
-                            }
-                        }
-                    }
-
-                    _ => {
-                        translate_instruction(
-                            instruction,
-                            compilation_ctx,
-                            builder,
-                            &entry.function,
-                            module,
-                            function_table,
-                            types_stack,
-                        )
-                        .unwrap();
-                    }
-                }
+                translate_branching_instruction(instruction, branches, loop_targets, builder);
+                translate_instruction(
+                    instruction,
+                    compilation_ctx,
+                    builder,
+                    &entry.function,
+                    module,
+                    function_table,
+                    types_stack,
+                )
+                .unwrap();
             }
         }
         Flow::Sequence(flows) => {
@@ -174,8 +137,6 @@ fn translate_flow(
         } => {
             let ty = InstrSeqType::new(&mut module.types, &[], &types_stack.to_val_types());
 
-            // TODO: Consider enclosing the loop within a block to facilitate mapping LoopBreak branch modes for exiting the loop.
-            // builder.block(ty, |block| {
             builder.loop_(ty, |loop_| {
                 // loop_targets maps the relooper-assigned loop id to the loop's instruction sequence id.
                 loop_targets.insert(*loop_id, loop_.id());
@@ -191,7 +152,6 @@ fn translate_flow(
                     entry,
                 );
             });
-            // });
         }
         // TODO: currently we are wrapping the instructions within each [if, else] branch in a block, which is not desired but required by walrus.
         // If possible, it would be great to avoid this.
@@ -322,6 +282,50 @@ fn translate_flow(
             }
         }
         Flow::Empty => (),
+    }
+}
+
+fn translate_branching_instruction(
+    instruction: &Bytecode,
+    branches: &HashMap<u16, BranchMode>,
+    loop_targets: &HashMap<u16, InstrSeqId>,
+    builder: &mut InstrSeqBuilder,
+) {
+    match instruction {
+        Bytecode::Branch(code_offset)
+        | Bytecode::BrFalse(code_offset)
+        | Bytecode::BrTrue(code_offset) => {
+            if let Some(branch_mode) = branches.get(code_offset) {
+                // TODO: WTF are multi branch modes?
+                let loop_id = match branch_mode {
+                    BranchMode::LoopContinue(id) | BranchMode::LoopContinueIntoMulti(id) => {
+                        Some(id)
+                    }
+                    _ => None,
+                };
+
+                if let Some(loop_id) = loop_id {
+                    if let Some(target_block_id) = loop_targets.get(loop_id) {
+                        match instruction {
+                            Bytecode::Branch(_) => {
+                                builder.br(*target_block_id);
+                            }
+                            Bytecode::BrFalse(_) => {
+                                builder.unop(UnaryOp::I32Eqz);
+                                builder.br_if(*target_block_id);
+                            }
+                            Bytecode::BrTrue(_) => {
+                                builder.br_if(*target_block_id);
+                            }
+                            _ => {}
+                        }
+                    } else {
+                        panic!("Loop target not found for loop_id: {}", loop_id);
+                    }
+                }
+            }
+        }
+        _ => {}
     }
 }
 
@@ -1431,7 +1435,9 @@ fn translate_instruction(
 
             bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
         }
-        Bytecode::BrTrue(_) | Bytecode::BrFalse(_) | Bytecode::Branch(_) => {}
+        Bytecode::BrTrue(_) | Bytecode::BrFalse(_) | Bytecode::Branch(_) => {
+            // Nothing to do here, branching instructions are translated in translate_branching_instruction
+        }
         //**
         // Enums
         //**
