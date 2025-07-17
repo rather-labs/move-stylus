@@ -1,5 +1,5 @@
 use crate::CompilationContext;
-use crate::MappedFunction;
+use crate::translation::MappedFunction;
 use crate::translation::TypesStack;
 use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::file_format::{Bytecode, CodeUnit};

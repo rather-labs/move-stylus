@@ -143,11 +143,11 @@ impl TypesStack {
         match instruction {
             // Load a fixed constant
             Bytecode::LdConst(global_index) => {
-                let constant = &compilation_ctx.constants[global_index.0 as usize];
+                let constant = &compilation_ctx.root_module_data.constants[global_index.0 as usize];
                 let constant_type = &constant.type_;
                 let constant_type: IntermediateType = IntermediateType::try_from_signature_token(
                     constant_type,
-                    compilation_ctx.datatype_handles_map,
+                    &compilation_ctx.root_module_data.datatype_handles_map,
                 )?;
 
                 self.push(constant_type);
@@ -180,15 +180,15 @@ impl TypesStack {
             // Function calls
             Bytecode::Call(function_handle_index) => {
                 // Consume from the types stack the arguments that will be used by the function call
-                let arguments =
-                    &compilation_ctx.functions_arguments[function_handle_index.0 as usize];
+                let arguments = &compilation_ctx.root_module_data.functions_arguments
+                    [function_handle_index.0 as usize];
                 for argument in arguments.iter().rev() {
                     self.pop_expecting(argument)?;
                 }
 
                 // Insert in the stack types the types returned by the function (if any)
-                let return_types =
-                    &compilation_ctx.functions_returns[function_handle_index.0 as usize];
+                let return_types = &compilation_ctx.root_module_data.functions_returns
+                    [function_handle_index.0 as usize];
                 self.append(return_types);
             }
             // Locals
@@ -231,6 +231,7 @@ impl TypesStack {
             }
             Bytecode::ImmBorrowFieldGeneric(field_id) => {
                 let (struct_field_id, instantiation_types) = compilation_ctx
+                    .root_module_data
                     .instantiated_fields_to_generic_fields
                     .get(field_id)
                     .unwrap();
@@ -240,7 +241,7 @@ impl TypesStack {
                     .map(|t| {
                         IntermediateType::try_from_signature_token(
                             t,
-                            compilation_ctx.datatype_handles_map,
+                            &compilation_ctx.root_module_data.datatype_handles_map,
                         )
                         .map_err(TypesStackError::from)
                     })
@@ -292,6 +293,7 @@ impl TypesStack {
             }
             Bytecode::MutBorrowFieldGeneric(field_id) => {
                 let (struct_field_id, instantiation_types) = compilation_ctx
+                    .root_module_data
                     .instantiated_fields_to_generic_fields
                     .get(field_id)
                     .unwrap();
@@ -301,7 +303,7 @@ impl TypesStack {
                     .map(|t| {
                         IntermediateType::try_from_signature_token(
                             t,
-                            compilation_ctx.datatype_handles_map,
+                            &compilation_ctx.root_module_data.datatype_handles_map,
                         )
                         .map_err(TypesStackError::from)
                     })
@@ -789,6 +791,25 @@ impl TypesStack {
                 self.pop_expecting(&IntermediateType::IBool)?;
             }
             Bytecode::Branch(_) => (),
+            Bytecode::PackVariant(index) => {
+                let enum_ = compilation_ctx.get_enum_by_variant_handle_idx(index)?;
+                let index_inside_enum =
+                    compilation_ctx.get_variant_position_by_variant_handle_idx(index)?;
+
+                for pack_type in enum_.variants[index_inside_enum as usize]
+                    .fields
+                    .iter()
+                    .rev()
+                {
+                    if self.pop()? != *pack_type {
+                        return Err(TypesStackError::TypeMismatch {
+                            expected: pack_type.clone(),
+                            found: self.pop()?,
+                        });
+                    }
+                }
+                self.push(IntermediateType::IEnum(enum_.index));
+            }
             b => Err(TypesStackError::Translation(Box::new(
                 TranslationError::UnsupportedOperation {
                     operation: b.clone(),

@@ -342,7 +342,7 @@ impl IVector {
                 }
 
                 IntermediateType::IExternalUserData { .. } => todo!(),
-                t => panic!("unssuported vector type {t:?}"),
+                t => panic!("unsupported vector type {t:?}"),
             }
 
             // === Store result from stack into memory ===

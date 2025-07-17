@@ -206,8 +206,9 @@ fn translate_flow(
             let else_types_stack = else_body.get_types_stack();
 
             if then_types_stack == else_types_stack {
-                let ty = InstrSeqType::new(&mut module.types, &[], &then_types_stack.to_val_types());
-            
+                let ty =
+                    InstrSeqType::new(&mut module.types, &[], &then_types_stack.to_val_types());
+
                 let then_id = {
                     let mut then_seq = builder.dangling_instr_seq(ty);
                     translate_flow(
@@ -222,7 +223,7 @@ fn translate_flow(
                     );
                     then_seq.id()
                 };
-    
+
                 let else_id = {
                     let mut else_seq = builder.dangling_instr_seq(ty);
                     translate_flow(
@@ -281,9 +282,7 @@ fn translate_flow(
                     loop_targets,
                     entry,
                 );
-
             } else if else_types_stack.is_empty() {
-
                 let phantom_seq = builder.dangling_instr_seq(None);
                 let phantom_seq_id = phantom_seq.id();
 
@@ -307,7 +306,7 @@ fn translate_flow(
                     consequent: else_id,
                     alternative: phantom_seq_id,
                 });
-            
+
                 translate_flow(
                     compilation_ctx,
                     builder,
@@ -318,7 +317,6 @@ fn translate_flow(
                     loop_targets,
                     entry,
                 );
-
             } else {
                 panic!(
                     "Error: Mismatched types on the stack from Then and Else branches, and neither is empty."
@@ -1437,8 +1435,6 @@ fn translate_instruction(
             bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
         }
         Bytecode::BrTrue(_) | Bytecode::BrFalse(_) | Bytecode::Branch(_) => {}
-        b => Err(TranslationError::UnsupportedOperation {
-
         //**
         // Enums
         //**
@@ -1458,7 +1454,7 @@ fn translate_instruction(
 
             types_stack.push(IntermediateType::IEnum(enum_.index));
         }
-        b => Err(TranslationError::UnssuportedOperation {
+        b => Err(TranslationError::UnsupportedOperation {
             operation: b.clone(),
         })?,
     }
