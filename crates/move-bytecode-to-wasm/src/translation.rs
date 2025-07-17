@@ -106,7 +106,9 @@ fn translate_flow(
             for instruction in instructions {
                 match instruction {
                     // WATCH OUT, BRFALSE CAN ALSO BE USED AS A LOOP CONTINUE
-                    Bytecode::Branch(code_offset) | Bytecode::BrFalse(code_offset) => {
+                    Bytecode::Branch(code_offset)
+                    | Bytecode::BrFalse(code_offset)
+                    | Bytecode::BrTrue(code_offset) => {
                         if let Some(branch_mode) = branches.get(code_offset) {
                             // TODO: WTF are multi branch modes?
                             let loop_id = match branch_mode {
@@ -122,7 +124,10 @@ fn translate_flow(
                                             builder.br(*target_block_id);
                                         }
                                         Bytecode::BrFalse(code_offset) => {
-                                            builder.unop(UnaryOp::I32Eqz); // i32.eqz
+                                            builder.unop(UnaryOp::I32Eqz);
+                                            builder.br_if(*target_block_id);
+                                        }
+                                        Bytecode::BrFalse(code_offset) => {
                                             builder.br_if(*target_block_id);
                                         }
                                         _ => {}
@@ -199,44 +204,42 @@ fn translate_flow(
         } => {
             let then_types_stack = then_body.get_types_stack();
             let else_types_stack = else_body.get_types_stack();
-            let then_val_types =
-                InstrSeqType::new(&mut module.types, &[], &then_types_stack.to_val_types());
-            let else_val_types =
-                InstrSeqType::new(&mut module.types, &[], &else_types_stack.to_val_types());
-
-            let then_id = {
-                let mut then_seq = builder.dangling_instr_seq(then_val_types);
-                translate_flow(
-                    compilation_ctx,
-                    &mut then_seq,
-                    module,
-                    function_table,
-                    &mut types_stack.clone(),
-                    &*then_body,
-                    loop_targets,
-                    entry,
-                );
-                then_seq.id()
-            };
-
-            let else_id = {
-                let mut else_seq = builder.dangling_instr_seq(else_val_types);
-                translate_flow(
-                    compilation_ctx,
-                    &mut else_seq,
-                    module,
-                    function_table,
-                    &mut types_stack.clone(),
-                    &*else_body,
-                    loop_targets,
-                    entry,
-                );
-                else_seq.id()
-            };
 
             if then_types_stack == else_types_stack {
+                let ty = InstrSeqType::new(&mut module.types, &[], &then_types_stack.to_val_types());
+            
+                let then_id = {
+                    let mut then_seq = builder.dangling_instr_seq(ty);
+                    translate_flow(
+                        compilation_ctx,
+                        &mut then_seq,
+                        module,
+                        function_table,
+                        &mut types_stack.clone(),
+                        &*then_body,
+                        loop_targets,
+                        entry,
+                    );
+                    then_seq.id()
+                };
+    
+                let else_id = {
+                    let mut else_seq = builder.dangling_instr_seq(ty);
+                    translate_flow(
+                        compilation_ctx,
+                        &mut else_seq,
+                        module,
+                        function_table,
+                        &mut types_stack.clone(),
+                        &*else_body,
+                        loop_targets,
+                        entry,
+                    );
+                    else_seq.id()
+                };
+
                 builder.if_else(
-                    then_val_types,
+                    ty,
                     |then| {
                         then.instr(Block { seq: then_id });
                     },
@@ -245,23 +248,77 @@ fn translate_flow(
                     },
                 );
             } else if then_types_stack.is_empty() {
-                builder.if_else(
-                    None,
-                    |then| {
-                        then.instr(Block { seq: then_id });
-                    },
-                    |else_| {},
+                let phantom_seq = builder.dangling_instr_seq(None);
+                let phantom_seq_id = phantom_seq.id();
+
+                let then_id = {
+                    let mut then_seq = builder.dangling_instr_seq(None);
+                    translate_flow(
+                        compilation_ctx,
+                        &mut then_seq,
+                        module,
+                        function_table,
+                        &mut types_stack.clone(),
+                        &*then_body,
+                        loop_targets,
+                        entry,
+                    );
+                    then_seq.id()
+                };
+
+                builder.instr(walrus::ir::IfElse {
+                    consequent: then_id,
+                    alternative: phantom_seq_id,
+                });
+
+                translate_flow(
+                    compilation_ctx,
+                    builder,
+                    module,
+                    function_table,
+                    &mut types_stack.clone(),
+                    &*else_body,
+                    loop_targets,
+                    entry,
                 );
-                builder.instr(Block { seq: else_id });
+
             } else if else_types_stack.is_empty() {
-                builder.if_else(
-                    None,
-                    |then| {},
-                    |else_| {
-                        else_.instr(Block { seq: else_id });
-                    },
+
+                let phantom_seq = builder.dangling_instr_seq(None);
+                let phantom_seq_id = phantom_seq.id();
+
+                let else_id = {
+                    let mut else_seq = builder.dangling_instr_seq(None);
+                    translate_flow(
+                        compilation_ctx,
+                        &mut else_seq,
+                        module,
+                        function_table,
+                        &mut types_stack.clone(),
+                        &*else_body,
+                        loop_targets,
+                        entry,
+                    );
+                    else_seq.id()
+                };
+
+                builder.unop(UnaryOp::I32Eqz);
+                builder.instr(walrus::ir::IfElse {
+                    consequent: else_id,
+                    alternative: phantom_seq_id,
+                });
+            
+                translate_flow(
+                    compilation_ctx,
+                    builder,
+                    module,
+                    function_table,
+                    &mut types_stack.clone(),
+                    &*then_body,
+                    loop_targets,
+                    entry,
                 );
-                builder.instr(Block { seq: then_id });
+
             } else {
                 panic!(
                     "Error: Mismatched types on the stack from Then and Else branches, and neither is empty."

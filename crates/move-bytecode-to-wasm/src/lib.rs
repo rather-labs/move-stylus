@@ -376,6 +376,7 @@ macro_rules! declare_host_debug_functions {
     ($module: ident) => {
         (
             $module.imports.get_func("", "print_i32").unwrap(),
+            $module.imports.get_func("", "print_i64").unwrap(),
             $module.imports.get_func("", "print_memory_from").unwrap(),
             $module.imports.get_func("", "print_separator").unwrap(),
             $module.imports.get_func("", "print_u128").unwrap(),

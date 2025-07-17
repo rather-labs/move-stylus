@@ -81,5 +81,24 @@ public fun test_match(x: u8): u8 {
         3 => 66,
         _ => 0
     }
+}
 
+public fun test_match_in_loop(): u8 {
+    let mut i = 1;
+    let mut acc = 1;
+    loop {
+        i = i + 1;
+        match (i) {
+            1 => acc = acc + 1,
+            2 => acc = acc + 2,
+            3 => acc = acc + 3,
+            4 => acc = acc + 4,
+            _ => acc = acc + 4,
+        };
+        if (i > 10) {
+            break
+        };
+    };
+
+    acc
 }

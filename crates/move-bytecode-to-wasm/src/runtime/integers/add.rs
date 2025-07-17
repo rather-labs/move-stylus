@@ -259,7 +259,7 @@ pub fn add_u64(module: &mut Module) -> FunctionId {
     let n2 = module.locals.add(ValType::I64);
     let res = module.locals.add(ValType::I64);
 
-    // Add the u64 numbers ans set the result
+    // Add the u64 numbers and set the result
     builder
         .local_get(n1)
         .local_get(n2)
