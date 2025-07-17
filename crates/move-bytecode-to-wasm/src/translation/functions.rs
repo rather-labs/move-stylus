@@ -138,6 +138,52 @@ impl MappedFunction {
     }
 }
 
+pub struct DependencyMappedFunction {
+    pub name: String,
+    pub signature: ISignature,
+    pub function_locals_ir: Vec<IntermediateType>,
+}
+
+impl DependencyMappedFunction {
+    pub fn new(
+        name: String,
+        move_args: &Signature,
+        move_rets: &Signature,
+        move_locals: &[SignatureToken],
+        handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+    ) -> Self {
+        let signature = ISignature::from_signatures(move_args, move_rets, handles_map);
+
+        /*
+        assert!(
+            wasm_ret_types.len() <= 1,
+            "Multiple return values not supported"
+        );
+        */
+
+        let ir_arg_types = move_args
+            .0
+            .iter()
+            .map(|s| IntermediateType::try_from_signature_token(s, handles_map));
+
+        // Declared locals
+        let ir_declared_locals_types = move_locals
+            .iter()
+            .map(|s| IntermediateType::try_from_signature_token(s, handles_map));
+
+        let local_variables_type = ir_arg_types
+            .chain(ir_declared_locals_types)
+            .collect::<Result<Vec<_>, _>>()
+            .expect("Failed to parse types");
+
+        Self {
+            name,
+            signature,
+            function_locals_ir: local_variables_type,
+        }
+    }
+}
+
 /// Adds the instructions to unpack the return values from memory
 ///
 /// The returns values are read from memory and pushed to the stack
