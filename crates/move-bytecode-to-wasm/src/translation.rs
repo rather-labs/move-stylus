@@ -126,14 +126,7 @@ fn translate_flow(
         }
         Flow::Sequence(flows) => {
             for f in flows {
-                translate_flow(
-                    &ctx,
-                    builder,
-                    module,
-                    types_stack,
-                    f,
-                    loop_targets,
-                );
+                translate_flow(&ctx, builder, module, types_stack, f, loop_targets);
             }
         }
         Flow::Loop {

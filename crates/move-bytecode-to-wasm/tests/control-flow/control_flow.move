@@ -102,3 +102,31 @@ public fun test_match_in_loop(): u8 {
 
     acc
 }
+
+public fun test_labeled_loops(x: u8): u8 {
+    let mut outer_count = 0;
+    let mut inner_count = 0;
+
+    'outer: loop {
+        outer_count = outer_count + 1;
+
+        'inner: while (inner_count < x) {
+            inner_count = inner_count + 1;
+
+            if (inner_count % 17 == 0) {
+                break 'outer 
+            };
+
+           if (inner_count % 13 == 0) {
+                outer_count = outer_count + 1;
+                continue 'outer
+            };
+        };
+
+        if (outer_count > 23) {
+            break  
+        };
+    };
+
+    outer_count + inner_count
+}
