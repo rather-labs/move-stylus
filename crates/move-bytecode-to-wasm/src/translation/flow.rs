@@ -24,7 +24,6 @@ pub enum Flow {
         types_stack: TypesStack,
         then_body: Box<Flow>,
         else_body: Box<Flow>,
-        // br_if_target: Option<u16>,
     },
     Empty,
 }
@@ -57,8 +56,9 @@ impl Flow {
         // Create the control flow graph from the code unit
         let cfg = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
 
-        // Reloop the control flow graph. This transforms the cfg into a structured object
-        // The relooped cfg is composed of ShapedBlocks
+        // Reloop the Control Flow Graph,
+        // Emscripten paper, original relooper implementation: https://github.com/emscripten-core/emscripten/blob/main/docs/paper.pdf
+        // The one we are using: https://github.com/curiousdannii/if-decompiler/blob/master/relooper/src/lib.rs
         let relooped = {
             let nodes: Vec<(u16, Vec<u16>)> = (&cfg as &dyn ControlFlowGraph)
                 .blocks()
@@ -82,6 +82,8 @@ impl Flow {
                 let code = &code_unit.code[start as usize..end as usize];
 
                 let mut ts = TypesStack::new();
+                // TypesStack::process_instruction() updates the types stack based on the instruction it processes, but does not emit wasm code.
+                // We calculate the final state of the typestack for each block. This is consistent because each block has its own scope.
                 for instruction in code {
                     ts.process_instruction(instruction, compilation_ctx, mapped_function)
                         .unwrap();
