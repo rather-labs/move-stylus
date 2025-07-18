@@ -99,6 +99,10 @@ impl FunctionTable {
         self.entries.get_mut(index)
     }
 
+    pub fn get_by_function_id(&self, function_id: &FunctionId) -> Option<&TableEntry> {
+        self.entries.iter().find(|e| &e.function_id == function_id)
+    }
+
     pub fn get_table_id(&self) -> TableId {
         self.table_id
     }

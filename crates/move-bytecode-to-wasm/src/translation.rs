@@ -40,16 +40,14 @@ pub fn translate_function(
     function_information: &MappedFunction,
     move_bytecode: &CodeUnit,
 ) -> Result<FunctionId> {
-    let entry = function_table
-        .get_mut(index)
-        .ok_or(anyhow::anyhow!("index {index} not found in function table"))?;
-
     anyhow::ensure!(
         move_bytecode.jump_tables.is_empty(),
         "Jump tables are not supported yet"
     );
 
-    let mut function = FunctionBuilder::new(&mut module.types, &entry.params, &entry.results);
+    let params = function_information.signature.get_argument_wasm_types();
+    let results = function_information.signature.get_return_wasm_types();
+    let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
     let mut builder = function.func_body();
 
     let (arguments, mut function_locals) = process_fn_local_variables(function_information, module);
@@ -256,7 +254,9 @@ fn map_bytecode_instruction(
                 }
             }
 
-            if let Some(f) = function_table.get_by_function_handle_index(function_handle_index) {
+            let function_id = &compilation_ctx.root_module_data.function_calls
+                [function_handle_index.into_index()];
+            if let Some(f) = function_table.get_by_function_id(function_id) {
                 builder
                     .i32_const(f.index)
                     .call_indirect(f.type_id, function_table.get_table_id());
