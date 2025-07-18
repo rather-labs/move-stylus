@@ -283,7 +283,7 @@ fn translate_and_link_functions(
 
     let move_bytecode = function_definition.code.as_ref().unwrap();
 
-    let wasm_function_id = translate_function(
+    let (wasm_function_id, functions_to_link) = translate_function(
         module,
         compilation_ctx,
         function_table,
@@ -298,6 +298,17 @@ fn translate_and_link_functions(
         .add_to_wasm_table(module, function_id, wasm_function_id)
         .expect("there was an error adding the module's functions to the function table");
     println!();
+
+    // Recursively translate and link functions called by this function
+    functions_to_link.iter().for_each(|function_id| {
+        translate_and_link_functions(
+            function_id,
+            function_table,
+            function_definitions,
+            module,
+            compilation_ctx,
+        )
+    });
 }
 
 fn inject_debug_fns(module: &mut walrus::Module) {

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use anyhow::Result;
 use functions::{
     MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
@@ -8,11 +10,11 @@ use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, CodeUnit};
 use move_binary_format::internals::ModuleIndex;
-use table::FunctionTable;
+use table::{FunctionId, FunctionTable};
 use types_stack::TypesStack;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
 use walrus::{FunctionBuilder, LocalId, Module};
-use walrus::{FunctionId, InstrSeqBuilder, ValType, ir::MemArg};
+use walrus::{FunctionId as WasmFunctionId, InstrSeqBuilder, ValType, ir::MemArg};
 
 use crate::CompilationContext;
 use crate::runtime::RuntimeFunction;
@@ -39,7 +41,7 @@ pub fn translate_function(
     function_table: &mut FunctionTable,
     function_information: &MappedFunction,
     move_bytecode: &CodeUnit,
-) -> Result<FunctionId> {
+) -> Result<(WasmFunctionId, HashSet<FunctionId>)> {
     anyhow::ensure!(
         move_bytecode.jump_tables.is_empty(),
         "Jump tables are not supported yet"
@@ -67,8 +69,9 @@ pub fn translate_function(
 
     let mut types_stack = TypesStack::new();
 
+    let mut functions_to_link = HashSet::new();
     for instruction in &move_bytecode.code {
-        map_bytecode_instruction(
+        let mut fns_to_link = map_bytecode_instruction(
             instruction,
             compilation_ctx,
             &mut builder,
@@ -81,10 +84,12 @@ pub fn translate_function(
         .map_err(|e| {
             panic!("There was an error translating the bytecode instruction {instruction:?}\n{e}")
         })?;
+
+        functions_to_link.extend(fns_to_link.drain(..))
     }
 
     let function_id = function.finish(arguments, &mut module.funcs);
-    Ok(function_id)
+    Ok((function_id, functions_to_link))
 }
 
 fn process_fn_local_variables(
@@ -175,8 +180,8 @@ fn map_bytecode_instruction(
     function_table: &mut FunctionTable,
     types_stack: &mut TypesStack,
     function_locals: &[LocalId],
-) -> Result<(), TranslationError> {
-    // let mut fns_to_link = Vec::new();
+) -> Result<Vec<FunctionId>, TranslationError> {
+    let mut functions_calls_to_link = Vec::new();
 
     match instruction {
         // Load a fixed constant
@@ -298,6 +303,8 @@ fn map_bytecode_instruction(
                 builder
                     .i32_const(f_entry.index)
                     .call_indirect(f_entry.type_id, function_table.get_table_id());
+
+                functions_calls_to_link.push(function_id.clone());
             }
 
             add_unpack_function_return_values_instructions(
@@ -1336,5 +1343,5 @@ fn map_bytecode_instruction(
         })?,
     }
 
-    Ok(())
+    Ok(functions_calls_to_link)
 }
