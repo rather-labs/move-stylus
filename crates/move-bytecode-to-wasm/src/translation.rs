@@ -69,7 +69,7 @@ pub fn translate_function(
 
     let code_unit = &entry.get_move_code_unit().unwrap();
 
-    let flow = Flow::new(code_unit, &entry);
+    let flow = Flow::new(code_unit, entry);
     println!("flow: {:#?}", flow);
 
     // Type stack for the current function.
@@ -114,7 +114,7 @@ fn translate_flow(
                     &ctx.entry.function,
                     module,
                     ctx.function_table,
-                    &mut ctx.types_stack,
+                    ctx.types_stack,
                 )
                 .unwrap();
             }
@@ -129,7 +129,7 @@ fn translate_flow(
             loop_id,
             body,
         } => {
-            let ty = InstrSeqType::new(&mut module.types, &[], &stack);
+            let ty = InstrSeqType::new(&mut module.types, &[], stack);
             builder.loop_(ty, |loop_| {
                 // loop_targets maps the relooper-assigned loop id to the loop's instruction sequence id.
                 loop_targets.insert(*loop_id, loop_.id());
