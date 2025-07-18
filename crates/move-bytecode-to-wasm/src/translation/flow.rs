@@ -47,10 +47,7 @@ impl Flow {
         matches!(&self, Self::Empty)
     }
 
-    pub fn new(
-        code_unit: &CodeUnit,
-        entry: &TableEntry,
-    ) -> Self {
+    pub fn new(code_unit: &CodeUnit, entry: &TableEntry) -> Self {
         // Create the control flow graph from the code unit
         let cfg = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
 

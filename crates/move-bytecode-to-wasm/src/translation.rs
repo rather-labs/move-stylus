@@ -144,7 +144,7 @@ fn translate_flow(
         } => {
             let then_stack = then_body.get_stack();
             let else_stack = else_body.get_stack();
-    
+
             if then_stack == else_stack {
                 let ty = InstrSeqType::new(&mut module.types, &[], &then_stack);
                 let then_id = {
