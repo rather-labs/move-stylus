@@ -266,12 +266,14 @@ fn map_bytecode_instruction(
 
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {
+                println!("found function in table {function_id}");
                 builder
                     .i32_const(f.index)
                     .call_indirect(f.type_id, function_table.get_table_id());
             }
             // Otherwise we add it to the table and declare it for linking
             else {
+                println!("adding {function_id} to table ");
                 let function_information = &compilation_ctx.root_module_data.function_information
                     [function_handle_index.into_index()];
 

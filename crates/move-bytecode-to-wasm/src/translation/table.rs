@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use anyhow::Result;
 use walrus::{
     ConstExpr, ElementKind, FunctionId as WasmFunctionId, Module, TableId, TypeId, ValType,
@@ -16,6 +18,13 @@ pub struct FunctionId {
     pub module_id: ModuleId,
 }
 
+impl Display for FunctionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}::{}", self.module_id, self.identifier)
+    }
+}
+
+#[derive(Debug)]
 pub struct TableEntry {
     pub index: i32,
     pub function_id: FunctionId,
@@ -85,10 +94,12 @@ impl FunctionTable {
         );
 
         let entry = self
-            .get_mut_by_function_id(&function_id)
+            .get_mut_by_function_id(function_id)
             .ok_or(anyhow::anyhow!("invalid entry {function_id:?}"))?;
 
         entry.wasm_function_id = Some(wasm_function_id);
+
+        println!("assigned to {function_id} wasm function id {wasm_function_id:?}");
 
         Ok(())
     }
@@ -108,9 +119,10 @@ impl FunctionTable {
     }
 
     pub fn ensure_all_functions_added(&self) -> Result<()> {
+        println!("{:#?}", self.entries);
         if let Some(entry) = self.entries.iter().find(|e| e.wasm_function_id.is_none()) {
             anyhow::bail!(
-                "function {:?} was not added to the functions table",
+                "function {} was not added to the functions table",
                 entry.function_id
             );
         }

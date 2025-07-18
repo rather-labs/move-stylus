@@ -106,8 +106,6 @@ pub fn translate_package(
             allocator: allocator_func,
         };
 
-        let mut public_functions = Vec::new();
-
         translate_and_link_functions(
             &root_module_data,
             &root_module_id,
@@ -117,6 +115,7 @@ pub fn translate_package(
             &compilation_ctx,
         );
 
+        let mut public_functions = Vec::new();
         for function_information in root_module_data
             .function_information
             .iter()
@@ -245,29 +244,35 @@ fn translate_and_link_functions(
         .iter()
         .filter(|fi| &fi.function_id.module_id == module_id)
     {
+        println!("\n processing {}", function_information.function_id);
+        // First we check if there is already an entry for this function
         if let Some(table_entry) =
             function_table.get_by_function_id(&function_information.function_id)
         {
+            // If it has asigned a wasm function id means that we already translated it, so we skip
+            // it
             if table_entry.wasm_function_id.is_some() {
                 println!("continuee");
                 continue;
             }
+        }
+        // If it is not present, we add an entry for it
+        else {
+            function_table.add(
+                module,
+                function_information.function_id.clone(),
+                function_information,
+            );
         }
 
         let function_definition = function_definitions
             .get(&function_information.function_id)
             .unwrap_or_else(|| {
                 panic!(
-                    "could not find function definition for {:?}",
+                    "could not find function definition for {}",
                     function_information.function_id
                 )
             });
-
-        function_table.add(
-            module,
-            function_information.function_id.clone(),
-            function_information,
-        );
 
         let move_bytecode = function_definition.code.as_ref().unwrap();
 
@@ -280,14 +285,17 @@ fn translate_and_link_functions(
         )
         .unwrap_or_else(|_| {
             panic!(
-                "there was an error translating {:?}",
+                "there was an error translating {}",
                 function_information.function_id
             )
         });
 
+        println!("translated {}", function_information.function_id);
+
         function_table
             .add_to_wasm_table(module, &function_information.function_id, function_id)
             .expect("there was an error adding the module's functions to the function table");
+        println!();
     }
 }
 
