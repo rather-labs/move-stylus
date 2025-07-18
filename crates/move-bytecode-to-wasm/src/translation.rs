@@ -384,8 +384,7 @@ fn map_bytecode_instruction(
             );
         }
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
-            let (struct_field_id, instantiation_types) = compilation_ctx
-                .root_module_data
+            let (struct_field_id, instantiation_types) = module_data
                 .instantiated_fields_to_generic_fields
                 .get(field_id)
                 .unwrap();
@@ -438,8 +437,7 @@ fn map_bytecode_instruction(
             );
         }
         Bytecode::MutBorrowFieldGeneric(field_id) => {
-            let (struct_field_id, instantiation_types) = compilation_ctx
-                .root_module_data
+            let (struct_field_id, instantiation_types) = module_data
                 .instantiated_fields_to_generic_fields
                 .get(field_id)
                 .unwrap();
