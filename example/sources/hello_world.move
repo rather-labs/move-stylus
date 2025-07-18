@@ -1,46 +1,12 @@
 module hello_world::hello_world;
 
-use sui::tx_context::TxContext;
+// use sui::tx_context::TxContext;
+use sui::tx_context::{sender, TxContext};
 use hello_world::other_mod::Test;
 use hello_world::another_mod::AnotherTest;
 
 //  TODO: Add support for native functions
 //  native public fun emit_log(ptr: u32, len: u32, topic: u32);
-
-/*
-public fun cast_u8(x: u16): u8 {
-    x as u8
-}
-
-public fun echo(x: u128): u128 {
-    x
-}
-
-public fun getCopiedLocal(): u128 {
-    let x = 123;
-    x
-}
-
-public fun echo_signer_with_int(x: signer, y: u8): (u8, signer) {
-    (y, x)
-}
-
-public fun sum8(x: u8, y: u8): u8 {
-    x + y
-}
-
-public fun sum16(x: u16, y: u16): u16 {
-    x + y
-}
-
-public fun sum32(x: u32, y: u32): u32 {
-    x + y
-}
-
-public fun sum64(x: u64, y: u64): u64 {
-    x + y
-}
-*/
 
 public fun test(ctx: &TxContext): address {
     ctx.sender()
@@ -48,11 +14,7 @@ public fun test(ctx: &TxContext): address {
 }
 
 /*
-public fun test2(ctx: &Test): u8 {
-    42
-}
-
-public fun test3(ctx: &AnotherTest): u8 {
-    42
-}
-*/
+public fun test(): address {
+    sender()
+    // ctx.sender
+}*/

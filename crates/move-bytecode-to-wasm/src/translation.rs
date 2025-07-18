@@ -284,17 +284,14 @@ fn map_bytecode_instruction(
             let function_id = &module_data.function_calls[function_handle_index.into_index()];
 
             // If the function is in the table we call it directly
-            if let Some(f) = function_table.get_by_function_id(function_id) {
+            let f_entry = if let Some(f) = function_table.get_by_function_id(function_id) {
                 println!("found function in table {function_id}");
-                builder
-                    .i32_const(f.index)
-                    .call_indirect(f.type_id, function_table.get_table_id());
+                f
             }
             // Otherwise we add it to the table and declare it for linking
             else {
                 println!("adding {function_id} to table ");
-                let function_information = if let Some(fi) = &compilation_ctx
-                    .root_module_data
+                let function_information = if let Some(fi) = module_data
                     .function_information
                     .get(function_handle_index.into_index())
                 {
@@ -314,12 +311,14 @@ fn map_bytecode_instruction(
 
                 let f_entry = function_table.add(module, function_id.clone(), function_information);
 
-                builder
-                    .i32_const(f_entry.index)
-                    .call_indirect(f_entry.type_id, function_table.get_table_id());
-
                 functions_calls_to_link.push(function_id.clone());
-            }
+
+                f_entry
+            };
+
+            builder
+                .i32_const(f_entry.index)
+                .call_indirect(f_entry.type_id, function_table.get_table_id());
 
             add_unpack_function_return_values_instructions(
                 builder,
