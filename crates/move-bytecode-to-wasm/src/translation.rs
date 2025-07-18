@@ -50,20 +50,20 @@ pub fn translate_function(
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
     let mut builder = function.func_body();
 
-    let (mut arguments, locals) = process_fn_local_variables(function_information, module);
-    box_args(
-        &mut builder,
-        module,
-        compilation_ctx,
-        &mut arguments,
-        function_information,
-    );
+    let (arguments, locals) = process_fn_local_variables(function_information, module);
 
     // All the function locals are compose by the argument locals concatenated with the local
     // variable locals
     let mut function_locals = Vec::new();
     function_locals.extend_from_slice(&arguments);
     function_locals.extend_from_slice(&locals);
+    box_args(
+        &mut builder,
+        module,
+        compilation_ctx,
+        &mut function_locals,
+        function_information,
+    );
 
     let mut types_stack = TypesStack::new();
 
