@@ -16,7 +16,7 @@ use super::{intermediate_types::IntermediateType, table::FunctionId};
 pub struct MappedFunction {
     pub function_id: FunctionId,
     pub signature: ISignature,
-    pub function_locals_ir: Vec<IntermediateType>,
+    pub locals: Vec<IntermediateType>,
     pub arguments: Vec<IntermediateType>,
 
     /// Flag that tells us if the function can be used as an entrypoint
@@ -41,33 +41,37 @@ impl MappedFunction {
             "Multiple return values not supported"
         );
 
-        let ir_arg_types = move_args
+        let arguments = move_args
             .0
             .iter()
-            .map(|s| IntermediateType::try_from_signature_token(s, handles_map));
+            .map(|s| IntermediateType::try_from_signature_token(s, handles_map))
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
         // Declared locals
-        let ir_declared_locals_types = move_locals
+        let locals = move_locals
             .iter()
-            .map(|s| IntermediateType::try_from_signature_token(s, handles_map));
-
-        let local_variables_type = ir_arg_types
-            .clone()
-            .chain(ir_declared_locals_types)
+            .map(|s| IntermediateType::try_from_signature_token(s, handles_map))
             .collect::<Result<Vec<_>, _>>()
-            .expect("Failed to parse types");
-
-        let arguments = ir_arg_types
-            .collect::<Result<Vec<_>, _>>()
-            .expect("Failed to argument types");
+            .unwrap();
 
         Self {
             function_id,
             signature,
-            function_locals_ir: local_variables_type,
+            locals,
             arguments,
             // TODO: change to function_definition.is_entry
             is_entry: function_definition.visibility == Visibility::Public,
+        }
+    }
+}
+
+impl MappedFunction {
+    pub fn get_local_ir(&self, local_index: usize) -> &IntermediateType {
+        if local_index < self.arguments.len() {
+            &self.arguments[local_index]
+        } else {
+            &self.locals[local_index - self.arguments.len()]
         }
     }
 }

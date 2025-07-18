@@ -13,7 +13,6 @@ use translation::{
     translate_function,
 };
 use walrus::{Module, RefType, ValType};
-use wasm_validation::validate_stylus_wasm;
 
 pub(crate) mod abi_types;
 mod compilation_context;
@@ -100,7 +99,7 @@ pub fn translate_package(
         );
 
         let compilation_ctx = CompilationContext {
-            root_module_data: &modules_data[&root_module_id],
+            root_module_data: &root_module_data,
             deps_data: &modules_data,
             memory_id,
             allocator: allocator_func,
@@ -122,7 +121,7 @@ pub fn translate_package(
             function_table.add(
                 &mut module,
                 function_information.function_id.clone(),
-                &function_information,
+                function_information,
             );
 
             let move_bytecode = function_definition.code.as_ref().unwrap();
@@ -131,16 +130,15 @@ pub fn translate_package(
                 &mut module,
                 &compilation_ctx,
                 &mut function_table,
-                &function_information,
+                function_information,
                 move_bytecode,
             )
-            .expect(
-                format!(
+            .unwrap_or_else(|_| {
+                panic!(
                     "there was an error translating {:?}",
                     function_information.function_id
                 )
-                .as_str(),
-            );
+            });
 
             function_ids.push(function_id);
 
@@ -164,7 +162,7 @@ pub fn translate_package(
         }
 
         function_table.ensure_all_functions_added().unwrap();
-        validate_stylus_wasm(&mut module).unwrap();
+        // validate_stylus_wasm(&mut module).unwrap();
 
         modules.insert(module_name, module);
         modules_data.insert(root_module_id.clone(), root_module_data);

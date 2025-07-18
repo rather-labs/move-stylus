@@ -50,14 +50,20 @@ pub fn translate_function(
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
     let mut builder = function.func_body();
 
-    let (arguments, mut function_locals) = process_fn_local_variables(function_information, module);
+    let (mut arguments, locals) = process_fn_local_variables(function_information, module);
     box_args(
         &mut builder,
         module,
         compilation_ctx,
-        &mut function_locals,
+        &mut arguments,
         function_information,
     );
+
+    // All the function locals are compose by the argument locals concatenated with the local
+    // variable locals
+    let mut function_locals = Vec::new();
+    function_locals.extend_from_slice(&arguments);
+    function_locals.extend_from_slice(&locals);
 
     let mut types_stack = TypesStack::new();
 
@@ -66,7 +72,7 @@ pub fn translate_function(
             instruction,
             compilation_ctx,
             &mut builder,
-            &function_information,
+            function_information,
             module,
             function_table,
             &mut types_stack,
@@ -99,18 +105,19 @@ fn process_fn_local_variables(
         .map(|ty| module.locals.add(*ty))
         .collect();
 
-    // Combine all
-    let local_variables = function_information
-        .function_locals_ir
+    let wasm_declared_locals = function_information
+        .locals
         .iter()
-        .map(|ty| match ty {
-            IntermediateType::IU64 => ValType::I32, // to store pointer instead of i64
-            other => ValType::from(other),
+        .map(|ty| {
+            match ty {
+                IntermediateType::IU64 => ValType::I32, // to store pointer instead of i64
+                other => ValType::from(other),
+            }
         })
-        .map(|val| module.locals.add(val))
+        .map(|ty| module.locals.add(ty))
         .collect();
 
-    (wasm_arg_locals, local_variables)
+    (wasm_arg_locals, wasm_declared_locals)
 }
 
 /// Converts value-based function arguments into heap-allocated pointers.
@@ -288,7 +295,7 @@ fn map_bytecode_instruction(
         // Locals
         Bytecode::StLoc(local_id) => {
             let local = function_locals[*local_id as usize];
-            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
+            let local_type = &mapped_function.get_local_ir(*local_id as usize);
             // If type is a reference we set the local directly, else we box it.
             if let IntermediateType::IRef(_) | IntermediateType::IMutRef(_) = local_type {
                 builder.local_set(local);
@@ -300,25 +307,26 @@ fn map_bytecode_instruction(
         Bytecode::MoveLoc(local_id) => {
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
             let local = function_locals[*local_id as usize];
-            let local_type = mapped_function.function_locals_ir[*local_id as usize].clone();
+            let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
+            println!("{local:?} {local_type:?}");
             local_type.move_local_instructions(builder, compilation_ctx, local);
             types_stack.push(local_type);
         }
         Bytecode::CopyLoc(local_id) => {
             let local = function_locals[*local_id as usize];
-            let local_type = mapped_function.function_locals_ir[*local_id as usize].clone();
+            let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             local_type.copy_local_instructions(module, builder, compilation_ctx, local);
             types_stack.push(local_type);
         }
         Bytecode::ImmBorrowLoc(local_id) => {
             let local = function_locals[*local_id as usize];
-            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
+            let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             local_type.add_borrow_local_instructions(builder, local);
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
         }
         Bytecode::MutBorrowLoc(local_id) => {
             let local = function_locals[*local_id as usize];
-            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
+            let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             local_type.add_borrow_local_instructions(builder, local);
             types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
         }
