@@ -19,15 +19,8 @@ pub struct FunctionId {
 pub struct TableEntry {
     pub index: i32,
     pub function_id: FunctionId,
+    pub wasm_function_id: Option<WasmFunctionId>,
     pub type_id: TypeId,
-    pub params: Vec<ValType>,
-    pub results: Vec<ValType>,
-
-    /// This field is used as a safeguard, it is set to true when `Self::add_to_wasm_table` is
-    /// executed. If we find any entry with this field in false, means we never executed said
-    /// method, on some entry resulting in some functions not present in the table, if that happens
-    /// we are going to be able to call the function present in this entry.
-    added_to_wasm_table: bool,
 }
 
 pub struct FunctionTable {
@@ -63,10 +56,8 @@ impl FunctionTable {
         self.entries.push(TableEntry {
             index,
             function_id,
+            wasm_function_id: None,
             type_id,
-            params,
-            results,
-            added_to_wasm_table: false,
         });
 
         let table = module.tables.get_mut(self.table_id);
@@ -78,48 +69,46 @@ impl FunctionTable {
     pub fn add_to_wasm_table(
         &mut self,
         module: &mut Module,
-        index: usize,
-        function_id: WasmFunctionId,
+        function_id: &FunctionId,
+        wasm_function_id: WasmFunctionId,
     ) -> anyhow::Result<()> {
         let entry = self
-            .entries
-            .get_mut(index)
-            .ok_or(anyhow::anyhow!("invalid entry {index}"))?;
+            .get_by_function_id(function_id)
+            .ok_or(anyhow::anyhow!("invalid entry {function_id:?}"))?;
 
         module.elements.add(
             ElementKind::Active {
                 table: self.table_id,
-                offset: ConstExpr::Value(Value::I32(index as i32)),
+                offset: ConstExpr::Value(Value::I32(entry.index as i32)),
             },
-            walrus::ElementItems::Functions(vec![function_id]),
+            walrus::ElementItems::Functions(vec![wasm_function_id]),
         );
-        entry.added_to_wasm_table = true;
+
+        let entry = self
+            .get_mut_by_function_id(&function_id)
+            .ok_or(anyhow::anyhow!("invalid entry {function_id:?}"))?;
+
+        entry.wasm_function_id = Some(wasm_function_id);
 
         Ok(())
-    }
-
-    pub fn get(&self, index: usize) -> Option<&TableEntry> {
-        self.entries.get(index)
-    }
-
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut TableEntry> {
-        self.entries.get_mut(index)
     }
 
     pub fn get_by_function_id(&self, function_id: &FunctionId) -> Option<&TableEntry> {
         self.entries.iter().find(|e| &e.function_id == function_id)
     }
 
+    pub fn get_mut_by_function_id(&mut self, function_id: &FunctionId) -> Option<&mut TableEntry> {
+        self.entries
+            .iter_mut()
+            .find(|e| &e.function_id == function_id)
+    }
+
     pub fn get_table_id(&self) -> TableId {
         self.table_id
     }
 
-    pub fn len(&self) -> usize {
-        self.entries.len()
-    }
-
     pub fn ensure_all_functions_added(&self) -> Result<()> {
-        if let Some(entry) = self.entries.iter().find(|e| !e.added_to_wasm_table) {
+        if let Some(entry) = self.entries.iter().find(|e| e.wasm_function_id.is_none()) {
             anyhow::bail!(
                 "function {:?} was not added to the functions table",
                 entry.function_id

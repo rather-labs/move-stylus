@@ -13,6 +13,7 @@ use translation::{
     translate_function,
 };
 use walrus::{Module, RefType, ValType};
+use wasm_validation::validate_stylus_wasm;
 
 pub(crate) mod abi_types;
 mod compilation_context;
@@ -106,45 +107,30 @@ pub fn translate_package(
         };
 
         let mut public_functions = Vec::new();
-        let mut function_ids = Vec::new();
 
-        // Process function defined in this module
+        translate_and_link_functions(
+            &root_module_data,
+            &root_module_id,
+            &mut function_table,
+            &function_definitions,
+            &mut module,
+            &compilation_ctx,
+        );
+
         for function_information in root_module_data
             .function_information
             .iter()
             .filter(|fi| fi.function_id.module_id == root_module_id)
         {
-            let function_definition = function_definitions
-                .get(&function_information.function_id)
+            let wasm_function_id = function_table
+                .get_by_function_id(&function_information.function_id)
+                .unwrap()
+                .wasm_function_id
                 .unwrap();
-
-            function_table.add(
-                &mut module,
-                function_information.function_id.clone(),
-                function_information,
-            );
-
-            let move_bytecode = function_definition.code.as_ref().unwrap();
-
-            let function_id = translate_function(
-                &mut module,
-                &compilation_ctx,
-                &mut function_table,
-                function_information,
-                move_bytecode,
-            )
-            .unwrap_or_else(|_| {
-                panic!(
-                    "there was an error translating {:?}",
-                    function_information.function_id
-                )
-            });
-
-            function_ids.push(function_id);
 
             if function_information.is_entry {
                 public_functions.push(PublicFunction::new(
-                    function_id,
+                    wasm_function_id,
                     &function_information.function_id.identifier,
                     &function_information.signature,
                     &compilation_ctx,
@@ -154,15 +140,8 @@ pub fn translate_package(
 
         hostio::build_entrypoint_router(&mut module, &public_functions, &compilation_ctx);
 
-        // Fill the WASM table with the function ids
-        for (index, function_id) in function_ids.into_iter().enumerate() {
-            function_table
-                .add_to_wasm_table(&mut module, index, function_id)
-                .expect("there was an error adding the module's functions to the function table");
-        }
-
         function_table.ensure_all_functions_added().unwrap();
-        // validate_stylus_wasm(&mut module).unwrap();
+        validate_stylus_wasm(&mut module).unwrap();
 
         modules.insert(module_name, module);
         modules_data.insert(root_module_id.clone(), root_module_data);
@@ -190,19 +169,6 @@ pub fn translate_package_cli(package: CompiledPackage, rerooted_path: &Path) {
         )
         .expect("Failed to write WAT file");
     }
-}
-
-#[cfg(feature = "inject-host-debug-fns")]
-#[macro_export]
-macro_rules! declare_host_debug_functions {
-    ($module: ident) => {
-        (
-            $module.imports.get_func("", "print_i32").unwrap(),
-            $module.imports.get_func("", "print_memory_from").unwrap(),
-            $module.imports.get_func("", "print_separator").unwrap(),
-            $module.imports.get_func("", "print_u128").unwrap(),
-        )
-    };
 }
 
 /// This functions process the dependency tree for the root module.
@@ -265,6 +231,66 @@ pub fn process_dependency_tree<'move_package>(
     }
 }
 
+fn translate_and_link_functions(
+    module_data: &ModuleData,
+    module_id: &ModuleId,
+    function_table: &mut FunctionTable,
+    function_definitions: &GlobalFunctionTable,
+    module: &mut walrus::Module,
+    compilation_ctx: &CompilationContext,
+) {
+    // Process function defined in this module
+    for function_information in module_data
+        .function_information
+        .iter()
+        .filter(|fi| &fi.function_id.module_id == module_id)
+    {
+        if let Some(table_entry) =
+            function_table.get_by_function_id(&function_information.function_id)
+        {
+            if table_entry.wasm_function_id.is_some() {
+                println!("continuee");
+                continue;
+            }
+        }
+
+        let function_definition = function_definitions
+            .get(&function_information.function_id)
+            .unwrap_or_else(|| {
+                panic!(
+                    "could not find function definition for {:?}",
+                    function_information.function_id
+                )
+            });
+
+        function_table.add(
+            module,
+            function_information.function_id.clone(),
+            function_information,
+        );
+
+        let move_bytecode = function_definition.code.as_ref().unwrap();
+
+        let function_id = translate_function(
+            module,
+            compilation_ctx,
+            function_table,
+            function_information,
+            move_bytecode,
+        )
+        .unwrap_or_else(|_| {
+            panic!(
+                "there was an error translating {:?}",
+                function_information.function_id
+            )
+        });
+
+        function_table
+            .add_to_wasm_table(module, &function_information.function_id, function_id)
+            .expect("there was an error adding the module's functions to the function table");
+    }
+}
+
 fn inject_debug_fns(module: &mut walrus::Module) {
     if cfg!(feature = "inject-host-debug-fns") {
         let func_ty = module.types.add(&[ValType::I32], &[]);
@@ -285,4 +311,17 @@ fn inject_debug_fns(module: &mut walrus::Module) {
         let func_ty = module.types.add(&[ValType::I32], &[]);
         module.add_import_func("", "print_address", func_ty);
     }
+}
+
+#[cfg(feature = "inject-host-debug-fns")]
+#[macro_export]
+macro_rules! declare_host_debug_functions {
+    ($module: ident) => {
+        (
+            $module.imports.get_func("", "print_i32").unwrap(),
+            $module.imports.get_func("", "print_memory_from").unwrap(),
+            $module.imports.get_func("", "print_separator").unwrap(),
+            $module.imports.get_func("", "print_u128").unwrap(),
+        )
+    };
 }
