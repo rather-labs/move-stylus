@@ -107,12 +107,7 @@ fn translate_flow(
             ..
         } => {
             for instruction in instructions {
-                translate_branching_instruction(
-                    &instruction,
-                    &branches,
-                    &ctx.loop_targets,
-                    builder,
-                );
+                translate_branching_instruction(instruction, branches, ctx.loop_targets, builder);
                 translate_instruction(
                     instruction,
                     ctx.compilation_ctx,
