@@ -44,7 +44,12 @@ impl FunctionTable {
         }
     }
 
-    pub fn add(&mut self, module: &mut Module, function_id: FunctionId, function: &MappedFunction) {
+    pub fn add(
+        &mut self,
+        module: &mut Module,
+        function_id: FunctionId,
+        function: &MappedFunction,
+    ) -> &TableEntry {
         let params: Vec<ValType> = function
             .signature
             .arguments
@@ -66,6 +71,8 @@ impl FunctionTable {
 
         let table = module.tables.get_mut(self.table_id);
         table.initial = self.entries.len() as u64;
+
+        &self.entries[self.entries.len() - 1]
     }
 
     pub fn add_to_wasm_table(

@@ -172,7 +172,7 @@ fn map_bytecode_instruction(
     builder: &mut InstrSeqBuilder,
     mapped_function: &MappedFunction,
     module: &mut Module,
-    function_table: &FunctionTable,
+    function_table: &mut FunctionTable,
     types_stack: &mut TypesStack,
     function_locals: &[LocalId],
 ) -> Result<(), TranslationError> {
@@ -263,21 +263,23 @@ fn map_bytecode_instruction(
 
             let function_id = &compilation_ctx.root_module_data.function_calls
                 [function_handle_index.into_index()];
+
+            // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {
                 builder
                     .i32_const(f.index)
                     .call_indirect(f.type_id, function_table.get_table_id());
-            } else {
-                todo!()
-                /*
-                // TODO calculate index correctly. This function is not linked yet
-                let results = &compilation_ctx.root_module_data.functions_arguments
+            }
+            // Otherwise we add it to the table and declare it for linking
+            else {
+                let function_information = &compilation_ctx.root_module_data.function_information
                     [function_handle_index.into_index()];
-                let type_id = module.types.add(&arguments, &results);
+
+                let f_entry = function_table.add(module, function_id.clone(), function_information);
+
                 builder
-                    .i32_const((function_table.len() + fns_to_link.len()) as i32)
-                    .call_indirect(type_id, function_table.get_table_id());
-                */
+                    .i32_const(f_entry.index)
+                    .call_indirect(f_entry.type_id, function_table.get_table_id());
             }
 
             add_unpack_function_return_values_instructions(
@@ -308,7 +310,6 @@ fn map_bytecode_instruction(
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
-            println!("{local:?} {local_type:?}");
             local_type.move_local_instructions(builder, compilation_ctx, local);
             types_stack.push(local_type);
         }

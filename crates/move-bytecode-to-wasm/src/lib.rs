@@ -168,8 +168,6 @@ pub fn translate_package(
         modules_data.insert(root_module_id.clone(), root_module_data);
     }
 
-    println!("{:?}", function_definitions.keys());
-
     modules
 }
 
