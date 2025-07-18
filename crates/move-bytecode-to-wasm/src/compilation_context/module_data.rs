@@ -483,10 +483,6 @@ impl ModuleData {
             );
 
             let function_name = move_module.identifier_at(function.name).as_str();
-            let function_id = FunctionId {
-                identifier: function_name.to_string(),
-                module_id: module_id.clone(),
-            };
 
             let function_module = move_module.module_handle_at(function.module);
             let function_module_name = move_module.identifier_at(function_module.name).as_str();
@@ -494,6 +490,15 @@ impl ModuleData {
                 .address_identifier_at(function_module.address)
                 .into_bytes()
                 .into();
+
+            // TODO: clones and to_string()....
+            let function_id = FunctionId {
+                identifier: function_name.to_string(),
+                module_id: ModuleId {
+                    address: function_module_address,
+                    module_name: function_module_name.to_string(),
+                },
+            };
 
             // If the functions is defined in this module, we can obtain its definition and process
             // it.
@@ -538,89 +543,4 @@ impl ModuleData {
             function_information,
         )
     }
-
-    /*
-        fn process_dependency_function_definitions<'move_package>(
-            module_id: ModuleId,
-            move_module: &'move_package CompiledModule,
-            datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-            function_definitions: &mut GlobalFunctionTable<'move_package>,
-        ) -> (
-            Vec<Vec<IntermediateType>>,
-            Vec<Vec<IntermediateType>>,
-            Vec<FunctionId>,
-            Vec<MappedFunction>,
-        ) {
-            // Return types of functions in intermediate types. Used to fill the stack type
-            let mut functions_returns = Vec::new();
-            let mut functions_arguments = Vec::new();
-            let mut function_calls = Vec::new();
-            let mut function_information = Vec::new();
-
-            for (function_def, function_handle) in move_module
-                .function_defs()
-                .iter()
-                .zip(move_module.function_handles.iter())
-            {
-                assert!(
-                    function_def.acquires_global_resources.is_empty(),
-                    "Acquiring global resources is not supported yet"
-                );
-
-                let move_function_arguments = &move_module.signature_at(function_handle.parameters);
-
-                functions_arguments.push(
-                    move_function_arguments
-                        .0
-                        .iter()
-                        .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                        .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-                        .unwrap(),
-                );
-
-                let move_function_return = &move_module.signature_at(function_handle.return_);
-
-                functions_returns.push(
-                    move_function_return
-                        .0
-                        .iter()
-                        .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                        .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-                        .unwrap(),
-                );
-
-                // Code can be empty (for example in native functions)
-                let code_locals = if let Some(code) = function_def.code.as_ref() {
-                    &move_module.signature_at(code.locals).0
-                } else {
-                    &vec![]
-                };
-
-                let function_name = move_module.identifier_at(function_handle.name).to_string();
-
-                let function_id = FunctionId {
-                    identifier: function_name.clone(),
-                    module_id: module_id.clone(),
-                };
-
-                function_information.push(MappedFunction::new(
-                    function_name,
-                    move_function_arguments,
-                    move_function_return,
-                    code_locals,
-                    &function_def,
-                    datatype_handles_map,
-                ));
-
-                function_definitions.insert(function_id, function_def);
-            }
-
-            (
-                functions_arguments,
-                functions_returns,
-                function_calls,
-                function_information,
-            )
-        }
-    */
 }

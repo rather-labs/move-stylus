@@ -119,7 +119,6 @@ impl FunctionTable {
     }
 
     pub fn ensure_all_functions_added(&self) -> Result<()> {
-        println!("{:#?}", self.entries);
         if let Some(entry) = self.entries.iter().find(|e| e.wasm_function_id.is_none()) {
             anyhow::bail!(
                 "function {} was not added to the functions table",

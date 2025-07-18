@@ -274,8 +274,24 @@ fn map_bytecode_instruction(
             // Otherwise we add it to the table and declare it for linking
             else {
                 println!("adding {function_id} to table ");
-                let function_information = &compilation_ctx.root_module_data.function_information
-                    [function_handle_index.into_index()];
+                let function_information = if let Some(fi) = &compilation_ctx
+                    .root_module_data
+                    .function_information
+                    .get(function_handle_index.into_index())
+                {
+                    fi
+                } else {
+                    let dependency_data = compilation_ctx
+                        .deps_data
+                        .get(&function_id.module_id)
+                        .unwrap();
+
+                    dependency_data
+                        .function_information
+                        .iter()
+                        .find(|f| &f.function_id == function_id)
+                        .unwrap()
+                };
 
                 let f_entry = function_table.add(module, function_id.clone(), function_information);
 
