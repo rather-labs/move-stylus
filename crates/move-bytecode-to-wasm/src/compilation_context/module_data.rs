@@ -571,13 +571,12 @@ impl ModuleData {
                     code_locals,
                     function_def,
                     datatype_handles_map,
-                    wasm_module,
                 );
 
                 function_table.add(
                     wasm_module,
                     function_id.clone(),
-                    mapped_function,
+                    &mapped_function,
                     function_handle_index,
                 );
 

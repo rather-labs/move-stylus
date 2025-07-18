@@ -20,7 +20,6 @@ pub struct FunctionId {
 pub struct TableEntry {
     pub index: i32,
     pub function_id: FunctionId,
-    pub function: MappedFunction,
     pub function_handle_index: FunctionHandleIndex,
     pub type_id: TypeId,
     pub params: Vec<ValType>,
@@ -51,7 +50,7 @@ impl FunctionTable {
         &mut self,
         module: &mut Module,
         function_id: FunctionId,
-        function: MappedFunction,
+        function: &MappedFunction,
         function_handle_index: FunctionHandleIndex,
     ) {
         let params: Vec<ValType> = function
@@ -67,7 +66,6 @@ impl FunctionTable {
         self.entries.push(TableEntry {
             index,
             function_id,
-            function,
             type_id,
             params,
             results,
@@ -130,8 +128,8 @@ impl FunctionTable {
     pub fn ensure_all_functions_added(&self) -> Result<()> {
         if let Some(entry) = self.entries.iter().find(|e| !e.added_to_wasm_table) {
             anyhow::bail!(
-                "function {} was not added to the functions table",
-                entry.function.name
+                "function {:?} was not added to the functions table",
+                entry.function_id
             );
         }
 
