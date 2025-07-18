@@ -17,6 +17,7 @@ use walrus::{FunctionBuilder, LocalId, Module};
 use walrus::{FunctionId as WasmFunctionId, InstrSeqBuilder, ValType, ir::MemArg};
 
 use crate::CompilationContext;
+use crate::compilation_context::ModuleData;
 use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
@@ -38,6 +39,7 @@ pub use error::TranslationError;
 pub fn translate_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    module_data: &ModuleData,
     function_table: &mut FunctionTable,
     function_information: &MappedFunction,
     move_bytecode: &CodeUnit,
@@ -68,12 +70,20 @@ pub fn translate_function(
     );
 
     let mut types_stack = TypesStack::new();
-
     let mut functions_to_link = HashSet::new();
+
+    /*
+    println!(
+        "Translating {}, {:#?}",
+        function_information.function_id, &move_bytecode
+    );
+    */
+
     for instruction in &move_bytecode.code {
         let mut fns_to_link = map_bytecode_instruction(
             instruction,
             compilation_ctx,
+            module_data,
             &mut builder,
             function_information,
             module,
@@ -87,6 +97,8 @@ pub fn translate_function(
 
         functions_to_link.extend(fns_to_link.drain(..))
     }
+
+    function.name(function_information.function_id.identifier.clone());
 
     let function_id = function.finish(arguments, &mut module.funcs);
     Ok((function_id, functions_to_link))
@@ -171,9 +183,12 @@ pub fn box_args(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn map_bytecode_instruction(
     instruction: &Bytecode,
     compilation_ctx: &CompilationContext,
+    // Module we are currently compiling
+    module_data: &ModuleData,
     builder: &mut InstrSeqBuilder,
     mapped_function: &MappedFunction,
     module: &mut Module,
@@ -186,12 +201,12 @@ fn map_bytecode_instruction(
     match instruction {
         // Load a fixed constant
         Bytecode::LdConst(global_index) => {
-            let constant = &compilation_ctx.root_module_data.constants[global_index.0 as usize];
+            let constant = &module_data.constants[global_index.0 as usize];
             let mut data = constant.data.clone().into_iter();
             let constant_type = &constant.type_;
             let constant_type: IntermediateType = IntermediateType::try_from_signature_token(
                 constant_type,
-                &compilation_ctx.root_module_data.datatype_handles_map,
+                &module_data.datatype_handles_map,
             )?;
 
             constant_type.load_constant_instructions(module, builder, &mut data, compilation_ctx);
@@ -249,8 +264,8 @@ fn map_bytecode_instruction(
         // Function calls
         Bytecode::Call(function_handle_index) => {
             // Consume from the types stack the arguments that will be used by the function call
-            let arguments = &compilation_ctx.root_module_data.functions_arguments
-                [function_handle_index.into_index()];
+            let arguments = &module_data.functions_arguments[function_handle_index.into_index()];
+
             for argument in arguments.iter().rev() {
                 types_stack.pop_expecting(argument)?;
 
@@ -266,8 +281,7 @@ fn map_bytecode_instruction(
                 }
             }
 
-            let function_id = &compilation_ctx.root_module_data.function_calls
-                [function_handle_index.into_index()];
+            let function_id = &module_data.function_calls[function_handle_index.into_index()];
 
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {
@@ -310,13 +324,11 @@ fn map_bytecode_instruction(
             add_unpack_function_return_values_instructions(
                 builder,
                 module,
-                &compilation_ctx.root_module_data.functions_returns
-                    [function_handle_index.0 as usize],
+                &module_data.functions_returns[function_handle_index.0 as usize],
                 compilation_ctx.memory_id,
             );
             // Insert in the stack types the types returned by the function (if any)
-            let return_types = &compilation_ctx.root_module_data.functions_returns
-                [function_handle_index.0 as usize];
+            let return_types = &module_data.functions_returns[function_handle_index.0 as usize];
             types_stack.append(return_types);
         }
         // Locals
@@ -382,10 +394,7 @@ fn map_bytecode_instruction(
             let instantiation_types = instantiation_types
                 .iter()
                 .map(|t| {
-                    IntermediateType::try_from_signature_token(
-                        t,
-                        &compilation_ctx.root_module_data.datatype_handles_map,
-                    )
+                    IntermediateType::try_from_signature_token(t, &module_data.datatype_handles_map)
                 })
                 .collect::<Result<Vec<_>, anyhow::Error>>()?;
 
@@ -439,10 +448,7 @@ fn map_bytecode_instruction(
             let instantiation_types = instantiation_types
                 .iter()
                 .map(|t| {
-                    IntermediateType::try_from_signature_token(
-                        t,
-                        &compilation_ctx.root_module_data.datatype_handles_map,
-                    )
+                    IntermediateType::try_from_signature_token(t, &module_data.datatype_handles_map)
                 })
                 .collect::<Result<Vec<_>, anyhow::Error>>()?;
 

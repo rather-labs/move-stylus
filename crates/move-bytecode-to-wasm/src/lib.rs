@@ -239,26 +239,27 @@ fn translate_and_link_functions(
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
 ) {
-    // Obtain the function information
-
-    let function_information = if let Some(fi) = compilation_ctx
+    // Obtain the function information and module's data
+    let (function_information, module_data) = if let Some(fi) = compilation_ctx
         .root_module_data
         .function_information
         .iter()
         .find(|f| &f.function_id == function_id)
     {
-        fi
+        (fi, compilation_ctx.root_module_data)
     } else {
-        let dependency_data = compilation_ctx
+        let module_data = compilation_ctx
             .deps_data
             .get(&function_id.module_id)
             .unwrap();
 
-        dependency_data
+        let fi = module_data
             .function_information
             .iter()
             .find(|f| &f.function_id == function_id)
-            .unwrap()
+            .unwrap();
+
+        (fi, module_data)
     };
 
     // Process function defined in this module
@@ -282,10 +283,16 @@ fn translate_and_link_functions(
         .unwrap_or_else(|| panic!("could not find function definition for {}", function_id));
 
     let move_bytecode = function_definition.code.as_ref().unwrap();
-
+    /*
+    println!(
+        "Translating {}, {:#?}",
+        function_information.function_id, function_definition
+    );
+    */
     let (wasm_function_id, functions_to_link) = translate_function(
         module,
         compilation_ctx,
+        module_data,
         function_table,
         function_information,
         move_bytecode,
