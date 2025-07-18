@@ -1,13 +1,13 @@
 use crate::{
     GlobalFunctionTable,
     translation::{
-        functions::{DependencyMappedFunction, MappedFunction},
+        functions::MappedFunction,
         intermediate_types::{
             IntermediateType,
             enums::{IEnum, IEnumVariant},
             structs::IStruct,
         },
-        table::{FunctionId, FunctionTable},
+        table::FunctionId,
     },
 };
 use move_binary_format::{
@@ -100,6 +100,9 @@ pub struct ModuleData {
     /// Functions called inside this module. The functions on this list can be defined inside the
     /// current module or in an immediate dependency
     pub function_calls: Vec<FunctionId>,
+
+    /// Function information about this module's defined functions
+    pub function_information: Vec<MappedFunction>,
 }
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
@@ -142,8 +145,6 @@ impl ModuleData {
     pub fn build_module_data<'move_package>(
         module_id: ModuleId,
         move_module: &'move_package CompiledModule,
-        wasm_module: &mut walrus::Module,
-        function_table: &mut FunctionTable,
         function_definitions: &mut GlobalFunctionTable<'move_package>,
     ) -> Self {
         let datatype_handles_map = Self::process_datatype_handles(move_module);
@@ -162,12 +163,10 @@ impl ModuleData {
         let (module_enums, variants_to_enum_map) =
             Self::process_concrete_enums(move_module, &datatype_handles_map);
 
-        let (functions_arguments, functions_returns, function_calls) =
+        let (functions_arguments, functions_returns, function_calls, function_information) =
             Self::process_function_definitions(
                 module_id,
                 move_module,
-                wasm_module,
-                function_table,
                 &datatype_handles_map,
                 function_definitions,
             );
@@ -186,52 +185,7 @@ impl ModuleData {
             variants_to_enum_map,
             instantiated_fields_to_generic_fields,
             function_calls,
-        }
-    }
-
-    pub fn build_dependency_module_data<'move_package>(
-        module_id: ModuleId,
-        move_module: &'move_package CompiledModule,
-        function_definitions: &mut GlobalFunctionTable<'move_package>,
-    ) -> Self {
-        let datatype_handles_map = Self::process_datatype_handles(move_module);
-
-        let (module_generic_structs_instances, generic_fields_to_struct_map) =
-            Self::process_generic_structs(move_module);
-
-        let instantiated_fields_to_generic_fields =
-            Self::process_generic_field_instances(move_module);
-
-        // Module's structs
-        let (module_structs, fields_to_struct_map) =
-            Self::process_concrete_structs(move_module, &datatype_handles_map);
-
-        // Module's enums
-        let (module_enums, variants_to_enum_map) =
-            Self::process_concrete_enums(move_module, &datatype_handles_map);
-
-        let (functions_arguments, functions_returns, function_calls) =
-            Self::process_dependency_function_definitions(
-                module_id,
-                move_module,
-                &datatype_handles_map,
-                function_definitions,
-            );
-
-        ModuleData {
-            constants: move_module.constant_pool.clone(), // TODO: Clone
-            functions_arguments,
-            functions_returns,
-            module_signatures: move_module.signatures.clone(),
-            module_structs,
-            module_generic_structs_instances,
-            datatype_handles_map,
-            fields_to_struct_map,
-            generic_fields_to_struct_map,
-            module_enums,
-            variants_to_enum_map,
-            instantiated_fields_to_generic_fields,
-            function_calls,
+            function_information,
         }
     }
 
@@ -491,19 +445,19 @@ impl ModuleData {
     fn process_function_definitions<'move_package>(
         module_id: ModuleId,
         move_module: &'move_package CompiledModule,
-        wasm_module: &mut walrus::Module,
-        function_table: &mut FunctionTable,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         function_definitions: &mut GlobalFunctionTable<'move_package>,
     ) -> (
         Vec<Vec<IntermediateType>>,
         Vec<Vec<IntermediateType>>,
         Vec<FunctionId>,
+        Vec<MappedFunction>,
     ) {
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
         let mut functions_arguments = Vec::new();
         let mut function_calls = Vec::new();
+        let mut function_information = Vec::new();
 
         for (index, function) in move_module.function_handles().iter().enumerate() {
             let move_function_arguments = &move_module.signature_at(function.parameters);
@@ -562,23 +516,14 @@ impl ModuleData {
                     &vec![]
                 };
 
-                let function_handle_index = function_def.function;
-
-                let mapped_function = MappedFunction::new(
-                    function_name.to_string(),
+                function_information.push(MappedFunction::new(
+                    function_id.clone(),
                     move_function_arguments,
                     move_function_return,
                     code_locals,
                     function_def,
                     datatype_handles_map,
-                );
-
-                function_table.add(
-                    wasm_module,
-                    function_id.clone(),
-                    &mapped_function,
-                    function_handle_index,
-                );
+                ));
 
                 function_definitions.insert(function_id.clone(), function_def);
             }
@@ -586,81 +531,96 @@ impl ModuleData {
             function_calls.push(function_id);
         }
 
-        (functions_arguments, functions_returns, function_calls)
+        (
+            functions_arguments,
+            functions_returns,
+            function_calls,
+            function_information,
+        )
     }
 
-    fn process_dependency_function_definitions<'move_package>(
-        module_id: ModuleId,
-        move_module: &'move_package CompiledModule,
-        datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-        function_definitions: &mut GlobalFunctionTable<'move_package>,
-    ) -> (
-        Vec<Vec<IntermediateType>>,
-        Vec<Vec<IntermediateType>>,
-        Vec<FunctionId>,
-    ) {
-        // Return types of functions in intermediate types. Used to fill the stack type
-        let mut functions_returns = Vec::new();
-        let mut functions_arguments = Vec::new();
-        let mut function_calls = Vec::new();
+    /*
+        fn process_dependency_function_definitions<'move_package>(
+            module_id: ModuleId,
+            move_module: &'move_package CompiledModule,
+            datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+            function_definitions: &mut GlobalFunctionTable<'move_package>,
+        ) -> (
+            Vec<Vec<IntermediateType>>,
+            Vec<Vec<IntermediateType>>,
+            Vec<FunctionId>,
+            Vec<MappedFunction>,
+        ) {
+            // Return types of functions in intermediate types. Used to fill the stack type
+            let mut functions_returns = Vec::new();
+            let mut functions_arguments = Vec::new();
+            let mut function_calls = Vec::new();
+            let mut function_information = Vec::new();
 
-        for (function_def, function_handle) in move_module
-            .function_defs()
-            .iter()
-            .zip(move_module.function_handles.iter())
-        {
-            assert!(
-                function_def.acquires_global_resources.is_empty(),
-                "Acquiring global resources is not supported yet"
-            );
+            for (function_def, function_handle) in move_module
+                .function_defs()
+                .iter()
+                .zip(move_module.function_handles.iter())
+            {
+                assert!(
+                    function_def.acquires_global_resources.is_empty(),
+                    "Acquiring global resources is not supported yet"
+                );
 
-            let move_function_arguments = &move_module.signature_at(function_handle.parameters);
+                let move_function_arguments = &move_module.signature_at(function_handle.parameters);
 
-            functions_arguments.push(
-                move_function_arguments
-                    .0
-                    .iter()
-                    .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-                    .unwrap(),
-            );
+                functions_arguments.push(
+                    move_function_arguments
+                        .0
+                        .iter()
+                        .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
+                        .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                        .unwrap(),
+                );
 
-            let move_function_return = &move_module.signature_at(function_handle.return_);
+                let move_function_return = &move_module.signature_at(function_handle.return_);
 
-            functions_returns.push(
-                move_function_return
-                    .0
-                    .iter()
-                    .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-                    .unwrap(),
-            );
+                functions_returns.push(
+                    move_function_return
+                        .0
+                        .iter()
+                        .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
+                        .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                        .unwrap(),
+                );
 
-            // Code can be empty (for example in native functions)
-            let code_locals = if let Some(code) = function_def.code.as_ref() {
-                &move_module.signature_at(code.locals).0
-            } else {
-                &vec![]
-            };
+                // Code can be empty (for example in native functions)
+                let code_locals = if let Some(code) = function_def.code.as_ref() {
+                    &move_module.signature_at(code.locals).0
+                } else {
+                    &vec![]
+                };
 
-            let function_name = move_module.identifier_at(function_handle.name).to_string();
+                let function_name = move_module.identifier_at(function_handle.name).to_string();
 
-            let function_id = FunctionId {
-                identifier: function_name.clone(),
-                module_id: module_id.clone(),
-            };
+                let function_id = FunctionId {
+                    identifier: function_name.clone(),
+                    module_id: module_id.clone(),
+                };
 
-            let mapped_function = DependencyMappedFunction::new(
-                function_name,
-                move_function_arguments,
-                move_function_return,
-                code_locals,
-                datatype_handles_map,
-            );
+                function_information.push(MappedFunction::new(
+                    function_name,
+                    move_function_arguments,
+                    move_function_return,
+                    code_locals,
+                    &function_def,
+                    datatype_handles_map,
+                ));
 
-            function_definitions.insert(function_id, function_def);
+                function_definitions.insert(function_id, function_def);
+            }
+
+            (
+                functions_arguments,
+                functions_returns,
+                function_calls,
+                function_information,
+            )
         }
-
-        (functions_arguments, functions_returns, function_calls)
-    }
+    */
 }

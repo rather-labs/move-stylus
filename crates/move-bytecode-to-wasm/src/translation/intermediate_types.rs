@@ -1045,6 +1045,7 @@ impl From<IntermediateType> for ValType {
     }
 }
 
+#[derive(Debug)]
 pub struct ISignature {
     pub arguments: Vec<IntermediateType>,
     pub returns: Vec<IntermediateType>,

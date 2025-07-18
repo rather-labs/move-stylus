@@ -1,5 +1,4 @@
 use anyhow::Result;
-use move_binary_format::file_format::FunctionHandleIndex;
 use walrus::{
     ConstExpr, ElementKind, FunctionId as WasmFunctionId, Module, TableId, TypeId, ValType,
     ir::Value,
@@ -20,7 +19,6 @@ pub struct FunctionId {
 pub struct TableEntry {
     pub index: i32,
     pub function_id: FunctionId,
-    pub function_handle_index: FunctionHandleIndex,
     pub type_id: TypeId,
     pub params: Vec<ValType>,
     pub results: Vec<ValType>,
@@ -46,13 +44,7 @@ impl FunctionTable {
         }
     }
 
-    pub fn add(
-        &mut self,
-        module: &mut Module,
-        function_id: FunctionId,
-        function: &MappedFunction,
-        function_handle_index: FunctionHandleIndex,
-    ) {
+    pub fn add(&mut self, module: &mut Module, function_id: FunctionId, function: &MappedFunction) {
         let params: Vec<ValType> = function
             .signature
             .arguments
@@ -69,7 +61,6 @@ impl FunctionTable {
             type_id,
             params,
             results,
-            function_handle_index,
             added_to_wasm_table: false,
         });
 
@@ -106,15 +97,6 @@ impl FunctionTable {
 
     pub fn get_mut(&mut self, index: usize) -> Option<&mut TableEntry> {
         self.entries.get_mut(index)
-    }
-
-    pub fn get_by_function_handle_index(
-        &self,
-        function_handle_index: &FunctionHandleIndex,
-    ) -> Option<&TableEntry> {
-        self.entries
-            .iter()
-            .find(|e| e.function_handle_index == *function_handle_index)
     }
 
     pub fn get_table_id(&self) -> TableId {

@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::Path};
 
 use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
-use compilation_context::{ModuleData, ModuleId, module_data::Address};
+use compilation_context::{ModuleData, ModuleId};
 use move_binary_format::file_format::FunctionDefinition;
 use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
@@ -67,7 +67,7 @@ pub fn translate_package(
     // statically link them
     let mut function_definitions: GlobalFunctionTable = HashMap::new();
 
-    // TODO: a lot of cloenes, we must create a symbol pool
+    // TODO: a lot of clones, we must create a symbol pool
     for root_compiled_module in &root_compiled_units {
         let module_name = root_compiled_module.unit.name.to_string();
         println!("compiling module {module_name}...");
@@ -96,12 +96,8 @@ pub fn translate_package(
         let root_module_data = ModuleData::build_module_data(
             root_module_id.clone(),
             root_compiled_module,
-            &mut module,
-            &mut function_table,
             &mut function_definitions,
         );
-
-        modules_data.insert(root_module_id.clone(), root_module_data);
 
         let compilation_ctx = CompilationContext {
             root_module_data: &modules_data[&root_module_id],
@@ -113,41 +109,46 @@ pub fn translate_package(
         let mut public_functions = Vec::new();
         let mut function_ids = Vec::new();
 
-        for index in 0..function_table.len() {
-            let function_handle_idx = function_table.get(index).unwrap().function_handle_index;
-            let function_name = root_compiled_module.identifier_at(
-                root_compiled_module
-                    .function_handle_at(function_handle_idx)
-                    .name,
-            );
-
-            let (_, function_definition) = root_compiled_module
-                .find_function_def_by_name(function_name.as_str())
+        // Process function defined in this module
+        for function_information in root_module_data
+            .function_information
+            .iter()
+            .filter(|fi| fi.function_id.module_id == root_module_id)
+        {
+            let function_definition = function_definitions
+                .get(&function_information.function_id)
                 .unwrap();
+
+            function_table.add(
+                &mut module,
+                function_information.function_id.clone(),
+                &function_information,
+            );
 
             let move_bytecode = function_definition.code.as_ref().unwrap();
 
             let function_id = translate_function(
                 &mut module,
-                index,
                 &compilation_ctx,
                 &mut function_table,
+                &function_information,
                 move_bytecode,
             )
-            .unwrap();
+            .expect(
+                format!(
+                    "there was an error translating {:?}",
+                    function_information.function_id
+                )
+                .as_str(),
+            );
 
             function_ids.push(function_id);
-        }
 
-        for (index, function_id) in function_ids.iter().enumerate() {
-            let entry = function_table.get(index).unwrap();
-            let mapped_function = &entry.function;
-
-            if mapped_function.is_entry {
+            if function_information.is_entry {
                 public_functions.push(PublicFunction::new(
-                    *function_id,
-                    &mapped_function.name,
-                    &mapped_function.signature,
+                    function_id,
+                    &function_information.function_id.identifier,
+                    &function_information.signature,
                     &compilation_ctx,
                 ));
             }
@@ -166,6 +167,7 @@ pub fn translate_package(
         validate_stylus_wasm(&mut module).unwrap();
 
         modules.insert(module_name, module);
+        modules_data.insert(root_module_id.clone(), root_module_data);
     }
 
     println!("{:?}", function_definitions.keys());
@@ -252,7 +254,7 @@ pub fn process_dependency_tree<'move_package>(
             );
         }
 
-        let dependency_module_data = ModuleData::build_dependency_module_data(
+        let dependency_module_data = ModuleData::build_module_data(
             module_id.clone(),
             dependency_module,
             function_definitions,

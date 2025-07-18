@@ -10,10 +10,11 @@ use walrus::{
 
 use crate::{CompilationContext, UserDefinedType, translation::intermediate_types::ISignature};
 
-use super::intermediate_types::IntermediateType;
+use super::{intermediate_types::IntermediateType, table::FunctionId};
 
+#[derive(Debug)]
 pub struct MappedFunction {
-    pub name: String,
+    pub function_id: FunctionId,
     pub signature: ISignature,
     pub function_locals_ir: Vec<IntermediateType>,
     pub arguments: Vec<IntermediateType>,
@@ -25,7 +26,7 @@ pub struct MappedFunction {
 impl MappedFunction {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        name: String,
+        function_id: FunctionId,
         move_args: &Signature,
         move_rets: &Signature,
         move_locals: &[SignatureToken],
@@ -61,58 +62,12 @@ impl MappedFunction {
             .expect("Failed to argument types");
 
         Self {
-            name,
+            function_id,
             signature,
             function_locals_ir: local_variables_type,
             arguments,
             // TODO: change to function_definition.is_entry
             is_entry: function_definition.visibility == Visibility::Public,
-        }
-    }
-}
-
-pub struct DependencyMappedFunction {
-    pub name: String,
-    pub signature: ISignature,
-    pub function_locals_ir: Vec<IntermediateType>,
-}
-
-impl DependencyMappedFunction {
-    pub fn new(
-        name: String,
-        move_args: &Signature,
-        move_rets: &Signature,
-        move_locals: &[SignatureToken],
-        handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-    ) -> Self {
-        let signature = ISignature::from_signatures(move_args, move_rets, handles_map);
-
-        /*
-        assert!(
-            wasm_ret_types.len() <= 1,
-            "Multiple return values not supported"
-        );
-        */
-
-        let ir_arg_types = move_args
-            .0
-            .iter()
-            .map(|s| IntermediateType::try_from_signature_token(s, handles_map));
-
-        // Declared locals
-        let ir_declared_locals_types = move_locals
-            .iter()
-            .map(|s| IntermediateType::try_from_signature_token(s, handles_map));
-
-        let local_variables_type = ir_arg_types
-            .chain(ir_declared_locals_types)
-            .collect::<Result<Vec<_>, _>>()
-            .expect("Failed to parse types");
-
-        Self {
-            name,
-            signature,
-            function_locals_ir: local_variables_type,
         }
     }
 }
