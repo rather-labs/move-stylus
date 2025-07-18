@@ -106,21 +106,20 @@ pub fn translate_package(
             allocator: allocator_func,
         };
 
-        translate_and_link_functions(
-            &root_module_data,
-            &root_module_id,
-            &mut function_table,
-            &function_definitions,
-            &mut module,
-            &compilation_ctx,
-        );
-
         let mut public_functions = Vec::new();
         for function_information in root_module_data
             .function_information
             .iter()
             .filter(|fi| fi.function_id.module_id == root_module_id)
         {
+            translate_and_link_functions(
+                &function_information.function_id,
+                &mut function_table,
+                &function_definitions,
+                &mut module,
+                &compilation_ctx,
+            );
+
             let wasm_function_id = function_table
                 .get_by_function_id(&function_information.function_id)
                 .unwrap()
@@ -230,73 +229,75 @@ pub fn process_dependency_tree<'move_package>(
     }
 }
 
+/// Trnaslates a function to WASM and links it to the WASM module
+///
+/// It also recursively translates and links all the functions called by this function
 fn translate_and_link_functions(
-    module_data: &ModuleData,
-    module_id: &ModuleId,
+    function_id: &FunctionId,
     function_table: &mut FunctionTable,
     function_definitions: &GlobalFunctionTable,
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
 ) {
-    // Process function defined in this module
-    for function_information in module_data
+    // Obtain the function information
+
+    let function_information = if let Some(fi) = compilation_ctx
+        .root_module_data
         .function_information
         .iter()
-        .filter(|fi| &fi.function_id.module_id == module_id)
+        .find(|f| &f.function_id == function_id)
     {
-        println!("\n processing {}", function_information.function_id);
-        // First we check if there is already an entry for this function
-        if let Some(table_entry) =
-            function_table.get_by_function_id(&function_information.function_id)
-        {
-            // If it has asigned a wasm function id means that we already translated it, so we skip
-            // it
-            if table_entry.wasm_function_id.is_some() {
-                println!("continuee");
-                continue;
-            }
+        fi
+    } else {
+        let dependency_data = compilation_ctx
+            .deps_data
+            .get(&function_id.module_id)
+            .unwrap();
+
+        dependency_data
+            .function_information
+            .iter()
+            .find(|f| &f.function_id == function_id)
+            .unwrap()
+    };
+
+    // Process function defined in this module
+    println!("\n processing {function_id}");
+    // First we check if there is already an entry for this function
+    if let Some(table_entry) = function_table.get_by_function_id(function_id) {
+        // If it has asigned a wasm function id means that we already translated it, so we skip
+        // it
+        if table_entry.wasm_function_id.is_some() {
+            println!("continuee");
+            return;
         }
-        // If it is not present, we add an entry for it
-        else {
-            function_table.add(
-                module,
-                function_information.function_id.clone(),
-                function_information,
-            );
-        }
-
-        let function_definition = function_definitions
-            .get(&function_information.function_id)
-            .unwrap_or_else(|| {
-                panic!(
-                    "could not find function definition for {}",
-                    function_information.function_id
-                )
-            });
-
-        let move_bytecode = function_definition.code.as_ref().unwrap();
-
-        let function_id = translate_function(
-            module,
-            compilation_ctx,
-            function_table,
-            function_information,
-            move_bytecode,
-        )
-        .unwrap_or_else(|_| {
-            panic!(
-                "there was an error translating {}",
-                function_information.function_id
-            )
-        });
-
-        println!("translated {}", function_information.function_id);
-
-        function_table
-            .add_to_wasm_table(module, &function_information.function_id, function_id)
-            .expect("there was an error adding the module's functions to the function table");
-        println!();
     }
+    // If it is not present, we add an entry for it
+    else {
+        function_table.add(module, function_id.clone(), function_information);
+    }
+
+    let function_definition = function_definitions
+        .get(function_id)
+        .unwrap_or_else(|| panic!("could not find function definition for {}", function_id));
+
+    let move_bytecode = function_definition.code.as_ref().unwrap();
+
+    let wasm_function_id = translate_function(
+        module,
+        compilation_ctx,
+        function_table,
+        function_information,
+        move_bytecode,
+    )
+    .unwrap_or_else(|_| panic!("there was an error translating {}", function_id));
+
+    println!("translated {}", function_id);
+
+    function_table
+        .add_to_wasm_table(module, function_id, wasm_function_id)
+        .expect("there was an error adding the module's functions to the function table");
+    println!();
 }
 
 fn inject_debug_fns(module: &mut walrus::Module) {
