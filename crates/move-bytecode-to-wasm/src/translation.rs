@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 use move_binary_format::file_format::Bytecode;
 use relooper::BranchMode;
-use walrus::ir::{BinaryOp, Block, InstrSeqId, InstrSeqType, LoadKind, MemArg, UnaryOp};
+use walrus::ir::{BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, UnaryOp};
 use walrus::{FunctionBuilder, FunctionId, InstrSeqBuilder, Module, ValType};
 
 use crate::CompilationContext;
@@ -34,11 +34,12 @@ pub mod functions;
 pub mod intermediate_types;
 pub mod table;
 
-struct TranslateInstructionContext<'a> {
+struct TranslateFlowContext<'a> {
     compilation_ctx: &'a CompilationContext,
     types_stack: &'a mut TypesStack,
     function_table: &'a FunctionTable,
     entry: &'a TableEntry,
+    loop_targets: &'a mut HashMap<u16, InstrSeqId>,
 }
 
 pub fn translate_function(
@@ -72,32 +73,32 @@ pub fn translate_function(
     let flow = Flow::new(code_unit, entry);
     println!("flow: {:#?}", flow);
 
-    // Type stack for the current function.
-    // It is filled recursively, meaning parent nodes inherit types left by child nodes on the stack.
-    let mut types_stack = TypesStack::new();
     // Loop targets maps the relooper-assigned loop id to the loop's instruction sequence id.
     let mut loop_targets: HashMap<u16, InstrSeqId> = HashMap::new();
 
-    let mut ctx = TranslateInstructionContext {
+    let mut types_stack = TypesStack::new();
+
+    let mut ctx = TranslateFlowContext {
         compilation_ctx,
         function_table,
         entry,
         types_stack: &mut types_stack,
+        loop_targets: &mut loop_targets,
     };
 
-    translate_flow(&mut ctx, &mut builder, module, &flow, &mut loop_targets);
+    translate_flow(&mut ctx, &mut builder, module, &flow);
 
     let function_id = function.finish(entry.function.arg_locals.clone(), &mut module.funcs);
     Ok(function_id)
 }
 
-// TODO: check we are setting result types correctly
+// Recusively translate the flow to wasm.
+// It is responsible for both handling the control flow as well as translating the specific instructions to wasm.
 fn translate_flow(
-    ctx: &mut TranslateInstructionContext,
+    ctx: &mut TranslateFlowContext,
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
     flow: &Flow,
-    loop_targets: &mut HashMap<u16, InstrSeqId>,
 ) {
     match flow {
         Flow::Simple {
@@ -106,7 +107,12 @@ fn translate_flow(
             ..
         } => {
             for instruction in instructions {
-                translate_branching_instruction(instruction, branches, loop_targets, builder);
+                translate_branching_instruction(
+                    &instruction,
+                    &branches,
+                    &ctx.loop_targets,
+                    builder,
+                );
                 translate_instruction(
                     instruction,
                     ctx.compilation_ctx,
@@ -121,7 +127,7 @@ fn translate_flow(
         }
         Flow::Sequence(flows) => {
             for f in flows {
-                translate_flow(ctx, builder, module, f, loop_targets);
+                translate_flow(ctx, builder, module, f);
             }
         }
         Flow::Loop {
@@ -132,9 +138,8 @@ fn translate_flow(
             let ty = InstrSeqType::new(&mut module.types, &[], stack);
             builder.loop_(ty, |loop_| {
                 // loop_targets maps the relooper-assigned loop id to the loop's instruction sequence id.
-                loop_targets.insert(*loop_id, loop_.id());
-
-                translate_flow(ctx, loop_, module, body, loop_targets);
+                ctx.loop_targets.insert(*loop_id, loop_.id());
+                translate_flow(ctx, loop_, module, body);
             });
         }
         Flow::IfElse {
@@ -149,13 +154,13 @@ fn translate_flow(
                 let ty = InstrSeqType::new(&mut module.types, &[], &then_stack);
                 let then_id = {
                     let mut then_seq = builder.dangling_instr_seq(ty);
-                    translate_flow(ctx, &mut then_seq, module, then_body, loop_targets);
+                    translate_flow(ctx, &mut then_seq, module, then_body);
                     then_seq.id()
                 };
 
                 let else_id = {
                     let mut else_seq = builder.dangling_instr_seq(ty);
-                    translate_flow(ctx, &mut else_seq, module, else_body, loop_targets);
+                    translate_flow(ctx, &mut else_seq, module, else_body);
                     else_seq.id()
                 };
 
@@ -174,33 +179,33 @@ fn translate_flow(
 
                 let then_id = {
                     let mut then_seq = builder.dangling_instr_seq(None);
-                    translate_flow(ctx, &mut then_seq, module, then_body, loop_targets);
+                    translate_flow(ctx, &mut then_seq, module, then_body);
                     then_seq.id()
                 };
 
-                builder.instr(walrus::ir::IfElse {
+                builder.instr(IfElse {
                     consequent: then_id,
                     alternative: phantom_seq_id,
                 });
 
-                translate_flow(ctx, builder, module, else_body, loop_targets);
+                translate_flow(ctx, builder, module, else_body);
             } else if else_stack.is_empty() {
                 let phantom_seq = builder.dangling_instr_seq(None);
                 let phantom_seq_id = phantom_seq.id();
 
                 let else_id = {
                     let mut else_seq = builder.dangling_instr_seq(None);
-                    translate_flow(ctx, &mut else_seq, module, else_body, loop_targets);
+                    translate_flow(ctx, &mut else_seq, module, else_body);
                     else_seq.id()
                 };
 
                 builder.unop(UnaryOp::I32Eqz);
-                builder.instr(walrus::ir::IfElse {
+                builder.instr(IfElse {
                     consequent: else_id,
                     alternative: phantom_seq_id,
                 });
 
-                translate_flow(ctx, builder, module, then_body, loop_targets);
+                translate_flow(ctx, builder, module, then_body);
             } else {
                 panic!(
                     "Error: Mismatched types on the stack from Then and Else branches, and neither is empty."
