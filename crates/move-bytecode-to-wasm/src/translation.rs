@@ -36,6 +36,7 @@ pub mod table;
 
 struct TranslateInstructionContext<'a> {
     compilation_ctx: &'a CompilationContext,
+    types_stack: &'a mut TypesStack,
     function_table: &'a FunctionTable,
     entry: &'a TableEntry,
 }
@@ -68,7 +69,8 @@ pub fn translate_function(
 
     let code_unit = &entry.get_move_code_unit().unwrap();
 
-    let flow = Flow::new(code_unit, compilation_ctx, &entry.function);
+    let flow = Flow::new(code_unit, &entry);
+    println!("flow: {:#?}", flow);
 
     // Type stack for the current function.
     // It is filled recursively, meaning parent nodes inherit types left by child nodes on the stack.
@@ -76,20 +78,14 @@ pub fn translate_function(
     // Loop targets maps the relooper-assigned loop id to the loop's instruction sequence id.
     let mut loop_targets: HashMap<u16, InstrSeqId> = HashMap::new();
 
-    let ctx = TranslateInstructionContext {
+    let mut ctx = TranslateInstructionContext {
         compilation_ctx,
         function_table,
         entry,
+        types_stack: &mut types_stack,
     };
 
-    translate_flow(
-        &ctx,
-        &mut builder,
-        module,
-        &mut types_stack,
-        &flow,
-        &mut loop_targets,
-    );
+    translate_flow(&mut ctx, &mut builder, module, &flow, &mut loop_targets);
 
     let function_id = function.finish(entry.function.arg_locals.clone(), &mut module.funcs);
     Ok(function_id)
@@ -97,10 +93,9 @@ pub fn translate_function(
 
 // TODO: check we are setting result types correctly
 fn translate_flow(
-    ctx: &TranslateInstructionContext,
+    ctx: &mut TranslateInstructionContext,
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
-    types_stack: &mut TypesStack,
     flow: &Flow,
     loop_targets: &mut HashMap<u16, InstrSeqId>,
 ) {
@@ -119,74 +114,48 @@ fn translate_flow(
                     &ctx.entry.function,
                     module,
                     ctx.function_table,
-                    types_stack,
+                    &mut ctx.types_stack,
                 )
                 .unwrap();
             }
         }
         Flow::Sequence(flows) => {
             for f in flows {
-                translate_flow(ctx, builder, module, types_stack, f, loop_targets);
+                translate_flow(ctx, builder, module, f, loop_targets);
             }
         }
         Flow::Loop {
-            types_stack,
+            stack,
             loop_id,
             body,
         } => {
-            let ty = InstrSeqType::new(&mut module.types, &[], &types_stack.to_val_types());
-
+            let ty = InstrSeqType::new(&mut module.types, &[], &stack);
             builder.loop_(ty, |loop_| {
                 // loop_targets maps the relooper-assigned loop id to the loop's instruction sequence id.
                 loop_targets.insert(*loop_id, loop_.id());
 
-                translate_flow(
-                    ctx,
-                    loop_,
-                    module,
-                    &mut types_stack.clone(),
-                    body,
-                    loop_targets,
-                );
+                translate_flow(ctx, loop_, module, body, loop_targets);
             });
         }
-        // TODO: currently we are wrapping the instructions within each [if, else] branch in a block, which is not desired but required by walrus.
-        // If possible, it would be great to avoid this.
         Flow::IfElse {
-            types_stack,
             then_body,
             else_body,
+            ..
         } => {
-            let then_types_stack = then_body.get_types_stack();
-            let else_types_stack = else_body.get_types_stack();
-
-            if then_types_stack == else_types_stack {
-                let ty =
-                    InstrSeqType::new(&mut module.types, &[], &then_types_stack.to_val_types());
-
+            let then_stack = then_body.get_stack();
+            let else_stack = else_body.get_stack();
+    
+            if then_stack == else_stack {
+                let ty = InstrSeqType::new(&mut module.types, &[], &then_stack);
                 let then_id = {
                     let mut then_seq = builder.dangling_instr_seq(ty);
-                    translate_flow(
-                        ctx,
-                        &mut then_seq,
-                        module,
-                        &mut types_stack.clone(),
-                        then_body,
-                        loop_targets,
-                    );
+                    translate_flow(ctx, &mut then_seq, module, then_body, loop_targets);
                     then_seq.id()
                 };
 
                 let else_id = {
                     let mut else_seq = builder.dangling_instr_seq(ty);
-                    translate_flow(
-                        ctx,
-                        &mut else_seq,
-                        module,
-                        &mut types_stack.clone(),
-                        else_body,
-                        loop_targets,
-                    );
+                    translate_flow(ctx, &mut else_seq, module, else_body, loop_targets);
                     else_seq.id()
                 };
 
@@ -199,20 +168,13 @@ fn translate_flow(
                         else_.instr(Block { seq: else_id });
                     },
                 );
-            } else if then_types_stack.is_empty() {
+            } else if then_stack.is_empty() {
                 let phantom_seq = builder.dangling_instr_seq(None);
                 let phantom_seq_id = phantom_seq.id();
 
                 let then_id = {
                     let mut then_seq = builder.dangling_instr_seq(None);
-                    translate_flow(
-                        ctx,
-                        &mut then_seq,
-                        module,
-                        &mut types_stack.clone(),
-                        then_body,
-                        loop_targets,
-                    );
+                    translate_flow(ctx, &mut then_seq, module, then_body, loop_targets);
                     then_seq.id()
                 };
 
@@ -221,28 +183,14 @@ fn translate_flow(
                     alternative: phantom_seq_id,
                 });
 
-                translate_flow(
-                    ctx,
-                    builder,
-                    module,
-                    &mut types_stack.clone(),
-                    else_body,
-                    loop_targets,
-                );
-            } else if else_types_stack.is_empty() {
+                translate_flow(ctx, builder, module, else_body, loop_targets);
+            } else if else_stack.is_empty() {
                 let phantom_seq = builder.dangling_instr_seq(None);
                 let phantom_seq_id = phantom_seq.id();
 
                 let else_id = {
                     let mut else_seq = builder.dangling_instr_seq(None);
-                    translate_flow(
-                        ctx,
-                        &mut else_seq,
-                        module,
-                        &mut types_stack.clone(),
-                        else_body,
-                        loop_targets,
-                    );
+                    translate_flow(ctx, &mut else_seq, module, else_body, loop_targets);
                     else_seq.id()
                 };
 
@@ -252,14 +200,7 @@ fn translate_flow(
                     alternative: phantom_seq_id,
                 });
 
-                translate_flow(
-                    ctx,
-                    builder,
-                    module,
-                    &mut types_stack.clone(),
-                    then_body,
-                    loop_targets,
-                );
+                translate_flow(ctx, builder, module, then_body, loop_targets);
             } else {
                 panic!(
                     "Error: Mismatched types on the stack from Then and Else branches, and neither is empty."

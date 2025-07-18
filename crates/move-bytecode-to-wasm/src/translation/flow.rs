@@ -1,27 +1,26 @@
-use crate::CompilationContext;
-use crate::translation::MappedFunction;
-use crate::translation::TypesStack;
+use crate::translation::table::TableEntry;
 use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::file_format::{Bytecode, CodeUnit};
 use relooper::{BranchMode, ShapedBlock};
 use std::collections::HashMap;
+use walrus::ValType;
 
 #[derive(Debug, Clone)]
 pub enum Flow {
     Simple {
         // label: u16,
-        types_stack: TypesStack,
+        stack: Vec<ValType>,
         instructions: Vec<Bytecode>,
         branches: HashMap<u16, BranchMode>,
     },
     Sequence(Vec<Flow>),
     Loop {
         loop_id: u16,
-        types_stack: TypesStack,
+        stack: Vec<ValType>,
         body: Box<Flow>,
     },
     IfElse {
-        types_stack: TypesStack,
+        stack: Vec<ValType>,
         then_body: Box<Flow>,
         else_body: Box<Flow>,
     },
@@ -30,17 +29,17 @@ pub enum Flow {
 
 // TODO: check how we are building up the types stack
 impl Flow {
-    pub fn get_types_stack(&self) -> TypesStack {
+    pub fn get_stack(&self) -> Vec<ValType> {
         match self {
-            Flow::Simple { types_stack, .. } => types_stack.clone(),
+            Flow::Simple { stack, .. } => stack.clone(),
             // TODO: is concat correct here?
             // concat instructions and then build the types stack!
-            Flow::Sequence(blocks) => TypesStack(blocks.iter().fold(vec![], |acc, f| {
-                [acc, f.get_types_stack().0.clone()].concat()
-            })),
-            Flow::Loop { types_stack, .. } => types_stack.clone(),
-            Flow::IfElse { types_stack, .. } => types_stack.clone(),
-            Flow::Empty => TypesStack::new(),
+            Flow::Sequence(blocks) => blocks
+                .iter()
+                .fold(vec![], |acc, f| [acc, f.get_stack()].concat()),
+            Flow::Loop { stack, .. } => stack.clone(),
+            Flow::IfElse { stack, .. } => stack.clone(),
+            Flow::Empty => vec![],
         }
     }
 
@@ -50,8 +49,7 @@ impl Flow {
 
     pub fn new(
         code_unit: &CodeUnit,
-        compilation_ctx: &CompilationContext,
-        mapped_function: &MappedFunction,
+        entry: &TableEntry,
     ) -> Self {
         // Create the control flow graph from the code unit
         let cfg = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
@@ -71,9 +69,8 @@ impl Flow {
         println!("relooped: {relooped:#?}");
 
         // Context for each block within the control flow graph
-        // This context maps the block's starting index to its corresponding bytecode instructions and the expected types stack after the block's execution
-        // TODO: is it okey to calculate the types stack in the cfg instead of the relooped cfg?
-        let blocks_ctx: HashMap<u16, (Vec<Bytecode>, TypesStack)> = (&cfg as &dyn ControlFlowGraph)
+        let blocks_ctx: HashMap<u16, (Vec<Bytecode>, Vec<ValType>)> = (&cfg
+            as &dyn ControlFlowGraph)
             .blocks()
             .into_iter()
             .map(|b| {
@@ -81,15 +78,13 @@ impl Flow {
                 let end = cfg.block_end(b) + 1;
                 let code = &code_unit.code[start as usize..end as usize];
 
-                let mut ts = TypesStack::new();
-                // TypesStack::process_instruction() updates the types stack based on the instruction it processes, but does not emit wasm code.
-                // We calculate the final state of the typestack for each block. This is consistent because each block has its own scope.
-                for instruction in code {
-                    ts.process_instruction(instruction, compilation_ctx, mapped_function)
-                        .unwrap();
+                let mut stack: Vec<ValType> = vec![];
+                // If the block contains a Ret instruction, then set the types stack of this block to the expected return type of the function.
+                if code.contains(&Bytecode::Ret) {
+                    stack = entry.results.clone();
                 }
 
-                (start, (code.to_vec(), ts))
+                (start, (code.to_vec(), stack))
             })
             .collect();
 
@@ -98,14 +93,13 @@ impl Flow {
 
     fn build(
         shaped_block: &ShapedBlock<u16>,
-        blocks_ctx: &HashMap<u16, (Vec<Bytecode>, TypesStack)>,
+        blocks_ctx: &HashMap<u16, (Vec<Bytecode>, Vec<ValType>)>,
     ) -> Flow {
         match shaped_block {
             ShapedBlock::Simple(simple_block) => {
                 let block_ctx = blocks_ctx.get(&simple_block.label).unwrap();
                 let b = Flow::Simple {
-                    types_stack: block_ctx.1.clone(),
-                    // label: simple_block.label,
+                    stack: block_ctx.1.clone(),
                     instructions: block_ctx.0.clone(),
                     branches: simple_block
                         .branches
@@ -147,7 +141,7 @@ impl Flow {
                 let inner_block = Self::build(&loop_block.inner, blocks_ctx);
 
                 let loop_flow = Flow::Loop {
-                    types_stack: inner_block.get_types_stack(),
+                    stack: inner_block.get_stack(),
                     loop_id: loop_block.loop_id,
                     body: Box::new(inner_block),
                 };
@@ -174,25 +168,25 @@ impl Flow {
                         let then_arm = Self::build(&multiple_block.handled[0].inner, blocks_ctx);
                         let else_arm = Self::build(&multiple_block.handled[1].inner, blocks_ctx);
 
-                        let then_types = then_arm.get_types_stack();
-                        let else_types = else_arm.get_types_stack();
+                        let then_stack = then_arm.get_stack();
+                        let else_stack = else_arm.get_stack();
 
-                        let ty = if !then_types.is_empty()
-                            && !else_types.is_empty()
-                            && then_types != else_types
+                        let stack = if !then_stack.is_empty()
+                            && !else_stack.is_empty()
+                            && then_stack != else_stack
                         {
                             panic!(
                                 "Type stacks of if/else branches must be the same or one must be empty. If types: {:?}, Else types: {:?}",
-                                then_types, else_types
+                                then_stack, else_stack
                             );
-                        } else if !then_types.is_empty() {
-                            then_types
+                        } else if !then_stack.is_empty() {
+                            then_stack
                         } else {
-                            else_types // if both are empty, this returns an empty TypesStack
+                            else_stack // if both are empty, this returns an empty TypesStack
                         };
 
                         Flow::IfElse {
-                            types_stack: ty,
+                            stack,
                             then_body: Box::new(then_arm),
                             else_body: Box::new(else_arm),
                         }

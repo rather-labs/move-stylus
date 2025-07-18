@@ -130,3 +130,22 @@ public fun test_labeled_loops(x: u8): u8 {
 
     outer_count + inner_count
 }
+
+
+public fun check_even(i: u8): u8 {
+    if (i % 2 == 0) {
+        42
+    } else {
+        55
+    }
+}
+
+public fun misc_2(x: u8): u8 {
+    let mut i = 0;
+    while (i < x) {
+        i = i + 1;
+    };
+    
+   let j = check_even(i);
+   j
+}

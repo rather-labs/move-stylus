@@ -44,6 +44,7 @@ mod control_flow {
         function crazyLoop(uint8 i) external returns (uint8);
         function testMatchInLoop() external returns (uint8);
         function testLabeledLoops(uint8 x) external returns (uint8);
+        function misc2(uint8 x) external returns (uint8);
     );
 
     #[rstest]
@@ -67,6 +68,8 @@ mod control_flow {
     #[case(testLabeledLoopsCall::new((1u8,)), 25u8)]
     #[case(testLabeledLoopsCall::new((20u8,)), 20u8)]
     #[case(testLabeledLoopsCall::new((10u8,)), 34u8)]
+    #[case(misc2Call::new((10u8,)), 42u8)]
+    #[case(misc2Call::new((15u8,)), 55u8)]
     fn test_control_flow<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
