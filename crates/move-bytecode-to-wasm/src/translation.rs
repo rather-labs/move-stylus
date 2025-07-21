@@ -403,7 +403,7 @@ fn map_bytecode_instruction(
                 .collect::<Result<Vec<_>, anyhow::Error>>()?;
 
             let struct_ = if let Ok(struct_) =
-                compilation_ctx.get_generic_struct_by_field_handle_idx(field_id)
+                module_data.get_generic_struct_by_field_handle_idx(field_id)
             {
                 struct_
             } else {
@@ -455,7 +455,7 @@ fn map_bytecode_instruction(
                 .collect::<Result<Vec<_>, anyhow::Error>>()?;
 
             let struct_ = if let Ok(struct_) =
-                compilation_ctx.get_generic_struct_by_field_handle_idx(field_id)
+                module_data.get_generic_struct_by_field_handle_idx(field_id)
             {
                 struct_
             } else {
@@ -1289,10 +1289,9 @@ fn map_bytecode_instruction(
 
             bytecodes::structs::pack(&struct_, module, builder, compilation_ctx, types_stack)?;
 
-            let idx = compilation_ctx
+            let idx = module_data
                 .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
-            let types =
-                compilation_ctx.get_generic_struct_types_instances(struct_definition_index)?;
+            let types = module_data.get_generic_struct_types_instances(struct_definition_index)?;
 
             types_stack.push(IntermediateType::IGenericStructInstance(idx, types));
         }
@@ -1305,10 +1304,9 @@ fn map_bytecode_instruction(
             bytecodes::structs::unpack(struct_, module, builder, compilation_ctx, types_stack)?;
         }
         Bytecode::UnpackGeneric(struct_definition_index) => {
-            let idx = compilation_ctx
+            let idx = module_data
                 .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
-            let types =
-                compilation_ctx.get_generic_struct_types_instances(struct_definition_index)?;
+            let types = module_data.get_generic_struct_types_instances(struct_definition_index)?;
 
             types_stack.pop_expecting(&IntermediateType::IGenericStructInstance(idx, types))?;
 
@@ -1322,9 +1320,9 @@ fn map_bytecode_instruction(
         // Enums
         //**
         Bytecode::PackVariant(index) => {
-            let enum_ = compilation_ctx.get_enum_by_variant_handle_idx(index)?;
+            let enum_ = module_data.get_enum_by_variant_handle_idx(index)?;
             let index_inside_enum =
-                compilation_ctx.get_variant_position_by_variant_handle_idx(index)?;
+                module_data.get_variant_position_by_variant_handle_idx(index)?;
 
             bytecodes::enums::pack_variant(
                 enum_,

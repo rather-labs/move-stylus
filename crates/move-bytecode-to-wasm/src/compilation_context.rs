@@ -1,12 +1,9 @@
 mod error;
 pub mod module_data;
 
-use crate::translation::intermediate_types::{IntermediateType, enums::IEnum, structs::IStruct};
+use crate::translation::intermediate_types::{enums::IEnum, structs::IStruct};
 pub use error::CompilationContextError;
-pub use module_data::{ModuleData, ModuleId, UserDefinedType, VariantData};
-use move_binary_format::file_format::{
-    FieldHandleIndex, FieldInstantiationIndex, StructDefInstantiationIndex, VariantHandleIndex,
-};
+pub use module_data::{ModuleData, ModuleId, UserDefinedType};
 use std::collections::HashMap;
 use walrus::{FunctionId, MemoryId};
 
@@ -53,101 +50,5 @@ impl CompilationContext<'_> {
         } else {
             todo!("enum case and empty case")
         }
-    }
-
-    pub fn get_generic_struct_by_field_handle_idx(
-        &self,
-        field_index: &FieldInstantiationIndex,
-    ) -> Result<IStruct> {
-        let struct_id = self
-            .root_module_data
-            .generic_fields_to_struct_map
-            .get(field_index)
-            .ok_or(CompilationContextError::GenericStructWithFieldIdxNotFound(
-                *field_index,
-            ))?;
-
-        let struct_instance = &self.root_module_data.module_generic_structs_instances[*struct_id];
-        let generic_struct = &self.root_module_data.module_structs[struct_instance.0.0 as usize];
-
-        let types = struct_instance
-            .1
-            .iter()
-            .map(|t| {
-                IntermediateType::try_from_signature_token(
-                    t,
-                    &self.root_module_data.datatype_handles_map,
-                )
-            })
-            .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
-            .unwrap();
-
-        Ok(generic_struct.instantiate(&types))
-    }
-
-    pub fn get_generic_struct_types_instances(
-        &self,
-        struct_index: &StructDefInstantiationIndex,
-    ) -> Result<Vec<IntermediateType>> {
-        let struct_instance =
-            &self.root_module_data.module_generic_structs_instances[struct_index.0 as usize];
-
-        let types = struct_instance
-            .1
-            .iter()
-            .map(|t| {
-                IntermediateType::try_from_signature_token(
-                    t,
-                    &self.root_module_data.datatype_handles_map,
-                )
-            })
-            .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
-            .unwrap();
-
-        Ok(types)
-    }
-
-    pub fn get_generic_struct_idx_by_struct_definition_idx(
-        &self,
-        struct_index: &StructDefInstantiationIndex,
-    ) -> u16 {
-        let struct_instance =
-            &self.root_module_data.module_generic_structs_instances[struct_index.0 as usize];
-        struct_instance.0.0
-    }
-
-    pub fn get_enum_by_variant_handle_idx(&self, idx: &VariantHandleIndex) -> Result<&IEnum> {
-        let VariantData { enum_index, .. } = self
-            .root_module_data
-            .variants_to_enum_map
-            .get(idx)
-            .ok_or(CompilationContextError::EnumWithVariantIdxNotFound(idx.0))?;
-
-        self.root_module_data
-            .module_enums
-            .get(*enum_index)
-            .ok_or(CompilationContextError::EnumNotFound(*enum_index as u16))
-    }
-
-    pub fn get_variant_position_by_variant_handle_idx(
-        &self,
-        idx: &VariantHandleIndex,
-    ) -> Result<u16> {
-        let VariantData {
-            index_inside_enum, ..
-        } = self
-            .root_module_data
-            .variants_to_enum_map
-            .get(idx)
-            .ok_or(CompilationContextError::EnumWithVariantIdxNotFound(idx.0))?;
-
-        Ok(*index_inside_enum as u16)
-    }
-
-    pub fn get_enum_by_index(&self, index: u16) -> Result<&IEnum> {
-        self.root_module_data
-            .module_enums
-            .get(index as usize)
-            .ok_or(CompilationContextError::EnumNotFound(index))
     }
 }

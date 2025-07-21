@@ -195,7 +195,10 @@ impl Unpackable for IntermediateType {
                 )
             }
             IntermediateType::IEnum(enum_index) => {
-                let enum_ = compilation_ctx.get_enum_by_index(*enum_index).unwrap();
+                let enum_ = compilation_ctx
+                    .root_module_data
+                    .get_enum_by_index(*enum_index)
+                    .unwrap();
                 if !enum_.is_simple {
                     panic!(
                         "cannot abi unpack enum with index {enum_index}, it contains at least one variant with fields"

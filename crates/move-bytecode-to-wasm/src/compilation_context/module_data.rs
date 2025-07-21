@@ -547,9 +547,10 @@ impl ModuleData {
             function_information,
         )
     }
-    // ===============
+
+    // =======
     // Structs
-    // ============
+    // =======
 
     pub fn get_struct_by_struct_definition_idx(
         &self,
@@ -601,6 +602,90 @@ impl ModuleData {
             .ok_or(CompilationContextError::StructWithFieldIdxNotFound(
                 *field_index,
             ))
+    }
+
+    // ===============
+    // Generic Structs
+    // ===============
+
+    pub fn get_generic_struct_by_field_handle_idx(
+        &self,
+        field_index: &FieldInstantiationIndex,
+    ) -> Result<IStruct> {
+        let struct_id = self.generic_fields_to_struct_map.get(field_index).ok_or(
+            CompilationContextError::GenericStructWithFieldIdxNotFound(*field_index),
+        )?;
+
+        let struct_instance = &self.module_generic_structs_instances[*struct_id];
+        let generic_struct = &self.module_structs[struct_instance.0.0 as usize];
+
+        let types = struct_instance
+            .1
+            .iter()
+            .map(|t| IntermediateType::try_from_signature_token(t, &self.datatype_handles_map))
+            .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+            .unwrap();
+
+        Ok(generic_struct.instantiate(&types))
+    }
+
+    pub fn get_generic_struct_types_instances(
+        &self,
+        struct_index: &StructDefInstantiationIndex,
+    ) -> Result<Vec<IntermediateType>> {
+        let struct_instance = &self.module_generic_structs_instances[struct_index.0 as usize];
+
+        let types = struct_instance
+            .1
+            .iter()
+            .map(|t| IntermediateType::try_from_signature_token(t, &self.datatype_handles_map))
+            .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+            .unwrap();
+
+        Ok(types)
+    }
+
+    pub fn get_generic_struct_idx_by_struct_definition_idx(
+        &self,
+        struct_index: &StructDefInstantiationIndex,
+    ) -> u16 {
+        let struct_instance = &self.module_generic_structs_instances[struct_index.0 as usize];
+        struct_instance.0.0
+    }
+
+    pub fn get_enum_by_variant_handle_idx(&self, idx: &VariantHandleIndex) -> Result<&IEnum> {
+        let VariantData { enum_index, .. } = self
+            .variants_to_enum_map
+            .get(idx)
+            .ok_or(CompilationContextError::EnumWithVariantIdxNotFound(idx.0))?;
+
+        self.module_enums
+            .get(*enum_index)
+            .ok_or(CompilationContextError::EnumNotFound(*enum_index as u16))
+    }
+
+    // =====
+    // Enums
+    // =====
+
+    pub fn get_variant_position_by_variant_handle_idx(
+        &self,
+        idx: &VariantHandleIndex,
+    ) -> Result<u16> {
+        let VariantData {
+            index_inside_enum, ..
+        } = self
+            .variants_to_enum_map
+            .get(idx)
+            .ok_or(CompilationContextError::EnumWithVariantIdxNotFound(idx.0))?;
+
+        Ok(*index_inside_enum as u16)
+    }
+
+    pub fn get_enum_by_index(&self, index: u16) -> Result<&IEnum> {
+        self.module_enums
+            .get(index as usize)
+            .ok_or(CompilationContextError::EnumNotFound(index))
     }
 
     // ====

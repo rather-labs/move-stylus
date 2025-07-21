@@ -1,7 +1,6 @@
 use move_binary_format::file_format::SignatureIndex;
 
 use crate::{
-    CompilationContext,
     compilation_context::module_data::ModuleData,
     translation::{TranslationError, intermediate_types::IntermediateType},
 };
