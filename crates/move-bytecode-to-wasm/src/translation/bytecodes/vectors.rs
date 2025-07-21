@@ -16,17 +16,12 @@ pub fn get_inner_type_from_signature(
 ) -> Result<IntermediateType, TranslationError> {
     let signatures = module_data.get_signatures_by_index(*signature_index)?;
 
-    let signature = if signatures.len() != 1 {
-        return Err(TranslationError::VectorInnerTypeNumberError {
+    if signatures.len() != 1 {
+        Err(TranslationError::VectorInnerTypeNumberError {
             signature_index: *signature_index,
             number: signatures.len(),
-        });
+        })
     } else {
-        &signatures[0]
-    };
-
-    Ok(IntermediateType::try_from_signature_token(
-        signature,
-        &module_data.datatype_handles_map,
-    )?)
+        Ok(signatures[0].clone())
+    }
 }

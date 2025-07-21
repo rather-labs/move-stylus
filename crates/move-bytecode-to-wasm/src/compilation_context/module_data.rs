@@ -20,8 +20,8 @@ use move_binary_format::{
     CompiledModule,
     file_format::{
         Constant, DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex,
-        FieldInstantiationIndex, FunctionDefinitionIndex, Signature, SignatureIndex,
-        SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
+        FieldInstantiationIndex, FunctionDefinitionIndex, SignatureIndex,
+        StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
     },
     internals::ModuleIndex,
 };
@@ -96,7 +96,7 @@ pub struct ModuleData {
     pub enums: EnumData,
 
     /// Module's signatures
-    pub module_signatures: Vec<Signature>,
+    pub signatures: Vec<Vec<IntermediateType>>,
 
     /// This Hashmap maps the move's datatype handles to our internal representation of those
     /// types. The datatype handles are used interally by move to look for user defined data
@@ -146,12 +146,23 @@ impl ModuleData {
             function_definitions,
         );
 
+        let signatures = move_module
+            .signatures()
+            .iter()
+            .map(|s| {
+                s.0.iter()
+                    .map(|t| IntermediateType::try_from_signature_token(t, &datatype_handles_map))
+                    .collect::<std::result::Result<Vec<IntermediateType>, _>>()
+            })
+            .collect::<std::result::Result<Vec<Vec<IntermediateType>>, _>>()
+            .unwrap();
+
         ModuleData {
             constants: move_module.constant_pool.clone(), // TODO: Clone
             functions,
             structs,
             enums,
-            module_signatures: move_module.signatures.clone(),
+            signatures,
             datatype_handles_map,
         }
     }
@@ -518,10 +529,12 @@ impl ModuleData {
         }
     }
 
-    pub fn get_signatures_by_index(&self, index: SignatureIndex) -> Result<&Vec<SignatureToken>> {
-        self.module_signatures
+    pub fn get_signatures_by_index<'a>(
+        &'a self,
+        index: SignatureIndex,
+    ) -> Result<&'a Vec<IntermediateType>> {
+        self.signatures
             .get(index.into_index())
-            .map(|s| &s.0)
             .ok_or(CompilationContextError::SignatureNotFound(index))
     }
 }
