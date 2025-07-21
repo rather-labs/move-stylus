@@ -587,6 +587,22 @@ impl ModuleData {
             .ok_or(CompilationContextError::StructNotFound(index))
     }
 
+    pub fn get_struct_by_field_handle_idx(
+        &self,
+        field_index: &FieldHandleIndex,
+    ) -> Result<&IStruct> {
+        let struct_id = self.fields_to_struct_map.get(field_index).ok_or(
+            CompilationContextError::StructWithFieldIdxNotFound(*field_index),
+        )?;
+
+        self.module_structs
+            .iter()
+            .find(|s| &s.struct_definition_index == struct_id)
+            .ok_or(CompilationContextError::StructWithFieldIdxNotFound(
+                *field_index,
+            ))
+    }
+
     // ====
     // General
     // ==

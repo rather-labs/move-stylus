@@ -374,7 +374,7 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
         }
         Bytecode::ImmBorrowField(field_id) => {
-            let struct_ = compilation_ctx.get_struct_by_field_handle_idx(field_id)?;
+            let struct_ = module_data.get_struct_by_field_handle_idx(field_id)?;
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
@@ -407,8 +407,7 @@ fn map_bytecode_instruction(
             {
                 struct_
             } else {
-                let generic_stuct =
-                    compilation_ctx.get_struct_by_field_handle_idx(struct_field_id)?;
+                let generic_stuct = module_data.get_struct_by_field_handle_idx(struct_field_id)?;
 
                 generic_stuct.instantiate(&instantiation_types)
             };
@@ -427,7 +426,7 @@ fn map_bytecode_instruction(
             );
         }
         Bytecode::MutBorrowField(field_id) => {
-            let struct_ = compilation_ctx.get_struct_by_field_handle_idx(field_id)?;
+            let struct_ = module_data.get_struct_by_field_handle_idx(field_id)?;
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
@@ -460,8 +459,7 @@ fn map_bytecode_instruction(
             {
                 struct_
             } else {
-                let generic_stuct =
-                    compilation_ctx.get_struct_by_field_handle_idx(struct_field_id)?;
+                let generic_stuct = module_data.get_struct_by_field_handle_idx(struct_field_id)?;
                 generic_stuct.instantiate(&instantiation_types)
             };
 
