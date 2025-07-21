@@ -3,9 +3,9 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use crate::CompilationContext;
 use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
+use crate::{CompilationContext, compilation_context::ModuleData};
 
 use super::IntermediateType;
 
@@ -154,6 +154,7 @@ impl IVector {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
+        module_data: &ModuleData,
     ) {
         // === Local declarations ===
         let src_ptr = module.locals.add(ValType::I32); // pointer to the vector to be copied
@@ -325,7 +326,13 @@ impl IVector {
                     );
 
                     loop_block.i32_const(1); // We dont increase the capacity of nested vectors
-                    IVector::copy_local_instructions(inner_, module, loop_block, compilation_ctx);
+                    IVector::copy_local_instructions(
+                        inner_,
+                        module,
+                        loop_block,
+                        compilation_ctx,
+                        module_data,
+                    );
                 }
                 IntermediateType::IStruct(index) => {
                     loop_block.load(
@@ -337,8 +344,13 @@ impl IVector {
                         },
                     );
 
-                    let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
-                    struct_.copy_local_instructions(module, loop_block, compilation_ctx);
+                    let struct_ = module_data.get_struct_by_index(*index).unwrap();
+                    struct_.copy_local_instructions(
+                        module,
+                        loop_block,
+                        compilation_ctx,
+                        module_data,
+                    );
                 }
 
                 IntermediateType::IExternalUserData { .. } => todo!(),
@@ -656,6 +668,7 @@ impl IVector {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
+        module_data: &ModuleData,
     ) {
         let valtype = inner.into();
         let size = inner.stack_data_size() as i32;
@@ -711,7 +724,7 @@ impl IVector {
                 then.local_get(vec_ptr);
                 then.i32_const(2); // Capacity multiplier
 
-                IVector::copy_local_instructions(inner, module, then, compilation_ctx);
+                IVector::copy_local_instructions(inner, module, then, compilation_ctx, module_data);
 
                 // Set vec_ptr to the new vector pointer and store it at *vec_ref
                 // This modifies the original vector reference to point to the new vector
@@ -832,6 +845,7 @@ mod tests {
             &mut raw_module,
             &mut builder,
             &compilation_ctx,
+            &compilation_ctx.root_module_data,
         );
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
@@ -1054,6 +1068,7 @@ mod tests {
             &mut raw_module,
             &mut builder,
             &compilation_ctx,
+            &compilation_ctx.root_module_data,
         );
 
         // Second push back pushes the element to the new copied vector, which has capacity
@@ -1064,6 +1079,7 @@ mod tests {
             &mut raw_module,
             &mut builder,
             &compilation_ctx,
+            &compilation_ctx.root_module_data,
         );
 
         builder.local_get(vec_ref).load(

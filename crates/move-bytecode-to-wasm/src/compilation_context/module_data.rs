@@ -445,6 +445,7 @@ impl ModuleData {
         (module_enums, variants_to_enum_map)
     }
 
+    #[allow(clippy::type_complexity)]
     fn process_function_definitions<'move_package>(
         module_id: ModuleId,
         move_module: &'move_package CompiledModule,
@@ -577,6 +578,13 @@ impl ModuleData {
             .unwrap();
 
         Ok(generic_struct.instantiate(&types))
+    }
+
+    pub fn get_struct_by_index(&self, index: u16) -> Result<&IStruct> {
+        self.module_structs
+            .iter()
+            .find(|s| s.index() == index)
+            .ok_or(CompilationContextError::StructNotFound(index))
     }
 
     // ====

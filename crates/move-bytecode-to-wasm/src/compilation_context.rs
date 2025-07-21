@@ -4,12 +4,8 @@ pub mod module_data;
 use crate::translation::intermediate_types::{IntermediateType, enums::IEnum, structs::IStruct};
 pub use error::CompilationContextError;
 pub use module_data::{ModuleData, ModuleId, UserDefinedType, VariantData};
-use move_binary_format::{
-    file_format::{
-        FieldHandleIndex, FieldInstantiationIndex, SignatureIndex, SignatureToken,
-        StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
-    },
-    internals::ModuleIndex,
+use move_binary_format::file_format::{
+    FieldHandleIndex, FieldInstantiationIndex, StructDefInstantiationIndex, VariantHandleIndex,
 };
 use std::collections::HashMap;
 use walrus::{FunctionId, MemoryId};
@@ -57,14 +53,6 @@ impl CompilationContext<'_> {
         } else {
             todo!("enum case and empty case")
         }
-    }
-
-    pub fn get_struct_by_index(&self, index: u16) -> Result<&IStruct> {
-        self.root_module_data
-            .module_structs
-            .iter()
-            .find(|s| s.index() == index)
-            .ok_or(CompilationContextError::StructNotFound(index))
     }
 
     pub fn get_struct_by_field_handle_idx(

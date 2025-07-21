@@ -336,7 +336,10 @@ impl Packable for IntermediateType {
                 compilation_ctx,
             ),
             IntermediateType::IStruct(index) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_ = compilation_ctx
+                    .root_module_data
+                    .get_struct_by_index(*index)
+                    .unwrap();
                 struct_.add_pack_instructions(
                     builder,
                     module,
@@ -348,7 +351,10 @@ impl Packable for IntermediateType {
                 )
             }
             IntermediateType::IGenericStructInstance(index, types) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_ = compilation_ctx
+                    .root_module_data
+                    .get_struct_by_index(*index)
+                    .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.add_pack_instructions(
                     builder,
@@ -393,7 +399,10 @@ impl Packable for IntermediateType {
     ) {
         match self {
             IntermediateType::IStruct(index) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_ = compilation_ctx
+                    .root_module_data
+                    .get_struct_by_index(*index)
+                    .unwrap();
                 struct_.add_pack_instructions(
                     builder,
                     module,
@@ -405,7 +414,10 @@ impl Packable for IntermediateType {
                 );
             }
             IntermediateType::IGenericStructInstance(index, types) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_ = compilation_ctx
+                    .root_module_data
+                    .get_struct_by_index(*index)
+                    .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.add_pack_instructions(
                     builder,
@@ -446,12 +458,18 @@ impl Packable for IntermediateType {
             IntermediateType::IRef(inner) => inner.encoded_size(compilation_ctx),
             IntermediateType::IMutRef(inner) => inner.encoded_size(compilation_ctx),
             IntermediateType::IGenericStructInstance(index, types) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_ = compilation_ctx
+                    .root_module_data
+                    .get_struct_by_index(*index)
+                    .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.solidity_abi_encode_size(compilation_ctx)
             }
             IntermediateType::IStruct(index) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_ = compilation_ctx
+                    .root_module_data
+                    .get_struct_by_index(*index)
+                    .unwrap();
                 struct_.solidity_abi_encode_size(compilation_ctx)
             }
             IntermediateType::ITypeParameter(_) => {
@@ -490,11 +508,17 @@ impl Packable for IntermediateType {
             | IntermediateType::IMutRef(_) => false,
             IntermediateType::IVector(_) => true,
             IntermediateType::IStruct(index) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_ = compilation_ctx
+                    .root_module_data
+                    .get_struct_by_index(*index)
+                    .unwrap();
                 struct_.solidity_abi_encode_is_dynamic(compilation_ctx)
             }
             IntermediateType::IGenericStructInstance(index, types) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_ = compilation_ctx
+                    .root_module_data
+                    .get_struct_by_index(*index)
+                    .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.solidity_abi_encode_is_dynamic(compilation_ctx)
             }

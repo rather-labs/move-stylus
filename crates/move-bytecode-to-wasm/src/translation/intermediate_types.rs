@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use crate::{
-    CompilationContext, UserDefinedType, compilation_context::ModuleId, runtime::RuntimeFunction,
+    CompilationContext, UserDefinedType,
+    compilation_context::{ModuleData, ModuleId},
+    runtime::RuntimeFunction,
     wasm_builder_extensions::WasmBuilderExtension,
 };
 use address::IAddress;
@@ -299,6 +301,7 @@ impl IntermediateType {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
+        module_data: &ModuleData,
         local: LocalId,
     ) {
         builder.local_get(local);
@@ -378,10 +381,16 @@ impl IntermediateType {
                     },
                 );
                 builder.i32_const(1); // This is the length "multiplier", i.e. length * multiplier = capacity
-                IVector::copy_local_instructions(inner_type, module, builder, compilation_ctx);
+                IVector::copy_local_instructions(
+                    inner_type,
+                    module,
+                    builder,
+                    compilation_ctx,
+                    module_data,
+                );
             }
             IntermediateType::IStruct(index) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_ = module_data.get_struct_by_index(*index).unwrap();
                 builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -390,10 +399,10 @@ impl IntermediateType {
                         offset: 0,
                     },
                 );
-                struct_.copy_local_instructions(module, builder, compilation_ctx);
+                struct_.copy_local_instructions(module, builder, compilation_ctx, module_data);
             }
             IntermediateType::IGenericStructInstance(index, types) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_ = module_data.get_struct_by_index(*index).unwrap();
                 let struct_instance = struct_.instantiate(types);
                 builder.load(
                     compilation_ctx.memory_id,
@@ -403,7 +412,12 @@ impl IntermediateType {
                         offset: 0,
                     },
                 );
-                struct_instance.copy_local_instructions(module, builder, compilation_ctx);
+                struct_instance.copy_local_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    module_data,
+                );
             }
             IntermediateType::IExternalUserData { .. } => todo!(),
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -549,6 +563,7 @@ impl IntermediateType {
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
+        module_data: &ModuleData,
     ) {
         builder.load(
             compilation_ctx.memory_id,
@@ -592,20 +607,33 @@ impl IntermediateType {
             }
             IntermediateType::IVector(inner_type) => {
                 builder.i32_const(1); // Length multiplier
-                IVector::copy_local_instructions(inner_type, module, builder, compilation_ctx);
+                IVector::copy_local_instructions(
+                    inner_type,
+                    module,
+                    builder,
+                    compilation_ctx,
+                    module_data,
+                );
             }
             IntermediateType::IStruct(index) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
-                IStruct::copy_local_instructions(struct_, module, builder, compilation_ctx);
+                let struct_ = module_data.get_struct_by_index(*index).unwrap();
+                IStruct::copy_local_instructions(
+                    struct_,
+                    module,
+                    builder,
+                    compilation_ctx,
+                    module_data,
+                );
             }
             IntermediateType::IGenericStructInstance(index, types) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_ = module_data.get_struct_by_index(*index).unwrap();
                 let struct_instance = struct_.instantiate(types);
                 IStruct::copy_local_instructions(
                     &struct_instance,
                     module,
                     builder,
                     compilation_ctx,
+                    module_data,
                 );
             }
             IntermediateType::IExternalUserData { .. } => todo!(),
@@ -861,6 +889,7 @@ impl IntermediateType {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
+        module_data: &ModuleData,
     ) {
         match self {
             Self::IBool | Self::IU8 | Self::IU16 | Self::IU32 => {
@@ -879,9 +908,11 @@ impl IntermediateType {
                 builder.i32_const(1);
             }
             Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner),
-            Self::IStruct(index) => IStruct::equality(builder, module, compilation_ctx, *index),
+            Self::IStruct(index) => {
+                IStruct::equality(builder, module, compilation_ctx, module_data, *index)
+            }
             Self::IGenericStructInstance(index, _) => {
-                IStruct::equality(builder, module, compilation_ctx, *index)
+                IStruct::equality(builder, module, compilation_ctx, module_data, *index)
             }
             Self::IEnum(_) => todo!(),
             Self::IRef(inner) | Self::IMutRef(inner) => {
@@ -965,7 +996,7 @@ impl IntermediateType {
                     IntermediateType::IExternalUserData { .. } => todo!(),
                 }
 
-                inner.load_equality_instructions(module, builder, compilation_ctx)
+                inner.load_equality_instructions(module, builder, compilation_ctx, module_data)
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot compare a type parameter, expected a concrete type");
@@ -979,8 +1010,9 @@ impl IntermediateType {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
+        module_data: &ModuleData,
     ) {
-        self.load_equality_instructions(module, builder, compilation_ctx);
+        self.load_equality_instructions(module, builder, compilation_ctx, module_data);
         builder.negate();
     }
 

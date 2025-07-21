@@ -46,7 +46,9 @@
 use std::collections::HashMap;
 
 use crate::{
-    CompilationContext, abi_types::packing::Packable, compilation_context::ExternalModuleData,
+    CompilationContext,
+    abi_types::packing::Packable,
+    compilation_context::{ExternalModuleData, ModuleData},
 };
 
 use super::IntermediateType;
@@ -119,9 +121,10 @@ impl IStruct {
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
+        module_data: &ModuleData,
         index: u16,
     ) {
-        let struct_ = compilation_ctx.get_struct_by_index(index).unwrap();
+        let struct_ = module_data.get_struct_by_index(index).unwrap();
 
         let s1_ptr = module.locals.add(ValType::I32);
         let s2_ptr = module.locals.add(ValType::I32);
@@ -178,7 +181,7 @@ impl IStruct {
                     load_value_to_stack(field, block);
                 }
 
-                field.load_equality_instructions(module, block, compilation_ctx);
+                field.load_equality_instructions(module, block, compilation_ctx, module_data);
 
                 block.if_else(
                     None,
@@ -198,6 +201,7 @@ impl IStruct {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
+        module_data: &ModuleData,
     ) {
         let original_struct_ptr = module.locals.add(ValType::I32);
         let ptr = module.locals.add(ValType::I32);
@@ -286,7 +290,13 @@ impl IStruct {
                         .binop(BinaryOp::I32Add)
                         .local_set(ptr_to_data);
 
-                    field.copy_local_instructions(module, builder, compilation_ctx, ptr_to_data);
+                    field.copy_local_instructions(
+                        module,
+                        builder,
+                        compilation_ctx,
+                        module_data,
+                        ptr_to_data,
+                    );
 
                     builder.local_set(ptr_to_data);
                 }
@@ -347,13 +357,19 @@ impl IStruct {
                 | IntermediateType::IAddress => continue,
                 IntermediateType::IVector(_) => return true,
                 IntermediateType::IStruct(index) => {
-                    let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                    let struct_ = compilation_ctx
+                        .root_module_data
+                        .get_struct_by_index(*index)
+                        .unwrap();
                     if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
                         return true;
                     }
                 }
                 IntermediateType::IGenericStructInstance(index, types) => {
-                    let child_struct = compilation_ctx.get_struct_by_index(*index).unwrap();
+                    let child_struct = compilation_ctx
+                        .root_module_data
+                        .get_struct_by_index(*index)
+                        .unwrap();
                     let child_struct_instance = child_struct.instantiate(types);
 
                     if child_struct_instance.solidity_abi_encode_is_dynamic(compilation_ctx) {
@@ -409,7 +425,10 @@ impl IStruct {
                     size += (field as &dyn Packable).encoded_size(compilation_ctx);
                 }
                 IntermediateType::IGenericStructInstance(index, types) => {
-                    let child_struct = compilation_ctx.get_struct_by_index(*index).unwrap();
+                    let child_struct = compilation_ctx
+                        .root_module_data
+                        .get_struct_by_index(*index)
+                        .unwrap();
                     let child_struct_instance = child_struct.instantiate(types);
 
                     if child_struct_instance.solidity_abi_encode_is_dynamic(compilation_ctx) {
@@ -419,7 +438,10 @@ impl IStruct {
                     }
                 }
                 IntermediateType::IStruct(index) => {
-                    let child_struct = compilation_ctx.get_struct_by_index(*index).unwrap();
+                    let child_struct = compilation_ctx
+                        .root_module_data
+                        .get_struct_by_index(*index)
+                        .unwrap();
 
                     if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
                         size += 32;

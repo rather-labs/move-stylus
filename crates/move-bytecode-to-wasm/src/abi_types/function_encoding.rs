@@ -71,11 +71,17 @@ impl SolName for IntermediateType {
                 .sol_name(compilation_ctx)
                 .map(|sol_n| format!("{sol_n}[]")),
             IntermediateType::IStruct(index) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_ = compilation_ctx
+                    .root_module_data
+                    .get_struct_by_index(*index)
+                    .unwrap();
                 Self::struct_fields_sol_name(struct_, compilation_ctx)
             }
             IntermediateType::IGenericStructInstance(index, types) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_ = compilation_ctx
+                    .root_module_data
+                    .get_struct_by_index(*index)
+                    .unwrap();
                 let struct_instance = struct_.instantiate(types);
 
                 Self::struct_fields_sol_name(&struct_instance, compilation_ctx)

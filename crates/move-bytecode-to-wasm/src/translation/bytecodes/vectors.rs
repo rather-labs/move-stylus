@@ -1,7 +1,9 @@
 use move_binary_format::file_format::SignatureIndex;
 
 use crate::{
-    compilation_context::module_data::ModuleData, translation::{intermediate_types::IntermediateType, TranslationError}, CompilationContext
+    CompilationContext,
+    compilation_context::module_data::ModuleData,
+    translation::{TranslationError, intermediate_types::IntermediateType},
 };
 
 /// Converts the signature index pointing to a Move's Signature token that represents the inner
