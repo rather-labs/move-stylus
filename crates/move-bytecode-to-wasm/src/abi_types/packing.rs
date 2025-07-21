@@ -4,6 +4,7 @@ use walrus::{InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
 
 use crate::{
     CompilationContext,
+    compilation_context::ExternalModuleData,
     translation::intermediate_types::{
         IntermediateType,
         address::IAddress,
@@ -456,7 +457,21 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("can't know the size of a generic type parameter at compile time");
             }
-            IntermediateType::IExternalUserData { .. } => todo!(),
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } => {
+                let external_data = compilation_ctx
+                    .get_external_module_data(module_id, identifier)
+                    .unwrap();
+
+                match external_data {
+                    ExternalModuleData::Struct(external_struct) => {
+                        external_struct.solidity_abi_encode_size(compilation_ctx)
+                    }
+                    ExternalModuleData::Enum(_) => sol_data::Uint::<8>::ENCODED_SIZE.unwrap(),
+                }
+            }
         }
     }
 

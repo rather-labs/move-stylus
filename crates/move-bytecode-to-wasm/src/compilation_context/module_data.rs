@@ -15,7 +15,7 @@ use move_binary_format::{
         StructDefinitionIndex, VariantHandleIndex,
     },
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 use walrus::RefType;
 
 #[derive(Debug)]
@@ -96,13 +96,40 @@ pub struct ModuleData {
     pub datatype_handles_map: HashMap<DatatypeHandleIndex, UserDefinedType>,
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
-pub enum ModuleId {
-    /// Module we are currently compiling.
-    Root,
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
+#[repr(transparent)]
+pub struct Address([u8; 32]);
 
-    /// Dependency module identified by an address.
-    Dependency { address: [u8; 32], package: String },
+impl Display for Address {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(last_nonzero) = self.0.iter().rposition(|&b| b != 0) {
+            for byte in &self.0[last_nonzero..] {
+                write!(f, "0x{:02x}", byte)?;
+            }
+        } else {
+            write!(f, "0x0")?;
+        }
+
+        Ok(())
+    }
+}
+
+impl From<[u8; 32]> for Address {
+    fn from(value: [u8; 32]) -> Self {
+        Self(value)
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+pub struct ModuleId {
+    pub address: Address,
+    pub module_name: String,
+}
+
+impl Display for ModuleId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}::{}", self.address, self.module_name)
+    }
 }
 
 impl ModuleData {
@@ -176,9 +203,12 @@ impl ModuleData {
                 };
             } else {
                 let datatype_module = module.module_handle_at(datatype_handle.module);
-                let module_id = ModuleId::Dependency {
-                    address: **module.address_identifier_at(datatype_module.address),
-                    package: module.identifier_at(datatype_module.name).to_string(),
+                let module_id = ModuleId {
+                    address: module
+                        .address_identifier_at(datatype_module.address)
+                        .into_bytes()
+                        .into(),
+                    module_name: module.identifier_at(datatype_module.name).to_string(),
                 };
 
                 datatype_handles_map.insert(

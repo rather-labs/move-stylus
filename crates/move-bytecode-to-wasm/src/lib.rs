@@ -53,30 +53,40 @@ pub fn translate_package(
     );
 
     let mut modules = HashMap::new();
+
+    // Contains the module data for all the root package and its dependencies
+    let mut modules_data: HashMap<ModuleId, ModuleData> = HashMap::new();
+
+    // TODO: a lot of cloenes, we must create a symbol pool
     for root_compiled_module in root_compiled_units {
         let module_name = root_compiled_module.unit.name.to_string();
         let root_compiled_module = root_compiled_module.unit.module;
+
+        println!("compiling module {module_name}...");
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
         inject_debug_fns(&mut module);
 
         // Process the dependency tree
-        let mut deps_data: HashMap<ModuleId, ModuleData> = HashMap::new();
         process_dependency_tree(
-            &mut deps_data,
+            &mut modules_data,
             &package.deps_compiled_units,
             &root_compiled_module.immediate_dependencies(),
             &mut module,
         );
 
-        println!("compiling module...");
-
         let (root_module_data, mut function_table) =
             ModuleData::build_module_data(&root_compiled_module, &mut module);
 
+        let root_module_id = ModuleId {
+            address: root_compiled_module.address().into_bytes().into(),
+            module_name: module_name.clone(),
+        };
+        modules_data.insert(root_module_id.clone(), root_module_data);
+
         let compilation_ctx = CompilationContext {
-            root_module_data,
-            deps_data,
+            root_module_data: &modules_data[&root_module_id],
+            deps_data: &modules_data,
             memory_id,
             allocator: allocator_func,
         };
@@ -167,15 +177,17 @@ pub fn process_dependency_tree(
     module: &mut Module,
 ) {
     for dependency in dependencies {
-        println!("processing dependency {}...", dependency.name());
-        let module_id = ModuleId::Dependency {
-            package: dependency.name().to_string(),
-            address: **dependency.address(),
+        let module_id = ModuleId {
+            module_name: dependency.name().to_string(),
+            address: dependency.address().into_bytes().into(),
         };
-
+        print!("\tprocessing dependency {module_id}...",);
         // If the HashMap contains the key, we already processed that dependency
         if dependencies_data.contains_key(&module_id) {
+            println!(" [cached]");
             continue;
+        } else {
+            println!();
         }
 
         // Find the dependency inside Move's compiled package
