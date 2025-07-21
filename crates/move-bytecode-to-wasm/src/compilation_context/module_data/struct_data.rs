@@ -1,25 +1,12 @@
-pub use crate::{
-    GlobalFunctionTable,
-    translation::{
-        functions::MappedFunction,
-        intermediate_types::{
-            IntermediateType,
-            enums::{IEnum, IEnumVariant},
-            structs::IStruct,
-        },
-        table::FunctionId,
-    },
-};
+pub use crate::translation::intermediate_types::{IntermediateType, structs::IStruct};
 use move_binary_format::{
-    CompiledModule,
     file_format::{
-        Constant, DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex,
-        FieldInstantiationIndex, FunctionDefinitionIndex, Signature, SignatureIndex,
-        SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
+        FieldHandleIndex, FieldInstantiationIndex, StructDefInstantiationIndex,
+        StructDefinitionIndex,
     },
     internals::ModuleIndex,
 };
-use std::{collections::HashMap, fmt::Display};
+use std::collections::HashMap;
 
 use super::{CompilationContextError, Result};
 
@@ -58,6 +45,13 @@ pub struct StructData {
 }
 
 impl StructData {
+    pub fn get_by_index(&self, index: u16) -> Result<&IStruct> {
+        self.structs
+            .iter()
+            .find(|s| s.index() == index)
+            .ok_or(CompilationContextError::StructNotFound(index))
+    }
+
     pub fn get_by_struct_definition_idx(
         &self,
         struct_index: &StructDefinitionIndex,
@@ -70,27 +64,7 @@ impl StructData {
             ))
     }
 
-    pub fn get_generic_struct_by_struct_definition_idx(
-        &self,
-        struct_index: &StructDefInstantiationIndex,
-    ) -> Result<IStruct> {
-        let (idx, concrete_types) = &self.generic_structs_instances[struct_index.into_index()];
-        let generic_struct = &self.structs[idx.into_index()];
-
-        Ok(generic_struct.instantiate(&concrete_types))
-    }
-
-    pub fn get_struct_by_index(&self, index: u16) -> Result<&IStruct> {
-        self.structs
-            .iter()
-            .find(|s| s.index() == index)
-            .ok_or(CompilationContextError::StructNotFound(index))
-    }
-
-    pub fn get_struct_by_field_handle_idx(
-        &self,
-        field_index: &FieldHandleIndex,
-    ) -> Result<&IStruct> {
+    pub fn get_by_field_handle_idx(&self, field_index: &FieldHandleIndex) -> Result<&IStruct> {
         let struct_id = self.fields_to_struct.get(field_index).ok_or(
             CompilationContextError::StructWithFieldIdxNotFound(*field_index),
         )?;
@@ -103,7 +77,17 @@ impl StructData {
             ))
     }
 
-    pub fn get_generic_struct_by_field_handle_idx(
+    pub fn get_struct_instance_by_struct_definition_idx(
+        &self,
+        struct_index: &StructDefInstantiationIndex,
+    ) -> Result<IStruct> {
+        let (idx, concrete_types) = &self.generic_structs_instances[struct_index.into_index()];
+        let generic_struct = &self.structs[idx.into_index()];
+
+        Ok(generic_struct.instantiate(concrete_types))
+    }
+
+    pub fn get_struct_instance_by_field_handle_idx(
         &self,
         field_index: &FieldInstantiationIndex,
     ) -> Result<IStruct> {
@@ -114,7 +98,7 @@ impl StructData {
         let (idx, types) = &self.generic_structs_instances[*struct_id];
         let generic_struct = &self.structs[idx.into_index()];
 
-        Ok(generic_struct.instantiate(&types))
+        Ok(generic_struct.instantiate(types))
     }
 
     pub fn get_generic_struct_types_instances(

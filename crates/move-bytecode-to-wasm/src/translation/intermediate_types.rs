@@ -390,7 +390,7 @@ impl IntermediateType {
                 );
             }
             IntermediateType::IStruct(index) => {
-                let struct_ = module_data.structs.get_struct_by_index(*index).unwrap();
+                let struct_ = module_data.structs.get_by_index(*index).unwrap();
                 builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -402,7 +402,7 @@ impl IntermediateType {
                 struct_.copy_local_instructions(module, builder, compilation_ctx, module_data);
             }
             IntermediateType::IGenericStructInstance(index, types) => {
-                let struct_ = module_data.structs.get_struct_by_index(*index).unwrap();
+                let struct_ = module_data.structs.get_by_index(*index).unwrap();
                 let struct_instance = struct_.instantiate(types);
                 builder.load(
                     compilation_ctx.memory_id,
@@ -616,7 +616,7 @@ impl IntermediateType {
                 );
             }
             IntermediateType::IStruct(index) => {
-                let struct_ = module_data.structs.get_struct_by_index(*index).unwrap();
+                let struct_ = module_data.structs.get_by_index(*index).unwrap();
                 IStruct::copy_local_instructions(
                     struct_,
                     module,
@@ -626,7 +626,7 @@ impl IntermediateType {
                 );
             }
             IntermediateType::IGenericStructInstance(index, types) => {
-                let struct_ = module_data.structs.get_struct_by_index(*index).unwrap();
+                let struct_ = module_data.structs.get_by_index(*index).unwrap();
                 let struct_instance = struct_.instantiate(types);
                 IStruct::copy_local_instructions(
                     &struct_instance,

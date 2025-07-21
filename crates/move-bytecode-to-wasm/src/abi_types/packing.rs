@@ -339,7 +339,7 @@ impl Packable for IntermediateType {
                 let struct_ = compilation_ctx
                     .root_module_data
                     .structs
-                    .get_struct_by_index(*index)
+                    .get_by_index(*index)
                     .unwrap();
                 struct_.add_pack_instructions(
                     builder,
@@ -355,7 +355,7 @@ impl Packable for IntermediateType {
                 let struct_ = compilation_ctx
                     .root_module_data
                     .structs
-                    .get_struct_by_index(*index)
+                    .get_by_index(*index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.add_pack_instructions(
@@ -407,7 +407,7 @@ impl Packable for IntermediateType {
                 let struct_ = compilation_ctx
                     .root_module_data
                     .structs
-                    .get_struct_by_index(*index)
+                    .get_by_index(*index)
                     .unwrap();
                 struct_.add_pack_instructions(
                     builder,
@@ -423,7 +423,7 @@ impl Packable for IntermediateType {
                 let struct_ = compilation_ctx
                     .root_module_data
                     .structs
-                    .get_struct_by_index(*index)
+                    .get_by_index(*index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.add_pack_instructions(
@@ -468,7 +468,7 @@ impl Packable for IntermediateType {
                 let struct_ = compilation_ctx
                     .root_module_data
                     .structs
-                    .get_struct_by_index(*index)
+                    .get_by_index(*index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.solidity_abi_encode_size(compilation_ctx)
@@ -477,7 +477,7 @@ impl Packable for IntermediateType {
                 let struct_ = compilation_ctx
                     .root_module_data
                     .structs
-                    .get_struct_by_index(*index)
+                    .get_by_index(*index)
                     .unwrap();
                 struct_.solidity_abi_encode_size(compilation_ctx)
             }
@@ -520,7 +520,7 @@ impl Packable for IntermediateType {
                 let struct_ = compilation_ctx
                     .root_module_data
                     .structs
-                    .get_struct_by_index(*index)
+                    .get_by_index(*index)
                     .unwrap();
                 struct_.solidity_abi_encode_is_dynamic(compilation_ctx)
             }
@@ -528,7 +528,7 @@ impl Packable for IntermediateType {
                 let struct_ = compilation_ctx
                     .root_module_data
                     .structs
-                    .get_struct_by_index(*index)
+                    .get_by_index(*index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.solidity_abi_encode_is_dynamic(compilation_ctx)

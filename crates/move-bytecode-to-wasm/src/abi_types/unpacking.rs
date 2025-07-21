@@ -170,7 +170,7 @@ impl Unpackable for IntermediateType {
                 let struct_ = compilation_ctx
                     .root_module_data
                     .structs
-                    .get_struct_by_index(*index)
+                    .get_by_index(*index)
                     .unwrap();
 
                 struct_.add_unpack_instructions(
@@ -185,7 +185,7 @@ impl Unpackable for IntermediateType {
                 let struct_ = compilation_ctx
                     .root_module_data
                     .structs
-                    .get_struct_by_index(*index)
+                    .get_by_index(*index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.add_unpack_instructions(

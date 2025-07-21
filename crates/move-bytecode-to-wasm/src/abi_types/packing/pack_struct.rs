@@ -212,7 +212,7 @@ impl IStruct {
                     let child_struct = compilation_ctx
                         .root_module_data
                         .structs
-                        .get_struct_by_index(*index)
+                        .get_by_index(*index)
                         .unwrap();
                     if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
                         child_struct.add_pack_instructions(
@@ -242,7 +242,7 @@ impl IStruct {
                     let child_struct = compilation_ctx
                         .root_module_data
                         .structs
-                        .get_struct_by_index(*index)
+                        .get_by_index(*index)
                         .unwrap();
                     let child_struct_instance = child_struct.instantiate(types);
 

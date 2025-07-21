@@ -344,7 +344,7 @@ impl IVector {
                         },
                     );
 
-                    let struct_ = module_data.structs.get_struct_by_index(*index).unwrap();
+                    let struct_ = module_data.structs.get_by_index(*index).unwrap();
                     struct_.copy_local_instructions(
                         module,
                         loop_block,
