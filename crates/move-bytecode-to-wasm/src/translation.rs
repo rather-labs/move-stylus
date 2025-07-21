@@ -257,7 +257,7 @@ fn map_bytecode_instruction(
         // Function calls
         Bytecode::Call(function_handle_index) => {
             // Consume from the types stack the arguments that will be used by the function call
-            let arguments = &module_data.functions_arguments[function_handle_index.into_index()];
+            let arguments = &module_data.functions.arguments[function_handle_index.into_index()];
 
             for argument in arguments.iter().rev() {
                 types_stack.pop_expecting(argument)?;
@@ -274,7 +274,7 @@ fn map_bytecode_instruction(
                 }
             }
 
-            let function_id = &module_data.function_calls[function_handle_index.into_index()];
+            let function_id = &module_data.functions.calls[function_handle_index.into_index()];
 
             // If the function is in the table we call it directly
             let f_entry = if let Some(f) = function_table.get_by_function_id(function_id) {
@@ -283,7 +283,8 @@ fn map_bytecode_instruction(
             // Otherwise we add it to the table and declare it for linking
             else {
                 let function_information = if let Some(fi) = module_data
-                    .function_information
+                    .functions
+                    .information
                     .get(function_handle_index.into_index())
                 {
                     fi
@@ -294,7 +295,8 @@ fn map_bytecode_instruction(
                         .unwrap();
 
                     dependency_data
-                        .function_information
+                        .functions
+                        .information
                         .iter()
                         .find(|f| &f.function_id == function_id)
                         .unwrap()
@@ -314,11 +316,11 @@ fn map_bytecode_instruction(
             add_unpack_function_return_values_instructions(
                 builder,
                 module,
-                &module_data.functions_returns[function_handle_index.0 as usize],
+                &module_data.functions.returns[function_handle_index.into_index()],
                 compilation_ctx.memory_id,
             );
             // Insert in the stack types the types returned by the function (if any)
-            let return_types = &module_data.functions_returns[function_handle_index.0 as usize];
+            let return_types = &module_data.functions.returns[function_handle_index.0 as usize];
             types_stack.append(return_types);
         }
         // Locals

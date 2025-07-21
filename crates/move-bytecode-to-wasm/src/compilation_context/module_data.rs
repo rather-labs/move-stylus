@@ -1,3 +1,5 @@
+mod function_data;
+
 use crate::{
     GlobalFunctionTable,
     translation::{
@@ -10,6 +12,7 @@ use crate::{
         table::FunctionId,
     },
 };
+use function_data::FunctionData;
 use move_binary_format::{
     CompiledModule,
     file_format::{
@@ -49,11 +52,8 @@ pub struct ModuleData {
     /// Move's connstant pool
     pub constants: Vec<Constant>,
 
-    /// Module's functions arguments.
-    pub functions_arguments: Vec<Vec<IntermediateType>>,
-
-    /// Module's functions Returns.
-    pub functions_returns: Vec<Vec<IntermediateType>>,
+    /// Module's functions information
+    pub functions: FunctionData,
 
     /// Module's signatures
     pub module_signatures: Vec<Signature>,
@@ -99,13 +99,6 @@ pub struct ModuleData {
     /// types. The datatype handles are used interally by move to look for user defined data
     /// types
     pub datatype_handles_map: HashMap<DatatypeHandleIndex, UserDefinedType>,
-
-    /// Functions called inside this module. The functions on this list can be defined inside the
-    /// current module or in an immediate dependency
-    pub function_calls: Vec<FunctionId>,
-
-    /// Function information about this module's defined functions
-    pub function_information: Vec<MappedFunction>,
 }
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
@@ -166,18 +159,16 @@ impl ModuleData {
         let (module_enums, variants_to_enum_map) =
             Self::process_concrete_enums(move_module, &datatype_handles_map);
 
-        let (functions_arguments, functions_returns, function_calls, function_information) =
-            Self::process_function_definitions(
-                module_id,
-                move_module,
-                &datatype_handles_map,
-                function_definitions,
-            );
+        let functions = Self::process_function_definitions(
+            module_id,
+            move_module,
+            &datatype_handles_map,
+            function_definitions,
+        );
 
         ModuleData {
             constants: move_module.constant_pool.clone(), // TODO: Clone
-            functions_arguments,
-            functions_returns,
+            functions,
             module_signatures: move_module.signatures.clone(),
             module_structs,
             module_generic_structs_instances,
@@ -187,8 +178,6 @@ impl ModuleData {
             module_enums,
             variants_to_enum_map,
             instantiated_fields_to_generic_fields,
-            function_calls,
-            function_information,
         }
     }
 
@@ -445,18 +434,12 @@ impl ModuleData {
         (module_enums, variants_to_enum_map)
     }
 
-    #[allow(clippy::type_complexity)]
     fn process_function_definitions<'move_package>(
         module_id: ModuleId,
         move_module: &'move_package CompiledModule,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         function_definitions: &mut GlobalFunctionTable<'move_package>,
-    ) -> (
-        Vec<Vec<IntermediateType>>,
-        Vec<Vec<IntermediateType>>,
-        Vec<FunctionId>,
-        Vec<MappedFunction>,
-    ) {
+    ) -> FunctionData {
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
         let mut functions_arguments = Vec::new();
@@ -540,12 +523,12 @@ impl ModuleData {
             function_calls.push(function_id);
         }
 
-        (
-            functions_arguments,
-            functions_returns,
-            function_calls,
-            function_information,
-        )
+        FunctionData {
+            arguments: functions_arguments,
+            returns: functions_returns,
+            calls: function_calls,
+            information: function_information,
+        }
     }
 
     // =======

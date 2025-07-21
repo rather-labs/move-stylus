@@ -108,7 +108,8 @@ pub fn translate_package(
 
         let mut public_functions = Vec::new();
         for function_information in root_module_data
-            .function_information
+            .functions
+            .information
             .iter()
             .filter(|fi| fi.function_id.module_id == root_module_id)
         {
@@ -242,7 +243,8 @@ fn translate_and_link_functions(
     // Obtain the function information and module's data
     let (function_information, module_data) = if let Some(fi) = compilation_ctx
         .root_module_data
-        .function_information
+        .functions
+        .information
         .iter()
         .find(|f| &f.function_id == function_id)
     {
@@ -254,7 +256,8 @@ fn translate_and_link_functions(
             .unwrap();
 
         let fi = module_data
-            .function_information
+            .functions
+            .information
             .iter()
             .find(|f| &f.function_id == function_id)
             .unwrap();
