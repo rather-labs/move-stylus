@@ -482,10 +482,8 @@ fn map_bytecode_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
             );
 
-            let expected_vec_inner = bytecodes::vectors::get_inner_type_from_signature(
-                signature_index,
-                compilation_ctx,
-            )?;
+            let expected_vec_inner =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -511,10 +509,8 @@ fn map_bytecode_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
             );
 
-            let expected_vec_inner = bytecodes::vectors::get_inner_type_from_signature(
-                signature_index,
-                compilation_ctx,
-            )?;
+            let expected_vec_inner =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -528,10 +524,8 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IMutRef(Box::new(*vec_inner)));
         }
         Bytecode::VecPack(signature_index, num_elements) => {
-            let inner = bytecodes::vectors::get_inner_type_from_signature(
-                signature_index,
-                compilation_ctx,
-            )?;
+            let inner =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             IVector::vec_pack_instructions(
                 &inner,
@@ -562,10 +556,8 @@ fn map_bytecode_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
             );
 
-            let expected_vec_inner = bytecodes::vectors::get_inner_type_from_signature(
-                signature_index,
-                compilation_ctx,
-            )?;
+            let expected_vec_inner =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -621,10 +613,8 @@ fn map_bytecode_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *mut_inner)
             );
 
-            let expected_elem_type = bytecodes::vectors::get_inner_type_from_signature(
-                signature_index,
-                compilation_ctx,
-            )?;
+            let expected_elem_type =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             if *vec_inner != expected_elem_type {
                 return Err(TranslationError::TypeMismatch {
@@ -656,10 +646,8 @@ fn map_bytecode_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *mut_inner)
             );
 
-            let expected_vec_inner = bytecodes::vectors::get_inner_type_from_signature(
-                signature_index,
-                compilation_ctx,
-            )?;
+            let expected_vec_inner =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -680,10 +668,8 @@ fn map_bytecode_instruction(
             }
         }
         Bytecode::VecLen(signature_index) => {
-            let elem_ir_type = bytecodes::vectors::get_inner_type_from_signature(
-                signature_index,
-                compilation_ctx,
-            )?;
+            let elem_ir_type =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
                 IntermediateType::IVector(Box::new(elem_ir_type)),
@@ -1281,15 +1267,15 @@ fn map_bytecode_instruction(
         }
         Bytecode::Pack(struct_definition_index) => {
             let struct_ =
-                compilation_ctx.get_struct_by_struct_definition_idx(struct_definition_index)?;
+                module_data.get_struct_by_struct_definition_idx(struct_definition_index)?;
 
             bytecodes::structs::pack(struct_, module, builder, compilation_ctx, types_stack)?;
 
             types_stack.push(IntermediateType::IStruct(struct_definition_index.0));
         }
         Bytecode::PackGeneric(struct_definition_index) => {
-            let struct_ = compilation_ctx
-                .get_generic_struct_by_struct_definition_idx(struct_definition_index)?;
+            let struct_ =
+                module_data.get_generic_struct_by_struct_definition_idx(struct_definition_index)?;
 
             bytecodes::structs::pack(&struct_, module, builder, compilation_ctx, types_stack)?;
 
@@ -1304,7 +1290,7 @@ fn map_bytecode_instruction(
             types_stack.pop_expecting(&IntermediateType::IStruct(struct_definition_index.0))?;
 
             let struct_ =
-                compilation_ctx.get_struct_by_struct_definition_idx(struct_definition_index)?;
+                module_data.get_struct_by_struct_definition_idx(struct_definition_index)?;
 
             bytecodes::structs::unpack(struct_, module, builder, compilation_ctx, types_stack)?;
         }
@@ -1316,8 +1302,8 @@ fn map_bytecode_instruction(
 
             types_stack.pop_expecting(&IntermediateType::IGenericStructInstance(idx, types))?;
 
-            let struct_ = compilation_ctx
-                .get_generic_struct_by_struct_definition_idx(struct_definition_index)?;
+            let struct_ =
+                module_data.get_generic_struct_by_struct_definition_idx(struct_definition_index)?;
 
             bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
         }

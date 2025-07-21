@@ -88,19 +88,6 @@ impl CompilationContext<'_> {
             ))
     }
 
-    pub fn get_struct_by_struct_definition_idx(
-        &self,
-        struct_index: &StructDefinitionIndex,
-    ) -> Result<&IStruct> {
-        self.root_module_data
-            .module_structs
-            .iter()
-            .find(|s| &s.struct_definition_index == struct_index)
-            .ok_or(CompilationContextError::StructWithDefinitionIdxNotFound(
-                *struct_index,
-            ))
-    }
-
     pub fn get_generic_struct_by_field_handle_idx(
         &self,
         field_index: &FieldInstantiationIndex,
@@ -114,29 +101,6 @@ impl CompilationContext<'_> {
             ))?;
 
         let struct_instance = &self.root_module_data.module_generic_structs_instances[*struct_id];
-        let generic_struct = &self.root_module_data.module_structs[struct_instance.0.0 as usize];
-
-        let types = struct_instance
-            .1
-            .iter()
-            .map(|t| {
-                IntermediateType::try_from_signature_token(
-                    t,
-                    &self.root_module_data.datatype_handles_map,
-                )
-            })
-            .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
-            .unwrap();
-
-        Ok(generic_struct.instantiate(&types))
-    }
-
-    pub fn get_generic_struct_by_struct_definition_idx(
-        &self,
-        struct_index: &StructDefInstantiationIndex,
-    ) -> Result<IStruct> {
-        let struct_instance =
-            &self.root_module_data.module_generic_structs_instances[struct_index.0 as usize];
         let generic_struct = &self.root_module_data.module_structs[struct_instance.0.0 as usize];
 
         let types = struct_instance
@@ -183,14 +147,6 @@ impl CompilationContext<'_> {
         let struct_instance =
             &self.root_module_data.module_generic_structs_instances[struct_index.0 as usize];
         struct_instance.0.0
-    }
-
-    pub fn get_signatures_by_index(&self, index: SignatureIndex) -> Result<&Vec<SignatureToken>> {
-        self.root_module_data
-            .module_signatures
-            .get(index.into_index())
-            .map(|s| &s.0)
-            .ok_or(CompilationContextError::SignatureNotFound(index))
     }
 
     pub fn get_enum_by_variant_handle_idx(&self, idx: &VariantHandleIndex) -> Result<&IEnum> {

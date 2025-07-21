@@ -14,11 +14,14 @@ use move_binary_format::{
     CompiledModule,
     file_format::{
         Constant, DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex,
-        FieldInstantiationIndex, FunctionDefinitionIndex, Signature, SignatureToken,
-        StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
+        FieldInstantiationIndex, FunctionDefinitionIndex, Signature, SignatureIndex,
+        SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
     },
+    internals::ModuleIndex,
 };
 use std::{collections::HashMap, fmt::Display};
+
+use super::{CompilationContextError, Result};
 
 #[derive(Debug)]
 pub enum UserDefinedType {
@@ -404,7 +407,7 @@ impl ModuleData {
                             datatype_handles_map,
                         )
                     })
-                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
                     .unwrap();
 
                 variants.push(IEnumVariant::new(
@@ -467,7 +470,7 @@ impl ModuleData {
                     .0
                     .iter()
                     .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
                     .unwrap(),
             );
 
@@ -478,7 +481,7 @@ impl ModuleData {
                     .0
                     .iter()
                     .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                    .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
                     .unwrap(),
             );
 
@@ -542,5 +545,48 @@ impl ModuleData {
             function_calls,
             function_information,
         )
+    }
+    // ===============
+    // Structs
+    // ============
+
+    pub fn get_struct_by_struct_definition_idx(
+        &self,
+        struct_index: &StructDefinitionIndex,
+    ) -> Result<&IStruct> {
+        self.module_structs
+            .iter()
+            .find(|s| &s.struct_definition_index == struct_index)
+            .ok_or(CompilationContextError::StructWithDefinitionIdxNotFound(
+                *struct_index,
+            ))
+    }
+
+    pub fn get_generic_struct_by_struct_definition_idx(
+        &self,
+        struct_index: &StructDefInstantiationIndex,
+    ) -> Result<IStruct> {
+        let struct_instance = &self.module_generic_structs_instances[struct_index.0 as usize];
+        let generic_struct = &self.module_structs[struct_instance.0.0 as usize];
+
+        let types = struct_instance
+            .1
+            .iter()
+            .map(|t| IntermediateType::try_from_signature_token(t, &self.datatype_handles_map))
+            .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+            .unwrap();
+
+        Ok(generic_struct.instantiate(&types))
+    }
+
+    // ====
+    // General
+    // ==
+
+    pub fn get_signatures_by_index(&self, index: SignatureIndex) -> Result<&Vec<SignatureToken>> {
+        self.module_signatures
+            .get(index.into_index())
+            .map(|s| &s.0)
+            .ok_or(CompilationContextError::SignatureNotFound(index))
     }
 }

@@ -1,8 +1,7 @@
 use move_binary_format::file_format::SignatureIndex;
 
 use crate::{
-    CompilationContext,
-    translation::{TranslationError, intermediate_types::IntermediateType},
+    compilation_context::module_data::ModuleData, translation::{intermediate_types::IntermediateType, TranslationError}, CompilationContext
 };
 
 /// Converts the signature index pointing to a Move's Signature token that represents the inner
@@ -12,9 +11,9 @@ use crate::{
 /// compilation matches the one contained in the types stack.
 pub fn get_inner_type_from_signature(
     signature_index: &SignatureIndex,
-    compilation_ctx: &CompilationContext,
+    module_data: &ModuleData,
 ) -> Result<IntermediateType, TranslationError> {
-    let signatures = compilation_ctx.get_signatures_by_index(*signature_index)?;
+    let signatures = module_data.get_signatures_by_index(*signature_index)?;
 
     let signature = if signatures.len() != 1 {
         return Err(TranslationError::VectorInnerTypeNumberError {
@@ -27,6 +26,6 @@ pub fn get_inner_type_from_signature(
 
     Ok(IntermediateType::try_from_signature_token(
         signature,
-        &compilation_ctx.root_module_data.datatype_handles_map,
+        &module_data.datatype_handles_map,
     )?)
 }
