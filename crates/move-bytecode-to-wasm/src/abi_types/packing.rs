@@ -371,6 +371,7 @@ impl Packable for IntermediateType {
             IntermediateType::IEnum(enum_index) => {
                 let enum_ = compilation_ctx
                     .root_module_data
+                    .enums
                     .get_enum_by_index(*enum_index)
                     .unwrap();
                 if !enum_.is_simple {

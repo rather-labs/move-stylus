@@ -1,3 +1,4 @@
+mod enum_data;
 mod function_data;
 mod struct_data;
 
@@ -13,6 +14,7 @@ use crate::{
         table::FunctionId,
     },
 };
+use enum_data::{EnumData, VariantData};
 use function_data::FunctionData;
 use move_binary_format::{
     CompiledModule,
@@ -41,38 +43,6 @@ pub enum UserDefinedType {
         module: ModuleId,
         identifier: String,
     },
-}
-
-#[derive(Debug)]
-pub struct VariantData {
-    pub enum_index: usize,
-    pub index_inside_enum: usize,
-}
-
-#[derive(Debug, Default)]
-pub struct ModuleData {
-    /// Move's connstant pool
-    pub constants: Vec<Constant>,
-
-    /// Module's functions information
-    pub functions: FunctionData,
-
-    /// Module's structs information
-    pub structs: StructData,
-
-    /// Module's signatures
-    pub module_signatures: Vec<Signature>,
-
-    /// Module's enums: contains all the user defined enums
-    pub module_enums: Vec<IEnum>,
-
-    /// Maps a enum's variant index to its corresponding enum and position inside the enum
-    pub variants_to_enum_map: HashMap<VariantHandleIndex, VariantData>,
-
-    /// This Hashmap maps the move's datatype handles to our internal representation of those
-    /// types. The datatype handles are used interally by move to look for user defined data
-    /// types
-    pub datatype_handles_map: HashMap<DatatypeHandleIndex, UserDefinedType>,
 }
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
@@ -111,6 +81,29 @@ impl Display for ModuleId {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct ModuleData {
+    /// Move's connstant pool
+    pub constants: Vec<Constant>,
+
+    /// Module's functions information
+    pub functions: FunctionData,
+
+    /// Module's structs information
+    pub structs: StructData,
+
+    /// Module's enum information
+    pub enums: EnumData,
+
+    /// Module's signatures
+    pub module_signatures: Vec<Signature>,
+
+    /// This Hashmap maps the move's datatype handles to our internal representation of those
+    /// types. The datatype handles are used interally by move to look for user defined data
+    /// types
+    pub datatype_handles_map: HashMap<DatatypeHandleIndex, UserDefinedType>,
+}
+
 impl ModuleData {
     pub fn build_module_data<'move_package>(
         module_id: ModuleId,
@@ -141,6 +134,11 @@ impl ModuleData {
         let (module_enums, variants_to_enum_map) =
             Self::process_concrete_enums(move_module, &datatype_handles_map);
 
+        let enums = EnumData {
+            enums: module_enums,
+            variants_to_enum: variants_to_enum_map,
+        };
+
         let functions = Self::process_function_definitions(
             module_id,
             move_module,
@@ -152,10 +150,9 @@ impl ModuleData {
             constants: move_module.constant_pool.clone(), // TODO: Clone
             functions,
             structs,
+            enums,
             module_signatures: move_module.signatures.clone(),
             datatype_handles_map,
-            module_enums,
-            variants_to_enum_map,
         }
     }
 
@@ -520,45 +517,6 @@ impl ModuleData {
             information: function_information,
         }
     }
-
-    pub fn get_enum_by_variant_handle_idx(&self, idx: &VariantHandleIndex) -> Result<&IEnum> {
-        let VariantData { enum_index, .. } = self
-            .variants_to_enum_map
-            .get(idx)
-            .ok_or(CompilationContextError::EnumWithVariantIdxNotFound(idx.0))?;
-
-        self.module_enums
-            .get(*enum_index)
-            .ok_or(CompilationContextError::EnumNotFound(*enum_index as u16))
-    }
-
-    // =====
-    // Enums
-    // =====
-
-    pub fn get_variant_position_by_variant_handle_idx(
-        &self,
-        idx: &VariantHandleIndex,
-    ) -> Result<u16> {
-        let VariantData {
-            index_inside_enum, ..
-        } = self
-            .variants_to_enum_map
-            .get(idx)
-            .ok_or(CompilationContextError::EnumWithVariantIdxNotFound(idx.0))?;
-
-        Ok(*index_inside_enum as u16)
-    }
-
-    pub fn get_enum_by_index(&self, index: u16) -> Result<&IEnum> {
-        self.module_enums
-            .get(index as usize)
-            .ok_or(CompilationContextError::EnumNotFound(index))
-    }
-
-    // ====
-    // General
-    // ==
 
     pub fn get_signatures_by_index(&self, index: SignatureIndex) -> Result<&Vec<SignatureToken>> {
         self.module_signatures

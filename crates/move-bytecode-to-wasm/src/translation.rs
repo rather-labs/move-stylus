@@ -1329,9 +1329,10 @@ fn map_bytecode_instruction(
         // Enums
         //**
         Bytecode::PackVariant(index) => {
-            let enum_ = module_data.get_enum_by_variant_handle_idx(index)?;
-            let index_inside_enum =
-                module_data.get_variant_position_by_variant_handle_idx(index)?;
+            let enum_ = module_data.enums.get_enum_by_variant_handle_idx(index)?;
+            let index_inside_enum = module_data
+                .enums
+                .get_variant_position_by_variant_handle_idx(index)?;
 
             bytecodes::enums::pack_variant(
                 enum_,
