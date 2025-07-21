@@ -1,4 +1,4 @@
-module 0x01::control_flow;
+module 0x01::control_flow_u8;
 
 public fun simple_loop(x: u8): u8 {
     let mut i = 0;
@@ -48,11 +48,16 @@ public fun misc_1(x: u8): u8 {
     }
 }
 
-public fun early_return(x: u8): u8 {
+public fun conditional_return(x: u8): u8 {
     if (x > 100) {
         return 255
-    };
-    x + 1
+    } else {
+        if (x % 17 == 0) {
+            x + 200
+        } else {
+            x - 20
+        }
+    }
 }
 
 public fun crazy_loop(mut i: u8): u8 {
@@ -140,7 +145,7 @@ public fun check_even(i: u8): u8 {
     }
 }
 
-public fun misc_2(x: u8): u8 {
+public fun check_even_after_loop(x: u8): u8 {
     let mut i = 0;
     while (i < x) {
         i = i + 1;
@@ -148,4 +153,17 @@ public fun misc_2(x: u8): u8 {
     
    let j = check_even(i);
    j
+}
+
+public fun collatz(mut x: u64): u64 {
+    let mut count = 0;
+    while (x != 1) {
+        if (x % 2 == 0) {
+            x = x / 2;
+        } else {
+            x = x * 3 + 1;
+        };
+        count = count + 1;
+    };
+    count
 }

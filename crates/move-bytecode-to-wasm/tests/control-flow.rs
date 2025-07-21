@@ -19,14 +19,14 @@ fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u
     Ok(())
 }
 
-mod control_flow {
+mod control_flow_u8 {
     use super::*;
 
     #[fixture]
     #[once]
     fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "control_flow";
-        const SOURCE_PATH: &str = "tests/control-flow/control_flow.move";
+        const MODULE_NAME: &str = "control_flow_u8";
+        const SOURCE_PATH: &str = "tests/control-flow/control_flow_u8.move";
 
         let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
 
@@ -39,12 +39,13 @@ mod control_flow {
         function misc1(uint8 x) external returns (uint8);
         function nestedLoop(uint8 x) external returns (uint8);
         function loopWithBreak(uint8 x) external returns (uint8);
-        function earlyReturn(uint8 x) external returns (uint8);
+        function conditionalReturn(uint8 x) external returns (uint8);
         function testMatch(uint8 x) external returns (uint8);
         function crazyLoop(uint8 i) external returns (uint8);
         function testMatchInLoop() external returns (uint8);
         function testLabeledLoops(uint8 x) external returns (uint8);
-        function misc2(uint8 x) external returns (uint8);
+        function checkEven(uint8 x) external returns (uint8);
+        function checkEvenAfterLoop(uint8 x) external returns (uint8);
     );
 
     #[rstest]
@@ -55,8 +56,15 @@ mod control_flow {
     #[case(nestedLoopCall::new((5u8,)), 20u8)]
     #[case(loopWithBreakCall::new((5u8,)), 21u8)]
     #[case(loopWithBreakCall::new((10u8,)), 66u8)]
-    #[case(earlyReturnCall::new((5u8,)), 6u8)]
-    #[case(earlyReturnCall::new((150u8,)), 255u8)]
+    #[should_panic]
+    #[case(conditionalReturnCall::new((5u8,)), 0u8)]
+    #[should_panic]
+    #[case(conditionalReturnCall::new((68u8,)), 255u8)]
+    #[case(conditionalReturnCall::new((17u8,)), 217u8)]
+    #[case(conditionalReturnCall::new((20u8,)), 0u8)]
+    #[case(conditionalReturnCall::new((26u8,)), 6u8)]
+    #[case(conditionalReturnCall::new((101u8,)), 255u8)]
+    #[case(conditionalReturnCall::new((255u8,)), 255u8)]
     #[case(testMatchCall::new((1u8,)), 44u8)]
     #[case(testMatchCall::new((2u8,)), 55u8)]
     #[case(testMatchCall::new((3u8,)), 66u8)]
@@ -68,9 +76,11 @@ mod control_flow {
     #[case(testLabeledLoopsCall::new((1u8,)), 25u8)]
     #[case(testLabeledLoopsCall::new((20u8,)), 20u8)]
     #[case(testLabeledLoopsCall::new((10u8,)), 34u8)]
-    #[case(misc2Call::new((10u8,)), 42u8)]
-    #[case(misc2Call::new((15u8,)), 55u8)]
-    fn test_control_flow<T: SolCall>(
+    #[case(checkEvenAfterLoopCall::new((10u8,)), 42u8)]
+    #[case(checkEvenAfterLoopCall::new((15u8,)), 55u8)]
+    #[case(checkEvenCall::new((10u8,)), 42u8)]
+    #[case(checkEvenCall::new((15u8,)), 55u8)]
+    fn test_control_flow_u8<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: u8,
@@ -79,6 +89,46 @@ mod control_flow {
             runtime,
             call_data.abi_encode(),
             <sol!((uint8,))>::abi_encode_params(&(expected_result,)),
+        )
+        .unwrap();
+    }
+}
+
+mod control_flow_u64 {
+    use super::*;
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "control_flow_u64";
+        const SOURCE_PATH: &str = "tests/control-flow/control_flow_u64.move";
+
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+        function collatz(uint64 x) external returns (uint64);
+    );
+
+    #[rstest]
+    #[case(collatzCall::new((1u64,)), 0u64)]
+    #[case(collatzCall::new((2u64,)), 1u64)]
+    #[case(collatzCall::new((3u64,)), 7u64)]
+    #[case(collatzCall::new((4u64,)), 2u64)]
+    #[case(collatzCall::new((5u64,)), 5u64)]
+    #[case(collatzCall::new((6u64,)), 8u64)]
+    fn test_control_flow_u64<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: u64,
+    ) {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            <sol!((uint64,))>::abi_encode_params(&(expected_result,)),
         )
         .unwrap();
     }

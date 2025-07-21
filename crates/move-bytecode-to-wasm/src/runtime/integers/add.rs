@@ -273,18 +273,18 @@ pub fn add_u64(module: &mut Module) -> FunctionId {
     // else trap
     builder
         .local_get(n1)
-        .binop(BinaryOp::I64GtU)
+        .binop(BinaryOp::I64LtU)
         .local_get(res)
         .local_get(n2)
-        .binop(BinaryOp::I64GtU)
-        .binop(BinaryOp::I32And)
+        .binop(BinaryOp::I64LtU)
+        .binop(BinaryOp::I32Or)
         .if_else(
             Some(ValType::I64),
             |then| {
-                then.local_get(res);
+                then.unreachable();
             },
             |else_| {
-                else_.unreachable();
+                else_.local_get(res);
             },
         );
 
