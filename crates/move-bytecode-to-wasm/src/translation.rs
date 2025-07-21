@@ -72,13 +72,6 @@ pub fn translate_function(
     let mut types_stack = TypesStack::new();
     let mut functions_to_link = HashSet::new();
 
-    /*
-    println!(
-        "Translating {}, {:#?}",
-        function_information.function_id, &move_bytecode
-    );
-    */
-
     for instruction in &move_bytecode.code {
         let mut fns_to_link = map_bytecode_instruction(
             instruction,
@@ -285,12 +278,10 @@ fn map_bytecode_instruction(
 
             // If the function is in the table we call it directly
             let f_entry = if let Some(f) = function_table.get_by_function_id(function_id) {
-                println!("found function in table {function_id}");
                 f
             }
             // Otherwise we add it to the table and declare it for linking
             else {
-                println!("adding {function_id} to table ");
                 let function_information = if let Some(fi) = module_data
                     .function_information
                     .get(function_handle_index.into_index())

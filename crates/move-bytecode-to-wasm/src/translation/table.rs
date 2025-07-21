@@ -99,8 +99,6 @@ impl FunctionTable {
 
         entry.wasm_function_id = Some(wasm_function_id);
 
-        println!("assigned to {function_id} wasm function id {wasm_function_id:?}");
-
         Ok(())
     }
 

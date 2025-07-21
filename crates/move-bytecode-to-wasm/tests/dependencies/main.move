@@ -1,12 +1,13 @@
-module 0x0::main;
+module test::main;
 
-use 0x0::other_mod::Test;
-use 0x0::another_mod::AnotherTest;
+use test::other_mod::Test;
+use test::another_mod::AnotherTest;
 
-public fun test(_ctx: &Test): u8 {
-    42
+public fun echo_test_struct(test: &Test): (u8, u8) {
+    let (a, b) = test.get_values();
+    (a, b)
 }
 
-public fun test2(_ctx: &AnotherTest): u8 {
-    42
+public fun echo_another_test_struct(another_test: &AnotherTest): u8 {
+    another_test.get_value()
 }

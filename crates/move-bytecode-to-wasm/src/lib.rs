@@ -263,13 +263,11 @@ fn translate_and_link_functions(
     };
 
     // Process function defined in this module
-    println!("\n processing {function_id}");
     // First we check if there is already an entry for this function
     if let Some(table_entry) = function_table.get_by_function_id(function_id) {
         // If it has asigned a wasm function id means that we already translated it, so we skip
         // it
         if table_entry.wasm_function_id.is_some() {
-            println!("continuee");
             return;
         }
     }
@@ -283,12 +281,6 @@ fn translate_and_link_functions(
         .unwrap_or_else(|| panic!("could not find function definition for {}", function_id));
 
     let move_bytecode = function_definition.code.as_ref().unwrap();
-    /*
-    println!(
-        "Translating {}, {:#?}",
-        function_information.function_id, function_definition
-    );
-    */
     let (wasm_function_id, functions_to_link) = translate_function(
         module,
         compilation_ctx,
@@ -299,12 +291,9 @@ fn translate_and_link_functions(
     )
     .unwrap_or_else(|_| panic!("there was an error translating {}", function_id));
 
-    println!("translated {}", function_id);
-
     function_table
         .add_to_wasm_table(module, function_id, wasm_function_id)
         .expect("there was an error adding the module's functions to the function table");
-    println!();
 
     // Recursively translate and link functions called by this function
     functions_to_link.iter().for_each(|function_id| {
