@@ -169,6 +169,7 @@ impl Unpackable for IntermediateType {
             IntermediateType::IStruct(index) => {
                 let struct_ = compilation_ctx
                     .root_module_data
+                    .structs
                     .get_struct_by_index(*index)
                     .unwrap();
 
@@ -183,6 +184,7 @@ impl Unpackable for IntermediateType {
             IntermediateType::IGenericStructInstance(index, types) => {
                 let struct_ = compilation_ctx
                     .root_module_data
+                    .structs
                     .get_struct_by_index(*index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);

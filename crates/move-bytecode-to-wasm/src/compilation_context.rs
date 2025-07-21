@@ -42,7 +42,8 @@ impl CompilationContext<'_> {
         )?;
 
         if let Some(struct_) = module
-            .module_structs
+            .structs
+            .structs
             .iter()
             .find(|s| s.identifier == identifier)
         {

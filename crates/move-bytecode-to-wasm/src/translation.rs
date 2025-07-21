@@ -367,7 +367,9 @@ fn map_bytecode_instruction(
             types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
         }
         Bytecode::ImmBorrowField(field_id) => {
-            let struct_ = module_data.get_struct_by_field_handle_idx(field_id)?;
+            let struct_ = module_data
+                .structs
+                .get_struct_by_field_handle_idx(field_id)?;
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
@@ -384,30 +386,30 @@ fn map_bytecode_instruction(
         }
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = module_data
+                .structs
                 .instantiated_fields_to_generic_fields
                 .get(field_id)
                 .unwrap();
 
-            let instantiation_types = instantiation_types
-                .iter()
-                .map(|t| {
-                    IntermediateType::try_from_signature_token(t, &module_data.datatype_handles_map)
-                })
-                .collect::<Result<Vec<_>, anyhow::Error>>()?;
-
-            let struct_ = if let Ok(struct_) =
-                module_data.get_generic_struct_by_field_handle_idx(field_id)
+            let struct_ = if let Ok(struct_) = module_data
+                .structs
+                .get_generic_struct_by_field_handle_idx(field_id)
             {
                 struct_
             } else {
-                let generic_stuct = module_data.get_struct_by_field_handle_idx(struct_field_id)?;
+                let generic_stuct = module_data
+                    .structs
+                    .get_struct_by_field_handle_idx(struct_field_id)?;
 
                 generic_stuct.instantiate(&instantiation_types)
             };
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
-                IntermediateType::IGenericStructInstance(struct_.index(), instantiation_types),
+                IntermediateType::IGenericStructInstance(
+                    struct_.index(),
+                    instantiation_types.to_vec(),
+                ),
             )))?;
 
             bytecodes::structs::borrow_field(
@@ -419,7 +421,9 @@ fn map_bytecode_instruction(
             );
         }
         Bytecode::MutBorrowField(field_id) => {
-            let struct_ = module_data.get_struct_by_field_handle_idx(field_id)?;
+            let struct_ = module_data
+                .structs
+                .get_struct_by_field_handle_idx(field_id)?;
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
@@ -436,29 +440,29 @@ fn map_bytecode_instruction(
         }
         Bytecode::MutBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = module_data
+                .structs
                 .instantiated_fields_to_generic_fields
                 .get(field_id)
                 .unwrap();
 
-            let instantiation_types = instantiation_types
-                .iter()
-                .map(|t| {
-                    IntermediateType::try_from_signature_token(t, &module_data.datatype_handles_map)
-                })
-                .collect::<Result<Vec<_>, anyhow::Error>>()?;
-
-            let struct_ = if let Ok(struct_) =
-                module_data.get_generic_struct_by_field_handle_idx(field_id)
+            let struct_ = if let Ok(struct_) = module_data
+                .structs
+                .get_generic_struct_by_field_handle_idx(field_id)
             {
                 struct_
             } else {
-                let generic_stuct = module_data.get_struct_by_field_handle_idx(struct_field_id)?;
+                let generic_stuct = module_data
+                    .structs
+                    .get_struct_by_field_handle_idx(struct_field_id)?;
                 generic_stuct.instantiate(&instantiation_types)
             };
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
-                IntermediateType::IGenericStructInstance(struct_.index(), instantiation_types),
+                IntermediateType::IGenericStructInstance(
+                    struct_.index(),
+                    instantiation_types.to_vec(),
+                ),
             )))?;
 
             bytecodes::structs::mut_borrow_field(
@@ -1269,42 +1273,58 @@ fn map_bytecode_instruction(
             types_stack.push(t);
         }
         Bytecode::Pack(struct_definition_index) => {
-            let struct_ =
-                module_data.get_struct_by_struct_definition_idx(struct_definition_index)?;
+            let struct_ = module_data
+                .structs
+                .get_by_struct_definition_idx(struct_definition_index)?;
 
             bytecodes::structs::pack(struct_, module, builder, compilation_ctx, types_stack)?;
 
             types_stack.push(IntermediateType::IStruct(struct_definition_index.0));
         }
         Bytecode::PackGeneric(struct_definition_index) => {
-            let struct_ =
-                module_data.get_generic_struct_by_struct_definition_idx(struct_definition_index)?;
+            let struct_ = module_data
+                .structs
+                .get_generic_struct_by_struct_definition_idx(struct_definition_index)?;
 
             bytecodes::structs::pack(&struct_, module, builder, compilation_ctx, types_stack)?;
 
             let idx = module_data
+                .structs
                 .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
-            let types = module_data.get_generic_struct_types_instances(struct_definition_index)?;
+            let types = module_data
+                .structs
+                .get_generic_struct_types_instances(struct_definition_index)?;
 
-            types_stack.push(IntermediateType::IGenericStructInstance(idx, types));
+            types_stack.push(IntermediateType::IGenericStructInstance(
+                idx,
+                types.to_vec(),
+            ));
         }
         Bytecode::Unpack(struct_definition_index) => {
             types_stack.pop_expecting(&IntermediateType::IStruct(struct_definition_index.0))?;
 
-            let struct_ =
-                module_data.get_struct_by_struct_definition_idx(struct_definition_index)?;
+            let struct_ = module_data
+                .structs
+                .get_by_struct_definition_idx(struct_definition_index)?;
 
             bytecodes::structs::unpack(struct_, module, builder, compilation_ctx, types_stack)?;
         }
         Bytecode::UnpackGeneric(struct_definition_index) => {
             let idx = module_data
+                .structs
                 .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
-            let types = module_data.get_generic_struct_types_instances(struct_definition_index)?;
+            let types = module_data
+                .structs
+                .get_generic_struct_types_instances(struct_definition_index)?;
 
-            types_stack.pop_expecting(&IntermediateType::IGenericStructInstance(idx, types))?;
+            types_stack.pop_expecting(&IntermediateType::IGenericStructInstance(
+                idx,
+                types.to_vec(),
+            ))?;
 
-            let struct_ =
-                module_data.get_generic_struct_by_struct_definition_idx(struct_definition_index)?;
+            let struct_ = module_data
+                .structs
+                .get_generic_struct_by_struct_definition_idx(struct_definition_index)?;
 
             bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
         }

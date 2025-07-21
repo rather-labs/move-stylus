@@ -124,7 +124,7 @@ impl IStruct {
         module_data: &ModuleData,
         index: u16,
     ) {
-        let struct_ = module_data.get_struct_by_index(index).unwrap();
+        let struct_ = module_data.structs.get_struct_by_index(index).unwrap();
 
         let s1_ptr = module.locals.add(ValType::I32);
         let s2_ptr = module.locals.add(ValType::I32);
@@ -359,6 +359,7 @@ impl IStruct {
                 IntermediateType::IStruct(index) => {
                     let struct_ = compilation_ctx
                         .root_module_data
+                        .structs
                         .get_struct_by_index(*index)
                         .unwrap();
                     if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
@@ -368,6 +369,7 @@ impl IStruct {
                 IntermediateType::IGenericStructInstance(index, types) => {
                     let child_struct = compilation_ctx
                         .root_module_data
+                        .structs
                         .get_struct_by_index(*index)
                         .unwrap();
                     let child_struct_instance = child_struct.instantiate(types);
@@ -427,6 +429,7 @@ impl IStruct {
                 IntermediateType::IGenericStructInstance(index, types) => {
                     let child_struct = compilation_ctx
                         .root_module_data
+                        .structs
                         .get_struct_by_index(*index)
                         .unwrap();
                     let child_struct_instance = child_struct.instantiate(types);
@@ -440,6 +443,7 @@ impl IStruct {
                 IntermediateType::IStruct(index) => {
                     let child_struct = compilation_ctx
                         .root_module_data
+                        .structs
                         .get_struct_by_index(*index)
                         .unwrap();
 

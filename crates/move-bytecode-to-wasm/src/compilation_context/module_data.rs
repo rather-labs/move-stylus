@@ -1,4 +1,5 @@
 mod function_data;
+mod struct_data;
 
 use crate::{
     GlobalFunctionTable,
@@ -23,6 +24,7 @@ use move_binary_format::{
     internals::ModuleIndex,
 };
 use std::{collections::HashMap, fmt::Display};
+use struct_data::StructData;
 
 use super::{CompilationContextError, Result};
 
@@ -55,39 +57,11 @@ pub struct ModuleData {
     /// Module's functions information
     pub functions: FunctionData,
 
+    /// Module's structs information
+    pub structs: StructData,
+
     /// Module's signatures
     pub module_signatures: Vec<Signature>,
-
-    /// Module's structs: contains all the user defined structs
-    pub module_structs: Vec<IStruct>,
-
-    /// Module's generic structs instances: contains all the user defined generic structs instances
-    /// with its corresponding types
-    pub module_generic_structs_instances: Vec<(StructDefinitionIndex, Vec<SignatureToken>)>,
-
-    /// Maps a field index to its corresponding struct
-    pub fields_to_struct_map: HashMap<FieldHandleIndex, StructDefinitionIndex>,
-
-    /// Maps a generic field index to its corresponding struct in module_generic_structs_instances
-    pub generic_fields_to_struct_map: HashMap<FieldInstantiationIndex, usize>,
-
-    /// Maps a field instantiation index to its corresponding index inside the struct.
-    /// Field instantiation indexes are unique per struct instantiation, so, for example if we have
-    /// the following struct:
-    /// ```move
-    /// struct S<T> {
-    ///    x: T,
-    /// }
-    /// ```
-    /// And we instantiate it with `S<u64>`, and `S<bool>`, the we will have a
-    /// FieldInstantiationIndex(0) and a FieldInstantiationIndex(1) both for the `x` field, but the
-    /// index inside the struct is 0 in both cases.
-    ///
-    /// We also map the concrete types of the instantiated generic struct where this field
-    /// instantiuation belongs to. This is needed because there are situations where we need to
-    /// intantiate the struct only with the field instantiation index and no other information.
-    pub instantiated_fields_to_generic_fields:
-        HashMap<FieldInstantiationIndex, (FieldHandleIndex, Vec<SignatureToken>)>,
 
     /// Module's enums: contains all the user defined enums
     pub module_enums: Vec<IEnum>,
@@ -145,15 +119,23 @@ impl ModuleData {
     ) -> Self {
         let datatype_handles_map = Self::process_datatype_handles(move_module);
 
-        let (module_generic_structs_instances, generic_fields_to_struct_map) =
-            Self::process_generic_structs(move_module);
-
-        let instantiated_fields_to_generic_fields =
-            Self::process_generic_field_instances(move_module);
-
         // Module's structs
         let (module_structs, fields_to_struct_map) =
             Self::process_concrete_structs(move_module, &datatype_handles_map);
+
+        let (module_generic_structs_instances, generic_fields_to_struct_map) =
+            Self::process_generic_structs(move_module, &datatype_handles_map);
+
+        let instantiated_fields_to_generic_fields =
+            Self::process_generic_field_instances(move_module, &datatype_handles_map);
+
+        let structs = StructData {
+            structs: module_structs,
+            generic_structs_instances: module_generic_structs_instances,
+            fields_to_struct: fields_to_struct_map,
+            generic_fields_to_struct: generic_fields_to_struct_map,
+            instantiated_fields_to_generic_fields,
+        };
 
         // Module's enums
         let (module_enums, variants_to_enum_map) =
@@ -169,15 +151,11 @@ impl ModuleData {
         ModuleData {
             constants: move_module.constant_pool.clone(), // TODO: Clone
             functions,
+            structs,
             module_signatures: move_module.signatures.clone(),
-            module_structs,
-            module_generic_structs_instances,
             datatype_handles_map,
-            fields_to_struct_map,
-            generic_fields_to_struct_map,
             module_enums,
             variants_to_enum_map,
-            instantiated_fields_to_generic_fields,
         }
     }
 
@@ -295,8 +273,9 @@ impl ModuleData {
     #[allow(clippy::type_complexity)]
     fn process_generic_structs(
         module: &CompiledModule,
+        datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
     ) -> (
-        Vec<(StructDefinitionIndex, Vec<SignatureToken>)>,
+        Vec<(StructDefinitionIndex, Vec<IntermediateType>)>,
         HashMap<FieldInstantiationIndex, usize>,
     ) {
         let mut module_generic_structs_instances = vec![];
@@ -305,11 +284,16 @@ impl ModuleData {
         for (index, struct_instance) in module.struct_instantiations().iter().enumerate() {
             // Map the struct instantiation to the generic struct definition and the instantiation
             // types. The index in the array will match the PackGeneric(index) instruction
-            let struct_instantiation_types =
-                &module.signature_at(struct_instance.type_parameters).0;
+            let struct_instantiation_types = module
+                .signature_at(struct_instance.type_parameters)
+                .0
+                .iter()
+                .map(|t| IntermediateType::try_from_signature_token(t, datatype_handles_map))
+                .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                .unwrap();
 
             module_generic_structs_instances
-                .push((struct_instance.def, struct_instantiation_types.clone()));
+                .push((struct_instance.def, struct_instantiation_types));
 
             // Process the mapping of generic fields to structs instantiations
             let generic_struct_definition = &module.struct_defs()[struct_instance.def.0 as usize];
@@ -356,7 +340,8 @@ impl ModuleData {
 
     fn process_generic_field_instances(
         module: &CompiledModule,
-    ) -> HashMap<FieldInstantiationIndex, (FieldHandleIndex, Vec<SignatureToken>)> {
+        datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+    ) -> HashMap<FieldInstantiationIndex, (FieldHandleIndex, Vec<IntermediateType>)> {
         // Map instantiated struct fields to indexes of generic fields
         let mut instantiated_fields_to_generic_fields = HashMap::new();
         for (index, field_instance) in module.field_instantiations().iter().enumerate() {
@@ -367,7 +352,12 @@ impl ModuleData {
                     module
                         .signature_at(field_instance.type_parameters)
                         .0
-                        .clone(),
+                        .iter()
+                        .map(|t| {
+                            IntermediateType::try_from_signature_token(t, datatype_handles_map)
+                        })
+                        .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                        .unwrap(),
                 ),
             );
         }
@@ -529,111 +519,6 @@ impl ModuleData {
             calls: function_calls,
             information: function_information,
         }
-    }
-
-    // =======
-    // Structs
-    // =======
-
-    pub fn get_struct_by_struct_definition_idx(
-        &self,
-        struct_index: &StructDefinitionIndex,
-    ) -> Result<&IStruct> {
-        self.module_structs
-            .iter()
-            .find(|s| &s.struct_definition_index == struct_index)
-            .ok_or(CompilationContextError::StructWithDefinitionIdxNotFound(
-                *struct_index,
-            ))
-    }
-
-    pub fn get_generic_struct_by_struct_definition_idx(
-        &self,
-        struct_index: &StructDefInstantiationIndex,
-    ) -> Result<IStruct> {
-        let struct_instance = &self.module_generic_structs_instances[struct_index.0 as usize];
-        let generic_struct = &self.module_structs[struct_instance.0.0 as usize];
-
-        let types = struct_instance
-            .1
-            .iter()
-            .map(|t| IntermediateType::try_from_signature_token(t, &self.datatype_handles_map))
-            .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
-            .unwrap();
-
-        Ok(generic_struct.instantiate(&types))
-    }
-
-    pub fn get_struct_by_index(&self, index: u16) -> Result<&IStruct> {
-        self.module_structs
-            .iter()
-            .find(|s| s.index() == index)
-            .ok_or(CompilationContextError::StructNotFound(index))
-    }
-
-    pub fn get_struct_by_field_handle_idx(
-        &self,
-        field_index: &FieldHandleIndex,
-    ) -> Result<&IStruct> {
-        let struct_id = self.fields_to_struct_map.get(field_index).ok_or(
-            CompilationContextError::StructWithFieldIdxNotFound(*field_index),
-        )?;
-
-        self.module_structs
-            .iter()
-            .find(|s| &s.struct_definition_index == struct_id)
-            .ok_or(CompilationContextError::StructWithFieldIdxNotFound(
-                *field_index,
-            ))
-    }
-
-    // ===============
-    // Generic Structs
-    // ===============
-
-    pub fn get_generic_struct_by_field_handle_idx(
-        &self,
-        field_index: &FieldInstantiationIndex,
-    ) -> Result<IStruct> {
-        let struct_id = self.generic_fields_to_struct_map.get(field_index).ok_or(
-            CompilationContextError::GenericStructWithFieldIdxNotFound(*field_index),
-        )?;
-
-        let struct_instance = &self.module_generic_structs_instances[*struct_id];
-        let generic_struct = &self.module_structs[struct_instance.0.0 as usize];
-
-        let types = struct_instance
-            .1
-            .iter()
-            .map(|t| IntermediateType::try_from_signature_token(t, &self.datatype_handles_map))
-            .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
-            .unwrap();
-
-        Ok(generic_struct.instantiate(&types))
-    }
-
-    pub fn get_generic_struct_types_instances(
-        &self,
-        struct_index: &StructDefInstantiationIndex,
-    ) -> Result<Vec<IntermediateType>> {
-        let struct_instance = &self.module_generic_structs_instances[struct_index.0 as usize];
-
-        let types = struct_instance
-            .1
-            .iter()
-            .map(|t| IntermediateType::try_from_signature_token(t, &self.datatype_handles_map))
-            .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
-            .unwrap();
-
-        Ok(types)
-    }
-
-    pub fn get_generic_struct_idx_by_struct_definition_idx(
-        &self,
-        struct_index: &StructDefInstantiationIndex,
-    ) -> u16 {
-        let struct_instance = &self.module_generic_structs_instances[struct_index.0 as usize];
-        struct_instance.0.0
     }
 
     pub fn get_enum_by_variant_handle_idx(&self, idx: &VariantHandleIndex) -> Result<&IEnum> {
