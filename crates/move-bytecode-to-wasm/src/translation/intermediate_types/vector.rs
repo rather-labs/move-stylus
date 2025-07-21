@@ -845,7 +845,7 @@ mod tests {
             &mut raw_module,
             &mut builder,
             &compilation_ctx,
-            &compilation_ctx.root_module_data,
+            compilation_ctx.root_module_data,
         );
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
@@ -1068,7 +1068,7 @@ mod tests {
             &mut raw_module,
             &mut builder,
             &compilation_ctx,
-            &compilation_ctx.root_module_data,
+            compilation_ctx.root_module_data,
         );
 
         // Second push back pushes the element to the new copied vector, which has capacity
@@ -1079,7 +1079,7 @@ mod tests {
             &mut raw_module,
             &mut builder,
             &compilation_ctx,
-            &compilation_ctx.root_module_data,
+            compilation_ctx.root_module_data,
         );
 
         builder.local_get(vec_ref).load(

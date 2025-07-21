@@ -1,27 +1,6 @@
-use crate::{
-    GlobalFunctionTable,
-    translation::{
-        functions::MappedFunction,
-        intermediate_types::{
-            IntermediateType,
-            enums::{IEnum, IEnumVariant},
-            structs::IStruct,
-        },
-        table::FunctionId,
-    },
+use crate::translation::{
+    functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionId,
 };
-use move_binary_format::{
-    CompiledModule,
-    file_format::{
-        Constant, DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex,
-        FieldInstantiationIndex, FunctionDefinitionIndex, Signature, SignatureIndex,
-        SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
-    },
-    internals::ModuleIndex,
-};
-use std::{collections::HashMap, fmt::Display};
-
-use super::{CompilationContextError, Result};
 
 #[derive(Debug, Default)]
 pub struct FunctionData {

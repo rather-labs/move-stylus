@@ -24,8 +24,8 @@ fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u
 fn runtime() -> RuntimeSandbox {
     let mut translated_packages = translate_test_complete_package("tests/dependencies");
 
-    let mut translated_package = translated_packages.get_mut("main").unwrap();
-    RuntimeSandbox::new(&mut translated_package)
+    let translated_package = translated_packages.get_mut("main").unwrap();
+    RuntimeSandbox::new(translated_package)
 }
 
 sol!(
@@ -75,7 +75,7 @@ fn test_dependencies<T: SolCall, V: SolValue>(
     for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
 {
     run_test(
-        &runtime,
+        runtime,
         call_data.abi_encode(),
         expected_result.abi_encode_params(),
     )
