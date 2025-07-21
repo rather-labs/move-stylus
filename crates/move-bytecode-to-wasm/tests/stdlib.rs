@@ -6,9 +6,6 @@ mod common;
 /// Bytecode.
 /// We can't translate it to WASM yet so it should panic!
 #[test]
-/*#[should_panic(
-    expected = "cannot convert a type parameter to a wasm type, expected a concrete type"
-)]*/
 #[should_panic]
 fn test_use_stdlib() {
     const MODULE_NAME: &str = "use_stdlib";
