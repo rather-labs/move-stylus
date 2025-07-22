@@ -27,13 +27,4 @@ impl NativeFunction {
             }
         }
     }
-
-    /// Some functions can be defined direcly as imported host functions. This function maps the
-    /// native funtion to the host function
-    fn host_fn_name(name: &str) -> Option<&'static str> {
-        match name {
-            Self::NATIVE_SENDER => Some("msg_sender"),
-            _ => panic!("native function {name} not supported yet"),
-        }
-    }
 }

@@ -43,6 +43,7 @@ mod tx_context {
     }
 
     sol!(
+        // TODO: remove this as argument when the automatic injection is implemented
         struct TxContext {
             bool tx_ctx;
         }

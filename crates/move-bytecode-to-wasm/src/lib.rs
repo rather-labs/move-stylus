@@ -8,7 +8,6 @@ use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
     source_package::parsed_manifest::PackageName,
 };
-use native_functions::NativeFunction;
 use translation::{
     table::{FunctionId, FunctionTable},
     translate_function,

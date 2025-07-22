@@ -13,7 +13,7 @@ use move_binary_format::internals::ModuleIndex;
 use table::{FunctionId, FunctionTable, TableEntry};
 use types_stack::TypesStack;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
-use walrus::{FunctionBuilder, LocalId, Module, TableId, TypeId};
+use walrus::{FunctionBuilder, LocalId, Module, TableId};
 use walrus::{FunctionId as WasmFunctionId, InstrSeqBuilder, ValType, ir::MemArg};
 
 use crate::CompilationContext;
@@ -287,8 +287,9 @@ fn map_bytecode_instruction(
                 );
             }
             // Otherwise
-            // If the function is not native, we add it to the table and declare it for linking
-            // If the function IS nativem, we link it and call it directly
+            // If the function is not native, we add it to the table and declare it for translating
+            // and linking
+            // If the function IS native, we link it and call it directly
             else {
                 let function_information = if let Some(fi) = module_data
                     .functions
