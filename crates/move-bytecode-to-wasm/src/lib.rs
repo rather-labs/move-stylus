@@ -286,7 +286,8 @@ fn translate_and_link_functions(
         .unwrap_or_else(|| panic!("could not find function definition for {}", function_id));
 
     // If the function contains code we translate it
-    // If it does not it means is a native function, we just link it in the wasm
+    // If it does not it means is a native function, we do nothing, it is linked and called
+    // directly in the translation function
     if let Some(move_bytecode) = function_definition.code.as_ref() {
         let (wasm_function_id, functions_to_link) = translate_function(
             module,
@@ -312,16 +313,6 @@ fn translate_and_link_functions(
                 compilation_ctx,
             )
         });
-    } else {
-        let native_function_id = NativeFunction::get(
-            &function_information.function_id.identifier,
-            module,
-            compilation_ctx,
-        );
-
-        function_table
-            .add_to_wasm_table(module, function_id, native_function_id)
-            .expect("there was an error adding a native function to the function table");
     }
 }
 
