@@ -8,6 +8,7 @@ use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
     source_package::parsed_manifest::PackageName,
 };
+use native_functions::NativeFunction;
 use translation::{
     table::{FunctionId, FunctionTable},
     translate_function,
@@ -19,6 +20,7 @@ pub(crate) mod abi_types;
 mod compilation_context;
 mod hostio;
 mod memory;
+mod native_functions;
 mod runtime;
 mod runtime_error_codes;
 mod translation;
@@ -283,31 +285,38 @@ fn translate_and_link_functions(
         .get(function_id)
         .unwrap_or_else(|| panic!("could not find function definition for {}", function_id));
 
-    let move_bytecode = function_definition.code.as_ref().unwrap();
-    let (wasm_function_id, functions_to_link) = translate_function(
-        module,
-        compilation_ctx,
-        module_data,
-        function_table,
-        function_information,
-        move_bytecode,
-    )
-    .unwrap_or_else(|_| panic!("there was an error translating {}", function_id));
-
-    function_table
-        .add_to_wasm_table(module, function_id, wasm_function_id)
-        .expect("there was an error adding the module's functions to the function table");
-
-    // Recursively translate and link functions called by this function
-    functions_to_link.iter().for_each(|function_id| {
-        translate_and_link_functions(
-            function_id,
-            function_table,
-            function_definitions,
+    // If the function contains code we translate it
+    // If it does not it means is a native function, we just link it in the wasm
+    if let Some(move_bytecode) = function_definition.code.as_ref() {
+        let (wasm_function_id, functions_to_link) = translate_function(
             module,
             compilation_ctx,
+            module_data,
+            function_table,
+            function_information,
+            move_bytecode,
         )
-    });
+        .unwrap_or_else(|_| panic!("there was an error translating {}", function_id));
+
+        function_table
+            .add_to_wasm_table(module, function_id, wasm_function_id)
+            .expect("there was an error adding the module's functions to the function table");
+
+        // Recursively translate and link functions called by this function
+        functions_to_link.iter().for_each(|function_id| {
+            translate_and_link_functions(
+                function_id,
+                function_table,
+                function_definitions,
+                module,
+                compilation_ctx,
+            )
+        });
+    } else {
+        let native_function_id =
+            NativeFunction::get(&function_information.function_id.identifier, module);
+        function_table.add_to_wasm_table(module, function_id, native_function_id);
+    }
 }
 
 fn inject_debug_fns(module: &mut walrus::Module) {
