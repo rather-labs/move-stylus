@@ -529,10 +529,7 @@ impl ModuleData {
         }
     }
 
-    pub fn get_signatures_by_index<'a>(
-        &'a self,
-        index: SignatureIndex,
-    ) -> Result<&'a Vec<IntermediateType>> {
+    pub fn get_signatures_by_index(&self, index: SignatureIndex) -> Result<&Vec<IntermediateType>> {
         self.signatures
             .get(index.into_index())
             .ok_or(CompilationContextError::SignatureNotFound(index))
