@@ -10,14 +10,15 @@ use intermediate_types::simple_integers::{IU16, IU32, IU64};
 use intermediate_types::{simple_integers::IU8, vector::IVector};
 use move_binary_format::file_format::{Bytecode, CodeUnit};
 use move_binary_format::internals::ModuleIndex;
-use table::{FunctionId, FunctionTable};
+use table::{FunctionId, FunctionTable, TableEntry};
 use types_stack::TypesStack;
 use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
-use walrus::{FunctionBuilder, LocalId, Module};
+use walrus::{FunctionBuilder, LocalId, Module, TableId, TypeId};
 use walrus::{FunctionId as WasmFunctionId, InstrSeqBuilder, ValType, ir::MemArg};
 
 use crate::CompilationContext;
 use crate::compilation_context::ModuleData;
+use crate::native_functions::NativeFunction;
 use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
@@ -275,10 +276,19 @@ fn map_bytecode_instruction(
             let function_id = &module_data.functions.calls[function_handle_index.into_index()];
 
             // If the function is in the table we call it directly
-            let f_entry = if let Some(f) = function_table.get_by_function_id(function_id) {
-                f
+            if let Some(f) = function_table.get_by_function_id(function_id) {
+                call_indirect(
+                    &f,
+                    &module_data.functions.returns[function_handle_index.into_index()],
+                    function_table.get_table_id(),
+                    builder,
+                    module,
+                    compilation_ctx,
+                );
             }
-            // Otherwise we add it to the table and declare it for linking
+            // Otherwise
+            // If the function is not native, we add it to the table and declare it for linking
+            // If the function IS nativem, we link it and call it directly
             else {
                 let function_information = if let Some(fi) = module_data
                     .functions
@@ -299,24 +309,27 @@ fn map_bytecode_instruction(
                         .find(|f| &f.function_id == function_id)
                         .unwrap()
                 };
+                if function_information.is_native {
+                    let native_function_id =
+                        NativeFunction::get(&function_id.identifier, module, compilation_ctx);
+                    builder.call(native_function_id);
+                } else {
+                    let table_id = function_table.get_table_id();
+                    let f_entry =
+                        function_table.add(module, function_id.clone(), function_information);
+                    functions_calls_to_link.push(function_id.clone());
 
-                let f_entry = function_table.add(module, function_id.clone(), function_information);
-
-                functions_calls_to_link.push(function_id.clone());
-
-                f_entry
+                    call_indirect(
+                        f_entry,
+                        &module_data.functions.returns[function_handle_index.into_index()],
+                        table_id,
+                        builder,
+                        module,
+                        compilation_ctx,
+                    );
+                }
             };
 
-            builder
-                .i32_const(f_entry.index)
-                .call_indirect(f_entry.type_id, function_table.get_table_id());
-
-            add_unpack_function_return_values_instructions(
-                builder,
-                module,
-                &module_data.functions.returns[function_handle_index.into_index()],
-                compilation_ctx.memory_id,
-            );
             // Insert in the stack types the types returned by the function (if any)
             let return_types = &module_data.functions.returns[function_handle_index.0 as usize];
             types_stack.append(return_types);
@@ -1349,4 +1362,24 @@ fn map_bytecode_instruction(
     }
 
     Ok(functions_calls_to_link)
+}
+
+fn call_indirect(
+    function_entry: &TableEntry,
+    function_returns: &[IntermediateType],
+    wasm_table_id: TableId,
+    builder: &mut InstrSeqBuilder,
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) {
+    builder
+        .i32_const(function_entry.index)
+        .call_indirect(function_entry.type_id, wasm_table_id);
+
+    add_unpack_function_return_values_instructions(
+        builder,
+        module,
+        function_returns,
+        compilation_ctx.memory_id,
+    );
 }

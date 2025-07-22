@@ -21,6 +21,9 @@ pub struct MappedFunction {
 
     /// Flag that tells us if the function can be used as an entrypoint
     pub is_entry: bool,
+
+    /// Flag that tells us if the function is a native function
+    pub is_native: bool,
 }
 
 impl MappedFunction {
@@ -32,6 +35,7 @@ impl MappedFunction {
         move_locals: &[SignatureToken],
         function_definition: &FunctionDefinition,
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+        is_native: bool,
     ) -> Self {
         let signature = ISignature::from_signatures(move_args, move_rets, handles_map);
         let wasm_ret_types = signature.get_return_wasm_types();
@@ -62,6 +66,7 @@ impl MappedFunction {
             arguments,
             // TODO: change to function_definition.is_entry
             is_entry: function_definition.visibility == Visibility::Public,
+            is_native,
         }
     }
 }

@@ -23,7 +23,11 @@ fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u
 }
 
 mod tx_context {
-    use crate::common::translate_test_package_with_framework;
+    use alloy_primitives::Address;
+
+    use crate::common::{
+        runtime_sandbox::constants::MSG_SENDER_ADDRESS, translate_test_package_with_framework,
+    };
 
     use super::*;
 
@@ -49,7 +53,7 @@ mod tx_context {
     );
 
     #[rstest]
-    #[case(getSenderCall::new((TxContext { tx_ctx: false },)), (address!("0x7030507000000000000000000000000007030507"),))]
+    #[case(getSenderCall::new((TxContext { tx_ctx: false },)), (Address::new(MSG_SENDER_ADDRESS),))]
     fn test_tx_context<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

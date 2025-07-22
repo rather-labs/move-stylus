@@ -499,11 +499,12 @@ impl ModuleData {
                     function_def.acquires_global_resources.is_empty(),
                     "Acquiring global resources is not supported yet"
                 );
+
                 // Code can be empty (for example in native functions)
-                let code_locals = if let Some(code) = function_def.code.as_ref() {
-                    &move_module.signature_at(code.locals).0
+                let (code_locals, is_native) = if let Some(code) = function_def.code.as_ref() {
+                    (&move_module.signature_at(code.locals).0, false)
                 } else {
-                    &vec![]
+                    (&vec![], true)
                 };
 
                 function_information.push(MappedFunction::new(
@@ -513,6 +514,7 @@ impl ModuleData {
                     code_locals,
                     function_def,
                     datatype_handles_map,
+                    is_native,
                 ));
 
                 function_definitions.insert(function_id.clone(), function_def);
