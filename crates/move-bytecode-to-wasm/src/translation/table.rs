@@ -75,26 +75,6 @@ impl FunctionTable {
         &self.entries[self.entries.len() - 1]
     }
 
-    pub fn add_imported_function(
-        &mut self,
-        module: &mut Module,
-        function_id: FunctionId,
-        type_id: TypeId,
-    ) -> &TableEntry {
-        let index = self.entries.len() as i32;
-        self.entries.push(TableEntry {
-            index,
-            function_id,
-            wasm_function_id: None,
-            type_id,
-        });
-
-        let table = module.tables.get_mut(self.table_id);
-        table.initial = self.entries.len() as u64;
-
-        &self.entries[self.entries.len() - 1]
-    }
-
     pub fn add_to_wasm_table(
         &mut self,
         module: &mut Module,

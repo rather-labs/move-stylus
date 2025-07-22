@@ -318,6 +318,7 @@ fn translate_and_link_functions(
             module,
             compilation_ctx,
         );
+
         function_table
             .add_to_wasm_table(module, function_id, native_function_id)
             .expect("there was an error adding a native function to the function table");
