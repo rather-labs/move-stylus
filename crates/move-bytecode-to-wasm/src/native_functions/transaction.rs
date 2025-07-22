@@ -2,8 +2,9 @@
 
 use walrus::{FunctionId, Module, ValType};
 
+use crate::hostio::host_functions::msg_sender;
+
 pub fn add_native_sender_fn(module: &mut Module) -> FunctionId {
-    let msg_sender = module.types.add(&[], &[ValType::I32]);
-    let (function_id, _) = module.add_import_func("vm_hooks", "msg_sender", msg_sender);
+    let (function_id, _) = msg_sender(module);
     function_id
 }

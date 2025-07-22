@@ -66,3 +66,18 @@ pub fn emit_log(module: &mut Module) -> (FunctionId, ImportId) {
         .add(&[ValType::I32, ValType::I32, ValType::I32], &[]);
     module.add_import_func("vm_hooks", "emit_log", emit_log)
 }
+
+/// Gets the address of the account that called the program. For normal L2-to-L2 transactions
+/// the semantics are equivalent to that of the EVM's [`CALLER`] opcode, including in cases
+/// arising from [`DELEGATE_CALL`].
+///
+/// For L1-to-L2 retryable ticket transactions, the top-level sender's address will be aliased.
+/// See [`Retryable Ticket Address Aliasing`] for more information on how this works.
+///
+/// [`CALLER`]: https://www.evm.codes/#33
+/// [`DELEGATE_CALL`]: https://www.evm.codes/#f4
+/// [`Retryable Ticket Address Aliasing`]: https://developer.arbitrum.io/arbos/l1-to-l2-messaging#address-aliasing
+pub fn msg_sender(module: &mut Module) -> (FunctionId, ImportId) {
+    let msg_sender = module.types.add(&[ValType::I32], &[]);
+    module.add_import_func("vm_hooks", "msg_sender", msg_sender)
+}
