@@ -112,15 +112,13 @@ impl Flow {
                     branches.keys().collect::<HashSet<_>>().len()
                 );
 
-                let simple_flow = Flow::Simple {
+                Flow::Simple {
                     stack: [block_ctx.1.clone(), immediate_flow.get_stack()].concat(),
                     instructions: block_ctx.0.clone(),
                     immediate: Box::new(immediate_flow),
                     next: Box::new(next_flow),
                     branches,
-                };
-
-                simple_flow
+                }
             }
             ShapedBlock::Loop(loop_block) => {
                 let inner_flow = Self::build(&loop_block.inner, blocks_ctx);
@@ -131,14 +129,12 @@ impl Flow {
                     Flow::Empty
                 };
 
-                let loop_flow = Flow::Loop {
+                Flow::Loop {
                     stack: inner_flow.get_stack(),
                     loop_id: loop_block.loop_id,
                     inner: Box::new(inner_flow),
                     next: Box::new(next_flow),
-                };
-
-                loop_flow
+                }
             }
             ShapedBlock::Multiple(multiple_block) => {
                 // The relooper algorithm generates multiple blocks when a conditional jump is present.

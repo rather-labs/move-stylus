@@ -73,7 +73,6 @@ struct TranslateFlowContext<'a> {
     branch_targets: &'a mut BranchTargets,
 }
 
-
 pub fn translate_function(
     module: &mut Module,
     index: usize,
@@ -148,7 +147,9 @@ fn translate_flow(
                     if let BranchMode::MergedBranch | BranchMode::MergedBranchIntoMulti =
                         branch_mode
                     {
-                        ctx.branch_targets.merged_branch.insert(*target_label, block.id());
+                        ctx.branch_targets
+                            .merged_branch
+                            .insert(*target_label, block.id());
                     }
                 }
 
@@ -156,7 +157,7 @@ fn translate_flow(
                     translate_branching_instruction(
                         instruction,
                         branches,
-                        &mut ctx.branch_targets,
+                        ctx.branch_targets,
                         block,
                     );
                     translate_instruction(
@@ -191,7 +192,9 @@ fn translate_flow(
 
                 block.loop_(ty, |loop_| {
                     // Map the loop_id to the actual loop instruction, so `continue` knows where to jump.
-                    ctx.branch_targets.loop_continue.insert(*loop_id, loop_.id());
+                    ctx.branch_targets
+                        .loop_continue
+                        .insert(*loop_id, loop_.id());
 
                     // Translate the loop body (inner) inside the loop block.
                     translate_flow(ctx, loop_, module, inner);
@@ -281,20 +284,21 @@ fn translate_branching_instruction(
     targets: &BranchTargets,
     builder: &mut InstrSeqBuilder,
 ) {
-    let emit_jump = |builder: &mut InstrSeqBuilder, instr: &Bytecode, target: InstrSeqId| match instr {
-        Bytecode::Branch(_) => {
-            builder.br(target);
-        }
-        Bytecode::BrFalse(_) => {
-            builder.unop(UnaryOp::I32Eqz);
-            builder.br_if(target);
-        }
-        Bytecode::BrTrue(_) => {
-            builder.unop(UnaryOp::I32Eqz);
-            builder.br_if(target);
-        }
-        _ => unreachable!(),
-    };
+    let emit_jump =
+        |builder: &mut InstrSeqBuilder, instr: &Bytecode, target: InstrSeqId| match instr {
+            Bytecode::Branch(_) => {
+                builder.br(target);
+            }
+            Bytecode::BrFalse(_) => {
+                builder.unop(UnaryOp::I32Eqz);
+                builder.br_if(target);
+            }
+            Bytecode::BrTrue(_) => {
+                builder.unop(UnaryOp::I32Eqz);
+                builder.br_if(target);
+            }
+            _ => unreachable!(),
+        };
 
     if let Bytecode::Branch(code_offset)
     | Bytecode::BrFalse(code_offset)
