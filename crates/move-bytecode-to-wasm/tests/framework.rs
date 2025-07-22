@@ -1,0 +1,67 @@
+use alloy_primitives::{U256, address};
+use alloy_sol_types::SolValue;
+use alloy_sol_types::abi::TokenSeq;
+use alloy_sol_types::{SolCall, SolType, sol};
+use anyhow::Result;
+use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
+use rstest::{fixture, rstest};
+
+mod common;
+
+fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
+    let (result, return_data) = runtime.call_entrypoint(call_data)?;
+    anyhow::ensure!(
+        result == 0,
+        "Function returned non-zero exit code: {result}"
+    );
+    anyhow::ensure!(
+        return_data == expected_result,
+        "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
+    );
+
+    Ok(())
+}
+
+mod tx_context {
+    use crate::common::translate_test_package_with_framework;
+
+    use super::*;
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "tx_context";
+        const SOURCE_PATH: &str = "tests/framework/tx_context.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        struct TxContext {
+            bool tx_ctx;
+        }
+
+        #[allow(missing_docs)]
+        function getSender(TxContext tx_ctx) external returns (address);
+    );
+
+    #[rstest]
+    #[case(getSenderCall::new((TxContext { tx_ctx: false },)), (address!("0x7030507000000000000000000000000007030507"),))]
+    fn test_tx_context<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode_params(),
+        )
+        .unwrap();
+    }
+}

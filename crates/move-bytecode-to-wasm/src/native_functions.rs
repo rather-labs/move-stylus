@@ -17,19 +17,21 @@ impl NativeFunction {
     /// it just returns the id.
     ///
     /// This funciton is idempotent.
-    pub fn get(name: &str, module: &mut Module) -> FunctionId {
+    pub fn get(name: &str, module: &mut Module, compilaton_ctx: &CompilationContext) -> FunctionId {
+        /*
         if let Some(host_fn) = Self::host_fn_name(name) {
             if let Some(imported_fn) = module.imports.get_func("vm_hooks", host_fn).ok() {
                 // return module.imports.get(imported_fn);
                 return imported_fn;
             }
         }
+        */
 
         if let Some(function) = module.funcs.by_name(name) {
             function
         } else {
             match name {
-                Self::NATIVE_SENDER => transaction::add_native_sender_fn(module),
+                Self::NATIVE_SENDER => transaction::add_native_sender_fn(module, compilaton_ctx),
                 _ => panic!("native function {name} not supported yet"),
             }
         }

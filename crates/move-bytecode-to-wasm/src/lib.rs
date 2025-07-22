@@ -313,9 +313,14 @@ fn translate_and_link_functions(
             )
         });
     } else {
-        let native_function_id =
-            NativeFunction::get(&function_information.function_id.identifier, module);
-        function_table.add_to_wasm_table(module, function_id, native_function_id);
+        let native_function_id = NativeFunction::get(
+            &function_information.function_id.identifier,
+            module,
+            compilation_ctx,
+        );
+        function_table
+            .add_to_wasm_table(module, function_id, native_function_id)
+            .expect("there was an error adding a native function to the function table");
     }
 }
 
