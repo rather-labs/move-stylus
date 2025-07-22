@@ -91,8 +91,6 @@ pub fn translate_function(
         functions_to_link.extend(fns_to_link.drain(..))
     }
 
-    function.name(function_information.function_id.identifier.clone());
-
     let function_id = function.finish(arguments, &mut module.funcs);
     Ok((function_id, functions_to_link))
 }
