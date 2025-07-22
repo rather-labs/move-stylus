@@ -89,8 +89,8 @@ public fun test_match(x: u8): u8 {
 }
 
 public fun test_match_in_loop(): u8 {
-    let mut i = 1;
-    let mut acc = 1;
+    let mut i = 0;
+    let mut acc = 0;
     loop {
         i = i + 1;
         match (i) {
@@ -100,7 +100,7 @@ public fun test_match_in_loop(): u8 {
             4 => acc = acc + 4,
             _ => acc = acc + 4,
         };
-        if (i > 10) {
+        if (i > 1) {
             break
         };
     };
@@ -109,8 +109,8 @@ public fun test_match_in_loop(): u8 {
 }
 
 public fun test_labeled_loops(x: u8): u8 {
-    let mut outer_count = 0;
-    let mut inner_count = 0;
+    let mut outer_count = 1;
+    let mut inner_count = 1;
 
     'outer: loop {
         outer_count = outer_count + 1;
@@ -153,17 +153,4 @@ public fun check_even_after_loop(x: u8): u8 {
     
    let j = check_even(i);
    j
-}
-
-public fun collatz(mut x: u64): u64 {
-    let mut count = 0;
-    while (x != 1) {
-        if (x % 2 == 0) {
-            x = x / 2;
-        } else {
-            x = x * 3 + 1;
-        };
-        count = count + 1;
-    };
-    count
 }

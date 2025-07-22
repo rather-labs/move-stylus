@@ -509,7 +509,7 @@ mod tests {
     #[case(u32::MAX as i64, 1, u32::MAX as i64 + 1)]
     #[case(4294967295, 4294967295, 8589934590)]
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-    #[case(u64::MAX as i64 + 1, 1, u64::MAX as i64 + 1)]
+    #[case(u64::MAX as i64, 1, u64::MAX as i64 + 1)]
     fn test_add_u64(#[case] n1: i64, #[case] n2: i64, #[case] expected: i64) {
         let (mut raw_module, _, _) = build_module(None);
 

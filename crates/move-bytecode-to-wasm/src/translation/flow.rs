@@ -2,22 +2,23 @@ use crate::translation::table::TableEntry;
 use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::file_format::{Bytecode, CodeUnit};
 use relooper::{BranchMode, ShapedBlock};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use walrus::ValType;
 
 #[derive(Debug, Clone)]
 pub enum Flow {
     Simple {
-        // label: u16,
         stack: Vec<ValType>,
         instructions: Vec<Bytecode>,
+        immediate: Box<Flow>,
+        next: Box<Flow>,
         branches: HashMap<u16, BranchMode>,
     },
-    Sequence(Vec<Flow>),
     Loop {
         loop_id: u16,
         stack: Vec<ValType>,
-        body: Box<Flow>,
+        inner: Box<Flow>,
+        next: Box<Flow>,
     },
     IfElse {
         stack: Vec<ValType>,
@@ -27,27 +28,17 @@ pub enum Flow {
     Empty,
 }
 
-// TODO: check how we are building up the types stack
 impl Flow {
     pub fn get_stack(&self) -> Vec<ValType> {
         match self {
-            Flow::Simple { stack, .. } => stack.clone(),
-            // TODO: is concat correct here?
-            // concat instructions and then build the types stack!
-            Flow::Sequence(blocks) => blocks
-                .iter()
-                .fold(vec![], |acc, f| [acc, f.get_stack()].concat()),
+            Flow::Simple { stack, next, .. } => [stack.clone(), next.get_stack()].concat(),
             Flow::Loop { stack, .. } => stack.clone(),
             Flow::IfElse { stack, .. } => stack.clone(),
             Flow::Empty => vec![],
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        matches!(&self, Self::Empty)
-    }
-
-    pub fn new(code_unit: &CodeUnit, entry: &TableEntry) -> Self {
+    pub fn new(code_unit: &CodeUnit, entry: &TableEntry) -> Flow {
         // Create the control flow graph from the code unit
         let cfg = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
 
@@ -95,61 +86,59 @@ impl Flow {
         match shaped_block {
             ShapedBlock::Simple(simple_block) => {
                 let block_ctx = blocks_ctx.get(&simple_block.label).unwrap();
-                let b = Flow::Simple {
-                    stack: block_ctx.1.clone(),
-                    instructions: block_ctx.0.clone(),
-                    branches: simple_block
-                        .branches
-                        .iter()
-                        .map(|(k, v)| (*k, *v))
-                        .collect(),
-                };
 
                 // This are blocks immediately dominated by the current block
-                let immediate_blocks = simple_block
+                let immediate_flow = simple_block
                     .immediate
                     .as_ref()
                     .map(|b| Self::build(b, blocks_ctx))
                     .unwrap_or(Flow::Empty);
 
-                // Next block follows the current one, in the graph this represents an edge
-                let next_block = simple_block
+                // Next block follows the current one
+                let next_flow = simple_block
                     .next
                     .as_ref()
                     .map(|b| Self::build(b, blocks_ctx))
                     .unwrap_or(Flow::Empty);
 
-                // Revisit this part. We are flattening a nested structure into a sequence, is it always correct?
-                let mut seq = vec![b];
-                if !immediate_blocks.is_empty() {
-                    seq.push(immediate_blocks);
-                }
-                if !next_block.is_empty() {
-                    seq.push(next_block);
-                }
+                let branches: HashMap<u16, BranchMode> = simple_block
+                    .branches
+                    .iter()
+                    .map(|(k, v)| (*k, *v))
+                    .collect();
 
-                if seq.len() == 1 {
-                    seq.pop().unwrap()
-                } else {
-                    Flow::Sequence(seq)
-                }
-            }
-            ShapedBlock::Loop(loop_block) => {
-                let inner_block = Self::build(&loop_block.inner, blocks_ctx);
+                assert_eq!(
+                    branches.len(),
+                    branches.keys().collect::<HashSet<_>>().len()
+                );
 
-                let loop_flow = Flow::Loop {
-                    stack: inner_block.get_stack(),
-                    loop_id: loop_block.loop_id,
-                    body: Box::new(inner_block),
+                let simple_flow = Flow::Simple {
+                    stack: [block_ctx.1.clone(), immediate_flow.get_stack()].concat(),
+                    instructions: block_ctx.0.clone(),
+                    immediate: Box::new(immediate_flow),
+                    next: Box::new(next_flow),
+                    branches,
                 };
 
-                // Here too, we put the next block in the sequence if it exists
-                if let Some(next_block) = &loop_block.next {
-                    let next_flow = Self::build(next_block, blocks_ctx);
-                    Flow::Sequence(vec![loop_flow, next_flow])
+                simple_flow
+            }
+            ShapedBlock::Loop(loop_block) => {
+                let inner_flow = Self::build(&loop_block.inner, blocks_ctx);
+
+                let next_flow = if let Some(next_block) = &loop_block.next {
+                    Self::build(next_block, blocks_ctx)
                 } else {
-                    loop_flow
-                }
+                    Flow::Empty
+                };
+
+                let loop_flow = Flow::Loop {
+                    stack: inner_flow.get_stack(),
+                    loop_id: loop_block.loop_id,
+                    inner: Box::new(inner_flow),
+                    next: Box::new(next_flow),
+                };
+
+                loop_flow
             }
             ShapedBlock::Multiple(multiple_block) => {
                 // The relooper algorithm generates multiple blocks when a conditional jump is present.

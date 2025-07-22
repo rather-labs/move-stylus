@@ -34,13 +34,45 @@ pub mod functions;
 pub mod intermediate_types;
 pub mod table;
 
+struct BranchTargets {
+    loop_continue: HashMap<u16, InstrSeqId>,
+    loop_break: HashMap<u16, InstrSeqId>,
+    merged_branch: HashMap<u16, InstrSeqId>,
+}
+
+impl BranchTargets {
+    fn new() -> Self {
+        Self {
+            loop_continue: HashMap::new(),
+            loop_break: HashMap::new(),
+            merged_branch: HashMap::new(),
+        }
+    }
+
+    fn get_target(&self, branch_mode: &BranchMode, code_offset: &u16) -> Option<&InstrSeqId> {
+        match branch_mode {
+            BranchMode::LoopContinue(id) | BranchMode::LoopContinueIntoMulti(id) => {
+                self.loop_continue.get(id)
+            }
+            BranchMode::LoopBreak(id) | BranchMode::LoopBreakIntoMulti(id) => {
+                self.loop_break.get(id)
+            }
+            BranchMode::MergedBranch | BranchMode::MergedBranchIntoMulti => {
+                self.merged_branch.get(code_offset)
+            }
+            _ => None,
+        }
+    }
+}
+
 struct TranslateFlowContext<'a> {
     compilation_ctx: &'a CompilationContext,
     types_stack: &'a mut TypesStack,
     function_table: &'a FunctionTable,
     entry: &'a TableEntry,
-    loop_targets: &'a mut HashMap<u16, InstrSeqId>,
+    branch_targets: &'a mut BranchTargets,
 }
+
 
 pub fn translate_function(
     module: &mut Module,
@@ -73,9 +105,7 @@ pub fn translate_function(
     let flow = Flow::new(code_unit, entry);
     println!("flow: {:#?}", flow);
 
-    // Loop targets maps the relooper-assigned loop id to the loop's instruction sequence id.
-    let mut loop_targets: HashMap<u16, InstrSeqId> = HashMap::new();
-
+    let mut branch_targets = BranchTargets::new();
     let mut types_stack = TypesStack::new();
 
     let mut ctx = TranslateFlowContext {
@@ -83,7 +113,7 @@ pub fn translate_function(
         function_table,
         entry,
         types_stack: &mut types_stack,
-        loop_targets: &mut loop_targets,
+        branch_targets: &mut branch_targets,
     };
 
     translate_flow(&mut ctx, &mut builder, module, &flow);
@@ -103,39 +133,73 @@ fn translate_flow(
     match flow {
         Flow::Simple {
             instructions,
+            stack,
             branches,
+            immediate,
+            next,
             ..
         } => {
-            for instruction in instructions {
-                translate_branching_instruction(instruction, branches, ctx.loop_targets, builder);
-                translate_instruction(
-                    instruction,
-                    ctx.compilation_ctx,
-                    builder,
-                    &ctx.entry.function,
-                    module,
-                    ctx.function_table,
-                    ctx.types_stack,
-                )
-                .unwrap();
-            }
-        }
-        Flow::Sequence(flows) => {
-            for f in flows {
-                translate_flow(ctx, builder, module, f);
-            }
+            let ty = InstrSeqType::new(&mut module.types, &[], stack);
+            builder.block(ty, |block| {
+                // When we encounter a MergedBranch target for the first time, we map it to the block's ID (block.id()) that wraps the current simple flow.
+                // This mapping determines where to jump when a branch instruction targets that code_offset.
+                // Essentially, it allows skipping the current simple block and continuing to the next one.
+                for (target_label, branch_mode) in branches {
+                    if let BranchMode::MergedBranch | BranchMode::MergedBranchIntoMulti =
+                        branch_mode
+                    {
+                        ctx.branch_targets.merged_branch.insert(*target_label, block.id());
+                    }
+                }
+
+                for instruction in instructions {
+                    translate_branching_instruction(
+                        instruction,
+                        branches,
+                        &mut ctx.branch_targets,
+                        block,
+                    );
+                    translate_instruction(
+                        instruction,
+                        ctx.compilation_ctx,
+                        block,
+                        &ctx.entry.function,
+                        module,
+                        ctx.function_table,
+                        ctx.types_stack,
+                    )
+                    .unwrap();
+                }
+                translate_flow(ctx, block, module, immediate);
+            });
+            translate_flow(ctx, builder, module, next);
         }
         Flow::Loop {
             stack,
             loop_id,
-            body,
+            inner,
+            next,
+            ..
         } => {
             let ty = InstrSeqType::new(&mut module.types, &[], stack);
-            builder.loop_(ty, |loop_| {
-                // loop_targets maps the relooper-assigned loop id to the loop's instruction sequence id.
-                ctx.loop_targets.insert(*loop_id, loop_.id());
-                translate_flow(ctx, loop_, module, body);
+            // We wrap the loop in a block so we have a "landing spot" if we need to break out of it
+            // (in case we encounter a BranchMode::LoopBreak).
+            builder.block(ty, |block| {
+                // Map the Relooper's loop id to the Walrus instruction sequence ID
+                // Walrus needs the specific InstrSeqId where to branch to.
+                ctx.branch_targets.loop_break.insert(*loop_id, block.id());
+
+                block.loop_(ty, |loop_| {
+                    // Map the loop_id to the actual loop instruction, so `continue` knows where to jump.
+                    ctx.branch_targets.loop_continue.insert(*loop_id, loop_.id());
+
+                    // Translate the loop body (inner) inside the loop block.
+                    translate_flow(ctx, loop_, module, inner);
+                });
             });
+
+            // Translate the next flow outside the wrapping block.
+            translate_flow(ctx, builder, module, next);
         }
         Flow::IfElse {
             then_body,
@@ -214,44 +278,33 @@ fn translate_flow(
 fn translate_branching_instruction(
     instruction: &Bytecode,
     branches: &HashMap<u16, BranchMode>,
-    loop_targets: &HashMap<u16, InstrSeqId>,
+    targets: &BranchTargets,
     builder: &mut InstrSeqBuilder,
 ) {
-    match instruction {
-        Bytecode::Branch(code_offset)
-        | Bytecode::BrFalse(code_offset)
-        | Bytecode::BrTrue(code_offset) => {
-            if let Some(branch_mode) = branches.get(code_offset) {
-                // TODO: WTF are multi branch modes?
-                let loop_id = match branch_mode {
-                    BranchMode::LoopContinue(id) | BranchMode::LoopContinueIntoMulti(id) => {
-                        Some(id)
-                    }
-                    _ => None,
-                };
+    let emit_jump = |builder: &mut InstrSeqBuilder, instr: &Bytecode, target: InstrSeqId| match instr {
+        Bytecode::Branch(_) => {
+            builder.br(target);
+        }
+        Bytecode::BrFalse(_) => {
+            builder.unop(UnaryOp::I32Eqz);
+            builder.br_if(target);
+        }
+        Bytecode::BrTrue(_) => {
+            builder.unop(UnaryOp::I32Eqz);
+            builder.br_if(target);
+        }
+        _ => unreachable!(),
+    };
 
-                if let Some(loop_id) = loop_id {
-                    if let Some(target_block_id) = loop_targets.get(loop_id) {
-                        match instruction {
-                            Bytecode::Branch(_) => {
-                                builder.br(*target_block_id);
-                            }
-                            Bytecode::BrFalse(_) => {
-                                builder.unop(UnaryOp::I32Eqz);
-                                builder.br_if(*target_block_id);
-                            }
-                            Bytecode::BrTrue(_) => {
-                                builder.br_if(*target_block_id);
-                            }
-                            _ => {}
-                        }
-                    } else {
-                        panic!("Loop target not found for loop_id: {}", loop_id);
-                    }
-                }
+    if let Bytecode::Branch(code_offset)
+    | Bytecode::BrFalse(code_offset)
+    | Bytecode::BrTrue(code_offset) = instruction
+    {
+        if let Some(branch_mode) = branches.get(code_offset) {
+            if let Some(&target) = targets.get_target(branch_mode, code_offset) {
+                emit_jump(builder, instruction, target);
             }
         }
-        _ => {}
     }
 }
 
