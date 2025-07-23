@@ -65,6 +65,18 @@ public fun block_basefee(_self: &TxContext): u256 {
 }
 native fun native_block_basefee(): u256;
 
+/// Return the current block's gas limit.
+public fun block_gas_limit(_self: &TxContext): u64 {
+    native_block_gas_limit()
+}
+native fun native_block_gas_limit(): u64;
+
+/// Return the current block's timestamp as seconds since unix epoch
+public fun block_timestamp(_self: &TxContext): u64 {
+    native_block_timestamp()
+}
+native fun native_block_timestamp(): u64;
+
 
 
 /*

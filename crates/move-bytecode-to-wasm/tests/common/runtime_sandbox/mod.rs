@@ -3,7 +3,8 @@ pub mod constants;
 
 use anyhow::Result;
 use constants::{
-    BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, MSG_SENDER_ADDRESS, MSG_VALUE, SIGNER_ADDRESS,
+    BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, MSG_SENDER_ADDRESS, MSG_VALUE,
+    SIGNER_ADDRESS,
 };
 use walrus::Module;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
@@ -188,6 +189,18 @@ impl RuntimeSandbox {
                     println!("block_gas_limit");
 
                     BLOCK_GAS_LIMIT as i64
+                },
+            )
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "block_timestamp",
+                move |_caller: Caller<'_, ModuleData>| -> i64 {
+                    println!("block_timestamp");
+
+                    BLOCK_TIMESTAMP as i64
                 },
             )
             .unwrap();

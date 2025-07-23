@@ -21,3 +21,7 @@ public fun get_block_basefee(ctx: &TxContext): u256 {
 public fun get_block_gas_limit(ctx: &TxContext): u64 {
     ctx.block_gas_limit()
 }
+
+public fun get_block_timestamp(ctx: &TxContext): u64 {
+    ctx.block_timestamp()
+}

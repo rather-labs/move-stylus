@@ -121,3 +121,13 @@ pub fn block_gas_limit(module: &mut Module) -> (FunctionId, ImportId) {
     let block_gas_limit_ty = module.types.add(&[], &[ValType::I64]);
     module.add_import_func("vm_hooks", "block_gas_limit", block_gas_limit_ty)
 }
+
+/// Gets a bounded estimate of the Unix timestamp at which the Sequencer sequenced the
+/// transaction. See [`Block Numbers and Time`] for more information on how this value is
+/// determined.
+///
+/// [`Block Numbers and Time`]: https://developer.arbitrum.io/time
+pub fn block_timestamp(module: &mut Module) -> (FunctionId, ImportId) {
+    let block_timestamp_ty = module.types.add(&[], &[ValType::I64]);
+    module.add_import_func("vm_hooks", "block_timestamp", block_timestamp_ty)
+}
