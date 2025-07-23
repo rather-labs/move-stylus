@@ -18,6 +18,7 @@ pub struct MappedFunction {
     pub signature: ISignature,
     pub locals: Vec<IntermediateType>,
     pub arguments: Vec<IntermediateType>,
+    pub results: Vec<ValType>,
 
     /// Flag that tells us if the function can be used as an entrypoint
     pub is_entry: bool,
@@ -34,12 +35,9 @@ impl MappedFunction {
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
     ) -> Self {
         let signature = ISignature::from_signatures(move_args, move_rets, handles_map);
-        let wasm_ret_types = signature.get_return_wasm_types();
+        let results = signature.get_return_wasm_types();
 
-        assert!(
-            wasm_ret_types.len() <= 1,
-            "Multiple return values not supported"
-        );
+        assert!(results.len() <= 1, "Multiple return values not supported");
 
         let arguments = move_args
             .0
@@ -60,6 +58,7 @@ impl MappedFunction {
             signature,
             locals,
             arguments,
+            results,
             // TODO: change to function_definition.is_entry
             is_entry: function_definition.visibility == Visibility::Public,
         }

@@ -259,7 +259,7 @@ pub fn add_u64(module: &mut Module) -> FunctionId {
     let n2 = module.locals.add(ValType::I64);
     let res = module.locals.add(ValType::I64);
 
-    // Add the u64 numbers ans set the result
+    // Add the u64 numbers and set the result
     builder
         .local_get(n1)
         .local_get(n2)
@@ -273,18 +273,18 @@ pub fn add_u64(module: &mut Module) -> FunctionId {
     // else trap
     builder
         .local_get(n1)
-        .binop(BinaryOp::I64GtU)
+        .binop(BinaryOp::I64LtU)
         .local_get(res)
         .local_get(n2)
-        .binop(BinaryOp::I64GtU)
-        .binop(BinaryOp::I32And)
+        .binop(BinaryOp::I64LtU)
+        .binop(BinaryOp::I32Or)
         .if_else(
             Some(ValType::I64),
             |then| {
-                then.local_get(res);
+                then.unreachable();
             },
             |else_| {
-                else_.unreachable();
+                else_.local_get(res);
             },
         );
 
@@ -509,7 +509,7 @@ mod tests {
     #[case(u32::MAX as i64, 1, u32::MAX as i64 + 1)]
     #[case(4294967295, 4294967295, 8589934590)]
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
-    #[case(u64::MAX as i64 + 1, 1, u64::MAX as i64 + 1)]
+    #[case(u64::MAX as i64, 1, u64::MAX as i64 + 1)]
     fn test_add_u64(#[case] n1: i64, #[case] n2: i64, #[case] expected: i64) {
         let (mut raw_module, _, _) = build_module(None);
 
