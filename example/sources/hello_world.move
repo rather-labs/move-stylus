@@ -52,3 +52,4 @@ public fun test2(ctx: &Test): u8 {
 public fun test3(ctx: &AnotherTest): u8 {
     42
 }
+

@@ -28,5 +28,7 @@ move-vm-runtime = { git = "https://github.com/MystenLabs/sui" }
 move-vm-test-utils = { git = "https://github.com/MystenLabs/sui" }
 move-unit-test = { git = "https://github.com/MystenLabs/sui" }
 
+move-abstract-interpreter = { git = "https://github.com/MystenLabs/sui" }
+
 move-bytecode-to-wasm = { path = "crates/move-bytecode-to-wasm" }
 move-packages-build = { path = "crates/move-packages-build" }

@@ -1,6 +1,10 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;
+use relooper::BranchMode;
+use walrus::ir::{BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, UnaryOp};
+use walrus::{FunctionId as WasmFunctionId, FunctionBuilder, InstrSeqBuilder, LocalId, Module, ValType};
+
 use functions::{
     MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
 };
@@ -12,25 +16,74 @@ use move_binary_format::file_format::{Bytecode, CodeUnit};
 use move_binary_format::internals::ModuleIndex;
 use table::{FunctionId, FunctionTable, TableEntry};
 use types_stack::TypesStack;
-use walrus::ir::{BinaryOp, LoadKind, UnaryOp};
-use walrus::{FunctionBuilder, LocalId, Module, TableId};
-use walrus::{FunctionId as WasmFunctionId, InstrSeqBuilder, ValType, ir::MemArg};
-
+use walrus::{TableId};
+ 
 use crate::CompilationContext;
 use crate::compilation_context::ModuleData;
 use crate::native_functions::NativeFunction;
 use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
+use flow::Flow;
+
+pub use error::TranslationError;
+
 pub(crate) mod bytecodes;
+pub(crate) mod flow;
+pub(crate) mod types_stack;
+
 pub mod error;
 pub mod functions;
 /// The types in this module represent an intermediate Rust representation of Move types
 /// that is used to generate the WASM code.
 pub mod intermediate_types;
 pub mod table;
-pub(crate) mod types_stack;
-pub use error::TranslationError;
+
+/// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs.
+/// It is used to translate the branching instructions: Branch, BrFalse, BrTrue
+struct BranchTargets {
+    loop_continue: HashMap<u16, InstrSeqId>,
+    loop_break: HashMap<u16, InstrSeqId>,
+    merged_branch: HashMap<u16, InstrSeqId>,
+}
+
+impl BranchTargets {
+    fn new() -> Self {
+        Self {
+            loop_continue: HashMap::new(),
+            loop_break: HashMap::new(),
+            merged_branch: HashMap::new(),
+        }
+    }
+
+    fn get_target(&self, branch_mode: &BranchMode, code_offset: &u16) -> Option<&InstrSeqId> {
+        match branch_mode {
+            BranchMode::LoopContinue(id) | BranchMode::LoopContinueIntoMulti(id) => {
+                self.loop_continue.get(id)
+            }
+            BranchMode::LoopBreak(id) | BranchMode::LoopBreakIntoMulti(id) => {
+                self.loop_break.get(id)
+            }
+            BranchMode::MergedBranch | BranchMode::MergedBranchIntoMulti => {
+                self.merged_branch.get(code_offset)
+            }
+            _ => {
+                panic!("Unsupported branch mode: {:?}", branch_mode);
+            }
+        }
+    }
+}
+
+/// This is used to pass around the context of the translation process. Also clippy complains about too many arguments in translate_instruction.
+struct TranslateFlowContext<'a> {
+    compilation_ctx: &'a CompilationContext<'a>,
+    module_data: &'a ModuleData,
+    types_stack: &'a mut TypesStack,
+    function_information: &'a MappedFunction,
+    function_table: &'a mut FunctionTable,
+    function_locals: &'a Vec<LocalId>,
+    branch_targets: &'a mut BranchTargets,
+}
 
 /// Translates a move function to WASM
 ///
@@ -70,116 +123,213 @@ pub fn translate_function(
         function_information,
     );
 
+    // let entry = function_table
+    //     .get_by_function_id(&function_information.function_id)
+    //     .ok_or(anyhow::anyhow!("index {} not found in function table", function_information.function_id))?;
+
+    // let code_unit = &entry.get_move_code_unit().unwrap();
+
+    let flow = Flow::new(move_bytecode, function_information);
+
+    let mut branch_targets = BranchTargets::new();
     let mut types_stack = TypesStack::new();
     let mut functions_to_link = HashSet::new();
 
-    for instruction in &move_bytecode.code {
-        let mut fns_to_link = map_bytecode_instruction(
-            instruction,
-            compilation_ctx,
-            module_data,
-            &mut builder,
-            function_information,
-            module,
-            function_table,
-            &mut types_stack,
-            &function_locals,
-        )
-        .map_err(|e| {
-            panic!("There was an error translating the bytecode instruction {instruction:?}\n{e}")
-        })?;
+    let mut ctx = TranslateFlowContext {
+        compilation_ctx,
+        module_data,
+        function_table,
+        function_information,
+        function_locals: &function_locals,
+        types_stack: &mut types_stack,
+        branch_targets: &mut branch_targets,
+    };
 
-        functions_to_link.extend(fns_to_link.drain(..))
-    }
+    translate_flow(
+        &mut ctx,
+        &mut builder,
+        module,
+        &flow,
+        &mut functions_to_link,
+    );
 
     let function_id = function.finish(arguments, &mut module.funcs);
     Ok((function_id, functions_to_link))
 }
 
-fn process_fn_local_variables(
-    function_information: &MappedFunction,
-    module: &mut Module,
-) -> (Vec<LocalId>, Vec<LocalId>) {
-    let wasm_arg_types = function_information.signature.get_argument_wasm_types();
-    let wasm_ret_types = function_information.signature.get_return_wasm_types();
-
-    assert!(
-        wasm_ret_types.len() <= 1,
-        "Multiple return values not supported"
-    );
-
-    // WASM locals for arguments
-    let wasm_arg_locals: Vec<LocalId> = wasm_arg_types
-        .iter()
-        .map(|ty| module.locals.add(*ty))
-        .collect();
-
-    let wasm_declared_locals = function_information
-        .locals
-        .iter()
-        .map(|ty| {
-            match ty {
-                IntermediateType::IU64 => ValType::I32, // to store pointer instead of i64
-                other => ValType::from(other),
-            }
-        })
-        .map(|ty| module.locals.add(ty))
-        .collect();
-
-    (wasm_arg_locals, wasm_declared_locals)
-}
-
-/// Converts value-based function arguments into heap-allocated pointers.
-///
-/// For each value-type argument (like u64, u32, etc.), this stores the value in linear memory
-/// and updates the local to hold a pointer to that memory instead. This allows treating all
-/// arguments as pointers in later code.
-pub fn box_args(
+/// Recusively translate the flow to wasm.
+/// It is responsible for both handling the control flow as well as translating the specific instructions to wasm.
+fn translate_flow(
+    ctx: &mut TranslateFlowContext,
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
-    compilation_ctx: &CompilationContext,
-    function_locals: &mut [LocalId],
-    function_information: &MappedFunction,
+    flow: &Flow,
+    functions_to_link: &mut HashSet<FunctionId>,
 ) {
-    // Store the changes we need to make
-    let mut updates = Vec::new();
-
-    // Iterate over the mapped function arguments
-    for (local, ty) in function_locals
-        .iter()
-        .zip(&function_information.signature.arguments)
-    {
-        builder.local_get(*local);
-        match ty {
-            IntermediateType::IU64 => {
-                let outer_ptr = module.locals.add(ValType::I32);
-                ty.box_local_instructions(module, builder, compilation_ctx, outer_ptr);
-
-                if let Some(index) = function_locals.iter().position(|&id| id == *local) {
-                    updates.push((index, outer_ptr));
-                } else {
-                    panic!(
-                        "Couldn't find original local {:?} in function_information",
-                        local
-                    );
+    match flow {
+        Flow::Simple {
+            instructions,
+            stack,
+            branches,
+            immediate,
+            next,
+            ..
+        } => {
+            let ty = InstrSeqType::new(&mut module.types, &[], stack);
+            builder.block(ty, |block| {
+                // When we encounter a MergedBranch target for the first time, we map it to the block's ID (block.id()) that wraps the current simple flow.
+                // This mapping determines where to jump when a branch instruction targets that code_offset.
+                // Essentially, it allows skipping the current simple block and continuing to the next one.
+                for (target_label, branch_mode) in branches {
+                    if let BranchMode::MergedBranch | BranchMode::MergedBranchIntoMulti =
+                        branch_mode
+                    {
+                        ctx.branch_targets
+                            .merged_branch
+                            .insert(*target_label, block.id());
+                    }
                 }
-            }
-            _ => {
-                ty.box_local_instructions(module, builder, compilation_ctx, *local);
+
+                // First translate the instuctions associated with the simple flow itself
+                for instruction in instructions {
+                    let mut fns_to_link = translate_instruction(
+                        instruction,
+                        ctx.compilation_ctx,
+                        ctx.module_data,
+                        block,
+                        ctx.function_information,
+                        module,
+                        ctx.function_table,
+                        ctx.types_stack,
+                        ctx.function_locals,
+                        branches,
+                        ctx.branch_targets,
+                    )
+                    .unwrap();
+                    functions_to_link.extend(fns_to_link.drain(..));
+                }
+                // Then translate instructions of the immediate block, inside the current block
+                translate_flow(ctx, block, module, immediate, functions_to_link);
+            });
+            // Then translate instructions of the next block, but outside the wrapping block
+            translate_flow(ctx, builder, module, next, functions_to_link);
+        }
+        Flow::Loop {
+            stack,
+            loop_id,
+            inner,
+            next,
+            ..
+        } => {
+            let ty = InstrSeqType::new(&mut module.types, &[], stack);
+            // We wrap the loop in a block so we have a "landing spot" if we need to break out of it
+            // (in case we encounter a BranchMode::LoopBreak).
+            builder.block(ty, |block| {
+                // Map the Relooper's loop id to the Walrus instruction sequence ID
+                // Walrus needs the specific InstrSeqId where to branch to.
+                ctx.branch_targets.loop_break.insert(*loop_id, block.id());
+
+                block.loop_(ty, |loop_| {
+                    // Map the loop_id to the actual loop instruction, so `continue` knows where to jump.
+                    ctx.branch_targets
+                        .loop_continue
+                        .insert(*loop_id, loop_.id());
+
+                    // Translate the loop body (inner) inside the loop block.
+                    translate_flow(ctx, loop_, module, inner, functions_to_link);
+                });
+            });
+
+            // Translate the next flow outside the wrapping block.
+            translate_flow(ctx, builder, module, next, functions_to_link);
+        }
+        Flow::IfElse {
+            then_body,
+            else_body,
+            ..
+        } => {
+            let then_stack = then_body.get_stack();
+            let else_stack = else_body.get_stack();
+
+            if then_stack == else_stack {
+                let ty = InstrSeqType::new(&mut module.types, &[], &then_stack);
+                let then_id = {
+                    let mut then_seq = builder.dangling_instr_seq(ty);
+                    translate_flow(ctx, &mut then_seq, module, then_body, functions_to_link);
+                    then_seq.id()
+                };
+
+                let else_id = {
+                    let mut else_seq = builder.dangling_instr_seq(ty);
+                    translate_flow(ctx, &mut else_seq, module, else_body, functions_to_link);
+                    else_seq.id()
+                };
+
+                builder.if_else(
+                    ty,
+                    |then| {
+                        then.instr(Block { seq: then_id });
+                    },
+                    |else_| {
+                        else_.instr(Block { seq: else_id });
+                    },
+                );
+            } else if then_stack.is_empty() {
+                // If the `then` arm leaves nothing on the stack but the `else` arm does,
+                // we place the `else` arm after the if/else block.
+                // This situation typically occurs when the arm leaving values on the stack
+                // represents a function return, while the other arm simply reloops.
+                // The else arm can be safely placed outside the if/else block because it must always be reached,
+                // otherwise the block wouldnt have a defined result.
+                let phantom_seq = builder.dangling_instr_seq(None);
+                let phantom_seq_id = phantom_seq.id();
+
+                let then_id = {
+                    let mut then_seq = builder.dangling_instr_seq(None);
+                    translate_flow(ctx, &mut then_seq, module, then_body, functions_to_link);
+                    then_seq.id()
+                };
+
+                builder.instr(IfElse {
+                    consequent: then_id,
+                    alternative: phantom_seq_id,
+                });
+
+                translate_flow(ctx, builder, module, else_body, functions_to_link);
+            } else if else_stack.is_empty() {
+                // Similar to the above scenario.
+                let phantom_seq = builder.dangling_instr_seq(None);
+                let phantom_seq_id = phantom_seq.id();
+
+                let else_id = {
+                    let mut else_seq = builder.dangling_instr_seq(None);
+                    translate_flow(ctx, &mut else_seq, module, else_body, functions_to_link);
+                    else_seq.id()
+                };
+
+                builder.unop(UnaryOp::I32Eqz);
+                builder.instr(IfElse {
+                    consequent: else_id,
+                    alternative: phantom_seq_id,
+                });
+
+                translate_flow(ctx, builder, module, then_body, functions_to_link);
+            } else {
+                // If both arms leave values on the stack but with different types, we panic.
+                // In this scenario, the block wouldnt have a well-defined result type.
+                panic!(
+                    "Error: Mismatched types on the stack from Then and Else branches, and neither is empty."
+                );
             }
         }
-    }
-
-    for (index, pointer) in updates {
-        function_locals[index] = pointer;
+        Flow::Empty => (),
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn map_bytecode_instruction(
+fn translate_instruction(
     instruction: &Bytecode,
     compilation_ctx: &CompilationContext,
-    // Module we are currently compiling
     module_data: &ModuleData,
     builder: &mut InstrSeqBuilder,
     mapped_function: &MappedFunction,
@@ -187,6 +337,8 @@ fn map_bytecode_instruction(
     function_table: &mut FunctionTable,
     types_stack: &mut TypesStack,
     function_locals: &[LocalId],
+    branches: &HashMap<u16, BranchMode>,
+    branch_targets: &BranchTargets,
 ) -> Result<Vec<FunctionId>, TranslationError> {
     let mut functions_calls_to_link = Vec::new();
 
@@ -761,15 +913,10 @@ fn map_bytecode_instruction(
                 compilation_ctx,
             );
 
-            // Remove the return values from types stack and check if the types are correct
-            for return_type in mapped_function.signature.returns.iter().rev() {
-                types_stack.pop_expecting(return_type)?;
-            }
-
-            // Stack types should be empty
+            // We dont pop the return values from the stack, we just check if the types match
             assert!(
-                types_stack.is_empty(),
-                "types stack is not empty after return"
+                types_stack.0.ends_with(&mapped_function.signature.returns),
+                "types stack does not match function return types"
             );
         }
         Bytecode::CastU8 => {
@@ -1336,7 +1483,28 @@ fn map_bytecode_instruction(
 
             bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
         }
-
+        Bytecode::BrTrue(code_offset) => {
+            if let Some(branch_mode) = branches.get(code_offset) {
+                if let Some(&target) = branch_targets.get_target(branch_mode, code_offset) {
+                    builder.br_if(target);
+                }
+            }
+        }
+        Bytecode::BrFalse(code_offset) => {
+            if let Some(branch_mode) = branches.get(code_offset) {
+                if let Some(&target) = branch_targets.get_target(branch_mode, code_offset) {
+                    builder.unop(UnaryOp::I32Eqz);
+                    builder.br_if(target);
+                }
+            }
+        }
+        Bytecode::Branch(code_offset) => {
+            if let Some(branch_mode) = branches.get(code_offset) {
+                if let Some(&target) = branch_targets.get_target(branch_mode, code_offset) {
+                    builder.br(target);
+                }
+            }
+        }
         //**
         // Enums
         //**
@@ -1357,7 +1525,7 @@ fn map_bytecode_instruction(
 
             types_stack.push(IntermediateType::IEnum(enum_.index));
         }
-        b => Err(TranslationError::UnssuportedOperation {
+        b => Err(TranslationError::UnsupportedOperation {
             operation: b.clone(),
         })?,
     }
@@ -1383,4 +1551,83 @@ fn call_indirect(
         function_returns,
         compilation_ctx.memory_id,
     );
+}
+
+fn process_fn_local_variables(
+    function_information: &MappedFunction,
+    module: &mut Module,
+) -> (Vec<LocalId>, Vec<LocalId>) {
+    let wasm_arg_types = function_information.signature.get_argument_wasm_types();
+    let wasm_ret_types = function_information.signature.get_return_wasm_types();
+
+    assert!(
+        wasm_ret_types.len() <= 1,
+        "Multiple return values not supported"
+    );
+
+    // WASM locals for arguments
+    let wasm_arg_locals: Vec<LocalId> = wasm_arg_types
+        .iter()
+        .map(|ty| module.locals.add(*ty))
+        .collect();
+
+    let wasm_declared_locals = function_information
+        .locals
+        .iter()
+        .map(|ty| {
+            match ty {
+                IntermediateType::IU64 => ValType::I32, // to store pointer instead of i64
+                other => ValType::from(other),
+            }
+        })
+        .map(|ty| module.locals.add(ty))
+        .collect();
+
+    (wasm_arg_locals, wasm_declared_locals)
+}
+
+/// Converts value-based function arguments into heap-allocated pointers.
+///
+/// For each value-type argument (like u64, u32, etc.), this stores the value in linear memory
+/// and updates the local to hold a pointer to that memory instead. This allows treating all
+/// arguments as pointers in later code.
+pub fn box_args(
+    builder: &mut InstrSeqBuilder,
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    function_locals: &mut [LocalId],
+    function_information: &MappedFunction,
+) {
+    // Store the changes we need to make
+    let mut updates = Vec::new();
+
+    // Iterate over the mapped function arguments
+    for (local, ty) in function_locals
+        .iter()
+        .zip(&function_information.signature.arguments)
+    {
+        builder.local_get(*local);
+        match ty {
+            IntermediateType::IU64 => {
+                let outer_ptr = module.locals.add(ValType::I32);
+                ty.box_local_instructions(module, builder, compilation_ctx, outer_ptr);
+
+                if let Some(index) = function_locals.iter().position(|&id| id == *local) {
+                    updates.push((index, outer_ptr));
+                } else {
+                    panic!(
+                        "Couldn't find original local {:?} in function_information",
+                        local
+                    );
+                }
+            }
+            _ => {
+                ty.box_local_instructions(module, builder, compilation_ctx, *local);
+            }
+        }
+    }
+
+    for (index, pointer) in updates {
+        function_locals[index] = pointer;
+    }
 }

@@ -30,8 +30,8 @@ pub enum TranslationError {
         operand_type: IntermediateType,
     },
 
-    #[error("unssuported operation: {operation:?}")]
-    UnssuportedOperation { operation: Bytecode },
+    #[error("unsupported operation: {operation:?}")]
+    UnsupportedOperation { operation: Bytecode },
 
     #[error(
         "unable to perform \"{operation:?}\" on types {operand1:?} and {operand2:?}, expected the same type on types stack"

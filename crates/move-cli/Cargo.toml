@@ -27,6 +27,7 @@ move-binary-format.workspace = true
 move-package.workspace = true
 move-unit-test.workspace = true
 move-bytecode-viewer.workspace = true
+move-abstract-interpreter.workspace = true
 
 move-bytecode-to-wasm.workspace = true
 move-packages-build.workspace = true

@@ -1,6 +1,8 @@
-use super::intermediate_types::IntermediateType;
+use crate::translation::intermediate_types::IntermediateType;
+use move_binary_format::file_format::Bytecode;
 
-pub struct TypesStack(Vec<IntermediateType>);
+#[derive(Debug, Clone)]
+pub struct TypesStack(pub Vec<IntermediateType>);
 
 type Result<T> = std::result::Result<T, TypesStackError>;
 
@@ -52,10 +54,6 @@ impl TypesStack {
 
         Ok(res)
     }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -79,6 +77,15 @@ pub enum TypesStackError {
     MatchError {
         expected: &'static str,
         found: IntermediateType,
+    },
+
+    #[error(
+        "unable to perform \"{operation:?}\" on types {operand1:?} and {operand2:?}, expected the same type on types stack"
+    )]
+    OperationTypeMismatch {
+        operand1: IntermediateType,
+        operand2: IntermediateType,
+        operation: Bytecode,
     },
 }
 
