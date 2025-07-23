@@ -1,4 +1,4 @@
-use crate::translation::table::TableEntry;
+use crate::translation::functions::MappedFunction;
 use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::file_format::{Bytecode, CodeUnit};
 use relooper::{BranchMode, ShapedBlock};
@@ -39,7 +39,7 @@ impl Flow {
         }
     }
 
-    pub fn new(code_unit: &CodeUnit, entry: &TableEntry) -> Flow {
+    pub fn new(code_unit: &CodeUnit, function_information: &MappedFunction) -> Flow {
         // Create the control flow graph from the code unit
         let cfg = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
 
@@ -68,7 +68,7 @@ impl Flow {
                 let mut stack: Vec<ValType> = vec![];
                 // If the block contains a Ret instruction, then set the types stack of this block to the expected return type of the function.
                 if code.contains(&Bytecode::Ret) {
-                    stack = entry.results.clone();
+                    stack = function_information.results.clone();
                 }
 
                 (start, (code.to_vec(), stack))

@@ -1,23 +1,30 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;
-use move_binary_format::file_format::Bytecode;
+use move_binary_format::file_format::{Bytecode, CodeUnit};
+use move_binary_format::internals::ModuleIndex;
 use relooper::BranchMode;
+use walrus::FunctionId as WasmFunctionId;
 use walrus::ir::{BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, UnaryOp};
-use walrus::{FunctionBuilder, FunctionId, InstrSeqBuilder, Module, ValType};
+use walrus::{FunctionBuilder, InstrSeqBuilder, LocalId, Module, ValType};
 
-use crate::CompilationContext;
-use crate::runtime::RuntimeFunction;
-use crate::wasm_builder_extensions::WasmBuilderExtension;
-
-use flow::Flow;
-use functions::{add_unpack_function_return_values_instructions, prepare_function_return};
+use functions::{
+    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
+};
 use intermediate_types::IntermediateType;
 use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU8, IU16, IU32, IU64};
 use intermediate_types::vector::IVector;
-use table::{FunctionTable, TableEntry};
+use table::FunctionTable;
 use types_stack::TypesStack;
+
+use crate::CompilationContext;
+use crate::compilation_context::ModuleData;
+use crate::runtime::RuntimeFunction;
+use crate::wasm_builder_extensions::WasmBuilderExtension;
+use crate::FunctionId;
+
+use flow::Flow;
 
 pub use error::TranslationError;
 
@@ -70,57 +77,84 @@ impl BranchTargets {
 /// This is used to pass around the context of the translation process. Also clippy complains about too many arguments in translate_instruction.
 struct TranslateFlowContext<'a> {
     compilation_ctx: &'a CompilationContext<'a>,
+    module_data: &'a ModuleData,
     types_stack: &'a mut TypesStack,
-    function_table: &'a FunctionTable,
-    entry: &'a TableEntry,
+    function_information: &'a MappedFunction,
+    function_table: &'a mut FunctionTable,
+    function_locals: &'a Vec<LocalId>,
     branch_targets: &'a mut BranchTargets,
 }
 
+/// Translates a move function to WASM
+///
+/// The return values are:
+/// 1. The translated WASM FunctionId
+/// 2. A list of function ids from other modules to be translated and linked.
 pub fn translate_function(
     module: &mut Module,
-    index: usize,
     compilation_ctx: &CompilationContext,
+    module_data: &ModuleData,
     function_table: &mut FunctionTable,
-) -> Result<FunctionId> {
-    let entry = function_table
-        .get_mut(index)
-        .ok_or(anyhow::anyhow!("index {index} not found in function table"))?;
-
+    function_information: &MappedFunction,
+    move_bytecode: &CodeUnit,
+) -> Result<(WasmFunctionId, HashSet<FunctionId>)> {
     anyhow::ensure!(
-        entry.get_move_code_unit().unwrap().jump_tables.is_empty(),
+        move_bytecode.jump_tables.is_empty(),
         "Jump tables are not supported yet"
     );
 
-    let mut function = FunctionBuilder::new(&mut module.types, &entry.params, &entry.results);
+    let params = function_information.signature.get_argument_wasm_types();
+    let results = function_information.signature.get_return_wasm_types();
+    let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
     let mut builder = function.func_body();
 
-    entry
-        .function
-        .box_args(&mut builder, module, compilation_ctx);
+    let (arguments, locals) = process_fn_local_variables(function_information, module);
 
-    let entry = function_table
-        .get(index)
-        .ok_or(anyhow::anyhow!("index {index} not found in function table"))?;
+    // All the function locals are compose by the argument locals concatenated with the local
+    // variable locals
+    let mut function_locals = Vec::new();
+    function_locals.extend_from_slice(&arguments);
+    function_locals.extend_from_slice(&locals);
+    box_args(
+        &mut builder,
+        module,
+        compilation_ctx,
+        &mut function_locals,
+        function_information,
+    );
 
-    let code_unit = &entry.get_move_code_unit().unwrap();
+    // let entry = function_table
+    //     .get_by_function_id(&function_information.function_id)
+    //     .ok_or(anyhow::anyhow!("index {} not found in function table", function_information.function_id))?;
 
-    let flow = Flow::new(code_unit, entry);
+    // let code_unit = &entry.get_move_code_unit().unwrap();
+
+    let flow = Flow::new(move_bytecode, function_information);
 
     let mut branch_targets = BranchTargets::new();
     let mut types_stack = TypesStack::new();
+    let mut functions_to_link = HashSet::new();
 
     let mut ctx = TranslateFlowContext {
         compilation_ctx,
+        module_data,
         function_table,
-        entry,
+        function_information,
+        function_locals: &function_locals,
         types_stack: &mut types_stack,
         branch_targets: &mut branch_targets,
     };
 
-    translate_flow(&mut ctx, &mut builder, module, &flow);
+    translate_flow(
+        &mut ctx,
+        &mut builder,
+        module,
+        &flow,
+        &mut functions_to_link,
+    );
 
-    let function_id = function.finish(entry.function.arg_locals.clone(), &mut module.funcs);
-    Ok(function_id)
+    let function_id = function.finish(arguments, &mut module.funcs);
+    Ok((function_id, functions_to_link))
 }
 
 /// Recusively translate the flow to wasm.
@@ -130,6 +164,7 @@ fn translate_flow(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
     flow: &Flow,
+    functions_to_link: &mut HashSet<FunctionId>,
 ) {
     match flow {
         Flow::Simple {
@@ -157,13 +192,27 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
-                    translate_instruction(instruction, block, module, branches, ctx).unwrap();
+                    let mut fns_to_link = translate_instruction(
+                        instruction,
+                        ctx.compilation_ctx,
+                        ctx.module_data,
+                        block,
+                        ctx.function_information,
+                        module,
+                        &mut ctx.function_table,
+                        &mut ctx.types_stack,
+                        &ctx.function_locals,
+                        branches,
+                        ctx.branch_targets,
+                    )
+                    .unwrap();
+                    functions_to_link.extend(fns_to_link.drain(..));
                 }
                 // Then translate instructions of the immediate block, inside the current block
-                translate_flow(ctx, block, module, immediate);
+                translate_flow(ctx, block, module, immediate, functions_to_link);
             });
             // Then translate instructions of the next block, but outside the wrapping block
-            translate_flow(ctx, builder, module, next);
+            translate_flow(ctx, builder, module, next, functions_to_link);
         }
         Flow::Loop {
             stack,
@@ -187,12 +236,12 @@ fn translate_flow(
                         .insert(*loop_id, loop_.id());
 
                     // Translate the loop body (inner) inside the loop block.
-                    translate_flow(ctx, loop_, module, inner);
+                    translate_flow(ctx, loop_, module, inner, functions_to_link);
                 });
             });
 
             // Translate the next flow outside the wrapping block.
-            translate_flow(ctx, builder, module, next);
+            translate_flow(ctx, builder, module, next, functions_to_link);
         }
         Flow::IfElse {
             then_body,
@@ -206,13 +255,13 @@ fn translate_flow(
                 let ty = InstrSeqType::new(&mut module.types, &[], &then_stack);
                 let then_id = {
                     let mut then_seq = builder.dangling_instr_seq(ty);
-                    translate_flow(ctx, &mut then_seq, module, then_body);
+                    translate_flow(ctx, &mut then_seq, module, then_body, functions_to_link);
                     then_seq.id()
                 };
 
                 let else_id = {
                     let mut else_seq = builder.dangling_instr_seq(ty);
-                    translate_flow(ctx, &mut else_seq, module, else_body);
+                    translate_flow(ctx, &mut else_seq, module, else_body, functions_to_link);
                     else_seq.id()
                 };
 
@@ -237,7 +286,7 @@ fn translate_flow(
 
                 let then_id = {
                     let mut then_seq = builder.dangling_instr_seq(None);
-                    translate_flow(ctx, &mut then_seq, module, then_body);
+                    translate_flow(ctx, &mut then_seq, module, then_body, functions_to_link);
                     then_seq.id()
                 };
 
@@ -246,7 +295,7 @@ fn translate_flow(
                     alternative: phantom_seq_id,
                 });
 
-                translate_flow(ctx, builder, module, else_body);
+                translate_flow(ctx, builder, module, else_body, functions_to_link);
             } else if else_stack.is_empty() {
                 // Similar to the above scenario.
                 let phantom_seq = builder.dangling_instr_seq(None);
@@ -254,7 +303,7 @@ fn translate_flow(
 
                 let else_id = {
                     let mut else_seq = builder.dangling_instr_seq(None);
-                    translate_flow(ctx, &mut else_seq, module, else_body);
+                    translate_flow(ctx, &mut else_seq, module, else_body, functions_to_link);
                     else_seq.id()
                 };
 
@@ -264,7 +313,7 @@ fn translate_flow(
                     alternative: phantom_seq_id,
                 });
 
-                translate_flow(ctx, builder, module, then_body);
+                translate_flow(ctx, builder, module, then_body, functions_to_link);
             } else {
                 // If both arms leave values on the stack but with different types, we panic.
                 // In this scenario, the block wouldnt have a well-defined result type.
@@ -277,28 +326,31 @@ fn translate_flow(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn translate_instruction(
     instruction: &Bytecode,
+    compilation_ctx: &CompilationContext,
+    module_data: &ModuleData,
     builder: &mut InstrSeqBuilder,
+    mapped_function: &MappedFunction,
     module: &mut Module,
+    function_table: &mut FunctionTable,
+    types_stack: &mut TypesStack,
+    function_locals: &[LocalId],
     branches: &HashMap<u16, BranchMode>,
-    ctx: &mut TranslateFlowContext,
-) -> Result<(), TranslationError> {
-    let compilation_ctx = ctx.compilation_ctx;
-    let mapped_function = &ctx.entry.function;
-    let function_table = ctx.function_table;
-    let types_stack = &mut ctx.types_stack;
-    let branch_targets = &ctx.branch_targets;
+    branch_targets: &BranchTargets,
+) -> Result<Vec<FunctionId>, TranslationError> {
+    let mut functions_calls_to_link = Vec::new();
 
     match instruction {
         // Load a fixed constant
         Bytecode::LdConst(global_index) => {
-            let constant = &compilation_ctx.root_module_data.constants[global_index.0 as usize];
+            let constant = &module_data.constants[global_index.0 as usize];
             let mut data = constant.data.clone().into_iter();
             let constant_type = &constant.type_;
             let constant_type: IntermediateType = IntermediateType::try_from_signature_token(
                 constant_type,
-                &compilation_ctx.root_module_data.datatype_handles_map,
+                &module_data.datatype_handles_map,
             )?;
 
             constant_type.load_constant_instructions(module, builder, &mut data, compilation_ctx);
@@ -356,8 +408,8 @@ fn translate_instruction(
         // Function calls
         Bytecode::Call(function_handle_index) => {
             // Consume from the types stack the arguments that will be used by the function call
-            let arguments = &compilation_ctx.root_module_data.functions_arguments
-                [function_handle_index.0 as usize];
+            let arguments = &module_data.functions.arguments[function_handle_index.into_index()];
+
             for argument in arguments.iter().rev() {
                 types_stack.pop_expecting(argument)?;
 
@@ -373,30 +425,59 @@ fn translate_instruction(
                 }
             }
 
-            let f = function_table
-                .get_by_function_handle_index(function_handle_index)
-                .expect("function with index {function_handle_index:?} not found un table");
+            let function_id = &module_data.functions.calls[function_handle_index.into_index()];
+
+            // If the function is in the table we call it directly
+            let f_entry = if let Some(f) = function_table.get_by_function_id(function_id) {
+                f
+            }
+            // Otherwise we add it to the table and declare it for linking
+            else {
+                let function_information = if let Some(fi) = module_data
+                    .functions
+                    .information
+                    .get(function_handle_index.into_index())
+                {
+                    fi
+                } else {
+                    let dependency_data = compilation_ctx
+                        .deps_data
+                        .get(&function_id.module_id)
+                        .unwrap();
+
+                    dependency_data
+                        .functions
+                        .information
+                        .iter()
+                        .find(|f| &f.function_id == function_id)
+                        .unwrap()
+                };
+
+                let f_entry = function_table.add(module, function_id.clone(), function_information);
+
+                functions_calls_to_link.push(function_id.clone());
+
+                f_entry
+            };
 
             builder
-                .i32_const(f.index)
-                .call_indirect(f.type_id, function_table.get_table_id());
+                .i32_const(f_entry.index)
+                .call_indirect(f_entry.type_id, function_table.get_table_id());
 
             add_unpack_function_return_values_instructions(
                 builder,
                 module,
-                &compilation_ctx.root_module_data.functions_returns
-                    [function_handle_index.0 as usize],
+                &module_data.functions.returns[function_handle_index.into_index()],
                 compilation_ctx.memory_id,
             );
             // Insert in the stack types the types returned by the function (if any)
-            let return_types = &compilation_ctx.root_module_data.functions_returns
-                [function_handle_index.0 as usize];
+            let return_types = &module_data.functions.returns[function_handle_index.0 as usize];
             types_stack.append(return_types);
         }
         // Locals
         Bytecode::StLoc(local_id) => {
-            let local = mapped_function.function_locals[*local_id as usize];
-            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
+            let local = function_locals[*local_id as usize];
+            let local_type = &mapped_function.get_local_ir(*local_id as usize);
             // If type is a reference we set the local directly, else we box it.
             if let IntermediateType::IRef(_) | IntermediateType::IMutRef(_) = local_type {
                 builder.local_set(local);
@@ -407,31 +488,37 @@ fn translate_instruction(
         }
         Bytecode::MoveLoc(local_id) => {
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
-            let local = mapped_function.function_locals[*local_id as usize];
-            let local_type = mapped_function.function_locals_ir[*local_id as usize].clone();
+            let local = function_locals[*local_id as usize];
+            let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             local_type.move_local_instructions(builder, compilation_ctx, local);
             types_stack.push(local_type);
         }
         Bytecode::CopyLoc(local_id) => {
-            let local = mapped_function.function_locals[*local_id as usize];
-            let local_type = mapped_function.function_locals_ir[*local_id as usize].clone();
-            local_type.copy_local_instructions(module, builder, compilation_ctx, local);
+            let local = function_locals[*local_id as usize];
+            let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
+            local_type.copy_local_instructions(
+                module,
+                builder,
+                compilation_ctx,
+                module_data,
+                local,
+            );
             types_stack.push(local_type);
         }
         Bytecode::ImmBorrowLoc(local_id) => {
-            let local = mapped_function.function_locals[*local_id as usize];
-            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
+            let local = function_locals[*local_id as usize];
+            let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             local_type.add_borrow_local_instructions(builder, local);
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
         }
         Bytecode::MutBorrowLoc(local_id) => {
-            let local = mapped_function.function_locals[*local_id as usize];
-            let local_type = &mapped_function.function_locals_ir[*local_id as usize];
+            let local = function_locals[*local_id as usize];
+            let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             local_type.add_borrow_local_instructions(builder, local);
             types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
         }
         Bytecode::ImmBorrowField(field_id) => {
-            let struct_ = compilation_ctx.get_struct_by_field_handle_idx(field_id)?;
+            let struct_ = module_data.structs.get_by_field_handle_idx(field_id)?;
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
@@ -447,36 +534,31 @@ fn translate_instruction(
             );
         }
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
-            let (struct_field_id, instantiation_types) = compilation_ctx
-                .root_module_data
+            let (struct_field_id, instantiation_types) = module_data
+                .structs
                 .instantiated_fields_to_generic_fields
                 .get(field_id)
                 .unwrap();
 
-            let instantiation_types = instantiation_types
-                .iter()
-                .map(|t| {
-                    IntermediateType::try_from_signature_token(
-                        t,
-                        &compilation_ctx.root_module_data.datatype_handles_map,
-                    )
-                })
-                .collect::<Result<Vec<_>, anyhow::Error>>()?;
-
-            let struct_ = if let Ok(struct_) =
-                compilation_ctx.get_generic_struct_by_field_handle_idx(field_id)
+            let struct_ = if let Ok(struct_) = module_data
+                .structs
+                .get_struct_instance_by_field_handle_idx(field_id)
             {
                 struct_
             } else {
-                let generic_stuct =
-                    compilation_ctx.get_struct_by_field_handle_idx(struct_field_id)?;
+                let generic_stuct = module_data
+                    .structs
+                    .get_by_field_handle_idx(struct_field_id)?;
 
-                generic_stuct.instantiate(&instantiation_types)
+                generic_stuct.instantiate(instantiation_types)
             };
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
-                IntermediateType::IGenericStructInstance(struct_.index(), instantiation_types),
+                IntermediateType::IGenericStructInstance(
+                    struct_.index(),
+                    instantiation_types.to_vec(),
+                ),
             )))?;
 
             bytecodes::structs::borrow_field(
@@ -488,7 +570,7 @@ fn translate_instruction(
             );
         }
         Bytecode::MutBorrowField(field_id) => {
-            let struct_ = compilation_ctx.get_struct_by_field_handle_idx(field_id)?;
+            let struct_ = module_data.structs.get_by_field_handle_idx(field_id)?;
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
@@ -504,35 +586,30 @@ fn translate_instruction(
             );
         }
         Bytecode::MutBorrowFieldGeneric(field_id) => {
-            let (struct_field_id, instantiation_types) = compilation_ctx
-                .root_module_data
+            let (struct_field_id, instantiation_types) = module_data
+                .structs
                 .instantiated_fields_to_generic_fields
                 .get(field_id)
                 .unwrap();
 
-            let instantiation_types = instantiation_types
-                .iter()
-                .map(|t| {
-                    IntermediateType::try_from_signature_token(
-                        t,
-                        &compilation_ctx.root_module_data.datatype_handles_map,
-                    )
-                })
-                .collect::<Result<Vec<_>, anyhow::Error>>()?;
-
-            let struct_ = if let Ok(struct_) =
-                compilation_ctx.get_generic_struct_by_field_handle_idx(field_id)
+            let struct_ = if let Ok(struct_) = module_data
+                .structs
+                .get_struct_instance_by_field_handle_idx(field_id)
             {
                 struct_
             } else {
-                let generic_stuct =
-                    compilation_ctx.get_struct_by_field_handle_idx(struct_field_id)?;
-                generic_stuct.instantiate(&instantiation_types)
+                let generic_stuct = module_data
+                    .structs
+                    .get_by_field_handle_idx(struct_field_id)?;
+                generic_stuct.instantiate(instantiation_types)
             };
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
-                IntermediateType::IGenericStructInstance(struct_.index(), instantiation_types),
+                IntermediateType::IGenericStructInstance(
+                    struct_.index(),
+                    instantiation_types.to_vec(),
+                ),
             )))?;
 
             bytecodes::structs::mut_borrow_field(
@@ -553,10 +630,8 @@ fn translate_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
             );
 
-            let expected_vec_inner = bytecodes::vectors::get_inner_type_from_signature(
-                signature_index,
-                compilation_ctx,
-            )?;
+            let expected_vec_inner =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -582,10 +657,8 @@ fn translate_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
             );
 
-            let expected_vec_inner = bytecodes::vectors::get_inner_type_from_signature(
-                signature_index,
-                compilation_ctx,
-            )?;
+            let expected_vec_inner =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -599,10 +672,8 @@ fn translate_instruction(
             types_stack.push(IntermediateType::IMutRef(Box::new(*vec_inner)));
         }
         Bytecode::VecPack(signature_index, num_elements) => {
-            let inner = bytecodes::vectors::get_inner_type_from_signature(
-                signature_index,
-                compilation_ctx,
-            )?;
+            let inner =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             IVector::vec_pack_instructions(
                 &inner,
@@ -633,10 +704,8 @@ fn translate_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *ref_inner)
             );
 
-            let expected_vec_inner = bytecodes::vectors::get_inner_type_from_signature(
-                signature_index,
-                compilation_ctx,
-            )?;
+            let expected_vec_inner =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -692,10 +761,8 @@ fn translate_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *mut_inner)
             );
 
-            let expected_elem_type = bytecodes::vectors::get_inner_type_from_signature(
-                signature_index,
-                compilation_ctx,
-            )?;
+            let expected_elem_type =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             if *vec_inner != expected_elem_type {
                 return Err(TranslationError::TypeMismatch {
@@ -711,7 +778,13 @@ fn translate_instruction(
                 });
             }
 
-            IVector::vec_push_back_instructions(&elem_ty, module, builder, compilation_ctx);
+            IVector::vec_push_back_instructions(
+                &elem_ty,
+                module,
+                builder,
+                compilation_ctx,
+                module_data,
+            );
         }
         Bytecode::VecSwap(signature_index) => {
             let [id2_ty, id1_ty, ref_ty] = types_stack.pop_n_from_stack()?;
@@ -727,10 +800,8 @@ fn translate_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *mut_inner)
             );
 
-            let expected_vec_inner = bytecodes::vectors::get_inner_type_from_signature(
-                signature_index,
-                compilation_ctx,
-            )?;
+            let expected_vec_inner =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -751,10 +822,8 @@ fn translate_instruction(
             }
         }
         Bytecode::VecLen(signature_index) => {
-            let elem_ir_type = bytecodes::vectors::get_inner_type_from_signature(
-                signature_index,
-                compilation_ctx,
-            )?;
+            let elem_ir_type =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
                 IntermediateType::IVector(Box::new(elem_ir_type)),
@@ -790,7 +859,7 @@ fn translate_instruction(
                 ref_type
             ));
 
-            inner.add_read_ref_instructions(builder, module, compilation_ctx);
+            inner.add_read_ref_instructions(builder, module, compilation_ctx, module_data);
             types_stack.push(*inner);
         }
         Bytecode::WriteRef => {
@@ -1183,7 +1252,7 @@ fn translate_instruction(
                 });
             }
 
-            t1.load_equality_instructions(module, builder, compilation_ctx);
+            t1.load_equality_instructions(module, builder, compilation_ctx, module_data);
 
             types_stack.push(IntermediateType::IBool);
         }
@@ -1197,7 +1266,7 @@ fn translate_instruction(
                 });
             }
 
-            t1.load_not_equality_instructions(module, builder, compilation_ctx);
+            t1.load_not_equality_instructions(module, builder, compilation_ctx, module_data);
 
             types_stack.push(IntermediateType::IBool);
         }
@@ -1346,44 +1415,58 @@ fn translate_instruction(
             types_stack.push(t);
         }
         Bytecode::Pack(struct_definition_index) => {
-            let struct_ =
-                compilation_ctx.get_struct_by_struct_definition_idx(struct_definition_index)?;
+            let struct_ = module_data
+                .structs
+                .get_by_struct_definition_idx(struct_definition_index)?;
 
             bytecodes::structs::pack(struct_, module, builder, compilation_ctx, types_stack)?;
 
             types_stack.push(IntermediateType::IStruct(struct_definition_index.0));
         }
         Bytecode::PackGeneric(struct_definition_index) => {
-            let struct_ = compilation_ctx
-                .get_generic_struct_by_struct_definition_idx(struct_definition_index)?;
+            let struct_ = module_data
+                .structs
+                .get_struct_instance_by_struct_definition_idx(struct_definition_index)?;
 
             bytecodes::structs::pack(&struct_, module, builder, compilation_ctx, types_stack)?;
 
-            let idx = compilation_ctx
+            let idx = module_data
+                .structs
                 .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
-            let types =
-                compilation_ctx.get_generic_struct_types_instances(struct_definition_index)?;
+            let types = module_data
+                .structs
+                .get_generic_struct_types_instances(struct_definition_index)?;
 
-            types_stack.push(IntermediateType::IGenericStructInstance(idx, types));
+            types_stack.push(IntermediateType::IGenericStructInstance(
+                idx,
+                types.to_vec(),
+            ));
         }
         Bytecode::Unpack(struct_definition_index) => {
             types_stack.pop_expecting(&IntermediateType::IStruct(struct_definition_index.0))?;
 
-            let struct_ =
-                compilation_ctx.get_struct_by_struct_definition_idx(struct_definition_index)?;
+            let struct_ = module_data
+                .structs
+                .get_by_struct_definition_idx(struct_definition_index)?;
 
             bytecodes::structs::unpack(struct_, module, builder, compilation_ctx, types_stack)?;
         }
         Bytecode::UnpackGeneric(struct_definition_index) => {
-            let idx = compilation_ctx
+            let idx = module_data
+                .structs
                 .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
-            let types =
-                compilation_ctx.get_generic_struct_types_instances(struct_definition_index)?;
+            let types = module_data
+                .structs
+                .get_generic_struct_types_instances(struct_definition_index)?;
 
-            types_stack.pop_expecting(&IntermediateType::IGenericStructInstance(idx, types))?;
+            types_stack.pop_expecting(&IntermediateType::IGenericStructInstance(
+                idx,
+                types.to_vec(),
+            ))?;
 
-            let struct_ = compilation_ctx
-                .get_generic_struct_by_struct_definition_idx(struct_definition_index)?;
+            let struct_ = module_data
+                .structs
+                .get_struct_instance_by_struct_definition_idx(struct_definition_index)?;
 
             bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
         }
@@ -1413,9 +1496,10 @@ fn translate_instruction(
         // Enums
         //**
         Bytecode::PackVariant(index) => {
-            let enum_ = compilation_ctx.get_enum_by_variant_handle_idx(index)?;
-            let index_inside_enum =
-                compilation_ctx.get_variant_position_by_variant_handle_idx(index)?;
+            let enum_ = module_data.enums.get_enum_by_variant_handle_idx(index)?;
+            let index_inside_enum = module_data
+                .enums
+                .get_variant_position_by_variant_handle_idx(index)?;
 
             bytecodes::enums::pack_variant(
                 enum_,
@@ -1433,5 +1517,84 @@ fn translate_instruction(
         })?,
     }
 
-    Ok(())
+    Ok(functions_calls_to_link)
+}
+
+fn process_fn_local_variables(
+    function_information: &MappedFunction,
+    module: &mut Module,
+) -> (Vec<LocalId>, Vec<LocalId>) {
+    let wasm_arg_types = function_information.signature.get_argument_wasm_types();
+    let wasm_ret_types = function_information.signature.get_return_wasm_types();
+
+    assert!(
+        wasm_ret_types.len() <= 1,
+        "Multiple return values not supported"
+    );
+
+    // WASM locals for arguments
+    let wasm_arg_locals: Vec<LocalId> = wasm_arg_types
+        .iter()
+        .map(|ty| module.locals.add(*ty))
+        .collect();
+
+    let wasm_declared_locals = function_information
+        .locals
+        .iter()
+        .map(|ty| {
+            match ty {
+                IntermediateType::IU64 => ValType::I32, // to store pointer instead of i64
+                other => ValType::from(other),
+            }
+        })
+        .map(|ty| module.locals.add(ty))
+        .collect();
+
+    (wasm_arg_locals, wasm_declared_locals)
+}
+
+/// Converts value-based function arguments into heap-allocated pointers.
+///
+/// For each value-type argument (like u64, u32, etc.), this stores the value in linear memory
+/// and updates the local to hold a pointer to that memory instead. This allows treating all
+/// arguments as pointers in later code.
+pub fn box_args(
+    builder: &mut InstrSeqBuilder,
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    function_locals: &mut [LocalId],
+    function_information: &MappedFunction,
+) {
+    // Store the changes we need to make
+    let mut updates = Vec::new();
+
+    // Iterate over the mapped function arguments
+    for (local, ty) in function_locals
+        .iter()
+        .zip(&function_information.signature.arguments)
+    {
+        builder.local_get(*local);
+        match ty {
+            IntermediateType::IU64 => {
+                let outer_ptr = module.locals.add(ValType::I32);
+                ty.box_local_instructions(module, builder, compilation_ctx, outer_ptr);
+
+                if let Some(index) = function_locals.iter().position(|&id| id == *local) {
+                    updates.push((index, outer_ptr));
+                } else {
+                    panic!(
+                        "Couldn't find original local {:?} in function_information",
+                        local
+                    );
+                }
+            }
+            _ => {
+                ty.box_local_instructions(module, builder, compilation_ctx, *local);
+            }
+        }
+    }
+
+    for (index, pointer) in updates {
+        function_locals[index] = pointer;
+    }
 }

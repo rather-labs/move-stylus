@@ -167,7 +167,11 @@ impl Unpackable for IntermediateType {
                 compilation_ctx,
             ),
             IntermediateType::IStruct(index) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_ = compilation_ctx
+                    .root_module_data
+                    .structs
+                    .get_by_index(*index)
+                    .unwrap();
 
                 struct_.add_unpack_instructions(
                     function_builder,
@@ -178,7 +182,11 @@ impl Unpackable for IntermediateType {
                 );
             }
             IntermediateType::IGenericStructInstance(index, types) => {
-                let struct_ = compilation_ctx.get_struct_by_index(*index).unwrap();
+                let struct_ = compilation_ctx
+                    .root_module_data
+                    .structs
+                    .get_by_index(*index)
+                    .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.add_unpack_instructions(
                     function_builder,
@@ -189,7 +197,11 @@ impl Unpackable for IntermediateType {
                 )
             }
             IntermediateType::IEnum(enum_index) => {
-                let enum_ = compilation_ctx.get_enum_by_index(*enum_index).unwrap();
+                let enum_ = compilation_ctx
+                    .root_module_data
+                    .enums
+                    .get_enum_by_index(*enum_index)
+                    .unwrap();
                 if !enum_.is_simple {
                     panic!(
                         "cannot abi unpack enum with index {enum_index}, it contains at least one variant with fields"

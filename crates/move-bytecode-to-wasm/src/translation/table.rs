@@ -1,28 +1,35 @@
+use std::fmt::Display;
+
 use anyhow::Result;
-use move_binary_format::file_format::{CodeUnit, FunctionHandleIndex};
-use walrus::{ConstExpr, ElementKind, FunctionId, Module, TableId, TypeId, ValType, ir::Value};
+use walrus::{
+    ConstExpr, ElementKind, FunctionId as WasmFunctionId, Module, TableId, TypeId, ValType,
+    ir::Value,
+};
+
+use crate::compilation_context::ModuleId;
 
 use super::functions::MappedFunction;
 
-pub struct TableEntry {
-    pub index: i32,
-    pub function: MappedFunction,
-    pub function_handle_index: FunctionHandleIndex,
-    pub type_id: TypeId,
-    pub params: Vec<ValType>,
-    pub results: Vec<ValType>,
+/// Identifies a function inside a module
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+pub struct FunctionId {
+    pub identifier: String,
 
-    /// This field is used as a safeguard, it is set to true when `Self::add_to_wasm_table` is
-    /// executed. If we find any entry with this field in false, means we never executed said
-    /// method, on some entry resulting in some functions not present in the table, if that happens
-    /// we are going to be able to call the function present in this entry.
-    added_to_wasm_table: bool,
+    pub module_id: ModuleId,
 }
 
-impl TableEntry {
-    pub fn get_move_code_unit(&self) -> Option<&CodeUnit> {
-        self.function.function_definition.code.as_ref()
+impl Display for FunctionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}::{}", self.module_id, self.identifier)
     }
+}
+
+#[derive(Debug)]
+pub struct TableEntry {
+    pub index: i32,
+    pub function_id: FunctionId,
+    pub wasm_function_id: Option<WasmFunctionId>,
+    pub type_id: TypeId,
 }
 
 pub struct FunctionTable {
@@ -42,9 +49,9 @@ impl FunctionTable {
     pub fn add(
         &mut self,
         module: &mut Module,
-        function: MappedFunction,
-        function_handle_index: FunctionHandleIndex,
-    ) {
+        function_id: FunctionId,
+        function: &MappedFunction,
+    ) -> &TableEntry {
         let params: Vec<ValType> = function
             .signature
             .arguments
@@ -57,71 +64,63 @@ impl FunctionTable {
         let index = self.entries.len() as i32;
         self.entries.push(TableEntry {
             index,
-            function,
+            function_id,
+            wasm_function_id: None,
             type_id,
-            params,
-            results,
-            function_handle_index,
-            added_to_wasm_table: false,
         });
 
         let table = module.tables.get_mut(self.table_id);
         table.initial = self.entries.len() as u64;
+
+        &self.entries[self.entries.len() - 1]
     }
 
     pub fn add_to_wasm_table(
         &mut self,
         module: &mut Module,
-        index: usize,
-        function_id: FunctionId,
+        function_id: &FunctionId,
+        wasm_function_id: WasmFunctionId,
     ) -> anyhow::Result<()> {
         let entry = self
-            .entries
-            .get_mut(index)
-            .ok_or(anyhow::anyhow!("invalid entry {index}"))?;
+            .get_by_function_id(function_id)
+            .ok_or(anyhow::anyhow!("invalid entry {function_id:?}"))?;
 
         module.elements.add(
             ElementKind::Active {
                 table: self.table_id,
-                offset: ConstExpr::Value(Value::I32(index as i32)),
+                offset: ConstExpr::Value(Value::I32(entry.index as i32)),
             },
-            walrus::ElementItems::Functions(vec![function_id]),
+            walrus::ElementItems::Functions(vec![wasm_function_id]),
         );
-        entry.added_to_wasm_table = true;
+
+        let entry = self
+            .get_mut_by_function_id(function_id)
+            .ok_or(anyhow::anyhow!("invalid entry {function_id:?}"))?;
+
+        entry.wasm_function_id = Some(wasm_function_id);
 
         Ok(())
     }
 
-    pub fn get(&self, index: usize) -> Option<&TableEntry> {
-        self.entries.get(index)
+    pub fn get_by_function_id(&self, function_id: &FunctionId) -> Option<&TableEntry> {
+        self.entries.iter().find(|e| &e.function_id == function_id)
     }
 
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut TableEntry> {
-        self.entries.get_mut(index)
-    }
-
-    pub fn get_by_function_handle_index(
-        &self,
-        function_handle_index: &FunctionHandleIndex,
-    ) -> Option<&TableEntry> {
+    pub fn get_mut_by_function_id(&mut self, function_id: &FunctionId) -> Option<&mut TableEntry> {
         self.entries
-            .iter()
-            .find(|e| e.function_handle_index == *function_handle_index)
+            .iter_mut()
+            .find(|e| &e.function_id == function_id)
     }
 
     pub fn get_table_id(&self) -> TableId {
         self.table_id
     }
 
-    pub fn len(&self) -> usize {
-        self.entries.len()
-    }
-
     pub fn ensure_all_functions_added(&self) -> Result<()> {
-        if let Some(entry) = self.entries.iter().find(|e| !e.added_to_wasm_table) {
+        if let Some(entry) = self.entries.iter().find(|e| e.wasm_function_id.is_none()) {
             anyhow::bail!(
                 "function {} was not added to the functions table",
-                entry.function.name
+                entry.function_id
             );
         }
 

@@ -16,19 +16,42 @@ const EBadTxHashLength: u64 = 0;
 /// This cannot be constructed by a transaction--it is a privileged object created by
 /// the VM and passed in to the entrypoint of the transaction as `&mut TxContext`.
 public struct TxContext has drop {
+    /*
     /// The address of the user that signed the current transaction
     sender: address,
-    /// Hash of the current transaction
-    //tx_hash: vector<u8>,
-    /// The current epoch number
-    epoch: u64,
-    /// Timestamp that the epoch started at
-    epoch_timestamp_ms: u64,
-    /// Counter recording the number of fresh id's created while executing
-    /// this transaction. Always 0 at the start of a transaction
-    ids_created: u64,
+
+    /// The value of the sent message
+    msg_value: vector<u8>,
+
+    /// The current block
+    block_number: u256,
+
+    /// Base tx fee
+    block_basefee: u256,
+
+    /// Tx gas limit
+    block_gaslimit: u256,
+
+    /// Block approximate timestamp
+    block_timestamp: u256,
+
+    /// Chain ID
+    chain_id: u256,
+    */
 }
 
+// native fun native_sender();
+// native fun native_sender(): address;
+fun native_sender(): address {
+    @0x7357
+}
+
+public fun sender(_self: &TxContext): address {
+    native_sender()
+    // @0x7357
+}
+
+/*
 /// Return the address of the user that signed the current
 /// transaction
 public fun sender(_self: &TxContext): address {
@@ -254,4 +277,5 @@ native fun replace(
 #[allow(unused_function)]
 /// Native function for deriving an ID via hash(tx_hash || ids_created)
 native fun derive_id(tx_hash: vector<u8>, ids_created: u64): address;
+*/
 */

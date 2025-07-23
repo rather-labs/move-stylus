@@ -3,13 +3,16 @@ use std::{collections::HashMap, path::Path};
 use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use compilation_context::{ModuleData, ModuleId};
-use move_binary_format::file_format::Visibility;
+use move_binary_format::file_format::FunctionDefinition;
 use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
     source_package::parsed_manifest::PackageName,
 };
-use translation::translate_function;
-use walrus::{Module, ValType};
+use translation::{
+    table::{FunctionId, FunctionTable},
+    translate_function,
+};
+use walrus::{Module, RefType, ValType};
 use wasm_validation::validate_stylus_wasm;
 
 pub(crate) mod abi_types;
@@ -26,6 +29,9 @@ mod wasm_validation;
 
 #[cfg(test)]
 mod test_tools;
+
+pub type GlobalFunctionTable<'move_package> =
+    HashMap<FunctionId, &'move_package FunctionDefinition>;
 
 pub fn translate_single_module(package: CompiledPackage, module_name: &str) -> Module {
     let mut modules = translate_package(package, Some(module_name.to_string()));
@@ -57,59 +63,75 @@ pub fn translate_package(
     // Contains the module data for all the root package and its dependencies
     let mut modules_data: HashMap<ModuleId, ModuleData> = HashMap::new();
 
-    // TODO: a lot of cloenes, we must create a symbol pool
-    for root_compiled_module in root_compiled_units {
-        let module_name = root_compiled_module.unit.name.to_string();
-        let root_compiled_module = root_compiled_module.unit.module;
+    // Contains all a reference for all functions definitions in case we need to process them and
+    // statically link them
+    let mut function_definitions: GlobalFunctionTable = HashMap::new();
 
+    // TODO: a lot of clones, we must create a symbol pool
+    for root_compiled_module in &root_compiled_units {
+        let module_name = root_compiled_module.unit.name.to_string();
         println!("compiling module {module_name}...");
+        let root_compiled_module = &root_compiled_module.unit.module;
+
+        let root_module_id = ModuleId {
+            address: root_compiled_module.address().into_bytes().into(),
+            module_name: module_name.clone(),
+        };
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
         inject_debug_fns(&mut module);
+
+        // Function table
+        let function_table_id = module.tables.add_local(false, 0, None, RefType::Funcref);
+        let mut function_table = FunctionTable::new(function_table_id);
 
         // Process the dependency tree
         process_dependency_tree(
             &mut modules_data,
             &package.deps_compiled_units,
             &root_compiled_module.immediate_dependencies(),
-            &mut module,
+            &mut function_definitions,
         );
 
-        let (root_module_data, mut function_table) =
-            ModuleData::build_module_data(&root_compiled_module, &mut module);
-
-        let root_module_id = ModuleId {
-            address: root_compiled_module.address().into_bytes().into(),
-            module_name: module_name.clone(),
-        };
-        modules_data.insert(root_module_id.clone(), root_module_data);
+        let root_module_data = ModuleData::build_module_data(
+            root_module_id.clone(),
+            root_compiled_module,
+            &mut function_definitions,
+        );
 
         let compilation_ctx = CompilationContext {
-            root_module_data: &modules_data[&root_module_id],
+            root_module_data: &root_module_data,
             deps_data: &modules_data,
             memory_id,
             allocator: allocator_func,
         };
 
         let mut public_functions = Vec::new();
-        let mut function_ids = Vec::new();
+        for function_information in root_module_data
+            .functions
+            .information
+            .iter()
+            .filter(|fi| fi.function_id.module_id == root_module_id)
+        {
+            translate_and_link_functions(
+                &function_information.function_id,
+                &mut function_table,
+                &function_definitions,
+                &mut module,
+                &compilation_ctx,
+            );
 
-        for index in 0..function_table.len() {
-            let function_id =
-                translate_function(&mut module, index, &compilation_ctx, &mut function_table)
-                    .unwrap();
-            function_ids.push(function_id);
-        }
+            let wasm_function_id = function_table
+                .get_by_function_id(&function_information.function_id)
+                .unwrap()
+                .wasm_function_id
+                .unwrap();
 
-        for (index, function_id) in function_ids.iter().enumerate() {
-            let entry = function_table.get(index).unwrap();
-            let mapped_function = &entry.function;
-
-            if mapped_function.function_definition.visibility == Visibility::Public {
+            if function_information.is_entry {
                 public_functions.push(PublicFunction::new(
-                    *function_id,
-                    &mapped_function.name,
-                    &mapped_function.signature,
+                    wasm_function_id,
+                    &function_information.function_id.identifier,
+                    &function_information.signature,
                     &compilation_ctx,
                 ));
             }
@@ -117,17 +139,11 @@ pub fn translate_package(
 
         hostio::build_entrypoint_router(&mut module, &public_functions, &compilation_ctx);
 
-        // Fill the WASM table with the function ids
-        for (index, function_id) in function_ids.into_iter().enumerate() {
-            function_table
-                .add_to_wasm_table(&mut module, index, function_id)
-                .expect("there was an error adding the module's functions to the function table");
-        }
-
         function_table.ensure_all_functions_added().unwrap();
         validate_stylus_wasm(&mut module).unwrap();
 
         modules.insert(module_name, module);
+        modules_data.insert(root_module_id.clone(), root_module_data);
     }
 
     modules
@@ -154,28 +170,14 @@ pub fn translate_package_cli(package: CompiledPackage, rerooted_path: &Path) {
     }
 }
 
-#[cfg(feature = "inject-host-debug-fns")]
-#[macro_export]
-macro_rules! declare_host_debug_functions {
-    ($module: ident) => {
-        (
-            $module.imports.get_func("", "print_i32").unwrap(),
-            $module.imports.get_func("", "print_i64").unwrap(),
-            $module.imports.get_func("", "print_memory_from").unwrap(),
-            $module.imports.get_func("", "print_separator").unwrap(),
-            $module.imports.get_func("", "print_u128").unwrap(),
-        )
-    };
-}
-
 /// This functions process the dependency tree for the root module.
 ///
 /// It builds `ModuleData` for every module in the dependency tree and saves it in a HashMap.
-pub fn process_dependency_tree(
+pub fn process_dependency_tree<'move_package>(
     dependencies_data: &mut HashMap<ModuleId, ModuleData>,
-    deps_compiled_units: &[(PackageName, CompiledUnitWithSource)],
+    deps_compiled_units: &'move_package [(PackageName, CompiledUnitWithSource)],
     dependencies: &[move_core_types::language_storage::ModuleId],
-    module: &mut Module,
+    function_definitions: &mut GlobalFunctionTable<'move_package>,
 ) {
     for dependency in dependencies {
         let module_id = ModuleId {
@@ -209,12 +211,15 @@ pub fn process_dependency_tree(
                 dependencies_data,
                 deps_compiled_units,
                 &dependency_module.immediate_dependencies(),
-                module,
+                function_definitions,
             );
         }
 
-        let (dependency_module_data, _dependency_fn_table) =
-            ModuleData::build_module_data(dependency_module, module);
+        let dependency_module_data = ModuleData::build_module_data(
+            module_id.clone(),
+            dependency_module,
+            function_definitions,
+        );
 
         let processed_dependency = dependencies_data.insert(module_id, dependency_module_data);
 
@@ -223,6 +228,86 @@ pub fn process_dependency_tree(
             "processed the same dep twice in different contexts"
         );
     }
+}
+
+/// Trnaslates a function to WASM and links it to the WASM module
+///
+/// It also recursively translates and links all the functions called by this function
+fn translate_and_link_functions(
+    function_id: &FunctionId,
+    function_table: &mut FunctionTable,
+    function_definitions: &GlobalFunctionTable,
+    module: &mut walrus::Module,
+    compilation_ctx: &CompilationContext,
+) {
+    // Obtain the function information and module's data
+    let (function_information, module_data) = if let Some(fi) = compilation_ctx
+        .root_module_data
+        .functions
+        .information
+        .iter()
+        .find(|f| &f.function_id == function_id)
+    {
+        (fi, compilation_ctx.root_module_data)
+    } else {
+        let module_data = compilation_ctx
+            .deps_data
+            .get(&function_id.module_id)
+            .unwrap();
+
+        let fi = module_data
+            .functions
+            .information
+            .iter()
+            .find(|f| &f.function_id == function_id)
+            .unwrap();
+
+        (fi, module_data)
+    };
+
+    // Process function defined in this module
+    // First we check if there is already an entry for this function
+    if let Some(table_entry) = function_table.get_by_function_id(function_id) {
+        // If it has asigned a wasm function id means that we already translated it, so we skip
+        // it
+        if table_entry.wasm_function_id.is_some() {
+            return;
+        }
+    }
+    // If it is not present, we add an entry for it
+    else {
+        function_table.add(module, function_id.clone(), function_information);
+    }
+
+    let function_definition = function_definitions
+        .get(function_id)
+        .unwrap_or_else(|| panic!("could not find function definition for {}", function_id));
+
+    let move_bytecode = function_definition.code.as_ref().unwrap();
+    let (wasm_function_id, functions_to_link) = translate_function(
+        module,
+        compilation_ctx,
+        module_data,
+        function_table,
+        function_information,
+        move_bytecode,
+    )
+    .unwrap_or_else(|_| panic!("there was an error translating {}", function_id));
+
+    function_table
+        .add_to_wasm_table(module, function_id, wasm_function_id)
+        .expect("there was an error adding the module's functions to the function table");
+
+    // Recursively translate and link functions called by this function
+    functions_to_link.iter().for_each(|function_id| {
+        translate_and_link_functions(
+            function_id,
+            function_table,
+            function_definitions,
+            module,
+            compilation_ctx,
+        )
+    });
 }
 
 fn inject_debug_fns(module: &mut walrus::Module) {
@@ -245,4 +330,18 @@ fn inject_debug_fns(module: &mut walrus::Module) {
         let func_ty = module.types.add(&[ValType::I32], &[]);
         module.add_import_func("", "print_address", func_ty);
     }
+}
+
+#[cfg(feature = "inject-host-debug-fns")]
+#[macro_export]
+macro_rules! declare_host_debug_functions {
+    ($module: ident) => {
+        (
+            $module.imports.get_func("", "print_i32").unwrap(),
+            $module.imports.get_func("", "print_i64").unwrap(),
+            $module.imports.get_func("", "print_memory_from").unwrap(),
+            $module.imports.get_func("", "print_separator").unwrap(),
+            $module.imports.get_func("", "print_u128").unwrap(),
+        )
+    };
 }
