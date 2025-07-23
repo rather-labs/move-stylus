@@ -1,31 +1,3 @@
-use std::collections::{HashMap, HashSet};
-
-use anyhow::Result;
-use relooper::BranchMode;
-use walrus::ir::{BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, UnaryOp};
-use walrus::{FunctionId as WasmFunctionId, FunctionBuilder, InstrSeqBuilder, LocalId, Module, ValType};
-
-use functions::{
-    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
-};
-use intermediate_types::IntermediateType;
-use intermediate_types::heap_integers::{IU128, IU256};
-use intermediate_types::simple_integers::{IU16, IU32, IU64};
-use intermediate_types::{simple_integers::IU8, vector::IVector};
-use move_binary_format::file_format::{Bytecode, CodeUnit};
-use move_binary_format::internals::ModuleIndex;
-use table::{FunctionId, FunctionTable, TableEntry};
-use types_stack::TypesStack;
-use walrus::{TableId};
- 
-use crate::CompilationContext;
-use crate::compilation_context::ModuleData;
-use crate::native_functions::NativeFunction;
-use crate::runtime::RuntimeFunction;
-use crate::wasm_builder_extensions::WasmBuilderExtension;
-
-use flow::Flow;
-
 pub use error::TranslationError;
 
 pub(crate) mod bytecodes;
@@ -38,6 +10,35 @@ pub mod functions;
 /// that is used to generate the WASM code.
 pub mod intermediate_types;
 pub mod table;
+
+use crate::{
+    CompilationContext, compilation_context::ModuleData, native_functions::NativeFunction,
+    runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension,
+};
+use anyhow::Result;
+use flow::Flow;
+use functions::{
+    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
+};
+use intermediate_types::{
+    IntermediateType,
+    heap_integers::{IU128, IU256},
+    simple_integers::{IU8, IU16, IU32, IU64},
+    vector::IVector,
+};
+use move_binary_format::{
+    file_format::{Bytecode, CodeUnit},
+    internals::ModuleIndex,
+};
+use relooper::BranchMode;
+use std::collections::{HashMap, HashSet};
+use table::{FunctionId, FunctionTable, TableEntry};
+use types_stack::TypesStack;
+use walrus::TableId;
+use walrus::{
+    FunctionBuilder, FunctionId as WasmFunctionId, InstrSeqBuilder, LocalId, Module, ValType,
+    ir::{BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, UnaryOp},
+};
 
 /// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs.
 /// It is used to translate the branching instructions: Branch, BrFalse, BrTrue

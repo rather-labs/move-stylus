@@ -23,11 +23,9 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
         let dst_path = dst.join(entry.file_name());
 
         if file_type.is_dir() {
-            copy_dir_recursive(&src_path, &dst_path)?; // recurse into subdir
+            copy_dir_recursive(&src_path, &dst_path)?;
         } else if file_type.is_file() {
-            fs::copy(&src_path, &dst_path)?; // copy file
-        } else {
-            // Skip symlinks or special files
+            fs::copy(&src_path, &dst_path)?;
         }
     }
 
@@ -70,7 +68,7 @@ pub fn reroot_path(path: &Path) -> PathBuf {
     temp_install_directory
 }
 
-fn create_move_toml(install_dir: &PathBuf) {
+fn create_move_toml(install_dir: &Path) {
     // create Move.toml in dir
     std::fs::write(
         install_dir.join("Move.toml"),
@@ -85,10 +83,10 @@ test = "0x0"
     .unwrap();
 }
 
-fn create_move_toml_with_framework(install_dir: &PathBuf, framework_dir: &str) {
+fn create_move_toml_with_framework(install_dir: &Path, framework_dir: &str) {
     copy_dir_recursive(
         &PathBuf::from(framework_dir),
-        &PathBuf::from(install_dir.join("stylus-framework")),
+        &install_dir.join("stylus-framework"),
     )
     .unwrap();
 
