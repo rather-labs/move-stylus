@@ -53,11 +53,17 @@ public fun msg_value(_self: &TxContext): u256 {
 }
 native fun native_msg_value(): u256;
 
-/// Return the current block number.
+/// Return the current block's number.
 public fun block_number(_self: &TxContext): u64 {
     native_block_number()
 }
 native fun native_block_number(): u64;
+
+/// Return the current block's base fee (EIP-3198 and EIP-1559)
+public fun block_basefee(_self: &TxContext): u256 {
+    native_block_basefee()
+}
+native fun native_block_basefee(): u256;
 
 
 

@@ -2,7 +2,7 @@
 pub mod constants;
 
 use anyhow::Result;
-use constants::{BLOCK_NUMBER, MSG_SENDER_ADDRESS, MSG_VALUE, SIGNER_ADDRESS};
+use constants::{BLOCK_BASEFEE, BLOCK_NUMBER, MSG_SENDER_ADDRESS, MSG_VALUE, SIGNER_ADDRESS};
 use walrus::Module;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
 
@@ -141,7 +141,27 @@ impl RuntimeSandbox {
 
                     let mem = get_memory(&mut caller);
 
-                    mem.write(&mut caller, ptr as usize, &MSG_VALUE).unwrap();
+                    mem.write(&mut caller, ptr as usize, &MSG_VALUE.to_le_bytes::<32>())
+                        .unwrap();
+                },
+            )
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "block_basefee",
+                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
+                    println!("block_basefee, writing in {ptr}");
+
+                    let mem = get_memory(&mut caller);
+
+                    mem.write(
+                        &mut caller,
+                        ptr as usize,
+                        &BLOCK_BASEFEE.to_le_bytes::<32>(),
+                    )
+                    .unwrap();
                 },
             )
             .unwrap();

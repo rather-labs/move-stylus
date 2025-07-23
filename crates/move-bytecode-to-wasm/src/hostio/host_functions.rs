@@ -100,3 +100,12 @@ pub fn block_number(module: &mut Module) -> (FunctionId, ImportId) {
     let block_number_ty = module.types.add(&[], &[ValType::I64]);
     module.add_import_func("vm_hooks", "block_number", block_number_ty)
 }
+
+/// Gets the basefee of the current block. The semantics are equivalent to that of the EVM's
+/// [`BASEFEE`] opcode.
+///
+/// [`BASEFEE`]: https://www.evm.codes/#48
+pub fn block_basefee(module: &mut Module) -> (FunctionId, ImportId) {
+    let block_basefee_ty = module.types.add(&[ValType::I32], &[]);
+    module.add_import_func("vm_hooks", "block_basefee", block_basefee_ty)
+}

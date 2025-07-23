@@ -22,10 +22,10 @@ fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u
 }
 
 mod tx_context {
-    use alloy_primitives::{Address, U256};
+    use alloy_primitives::Address;
 
     use crate::common::{
-        runtime_sandbox::constants::{BLOCK_NUMBER, MSG_SENDER_ADDRESS, MSG_VALUE},
+        runtime_sandbox::constants::{BLOCK_BASEFEE, BLOCK_NUMBER, MSG_SENDER_ADDRESS, MSG_VALUE},
         translate_test_package_with_framework,
     };
 
@@ -48,12 +48,14 @@ mod tx_context {
         function getSender() external returns (address);
         function getMsgValue() external returns (uint256);
         function getBlockNumber() external returns (uint64);
+        function getBlockBasefee() external returns (uint256);
     );
 
     #[rstest]
     #[case(getSenderCall::new(()), (Address::new(MSG_SENDER_ADDRESS),))]
-    #[case(getMsgValueCall::new(()), (U256::from_le_bytes(MSG_VALUE),))]
+    #[case(getMsgValueCall::new(()), (MSG_VALUE,))]
     #[case(getBlockNumberCall::new(()), (BLOCK_NUMBER,))]
+    #[case(getBlockBasefeeCall::new(()), (BLOCK_BASEFEE,))]
     fn test_tx_context<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
