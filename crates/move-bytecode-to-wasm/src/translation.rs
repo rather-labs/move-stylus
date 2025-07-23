@@ -32,7 +32,7 @@ pub mod functions;
 pub mod intermediate_types;
 pub mod table;
 
-// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs. 
+// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs.
 // It is used to translate the branching instructions: Branch, BrFalse, BrTrue
 struct BranchTargets {
     loop_continue: HashMap<u16, InstrSeqId>,
