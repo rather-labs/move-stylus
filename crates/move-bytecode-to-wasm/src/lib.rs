@@ -37,7 +37,6 @@ pub fn translate_package(
     package: CompiledPackage,
     module_name: Option<String>,
 ) -> HashMap<String, Module> {
-    // println!("bbbbbbbbbbbbbbbbbbbbbbbbb\n{package:#?}");
     let root_compiled_units: Vec<CompiledUnitWithSource> = if let Some(module_name) = module_name {
         package
             .root_compiled_units

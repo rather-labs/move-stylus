@@ -1,7 +1,7 @@
 use crate::translation::intermediate_types::IntermediateType;
 use move_binary_format::file_format::Bytecode;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct TypesStack(pub Vec<IntermediateType>);
 
 type Result<T> = std::result::Result<T, TypesStackError>;

@@ -32,8 +32,8 @@ pub mod functions;
 pub mod intermediate_types;
 pub mod table;
 
-// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs.
-// It is used to translate the branching instructions: Branch, BrFalse, BrTrue
+/// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs.
+/// It is used to translate the branching instructions: Branch, BrFalse, BrTrue
 struct BranchTargets {
     loop_continue: HashMap<u16, InstrSeqId>,
     loop_break: HashMap<u16, InstrSeqId>,
@@ -60,12 +60,14 @@ impl BranchTargets {
             BranchMode::MergedBranch | BranchMode::MergedBranchIntoMulti => {
                 self.merged_branch.get(code_offset)
             }
-            _ => None,
+            _ => {
+                panic!("Unsupported branch mode: {:?}", branch_mode);
+            }
         }
     }
 }
 
-// This is used to pass around the context of the translation process. Also clippy complains about too many arguments in translate_instruction.
+/// This is used to pass around the context of the translation process. Also clippy complains about too many arguments in translate_instruction.
 struct TranslateFlowContext<'a> {
     compilation_ctx: &'a CompilationContext<'a>,
     types_stack: &'a mut TypesStack,
@@ -103,7 +105,6 @@ pub fn translate_function(
     let code_unit = &entry.get_move_code_unit().unwrap();
 
     let flow = Flow::new(code_unit, entry);
-    println!("flow: {:#?}", flow);
 
     let mut branch_targets = BranchTargets::new();
     let mut types_stack = TypesStack::new();
@@ -122,8 +123,8 @@ pub fn translate_function(
     Ok(function_id)
 }
 
-// Recusively translate the flow to wasm.
-// It is responsible for both handling the control flow as well as translating the specific instructions to wasm.
+/// Recusively translate the flow to wasm.
+/// It is responsible for both handling the control flow as well as translating the specific instructions to wasm.
 fn translate_flow(
     ctx: &mut TranslateFlowContext,
     builder: &mut InstrSeqBuilder,
@@ -231,7 +232,6 @@ fn translate_flow(
                 // represents a function return, while the other arm simply reloops.
                 // The else arm can be safely placed outside the if/else block because it must always be reached,
                 // otherwise the block wouldnt have a defined result.
-
                 let phantom_seq = builder.dangling_instr_seq(None);
                 let phantom_seq_id = phantom_seq.id();
 

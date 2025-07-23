@@ -173,7 +173,7 @@ impl Flow {
                         }
                     }
                     _ => panic!(
-                        "Unsupported MultipleBlock with {} branches",
+                        "Found MultipleBlock with {} branches",
                         multiple_block.handled.len()
                     ),
                 }
