@@ -25,7 +25,8 @@ impl IRef {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_, _) => {
+            | IntermediateType::IGenericStructInstance(_, _)
+            | IntermediateType::IExternalUserData { .. } => {
                 inner.add_unpack_instructions(
                     builder,
                     module,
@@ -77,27 +78,6 @@ impl IRef {
                 panic!("cannot unpack generic type parameter");
             }
             IntermediateType::IEnum(_) => todo!(),
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-            } => {
-                let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier)
-                    .unwrap();
-
-                match external_data {
-                    ExternalModuleData::Struct(istruct) => {
-                        istruct.add_unpack_instructions(
-                            builder,
-                            module,
-                            reader_pointer,
-                            calldata_reader_pointer,
-                            compilation_ctx,
-                        );
-                    }
-                    ExternalModuleData::Enum(_ienum) => todo!(),
-                }
-            }
         }
     }
 }

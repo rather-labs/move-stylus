@@ -49,11 +49,11 @@ mod tx_context {
         }
 
         #[allow(missing_docs)]
-        function getSender(TxContext tx_ctx) external returns (address);
+        function getSender() external returns (address);
     );
 
     #[rstest]
-    #[case(getSenderCall::new((TxContext { tx_ctx: false },)), (Address::new(MSG_SENDER_ADDRESS),))]
+    #[case(getSenderCall::new(()), (Address::new(MSG_SENDER_ADDRESS),))]
     fn test_tx_context<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

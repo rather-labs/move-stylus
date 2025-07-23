@@ -15,6 +15,8 @@ use crate::{
     },
 };
 
+use super::vm_handled_datatypes::TxContext;
+
 mod unpack_enum;
 mod unpack_heap_int;
 mod unpack_native_int;
@@ -46,7 +48,7 @@ pub trait Unpackable {
 ///
 /// Each parameter is decoded and loaded in the WASM stack. Complex data types are kept in memory
 /// and the pointer is pushed onto the stack in the parameter location.
-pub fn build_unpack_instructions<T: Unpackable>(
+pub fn build_unpack_instructions<T: Unpackable + std::fmt::Debug>(
     function_builder: &mut InstrSeqBuilder,
     module: &mut Module,
     function_arguments_signature: &[T],
@@ -224,13 +226,23 @@ impl Unpackable for IntermediateType {
                     .unwrap();
 
                 match external_data {
-                    ExternalModuleData::Struct(istruct) => istruct.add_unpack_instructions(
-                        function_builder,
-                        module,
-                        reader_pointer,
-                        calldata_reader_pointer,
-                        compilation_ctx,
-                    ),
+                    ExternalModuleData::Struct(istruct) => {
+                        println!("injecting tx context");
+                        if TxContext::struct_is_tx_context(module_id, identifier) {
+                            TxContext::inject_tx_context(
+                                function_builder,
+                                compilation_ctx.allocator,
+                            );
+                        } else {
+                            istruct.add_unpack_instructions(
+                                function_builder,
+                                module,
+                                reader_pointer,
+                                calldata_reader_pointer,
+                                compilation_ctx,
+                            )
+                        }
+                    }
                     ExternalModuleData::Enum(ienum) => {
                         if !ienum.is_simple {
                             panic!(
