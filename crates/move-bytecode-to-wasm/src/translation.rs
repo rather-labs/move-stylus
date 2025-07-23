@@ -66,7 +66,7 @@ impl BranchTargets {
 }
 
 struct TranslateFlowContext<'a> {
-    compilation_ctx: &'a CompilationContext,
+    compilation_ctx: &'a CompilationContext<'a>,
     types_stack: &'a mut TypesStack,
     function_table: &'a FunctionTable,
     entry: &'a TableEntry,

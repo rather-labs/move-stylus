@@ -25,11 +25,11 @@ pub enum ExternalModuleData<'a> {
 ///
 /// Functions are processed in order. To access function information (i.e: arguments or return
 /// arguments we must know the index of it)
-pub struct CompilationContext {
+pub struct CompilationContext<'a> {
     /// Data of the module we are currently compiling
-    pub root_module_data: ModuleData,
+    pub root_module_data: &'a ModuleData,
 
-    pub deps_data: HashMap<ModuleId, ModuleData>,
+    pub deps_data: &'a HashMap<ModuleId, ModuleData>,
 
     /// WASM memory id
     pub memory_id: MemoryId,
@@ -38,7 +38,7 @@ pub struct CompilationContext {
     pub allocator: FunctionId,
 }
 
-impl CompilationContext {
+impl CompilationContext<'_> {
     pub fn get_external_module_data(
         &self,
         module_id: &ModuleId,

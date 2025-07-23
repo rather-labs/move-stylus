@@ -45,7 +45,9 @@
 //! field management across all types.
 use std::collections::HashMap;
 
-use crate::{CompilationContext, abi_types::packing::Packable};
+use crate::{
+    CompilationContext, abi_types::packing::Packable, compilation_context::ExternalModuleData,
+};
 
 use super::IntermediateType;
 use move_binary_format::{
@@ -366,7 +368,24 @@ impl IStruct {
                     panic!("cannot know if a type parameter is dynamic, expected a concrete type");
                 }
                 IntermediateType::IEnum(_) => todo!(),
-                IntermediateType::IExternalUserData { .. } => todo!(),
+                IntermediateType::IExternalUserData {
+                    module_id,
+                    identifier,
+                } => {
+                    let external_data = compilation_ctx
+                        .get_external_module_data(module_id, identifier)
+                        .unwrap();
+
+                    match external_data {
+                        ExternalModuleData::Struct(istruct)
+                            if istruct.solidity_abi_encode_is_dynamic(compilation_ctx) =>
+                        {
+                            return true;
+                        }
+                        ExternalModuleData::Enum(_ienum) => todo!(),
+                        _ => (),
+                    }
+                }
             }
         }
 
@@ -416,7 +435,25 @@ impl IStruct {
                     panic!("cannot know a type parameter's size, expected a concrete type");
                 }
                 IntermediateType::IEnum(_) => todo!(),
-                IntermediateType::IExternalUserData { .. } => todo!(),
+                IntermediateType::IExternalUserData {
+                    module_id,
+                    identifier,
+                } => {
+                    let external_data = compilation_ctx
+                        .get_external_module_data(module_id, identifier)
+                        .unwrap();
+
+                    match external_data {
+                        ExternalModuleData::Struct(external_struct) => {
+                            if external_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
+                                size += 32;
+                            } else {
+                                size += field.encoded_size(compilation_ctx);
+                            }
+                        }
+                        ExternalModuleData::Enum(_ienum) => todo!(),
+                    }
+                }
             }
         }
 

@@ -123,7 +123,7 @@ mod tests {
     use move_binary_format::file_format::StructDefinitionIndex;
 
     use crate::{
-        test_compilation_context, test_tools::build_module,
+        compilation_context::ModuleData, test_compilation_context, test_tools::build_module,
         translation::intermediate_types::structs::IStruct,
     };
 
@@ -201,6 +201,7 @@ mod tests {
             ],
             HashMap::new(),
         );
+
         let struct_2 = IStruct::new(
             StructDefinitionIndex::new(1),
             "TestStruct2".to_string(),
@@ -210,14 +211,18 @@ mod tests {
             ],
             HashMap::new(),
         );
+
+        let mut module_data = ModuleData::default();
+
         let module_structs = vec![struct_1, struct_2];
-        compilation_ctx.root_module_data.module_structs = module_structs;
+        module_data.module_structs = module_structs;
 
         let signature: &[IntermediateType] = &[
             IntermediateType::IStruct(0),
             IntermediateType::IVector(Box::new(IntermediateType::IStruct(1))),
         ];
 
+        compilation_ctx.root_module_data = &module_data;
         assert_eq!(
             move_signature_to_abi_selector("test_struct", signature, &compilation_ctx),
             selector(

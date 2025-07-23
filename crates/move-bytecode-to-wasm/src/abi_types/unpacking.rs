@@ -2,6 +2,7 @@ use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
     CompilationContext,
+    compilation_context::ExternalModuleData,
     translation::intermediate_types::{
         IntermediateType,
         address::IAddress,
@@ -202,7 +203,38 @@ impl Unpackable for IntermediateType {
                     compilation_ctx,
                 )
             }
-            IntermediateType::IExternalUserData { .. } => todo!(),
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } => {
+                let external_data = compilation_ctx
+                    .get_external_module_data(module_id, identifier)
+                    .unwrap();
+
+                match external_data {
+                    ExternalModuleData::Struct(istruct) => istruct.add_unpack_instructions(
+                        function_builder,
+                        module,
+                        reader_pointer,
+                        calldata_reader_pointer,
+                        compilation_ctx,
+                    ),
+                    ExternalModuleData::Enum(ienum) => {
+                        if !ienum.is_simple {
+                            panic!(
+                                "cannot abi external module's enum {identifier}, it contains at least one variant with fields"
+                            );
+                        }
+                        IEnum::add_unpack_instructions(
+                            ienum,
+                            function_builder,
+                            module,
+                            reader_pointer,
+                            compilation_ctx,
+                        )
+                    }
+                }
+            }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot unpack generic type parameter");
             }
