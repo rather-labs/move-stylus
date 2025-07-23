@@ -278,7 +278,7 @@ fn map_bytecode_instruction(
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {
                 call_indirect(
-                    &f,
+                    f,
                     &module_data.functions.returns[function_handle_index.into_index()],
                     function_table.get_table_id(),
                     builder,
