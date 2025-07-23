@@ -37,10 +37,7 @@ impl MappedFunction {
         let signature = ISignature::from_signatures(move_args, move_rets, handles_map);
         let results = signature.get_return_wasm_types();
 
-        assert!(
-            results.len() <= 1,
-            "Multiple return values not supported"
-        );
+        assert!(results.len() <= 1, "Multiple return values not supported");
 
         let arguments = move_args
             .0

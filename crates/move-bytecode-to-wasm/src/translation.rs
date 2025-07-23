@@ -19,10 +19,10 @@ use table::FunctionTable;
 use types_stack::TypesStack;
 
 use crate::CompilationContext;
+use crate::FunctionId;
 use crate::compilation_context::ModuleData;
 use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
-use crate::FunctionId;
 
 use flow::Flow;
 
@@ -199,9 +199,9 @@ fn translate_flow(
                         block,
                         ctx.function_information,
                         module,
-                        &mut ctx.function_table,
-                        &mut ctx.types_stack,
-                        &ctx.function_locals,
+                        ctx.function_table,
+                        ctx.types_stack,
+                        ctx.function_locals,
                         branches,
                         ctx.branch_targets,
                     )
