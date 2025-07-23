@@ -29,10 +29,11 @@ pub enum Flow {
 }
 
 impl Flow {
+    // TODO: revise how we are adding up the stack
     pub fn get_stack(&self) -> Vec<ValType> {
         match self {
             Flow::Simple { stack, next, .. } => [stack.clone(), next.get_stack()].concat(),
-            Flow::Loop { stack, .. } => stack.clone(),
+            Flow::Loop { stack, next, .. } => [stack.clone(), next.get_stack()].concat(),
             Flow::IfElse { stack, .. } => stack.clone(),
             Flow::Empty => vec![],
         }
@@ -53,8 +54,6 @@ impl Flow {
                 .collect();
             *relooper::reloop(nodes, 0)
         };
-
-        println!("relooped: {relooped:#?}");
 
         // Context for each block within the control flow graph
         let blocks_ctx: HashMap<u16, (Vec<Bytecode>, Vec<ValType>)> = (&cfg
@@ -123,11 +122,11 @@ impl Flow {
             ShapedBlock::Loop(loop_block) => {
                 let inner_flow = Self::build(&loop_block.inner, blocks_ctx);
 
-                let next_flow = if let Some(next_block) = &loop_block.next {
-                    Self::build(next_block, blocks_ctx)
-                } else {
-                    Flow::Empty
-                };
+                let next_flow = loop_block
+                    .next
+                    .as_ref()
+                    .map(|b| Self::build(b, blocks_ctx))
+                    .unwrap_or(Flow::Empty);
 
                 Flow::Loop {
                     stack: inner_flow.get_stack(),
