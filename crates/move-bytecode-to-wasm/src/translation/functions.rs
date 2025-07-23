@@ -1,44 +1,39 @@
 use std::collections::HashMap;
 
 use move_binary_format::file_format::{
-    DatatypeHandleIndex, FunctionDefinition, Signature, SignatureToken,
+    DatatypeHandleIndex, FunctionDefinition, Signature, SignatureToken, Visibility,
 };
 use walrus::{
-    InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
+    InstrSeqBuilder, MemoryId, Module, ValType,
     ir::{LoadKind, MemArg, StoreKind},
 };
 
 use crate::{CompilationContext, UserDefinedType, translation::intermediate_types::ISignature};
 
-use super::intermediate_types::IntermediateType;
+use super::{intermediate_types::IntermediateType, table::FunctionId};
 
+#[derive(Debug)]
 pub struct MappedFunction {
-    pub name: String,
+    pub function_id: FunctionId,
     pub signature: ISignature,
-    pub function_definition: FunctionDefinition,
-    pub function_locals: Vec<LocalId>,
-    pub function_locals_ir: Vec<IntermediateType>,
-    pub arg_locals: Vec<LocalId>,
+    pub locals: Vec<IntermediateType>,
+    pub arguments: Vec<IntermediateType>,
+
+    /// Flag that tells us if the function can be used as an entrypoint
+    pub is_entry: bool,
 }
 
 impl MappedFunction {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        name: String,
+        function_id: FunctionId,
         move_args: &Signature,
         move_rets: &Signature,
         move_locals: &[SignatureToken],
-        move_def: FunctionDefinition,
+        function_definition: &FunctionDefinition,
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-        module: &mut Module,
     ) -> Self {
-        assert!(
-            move_def.acquires_global_resources.is_empty(),
-            "Acquiring global resources is not supported yet"
-        );
-
         let signature = ISignature::from_signatures(move_args, move_rets, handles_map);
-        let wasm_arg_types = signature.get_argument_wasm_types();
         let wasm_ret_types = signature.get_return_wasm_types();
 
         assert!(
@@ -46,96 +41,37 @@ impl MappedFunction {
             "Multiple return values not supported"
         );
 
-        // WASM locals for arguments
-        let wasm_arg_locals: Vec<LocalId> = wasm_arg_types
-            .iter()
-            .map(|ty| module.locals.add(*ty))
-            .collect();
-
-        let ir_arg_types = move_args
+        let arguments = move_args
             .0
             .iter()
-            .map(|s| IntermediateType::try_from_signature_token(s, handles_map));
+            .map(|s| IntermediateType::try_from_signature_token(s, handles_map))
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
 
         // Declared locals
-        let ir_declared_locals_types = move_locals
+        let locals = move_locals
             .iter()
-            .map(|s| IntermediateType::try_from_signature_token(s, handles_map));
-
-        let wasm_declared_locals = ir_declared_locals_types
-            .clone()
-            .map(|ty| match ty {
-                Ok(IntermediateType::IU64) => ValType::I32, // to store pointer instead of i64
-                Ok(ref other) => ValType::from(other),
-                Err(_) => ValType::I32,
-            })
-            .map(|val| module.locals.add(val));
-
-        // Combine all
-        let local_variables = wasm_arg_locals
-            .clone()
-            .into_iter()
-            .chain(wasm_declared_locals)
-            .collect();
-
-        let local_variables_type = ir_arg_types
-            .chain(ir_declared_locals_types)
+            .map(|s| IntermediateType::try_from_signature_token(s, handles_map))
             .collect::<Result<Vec<_>, _>>()
-            .expect("Failed to parse types");
+            .unwrap();
 
         Self {
-            name,
+            function_id,
             signature,
-            function_definition: move_def,
-            function_locals: local_variables,
-            function_locals_ir: local_variables_type,
-            arg_locals: wasm_arg_locals,
+            locals,
+            arguments,
+            // TODO: change to function_definition.is_entry
+            is_entry: function_definition.visibility == Visibility::Public,
         }
     }
+}
 
-    /// Converts value-based function arguments into heap-allocated pointers.
-    ///
-    /// For each value-type argument (like u64, u32, etc.), this stores the value in linear memory
-    /// and updates the local to hold a pointer to that memory instead. This allows treating all
-    /// arguments as pointers in later code.
-    pub fn box_args(
-        &mut self,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-        compilation_ctx: &CompilationContext,
-    ) {
-        // Store the changes we need to make
-        let mut updates = Vec::new();
-
-        // Iterate over the mapped function arguments
-        for (local, ty) in self
-            .function_locals
-            .iter()
-            .zip(self.signature.arguments.iter())
-        {
-            builder.local_get(*local);
-            match ty {
-                IntermediateType::IU64 => {
-                    let outer_ptr = module.locals.add(ValType::I32);
-                    ty.box_local_instructions(module, builder, compilation_ctx, outer_ptr);
-
-                    if let Some(index) = self.function_locals.iter().position(|&id| id == *local) {
-                        updates.push((index, outer_ptr));
-                    } else {
-                        panic!(
-                            "Couldn't find original local {:?} in mapped_function",
-                            local
-                        );
-                    }
-                }
-                _ => {
-                    ty.box_local_instructions(module, builder, compilation_ctx, *local);
-                }
-            }
-        }
-
-        for (index, pointer) in updates {
-            self.function_locals[index] = pointer;
+impl MappedFunction {
+    pub fn get_local_ir(&self, local_index: usize) -> &IntermediateType {
+        if local_index < self.arguments.len() {
+            &self.arguments[local_index]
+        } else {
+            &self.locals[local_index - self.arguments.len()]
         }
     }
 }
