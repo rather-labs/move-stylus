@@ -11,9 +11,7 @@ use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 
 use flow::Flow;
-use functions::{
-    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
-};
+use functions::{add_unpack_function_return_values_instructions, prepare_function_return};
 use intermediate_types::IntermediateType;
 use intermediate_types::heap_integers::{IU128, IU256};
 use intermediate_types::simple_integers::{IU8, IU16, IU32, IU64};
@@ -34,6 +32,8 @@ pub mod functions;
 pub mod intermediate_types;
 pub mod table;
 
+// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs. 
+// It is used to translate the branching instructions: Branch, BrFalse, BrTrue
 struct BranchTargets {
     loop_continue: HashMap<u16, InstrSeqId>,
     loop_break: HashMap<u16, InstrSeqId>,
@@ -65,6 +65,7 @@ impl BranchTargets {
     }
 }
 
+// This is used to pass around the context of the translation process. Also clippy complains about too many arguments in translate_instruction.
 struct TranslateFlowContext<'a> {
     compilation_ctx: &'a CompilationContext<'a>,
     types_stack: &'a mut TypesStack,
@@ -153,26 +154,14 @@ fn translate_flow(
                     }
                 }
 
+                // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
-                    translate_branching_instruction(
-                        instruction,
-                        branches,
-                        ctx.branch_targets,
-                        block,
-                    );
-                    translate_instruction(
-                        instruction,
-                        ctx.compilation_ctx,
-                        block,
-                        &ctx.entry.function,
-                        module,
-                        ctx.function_table,
-                        ctx.types_stack,
-                    )
-                    .unwrap();
+                    translate_instruction(instruction, block, module, branches, ctx).unwrap();
                 }
+                // Then translate instructions of the immediate block, inside the current block
                 translate_flow(ctx, block, module, immediate);
             });
+            // Then translate instructions of the next block, but outside the wrapping block
             translate_flow(ctx, builder, module, next);
         }
         Flow::Loop {
@@ -236,6 +225,13 @@ fn translate_flow(
                     },
                 );
             } else if then_stack.is_empty() {
+                // If the `then` arm leaves nothing on the stack but the `else` arm does,
+                // we place the `else` arm after the if/else block.
+                // This situation typically occurs when the arm leaving values on the stack
+                // represents a function return, while the other arm simply reloops.
+                // The else arm can be safely placed outside the if/else block because it must always be reached,
+                // otherwise the block wouldnt have a defined result.
+
                 let phantom_seq = builder.dangling_instr_seq(None);
                 let phantom_seq_id = phantom_seq.id();
 
@@ -252,6 +248,7 @@ fn translate_flow(
 
                 translate_flow(ctx, builder, module, else_body);
             } else if else_stack.is_empty() {
+                // Similar to the above scenario.
                 let phantom_seq = builder.dangling_instr_seq(None);
                 let phantom_seq_id = phantom_seq.id();
 
@@ -269,6 +266,8 @@ fn translate_flow(
 
                 translate_flow(ctx, builder, module, then_body);
             } else {
+                // If both arms leave values on the stack but with different types, we panic.
+                // In this scenario, the block wouldnt have a well-defined result type.
                 panic!(
                     "Error: Mismatched types on the stack from Then and Else branches, and neither is empty."
                 );
@@ -278,49 +277,19 @@ fn translate_flow(
     }
 }
 
-fn translate_branching_instruction(
-    instruction: &Bytecode,
-    branches: &HashMap<u16, BranchMode>,
-    targets: &BranchTargets,
-    builder: &mut InstrSeqBuilder,
-) {
-    let emit_jump =
-        |builder: &mut InstrSeqBuilder, instr: &Bytecode, target: InstrSeqId| match instr {
-            Bytecode::Branch(_) => {
-                builder.br(target);
-            }
-            Bytecode::BrFalse(_) => {
-                builder.unop(UnaryOp::I32Eqz);
-                builder.br_if(target);
-            }
-            Bytecode::BrTrue(_) => {
-                builder.unop(UnaryOp::I32Eqz);
-                builder.br_if(target);
-            }
-            _ => unreachable!(),
-        };
-
-    if let Bytecode::Branch(code_offset)
-    | Bytecode::BrFalse(code_offset)
-    | Bytecode::BrTrue(code_offset) = instruction
-    {
-        if let Some(branch_mode) = branches.get(code_offset) {
-            if let Some(&target) = targets.get_target(branch_mode, code_offset) {
-                emit_jump(builder, instruction, target);
-            }
-        }
-    }
-}
-
 fn translate_instruction(
     instruction: &Bytecode,
-    compilation_ctx: &CompilationContext,
     builder: &mut InstrSeqBuilder,
-    mapped_function: &MappedFunction,
     module: &mut Module,
-    function_table: &FunctionTable,
-    types_stack: &mut TypesStack,
+    branches: &HashMap<u16, BranchMode>,
+    ctx: &mut TranslateFlowContext,
 ) -> Result<(), TranslationError> {
+    let compilation_ctx = ctx.compilation_ctx;
+    let mapped_function = &ctx.entry.function;
+    let function_table = ctx.function_table;
+    let types_stack = &mut ctx.types_stack;
+    let branch_targets = &ctx.branch_targets;
+
     match instruction {
         // Load a fixed constant
         Bytecode::LdConst(global_index) => {
@@ -1418,8 +1387,27 @@ fn translate_instruction(
 
             bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
         }
-        Bytecode::BrTrue(_) | Bytecode::BrFalse(_) | Bytecode::Branch(_) => {
-            // Nothing to do here, branching instructions are translated in translate_branching_instruction
+        Bytecode::BrTrue(code_offset) => {
+            if let Some(branch_mode) = branches.get(code_offset) {
+                if let Some(&target) = branch_targets.get_target(branch_mode, code_offset) {
+                    builder.br_if(target);
+                }
+            }
+        }
+        Bytecode::BrFalse(code_offset) => {
+            if let Some(branch_mode) = branches.get(code_offset) {
+                if let Some(&target) = branch_targets.get_target(branch_mode, code_offset) {
+                    builder.unop(UnaryOp::I32Eqz);
+                    builder.br_if(target);
+                }
+            }
+        }
+        Bytecode::Branch(code_offset) => {
+            if let Some(branch_mode) = branches.get(code_offset) {
+                if let Some(&target) = branch_targets.get_target(branch_mode, code_offset) {
+                    builder.br(target);
+                }
+            }
         }
         //**
         // Enums
