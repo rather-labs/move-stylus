@@ -9,3 +9,7 @@ public fun get_sender(ctx: &TxContext): address {
 public fun get_msg_value(ctx: &TxContext): u256 {
     ctx.msg_value()
 }
+
+public fun get_block_number(ctx: &TxContext): u64 {
+    ctx.block_number()
+}

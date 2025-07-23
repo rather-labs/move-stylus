@@ -10,3 +10,5 @@ pub const MSG_SENDER_ADDRESS: [u8; 20] =
     [7, 3, 5, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 3, 5, 7];
 
 pub const MSG_VALUE: [u8; 32] = U256::MAX.to_le_bytes();
+
+pub const BLOCK_NUMBER: u64 = 3141592;

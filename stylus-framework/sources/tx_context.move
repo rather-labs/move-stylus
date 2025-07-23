@@ -47,12 +47,17 @@ public fun sender(_self: &TxContext): address {
 }
 native fun native_sender(): address;
 
-/// Return the address of the user that signed the current
-/// transaction
+/// Return the number of wei sent with the message
 public fun msg_value(_self: &TxContext): u256 {
     native_msg_value()
 }
 native fun native_msg_value(): u256;
+
+/// Return the current block number.
+public fun block_number(_self: &TxContext): u64 {
+    native_block_number()
+}
+native fun native_block_number(): u64;
 
 
 

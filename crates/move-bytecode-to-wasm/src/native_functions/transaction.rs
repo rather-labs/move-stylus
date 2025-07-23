@@ -1,14 +1,11 @@
 //! This module contains all the functions retaled to transaction information.
-
-use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
-
+use super::NativeFunction;
 use crate::{
     CompilationContext,
     hostio::host_functions::{msg_sender, msg_value},
     translation::intermediate_types::{address::IAddress, heap_integers::IU256},
 };
-
-use super::NativeFunction;
+use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
 
 pub fn add_native_sender_fn(
     module: &mut Module,

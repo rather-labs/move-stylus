@@ -90,3 +90,13 @@ pub fn msg_value(module: &mut Module) -> (FunctionId, ImportId) {
     let msg_value_ty = module.types.add(&[ValType::I32], &[]);
     module.add_import_func("vm_hooks", "msg_value", msg_value_ty)
 }
+
+/// Gets a bounded estimate of the L1 block number at which the Sequencer sequenced the
+/// transaction. See [`Block Numbers and Time`] for more information on how this value is
+/// determined.
+///
+/// [`Block Numbers and Time`]: https://developer.arbitrum.io/time
+pub fn block_number(module: &mut Module) -> (FunctionId, ImportId) {
+    let block_number_ty = module.types.add(&[], &[ValType::I64]);
+    module.add_import_func("vm_hooks", "block_number", block_number_ty)
+}

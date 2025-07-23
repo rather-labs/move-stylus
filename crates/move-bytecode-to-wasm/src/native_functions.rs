@@ -6,19 +6,38 @@ mod transaction;
 
 use walrus::{FunctionId, Module};
 
-use crate::CompilationContext;
+use crate::{CompilationContext, hostio};
 
 pub struct NativeFunction;
 
 impl NativeFunction {
     const NATIVE_SENDER: &str = "native_sender";
     const NATIVE_MSG_VALUE: &str = "native_msg_value";
+    const NATIVE_BLOCK_NUMBER: &str = "native_block_number";
 
     /// Links the function into the module and returns its id. If the function is already present
     /// it just returns the id.
     ///
     /// This funciton is idempotent.
     pub fn get(name: &str, module: &mut Module, compilaton_ctx: &CompilationContext) -> FunctionId {
+        // Some functions are implemented by host functions directly. For those, we just import and
+        // use them without wrapping them.
+        if let Some(host_fn_name) = Self::host_fn_name(name) {
+            if let Some(function_id) = module.imports.get_func("vm_hooks", host_fn_name).ok() {
+                return function_id;
+            } else {
+                match host_fn_name {
+                    "block_number" => {
+                        let (function_id, _) = hostio::host_functions::block_number(module);
+                        return function_id;
+                    }
+                    _ => {
+                        panic!("host function {host_fn_name} not supported yet");
+                    }
+                }
+            }
+        }
+
         if let Some(function) = module.funcs.by_name(name) {
             function
         } else {
@@ -29,6 +48,14 @@ impl NativeFunction {
                 }
                 _ => panic!("native function {name} not supported yet"),
             }
+        }
+    }
+
+    /// Maps the native function name to the host function name.
+    fn host_fn_name(name: &str) -> Option<&'static str> {
+        match name {
+            Self::NATIVE_BLOCK_NUMBER => Some("block_number"),
+            _ => None,
         }
     }
 }
