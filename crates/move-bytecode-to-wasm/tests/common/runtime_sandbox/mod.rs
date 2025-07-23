@@ -2,7 +2,7 @@
 pub mod constants;
 
 use anyhow::Result;
-use constants::{MSG_SENDER_ADDRESS, SIGNER_ADDRESS};
+use constants::{MSG_SENDER_ADDRESS, MSG_VALUE, SIGNER_ADDRESS};
 use walrus::Module;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
 
@@ -128,6 +128,20 @@ impl RuntimeSandbox {
 
                     mem.write(&mut caller, ptr as usize, &MSG_SENDER_ADDRESS)
                         .unwrap();
+                },
+            )
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "msg_value",
+                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
+                    println!("msg_value, writing in {ptr}");
+
+                    let mem = get_memory(&mut caller);
+
+                    mem.write(&mut caller, ptr as usize, &MSG_VALUE).unwrap();
                 },
             )
             .unwrap();

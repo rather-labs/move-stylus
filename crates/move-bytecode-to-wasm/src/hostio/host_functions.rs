@@ -81,3 +81,12 @@ pub fn msg_sender(module: &mut Module) -> (FunctionId, ImportId) {
     let msg_sender = module.types.add(&[ValType::I32], &[]);
     module.add_import_func("vm_hooks", "msg_sender", msg_sender)
 }
+
+/// Get the ETH value in wei sent to the program. The semantics are equivalent to that of the
+/// EVM's [`CALLVALUE`] opcode.
+///
+/// [`CALLVALUE`]: https://www.evm.codes/#34
+pub fn msg_value(module: &mut Module) -> (FunctionId, ImportId) {
+    let msg_value_ty = module.types.add(&[ValType::I32], &[]);
+    module.add_import_func("vm_hooks", "msg_value", msg_value_ty)
+}

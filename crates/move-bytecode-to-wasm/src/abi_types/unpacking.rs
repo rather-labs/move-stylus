@@ -175,6 +175,9 @@ impl Unpackable for IntermediateType {
                     .get_by_index(*index)
                     .unwrap();
 
+                // TODO: Check if the struct is TxContext. If it is, panic since the only valid
+                // TxContext is the one defined in the stylus framework.
+
                 struct_.add_unpack_instructions(
                     function_builder,
                     module,

@@ -47,6 +47,15 @@ public fun sender(_self: &TxContext): address {
 }
 native fun native_sender(): address;
 
+/// Return the address of the user that signed the current
+/// transaction
+public fun msg_value(_self: &TxContext): u256 {
+    native_msg_value()
+}
+native fun native_msg_value(): u256;
+
+
+
 /*
 /// Return the transaction digest (hash of transaction inputs).
 /// Please do not use as a source of randomness.

@@ -1,6 +1,5 @@
 use super::Unpackable;
 use crate::CompilationContext;
-use crate::compilation_context::ExternalModuleData;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::reference::{IMutRef, IRef};
 use walrus::{

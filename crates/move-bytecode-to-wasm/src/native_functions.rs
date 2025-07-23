@@ -12,6 +12,7 @@ pub struct NativeFunction;
 
 impl NativeFunction {
     const NATIVE_SENDER: &str = "native_sender";
+    const NATIVE_MSG_VALUE: &str = "native_msg_value";
 
     /// Links the function into the module and returns its id. If the function is already present
     /// it just returns the id.
@@ -23,6 +24,9 @@ impl NativeFunction {
         } else {
             match name {
                 Self::NATIVE_SENDER => transaction::add_native_sender_fn(module, compilaton_ctx),
+                Self::NATIVE_MSG_VALUE => {
+                    transaction::add_native_msg_value_fn(module, compilaton_ctx)
+                }
                 _ => panic!("native function {name} not supported yet"),
             }
         }

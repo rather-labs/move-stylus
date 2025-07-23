@@ -22,10 +22,11 @@ fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u
 }
 
 mod tx_context {
-    use alloy_primitives::Address;
+    use alloy_primitives::{Address, U256};
 
     use crate::common::{
-        runtime_sandbox::constants::MSG_SENDER_ADDRESS, translate_test_package_with_framework,
+        runtime_sandbox::constants::{MSG_SENDER_ADDRESS, MSG_VALUE},
+        translate_test_package_with_framework,
     };
 
     use super::*;
@@ -43,17 +44,14 @@ mod tx_context {
     }
 
     sol!(
-        // TODO: remove this as argument when the automatic injection is implemented
-        struct TxContext {
-            bool tx_ctx;
-        }
-
         #[allow(missing_docs)]
         function getSender() external returns (address);
+        function getMsgValue() external returns (uint256);
     );
 
     #[rstest]
     #[case(getSenderCall::new(()), (Address::new(MSG_SENDER_ADDRESS),))]
+    #[case(getMsgValueCall::new(()), (U256::from_le_bytes(MSG_VALUE),))]
     fn test_tx_context<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
