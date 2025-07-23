@@ -15,6 +15,10 @@ impl NativeFunction {
     const NATIVE_MSG_VALUE: &str = "native_msg_value";
     const NATIVE_BLOCK_NUMBER: &str = "native_block_number";
     const NATIVE_BLOCK_BASEFEE: &str = "native_block_basefee";
+    const NATIVE_BLOCK_GAS_LIMIT: &str = "native_block_gas_limit";
+
+    const HOST_BLOCK_NUMBER: &str = "block_number";
+    const HOST_BLOCK_GAS_LIMIT: &str = "block_gas_limit";
 
     /// Links the function into the module and returns its id. If the function is already present
     /// it just returns the id.
@@ -28,8 +32,12 @@ impl NativeFunction {
                 return function_id;
             } else {
                 match host_fn_name {
-                    "block_number" => {
+                    Self::HOST_BLOCK_NUMBER => {
                         let (function_id, _) = hostio::host_functions::block_number(module);
+                        return function_id;
+                    }
+                    Self::HOST_BLOCK_GAS_LIMIT => {
+                        let (function_id, _) = hostio::host_functions::block_gas_limit(module);
                         return function_id;
                     }
                     _ => {
@@ -58,7 +66,8 @@ impl NativeFunction {
     /// Maps the native function name to the host function name.
     fn host_fn_name(name: &str) -> Option<&'static str> {
         match name {
-            Self::NATIVE_BLOCK_NUMBER => Some("block_number"),
+            Self::NATIVE_BLOCK_NUMBER => Some(Self::HOST_BLOCK_NUMBER),
+            Self::NATIVE_BLOCK_GAS_LIMIT => Some(Self::HOST_BLOCK_GAS_LIMIT),
             _ => None,
         }
     }

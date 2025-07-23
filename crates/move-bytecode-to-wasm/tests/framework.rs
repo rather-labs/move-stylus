@@ -25,7 +25,9 @@ mod tx_context {
     use alloy_primitives::Address;
 
     use crate::common::{
-        runtime_sandbox::constants::{BLOCK_BASEFEE, BLOCK_NUMBER, MSG_SENDER_ADDRESS, MSG_VALUE},
+        runtime_sandbox::constants::{
+            BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, MSG_SENDER_ADDRESS, MSG_VALUE,
+        },
         translate_test_package_with_framework,
     };
 
@@ -49,6 +51,7 @@ mod tx_context {
         function getMsgValue() external returns (uint256);
         function getBlockNumber() external returns (uint64);
         function getBlockBasefee() external returns (uint256);
+        function getBlockGasLimit() external returns (uint64);
     );
 
     #[rstest]
@@ -56,6 +59,7 @@ mod tx_context {
     #[case(getMsgValueCall::new(()), (MSG_VALUE,))]
     #[case(getBlockNumberCall::new(()), (BLOCK_NUMBER,))]
     #[case(getBlockBasefeeCall::new(()), (BLOCK_BASEFEE,))]
+    #[case(getBlockGasLimitCall::new(()), (BLOCK_GAS_LIMIT,))]
     fn test_tx_context<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

@@ -109,3 +109,15 @@ pub fn block_basefee(module: &mut Module) -> (FunctionId, ImportId) {
     let block_basefee_ty = module.types.add(&[ValType::I32], &[]);
     module.add_import_func("vm_hooks", "block_basefee", block_basefee_ty)
 }
+
+/// Gets the gas limit of the current block. The semantics are equivalent to that of the EVM's
+/// [`GAS_LIMIT`] opcode. Note that as of the time of this writing, `evm.codes` incorrectly
+/// implies that the opcode returns the gas limit of the current transaction.  When in doubt,
+/// consult [`The Ethereum Yellow Paper`].
+///
+/// [`GAS_LIMIT`]: https://www.evm.codes/#45
+/// [`The Ethereum Yellow Paper`]: https://ethereum.github.io/yellowpaper/paper.pdf
+pub fn block_gas_limit(module: &mut Module) -> (FunctionId, ImportId) {
+    let block_gas_limit_ty = module.types.add(&[], &[ValType::I64]);
+    module.add_import_func("vm_hooks", "block_gas_limit", block_gas_limit_ty)
+}

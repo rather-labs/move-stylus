@@ -17,3 +17,7 @@ public fun get_block_number(ctx: &TxContext): u64 {
 public fun get_block_basefee(ctx: &TxContext): u256 {
     ctx.block_basefee()
 }
+
+public fun get_block_gas_limit(ctx: &TxContext): u64 {
+    ctx.block_gas_limit()
+}
