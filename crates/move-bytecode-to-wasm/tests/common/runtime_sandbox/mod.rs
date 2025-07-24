@@ -3,8 +3,8 @@ pub mod constants;
 
 use anyhow::Result;
 use constants::{
-    BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, MSG_SENDER_ADDRESS, MSG_VALUE,
-    SIGNER_ADDRESS,
+    BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, CHAIN_ID, MSG_SENDER_ADDRESS,
+    MSG_VALUE, SIGNER_ADDRESS,
 };
 use walrus::Module;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
@@ -21,6 +21,21 @@ pub struct RuntimeSandbox {
     engine: Engine,
     linker: Linker<ModuleData>,
     module: WasmModule,
+}
+
+macro_rules! link_fn_ret_constant {
+    ($linker:expr, $name:literal, $constant:expr, $constant_type: ty) => {
+        $linker
+            .func_wrap(
+                "vm_hooks",
+                $name,
+                move |_caller: Caller<'_, ModuleData>| -> $constant_type {
+                    println!("{} called", $name);
+                    $constant as $constant_type
+                },
+            )
+            .unwrap();
+    };
 }
 
 impl RuntimeSandbox {
@@ -169,41 +184,10 @@ impl RuntimeSandbox {
             )
             .unwrap();
 
-        linker
-            .func_wrap(
-                "vm_hooks",
-                "block_number",
-                move |_caller: Caller<'_, ModuleData>| -> i64 {
-                    println!("block_number");
-
-                    BLOCK_NUMBER as i64
-                },
-            )
-            .unwrap();
-
-        linker
-            .func_wrap(
-                "vm_hooks",
-                "block_gas_limit",
-                move |_caller: Caller<'_, ModuleData>| -> i64 {
-                    println!("block_gas_limit");
-
-                    BLOCK_GAS_LIMIT as i64
-                },
-            )
-            .unwrap();
-
-        linker
-            .func_wrap(
-                "vm_hooks",
-                "block_timestamp",
-                move |_caller: Caller<'_, ModuleData>| -> i64 {
-                    println!("block_timestamp");
-
-                    BLOCK_TIMESTAMP as i64
-                },
-            )
-            .unwrap();
+        link_fn_ret_constant!(linker, "chainid", CHAIN_ID, i64);
+        link_fn_ret_constant!(linker, "block_number", BLOCK_NUMBER, i64);
+        link_fn_ret_constant!(linker, "block_gas_limit", BLOCK_GAS_LIMIT, i64);
+        link_fn_ret_constant!(linker, "block_timestamp", BLOCK_TIMESTAMP, i64);
 
         if cfg!(feature = "inject-host-debug-fns") {
             linker

@@ -25,3 +25,7 @@ public fun get_block_gas_limit(ctx: &TxContext): u64 {
 public fun get_block_timestamp(ctx: &TxContext): u64 {
     ctx.block_timestamp()
 }
+
+public fun get_chain_id(ctx: &TxContext): u64 {
+    ctx.chain_id()
+}

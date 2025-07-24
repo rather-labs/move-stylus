@@ -131,3 +131,12 @@ pub fn block_timestamp(module: &mut Module) -> (FunctionId, ImportId) {
     let block_timestamp_ty = module.types.add(&[], &[ValType::I64]);
     module.add_import_func("vm_hooks", "block_timestamp", block_timestamp_ty)
 }
+
+/// Gets the unique chain identifier of the Arbitrum chain. The semantics are equivalent to
+/// that of the EVM's [`CHAIN_ID`] opcode.
+///
+/// [`CHAIN_ID`]: https://www.evm.codes/#46
+pub fn chain_id(module: &mut Module) -> (FunctionId, ImportId) {
+    let chain_id_ty = module.types.add(&[], &[ValType::I64]);
+    module.add_import_func("vm_hooks", "chainid", chain_id_ty)
+}

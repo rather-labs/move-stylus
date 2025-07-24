@@ -17,10 +17,12 @@ impl NativeFunction {
     const NATIVE_BLOCK_BASEFEE: &str = "native_block_basefee";
     const NATIVE_BLOCK_GAS_LIMIT: &str = "native_block_gas_limit";
     const NATIVE_BLOCK_TIMESTAMP: &str = "native_block_timestamp";
+    const NATIVE_CHAIN_ID: &str = "native_chain_id";
 
     const HOST_BLOCK_NUMBER: &str = "block_number";
     const HOST_BLOCK_GAS_LIMIT: &str = "block_gas_limit";
     const HOST_BLOCK_TIMESTAMP: &str = "block_timestamp";
+    const HOST_CHAIN_ID: &str = "chainid";
 
     /// Links the function into the module and returns its id. If the function is already present
     /// it just returns the id.
@@ -44,6 +46,10 @@ impl NativeFunction {
                     }
                     Self::HOST_BLOCK_TIMESTAMP => {
                         let (function_id, _) = hostio::host_functions::block_timestamp(module);
+                        return function_id;
+                    }
+                    Self::HOST_CHAIN_ID => {
+                        let (function_id, _) = hostio::host_functions::chain_id(module);
                         return function_id;
                     }
                     _ => {
@@ -75,6 +81,7 @@ impl NativeFunction {
             Self::NATIVE_BLOCK_NUMBER => Some(Self::HOST_BLOCK_NUMBER),
             Self::NATIVE_BLOCK_GAS_LIMIT => Some(Self::HOST_BLOCK_GAS_LIMIT),
             Self::NATIVE_BLOCK_TIMESTAMP => Some(Self::HOST_BLOCK_TIMESTAMP),
+            Self::NATIVE_CHAIN_ID => Some(Self::HOST_CHAIN_ID),
             _ => None,
         }
     }

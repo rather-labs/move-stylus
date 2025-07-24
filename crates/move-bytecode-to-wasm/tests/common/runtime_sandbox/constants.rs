@@ -18,3 +18,4 @@ pub const BLOCK_BASEFEE: U256 = U256::from_le_bytes([
 pub const BLOCK_NUMBER: u64 = 3141592;
 pub const BLOCK_GAS_LIMIT: u64 = 30_000_000;
 pub const BLOCK_TIMESTAMP: u64 = 1_234_567_890;
+pub const CHAIN_ID: u64 = 42331;

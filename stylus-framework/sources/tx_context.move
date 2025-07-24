@@ -77,6 +77,12 @@ public fun block_timestamp(_self: &TxContext): u64 {
 }
 native fun native_block_timestamp(): u64;
 
+/// Return the chain ID of the current transaction.
+public fun chain_id(_self: &TxContext): u64 {
+    native_chain_id()
+}
+native fun native_chain_id(): u64;
+
 
 
 /*
