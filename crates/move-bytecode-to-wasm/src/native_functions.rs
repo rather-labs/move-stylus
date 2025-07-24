@@ -33,7 +33,7 @@ impl NativeFunction {
         // Some functions are implemented by host functions directly. For those, we just import and
         // use them without wrapping them.
         if let Some(host_fn_name) = Self::host_fn_name(name) {
-            if let Some(function_id) = module.imports.get_func("vm_hooks", host_fn_name).ok() {
+            if let Ok(function_id) = module.imports.get_func("vm_hooks", host_fn_name) {
                 return function_id;
             } else {
                 match host_fn_name {

@@ -2,7 +2,7 @@
 //! automatically injected by the VM, such as the primitive type Signer or the TxContext struct
 //! from the stylus framework.
 
-use std::cell::LazyCell;
+use std::sync::LazyLock;
 
 use walrus::{FunctionId, InstrSeqBuilder, Module, ValType, ir::BinaryOp};
 
@@ -43,25 +43,25 @@ pub fn inject_signer(
 
 pub struct TxContext;
 
-impl TxContext {
-    const TX_CONTEXT_MODULE: LazyCell<ModuleId> = LazyCell::new(|| ModuleId {
-        address: Address::from([
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 2,
-        ]),
-        module_name: "tx_context".to_string(),
-    });
+static TX_CONTEXT_MODULE: LazyLock<ModuleId> = LazyLock::new(|| ModuleId {
+    address: Address::from([
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 2,
+    ]),
+    module_name: "tx_context".to_string(),
+});
 
+impl TxContext {
     const TX_CONTEXT_IDENTIFIER: &str = "TxContext";
 
     /// The only valid TxContext is the one defined in the stylus framework. Any other struct named
     /// TxContext from any other module must be reported as invalid.
     pub fn struct_is_tx_context(module_id: &ModuleId, identifier: &str) -> bool {
         if identifier == Self::TX_CONTEXT_IDENTIFIER {
-            if *module_id != *Self::TX_CONTEXT_MODULE {
+            if *module_id != *TX_CONTEXT_MODULE {
                 panic!(
                     "Using invalid TxContext struct from module {module_id}. The only valid TxContext object is from the module stylus::{}",
-                    *Self::TX_CONTEXT_MODULE
+                    *TX_CONTEXT_MODULE
                 );
             }
             return true;
