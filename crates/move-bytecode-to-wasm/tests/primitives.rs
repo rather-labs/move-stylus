@@ -499,6 +499,7 @@ mod uint_32 {
     #[case(echoCall::new((u32::MAX,)), (u32::MAX,))]
     #[case(echo2Call::new((111, 222)), (222,))]
     #[case(sumCall::new((65535, 65535)), (131070,))]
+    #[case(sumCall::new((0, 1)), (1,))]
     #[should_panic(expected = r#"wasm trap: wasm `unreachable` instruction executed"#)]
     #[case(sumCall::new((u32::MAX, 1)), ((),))]
     #[case(subCall::new((131070, 65535)), (65535,))]
