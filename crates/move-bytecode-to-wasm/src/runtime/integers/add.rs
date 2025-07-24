@@ -209,24 +209,24 @@ pub fn add_u32(module: &mut Module) -> FunctionId {
 
     // We check that the result is greater than the two operands. If this check fails means
     // WASM an overflow occured.
-    // if (res > n1) && (res > n2)
-    // then return res
-    // else trap
+    // if (res < n1) || (res < n2)
+    // then trap
+    // else return res
     builder
         .local_tee(res)
         .local_get(n1)
-        .binop(BinaryOp::I32GtU)
+        .binop(BinaryOp::I32LtU)
         .local_get(res)
         .local_get(n2)
-        .binop(BinaryOp::I32GtU)
-        .binop(BinaryOp::I32And)
+        .binop(BinaryOp::I32LtU)
+        .binop(BinaryOp::I32Or)
         .if_else(
             Some(ValType::I32),
             |then| {
-                then.local_get(res);
+                then.unreachable();
             },
             |else_| {
-                else_.unreachable();
+                else_.local_get(res);
             },
         );
 
@@ -268,9 +268,9 @@ pub fn add_u64(module: &mut Module) -> FunctionId {
 
     // We check that the result is greater than the two operands. If this check fails means
     // WASM an overflow occured.
-    // if (res > n1) && (res > n2)
-    // then return res
-    // else trap
+    // if (res < n1) || (res < n2)
+    // then trap
+    // else return res
     builder
         .local_get(n1)
         .binop(BinaryOp::I64LtU)
