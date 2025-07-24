@@ -15,30 +15,7 @@ const EBadTxHashLength: u64 = 0;
 /// Information about the transaction currently being executed.
 /// This cannot be constructed by a transaction--it is a privileged object created by
 /// the VM and passed in to the entrypoint of the transaction as `&mut TxContext`.
-public struct TxContext has drop {
-    /*
-    /// The address of the user that signed the current transaction
-    sender: address,
-
-    /// The value of the sent message
-    msg_value: vector<u8>,
-
-    /// The current block
-    block_number: u256,
-
-    /// Base tx fee
-    block_basefee: u256,
-
-    /// Tx gas limit
-    block_gaslimit: u256,
-
-    /// Block approximate timestamp
-    block_timestamp: u256,
-
-    /// Chain ID
-    chain_id: u256,
-    */
-}
+public struct TxContext has drop {}
 
 /// Return the address of the user that signed the current
 /// transaction
