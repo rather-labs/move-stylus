@@ -3,8 +3,8 @@ pub mod constants;
 
 use anyhow::Result;
 use constants::{
-    BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, CHAIN_ID, MSG_SENDER_ADDRESS,
-    MSG_VALUE, SIGNER_ADDRESS,
+    BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, CHAIN_ID, GAS_PRICE,
+    MSG_SENDER_ADDRESS, MSG_VALUE, SIGNER_ADDRESS,
 };
 use walrus::Module;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
@@ -36,6 +36,28 @@ macro_rules! link_fn_ret_constant {
             )
             .unwrap();
     };
+}
+
+macro_rules! link_fn_write_constant {
+    ($linker:expr, $name:literal, $constant:expr) => {
+        $linker
+            .func_wrap(
+                "vm_hooks",
+                $name,
+                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
+                    println!("{} called, writing in {ptr}", $name);
+
+                    let mem = match caller.get_export("memory") {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    mem.write(&mut caller, ptr as usize, &$constant).unwrap();
+                },
+            )
+            .unwrap();
+    };
+    () => {};
 }
 
 impl RuntimeSandbox {
@@ -106,21 +128,6 @@ impl RuntimeSandbox {
         linker
             .func_wrap(
                 "vm_hooks",
-                "tx_origin",
-                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
-                    println!("tx_origin, writing in {ptr}");
-
-                    let mem = get_memory(&mut caller);
-
-                    mem.write(&mut caller, ptr as usize, &SIGNER_ADDRESS)
-                        .unwrap();
-                },
-            )
-            .unwrap();
-
-        linker
-            .func_wrap(
-                "vm_hooks",
                 "emit_log",
                 move |mut caller: Caller<'_, ModuleData>, ptr: u32, len: u32, _topic: u32| {
                     println!("emit_log, reading from {ptr}, length: {len}");
@@ -135,54 +142,11 @@ impl RuntimeSandbox {
             )
             .unwrap();
 
-        linker
-            .func_wrap(
-                "vm_hooks",
-                "msg_sender",
-                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
-                    println!("msg_sender, writing in {ptr}");
-
-                    let mem = get_memory(&mut caller);
-
-                    mem.write(&mut caller, ptr as usize, &MSG_SENDER_ADDRESS)
-                        .unwrap();
-                },
-            )
-            .unwrap();
-
-        linker
-            .func_wrap(
-                "vm_hooks",
-                "msg_value",
-                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
-                    println!("msg_value, writing in {ptr}");
-
-                    let mem = get_memory(&mut caller);
-
-                    mem.write(&mut caller, ptr as usize, &MSG_VALUE.to_le_bytes::<32>())
-                        .unwrap();
-                },
-            )
-            .unwrap();
-
-        linker
-            .func_wrap(
-                "vm_hooks",
-                "block_basefee",
-                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
-                    println!("block_basefee, writing in {ptr}");
-
-                    let mem = get_memory(&mut caller);
-
-                    mem.write(
-                        &mut caller,
-                        ptr as usize,
-                        &BLOCK_BASEFEE.to_le_bytes::<32>(),
-                    )
-                    .unwrap();
-                },
-            )
-            .unwrap();
+        link_fn_write_constant!(linker, "tx_origin", SIGNER_ADDRESS);
+        link_fn_write_constant!(linker, "msg_sender", MSG_SENDER_ADDRESS);
+        link_fn_write_constant!(linker, "msg_value", MSG_VALUE.to_le_bytes::<32>());
+        link_fn_write_constant!(linker, "block_basefee", BLOCK_BASEFEE.to_le_bytes::<32>());
+        link_fn_write_constant!(linker, "tx_gas_price", GAS_PRICE.to_le_bytes::<32>());
 
         link_fn_ret_constant!(linker, "chainid", CHAIN_ID, i64);
         link_fn_ret_constant!(linker, "block_number", BLOCK_NUMBER, i64);

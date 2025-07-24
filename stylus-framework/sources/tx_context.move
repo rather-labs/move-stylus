@@ -83,7 +83,11 @@ public fun chain_id(_self: &TxContext): u64 {
 }
 native fun native_chain_id(): u64;
 
-
+/// Return the gas price of the transaction
+public fun gas_price(_self: &TxContext): u256 {
+    native_gas_price()
+}
+native fun native_gas_price(): u256;
 
 /*
 /// Return the transaction digest (hash of transaction inputs).

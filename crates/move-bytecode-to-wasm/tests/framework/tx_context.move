@@ -29,3 +29,7 @@ public fun get_block_timestamp(ctx: &TxContext): u64 {
 public fun get_chain_id(ctx: &TxContext): u64 {
     ctx.chain_id()
 }
+
+public fun get_gas_price(ctx: &TxContext): u256 {
+    ctx.gas_price()
+}

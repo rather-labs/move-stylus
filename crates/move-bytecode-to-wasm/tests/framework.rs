@@ -26,8 +26,8 @@ mod tx_context {
 
     use crate::common::{
         runtime_sandbox::constants::{
-            BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, MSG_SENDER_ADDRESS,
-            MSG_VALUE,
+            BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, GAS_PRICE,
+            MSG_SENDER_ADDRESS, MSG_VALUE,
         },
         translate_test_package_with_framework,
     };
@@ -54,6 +54,7 @@ mod tx_context {
         function getBlockBasefee() external returns (uint256);
         function getBlockGasLimit() external returns (uint64);
         function getBlockTimestamp() external returns (uint64);
+        function getGasPrice() external returns (uint256);
     );
 
     #[rstest]
@@ -63,6 +64,7 @@ mod tx_context {
     #[case(getBlockBasefeeCall::new(()), (BLOCK_BASEFEE,))]
     #[case(getBlockGasLimitCall::new(()), (BLOCK_GAS_LIMIT,))]
     #[case(getBlockTimestampCall::new(()), (BLOCK_TIMESTAMP,))]
+    #[case(getGasPriceCall::new(()), (GAS_PRICE,))]
     fn test_tx_context<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

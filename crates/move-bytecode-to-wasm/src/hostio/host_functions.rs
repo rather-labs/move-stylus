@@ -140,3 +140,12 @@ pub fn chain_id(module: &mut Module) -> (FunctionId, ImportId) {
     let chain_id_ty = module.types.add(&[], &[ValType::I64]);
     module.add_import_func("vm_hooks", "chainid", chain_id_ty)
 }
+
+/// Gets the gas price in wei per gas, which on Arbitrum chains equals the basefee. The
+/// semantics are equivalent to that of the EVM's [`GAS_PRICE`] opcode.
+///
+/// [`GAS_PRICE`]: https://www.evm.codes/#3A
+pub fn tx_gas_price(module: &mut Module) -> (FunctionId, ImportId) {
+    let tx_gas_price_ty = module.types.add(&[ValType::I32], &[]);
+    module.add_import_func("vm_hooks", "tx_gas_price", tx_gas_price_ty)
+}

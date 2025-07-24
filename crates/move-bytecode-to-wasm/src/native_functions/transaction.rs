@@ -2,7 +2,7 @@
 use super::NativeFunction;
 use crate::{
     CompilationContext,
-    hostio::host_functions::{block_basefee, msg_sender, msg_value},
+    hostio::host_functions::{block_basefee, msg_sender, msg_value, tx_gas_price},
     translation::intermediate_types::{address::IAddress, heap_integers::IU256},
 };
 use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
@@ -72,5 +72,12 @@ define_host_fn_native_fn_wrapper!(
     add_native_block_basefee_fn,
     block_basefee,
     NativeFunction::NATIVE_BLOCK_BASEFEE,
+    IU256::HEAP_SIZE
+);
+
+define_host_fn_native_fn_wrapper!(
+    add_native_tx_gas_price_fn,
+    tx_gas_price,
+    NativeFunction::NATIVE_GAS_PRICE,
     IU256::HEAP_SIZE
 );

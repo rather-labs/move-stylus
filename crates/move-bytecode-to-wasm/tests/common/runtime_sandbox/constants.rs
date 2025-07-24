@@ -15,6 +15,10 @@ pub const BLOCK_BASEFEE: U256 = U256::from_le_bytes([
     1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ]);
 
+pub const GAS_PRICE: U256 = U256::from_le_bytes([
+    5, 5, 5, 5, 5, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+]);
+
 pub const BLOCK_NUMBER: u64 = 3141592;
 pub const BLOCK_GAS_LIMIT: u64 = 30_000_000;
 pub const BLOCK_TIMESTAMP: u64 = 1_234_567_890;
