@@ -48,7 +48,7 @@ pub trait Unpackable {
 ///
 /// Each parameter is decoded and loaded in the WASM stack. Complex data types are kept in memory
 /// and the pointer is pushed onto the stack in the parameter location.
-pub fn build_unpack_instructions<T: Unpackable + std::fmt::Debug>(
+pub fn build_unpack_instructions<T: Unpackable>(
     function_builder: &mut InstrSeqBuilder,
     module: &mut Module,
     function_arguments_signature: &[T],
@@ -230,7 +230,6 @@ impl Unpackable for IntermediateType {
 
                 match external_data {
                     ExternalModuleData::Struct(istruct) => {
-                        println!("injecting tx context");
                         if TxContext::struct_is_tx_context(module_id, identifier) {
                             TxContext::inject_tx_context(
                                 function_builder,

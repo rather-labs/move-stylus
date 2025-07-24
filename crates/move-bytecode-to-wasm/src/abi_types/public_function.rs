@@ -124,8 +124,6 @@ impl<'a> PublicFunction<'a> {
                 }
             }
 
-            println!("{:?}", self.signature.arguments);
-
             // Wrap function to pack/unpack parameters
             self.wrap_public_function(module, block, args_pointer, compilation_ctx);
 
