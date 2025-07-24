@@ -1,7 +1,7 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-module sui::tx_context;
+module stylus::tx_context;
 
 #[test_only]
 /// Number of bytes in an tx hash (which will be the transaction digest)
@@ -40,18 +40,6 @@ public struct TxContext has drop {
     */
 }
 
-// native fun native_sender();
-// native fun native_sender(): address;
-fun native_sender(): address {
-    @0x7357
-}
-
-public fun sender(_self: &TxContext): address {
-    native_sender()
-    // @0x7357
-}
-
-/*
 /// Return the address of the user that signed the current
 /// transaction
 public fun sender(_self: &TxContext): address {
@@ -59,6 +47,7 @@ public fun sender(_self: &TxContext): address {
 }
 native fun native_sender(): address;
 
+/*
 /// Return the transaction digest (hash of transaction inputs).
 /// Please do not use as a source of randomness.
 // public fun digest(self: &TxContext): &vector<u8> {

@@ -1,31 +1,3 @@
-use std::collections::{HashMap, HashSet};
-
-use anyhow::Result;
-use move_binary_format::file_format::{Bytecode, CodeUnit};
-use move_binary_format::internals::ModuleIndex;
-use relooper::BranchMode;
-use walrus::FunctionId as WasmFunctionId;
-use walrus::ir::{BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, UnaryOp};
-use walrus::{FunctionBuilder, InstrSeqBuilder, LocalId, Module, ValType};
-
-use functions::{
-    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
-};
-use intermediate_types::IntermediateType;
-use intermediate_types::heap_integers::{IU128, IU256};
-use intermediate_types::simple_integers::{IU8, IU16, IU32, IU64};
-use intermediate_types::vector::IVector;
-use table::FunctionTable;
-use types_stack::TypesStack;
-
-use crate::CompilationContext;
-use crate::FunctionId;
-use crate::compilation_context::ModuleData;
-use crate::runtime::RuntimeFunction;
-use crate::wasm_builder_extensions::WasmBuilderExtension;
-
-use flow::Flow;
-
 pub use error::TranslationError;
 
 pub(crate) mod bytecodes;
@@ -38,6 +10,35 @@ pub mod functions;
 /// that is used to generate the WASM code.
 pub mod intermediate_types;
 pub mod table;
+
+use crate::{
+    CompilationContext, compilation_context::ModuleData, native_functions::NativeFunction,
+    runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension,
+};
+use anyhow::Result;
+use flow::Flow;
+use functions::{
+    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
+};
+use intermediate_types::{
+    IntermediateType,
+    heap_integers::{IU128, IU256},
+    simple_integers::{IU8, IU16, IU32, IU64},
+    vector::IVector,
+};
+use move_binary_format::{
+    file_format::{Bytecode, CodeUnit},
+    internals::ModuleIndex,
+};
+use relooper::BranchMode;
+use std::collections::{HashMap, HashSet};
+use table::{FunctionId, FunctionTable, TableEntry};
+use types_stack::TypesStack;
+use walrus::TableId;
+use walrus::{
+    FunctionBuilder, FunctionId as WasmFunctionId, InstrSeqBuilder, LocalId, Module, ValType,
+    ir::{BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, UnaryOp},
+};
 
 /// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs.
 /// It is used to translate the branching instructions: Branch, BrFalse, BrTrue
@@ -428,10 +429,20 @@ fn translate_instruction(
             let function_id = &module_data.functions.calls[function_handle_index.into_index()];
 
             // If the function is in the table we call it directly
-            let f_entry = if let Some(f) = function_table.get_by_function_id(function_id) {
-                f
+            if let Some(f) = function_table.get_by_function_id(function_id) {
+                call_indirect(
+                    f,
+                    &module_data.functions.returns[function_handle_index.into_index()],
+                    function_table.get_table_id(),
+                    builder,
+                    module,
+                    compilation_ctx,
+                );
             }
-            // Otherwise we add it to the table and declare it for linking
+            // Otherwise
+            // If the function is not native, we add it to the table and declare it for translating
+            // and linking
+            // If the function IS native, we link it and call it directly
             else {
                 let function_information = if let Some(fi) = module_data
                     .functions
@@ -452,24 +463,27 @@ fn translate_instruction(
                         .find(|f| &f.function_id == function_id)
                         .unwrap()
                 };
+                if function_information.is_native {
+                    let native_function_id =
+                        NativeFunction::get(&function_id.identifier, module, compilation_ctx);
+                    builder.call(native_function_id);
+                } else {
+                    let table_id = function_table.get_table_id();
+                    let f_entry =
+                        function_table.add(module, function_id.clone(), function_information);
+                    functions_calls_to_link.push(function_id.clone());
 
-                let f_entry = function_table.add(module, function_id.clone(), function_information);
-
-                functions_calls_to_link.push(function_id.clone());
-
-                f_entry
+                    call_indirect(
+                        f_entry,
+                        &module_data.functions.returns[function_handle_index.into_index()],
+                        table_id,
+                        builder,
+                        module,
+                        compilation_ctx,
+                    );
+                }
             };
 
-            builder
-                .i32_const(f_entry.index)
-                .call_indirect(f_entry.type_id, function_table.get_table_id());
-
-            add_unpack_function_return_values_instructions(
-                builder,
-                module,
-                &module_data.functions.returns[function_handle_index.into_index()],
-                compilation_ctx.memory_id,
-            );
             // Insert in the stack types the types returned by the function (if any)
             let return_types = &module_data.functions.returns[function_handle_index.0 as usize];
             types_stack.append(return_types);
@@ -1518,6 +1532,26 @@ fn translate_instruction(
     }
 
     Ok(functions_calls_to_link)
+}
+
+fn call_indirect(
+    function_entry: &TableEntry,
+    function_returns: &[IntermediateType],
+    wasm_table_id: TableId,
+    builder: &mut InstrSeqBuilder,
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) {
+    builder
+        .i32_const(function_entry.index)
+        .call_indirect(function_entry.type_id, wasm_table_id);
+
+    add_unpack_function_return_values_instructions(
+        builder,
+        module,
+        function_returns,
+        compilation_ctx.memory_id,
+    );
 }
 
 fn process_fn_local_variables(

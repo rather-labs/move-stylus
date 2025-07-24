@@ -499,6 +499,7 @@ impl ModuleData {
                     function_def.acquires_global_resources.is_empty(),
                     "Acquiring global resources is not supported yet"
                 );
+
                 // Code can be empty (for example in native functions)
                 let code_locals = if let Some(code) = function_def.code.as_ref() {
                     &move_module.signature_at(code.locals).0

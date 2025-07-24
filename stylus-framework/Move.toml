@@ -5,4 +5,4 @@ published-at = "0x2"
 edition = "2024.beta"
 
 [addresses]
-sui = "0x2"
+stylus = "0x2"

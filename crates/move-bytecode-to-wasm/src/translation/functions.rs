@@ -22,6 +22,9 @@ pub struct MappedFunction {
 
     /// Flag that tells us if the function can be used as an entrypoint
     pub is_entry: bool,
+
+    /// Flag that tells us if the function is a native function
+    pub is_native: bool,
 }
 
 impl MappedFunction {
@@ -61,6 +64,7 @@ impl MappedFunction {
             results,
             // TODO: change to function_definition.is_entry
             is_entry: function_definition.visibility == Visibility::Public,
+            is_native: function_definition.is_native(),
         }
     }
 }
