@@ -4,12 +4,11 @@
 //! and check the value again. The deployed contract is fully written in Rust and compiled to WASM
 //! but with Stylus, it is accessible just as a normal Solidity smart contract is via an ABI.
 
-use alloy_sol_types::{SolCall, SolType, sol};
 use dotenv::dotenv;
 use ethers::{
-    contract::abigen, middleware::SignerMiddleware, providers::{Http, Middleware, Provider}, signers::{LocalWallet, Signer}, types::{
-        transaction::eip2718::TypedTransaction, Address, TransactionRequest, H160, U256
-    }, utils::parse_ether
+    contract::abigen, middleware::SignerMiddleware, providers::{Http, Middleware, Provider},
+    signers::{LocalWallet, Signer},
+    types::{Address, U256},
 };
 
 use eyre::eyre;
@@ -25,8 +24,8 @@ async fn main() -> eyre::Result<()> {
     dotenv().ok();
     let priv_key = std::env::var("PRIV_KEY").map_err(|_| eyre!("No {} env var set", "PRIV_KEY"))?;
     let rpc_url = std::env::var("RPC_URL").map_err(|_| eyre!("No {} env var set", "RPC_URL"))?;
-    let contract_address = std::env::var("CONTRACT_ADDRESS")
-        .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS"))?;
+    let contract_address = std::env::var("CONTRACT_ADDRESS_PRIMITIVES")
+        .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_PRIMITIVES"))?;
 
     abigen!(
         Example,
