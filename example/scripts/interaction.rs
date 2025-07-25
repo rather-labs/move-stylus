@@ -56,32 +56,46 @@ async fn main() -> eyre::Result<()> {
         "#
     );
 
+    // We use sol! for structs because abigen! does not support them.
     sol!(
         #[allow(missing_docs)]
 
         #[derive(Debug)]
         struct Bar {
-            uint32 n;
-            uint128 o;
+            uint32 a;
+            uint128 b;
         }
 
         #[derive(Debug)]
         struct Foo {
-            uint16 g;
-            Bar p;
-            address q;
-            uint32[] r;
-            // uint128[] s;
-            bool t;
-            uint8 u;
-            uint16 v;
-            uint32 w;
-            uint64 x;
-            uint128 y;
-            uint256 z;
+            uint16 c;
+            Bar d;
+            address e;
+            bool f;
+            uint64 g;
+            uint256 h;
         }
 
-        function createFooU16(uint16 a, uint16 b) external view returns (Foo);
+        #[derive(Debug)]
+        enum TestEnum {
+            FirstVariant,
+            SecondVariant,
+        }
+
+        #[derive(Debug)]
+        struct AnotherTest {
+            uint8 pos0;
+        }
+
+        #[derive(Debug)]
+        struct Test {
+            uint8 pos0;
+            AnotherTest pos1;
+        }
+
+        function createFooU16(uint16 x, uint16 y) external view returns (Foo);
+        function echoVariant(TestEnum v) external view returns (TestEnum);
+        function testValues(Test test) external view returns (uint8, uint8);
     );
 
     let provider = Provider::<Http>::try_from(rpc_url)?;
@@ -135,6 +149,35 @@ async fn main() -> eyre::Result<()> {
     let sum_special_4 = example.sum_special(4).call().await?;
     println!("sumSpecial(4) = {}", sum_special_4);
 
+    call_contract::<createFooU16Call, Foo>(
+        client.clone(),
+        address,
+        createFooU16Call { x: 55, y: 66 }
+    ).await;
+
+    call_contract::<echoVariantCall, TestEnum>(
+        client.clone(),
+        address,
+        echoVariantCall { v: TestEnum::FirstVariant }
+    ).await;
+
+    call_contract::<echoVariantCall, TestEnum>(
+        client.clone(),
+        address,
+        echoVariantCall { v: TestEnum::SecondVariant }
+    ).await;
+
+    call_contract::<testValuesCall, sol!((uint8, uint8))>(
+        client.clone(),
+        address,
+        testValuesCall {
+            test: Test {
+                pos0: 55,
+                pos1: AnotherTest { pos0: 66 }
+            }
+        }
+    ).await;
+
     // This simple call will inject the "from" field as asigner
     let ret = example.echo_signer_with_int(42).call().await;
     println!("echoSignerWithInt = {:?}", ret);
@@ -142,12 +185,6 @@ async fn main() -> eyre::Result<()> {
     // A real tx should write in the logs the signer's address
     // 0x3f1eae7d46d88f08fc2f8ed27fcb2ab183eb2d0e
     let data = example.echo_signer_with_int(43).calldata().unwrap();
-
-    call_contract::<createFooU16Call, sol!((Foo,))>(
-        client.clone(),
-        address,
-        createFooU16Call { a: 1, b: 2 }
-    ).await;
 
     let tx = TransactionRequest::new()
         .to(H160::from_str(&contract_address).unwrap())
@@ -172,16 +209,12 @@ async fn call_contract<T: SolCall, R: SolType>(
     call_data: T,
 ) where <R as alloy_sol_types::SolType>::RustType: std::fmt::Debug {
     let response = client.call(
-        &TypedTransaction::Legacy(
-            TransactionRequest {
-                to: Some(address.into()),
-                data: Some(call_data.abi_encode().into()),
-                ..Default::default()
-            }),
+        &TypedTransaction::Legacy(TransactionRequest::new()
+            .to(address)
+            .data(call_data.abi_encode())),
         None)
         .await
         .unwrap();
 
-    println!("{}: {:?}", std::any::type_name::<T>(), response.as_ref());
-    println!("{}: {:?}", std::any::type_name::<T>(), R::abi_decode(response.as_ref()));
+    println!("{}: {:#?}", std::any::type_name::<T>(), R::abi_decode(response.as_ref()).unwrap());
 }

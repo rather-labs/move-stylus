@@ -8,23 +8,17 @@ const INT_AS_CONST: u128 = 128128128;
 
 /// Struct with generic type T
 public struct Bar has drop {
-    n: u32,
-    o: u128,
+    a: u32,
+    b: u128,
 }
 
 public struct Foo<T> has drop {
-    g: T,
-    p: Bar,
-    q: address,
-    r: vector<u32>,
-    // s: vector<u128>,
-    t: bool,
-    u: u8,
-    v: u16,
-    w: u32,
-    x: u64,
-    y: u128,
-    z: u256,
+    c: T,
+    d: Bar,
+    e: address,
+    f: bool,
+    g: u64,
+    h: u256,
 }
 
 // Enum
@@ -153,22 +147,15 @@ public fun sum_special(n: u64): u64 {
 // Structs
 public fun create_foo_u16(a: u16, b: u16): Foo<u16> {
     let mut foo = Foo {
-        g: a,
-        p: Bar { n: 42, o: 4242 },
-        q: @0x7357,
-        r: vector[0xFFFFFFFF],
-       // s: vector[6],
-        t: true,
-        u: 1,
-        v: 2,
-        w: 3,
-        x: 4,
-        y: 5,
-        z: 6,
+        c: a,
+        d: Bar { a: 42, b: 4242 },
+        e: @0x7357,
+        f: true,
+        g: 1,
+        h: 2,
     };
 
-    foo.g = a;
-    foo.v = b;
+    foo.c = b;
 
     foo
 }
