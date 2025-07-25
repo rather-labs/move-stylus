@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use move_binary_format::file_format::{
-    DatatypeHandleIndex, FunctionDefinition, Signature, SignatureToken, Visibility,
+    DatatypeHandleIndex, FunctionDefinition, Signature, SignatureToken,
 };
 use walrus::{
     InstrSeqBuilder, MemoryId, Module, ValType,
     ir::{LoadKind, MemArg, StoreKind},
 };
 
-use crate::{CompilationContext, UserDefinedType, translation::intermediate_types::ISignature};
+use crate::{CompilationContext, UserDefinedType, translation::intermediate_types::ISignature, constructor::is_init};
 
 use super::{intermediate_types::IntermediateType, table::FunctionId};
 
@@ -19,6 +19,9 @@ pub struct MappedFunction {
     pub locals: Vec<IntermediateType>,
     pub arguments: Vec<IntermediateType>,
     pub results: Vec<ValType>,
+
+    /// Flag that tells us if the function is the init function
+    pub is_init: bool,
 
     /// Flag that tells us if the function can be used as an entrypoint
     pub is_entry: bool,
@@ -56,14 +59,16 @@ impl MappedFunction {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
+        let is_init = is_init(function_id.clone(),  move_args, move_rets, function_definition);
+
         Self {
             function_id,
             signature,
             locals,
             arguments,
             results,
-            // TODO: change to function_definition.is_entry
-            is_entry: function_definition.visibility == Visibility::Public,
+            is_init,
+            is_entry: function_definition.is_entry,
             is_native: function_definition.is_native(),
         }
     }

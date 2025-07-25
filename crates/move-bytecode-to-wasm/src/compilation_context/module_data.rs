@@ -467,8 +467,7 @@ impl ModuleData {
                     .unwrap(),
             );
 
-            let function_name = move_module.identifier_at(function.name).as_str();
-
+            let function_name = move_module.identifier_at(function.name).as_str();            
             let function_module = move_module.module_handle_at(function.module);
             let function_module_name = move_module.identifier_at(function_module.name).as_str();
             let function_module_address: Address = move_module

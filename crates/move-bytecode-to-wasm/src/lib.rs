@@ -17,6 +17,7 @@ use wasm_validation::validate_stylus_wasm;
 
 pub(crate) mod abi_types;
 mod compilation_context;
+mod constructor;
 mod hostio;
 mod memory;
 mod native_functions;
@@ -44,6 +45,7 @@ pub fn translate_package(
     package: CompiledPackage,
     module_name: Option<String>,
 ) -> HashMap<String, Module> {
+    
     let root_compiled_units: Vec<CompiledUnitWithSource> = if let Some(module_name) = module_name {
         package
             .root_compiled_units
@@ -231,7 +233,7 @@ pub fn process_dependency_tree<'move_package>(
     }
 }
 
-/// Trnaslates a function to WASM and links it to the WASM module
+/// Translates a function to WASM and links it to the WASM module
 ///
 /// It also recursively translates and links all the functions called by this function
 fn translate_and_link_functions(
@@ -284,7 +286,7 @@ fn translate_and_link_functions(
         .get(function_id)
         .unwrap_or_else(|| panic!("could not find function definition for {}", function_id));
 
-    // If the function contains code we translate it
+        // If the function contains code we translate it
     // If it does not it means is a native function, we do nothing, it is linked and called
     // directly in the translation function
     if let Some(move_bytecode) = function_definition.code.as_ref() {
