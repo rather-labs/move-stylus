@@ -4,7 +4,7 @@ use stylus::tx_context::TxContext;
 use hello_world::other_mod::Test;
 use hello_world::another_mod::AnotherTest;
 
-const INT_AS_CONST: u128 = 128128;
+const INT_AS_CONST: u128 = 128128128;
 
 /// Struct with generic type T
 public struct Bar has drop {
@@ -17,7 +17,7 @@ public struct Foo<T> has drop {
     p: Bar,
     q: address,
     r: vector<u32>,
-    s: vector<u128>,
+    // s: vector<u128>,
     t: bool,
     u: u8,
     v: u16,
@@ -37,6 +37,7 @@ public enum TestEnum has drop {
 public fun get_constant(): u128 {
   INT_AS_CONST
 }
+
 /// Set constant as local
 public fun get_constant_local(): u128 {
   let x: u128 = INT_AS_CONST;
@@ -79,6 +80,11 @@ fun identity(x: u128): u128 {
 
 fun identity_2(_x: u128, y: u128): u128 {
   y
+}
+
+// Inteaction with signer
+public fun echo_signer_with_int(x: signer, y: u8): (u8, signer) {
+    (y, x)
 }
 
 /// Exposition of EVM global variables through TxContext object
@@ -150,8 +156,8 @@ public fun create_foo_u16(a: u16, b: u16): Foo<u16> {
         g: a,
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
-        r: vector[1],
-        s: vector[1],
+        r: vector[0xFFFFFFFF],
+       // s: vector[6],
         t: true,
         u: 1,
         v: 2,

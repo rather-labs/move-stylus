@@ -12,3 +12,4 @@ dotenv = "0.15.0"
 ethers = "2.0"
 eyre = "0.6.8"
 tokio = { version = "1.44.2", features = ["macros", "rt-multi-thread"] }
+alloy-sol-types = "1.0.0"

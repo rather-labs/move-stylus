@@ -109,3 +109,104 @@ public fun and(x: bool, y: bool): bool {
 public fun or(x: bool, y: bool): bool {
   x || y
 }
+
+// Comparison operations
+public fun less_than_u32(a: u32, b: u32): bool {
+    a < b
+}
+
+public fun less_than_eq_u32(a: u32, b: u32): bool {
+    a <= b
+}
+
+public fun greater_than_u32(a: u32, b: u32): bool {
+    a > b
+}
+
+public fun greater_eq_than_u32(a: u32, b: u32): bool {
+    a >= b
+}
+
+public fun less_than_u128(a: u128, b: u128): bool {
+    a < b
+}
+
+public fun less_than_eq_u128(a: u128, b: u128): bool {
+    a <= b
+}
+
+public fun greater_than_u128(a: u128, b: u128): bool {
+    a > b
+}
+
+public fun greater_eq_than_u128(a: u128, b: u128): bool {
+    a >= b
+}
+
+// Vector operations
+public fun vec_from_int32(x: u32, y: u32): vector<u32> {
+  let z = vector[x, y, x];
+  z
+}
+
+public fun vec_from_vec_and_int32(x: vector<u32>, y: u32): vector<vector<u32>> {
+  let z = vector[x, vector[y, y]];
+  z
+}
+
+public fun vec_len32(x: vector<u32>): u64 {
+  x.length()
+}
+
+public fun vec_pop_back32(x: vector<u32>): vector<u32> {
+  let mut y = x;
+  y.pop_back();
+  y.pop_back();
+  y
+}
+
+public fun vec_swap32(x: vector<u32>, id1: u64, id2: u64): vector<u32> {
+  let mut y = x;
+  y.swap(id1, id2);
+  y
+}
+
+public fun vec_push_back32(x: vector<u32>, y: u32): vector<u32> {
+  let mut z = x;
+  z.push_back(y);
+  z
+}
+
+public fun vec_from_int128(x: u128, y: u128): vector<u128> {
+  let z = vector[x, y, x];
+  z
+}
+
+public fun vec_from_vec_and_int128(x: vector<u128>, y: u128): vector<vector<u128>> {
+  let z = vector[x, vector[y, y]];
+  z
+}
+
+public fun vec_pop_back128(x: vector<u128>): vector<u128> {
+  let mut y = x;
+  y.pop_back();
+  y.pop_back();
+  y
+}
+
+public fun vec_swap128(x: vector<u128>, id1: u64, id2: u64): vector<u128> {
+  let mut y = x;
+  y.swap(id1, id2);
+  y
+}
+
+public fun vec_push_back128(x: vector<u128>, y: u128): vector<u128> {
+  let mut z = x;
+  z.push_back(y);
+  z.push_back(y);
+  z
+}
+
+public fun vec_len(x: vector<u128>): u64 {
+  x.length()
+}
