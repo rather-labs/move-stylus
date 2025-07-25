@@ -325,9 +325,8 @@ impl IU128 {
 
         builder
             .i32_const(Self::HEAP_SIZE)
-            .call(div_mod_function_id)
-            // drop the remainder
-            .drop();
+            .i32_const(1)
+            .call(div_mod_function_id);
     }
 
     pub fn remainder(
@@ -337,14 +336,10 @@ impl IU128 {
     ) {
         let div_mod_function_id = RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx));
 
-        let remainder_ptr = module.locals.add(ValType::I32);
         builder
             .i32_const(Self::HEAP_SIZE)
-            .call(div_mod_function_id)
-            .local_set(remainder_ptr)
-            // drop the quotient
-            .drop()
-            .local_get(remainder_ptr);
+            .i32_const(0)
+            .call(div_mod_function_id);
     }
 
     pub fn equality(
@@ -598,9 +593,8 @@ impl IU256 {
 
         builder
             .i32_const(Self::HEAP_SIZE)
-            .call(div_mod_function_id)
-            // drop the remainder
-            .drop();
+            .i32_const(1)
+            .call(div_mod_function_id);
     }
 
     pub fn remainder(
@@ -610,14 +604,10 @@ impl IU256 {
     ) {
         let div_mod_function_id = RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx));
 
-        let remainder_ptr = module.locals.add(ValType::I32);
         builder
             .i32_const(Self::HEAP_SIZE)
-            .call(div_mod_function_id)
-            .local_set(remainder_ptr)
-            // drop the quotient
-            .drop()
-            .local_get(remainder_ptr);
+            .i32_const(0)
+            .call(div_mod_function_id);
     }
 
     pub fn equality(

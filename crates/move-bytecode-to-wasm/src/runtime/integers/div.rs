@@ -73,18 +73,18 @@ const F_SHIFT_64BITS_RIGHT: &str = "shift_64bits_right";
 /// - Pointer to the dividend
 /// - Pointer to the divisor
 /// - Number of bytes the values occupy in memory
+/// - Whether return remainder or quotient. 1 for quotient, 0 for remainder.
 ///
 /// # Returns
-/// - Pointer to the quotient
-/// - Pointer to the remainder
+/// - Pointer to the result
 pub fn heap_integers_div_mod(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
 ) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
-        &[ValType::I32, ValType::I32, ValType::I32],
-        &[ValType::I32, ValType::I32],
+        &[ValType::I32, ValType::I32, ValType::I32, ValType::I32],
+        &[ValType::I32],
     );
 
     let shift_64bits_right_f = shift_64bits_right(module, compilation_ctx);
@@ -95,6 +95,7 @@ pub fn heap_integers_div_mod(
     let dividend_ptr = module.locals.add(ValType::I32);
     let divisor_ptr = module.locals.add(ValType::I32);
     let type_heap_size = module.locals.add(ValType::I32);
+    let quotient_or_reminder = module.locals.add(ValType::I32);
 
     // Locals
     let remainder_ptr = module.locals.add(ValType::I32);
@@ -316,11 +317,24 @@ pub fn heap_integers_div_mod(
                     .br(loop_id);
             });
         })
-        .local_get(quotient_ptr)
-        .local_get(remainder_ptr);
+        .local_get(quotient_or_reminder)
+        .if_else(
+            ValType::I32,
+            |then| {
+                then.local_get(quotient_ptr);
+            },
+            |else_| {
+                else_.local_get(remainder_ptr);
+            },
+        );
 
     function.finish(
-        vec![dividend_ptr, divisor_ptr, type_heap_size],
+        vec![
+            dividend_ptr,
+            divisor_ptr,
+            type_heap_size,
+            quotient_or_reminder,
+        ],
         &mut module.funcs,
     )
 }
@@ -519,32 +533,27 @@ mod tests {
     }
 
     #[rstest]
-    #[case(350, 13, 26, 12)]
-    #[case(5, 2, 2, 1)]
-    #[case(123456, 1, 123456, 0)]
-    #[case(987654321, 123456789, 8, 9)]
-    #[case(0, 2, 0, 0)]
-    // 2^96 / 2^32 = [q = 2^64, r = 0]
-    #[case(79228162514264337593543950336, 4294967296, 18446744073709551616, 0)]
+    #[case(350, 13, 26)]
+    #[case(5, 2, 2)]
+    #[case(123456, 1, 123456)]
+    #[case(987654321, 123456789, 8)]
+    #[case(0, 2, 0)]
+    // 2^96 / 2^32 = 2^64
+    #[case(79228162514264337593543950336, 4294967296, 18446744073709551616)]
     #[should_panic(expected = "wasm trap: integer divide by zero")]
-    #[case(10, 0, 0, 0)]
+    #[case(10, 0, 0)]
     // Timeouts, the algorithm is slow yet
     // (2^128 - 1) / 2^64 = [q = 2^64 - 1, r = 2^64 - 1]
     // #[case(u128::MAX, u64::MAX as u128 + 1, u64::MAX as u128, u64::MAX as u128)]
     // #[case(u128::MAX, 79228162514264337593543950336, u64::MAX as u128, u64::MAX as u128)]
-    fn test_div_mod_u128(
-        #[case] n1: u128,
-        #[case] n2: u128,
-        #[case] quotient: u128,
-        #[case] remainder: u128,
-    ) {
+    fn test_div_u128(#[case] n1: u128, #[case] n2: u128, #[case] quotient: u128) {
         const TYPE_HEAP_SIZE: i32 = 16;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
             &[ValType::I32, ValType::I32],
-            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
         );
 
         let n1_ptr = raw_module.locals.add(ValType::I32);
@@ -552,11 +561,12 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
+        // arguments for heap_integers_add (n1_ptr, n2_ptr, size in heap and return quotient)
         func_body
             .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(TYPE_HEAP_SIZE);
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(1);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
         let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx);
@@ -569,8 +579,7 @@ mod tests {
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
-        let (quotient_ptr, remainder_ptr): (i32, i32) =
-            entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
+        let quotient_ptr: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut quotient_result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
@@ -582,6 +591,60 @@ mod tests {
             )
             .unwrap();
 
+        assert_eq!(quotient_result_memory_data, quotient.to_le_bytes());
+    }
+
+    #[rstest]
+    #[case(350, 13, 12)]
+    #[case(5, 2, 1)]
+    #[case(123456, 1, 0)]
+    #[case(987654321, 123456789, 9)]
+    #[case(0, 2, 0)]
+    // 2^96 % 2^32 = 0
+    #[case(79228162514264337593543950336, 4294967296, 0)]
+    #[should_panic(expected = "wasm trap: integer divide by zero")]
+    #[case(10, 0, 0)]
+    // Timeouts, the algorithm is slow yet
+    // (2^128 - 1) % 2^64 = 2^64 - 1
+    // #[case(u128::MAX, u64::MAX as u128 + 1, u64::MAX as u128, u64::MAX as u128)]
+    // #[case(u128::MAX, 79228162514264337593543950336, u64::MAX as u128, u64::MAX as u128)]
+    fn test_mod_u128(#[case] n1: u128, #[case] n2: u128, #[case] remainder: u128) {
+        const TYPE_HEAP_SIZE: i32 = 16;
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for heap_integers_add (n1_ptr, n2_ptr, size in heap and return remainder)
+        func_body
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(0);
+
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx);
+        // Shift left
+        func_body.call(heap_integers_add_f);
+
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+        let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+
+        let remainder_ptr: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
         let mut remainder_result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
         memory
             .read(
@@ -591,54 +654,41 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(quotient_result_memory_data, quotient.to_le_bytes());
         assert_eq!(remainder_result_memory_data, remainder.to_le_bytes());
     }
 
     #[rstest]
-    #[case(U256::from(350), U256::from(13), U256::from(26), U256::from(12))]
-    #[case(U256::from(5), U256::from(2), U256::from(2), U256::from(1))]
-    #[case(U256::from(123456), U256::from(1), U256::from(123456), U256::from(0))]
-    #[case(
-        U256::from(987654321),
-        U256::from(123456789),
-        U256::from(8),
-        U256::from(9)
-    )]
-    #[case(U256::from(0), U256::from(2), U256::from(0), U256::from(0))]
-    // 2^96 / 2^32 = [q = 2^64, r = 0]
+    #[case(U256::from(350), U256::from(13), U256::from(26))]
+    #[case(U256::from(5), U256::from(2), U256::from(2))]
+    #[case(U256::from(123456), U256::from(1), U256::from(123456))]
+    #[case(U256::from(987654321), U256::from(123456789), U256::from(8))]
+    #[case(U256::from(0), U256::from(2), U256::from(0))]
+    // 2^96 / 2^32 = 2^64
     #[case(
         U256::from(79228162514264337593543950336_u128),
         U256::from(4294967296_u128),
-        U256::from(18446744073709551616_u128),
-        U256::from(0)
+        U256::from(18446744073709551616_u128)
     )]
-    // 2^192 / 2^64 = [q = 2^128, r = 0]
+    // 2^192 / 2^64 = 2^128
     #[case(
         U256::from_str_radix(
             "6277101735386680763835789423207666416102355444464034512896", 10
         ).unwrap(),
         U256::from(18446744073709551616_u128),
         U256::from(u128::MAX) + U256::from(1),
-        U256::from(0)
     )]
     // Timeouts, the algorithm is slow yet
-    // (2^128 - 1) / 2^64 = [q = 2^64 - 1, r = 2^64 - 1]
+    // (2^128 - 1) / 2^64 = 2^64 - 1
     // #[case(u128::MAX, u64::MAX as u128 + 1, u64::MAX as u128, u64::MAX as u128)]
     // #[case(u128::MAX, 79228162514264337593543950336, u64::MAX as u128, u64::MAX as u128)]
-    fn test_div_mod_u256(
-        #[case] n1: U256,
-        #[case] n2: U256,
-        #[case] quotient: U256,
-        #[case] remainder: U256,
-    ) {
+    fn test_div_u256(#[case] n1: U256, #[case] n2: U256, #[case] quotient: U256) {
         const TYPE_HEAP_SIZE: i32 = 32;
         let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
 
         let mut function_builder = FunctionBuilder::new(
             &mut raw_module.types,
             &[ValType::I32, ValType::I32],
-            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
         );
 
         let n1_ptr = raw_module.locals.add(ValType::I32);
@@ -646,11 +696,12 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
+        // arguments for heap_integers_add (n1_ptr, n2_ptr, size in heap and return quotient)
         func_body
             .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE)
-            .i32_const(TYPE_HEAP_SIZE);
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(1);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
         let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx);
@@ -664,8 +715,7 @@ mod tests {
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
 
-        let (quotient_ptr, remainder_ptr): (i32, i32) =
-            entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
+        let quotient_ptr: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
 
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut quotient_result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
@@ -677,6 +727,71 @@ mod tests {
             )
             .unwrap();
 
+        assert_eq!(quotient_result_memory_data, quotient.to_le_bytes::<32>());
+    }
+
+    #[rstest]
+    #[case(U256::from(350), U256::from(13), U256::from(12))]
+    #[case(U256::from(5), U256::from(2), U256::from(1))]
+    #[case(U256::from(123456), U256::from(1), U256::from(0))]
+    #[case(U256::from(987654321), U256::from(123456789), U256::from(9))]
+    #[case(U256::from(0), U256::from(2), U256::from(0))]
+    // 2^96 % 2^32 = 0
+    #[case(
+        U256::from(79228162514264337593543950336_u128),
+        U256::from(4294967296_u128),
+        U256::from(0)
+    )]
+    // 2^192 % 2^64 = 0
+    #[case(
+        U256::from_str_radix(
+            "6277101735386680763835789423207666416102355444464034512896", 10
+        ).unwrap(),
+        U256::from(18446744073709551616_u128),
+        U256::from(0)
+    )]
+    // Timeouts, the algorithm is slow yet
+    // (2^128 - 1) / 2^64 = [q = 2^64 - 1, r = 2^64 - 1]
+    // #[case(u128::MAX, u64::MAX as u128 + 1, u64::MAX as u128, u64::MAX as u128)]
+    // #[case(u128::MAX, 79228162514264337593543950336, u64::MAX as u128, u64::MAX as u128)]
+    fn test_mod_u256(#[case] n1: U256, #[case] n2: U256, #[case] remainder: U256) {
+        const TYPE_HEAP_SIZE: i32 = 32;
+        let (mut raw_module, allocator_func, memory_id) = build_module(Some(TYPE_HEAP_SIZE * 2));
+
+        let mut function_builder = FunctionBuilder::new(
+            &mut raw_module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32],
+        );
+
+        let n1_ptr = raw_module.locals.add(ValType::I32);
+        let n2_ptr = raw_module.locals.add(ValType::I32);
+
+        let mut func_body = function_builder.func_body();
+
+        // arguments for heap_integers_add (n1_ptr, n2_ptr, size in heap and return remainder)
+        func_body
+            .i32_const(0)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(0);
+
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+        let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx);
+        // Shift left
+        func_body.call(heap_integers_add_f);
+
+        let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let data = [n1.to_le_bytes::<32>(), n2.to_le_bytes::<32>()].concat();
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module(&mut raw_module, data.to_vec(), "test_function", None);
+
+        let remainder_ptr: i32 = entrypoint.call(&mut store, (0, TYPE_HEAP_SIZE)).unwrap();
+
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+
         let mut remainder_result_memory_data = vec![0; TYPE_HEAP_SIZE as usize];
         memory
             .read(
@@ -686,7 +801,6 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(quotient_result_memory_data, quotient.to_le_bytes::<32>());
         assert_eq!(remainder_result_memory_data, remainder.to_le_bytes::<32>());
     }
 }
