@@ -25,7 +25,11 @@ mod tx_context {
     use alloy_primitives::Address;
 
     use crate::common::{
-        runtime_sandbox::constants::MSG_SENDER_ADDRESS, translate_test_package_with_framework,
+        runtime_sandbox::constants::{
+            BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, GAS_PRICE,
+            MSG_SENDER_ADDRESS, MSG_VALUE,
+        },
+        translate_test_package_with_framework,
     };
 
     use super::*;
@@ -43,17 +47,24 @@ mod tx_context {
     }
 
     sol!(
-        // TODO: remove this as argument when the automatic injection is implemented
-        struct TxContext {
-            bool tx_ctx;
-        }
-
         #[allow(missing_docs)]
-        function getSender(TxContext tx_ctx) external returns (address);
+        function getSender() external returns (address);
+        function getMsgValue() external returns (uint256);
+        function getBlockNumber() external returns (uint64);
+        function getBlockBasefee() external returns (uint256);
+        function getBlockGasLimit() external returns (uint64);
+        function getBlockTimestamp() external returns (uint64);
+        function getGasPrice() external returns (uint256);
     );
 
     #[rstest]
-    #[case(getSenderCall::new((TxContext { tx_ctx: false },)), (Address::new(MSG_SENDER_ADDRESS),))]
+    #[case(getSenderCall::new(()), (Address::new(MSG_SENDER_ADDRESS),))]
+    #[case(getMsgValueCall::new(()), (MSG_VALUE,))]
+    #[case(getBlockNumberCall::new(()), (BLOCK_NUMBER,))]
+    #[case(getBlockBasefeeCall::new(()), (BLOCK_BASEFEE,))]
+    #[case(getBlockGasLimitCall::new(()), (BLOCK_GAS_LIMIT,))]
+    #[case(getBlockTimestampCall::new(()), (BLOCK_TIMESTAMP,))]
+    #[case(getGasPriceCall::new(()), (GAS_PRICE,))]
     fn test_tx_context<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

@@ -15,6 +15,8 @@ use crate::{
     },
 };
 
+use super::vm_handled_datatypes::TxContext;
+
 mod unpack_enum;
 mod unpack_heap_int;
 mod unpack_native_int;
@@ -173,6 +175,9 @@ impl Unpackable for IntermediateType {
                     .get_by_index(*index)
                     .unwrap();
 
+                // TODO: Check if the struct is TxContext. If it is, panic since the only valid
+                // TxContext is the one defined in the stylus framework.
+
                 struct_.add_unpack_instructions(
                     function_builder,
                     module,
@@ -224,13 +229,22 @@ impl Unpackable for IntermediateType {
                     .unwrap();
 
                 match external_data {
-                    ExternalModuleData::Struct(istruct) => istruct.add_unpack_instructions(
-                        function_builder,
-                        module,
-                        reader_pointer,
-                        calldata_reader_pointer,
-                        compilation_ctx,
-                    ),
+                    ExternalModuleData::Struct(istruct) => {
+                        if TxContext::struct_is_tx_context(module_id, identifier) {
+                            TxContext::inject_tx_context(
+                                function_builder,
+                                compilation_ctx.allocator,
+                            );
+                        } else {
+                            istruct.add_unpack_instructions(
+                                function_builder,
+                                module,
+                                reader_pointer,
+                                calldata_reader_pointer,
+                                compilation_ctx,
+                            )
+                        }
+                    }
                     ExternalModuleData::Enum(ienum) => {
                         if !ienum.is_simple {
                             panic!(

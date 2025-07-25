@@ -8,6 +8,8 @@ use crate::{
     utils::snake_to_camel,
 };
 
+use super::vm_handled_datatypes::TxContext;
+
 pub type AbiFunctionSelector = [u8; 4];
 
 fn selector<T: AsRef<[u8]>>(bytes: T) -> AbiFunctionSelector {
@@ -98,6 +100,13 @@ impl SolName for IntermediateType {
                     .get_external_module_data(module_id, identifier)
                     .unwrap();
                 match external_data {
+                    // TxContext should not be part of the function signature, since it is injected
+                    // by the VM.
+                    ExternalModuleData::Struct(_)
+                        if TxContext::struct_is_tx_context(module_id, identifier) =>
+                    {
+                        Some("".to_owned())
+                    }
                     ExternalModuleData::Struct(istruct) => {
                         Self::struct_fields_sol_name(istruct, compilation_ctx)
                     }

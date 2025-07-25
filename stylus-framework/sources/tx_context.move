@@ -15,30 +15,7 @@ const EBadTxHashLength: u64 = 0;
 /// Information about the transaction currently being executed.
 /// This cannot be constructed by a transaction--it is a privileged object created by
 /// the VM and passed in to the entrypoint of the transaction as `&mut TxContext`.
-public struct TxContext has drop {
-    /*
-    /// The address of the user that signed the current transaction
-    sender: address,
-
-    /// The value of the sent message
-    msg_value: vector<u8>,
-
-    /// The current block
-    block_number: u256,
-
-    /// Base tx fee
-    block_basefee: u256,
-
-    /// Tx gas limit
-    block_gaslimit: u256,
-
-    /// Block approximate timestamp
-    block_timestamp: u256,
-
-    /// Chain ID
-    chain_id: u256,
-    */
-}
+public struct TxContext has drop {}
 
 /// Return the address of the user that signed the current
 /// transaction
@@ -46,6 +23,48 @@ public fun sender(_self: &TxContext): address {
     native_sender()
 }
 native fun native_sender(): address;
+
+/// Return the number of wei sent with the message
+public fun msg_value(_self: &TxContext): u256 {
+    native_msg_value()
+}
+native fun native_msg_value(): u256;
+
+/// Return the current block's number.
+public fun block_number(_self: &TxContext): u64 {
+    native_block_number()
+}
+native fun native_block_number(): u64;
+
+/// Return the current block's base fee (EIP-3198 and EIP-1559)
+public fun block_basefee(_self: &TxContext): u256 {
+    native_block_basefee()
+}
+native fun native_block_basefee(): u256;
+
+/// Return the current block's gas limit.
+public fun block_gas_limit(_self: &TxContext): u64 {
+    native_block_gas_limit()
+}
+native fun native_block_gas_limit(): u64;
+
+/// Return the current block's timestamp as seconds since unix epoch
+public fun block_timestamp(_self: &TxContext): u64 {
+    native_block_timestamp()
+}
+native fun native_block_timestamp(): u64;
+
+/// Return the chain ID of the current transaction.
+public fun chain_id(_self: &TxContext): u64 {
+    native_chain_id()
+}
+native fun native_chain_id(): u64;
+
+/// Return the gas price of the transaction
+public fun gas_price(_self: &TxContext): u256 {
+    native_gas_price()
+}
+native fun native_gas_price(): u256;
 
 /*
 /// Return the transaction digest (hash of transaction inputs).
