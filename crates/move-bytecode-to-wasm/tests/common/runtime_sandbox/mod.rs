@@ -2,7 +2,10 @@
 pub mod constants;
 
 use anyhow::Result;
-use constants::{MSG_SENDER_ADDRESS, SIGNER_ADDRESS};
+use constants::{
+    BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, CHAIN_ID, GAS_PRICE,
+    MSG_SENDER_ADDRESS, MSG_VALUE, SIGNER_ADDRESS,
+};
 use walrus::Module;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
 
@@ -18,6 +21,43 @@ pub struct RuntimeSandbox {
     engine: Engine,
     linker: Linker<ModuleData>,
     module: WasmModule,
+}
+
+macro_rules! link_fn_ret_constant {
+    ($linker:expr, $name:literal, $constant:expr, $constant_type: ty) => {
+        $linker
+            .func_wrap(
+                "vm_hooks",
+                $name,
+                move |_caller: Caller<'_, ModuleData>| -> $constant_type {
+                    println!("{} called", $name);
+                    $constant as $constant_type
+                },
+            )
+            .unwrap();
+    };
+}
+
+macro_rules! link_fn_write_constant {
+    ($linker:expr, $name:literal, $constant:expr) => {
+        $linker
+            .func_wrap(
+                "vm_hooks",
+                $name,
+                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
+                    println!("{} called, writing in {ptr}", $name);
+
+                    let mem = match caller.get_export("memory") {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    mem.write(&mut caller, ptr as usize, &$constant).unwrap();
+                },
+            )
+            .unwrap();
+    };
+    () => {};
 }
 
 impl RuntimeSandbox {
@@ -88,21 +128,6 @@ impl RuntimeSandbox {
         linker
             .func_wrap(
                 "vm_hooks",
-                "tx_origin",
-                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
-                    println!("tx_origin, writing in {ptr}");
-
-                    let mem = get_memory(&mut caller);
-
-                    mem.write(&mut caller, ptr as usize, &SIGNER_ADDRESS)
-                        .unwrap();
-                },
-            )
-            .unwrap();
-
-        linker
-            .func_wrap(
-                "vm_hooks",
                 "emit_log",
                 move |mut caller: Caller<'_, ModuleData>, ptr: u32, len: u32, _topic: u32| {
                     println!("emit_log, reading from {ptr}, length: {len}");
@@ -117,20 +142,16 @@ impl RuntimeSandbox {
             )
             .unwrap();
 
-        linker
-            .func_wrap(
-                "vm_hooks",
-                "msg_sender",
-                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
-                    println!("msg_sender, writing in {ptr}");
+        link_fn_write_constant!(linker, "tx_origin", SIGNER_ADDRESS);
+        link_fn_write_constant!(linker, "msg_sender", MSG_SENDER_ADDRESS);
+        link_fn_write_constant!(linker, "msg_value", MSG_VALUE.to_le_bytes::<32>());
+        link_fn_write_constant!(linker, "block_basefee", BLOCK_BASEFEE.to_le_bytes::<32>());
+        link_fn_write_constant!(linker, "tx_gas_price", GAS_PRICE.to_le_bytes::<32>());
 
-                    let mem = get_memory(&mut caller);
-
-                    mem.write(&mut caller, ptr as usize, &MSG_SENDER_ADDRESS)
-                        .unwrap();
-                },
-            )
-            .unwrap();
+        link_fn_ret_constant!(linker, "chainid", CHAIN_ID, i64);
+        link_fn_ret_constant!(linker, "block_number", BLOCK_NUMBER, i64);
+        link_fn_ret_constant!(linker, "block_gas_limit", BLOCK_GAS_LIMIT, i64);
+        link_fn_ret_constant!(linker, "block_timestamp", BLOCK_TIMESTAMP, i64);
 
         if cfg!(feature = "inject-host-debug-fns") {
             linker
