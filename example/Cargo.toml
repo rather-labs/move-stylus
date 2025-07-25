@@ -7,6 +7,10 @@ edition = "2021"
 name = "interaction"
 path = "scripts/interaction.rs"
 
+[[bin]]
+name = "primitives_and_operations"
+path = "scripts/primitives_and_operations.rs"
+
 [dependencies]
 dotenv = "0.15.0"
 ethers = "2.0"

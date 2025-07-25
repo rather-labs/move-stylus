@@ -16,21 +16,6 @@ use eyre::eyre;
 use std::str::FromStr;
 use std::sync::Arc;
 
-
-
-/*
-            function sum32(uint32 x, uint32 y) public view returns (uint32)
-            function sum128(uint128 x, uint128 y) public view returns (uint128)
-            function sub32(uint32 x, uint32 y) public view returns (uint32)
-            function sub128(uint128 x, uint128 y) public view returns (uint128)
-            function mul32(uint32 x, uint32 y) public view returns (uint32)
-            function mul128(uint128 x, uint128 y) public view returns (uint128)
-            function div32(uint32 x, uint32 y) public view returns (uint32)
-            function div128(uint128 x, uint128 y) public view returns (uint128)
-            function mod32(uint32 x, uint32 y) public view returns (uint32)
-            function mod128(uint128 x, uint128 y) public view returns (uint128)
-*/
-
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     dotenv().ok();
