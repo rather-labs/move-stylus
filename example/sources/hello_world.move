@@ -2,7 +2,6 @@ module hello_world::hello_world;
 
 use stylus::tx_context::TxContext;
 use hello_world::other_mod::Test;
-use hello_world::another_mod::AnotherTest;
 
 const INT_AS_CONST: u128 = 128128128;
 
@@ -111,16 +110,16 @@ public fun fibonacci(n: u64): u64 {
     b
 }
 
+// Just an intrincated contrl flow example
 public fun sum_special(n: u64): u64 {
     let mut total = 0;
     let mut i = 1;
 
     'outer: loop {
         if (i > n) {
-            break // Exit main loop
+            break
         };
 
-        // Check if i is prime using a while loop
         if (i > 1) {
             let mut j = 2;
             let mut x = 1;
@@ -169,3 +168,4 @@ public fun echo_variant(x:  TestEnum): TestEnum {
 public fun test_values(test: &Test): (u8, u8) {
     test.get_test_values()
 }
+
