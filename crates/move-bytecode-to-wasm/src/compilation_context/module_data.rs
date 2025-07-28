@@ -4,6 +4,7 @@ mod struct_data;
 
 use crate::{
     GlobalFunctionTable,
+    constructor::is_init,
     translation::{
         functions::MappedFunction,
         intermediate_types::{
@@ -467,7 +468,7 @@ impl ModuleData {
                     .unwrap(),
             );
 
-            let function_name = move_module.identifier_at(function.name).as_str();            
+            let function_name = move_module.identifier_at(function.name).as_str();
             let function_module = move_module.module_handle_at(function.module);
             let function_module_name = move_module.identifier_at(function_module.name).as_str();
             let function_module_address: Address = move_module
@@ -506,6 +507,15 @@ impl ModuleData {
                     &vec![]
                 };
 
+                let is_init = is_init(
+                    function_id.clone(),
+                    move_function_arguments,
+                    move_function_return,
+                    function_def,
+                    datatype_handles_map,
+                    move_module,
+                );
+
                 function_information.push(MappedFunction::new(
                     function_id.clone(),
                     move_function_arguments,
@@ -513,6 +523,7 @@ impl ModuleData {
                     code_locals,
                     function_def,
                     datatype_handles_map,
+                    is_init,
                 ));
 
                 function_definitions.insert(function_id.clone(), function_def);

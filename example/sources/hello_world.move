@@ -53,6 +53,6 @@ public fun test3(ctx: &AnotherTest): u8 {
     42
 }
 
-fun init(ctx: &TxContext) {
-    
-}
+public struct HELLO_WORLD has drop {f: bool}
+
+fun init(otw: HELLO_WORLD, ctx: &TxContext) {}

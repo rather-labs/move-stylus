@@ -8,7 +8,7 @@ use walrus::{
     ir::{LoadKind, MemArg, StoreKind},
 };
 
-use crate::{CompilationContext, UserDefinedType, translation::intermediate_types::ISignature, constructor::is_init};
+use crate::{CompilationContext, UserDefinedType, translation::intermediate_types::ISignature};
 
 use super::{intermediate_types::IntermediateType, table::FunctionId};
 
@@ -20,7 +20,7 @@ pub struct MappedFunction {
     pub arguments: Vec<IntermediateType>,
     pub results: Vec<ValType>,
 
-    /// Flag that tells us if the function is the init function
+    /// Flag that tells us if the function is an init function
     pub is_init: bool,
 
     /// Flag that tells us if the function can be used as an entrypoint
@@ -39,6 +39,7 @@ impl MappedFunction {
         move_locals: &[SignatureToken],
         function_definition: &FunctionDefinition,
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+        is_init: bool,
     ) -> Self {
         let signature = ISignature::from_signatures(move_args, move_rets, handles_map);
         let results = signature.get_return_wasm_types();
@@ -58,8 +59,6 @@ impl MappedFunction {
             .map(|s| IntermediateType::try_from_signature_token(s, handles_map))
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
-
-        let is_init = is_init(function_id.clone(),  move_args, move_rets, function_definition);
 
         Self {
             function_id,

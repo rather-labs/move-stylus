@@ -45,7 +45,6 @@ pub fn translate_package(
     package: CompiledPackage,
     module_name: Option<String>,
 ) -> HashMap<String, Module> {
-    
     let root_compiled_units: Vec<CompiledUnitWithSource> = if let Some(module_name) = module_name {
         package
             .root_compiled_units
@@ -286,7 +285,7 @@ fn translate_and_link_functions(
         .get(function_id)
         .unwrap_or_else(|| panic!("could not find function definition for {}", function_id));
 
-        // If the function contains code we translate it
+    // If the function contains code we translate it
     // If it does not it means is a native function, we do nothing, it is linked and called
     // directly in the translation function
     if let Some(move_bytecode) = function_definition.code.as_ref() {
