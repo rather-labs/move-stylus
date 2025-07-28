@@ -191,9 +191,6 @@ pub fn build_pack_instructions<T: Packable>(
         }
     }
 
-    // This will remain in the stack as return value
-    // builder.local_get(pointer);
-
     // Use the allocator to get a pointer to the end of the calldata
     builder
         .i32_const(0)
@@ -204,7 +201,7 @@ pub fn build_pack_instructions<T: Packable>(
 
     (pointer, pointer_end)
 
-    // The value remaining in the stack is the length of the encoded data
+    // The pointer_end remaining in the stack is the length of the encoded data
 }
 
 impl Packable for IntermediateType {
@@ -599,7 +596,7 @@ mod tests {
         func_body.i32_const(1234);
         func_body.i64_const(123456789012345);
 
-        build_pack_instructions(
+        let (data_start, data_end) = build_pack_instructions(
             &mut func_body,
             &[
                 IntermediateType::IBool,
@@ -610,6 +607,8 @@ mod tests {
             &compilation_ctx,
         );
 
+        func_body.local_get(data_start).local_get(data_end);
+
         // validation
         func_body.call(validator_func);
 
@@ -618,8 +617,7 @@ mod tests {
 
         display_module(&mut raw_module);
 
-        let data =
-            <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
+        let data = <sol!((bool, uint16, uint64))>::abi_encode(&(true, 1234, 123456789012345));
         println!("data: {:?}", data);
         let data_len = data.len() as i32;
 
@@ -661,7 +659,7 @@ mod tests {
         func_body.i32_const(1234);
         func_body.i64_const(123456789012345);
 
-        build_pack_instructions(
+        let (data_start, data_end) = build_pack_instructions(
             &mut func_body,
             &[
                 IntermediateType::IBool,
@@ -672,6 +670,8 @@ mod tests {
             &compilation_ctx,
         );
 
+        func_body.local_get(data_start).local_get(data_end);
+
         // validation
         func_body.call(validator_func);
 
@@ -680,8 +680,7 @@ mod tests {
 
         display_module(&mut raw_module);
 
-        let data =
-            <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
+        let data = <sol!((bool, uint16, uint64))>::abi_encode(&(true, 1234, 123456789012345));
         println!("data: {:?}", data);
         let data_len = data.len() as i32;
 
@@ -750,7 +749,7 @@ mod tests {
         func_body.i32_const(0); // vector pointer
         func_body.i32_const(152); // u256 pointer
 
-        build_pack_instructions(
+        let (data_start, data_end) = build_pack_instructions(
             &mut func_body,
             &[
                 IntermediateType::IU16,
@@ -762,6 +761,8 @@ mod tests {
             &mut raw_module,
             &compilation_ctx,
         );
+
+        func_body.local_get(data_start).local_get(data_end);
 
         // validation
         func_body.call(validator_func);

@@ -220,13 +220,12 @@ impl<'a> PublicFunction<'a> {
                     compilation_ctx,
                 );
 
-                /*
+                // Add 32 to the length of the data
                 block
                     .i32_const(32)
                     .local_get(data_end)
                     .binop(BinaryOp::I32Add)
                     .local_set(data_end);
-                */
 
                 (data_start, data_end)
             } else {

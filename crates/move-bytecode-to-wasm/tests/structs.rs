@@ -65,8 +65,8 @@ mod struct_fields {
     #[case(echoU128Call::new((1,)), (1,))]
     #[case(echoU256Call::new((U256::MAX,)), (U256::MAX,))]
     #[case(echoU256Call::new((U256::from(1),)), (U256::from(1),))]
-    #[case(echoVecStackTypeCall::new((vec![1,2,u32::MAX,3,4],)), (vec![1,2,u32::MAX,3,4],))]
-    #[case(echoVecHeapTypeCall::new((vec![1,2,u128::MAX,3,4],)), (vec![1,2,u128::MAX,3,4],))]
+    #[case(echoVecStackTypeCall::new((vec![1,2,u32::MAX,3,4],)), vec![1,2,u32::MAX,3,4])]
+    #[case(echoVecHeapTypeCall::new((vec![1,2,u128::MAX,3,4],)), vec![1,2,u128::MAX,3,4])]
     #[case(echoAddressCall::new(
     (address!("0xcafe000000000000000000000000000000007357"),)),
     (address!("0xcafe000000000000000000000000000000007357"),))
@@ -134,8 +134,8 @@ mod struct_mut_fields {
     #[case(echoMutU128Call::new((1,)), (1,))]
     #[case(echoMutU256Call::new((U256::MAX,)), (U256::MAX,))]
     #[case(echoMutU256Call::new((U256::from(1),)), (U256::from(1),))]
-    #[case(echoMutVecStackTypeCall::new((vec![1,2,u32::MAX,3,4],)), (vec![1,2,u32::MAX,3,4],))]
-    #[case(echoMutVecHeapTypeCall::new((vec![1,2,u128::MAX,3,4],)), (vec![1,2,u128::MAX,3,4],))]
+    #[case(echoMutVecStackTypeCall::new((vec![1,2,u32::MAX,3,4],)), vec![1,2,u32::MAX,3,4])]
+    #[case(echoMutVecHeapTypeCall::new((vec![1,2,u128::MAX,3,4],)), vec![1,2,u128::MAX,3,4])]
     #[case(echoMutAddressCall::new(
         (address!("0xcafe000000000000000000000000000000007357"),)),
         (address!("0xcafe000000000000000000000000000000007357"),))
