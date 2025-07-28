@@ -38,7 +38,7 @@ sol!(
         }
 
         #[derive(Debug)]
-        struct FooFoo {
+        struct Baz {
             uint16 c;
             Bar d;
             address e;
@@ -66,7 +66,10 @@ sol!(
 
         function createFooU16(uint16 x, uint16 y) external view returns (Foo);
         function createFoo2U16(uint16 x, uint16 y) external view returns (Foo,Foo);
-        function createFooFooU16(uint16 x, uint16 y) external view returns (FooFoo);
+        function createBazU16(uint16 x, uint16 y) external view returns (Baz);
+        function createBaz2U16(uint16 x, uint16 y) external view returns (Baz,Baz);
+        function multiValues1() external view returns (uint32[], uint128[], bool, uint64);
+        function multiValues2() external view returns (uint8, bool, uint64);
         function echoVariant(TestEnum v) external view returns (TestEnum);
         function testValues(Test test) external view returns (uint8, uint8);
         function echo(uint128 x) external view returns (uint128);
@@ -141,16 +144,20 @@ async fn main() -> eyre::Result<()> {
     let create_foo = example.createFooU16(55, 66).call().await?;
     println!("createFooU16(55, 66) = {:#?}", create_foo);
 
-    let create_foo_foo = example.createFooFooU16(55, 66).call().await?;
-    println!("createFooFooU16(55, 66) = {:#?}", create_foo_foo);
-
-    /*
-    let create_foo = example.createFoo2U16(55, 66).call_raw().await?;
-    println!("createFoo2U16(55, 66) = {:?}", create_foo.bytes());
-    */
+    let create_baz = example.createBazU16(55, 66).call().await?;
+    println!("createBazU16(55, 66) = {:#?}", create_baz);
 
     let create_foo = example.createFoo2U16(55, 66).call().await?;
     println!("createFoo2U16(55, 66) = {:#?} {:#?}", create_foo._0, create_foo._1);
+
+    let create_baz = example.createBaz2U16(55, 66).call().await?;
+    println!("createBaz2U16(55, 66) = {:#?} {:#?}", create_baz._0, create_baz._1);
+
+    let multi_values = example.multiValues1().call().await?;
+    println!("multiValues1 = ({:?}, {:?}, {}, {})", multi_values._0, multi_values._1, multi_values._2, multi_values._3);
+
+    let multi_values = example.multiValues2().call().await?;
+    println!("multiValues2 = ({}, {}, {})", multi_values._0, multi_values._1, multi_values._2);
 
     let echo_variant = example.echoVariant(Example::TestEnum::FirstVariant).call().await?;
     println!("echoVariant(FirstVariant) = {:?}", echo_variant);

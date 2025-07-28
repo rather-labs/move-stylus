@@ -21,7 +21,7 @@ public struct Foo<T> has drop, copy {
     i: vector<u32>,
 }
 
-public struct FooFoo<T> has drop, copy {
+public struct Baz<T> has drop, copy {
     c: T,
     d: Bar,
     e: address,
@@ -186,8 +186,8 @@ public fun create_foo2_u16(a: u16, b: u16): (Foo<u16>, Foo<u16>) {
     (foo, copy(foo))
 }
 
-public fun create_foo_foo_u16(a: u16, b: u16): FooFoo<u16> {
-    let foo = FooFoo {
+public fun create_baz_u16(a: u16, b: u16): Baz<u16> {
+    let baz = Baz {
         c: a,
         d: Bar { a: 42, b: 4242 },
         e: @0x7357,
@@ -196,7 +196,28 @@ public fun create_foo_foo_u16(a: u16, b: u16): FooFoo<u16> {
         h: 2,
     };
 
-    foo
+    baz
+}
+
+public fun create_baz2_u16(a: u16, b: u16): (Baz<u16>, Baz<u16>) {
+    let baz = Baz {
+        c: a,
+        d: Bar { a: 42, b: 4242 },
+        e: @0x7357,
+        f: true,
+        g: 1,
+        h: 2,
+    };
+
+    (baz, copy(baz))
+}
+
+public fun multi_values_1(): (vector<u32>, vector<u128>, bool, u64) {
+    (vector[0xFFFFFFFF, 0xFFFFFFFF], vector[0xFFFFFFFFFF_u128], true, 42)
+}
+
+public fun multi_values_2(): (u8, bool, u64) {
+    (84, true, 42)
 }
 
 // Enums
