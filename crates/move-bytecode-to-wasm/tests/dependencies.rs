@@ -77,7 +77,7 @@ fn test_dependencies<T: SolCall, V: SolValue>(
     run_test(
         runtime,
         call_data.abi_encode(),
-        expected_result.abi_encode_params(),
+        expected_result.abi_encode(),
     )
     .unwrap();
 }
