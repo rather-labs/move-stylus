@@ -9,6 +9,7 @@ use alloy::providers::Provider;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
+use std::io::Read;
 
 use eyre::eyre;
 use std::str::FromStr;
@@ -44,7 +45,6 @@ sol!(
             bool f;
             uint64 g;
             uint256 h;
-            uint32[] i;
         }
 
         #[derive(Debug)]
@@ -138,15 +138,19 @@ async fn main() -> eyre::Result<()> {
     let sum_special_4 = example.sumSpecial(4).call().await?;
     println!("sumSpecial(4) = {}", sum_special_4);
 
-    let create_foo = example.createFoo2U16(55, 66).call().await?;
-    println!("createFoo2U16(55, 66) = {:#?} {:#?}", create_foo._0, create_foo._1);
-
     let create_foo = example.createFooU16(55, 66).call().await?;
     println!("createFooU16(55, 66) = {:#?}", create_foo);
 
-
     let create_foo_foo = example.createFooFooU16(55, 66).call().await?;
     println!("createFooFooU16(55, 66) = {:#?}", create_foo_foo);
+
+    /*
+    let create_foo = example.createFoo2U16(55, 66).call_raw().await?;
+    println!("createFoo2U16(55, 66) = {:?}", create_foo.bytes());
+    */
+
+    let create_foo = example.createFoo2U16(55, 66).call().await?;
+    println!("createFoo2U16(55, 66) = {:#?} {:#?}", create_foo._0, create_foo._1);
 
     let echo_variant = example.echoVariant(Example::TestEnum::FirstVariant).call().await?;
     println!("echoVariant(FirstVariant) = {:?}", echo_variant);

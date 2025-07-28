@@ -170,21 +170,6 @@ public fun create_foo_u16(a: u16, b: u16): Foo<u16> {
     foo
 }
 
-public fun create_foo_foo_u16(a: u16, b: u16): FooFoo<u16> {
-    let mut foo = FooFoo {
-        c: a,
-        d: Bar { a: 42, b: 4242 },
-        e: @0x7357,
-        f: true,
-        g: 1,
-        h: 2,
-    };
-
-    foo.c = b;
-
-    foo
-}
-
 public fun create_foo2_u16(a: u16, b: u16): (Foo<u16>, Foo<u16>) {
     let mut foo = Foo {
         c: a,
@@ -199,6 +184,19 @@ public fun create_foo2_u16(a: u16, b: u16): (Foo<u16>, Foo<u16>) {
     foo.c = b;
 
     (foo, copy(foo))
+}
+
+public fun create_foo_foo_u16(a: u16, b: u16): FooFoo<u16> {
+    let foo = FooFoo {
+        c: a,
+        d: Bar { a: 42, b: 4242 },
+        e: @0x7357,
+        f: true,
+        g: 1,
+        h: 2,
+    };
+
+    foo
 }
 
 // Enums
