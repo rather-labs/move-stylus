@@ -133,7 +133,7 @@ pub fn build_pack_instructions<T: Packable>(
         // definition, a tuple T is dynamic (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k.
         // The encode size for a dynamically encoded field inside a dynamically encoded tuple is
         // just 32 bytes (the value is the offset to where the values are packed)
-        args_size += if returns_multiple_values && signature_token.is_dynamic(compilation_ctx) {
+        args_size += if signature_token.is_dynamic(compilation_ctx) {
             32
         } else {
             signature_token.encoded_size(compilation_ctx)
@@ -164,7 +164,7 @@ pub fn build_pack_instructions<T: Packable>(
         // definition, a tuple T is dynamic (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k.
         // Given that the return tuple is encoded dynamically, for the values that are dynamic
         // inside the tuple, we must force a dynamic encoding.
-        if returns_multiple_values && signature_token.is_dynamic(compilation_ctx) {
+        if signature_token.is_dynamic(compilation_ctx) {
             signature_token.add_pack_instructions_dynamic(
                 builder,
                 module,
@@ -515,6 +515,7 @@ impl Packable for IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IRef(_)
+            | IntermediateType::IEnum(_)
             | IntermediateType::IMutRef(_) => false,
             IntermediateType::IVector(_) => true,
             IntermediateType::IStruct(index) => {
@@ -537,7 +538,6 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot check if generic type parameter is dynamic at compile time");
             }
-            IntermediateType::IEnum(_) => todo!(),
             IntermediateType::IExternalUserData { .. } => todo!(),
         }
     }

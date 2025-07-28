@@ -6,18 +6,19 @@ use hello_world::other_mod::Test;
 const INT_AS_CONST: u128 = 128128128;
 
 /// Struct with generic type T
-public struct Bar has drop {
+public struct Bar has drop, copy {
     a: u32,
     b: u128,
 }
 
-public struct Foo<T> has drop {
+public struct Foo<T> has drop, copy {
     c: T,
     d: Bar,
     e: address,
     f: bool,
     g: u64,
     h: u256,
+    i: vector<u32>,
 }
 
 // Enum
@@ -152,11 +153,28 @@ public fun create_foo_u16(a: u16, b: u16): Foo<u16> {
         f: true,
         g: 1,
         h: 2,
+        i: vector[0xFFFFFFFF],
     };
 
     foo.c = b;
 
     foo
+}
+
+public fun create_foo2_u16(a: u16, b: u16): (Foo<u16>, Foo<u16>) {
+    let mut foo = Foo {
+        c: a,
+        d: Bar { a: 42, b: 4242 },
+        e: @0x7357,
+        f: true,
+        g: 1,
+        h: 2,
+        i: vector[0xFFFFFFFF],
+    };
+
+    foo.c = b;
+
+    (foo, copy(foo))
 }
 
 // Enums

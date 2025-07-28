@@ -33,6 +33,7 @@ sol!(
             bool f;
             uint64 g;
             uint256 h;
+            uint32[] i;
         }
 
         #[derive(Debug)]
@@ -53,6 +54,7 @@ sol!(
         }
 
         function createFooU16(uint16 x, uint16 y) external view returns (Foo);
+        function createFoo2U16(uint16 x, uint16 y) external view returns (Foo,Foo);
         function echoVariant(TestEnum v) external view returns (TestEnum);
         function testValues(Test test) external view returns (uint8, uint8);
         function echo(uint128 x) external view returns (uint128);
@@ -123,6 +125,9 @@ async fn main() -> eyre::Result<()> {
 
     let sum_special_4 = example.sumSpecial(4).call().await?;
     println!("sumSpecial(4) = {}", sum_special_4);
+
+    let create_foo = example.createFoo2U16(55, 66).call().await?;
+    println!("createFoo2U16(55, 66) = {:#?} {:#?}", create_foo._0, create_foo._1);
 
     let create_foo = example.createFooU16(55, 66).call().await?;
     println!("createFooU16(55, 66) = {:#?}", create_foo);
