@@ -37,6 +37,17 @@ sol!(
         }
 
         #[derive(Debug)]
+        struct FooFoo {
+            uint16 c;
+            Bar d;
+            address e;
+            bool f;
+            uint64 g;
+            uint256 h;
+            uint32[] i;
+        }
+
+        #[derive(Debug)]
         enum TestEnum {
             FirstVariant,
             SecondVariant,
@@ -55,6 +66,7 @@ sol!(
 
         function createFooU16(uint16 x, uint16 y) external view returns (Foo);
         function createFoo2U16(uint16 x, uint16 y) external view returns (Foo,Foo);
+        function createFooFooU16(uint16 x, uint16 y) external view returns (FooFoo);
         function echoVariant(TestEnum v) external view returns (TestEnum);
         function testValues(Test test) external view returns (uint8, uint8);
         function echo(uint128 x) external view returns (uint128);
@@ -131,6 +143,10 @@ async fn main() -> eyre::Result<()> {
 
     let create_foo = example.createFooU16(55, 66).call().await?;
     println!("createFooU16(55, 66) = {:#?}", create_foo);
+
+
+    let create_foo_foo = example.createFooFooU16(55, 66).call().await?;
+    println!("createFooFooU16(55, 66) = {:#?}", create_foo_foo);
 
     let echo_variant = example.echoVariant(Example::TestEnum::FirstVariant).call().await?;
     println!("echoVariant(FirstVariant) = {:?}", echo_variant);

@@ -815,7 +815,7 @@ mod reference_structs {
         #[case] call_data: T,
         #[case] expected_result: Foo,
     ) {
-        let expected_result = expected_result.abi_encode_params();
+        let expected_result = expected_result.abi_encode();
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }

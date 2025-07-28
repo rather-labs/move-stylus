@@ -21,6 +21,15 @@ public struct Foo<T> has drop, copy {
     i: vector<u32>,
 }
 
+public struct FooFoo<T> has drop, copy {
+    c: T,
+    d: Bar,
+    e: address,
+    f: bool,
+    g: u64,
+    h: u256,
+}
+
 // Enum
 public enum TestEnum has drop {
     FirstVariant,
@@ -154,6 +163,21 @@ public fun create_foo_u16(a: u16, b: u16): Foo<u16> {
         g: 1,
         h: 2,
         i: vector[0xFFFFFFFF],
+    };
+
+    foo.c = b;
+
+    foo
+}
+
+public fun create_foo_foo_u16(a: u16, b: u16): FooFoo<u16> {
+    let mut foo = FooFoo {
+        c: a,
+        d: Bar { a: 42, b: 4242 },
+        e: @0x7357,
+        f: true,
+        g: 1,
+        h: 2,
     };
 
     foo.c = b;

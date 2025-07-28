@@ -1,8 +1,12 @@
-use walrus::{FunctionId, InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
+use walrus::{
+    FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
+    ir::{BinaryOp, MemArg, StoreKind},
+};
 
 use crate::{
     CompilationContext,
     abi_types::vm_handled_datatypes::inject_signer,
+    runtime::RuntimeFunction,
     translation::{
         functions::add_unpack_function_return_values_instructions,
         intermediate_types::{ISignature, IntermediateType},
@@ -11,7 +15,7 @@ use crate::{
 
 use super::{
     function_encoding::{AbiFunctionSelector, move_signature_to_abi_selector},
-    packing::build_pack_instructions,
+    packing::{Packable, build_pack_instructions},
     unpacking::build_unpack_instructions,
 };
 
@@ -172,8 +176,65 @@ impl<'a> PublicFunction<'a> {
             memory_id,
         );
 
-        build_pack_instructions(block, &self.signature.returns, module, compilation_ctx);
+        if self.signature.returns.is_empty() {
+            block.i32_const(0).i32_const(0).i32_const(0);
+            return;
+        }
 
+        // If we pack a unique value we proceed as always
+        let (data_start, data_end) = if self.signature.returns.len() == 1 {
+            build_pack_instructions(block, &self.signature.returns, module, compilation_ctx)
+        } else {
+            // If it is dynamic and have more than one return value, we have a tuple pointing to
+            // the values
+            if self
+                .signature
+                .returns
+                .iter()
+                .any(|it| it.is_dynamic(compilation_ctx))
+            {
+                let data_start = module.locals.add(ValType::I32);
+
+                // Alloc memory for pointing the dynamic typle
+                block
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(data_start);
+
+                // Little-endian to Big-endian
+                let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
+                block.i32_const(32).call(swap_i32_bytes_function).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        // Abi is left-padded to 32 bytes
+                        offset: 28,
+                    },
+                );
+
+                let (_, data_end) = build_pack_instructions(
+                    block,
+                    &self.signature.returns,
+                    module,
+                    compilation_ctx,
+                );
+
+                /*
+                block
+                    .i32_const(32)
+                    .local_get(data_end)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(data_end);
+                */
+
+                (data_start, data_end)
+            } else {
+                build_pack_instructions(block, &self.signature.returns, module, compilation_ctx)
+            }
+        };
+
+        block.local_get(data_start).local_get(data_end);
         // TODO: Define error handling strategy, for now it will always result in traps
         // So it will only reach this point in the case of success
         block.i32_const(0);

@@ -85,7 +85,7 @@ mod struct_fields {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -154,7 +154,7 @@ mod struct_mut_fields {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -586,7 +586,7 @@ mod struct_abi_packing_unpacking {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -905,7 +905,7 @@ mod struct_pack_unpack {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -1083,7 +1083,7 @@ mod struct_copy {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -1156,7 +1156,7 @@ mod generic_struct_fields {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -1232,7 +1232,7 @@ mod generic_struct_mut_fields {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -1686,7 +1686,7 @@ mod generic_struct_abi_packing_unpacking {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -2016,7 +2016,7 @@ mod generic_struct_pack_unpack {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -2108,7 +2108,7 @@ mod struct_misc {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }

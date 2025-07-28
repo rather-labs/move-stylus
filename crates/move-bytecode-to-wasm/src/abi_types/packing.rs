@@ -111,16 +111,7 @@ pub fn build_pack_instructions<T: Packable>(
     function_return_signature: &[T],
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-) {
-    if function_return_signature.is_empty() {
-        builder.i32_const(0);
-        builder.i32_const(0);
-        return;
-    }
-
-    // Indicates if the function returns multiple values
-    let returns_multiple_values = function_return_signature.len() > 1;
-
+) -> (LocalId, LocalId) {
     // We need to load all return types into locals in order to reverse the read order
     // Otherwise they would be popped in reverse order
     let mut locals = Vec::new();
@@ -142,6 +133,7 @@ pub fn build_pack_instructions<T: Packable>(
     locals.reverse();
 
     let pointer = module.locals.add(ValType::I32);
+    let pointer_end = module.locals.add(ValType::I32);
     let writer_pointer = module.locals.add(ValType::I32);
     let calldata_reference_pointer = module.locals.add(ValType::I32);
 
@@ -200,14 +192,17 @@ pub fn build_pack_instructions<T: Packable>(
     }
 
     // This will remain in the stack as return value
-    builder.local_get(pointer);
+    // builder.local_get(pointer);
 
     // Use the allocator to get a pointer to the end of the calldata
     builder
         .i32_const(0)
         .call(compilation_ctx.allocator)
         .local_get(pointer)
-        .binop(BinaryOp::I32Sub);
+        .binop(BinaryOp::I32Sub)
+        .local_set(pointer_end);
+
+    (pointer, pointer_end)
 
     // The value remaining in the stack is the length of the encoded data
 }
