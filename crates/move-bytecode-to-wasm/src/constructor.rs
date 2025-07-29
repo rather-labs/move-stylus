@@ -7,6 +7,36 @@ use move_binary_format::file_format::{
     SignatureToken, Visibility,
 };
 use std::collections::HashMap;
+use walrus::{FunctionBuilder, FunctionId as WalrusFunctionId, Module};
+
+pub fn inject_constructor(
+    module: &mut Module,
+    allocator_func: WalrusFunctionId,
+    init: Option<WalrusFunctionId>,
+) -> WalrusFunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[], &[]);
+    let mut builder = function.func_body();
+
+    if let Some(init_id) = init {
+        // Retrieve the WASM function signature for init
+        let init_type = module.funcs.get(init_id).ty();
+        let params = module.types.get(init_type).params();
+
+        // If init expects OTW as the first param, synthesize it
+        if params.len() == 2 {
+            // For now, push a dummy OTW reference 
+            builder.i32_const(0);
+        }
+
+        // Inject TxContext 
+        TxContext::inject_tx_context(&mut builder, allocator_func);
+
+        // Call init
+        builder.call(init_id);
+    }
+
+    function.finish(vec![], &mut module.funcs)
+}
 
 const INIT_FUNCTION_NAME: &str = "init";
 
@@ -93,6 +123,7 @@ pub fn is_init(
 }
 
 /// Checks if the given signature token is a one-time witness type.
+//
 // OTW (One-time witness) types are structs with the following requirements:
 // i. Their name is the upper-case version of the module's name.
 // ii. They have no fields (or a single boolean field).

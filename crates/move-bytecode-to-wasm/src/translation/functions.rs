@@ -20,8 +20,8 @@ pub struct MappedFunction {
     pub arguments: Vec<IntermediateType>,
     pub results: Vec<ValType>,
 
-    /// Flag that tells us if the function is an init function
-    pub is_init: bool,
+    /// Flag that tells us if the function acquires global resources
+    pub acquires_global_resources: bool,
 
     /// Flag that tells us if the function can be used as an entrypoint
     pub is_entry: bool,
@@ -39,7 +39,6 @@ impl MappedFunction {
         move_locals: &[SignatureToken],
         function_definition: &FunctionDefinition,
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-        is_init: bool,
     ) -> Self {
         let signature = ISignature::from_signatures(move_args, move_rets, handles_map);
         let results = signature.get_return_wasm_types();
@@ -60,13 +59,15 @@ impl MappedFunction {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
+        let acquires_global_resources = !function_definition.acquires_global_resources.is_empty();
+
         Self {
             function_id,
             signature,
             locals,
             arguments,
             results,
-            is_init,
+            acquires_global_resources,
             is_entry: function_definition.is_entry,
             is_native: function_definition.is_native(),
         }

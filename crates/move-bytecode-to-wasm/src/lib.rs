@@ -3,12 +3,14 @@ use std::{collections::HashMap, path::Path};
 use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use compilation_context::{ModuleData, ModuleId};
+use constructor::inject_constructor;
 use move_binary_format::file_format::FunctionDefinition;
 use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
     source_package::parsed_manifest::PackageName,
 };
 use translation::{
+    intermediate_types::ISignature,
     table::{FunctionId, FunctionTable},
     translate_function,
 };
@@ -137,6 +139,45 @@ pub fn translate_package(
                     &compilation_ctx,
                 ));
             }
+        }
+
+        let empty_signature = ISignature {
+            arguments: vec![],
+            returns: vec![],
+        };
+
+        if let Some(ref init_id) = root_module_data.functions.init {
+            // Get the wasm function id for the init function
+            let wasm_init_fn = function_table
+                .get_by_function_id(init_id)
+                .unwrap()
+                .wasm_function_id
+                .unwrap();
+
+            // Build constructor that calls init()
+            let constructor_fn_id =
+                inject_constructor(&mut module, allocator_func, Some(wasm_init_fn));
+
+            public_functions.push(PublicFunction::new(
+                constructor_fn_id,
+                "constructor",
+                &empty_signature,
+                &compilation_ctx,
+            ));
+
+            println!("Added constructor wrapping init(): {:?}", init_id);
+        } else {
+            // Add a no-op constructor
+            let constructor_fn_id = inject_constructor(&mut module, allocator_func, None);
+
+            public_functions.push(PublicFunction::new(
+                constructor_fn_id,
+                "constructor",
+                &empty_signature,
+                &compilation_ctx,
+            ));
+
+            println!("Added empty constructor (no init).");
         }
 
         hostio::build_entrypoint_router(&mut module, &public_functions, &compilation_ctx);

@@ -3,6 +3,6 @@ use stylus::tx_context::{sender, TxContext};
 
 public struct AnotherTest(u8)
 
-public struct ANOTHER_MOD has drop {}
+// public struct ANOTHER_MOD has drop {}
 
-fun init(otw: ANOTHER_MOD, ctx: &TxContext) {}
+fun init(ctx: &TxContext) {}

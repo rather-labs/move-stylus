@@ -124,12 +124,6 @@ pub fn translate_function(
         function_information,
     );
 
-    // let entry = function_table
-    //     .get_by_function_id(&function_information.function_id)
-    //     .ok_or(anyhow::anyhow!("index {} not found in function table", function_information.function_id))?;
-
-    // let code_unit = &entry.get_move_code_unit().unwrap();
-
     let flow = Flow::new(move_bytecode, function_information);
 
     let mut branch_targets = BranchTargets::new();

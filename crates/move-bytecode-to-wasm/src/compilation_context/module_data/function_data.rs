@@ -16,4 +16,7 @@ pub struct FunctionData {
 
     /// Function information about this module's defined functions
     pub information: Vec<MappedFunction>,
+
+    /// The function id of the init function of this module, if any.
+    pub init: Option<FunctionId>,
 }
