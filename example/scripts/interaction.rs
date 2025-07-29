@@ -9,7 +9,6 @@ use alloy::providers::Provider;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
-use std::io::Read;
 
 use eyre::eyre;
 use std::str::FromStr;
@@ -92,16 +91,16 @@ async fn main() -> eyre::Result<()> {
     let contract_address = std::env::var("CONTRACT_ADDRESS")
         .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS"))?;
 
-
     let signer = PrivateKeySigner::from_str(&priv_key)?;
 
-    let provider = Arc::new(ProviderBuilder::new()
-        .wallet(signer)
-        .with_chain_id(412346)
-        .connect_http(Url::from_str(&rpc_url).unwrap()));
+    let provider = Arc::new(
+        ProviderBuilder::new()
+            .wallet(signer)
+            .with_chain_id(412346)
+            .connect_http(Url::from_str(&rpc_url).unwrap()),
+    );
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
-
 
     let num = example.echo(123).call().await?;
     println!("echo(123) = {}", num);
@@ -148,27 +147,48 @@ async fn main() -> eyre::Result<()> {
     println!("createBazU16(55, 66) = {:#?}", create_baz);
 
     let create_foo = example.createFoo2U16(55, 66).call().await?;
-    println!("createFoo2U16(55, 66) = {:#?} {:#?}", create_foo._0, create_foo._1);
+    println!(
+        "createFoo2U16(55, 66) = {:#?} {:#?}",
+        create_foo._0, create_foo._1
+    );
 
     let create_baz = example.createBaz2U16(55, 66).call().await?;
-    println!("createBaz2U16(55, 66) = {:#?} {:#?}", create_baz._0, create_baz._1);
+    println!(
+        "createBaz2U16(55, 66) = {:#?} {:#?}",
+        create_baz._0, create_baz._1
+    );
 
     let multi_values = example.multiValues1().call().await?;
-    println!("multiValues1 = ({:?}, {:?}, {}, {})", multi_values._0, multi_values._1, multi_values._2, multi_values._3);
+    println!(
+        "multiValues1 = ({:?}, {:?}, {}, {})",
+        multi_values._0, multi_values._1, multi_values._2, multi_values._3
+    );
 
     let multi_values = example.multiValues2().call().await?;
-    println!("multiValues2 = ({}, {}, {})", multi_values._0, multi_values._1, multi_values._2);
+    println!(
+        "multiValues2 = ({}, {}, {})",
+        multi_values._0, multi_values._1, multi_values._2
+    );
 
-    let echo_variant = example.echoVariant(Example::TestEnum::FirstVariant).call().await?;
+    let echo_variant = example
+        .echoVariant(Example::TestEnum::FirstVariant)
+        .call()
+        .await?;
     println!("echoVariant(FirstVariant) = {:?}", echo_variant);
 
-    let echo_variant = example.echoVariant(Example::TestEnum::SecondVariant).call().await?;
+    let echo_variant = example
+        .echoVariant(Example::TestEnum::SecondVariant)
+        .call()
+        .await?;
     println!("echoVariant(SecondVariant) = {:?}", echo_variant);
 
-    let test_values = example.testValues(Example::Test {
-        pos0: 55,
-        pos1: Example::AnotherTest { pos0: 66 },
-    }).call().await?;
+    let test_values = example
+        .testValues(Example::Test {
+            pos0: 55,
+            pos1: Example::AnotherTest { pos0: 66 },
+        })
+        .call()
+        .await?;
     println!("testValues = ({}, {})", test_values._0, test_values._1);
 
     // This simple call will inject the "from" field as asigner
@@ -177,10 +197,11 @@ async fn main() -> eyre::Result<()> {
 
     // A real tx should write in the logs the signer's address
     // 0x3f1eae7d46d88f08fc2f8ed27fcb2ab183eb2d0e
-    let tx = example.echoSignerWithInt(43).into_transaction_request()
+    let tx = example
+        .echoSignerWithInt(43)
+        .into_transaction_request()
         .to(Address::from_str(&contract_address).unwrap())
         .value(parse_ether("0.1")?);
-
 
     let pending_tx = provider.send_transaction(tx).await?;
     let receipt = pending_tx.get_receipt().await?;
@@ -192,4 +213,3 @@ async fn main() -> eyre::Result<()> {
 
     Ok(())
 }
-

@@ -4,11 +4,16 @@
 //! and check the value again. The deployed contract is fully written in Rust and compiled to WASM
 //! but with Stylus, it is accessible just as a normal Solidity smart contract is via an ABI.
 
-use alloy::{primitives::{Address, U256}, providers::ProviderBuilder, signers::local::PrivateKeySigner, sol, transports::http::reqwest::Url};
+use alloy::{
+    primitives::{Address, U256},
+    providers::ProviderBuilder,
+    signers::local::PrivateKeySigner,
+    sol,
+    transports::http::reqwest::Url,
+};
 use dotenv::dotenv;
 use eyre::eyre;
 use std::{str::FromStr, sync::Arc};
-
 
 sol! {
     #[sol(rpc)]
@@ -51,8 +56,6 @@ sol! {
     }
 }
 
-
-
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     dotenv().ok();
@@ -63,10 +66,12 @@ async fn main() -> eyre::Result<()> {
 
     let signer = PrivateKeySigner::from_str(&priv_key)?;
 
-    let provider = Arc::new(ProviderBuilder::new()
-        .wallet(signer)
-        .with_chain_id(412346)
-        .connect_http(Url::from_str(&rpc_url).unwrap()));
+    let provider = Arc::new(
+        ProviderBuilder::new()
+            .wallet(signer)
+            .with_chain_id(412346)
+            .connect_http(Url::from_str(&rpc_url).unwrap()),
+    );
     let address = Address::from_str(&contract_address)?;
     let example = PrimitiveOperations::new(address, provider.clone());
 
@@ -75,7 +80,10 @@ async fn main() -> eyre::Result<()> {
     let res = example.castU8(42u128).call().await?;
     println!("castU8: {}", res);
 
-    let res = example.sumU256(U256::from(u128::MAX), U256::from(u128::MAX)).call().await?;
+    let res = example
+        .sumU256(U256::from(u128::MAX), U256::from(u128::MAX))
+        .call()
+        .await?;
     println!("sumU256: {}", res);
 
     let res = example.subU128(u128::MAX, u128::MAX - 1).call().await?;
@@ -92,13 +100,22 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nBitwise operations");
 
-    let res = example.orU256(U256::from(0xF0F0F0F0F0F0F0F0u128), U256::from(0x0F0F0F0F0F0F0F0Fu128)).call().await?;
+    let res = example
+        .orU256(
+            U256::from(0xF0F0F0F0F0F0F0F0u128),
+            U256::from(0x0F0F0F0F0F0F0F0Fu128),
+        )
+        .call()
+        .await?;
     println!("orU256: 0x{:x}", res);
 
     let res = example.xorU128(u128::MAX, u64::MAX as u128).call().await?;
     println!("xorU128: 0x{:x}", res);
 
-    let res = example.andU64(u64::MAX, 0xF000FFFFFFFF000Fu64).call().await?;
+    let res = example
+        .andU64(u64::MAX, 0xF000FFFFFFFF000Fu64)
+        .call()
+        .await?;
     println!("andU64: 0x{:x}", res);
 
     let res = example.shiftLeftU32(1, 31).call().await?;
@@ -126,19 +143,31 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nComparison operations");
 
-    let res = example.lessThanU256(U256::from(10), U256::from(20)).call().await?;
+    let res = example
+        .lessThanU256(U256::from(10), U256::from(20))
+        .call()
+        .await?;
     println!("lessThanU256(10, 20): {}", res);
 
-    let res = example.lessThanU256(U256::from(20), U256::from(10)).call().await?;
+    let res = example
+        .lessThanU256(U256::from(20), U256::from(10))
+        .call()
+        .await?;
     println!("lessThanU256(20, 10): {}", res);
 
     let res = example.lessThanEqU128(u128::MAX, u128::MAX).call().await?;
     println!("lessThanEqU128(u128::MAX, u128::MAX): {}", res);
 
-    let res = example.lessThanEqU128(u128::MAX - 1, u128::MAX).call().await?;
+    let res = example
+        .lessThanEqU128(u128::MAX - 1, u128::MAX)
+        .call()
+        .await?;
     println!("lessThanEqU128(u128::MAX - 1, u128::MAX): {}", res);
 
-    let res = example.lessThanEqU128(u128::MAX, u128::MAX - 1).call().await?;
+    let res = example
+        .lessThanEqU128(u128::MAX, u128::MAX - 1)
+        .call()
+        .await?;
     println!("lessThanEqU128(u128::MAX, u128::MAX - 1): {}", res);
 
     let res = example.greaterThanU64(100, 50).call().await?;
@@ -158,7 +187,10 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nVector operations");
 
-    let res = example.vecFromU256(U256::from(1), U256::from(2)).call().await?;
+    let res = example
+        .vecFromU256(U256::from(1), U256::from(2))
+        .call()
+        .await?;
     println!("vecFromU256(1, 2): {:?}", res);
 
     let res = example.vecLenU128(vec![1, 2, 3, 4]).call().await?;
@@ -175,5 +207,3 @@ async fn main() -> eyre::Result<()> {
 
     Ok(())
 }
-
-

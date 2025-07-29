@@ -1,12 +1,8 @@
-use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, MemArg, StoreKind},
-};
+use walrus::{FunctionId, InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
 
 use crate::{
     CompilationContext,
     abi_types::vm_handled_datatypes::inject_signer,
-    runtime::RuntimeFunction,
     translation::{
         functions::add_unpack_function_return_values_instructions,
         intermediate_types::{ISignature, IntermediateType},
@@ -15,7 +11,7 @@ use crate::{
 
 use super::{
     function_encoding::{AbiFunctionSelector, move_signature_to_abi_selector},
-    packing::{Packable, build_pack_instructions},
+    packing::build_pack_instructions,
     unpacking::build_unpack_instructions,
 };
 
