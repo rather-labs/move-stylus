@@ -1321,7 +1321,7 @@ fn test_multi_values_return() {
         address,
         uint32[],
         uint128[]
-    ))>::abi_encode(&(
+    ))>::abi_encode_sequence(&(
         U256::from(256256),
         6464,
         3232,
@@ -1343,7 +1343,7 @@ fn test_multi_values_return() {
         uint32,
         uint64,
         uint256
-    ))>::abi_encode(&(
+    ))>::abi_encode_sequence(&(
         vec![100, 200, 300],
         vec![10, 20, 30],
         address!("0x0000000000000000000000000000000000000001"),
@@ -1365,7 +1365,7 @@ fn test_multi_values_return() {
         address,
         uint32[],
         uint128[]
-    ))>::abi_encode(&(
+    ))>::abi_encode_sequence(&(
         U256::from(256256),
         6464,
         3232,
