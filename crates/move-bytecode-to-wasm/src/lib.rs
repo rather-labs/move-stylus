@@ -156,7 +156,7 @@ pub fn translate_package(
 
             // Build constructor that calls init()
             let constructor_fn_id =
-                inject_constructor(&mut module, allocator_func, Some(wasm_init_fn));
+                inject_constructor(&mut module, allocator_func, &compilation_ctx, Some(wasm_init_fn));
 
             public_functions.push(PublicFunction::new(
                 constructor_fn_id,
@@ -168,7 +168,7 @@ pub fn translate_package(
             println!("Added constructor wrapping init(): {:?}", init_id);
         } else {
             // Add a no-op constructor
-            let constructor_fn_id = inject_constructor(&mut module, allocator_func, None);
+            let constructor_fn_id = inject_constructor(&mut module, allocator_func, &compilation_ctx, None);
 
             public_functions.push(PublicFunction::new(
                 constructor_fn_id,

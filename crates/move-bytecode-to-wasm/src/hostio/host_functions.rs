@@ -30,6 +30,31 @@ pub fn write_result(module: &mut Module) -> (FunctionId, ImportId) {
     module.add_import_func("vm_hooks", "write_result", write_result_type)
 }
 
+/// Reads a 32-byte value from permanent storage. Stylus's storage format is identical to
+/// that of the EVM. This means that, under the hood, this hostio is accessing the 32-byte
+/// value stored in the EVM state trie at offset `key`, which will be `0` when not previously
+/// set. The semantics, then, are equivalent to that of the EVM's [`SLOAD`] opcode.
+///
+/// Note: the Stylus VM implements storage caching. This means that repeated calls to the same key
+/// will cost less than in the EVM.
+/// params: key: *const u8, dest: *mut u8
+pub fn storage_load_bytes32(module: &mut Module) -> (FunctionId, ImportId) {
+    let t = module.types.add(&[ValType::I32, ValType::I32], &[]);
+    module.add_import_func("vm_hooks", "storage_load_bytes32", t)
+}
+
+/// Writes a 32-byte value to the permanent storage cache. Stylus's storage format is identical to that
+/// of the EVM. This means that, under the hood, this hostio represents storing a 32-byte value into
+/// the EVM state trie at offset `key`. Refunds are tabulated exactly as in the EVM. The semantics, then,
+/// are equivalent to that of the EVM's [`SSTORE`] opcode.
+///
+/// Note: because the value is cached, one must call `storage_flush_cache` to persist it.
+/// params: key: *const u8, value: *const u8
+pub fn storage_cache_bytes32(module: &mut Module) -> (FunctionId, ImportId) {
+    let t = module.types.add(&[ValType::I32, ValType::I32], &[]);
+    module.add_import_func("vm_hooks", "storage_cache_bytes32", t)
+}
+
 /// Persists any dirty values in the storage cache to the EVM state trie, dropping the cache entirely if requested.
 /// Analogous to repeated invocations of [`SSTORE`].
 ///

@@ -1,5 +1,7 @@
 use crate::UserDefinedType;
 use crate::abi_types::vm_handled_datatypes::TxContext;
+use crate::hostio::host_functions;
+use crate::CompilationContext;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::table::FunctionId;
 use move_binary_format::file_format::{
@@ -7,13 +9,17 @@ use move_binary_format::file_format::{
     SignatureToken, Visibility,
 };
 use std::collections::HashMap;
-use walrus::{FunctionBuilder, FunctionId as WalrusFunctionId, Module};
+use walrus::{FunctionBuilder, FunctionId as WalrusFunctionId, Module, ValType, ir::{MemArg, StoreKind}};
 
 pub fn inject_constructor(
     module: &mut Module,
     allocator_func: WalrusFunctionId,
     init: Option<WalrusFunctionId>,
 ) -> WalrusFunctionId {
+    let (storage_load_bytes32_function, _) = host_functions::storage_load_bytes32(module);
+    let (storage_cache_bytes32_function, _) = host_functions::storage_cache_bytes32(module);
+    let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
+
     let mut function = FunctionBuilder::new(&mut module.types, &[], &[]);
     let mut builder = function.func_body();
 
@@ -24,19 +30,84 @@ pub fn inject_constructor(
 
         // If init expects OTW as the first param, synthesize it
         if params.len() == 2 {
-            // For now, push a dummy OTW reference 
+            // For now, push a dummy OTW reference
             builder.i32_const(0);
         }
 
-        // Inject TxContext 
+        // Inject TxContext
         TxContext::inject_tx_context(&mut builder, allocator_func);
 
         // Call init
         builder.call(init_id);
+
     }
 
     function.finish(vec![], &mut module.funcs)
 }
+
+// pub fn inject_constructor(
+//     module: &mut Module,
+//     allocator_func: WalrusFunctionId,
+//     compilation_ctx: &CompilationContext,
+//     init: Option<WalrusFunctionId>,
+// ) -> WalrusFunctionId {
+//     let (storage_cache_bytes32_function, _) = host_functions::storage_cache_bytes32(module);
+//     let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
+
+//     // Allocate locals for key and value (both 32 bytes)
+//     let key_ptr = module.locals.add(ValType::I32);
+//     let value_ptr = module.locals.add(ValType::I32);
+
+//     let mut function = FunctionBuilder::new(&mut module.types, &[], &[]);
+//     let mut builder = function.func_body();
+
+//     // Allocate memory for key and value
+//     // Let's say the key starts at memory offset 0, value at offset 32
+//     builder.i32_const(0); // key_ptr
+//     builder.local_set(key_ptr);
+
+//     builder.i32_const(32); // value_ptr
+//     builder.local_set(value_ptr);
+
+//     if let Some(init_id) = init {
+//         // If init expects OTW
+//         let init_type = module.funcs.get(init_id).ty();
+//         let params = module.types.get(init_type).params();
+//         if params.len() == 2 {
+//             builder.i32_const(0); // dummy OTW
+//         }
+
+//         // Inject TxContext
+//         TxContext::inject_tx_context(&mut builder, allocator_func);
+
+//         // Call init
+//         builder.call(init_id);
+//     }
+
+//     // ---- Write initialized flag ----
+//     // Fill value memory [32..64] with 1 (or any marker)
+//     builder.local_get(value_ptr);
+//     builder.i32_const(1);
+//     builder.store(
+//         compilation_ctx.memory_id,
+//         StoreKind::I32 { atomic: false },
+//         MemArg {
+//             align: 0,
+//             offset: 0,
+//         },
+//     );
+
+//     // Call storage_cache_bytes32(key_ptr, value_ptr)
+//     builder.local_get(key_ptr);
+//     builder.local_get(value_ptr);
+//     builder.call(storage_cache_bytes32_function);
+
+//     // Persist changes
+//     builder.i32_const(1); // clear cache after flush
+//     builder.call(storage_flush_cache_function);
+
+//     function.finish(vec![], &mut module.funcs)
+// }
 
 const INIT_FUNCTION_NAME: &str = "init";
 

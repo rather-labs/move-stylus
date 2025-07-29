@@ -16,42 +16,42 @@ public fun echo(x: u128): u128 {
     x
 }
 
-// public fun getCopiedLocal(): u128 {
-//     let x = 123;
-//     x
-// }
+public fun getCopiedLocal(): u128 {
+    let x = 123;
+    x
+}
 
-// public fun echo_signer_with_int(x: signer, y: u8): (u8, signer) {
-//     (y, x)
-// }
+public fun echo_signer_with_int(x: signer, y: u8): (u8, signer) {
+    (y, x)
+}
 
-// public fun sum8(x: u8, y: u8): u8 {
-//     x + y
-// }
+public fun sum8(x: u8, y: u8): u8 {
+    x + y
+}
 
-// public fun sum16(x: u16, y: u16): u16 {
-//     x + y
-// }
+public fun sum16(x: u16, y: u16): u16 {
+    x + y
+}
 
-// public fun sum32(x: u32, y: u32): u32 {
-//     x + y
-// }
+public fun sum32(x: u32, y: u32): u32 {
+    x + y
+}
 
-// public fun sum64(x: u64, y: u64): u64 {
-//     x + y
-// }
+public fun sum64(x: u64, y: u64): u64 {
+    x + y
+}
 
-// public fun test(ctx: &TxContext): u8 {
-//     42
-// }
+public fun test(ctx: &TxContext): u8 {
+    42
+}
 
-// public fun test2(ctx: &Test): u8 {
-//     42
-// }
+public fun test2(ctx: &Test): u8 {
+    42
+}
 
-// public fun test3(ctx: &AnotherTest): u8 {
-//     42
-// }
+public fun test3(ctx: &AnotherTest): u8 {
+    42
+}
 
 public struct HELLO_WORLD has drop {f: bool}
 

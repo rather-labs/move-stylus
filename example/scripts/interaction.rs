@@ -53,6 +53,14 @@ async fn main() -> eyre::Result<()> {
 
     let example = Example::new(address, client.clone());
 
+    // let slot = H160::zero(); // Use slot 0x0 for testing if you wrote to key [0; 32]
+    // let storage_value = provider
+    //     .get_storage_at(address, slot.into(), None)
+    //     .await?;
+
+    // println!("Storage value at slot 0x0: {:?}", storage_value);
+
+
     let num = example.echo(123).call().await;
     println!("Example echo = {:?}", num);
 
