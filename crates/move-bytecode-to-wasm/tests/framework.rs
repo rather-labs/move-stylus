@@ -55,7 +55,7 @@ mod tx_context {
         function getBlockGasLimit() external returns (uint64);
         function getBlockTimestamp() external returns (uint64);
         function getGasPrice() external returns (uint256);
-        function getFreshObjectAddress() external returns (address);
+        function getFreshObjectAddress() external returns (address, address, address);
     );
 
     #[rstest]
@@ -84,14 +84,24 @@ mod tx_context {
     #[rstest]
     #[case(
         getFreshObjectAddressCall::new(()),
-        hex::decode("1479ac7b704cd005bf5bb25f15df99642633f692cead691adc22f4f9e23653bc").unwrap()
+        (
+            hex::decode("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")
+                .map(|h| <[u8; 32]>::try_from(h).unwrap())
+                .unwrap(),
+            hex::decode("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989")
+                .map(|h| <[u8; 32]>::try_from(h).unwrap())
+                .unwrap(),
+            hex::decode("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255")
+                .map(|h| <[u8; 32]>::try_from(h).unwrap())
+                .unwrap()
+        )
     )]
     fn test_tx_fresh_id<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
-        #[case] expected_result: Vec<u8>,
+        #[case] expected_result: ([u8; 32], [u8; 32], [u8; 32]),
     ) {
-        let expected_result: [u8; 32] = expected_result.try_into().unwrap();
+        // let expected_result: [u8; 32] = expected_result.try_into().unwrap();
         run_test(
             runtime,
             call_data.abi_encode(),

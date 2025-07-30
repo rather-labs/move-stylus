@@ -143,7 +143,7 @@ impl RuntimeSandbox {
                     mem.read(&caller, input_data_ptr as usize, &mut input_data)
                         .unwrap();
 
-                    println!("input data: {}", hex::encode(&input_data));
+                    println!("input data to hash: {}", hex::encode(&input_data));
 
                     let hash = keccak256(input_data);
 
