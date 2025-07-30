@@ -66,6 +66,14 @@ public fun gas_price(_self: &TxContext): u256 {
 }
 native fun native_gas_price(): u256;
 
+/// Create an `address` that has not been used. As it is an object address, it will never
+/// occur as the address for a user.
+/// In other words, the generated address is a globally unique object ID.
+public fun fresh_object_address(_ctx: &mut TxContext): address {
+    fresh_id()
+}
+native fun fresh_id(): address;
+
 /*
 /// Return the transaction digest (hash of transaction inputs).
 /// Please do not use as a source of randomness.

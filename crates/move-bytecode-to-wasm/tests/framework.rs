@@ -55,6 +55,7 @@ mod tx_context {
         function getBlockGasLimit() external returns (uint64);
         function getBlockTimestamp() external returns (uint64);
         function getGasPrice() external returns (uint256);
+        function getFreshObjectAddress() external returns (address);
     );
 
     #[rstest]
@@ -66,6 +67,23 @@ mod tx_context {
     #[case(getBlockTimestampCall::new(()), (BLOCK_TIMESTAMP,))]
     #[case(getGasPriceCall::new(()), (GAS_PRICE,))]
     fn test_tx_context<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode(),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(getFreshObjectAddressCall::new(()), (Address::new(MSG_SENDER_ADDRESS),))]
+    fn test_tx_fresh_id<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 pub mod constants;
 
+use alloy_primitives::keccak256;
 use anyhow::Result;
 use constants::{
     BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, CHAIN_ID, GAS_PRICE,
@@ -123,6 +124,33 @@ impl RuntimeSandbox {
 
         linker
             .func_wrap("vm_hooks", "storage_flush_cache", |_: i32| {})
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "native_keccak256",
+                move |mut caller: Caller<'_, ModuleData>,
+                      input_data_ptr: u32,
+                      data_length: u32,
+                      return_data_ptr: u32| {
+                    let mem = match caller.get_module_export(&mem_export) {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    let mut input_data = vec![0; data_length as usize];
+                    mem.read(&caller, input_data_ptr as usize, &mut input_data)
+                        .unwrap();
+
+                    let hash = keccak256(input_data);
+
+                    mem.write(&mut caller, return_data_ptr as usize, hash.as_slice())
+                        .unwrap();
+
+                    Ok(())
+                },
+            )
             .unwrap();
 
         linker
