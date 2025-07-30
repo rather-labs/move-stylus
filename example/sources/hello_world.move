@@ -1,7 +1,6 @@
 module hello_world::hello_world;
 
-// use sui::tx_context::TxContext;
-use sui::tx_context::{sender, TxContext};
+use stylus::tx_context::{sender, TxContext};
 use hello_world::other_mod::Test;
 use hello_world::another_mod::AnotherTest;
 
@@ -53,3 +52,6 @@ public fun test3(ctx: &AnotherTest): u8 {
     42
 }
 
+fun init(ctx: &TxContext) {
+    // let x = ctx.block_number();
+}

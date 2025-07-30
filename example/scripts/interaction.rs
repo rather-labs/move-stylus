@@ -11,6 +11,7 @@ use ethers::{
     prelude::abigen,
     providers::{Http, Middleware, Provider},
     signers::{LocalWallet, Signer},
+    types::H256,
     types::{
         Address, H160, NameOrAddress, TransactionRequest, transaction::eip2718::TypedTransaction,
     },
@@ -52,6 +53,28 @@ async fn main() -> eyre::Result<()> {
     ));
 
     let example = Example::new(address, client.clone());
+
+    // Query slot 0x0 (the first storage slot)
+    let slot = H256::zero();
+    let storage_value = provider.get_storage_at(address, slot, None).await?;
+    println!(
+        "Storage value at slot 0x0 BEFORE constructor: {:?}",
+        storage_value
+    );
+
+    // // Call constructor() to write 1 into slot 0x0
+    // let binding = example.constructor_2();
+    // let pending_tx = binding.send().await?;
+    // let _receipt = pending_tx
+    //     .await?
+    //     .ok_or_else(|| eyre::format_err!("constructor tx dropped from mempool"))?;
+
+    // // Query slot 0x0 again
+    // let storage_value = provider.get_storage_at(address, slot, None).await?;
+    // println!(
+    //     "Storage value at slot 0x0 AFTER constructor: {:?}",
+    //     storage_value
+    // );
 
     let num = example.echo(123).call().await;
     println!("Example echo = {:?}", num);

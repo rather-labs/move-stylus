@@ -4,6 +4,7 @@ mod struct_data;
 
 use crate::{
     GlobalFunctionTable,
+    constructor::is_init,
     translation::{
         functions::MappedFunction,
         intermediate_types::{
@@ -443,6 +444,7 @@ impl ModuleData {
         let mut functions_arguments = Vec::new();
         let mut function_calls = Vec::new();
         let mut function_information = Vec::new();
+        let mut init = None;
 
         for (index, function) in move_module.function_handles().iter().enumerate() {
             let move_function_arguments = &move_module.signature_at(function.parameters);
@@ -507,6 +509,22 @@ impl ModuleData {
                     &vec![]
                 };
 
+                let is_init = is_init(
+                    function_id.clone(),
+                    move_function_arguments,
+                    move_function_return,
+                    function_def,
+                    datatype_handles_map,
+                    move_module,
+                );
+
+                if is_init {
+                    if init.is_some() {
+                        panic!("There can be only a single init function per module.");
+                    }
+                    init = Some(function_id.clone());
+                }
+
                 function_information.push(MappedFunction::new(
                     function_id.clone(),
                     move_function_arguments,
@@ -527,6 +545,7 @@ impl ModuleData {
             returns: functions_returns,
             calls: function_calls,
             information: function_information,
+            init,
         }
     }
 
