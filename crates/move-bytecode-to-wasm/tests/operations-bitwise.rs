@@ -55,7 +55,7 @@ mod uint_8 {
         #[case] call_data: T,
         #[case] expected_result: u8,
     ) {
-        let expected_result = <sol!((uint8,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint8,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -73,7 +73,7 @@ mod uint_8 {
         #[case] call_data: T,
         #[case] expected_result: u8,
     ) {
-        let expected_result = <sol!((uint8,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint8,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -91,7 +91,7 @@ mod uint_8 {
         #[case] call_data: T,
         #[case] expected_result: u8,
     ) {
-        let expected_result = <sol!((uint8,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint8,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -119,7 +119,7 @@ mod uint_8 {
         #[case] call_data: T,
         #[case] expected_result: u8,
     ) {
-        let expected_result = <sol!((uint8,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint8,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
@@ -159,7 +159,7 @@ mod uint_16 {
         #[case] call_data: T,
         #[case] expected_result: u16,
     ) {
-        let expected_result = <sol!((uint16,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint16,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -176,7 +176,7 @@ mod uint_16 {
         #[case] call_data: T,
         #[case] expected_result: u16,
     ) {
-        let expected_result = <sol!((uint16,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint16,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -193,7 +193,7 @@ mod uint_16 {
         #[case] call_data: T,
         #[case] expected_result: u16,
     ) {
-        let expected_result = <sol!((uint16,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint16,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -221,7 +221,7 @@ mod uint_16 {
         #[case] call_data: T,
         #[case] expected_result: u16,
     ) {
-        let expected_result = <sol!((uint16,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint16,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
@@ -262,7 +262,7 @@ mod uint_32 {
         #[case] expected_result: u32,
     ) {
         println!("expected_result: {expected_result}");
-        let expected_result = <sol!((uint32,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint32,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -279,7 +279,7 @@ mod uint_32 {
         #[case] call_data: T,
         #[case] expected_result: u32,
     ) {
-        let expected_result = <sol!((uint32,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint32,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -296,7 +296,7 @@ mod uint_32 {
         #[case] call_data: T,
         #[case] expected_result: u32,
     ) {
-        let expected_result = <sol!((uint32,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint32,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -324,7 +324,7 @@ mod uint_32 {
         #[case] call_data: T,
         #[case] expected_result: u32,
     ) {
-        let expected_result = <sol!((uint32,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint32,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
@@ -364,7 +364,7 @@ mod uint_64 {
         #[case] call_data: T,
         #[case] expected_result: u64,
     ) {
-        let expected_result = <sol!((uint64,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint64,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -381,7 +381,7 @@ mod uint_64 {
         #[case] call_data: T,
         #[case] expected_result: u64,
     ) {
-        let expected_result = <sol!((uint64,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint64,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -398,7 +398,7 @@ mod uint_64 {
         #[case] call_data: T,
         #[case] expected_result: u64,
     ) {
-        let expected_result = <sol!((uint64,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint64,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -426,7 +426,7 @@ mod uint_64 {
         #[case] call_data: T,
         #[case] expected_result: u64,
     ) {
-        let expected_result = <sol!((uint64,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint64,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
@@ -466,7 +466,7 @@ mod uint_128 {
         #[case] call_data: T,
         #[case] expected_result: u128,
     ) {
-        let expected_result = <sol!((uint128,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint128,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -483,7 +483,7 @@ mod uint_128 {
         #[case] call_data: T,
         #[case] expected_result: u128,
     ) {
-        let expected_result = <sol!((uint128,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint128,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -500,7 +500,7 @@ mod uint_128 {
         #[case] call_data: T,
         #[case] expected_result: u128,
     ) {
-        let expected_result = <sol!((uint128,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint128,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -528,7 +528,7 @@ mod uint_128 {
         #[case] call_data: T,
         #[case] expected_result: u128,
     ) {
-        let expected_result = <sol!((uint128,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint128,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
@@ -568,7 +568,7 @@ mod uint_256 {
         #[case] call_data: T,
         #[case] expected_result: U256,
     ) {
-        let expected_result = <sol!((uint256,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint256,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -585,7 +585,7 @@ mod uint_256 {
         #[case] call_data: T,
         #[case] expected_result: U256,
     ) {
-        let expected_result = <sol!((uint256,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint256,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -602,7 +602,7 @@ mod uint_256 {
         #[case] call_data: T,
         #[case] expected_result: U256,
     ) {
-        let expected_result = <sol!((uint256,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint256,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -626,7 +626,7 @@ mod uint_256 {
         #[case] call_data: T,
         #[case] expected_result: U256,
     ) {
-        let expected_result = <sol!((uint256,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint256,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }

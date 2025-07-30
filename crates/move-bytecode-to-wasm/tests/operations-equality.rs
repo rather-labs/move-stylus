@@ -87,7 +87,7 @@ mod primitives {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+            <sol!((bool,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }
@@ -127,7 +127,7 @@ mod primitives {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+            <sol!((bool,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }
@@ -420,7 +420,7 @@ mod vector {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+            <sol!((bool,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }
@@ -683,7 +683,7 @@ mod vector {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+            <sol!((bool,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }
@@ -878,7 +878,7 @@ mod references {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+            <sol!((bool,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }
@@ -1033,7 +1033,7 @@ mod references {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+            <sol!((bool,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }
@@ -1118,7 +1118,7 @@ mod structs {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+            <sol!((bool,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }
@@ -1162,7 +1162,7 @@ mod structs {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+            <sol!((bool,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }

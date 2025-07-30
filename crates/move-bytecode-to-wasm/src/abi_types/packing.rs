@@ -111,16 +111,7 @@ pub fn build_pack_instructions<T: Packable>(
     function_return_signature: &[T],
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-) {
-    if function_return_signature.is_empty() {
-        builder.i32_const(0);
-        builder.i32_const(0);
-        return;
-    }
-
-    // Indicates if the function returns multiple values
-    let returns_multiple_values = function_return_signature.len() > 1;
-
+) -> (LocalId, LocalId) {
     // We need to load all return types into locals in order to reverse the read order
     // Otherwise they would be popped in reverse order
     let mut locals = Vec::new();
@@ -133,7 +124,7 @@ pub fn build_pack_instructions<T: Packable>(
         // definition, a tuple T is dynamic (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k.
         // The encode size for a dynamically encoded field inside a dynamically encoded tuple is
         // just 32 bytes (the value is the offset to where the values are packed)
-        args_size += if returns_multiple_values && signature_token.is_dynamic(compilation_ctx) {
+        args_size += if signature_token.is_dynamic(compilation_ctx) {
             32
         } else {
             signature_token.encoded_size(compilation_ctx)
@@ -142,6 +133,7 @@ pub fn build_pack_instructions<T: Packable>(
     locals.reverse();
 
     let pointer = module.locals.add(ValType::I32);
+    let pointer_end = module.locals.add(ValType::I32);
     let writer_pointer = module.locals.add(ValType::I32);
     let calldata_reference_pointer = module.locals.add(ValType::I32);
 
@@ -164,7 +156,7 @@ pub fn build_pack_instructions<T: Packable>(
         // definition, a tuple T is dynamic (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k.
         // Given that the return tuple is encoded dynamically, for the values that are dynamic
         // inside the tuple, we must force a dynamic encoding.
-        if returns_multiple_values && signature_token.is_dynamic(compilation_ctx) {
+        if signature_token.is_dynamic(compilation_ctx) {
             signature_token.add_pack_instructions_dynamic(
                 builder,
                 module,
@@ -199,17 +191,17 @@ pub fn build_pack_instructions<T: Packable>(
         }
     }
 
-    // This will remain in the stack as return value
-    builder.local_get(pointer);
-
     // Use the allocator to get a pointer to the end of the calldata
     builder
         .i32_const(0)
         .call(compilation_ctx.allocator)
         .local_get(pointer)
-        .binop(BinaryOp::I32Sub);
+        .binop(BinaryOp::I32Sub)
+        .local_set(pointer_end);
 
-    // The value remaining in the stack is the length of the encoded data
+    (pointer, pointer_end)
+
+    // The pointer_end remaining in the stack is the length of the encoded data
 }
 
 impl Packable for IntermediateType {
@@ -515,6 +507,7 @@ impl Packable for IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IRef(_)
+            | IntermediateType::IEnum(_)
             | IntermediateType::IMutRef(_) => false,
             IntermediateType::IVector(_) => true,
             IntermediateType::IStruct(index) => {
@@ -537,7 +530,6 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot check if generic type parameter is dynamic at compile time");
             }
-            IntermediateType::IEnum(_) => todo!(),
             IntermediateType::IExternalUserData { .. } => todo!(),
         }
     }
@@ -604,7 +596,7 @@ mod tests {
         func_body.i32_const(1234);
         func_body.i64_const(123456789012345);
 
-        build_pack_instructions(
+        let (data_start, data_end) = build_pack_instructions(
             &mut func_body,
             &[
                 IntermediateType::IBool,
@@ -615,6 +607,8 @@ mod tests {
             &compilation_ctx,
         );
 
+        func_body.local_get(data_start).local_get(data_end);
+
         // validation
         func_body.call(validator_func);
 
@@ -623,8 +617,7 @@ mod tests {
 
         display_module(&mut raw_module);
 
-        let data =
-            <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
+        let data = <sol!((bool, uint16, uint64))>::abi_encode(&(true, 1234, 123456789012345));
         println!("data: {:?}", data);
         let data_len = data.len() as i32;
 
@@ -666,7 +659,7 @@ mod tests {
         func_body.i32_const(1234);
         func_body.i64_const(123456789012345);
 
-        build_pack_instructions(
+        let (data_start, data_end) = build_pack_instructions(
             &mut func_body,
             &[
                 IntermediateType::IBool,
@@ -677,6 +670,8 @@ mod tests {
             &compilation_ctx,
         );
 
+        func_body.local_get(data_start).local_get(data_end);
+
         // validation
         func_body.call(validator_func);
 
@@ -685,8 +680,7 @@ mod tests {
 
         display_module(&mut raw_module);
 
-        let data =
-            <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
+        let data = <sol!((bool, uint16, uint64))>::abi_encode(&(true, 1234, 123456789012345));
         println!("data: {:?}", data);
         let data_len = data.len() as i32;
 
@@ -755,7 +749,7 @@ mod tests {
         func_body.i32_const(0); // vector pointer
         func_body.i32_const(152); // u256 pointer
 
-        build_pack_instructions(
+        let (data_start, data_end) = build_pack_instructions(
             &mut func_body,
             &[
                 IntermediateType::IU16,
@@ -767,6 +761,8 @@ mod tests {
             &mut raw_module,
             &compilation_ctx,
         );
+
+        func_body.local_get(data_start).local_get(data_end);
 
         // validation
         func_body.call(validator_func);
