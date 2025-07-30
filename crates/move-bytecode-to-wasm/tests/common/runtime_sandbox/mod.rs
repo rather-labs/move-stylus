@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 pub mod constants;
 
-use alloy_primitives::keccak256;
+use alloy_primitives::{hex, keccak256};
 use anyhow::Result;
 use constants::{
     BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, CHAIN_ID, GAS_PRICE,
@@ -142,6 +142,8 @@ impl RuntimeSandbox {
                     let mut input_data = vec![0; data_length as usize];
                     mem.read(&caller, input_data_ptr as usize, &mut input_data)
                         .unwrap();
+
+                    println!("input data: {}", hex::encode(&input_data));
 
                     let hash = keccak256(input_data);
 

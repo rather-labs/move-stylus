@@ -22,7 +22,7 @@ fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u
 }
 
 mod tx_context {
-    use alloy_primitives::Address;
+    use alloy_primitives::{Address, hex};
 
     use crate::common::{
         runtime_sandbox::constants::{
@@ -82,14 +82,16 @@ mod tx_context {
     }
 
     #[rstest]
-    #[case(getFreshObjectAddressCall::new(()), (Address::new(MSG_SENDER_ADDRESS),))]
-    fn test_tx_fresh_id<T: SolCall, V: SolValue>(
+    #[case(
+        getFreshObjectAddressCall::new(()),
+        hex::decode("1479ac7b704cd005bf5bb25f15df99642633f692cead691adc22f4f9e23653bc").unwrap()
+    )]
+    fn test_tx_fresh_id<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
-        #[case] expected_result: V,
-    ) where
-        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
-    {
+        #[case] expected_result: Vec<u8>,
+    ) {
+        let expected_result: [u8; 32] = expected_result.try_into().unwrap();
         run_test(
             runtime,
             call_data.abi_encode(),
