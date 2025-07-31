@@ -381,7 +381,40 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
             }
-            IntermediateType::IExternalUserData { .. } => todo!(),
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } => {
+                let external_data = compilation_ctx
+                    .get_external_module_data(module_id, identifier)
+                    .unwrap();
+
+                match external_data {
+                    ExternalModuleData::Struct(struct_) => struct_.add_pack_instructions(
+                        builder,
+                        module,
+                        local,
+                        writer_pointer,
+                        calldata_reference_pointer,
+                        compilation_ctx,
+                        None,
+                    ),
+                    ExternalModuleData::Enum(enum_) => {
+                        if !enum_.is_simple {
+                            panic!(
+                                "cannot abi pack enum, it contains at least one variant with fields"
+                            );
+                        }
+                        IEnum::add_pack_instructions(
+                            builder,
+                            module,
+                            local,
+                            writer_pointer,
+                            compilation_ctx,
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -426,6 +459,41 @@ impl Packable for IntermediateType {
                     compilation_ctx,
                     Some(calldata_reference_pointer),
                 );
+            }
+
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } => {
+                let external_data = compilation_ctx
+                    .get_external_module_data(module_id, identifier)
+                    .unwrap();
+
+                match external_data {
+                    ExternalModuleData::Struct(struct_) => struct_.add_pack_instructions(
+                        builder,
+                        module,
+                        local,
+                        writer_pointer,
+                        calldata_reference_pointer,
+                        compilation_ctx,
+                        Some(calldata_reference_pointer),
+                    ),
+                    ExternalModuleData::Enum(enum_) => {
+                        if !enum_.is_simple {
+                            panic!(
+                                "cannot abi pack enum with it contains at least one variant with fields"
+                            );
+                        }
+                        IEnum::add_pack_instructions(
+                            builder,
+                            module,
+                            local,
+                            writer_pointer,
+                            compilation_ctx,
+                        )
+                    }
+                }
             }
             _ => self.add_pack_instructions(
                 builder,
