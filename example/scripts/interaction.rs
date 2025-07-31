@@ -11,7 +11,6 @@ use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::ht
 use dotenv::dotenv;
 
 use eyre::eyre;
-use std::io::Read;
 use std::str::FromStr;
 use std::sync::Arc;
 
