@@ -405,7 +405,7 @@ impl IntermediateType {
             }
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(&module_id, *index)
+                    .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
                 builder.load(
                     compilation_ctx.memory_id,
@@ -423,7 +423,7 @@ impl IntermediateType {
                 types,
             } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(&module_id, *index)
+                    .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 builder.load(
@@ -639,7 +639,7 @@ impl IntermediateType {
             }
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(&module_id, *index)
+                    .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
                 IStruct::copy_local_instructions(
                     struct_,
@@ -655,7 +655,7 @@ impl IntermediateType {
                 types,
             } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(&module_id, *index)
+                    .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 IStruct::copy_local_instructions(

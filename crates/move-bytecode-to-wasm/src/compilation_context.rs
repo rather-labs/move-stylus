@@ -61,7 +61,7 @@ impl CompilationContext<'_> {
         let module = self
             .deps_data
             .get(module_id)
-            .unwrap_or(&self.root_module_data);
+            .unwrap_or(self.root_module_data);
 
         module.structs.get_by_index(index)
     }

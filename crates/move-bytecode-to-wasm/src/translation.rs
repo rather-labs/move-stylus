@@ -532,7 +532,7 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
                 IntermediateType::IStruct {
                     module_id: module_data.id.clone(),
-                    index: struct_.index() as u16,
+                    index: struct_.index(),
                 },
             )))?;
 
@@ -588,7 +588,7 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
                 IntermediateType::IStruct {
                     module_id: module_data.id.clone(),
-                    index: struct_.index() as u16,
+                    index: struct_.index(),
                 },
             )))?;
 

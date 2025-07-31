@@ -4,7 +4,6 @@ use crate::{
     hostio::host_functions::{block_number, block_timestamp, native_keccak256},
     translation::intermediate_types::address::IAddress,
 };
-use alloy_primitives::I32;
 use walrus::{
     ConstExpr, FunctionBuilder, FunctionId, Module, ValType,
     ir::{BinaryOp, MemArg, StoreKind},

@@ -613,7 +613,7 @@ impl Packable for IntermediateType {
                     ExternalModuleData::Struct(istruct) => {
                         istruct.solidity_abi_encode_is_dynamic(compilation_ctx)
                     }
-                    ExternalModuleData::Enum(ienum) => false,
+                    ExternalModuleData::Enum(_) => false,
                 }
             }
         }
