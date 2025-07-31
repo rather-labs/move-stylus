@@ -124,12 +124,6 @@ pub fn translate_function(
         function_information,
     );
 
-    // let entry = function_table
-    //     .get_by_function_id(&function_information.function_id)
-    //     .ok_or(anyhow::anyhow!("index {} not found in function table", function_information.function_id))?;
-
-    // let code_unit = &entry.get_move_code_unit().unwrap();
-
     let flow = Flow::new(move_bytecode, function_information);
 
     let mut branch_targets = BranchTargets::new();
@@ -536,7 +530,10 @@ fn translate_instruction(
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
-                IntermediateType::IStruct(struct_.index()),
+                IntermediateType::IStruct {
+                    module_id: module_data.id.clone(),
+                    index: struct_.index() as u16,
+                },
             )))?;
 
             bytecodes::structs::borrow_field(
@@ -588,7 +585,10 @@ fn translate_instruction(
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
-                IntermediateType::IStruct(struct_.index()),
+                IntermediateType::IStruct {
+                    module_id: module_data.id.clone(),
+                    index: struct_.index() as u16,
+                },
             )))?;
 
             bytecodes::structs::mut_borrow_field(
@@ -738,7 +738,7 @@ fn translate_instruction(
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
                 | IntermediateType::IExternalUserData { .. }
-                | IntermediateType::IStruct(_)
+                | IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance(_, _)
                 | IntermediateType::IVector(_) => {
                     let pop_back_f =
@@ -1435,7 +1435,10 @@ fn translate_instruction(
 
             bytecodes::structs::pack(struct_, module, builder, compilation_ctx, types_stack)?;
 
-            types_stack.push(IntermediateType::IStruct(struct_definition_index.0));
+            types_stack.push(IntermediateType::IStruct {
+                module_id: module_data.id.clone(),
+                index: struct_definition_index.0,
+            });
         }
         Bytecode::PackGeneric(struct_definition_index) => {
             let struct_ = module_data
@@ -1457,7 +1460,10 @@ fn translate_instruction(
             ));
         }
         Bytecode::Unpack(struct_definition_index) => {
-            types_stack.pop_expecting(&IntermediateType::IStruct(struct_definition_index.0))?;
+            types_stack.pop_expecting(&IntermediateType::IStruct {
+                module_id: module_data.id.clone(),
+                index: struct_definition_index.0,
+            })?;
 
             let struct_ = module_data
                 .structs

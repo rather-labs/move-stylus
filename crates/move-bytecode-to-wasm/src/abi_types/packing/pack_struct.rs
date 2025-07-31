@@ -208,11 +208,9 @@ impl IStruct {
             // current offset of writer pointer, we are going to write the offset where we can find
             // the struct
             let advancement = match field {
-                IntermediateType::IStruct(index) => {
+                IntermediateType::IStruct { module_id, index } => {
                     let child_struct = compilation_ctx
-                        .root_module_data
-                        .structs
-                        .get_by_index(*index)
+                        .get_user_data_type_by_index(module_id, *index)
                         .unwrap();
                     if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
                         child_struct.add_pack_instructions(

@@ -72,12 +72,11 @@ impl SolName for IntermediateType {
             IntermediateType::IVector(inner) => inner
                 .sol_name(compilation_ctx)
                 .map(|sol_n| format!("{sol_n}[]")),
-            IntermediateType::IStruct(index) => {
+            IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
-                    .root_module_data
-                    .structs
-                    .get_by_index(*index)
+                    .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
+
                 Self::struct_fields_sol_name(struct_, compilation_ctx)
             }
             IntermediateType::IGenericStructInstance(index, types) => {
@@ -140,7 +139,9 @@ mod tests {
     use move_binary_format::file_format::StructDefinitionIndex;
 
     use crate::{
-        compilation_context::ModuleData, test_compilation_context, test_tools::build_module,
+        compilation_context::{ModuleData, ModuleId},
+        test_compilation_context,
+        test_tools::build_module,
         translation::intermediate_types::structs::IStruct,
     };
 
@@ -214,7 +215,13 @@ mod tests {
                 (None, IntermediateType::IU64),
                 (None, IntermediateType::IU128),
                 (None, IntermediateType::IU256),
-                (None, IntermediateType::IStruct(1)),
+                (
+                    None,
+                    IntermediateType::IStruct {
+                        module_id: ModuleId::default(),
+                        index: 1,
+                    },
+                ),
             ],
             HashMap::new(),
         );
@@ -235,8 +242,14 @@ mod tests {
         module_data.structs.structs = module_structs;
 
         let signature: &[IntermediateType] = &[
-            IntermediateType::IStruct(0),
-            IntermediateType::IVector(Box::new(IntermediateType::IStruct(1))),
+            IntermediateType::IStruct {
+                module_id: ModuleId::default(),
+                index: 0,
+            },
+            IntermediateType::IVector(Box::new(IntermediateType::IStruct {
+                module_id: ModuleId::default(),
+                index: 1,
+            })),
         ];
 
         compilation_ctx.root_module_data = &module_data;

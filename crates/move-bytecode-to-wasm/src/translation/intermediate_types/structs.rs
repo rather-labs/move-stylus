@@ -276,7 +276,7 @@ impl IStruct {
                         },
                     );
                 }
-                IntermediateType::IStruct(_)
+                IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance(_, _)
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
@@ -356,12 +356,11 @@ impl IStruct {
                 | IntermediateType::IU256
                 | IntermediateType::IAddress => continue,
                 IntermediateType::IVector(_) => return true,
-                IntermediateType::IStruct(index) => {
+                IntermediateType::IStruct { module_id, index } => {
                     let struct_ = compilation_ctx
-                        .root_module_data
-                        .structs
-                        .get_by_index(*index)
+                        .get_user_data_type_by_index(module_id, *index)
                         .unwrap();
+
                     if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
                         return true;
                     }
@@ -440,11 +439,9 @@ impl IStruct {
                         size += field.encoded_size(compilation_ctx);
                     }
                 }
-                IntermediateType::IStruct(index) => {
+                IntermediateType::IStruct { module_id, index } => {
                     let child_struct = compilation_ctx
-                        .root_module_data
-                        .structs
-                        .get_by_index(*index)
+                        .get_user_data_type_by_index(module_id, *index)
                         .unwrap();
 
                     if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {

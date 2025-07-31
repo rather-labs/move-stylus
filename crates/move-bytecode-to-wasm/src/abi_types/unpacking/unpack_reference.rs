@@ -23,7 +23,7 @@ impl IRef {
             | IntermediateType::ISigner
             | IntermediateType::IU128
             | IntermediateType::IU256
-            | IntermediateType::IStruct(_)
+            | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance(_, _)
             | IntermediateType::IExternalUserData { .. } => {
                 inner.add_unpack_instructions(
@@ -97,7 +97,7 @@ impl IMutRef {
             | IntermediateType::ISigner
             | IntermediateType::IU128
             | IntermediateType::IU256
-            | IntermediateType::IStruct(_)
+            | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance(_, _)
             | IntermediateType::IExternalUserData { .. } => {
                 inner.add_unpack_instructions(

@@ -94,7 +94,7 @@ pub fn pack_variant(
                     | IntermediateType::IAddress
                     | IntermediateType::ISigner
                     | IntermediateType::IVector(_)
-                    | IntermediateType::IStruct(_)
+                    | IntermediateType::IStruct { .. }
                     | IntermediateType::IGenericStructInstance(_, _) => {
                         builder.local_set(ptr_to_data);
 
