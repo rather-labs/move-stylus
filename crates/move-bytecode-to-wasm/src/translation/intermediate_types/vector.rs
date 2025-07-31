@@ -449,7 +449,7 @@ impl IVector {
                     | IntermediateType::IU256
                     | IntermediateType::IAddress
                     | IntermediateType::IStruct { .. }
-                    | IntermediateType::IGenericStructInstance(_, _)) => {
+                    | IntermediateType::IGenericStructInstance { .. }) => {
                         let vec_equality_heap_type_f_id =
                             RuntimeFunction::VecEqualityHeapType.get(module, Some(compilation_ctx));
 
@@ -640,7 +640,7 @@ impl IVector {
             | IntermediateType::ISigner
             | IntermediateType::IAddress
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance(_, _) => {
+            | IntermediateType::IGenericStructInstance { .. } => {
                 builder.call(downcast_f);
                 builder.i32_const(1);
             }
@@ -963,7 +963,7 @@ mod tests {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IGenericStructInstance(_, _)
+            | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::IStruct { .. } => {
                 let swap_f =
                     RuntimeFunction::VecPopBack32.get(&mut raw_module, Some(&compilation_ctx));

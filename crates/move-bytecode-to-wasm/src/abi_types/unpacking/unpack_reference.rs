@@ -24,7 +24,7 @@ impl IRef {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance(_, _)
+            | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::IExternalUserData { .. } => {
                 inner.add_unpack_instructions(
                     builder,
@@ -98,7 +98,7 @@ impl IMutRef {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance(_, _)
+            | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::IExternalUserData { .. } => {
                 inner.add_unpack_instructions(
                     builder,

@@ -95,7 +95,7 @@ pub fn pack_variant(
                     | IntermediateType::ISigner
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
-                    | IntermediateType::IGenericStructInstance(_, _) => {
+                    | IntermediateType::IGenericStructInstance { .. } => {
                         builder.local_set(ptr_to_data);
 
                         // Directly write the pointer to the data

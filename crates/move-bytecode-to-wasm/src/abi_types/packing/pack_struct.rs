@@ -236,11 +236,13 @@ impl IStruct {
                         field.encoded_size(compilation_ctx)
                     }
                 }
-                IntermediateType::IGenericStructInstance(index, types) => {
+                IntermediateType::IGenericStructInstance {
+                    module_id,
+                    index,
+                    types,
+                } => {
                     let child_struct = compilation_ctx
-                        .root_module_data
-                        .structs
-                        .get_by_index(*index)
+                        .get_user_data_type_by_index(module_id, *index)
                         .unwrap();
                     let child_struct_instance = child_struct.instantiate(types);
 

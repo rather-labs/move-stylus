@@ -79,11 +79,13 @@ impl SolName for IntermediateType {
 
                 Self::struct_fields_sol_name(struct_, compilation_ctx)
             }
-            IntermediateType::IGenericStructInstance(index, types) => {
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+            } => {
                 let struct_ = compilation_ctx
-                    .root_module_data
-                    .structs
-                    .get_by_index(*index)
+                    .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
 

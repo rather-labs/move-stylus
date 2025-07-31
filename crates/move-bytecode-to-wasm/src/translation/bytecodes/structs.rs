@@ -161,7 +161,7 @@ pub fn pack(
                     | IntermediateType::ISigner
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
-                    | IntermediateType::IGenericStructInstance(_, _) => {
+                    | IntermediateType::IGenericStructInstance { .. } => {
                         builder.local_set(ptr_to_data);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -251,7 +251,7 @@ pub fn unpack(
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance(_, _) => {}
+            | IntermediateType::IGenericStructInstance { .. } => {}
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 return Err(TranslationError::FoundReferenceInsideStruct {
                     struct_index: struct_.index(),

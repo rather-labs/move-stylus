@@ -566,10 +566,11 @@ fn translate_instruction(
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
-                IntermediateType::IGenericStructInstance(
-                    struct_.index(),
-                    instantiation_types.to_vec(),
-                ),
+                IntermediateType::IGenericStructInstance {
+                    module_id: module_data.id.clone(),
+                    index: struct_.index(),
+                    types: instantiation_types.to_vec(),
+                },
             )))?;
 
             bytecodes::structs::borrow_field(
@@ -620,10 +621,11 @@ fn translate_instruction(
 
             // Check if in the types stack we have the correct type
             types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
-                IntermediateType::IGenericStructInstance(
-                    struct_.index(),
-                    instantiation_types.to_vec(),
-                ),
+                IntermediateType::IGenericStructInstance {
+                    module_id: module_data.id.clone(),
+                    index: struct_.index(),
+                    types: instantiation_types.to_vec(),
+                },
             )))?;
 
             bytecodes::structs::mut_borrow_field(
@@ -739,7 +741,7 @@ fn translate_instruction(
                 | IntermediateType::ISigner
                 | IntermediateType::IExternalUserData { .. }
                 | IntermediateType::IStruct { .. }
-                | IntermediateType::IGenericStructInstance(_, _)
+                | IntermediateType::IGenericStructInstance { .. }
                 | IntermediateType::IVector(_) => {
                     let pop_back_f =
                         RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
@@ -1454,10 +1456,11 @@ fn translate_instruction(
                 .structs
                 .get_generic_struct_types_instances(struct_definition_index)?;
 
-            types_stack.push(IntermediateType::IGenericStructInstance(
-                idx,
-                types.to_vec(),
-            ));
+            types_stack.push(IntermediateType::IGenericStructInstance {
+                module_id: module_data.id.clone(),
+                index: idx,
+                types: types.to_vec(),
+            });
         }
         Bytecode::Unpack(struct_definition_index) => {
             types_stack.pop_expecting(&IntermediateType::IStruct {
@@ -1479,10 +1482,11 @@ fn translate_instruction(
                 .structs
                 .get_generic_struct_types_instances(struct_definition_index)?;
 
-            types_stack.pop_expecting(&IntermediateType::IGenericStructInstance(
-                idx,
-                types.to_vec(),
-            ))?;
+            types_stack.pop_expecting(&IntermediateType::IGenericStructInstance {
+                module_id: module_data.id.clone(),
+                index: idx,
+                types: types.to_vec(),
+            })?;
 
             let struct_ = module_data
                 .structs
