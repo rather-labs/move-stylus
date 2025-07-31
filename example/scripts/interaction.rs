@@ -11,6 +11,7 @@ use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::ht
 use dotenv::dotenv;
 
 use eyre::eyre;
+use std::io::Read;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -63,9 +64,10 @@ sol!(
             AnotherTest pos1;
         }
 
+        // TODO: Not sure if use address or bytes32
         #[derive(Debug)]
         struct ID {
-           address bytes;
+           bytes32 bytes;
         }
 
         #[derive(Debug)]
@@ -91,6 +93,7 @@ sol!(
         function fibonacci(uint64 n) external view returns (uint64);
         function sumSpecial(uint64 n) external view returns (uint64);
         function getUniqueIds() external view returns (UID, UID, UID);
+        function getUniqueId() external view returns (bytes32);
         function getFreshObjectAddress() external view returns (address);
     }
 );
