@@ -1,6 +1,8 @@
 module hello_world::hello_world;
 
 use stylus::tx_context::TxContext;
+use stylus::object as object;
+use stylus::object::UID;
 use hello_world::other_mod::Test;
 
 const INT_AS_CONST: u128 = 128128128;
@@ -228,4 +230,20 @@ public fun echo_variant(x:  TestEnum): TestEnum {
 // Use structs from other modules defined by us
 public fun test_values(test: &Test): (u8, u8) {
     test.get_test_values()
+}
+
+public fun get_fresh_object_address(ctx: &mut TxContext): address {
+    ctx.fresh_object_address()
+}
+
+public fun get_unique_ids(ctx: &mut TxContext): (UID, UID, UID) {
+    (
+        object::new(ctx),
+        object::new(ctx),
+        object::new(ctx),
+    )
+}
+
+public fun get_unique_id(ctx: &mut TxContext): UID {
+    object::new(ctx)
 }

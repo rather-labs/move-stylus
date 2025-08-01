@@ -22,7 +22,7 @@ fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u
 }
 
 mod tx_context {
-    use alloy_primitives::Address;
+    use alloy_primitives::{Address, hex};
 
     use crate::common::{
         runtime_sandbox::constants::{
@@ -55,6 +55,7 @@ mod tx_context {
         function getBlockGasLimit() external returns (uint64);
         function getBlockTimestamp() external returns (uint64);
         function getGasPrice() external returns (uint256);
+        function getFreshObjectAddress() external returns (address, address, address);
     );
 
     #[rstest]
@@ -72,6 +73,35 @@ mod tx_context {
     ) where
         for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
     {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode(),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(
+        getFreshObjectAddressCall::new(()),
+        (
+            hex::decode("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")
+                .map(|h| <[u8; 32]>::try_from(h).unwrap())
+                .unwrap(),
+            hex::decode("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989")
+                .map(|h| <[u8; 32]>::try_from(h).unwrap())
+                .unwrap(),
+            hex::decode("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255")
+                .map(|h| <[u8; 32]>::try_from(h).unwrap())
+                .unwrap()
+        )
+    )]
+    fn test_tx_fresh_id<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: ([u8; 32], [u8; 32], [u8; 32]),
+    ) {
+        // let expected_result: [u8; 32] = expected_result.try_into().unwrap();
         run_test(
             runtime,
             call_data.abi_encode(),

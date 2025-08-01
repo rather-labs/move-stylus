@@ -334,7 +334,7 @@ impl IVector {
                         module_data,
                     );
                 }
-                IntermediateType::IStruct(index) => {
+                IntermediateType::IStruct { module_id, index } => {
                     loop_block.load(
                         compilation_ctx.memory_id,
                         LoadKind::I32 { atomic: false },
@@ -344,7 +344,10 @@ impl IVector {
                         },
                     );
 
-                    let struct_ = module_data.structs.get_by_index(*index).unwrap();
+                    let struct_ = compilation_ctx
+                        .get_user_data_type_by_index(module_id, *index)
+                        .unwrap();
+
                     struct_.copy_local_instructions(
                         module,
                         loop_block,
@@ -445,8 +448,8 @@ impl IVector {
                     t @ (IntermediateType::IU128
                     | IntermediateType::IU256
                     | IntermediateType::IAddress
-                    | IntermediateType::IStruct(_)
-                    | IntermediateType::IGenericStructInstance(_, _)) => {
+                    | IntermediateType::IStruct { .. }
+                    | IntermediateType::IGenericStructInstance { .. }) => {
                         let vec_equality_heap_type_f_id =
                             RuntimeFunction::VecEqualityHeapType.get(module, Some(compilation_ctx));
 
@@ -636,8 +639,8 @@ impl IVector {
             | IntermediateType::IU256
             | IntermediateType::ISigner
             | IntermediateType::IAddress
-            | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_, _) => {
+            | IntermediateType::IStruct { .. }
+            | IntermediateType::IGenericStructInstance { .. } => {
                 builder.call(downcast_f);
                 builder.i32_const(1);
             }
@@ -960,8 +963,8 @@ mod tests {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IGenericStructInstance(_, _)
-            | IntermediateType::IStruct(_) => {
+            | IntermediateType::IGenericStructInstance { .. }
+            | IntermediateType::IStruct { .. } => {
                 let swap_f =
                     RuntimeFunction::VecPopBack32.get(&mut raw_module, Some(&compilation_ctx));
                 builder.call(swap_f);

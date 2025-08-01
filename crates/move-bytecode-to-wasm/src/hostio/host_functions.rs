@@ -191,3 +191,16 @@ fn get_or_insert_import(
     let ty = module.types.add(params, results);
     module.add_import_func("vm_hooks", name, ty)
 }
+
+/// Efficiently computes the [`keccak256`] hash of the given preimage.
+/// The semantics are equivalent to that of the EVM's [`SHA3`] opcode.
+///
+/// [`keccak256`]: https://en.wikipedia.org/wiki/SHA-3
+/// [`SHA3`]: https://www.evm.codes/#20
+#[allow(unused)]
+pub fn native_keccak256(module: &mut Module) -> (FunctionId, ImportId) {
+    let native_keccak256_ty = module
+        .types
+        .add(&[ValType::I32, ValType::I32, ValType::I32], &[]);
+    module.add_import_func("vm_hooks", "native_keccak256", native_keccak256_ty)
+}

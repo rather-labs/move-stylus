@@ -23,8 +23,8 @@ impl IRef {
             | IntermediateType::ISigner
             | IntermediateType::IU128
             | IntermediateType::IU256
-            | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_, _)
+            | IntermediateType::IStruct { .. }
+            | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::IExternalUserData { .. } => {
                 inner.add_unpack_instructions(
                     builder,
@@ -97,8 +97,9 @@ impl IMutRef {
             | IntermediateType::ISigner
             | IntermediateType::IU128
             | IntermediateType::IU256
-            | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_, _) => {
+            | IntermediateType::IStruct { .. }
+            | IntermediateType::IGenericStructInstance { .. }
+            | IntermediateType::IExternalUserData { .. } => {
                 inner.add_unpack_instructions(
                     builder,
                     module,
@@ -150,7 +151,6 @@ impl IMutRef {
                 panic!("cannot unpack generic type parameter");
             }
             IntermediateType::IEnum(_) => todo!(),
-            IntermediateType::IExternalUserData { .. } => todo!(),
         }
     }
 }
