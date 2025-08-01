@@ -9,19 +9,6 @@ use alloy::providers::Provider;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
-use ethers::{
-    abi::{ParamType, decode},
-    middleware::SignerMiddleware,
-    prelude::abigen,
-    providers::{Http, Middleware, Provider},
-    signers::{LocalWallet, Signer},
-    types::H256,
-    types::{
-        Address, H160, NameOrAddress, TransactionRequest, transaction::eip2718::TypedTransaction,
-    },
-    utils::parse_ether,
-};
-
 use eyre::eyre;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -114,6 +101,12 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
+    // Query slot 0x0 (the first storage slot)
+    // If the constructor has not been called yet, the storage value will be 0
+    let slot = alloy::primitives::U256::ZERO;
+    let storage_value = provider.get_storage_at(address, slot).await?;
+    println!("Storage value at slot 0x0: {:?}", storage_value);
+
     let num = example.echo(123).call().await?;
     println!("echo(123) = {}", num);
 
@@ -181,26 +174,6 @@ async fn main() -> eyre::Result<()> {
         "multiValues2 = ({}, {}, {})",
         multi_values._0, multi_values._1, multi_values._2
     );
-
-    // Query slot 0x0 (the first storage slot)
-    // If the constructor has not been called yet, the storage value will be 0
-    let slot = H256::zero();
-    let storage_value = provider.get_storage_at(address, slot, None).await?;
-    println!("Storage value at slot 0x0: {:?}", storage_value);
-
-    // // Call constructor() to write 1 into slot 0x0
-    // let binding = example.konstructor();
-    // let pending_tx = binding.send().await?;
-    // let _receipt = pending_tx
-    //     .await?
-    //     .ok_or_else(|| eyre::format_err!("constructor tx dropped from mempool"))?;
-
-    // // Query slot 0x0 again
-    // let storage_value = provider.get_storage_at(address, slot, None).await?;
-    // println!(
-    //     "Storage value at slot 0x0 AFTER constructor: {:?}",
-    //     storage_value
-    // );
 
     let num = example.echo(123).call().await;
     println!("Example echo = {:?}", num);
