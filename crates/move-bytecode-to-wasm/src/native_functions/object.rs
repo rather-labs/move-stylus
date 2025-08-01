@@ -62,7 +62,7 @@ pub fn add_native_fresh_id_fn(
     builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
-        .local_set(counter_dest_ptr);
+        .local_set(counter_value_ptr);
 
     // ID
     builder
