@@ -3,6 +3,7 @@ use std::{collections::HashMap, path::Path};
 use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use compilation_context::{ModuleData, ModuleId};
+use constructor::inject_constructor;
 use move_binary_format::file_format::FunctionDefinition;
 use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
@@ -12,11 +13,13 @@ use translation::{
     table::{FunctionId, FunctionTable},
     translate_function,
 };
+
 use walrus::{Module, RefType, ValType};
 use wasm_validation::validate_stylus_wasm;
 
 pub(crate) mod abi_types;
 mod compilation_context;
+mod constructor;
 mod hostio;
 mod memory;
 mod native_functions;
@@ -137,6 +140,14 @@ pub fn translate_package(
                 ));
             }
         }
+
+        // Inject constructor function.
+        inject_constructor(
+            &mut function_table,
+            &mut module,
+            &compilation_ctx,
+            &mut public_functions,
+        );
 
         hostio::build_entrypoint_router(&mut module, &public_functions, &compilation_ctx);
 

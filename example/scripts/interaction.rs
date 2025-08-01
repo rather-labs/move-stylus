@@ -9,7 +9,6 @@ use alloy::providers::Provider;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
-
 use eyre::eyre;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -116,6 +115,12 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
+    // Query slot 0x0 (the first storage slot)
+    // If the constructor has not been called yet, the storage value will be 0
+    let slot = alloy::primitives::U256::ZERO;
+    let storage_value = provider.get_storage_at(address, slot).await?;
+    println!("Storage value at slot 0x0: {:?}", storage_value);
+
     let num = example.echo(123).call().await?;
     println!("echo(123) = {}", num);
 
@@ -184,6 +189,8 @@ async fn main() -> eyre::Result<()> {
         multi_values._0, multi_values._1, multi_values._2
     );
 
+    let num = example.echo(123).call().await;
+    println!("Example echo = {:?}", num);
     let echo_variant = example
         .echoVariant(Example::TestEnum::FirstVariant)
         .call()
