@@ -531,7 +531,7 @@ impl ModuleData {
                 };
 
                 let is_init = is_init(
-                    function_id.clone(),
+                    &function_id,
                     move_function_arguments,
                     move_function_return,
                     function_def,

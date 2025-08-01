@@ -83,28 +83,16 @@ pub fn build_constructor(
         .i32_const(STORAGE_KEY_SIZE)
         .call(compilation_ctx.allocator)
         .local_set(key_ptr);
+
     builder
         .i32_const(STORAGE_KEY_SIZE)
         .call(compilation_ctx.allocator)
         .local_set(dest_ptr);
+
     builder
         .i32_const(STORAGE_KEY_SIZE)
         .call(compilation_ctx.allocator)
         .local_set(value_ptr);
-
-    // Zero-initialize the key memory
-    for offset in (0..STORAGE_KEY_SIZE).step_by(4) {
-        builder.local_get(key_ptr);
-        builder.i32_const(0);
-        builder.store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: offset as u32,
-            },
-        );
-    }
 
     // Read from storage into dest_ptr: storage_load_bytes32(key_ptr, dest_ptr)
     builder
@@ -195,7 +183,7 @@ const INIT_FUNCTION_NAME: &str = "init";
 // TODO: Note that we currently trigger a panic if a function named 'init' fails to satisfy certain criteria to qualify as a constructor.
 // This behavior is not enforced by the move compiler itself.
 pub fn is_init(
-    function_id: FunctionId,
+    function_id: &FunctionId,
     move_function_arguments: &Signature,
     move_function_return: &Signature,
     function_def: &FunctionDefinition,
