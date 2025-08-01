@@ -91,7 +91,7 @@ sol!(
         function fibonacci(uint64 n) external view returns (uint64);
         function sumSpecial(uint64 n) external view returns (uint64);
         function getUniqueIds() external view returns (UID, UID, UID);
-        function getUniqueId() external view returns (bytes32);
+        function getUniqueId() external view returns (UID);
         function getFreshObjectAddress() external view returns (address);
     }
 );
@@ -220,6 +220,9 @@ async fn main() -> eyre::Result<()> {
     println!("UID 1 = {:?}", ret._0);
     println!("UID 2 = {:?}", ret._1);
     println!("UID 3 = {:?}", ret._2);
+
+    let ret = example.getUniqueId().call().await?;
+    println!("getUniqueId = {:?}", ret);
 
     let ret = example.getFreshObjectAddress().call().await?;
     println!("fresh new id {ret:?}");
