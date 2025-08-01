@@ -168,11 +168,9 @@ impl Unpackable for IntermediateType {
                 calldata_reader_pointer,
                 compilation_ctx,
             ),
-            IntermediateType::IStruct(index) => {
+            IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
-                    .root_module_data
-                    .structs
-                    .get_by_index(*index)
+                    .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
 
                 // TODO: Check if the struct is TxContext. If it is, panic since the only valid
@@ -186,11 +184,13 @@ impl Unpackable for IntermediateType {
                     compilation_ctx,
                 );
             }
-            IntermediateType::IGenericStructInstance(index, types) => {
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+            } => {
                 let struct_ = compilation_ctx
-                    .root_module_data
-                    .structs
-                    .get_by_index(*index)
+                    .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.add_unpack_instructions(

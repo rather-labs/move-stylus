@@ -33,7 +33,7 @@ use super::{CompilationContextError, Result};
 #[derive(Debug)]
 pub enum UserDefinedType {
     /// Struct defined in this module
-    Struct(u16),
+    Struct { module_id: ModuleId, index: u16 },
 
     /// Enum defined in this module
     Enum(usize),
@@ -81,8 +81,21 @@ impl Display for ModuleId {
     }
 }
 
+// TODO: This just makes sense for testing
+impl Default for ModuleId {
+    fn default() -> Self {
+        Self {
+            address: Address::from([0; 32]),
+            module_name: "default".to_owned(),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct ModuleData {
+    /// Module's ID
+    pub id: ModuleId,
+
     /// Move's connstant pool
     pub constants: Vec<Constant>,
 
@@ -110,7 +123,7 @@ impl ModuleData {
         move_module: &'move_package CompiledModule,
         function_definitions: &mut GlobalFunctionTable<'move_package>,
     ) -> Self {
-        let datatype_handles_map = Self::process_datatype_handles(move_module);
+        let datatype_handles_map = Self::process_datatype_handles(&module_id, move_module);
 
         // Module's structs
         let (module_structs, fields_to_struct_map) =
@@ -140,7 +153,7 @@ impl ModuleData {
         };
 
         let functions = Self::process_function_definitions(
-            module_id,
+            module_id.clone(),
             move_module,
             &datatype_handles_map,
             function_definitions,
@@ -158,6 +171,7 @@ impl ModuleData {
             .unwrap();
 
         ModuleData {
+            id: module_id,
             constants: move_module.constant_pool.clone(), // TODO: Clone
             functions,
             structs,
@@ -168,6 +182,7 @@ impl ModuleData {
     }
 
     fn process_datatype_handles(
+        module_id: &ModuleId,
         module: &CompiledModule,
     ) -> HashMap<DatatypeHandleIndex, UserDefinedType> {
         let mut datatype_handles_map = HashMap::new();
@@ -185,7 +200,13 @@ impl ModuleData {
                     .iter()
                     .position(|s| s.struct_handle == idx)
                 {
-                    datatype_handles_map.insert(idx, UserDefinedType::Struct(position as u16));
+                    datatype_handles_map.insert(
+                        idx,
+                        UserDefinedType::Struct {
+                            module_id: module_id.clone(), // TODO: clone
+                            index: position as u16,
+                        },
+                    );
                 } else if let Some(position) =
                     module.enum_defs().iter().position(|e| e.enum_handle == idx)
                 {

@@ -276,8 +276,8 @@ impl IStruct {
                         },
                     );
                 }
-                IntermediateType::IStruct(_)
-                | IntermediateType::IGenericStructInstance(_, _)
+                IntermediateType::IStruct { .. }
+                | IntermediateType::IGenericStructInstance { .. }
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
                 | IntermediateType::IU128
@@ -356,21 +356,22 @@ impl IStruct {
                 | IntermediateType::IU256
                 | IntermediateType::IAddress => continue,
                 IntermediateType::IVector(_) => return true,
-                IntermediateType::IStruct(index) => {
-                    let struct_ = compilation_ctx
-                        .root_module_data
-                        .structs
-                        .get_by_index(*index)
+                IntermediateType::IStruct { module_id, index } => {
+                    let child_struct = compilation_ctx
+                        .get_user_data_type_by_index(module_id, *index)
                         .unwrap();
-                    if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
+
+                    if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
                         return true;
                     }
                 }
-                IntermediateType::IGenericStructInstance(index, types) => {
+                IntermediateType::IGenericStructInstance {
+                    module_id,
+                    index,
+                    types,
+                } => {
                     let child_struct = compilation_ctx
-                        .root_module_data
-                        .structs
-                        .get_by_index(*index)
+                        .get_user_data_type_by_index(module_id, *index)
                         .unwrap();
                     let child_struct_instance = child_struct.instantiate(types);
 
@@ -426,11 +427,13 @@ impl IStruct {
                 | IntermediateType::IVector(_) => {
                     size += (field as &dyn Packable).encoded_size(compilation_ctx);
                 }
-                IntermediateType::IGenericStructInstance(index, types) => {
+                IntermediateType::IGenericStructInstance {
+                    module_id,
+                    index,
+                    types,
+                } => {
                     let child_struct = compilation_ctx
-                        .root_module_data
-                        .structs
-                        .get_by_index(*index)
+                        .get_user_data_type_by_index(module_id, *index)
                         .unwrap();
                     let child_struct_instance = child_struct.instantiate(types);
 
@@ -440,11 +443,9 @@ impl IStruct {
                         size += field.encoded_size(compilation_ctx);
                     }
                 }
-                IntermediateType::IStruct(index) => {
+                IntermediateType::IStruct { module_id, index } => {
                     let child_struct = compilation_ctx
-                        .root_module_data
-                        .structs
-                        .get_by_index(*index)
+                        .get_user_data_type_by_index(module_id, *index)
                         .unwrap();
 
                     if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {

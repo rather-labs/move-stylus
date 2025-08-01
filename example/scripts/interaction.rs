@@ -63,6 +63,17 @@ sol!(
             AnotherTest pos1;
         }
 
+        // TODO: Not sure if use address or bytes32
+        #[derive(Debug)]
+        struct ID {
+           bytes32 bytes;
+        }
+
+        #[derive(Debug)]
+        struct UID {
+           ID id;
+        }
+
         function createFooU16(uint16 x, uint16 y) external view returns (Foo);
         function createFoo2U16(uint16 x, uint16 y) external view returns (Foo,Foo);
         function createBazU16(uint16 x, uint16 y) external view returns (Baz);
@@ -80,6 +91,9 @@ sol!(
         function txContextProperties() public view returns (address, uint256, uint64, uint256, uint64, uint64, uint64, uint256);
         function fibonacci(uint64 n) external view returns (uint64);
         function sumSpecial(uint64 n) external view returns (uint64);
+        function getUniqueIds() external view returns (UID, UID, UID);
+        function getUniqueId() external view returns (bytes32);
+        function getFreshObjectAddress() external view returns (address);
     }
 );
 
@@ -194,6 +208,14 @@ async fn main() -> eyre::Result<()> {
     // This simple call will inject the "from" field as asigner
     let ret = example.echoSignerWithInt(42).call().await?;
     println!("echoSignerWithInt = ({}, {})", ret._0, ret._1);
+
+    let ret = example.getUniqueIds().call().await?;
+    println!("UID 1 = {:?}", ret._0);
+    println!("UID 2 = {:?}", ret._1);
+    println!("UID 3 = {:?}", ret._2);
+
+    let ret = example.getFreshObjectAddress().call().await?;
+    println!("fresh new id {ret:?}");
 
     // A real tx should write in the logs the signer's address
     // 0x3f1eae7d46d88f08fc2f8ed27fcb2ab183eb2d0e

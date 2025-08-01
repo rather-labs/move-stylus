@@ -52,4 +52,17 @@ impl CompilationContext<'_> {
             todo!("enum case and empty case")
         }
     }
+
+    pub fn get_user_data_type_by_index(
+        &self,
+        module_id: &ModuleId,
+        index: u16,
+    ) -> Result<&IStruct> {
+        let module = self
+            .deps_data
+            .get(module_id)
+            .unwrap_or(self.root_module_data);
+
+        module.structs.get_by_index(index)
+    }
 }

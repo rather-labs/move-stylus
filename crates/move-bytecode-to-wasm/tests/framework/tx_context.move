@@ -33,3 +33,12 @@ public fun get_chain_id(ctx: &TxContext): u64 {
 public fun get_gas_price(ctx: &TxContext): u256 {
     ctx.gas_price()
 }
+
+public fun get_fresh_object_address(ctx: &mut TxContext): (address, address, address) {
+    (
+        ctx.fresh_object_address(),
+        ctx.fresh_object_address(),
+        ctx.fresh_object_address(),
+    )
+
+}

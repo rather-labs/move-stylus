@@ -21,8 +21,8 @@ impl IRef {
         match inner {
             // Heap types: just forward the pointer
             IntermediateType::IVector(_)
-            | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_, _)
+            | IntermediateType::IStruct { .. }
+            | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::ISigner
             | IntermediateType::IU128
             | IntermediateType::IU256
@@ -101,8 +101,8 @@ impl IMutRef {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
-            | IntermediateType::IStruct(_)
-            | IntermediateType::IGenericStructInstance(_, _) => {
+            | IntermediateType::IStruct { .. }
+            | IntermediateType::IGenericStructInstance { .. } => {
                 inner.add_pack_instructions(
                     builder,
                     module,
