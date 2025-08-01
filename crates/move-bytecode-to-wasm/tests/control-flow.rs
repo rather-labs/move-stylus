@@ -88,7 +88,7 @@ mod control_flow_u8 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((uint8,))>::abi_encode_params(&(expected_result,)),
+            <sol!((uint8,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }
@@ -155,7 +155,7 @@ mod control_flow_u64 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((uint64,))>::abi_encode_params(&(expected_result,)),
+            <sol!((uint64,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }

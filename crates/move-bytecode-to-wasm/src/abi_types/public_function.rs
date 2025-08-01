@@ -172,8 +172,16 @@ impl<'a> PublicFunction<'a> {
             memory_id,
         );
 
-        build_pack_instructions(block, &self.signature.returns, module, compilation_ctx);
+        if self.signature.returns.is_empty() {
+            block.i32_const(0).i32_const(0).i32_const(0);
+            return;
+        }
 
+        // If we pack a unique value we proceed as always
+        let (data_start, data_end) =
+            build_pack_instructions(block, &self.signature.returns, module, compilation_ctx);
+
+        block.local_get(data_start).local_get(data_end);
         // TODO: Define error handling strategy, for now it will always result in traps
         // So it will only reach this point in the case of success
         block.i32_const(0);

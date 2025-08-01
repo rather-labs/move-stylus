@@ -63,7 +63,7 @@ mod comparisons_u8 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+            <sol!((bool,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }
@@ -112,7 +112,7 @@ mod comparisons_u16 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+            <sol!((bool,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }
@@ -161,7 +161,7 @@ mod comparisons_u32 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+            <sol!((bool,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }
@@ -210,7 +210,7 @@ mod comparisons_u64 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+            <sol!((bool,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }
@@ -259,7 +259,7 @@ mod comparisons_u128 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+            <sol!((bool,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }
@@ -308,7 +308,7 @@ mod comparisons_u256 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            <sol!((bool,))>::abi_encode_params(&(expected_result,)),
+            <sol!((bool,))>::abi_encode(&(expected_result,)),
         )
         .unwrap();
     }

@@ -65,7 +65,7 @@ mod bool_type {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -132,7 +132,7 @@ mod address_type {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -180,7 +180,7 @@ mod signer_type {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -245,7 +245,7 @@ mod uint_8 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -273,7 +273,7 @@ mod uint_8 {
         run_test(
             runtime,
             divCall::new((dividend, divisor)).abi_encode(),
-            <(&i32,)>::abi_encode_params(&(&expected_result,)),
+            <(&i32,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -297,7 +297,7 @@ mod uint_8 {
         run_test(
             runtime,
             modCall::new((dividend, divisor)).abi_encode(),
-            <(&i32,)>::abi_encode_params(&(&expected_result,)),
+            <(&i32,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -324,7 +324,7 @@ mod uint_8 {
         run_test(
             runtime,
             mulCall::new((n1, n2)).abi_encode(),
-            <(&i32,)>::abi_encode_params(&(&expected_result,)),
+            <(&i32,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -380,7 +380,7 @@ mod uint_16 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -408,7 +408,7 @@ mod uint_16 {
         run_test(
             runtime,
             divCall::new((dividend, divisor)).abi_encode(),
-            <(&u16,)>::abi_encode_params(&(&expected_result,)),
+            <(&u16,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -431,7 +431,7 @@ mod uint_16 {
         run_test(
             runtime,
             modCall::new((dividend, divisor)).abi_encode(),
-            <(&u16,)>::abi_encode_params(&(&expected_result,)),
+            <(&u16,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -458,7 +458,7 @@ mod uint_16 {
         run_test(
             runtime,
             mulCall::new((n1, n2)).abi_encode(),
-            <(&u16,)>::abi_encode_params(&(&expected_result,)),
+            <(&u16,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -515,7 +515,7 @@ mod uint_32 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -543,7 +543,7 @@ mod uint_32 {
         run_test(
             runtime,
             divCall::new((dividend, divisor)).abi_encode(),
-            <(&u32,)>::abi_encode_params(&(&expected_result,)),
+            <(&u32,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -566,7 +566,7 @@ mod uint_32 {
         run_test(
             runtime,
             modCall::new((dividend, divisor)).abi_encode(),
-            <(&u32,)>::abi_encode_params(&(&expected_result,)),
+            <(&u32,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -591,7 +591,7 @@ mod uint_32 {
         run_test(
             runtime,
             mulCall::new((n1, n2)).abi_encode(),
-            <(&u32,)>::abi_encode_params(&(&expected_result,)),
+            <(&u32,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -647,7 +647,7 @@ mod uint_64 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -675,7 +675,7 @@ mod uint_64 {
         run_test(
             runtime,
             divCall::new((dividend, divisor)).abi_encode(),
-            <(&u64,)>::abi_encode_params(&(&expected_result,)),
+            <(&u64,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -698,7 +698,7 @@ mod uint_64 {
         run_test(
             runtime,
             modCall::new((dividend, divisor)).abi_encode(),
-            <(&u64,)>::abi_encode_params(&(&expected_result,)),
+            <(&u64,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -723,7 +723,7 @@ mod uint_64 {
         run_test(
             runtime,
             mulCall::new((n1, n2)).abi_encode(),
-            <(&u64,)>::abi_encode_params(&(&expected_result,)),
+            <(&u64,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -773,7 +773,7 @@ mod uint_128 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -816,7 +816,7 @@ mod uint_128 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -849,7 +849,7 @@ mod uint_128 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -886,7 +886,7 @@ mod uint_128 {
         run_test(
             runtime,
             mulCall::new((n1, n2)).abi_encode(),
-            <(&u128,)>::abi_encode_params(&(&expected_result,)),
+            <(&u128,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -910,7 +910,7 @@ mod uint_128 {
         run_test(
             runtime,
             divCall::new((dividend, divisor)).abi_encode(),
-            <(&u128,)>::abi_encode_params(&(&expected_result,)),
+            <(&u128,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -934,7 +934,7 @@ mod uint_128 {
         run_test(
             runtime,
             modCall::new((dividend, divisor)).abi_encode(),
-            <(&u128,)>::abi_encode_params(&(&expected_result,)),
+            <(&u128,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -984,7 +984,7 @@ mod uint_256 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -1084,7 +1084,7 @@ mod uint_256 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -1143,7 +1143,7 @@ mod uint_256 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -1218,7 +1218,7 @@ mod uint_256 {
         run_test(
             runtime,
             mulCall::new((n1, n2)).abi_encode(),
-            <(&U256,)>::abi_encode_params(&(&expected_result,)),
+            <(&U256,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -1254,7 +1254,7 @@ mod uint_256 {
         run_test(
             runtime,
             divCall::new((dividend, divisor)).abi_encode(),
-            <(&U256,)>::abi_encode_params(&(&expected_result,)),
+            <(&U256,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -1290,7 +1290,7 @@ mod uint_256 {
         run_test(
             runtime,
             modCall::new((dividend, divisor)).abi_encode(),
-            <(&U256,)>::abi_encode_params(&(&expected_result,)),
+            <(&U256,)>::abi_encode(&(&expected_result,)),
         )
         .unwrap();
     }
@@ -1321,7 +1321,7 @@ fn test_multi_values_return() {
         address,
         uint32[],
         uint128[]
-    ))>::abi_encode_params(&(
+    ))>::abi_encode_sequence(&(
         U256::from(256256),
         6464,
         3232,
@@ -1343,7 +1343,7 @@ fn test_multi_values_return() {
         uint32,
         uint64,
         uint256
-    ))>::abi_encode_params(&(
+    ))>::abi_encode_sequence(&(
         vec![100, 200, 300],
         vec![10, 20, 30],
         address!("0x0000000000000000000000000000000000000001"),
@@ -1365,7 +1365,7 @@ fn test_multi_values_return() {
         address,
         uint32[],
         uint128[]
-    ))>::abi_encode_params(&(
+    ))>::abi_encode_sequence(&(
         U256::from(256256),
         6464,
         3232,
@@ -1437,7 +1437,7 @@ mod vec_32 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -1502,7 +1502,7 @@ mod vec_64 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -1567,7 +1567,7 @@ mod vec_128 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -1629,7 +1629,7 @@ mod vec_vec_32 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -1691,7 +1691,7 @@ mod vec_vec_128 {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }
@@ -2156,7 +2156,7 @@ mod vec_struct {
         run_test(
             runtime,
             call_data.abi_encode(),
-            expected_result.abi_encode_params(),
+            expected_result.abi_encode(),
         )
         .unwrap();
     }

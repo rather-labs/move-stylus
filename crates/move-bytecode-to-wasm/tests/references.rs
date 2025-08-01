@@ -58,7 +58,7 @@ mod reference_bool {
         #[case] call_data: T,
         #[case] expected_result: bool,
     ) {
-        let expected_result = <sol!((bool,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((bool,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -70,7 +70,7 @@ mod reference_bool {
         #[case] call_data: T,
         #[case] expected_result: Vec<bool>,
     ) {
-        let expected_result = <sol!((bool[],))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!(bool[])>::abi_encode(&expected_result);
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
@@ -113,7 +113,7 @@ mod reference_uint_8 {
         #[case] call_data: T,
         #[case] expected_result: u8,
     ) {
-        let expected_result = <sol!((uint8,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint8,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -125,7 +125,7 @@ mod reference_uint_8 {
         #[case] call_data: T,
         #[case] expected_result: Vec<u8>,
     ) {
-        let expected_result = <sol!((uint8[],))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!(uint8[])>::abi_encode(&expected_result);
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
@@ -168,7 +168,7 @@ mod reference_uint_16 {
         #[case] call_data: T,
         #[case] expected_result: u16,
     ) {
-        let expected_result = <sol!((uint16,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint16,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -180,7 +180,7 @@ mod reference_uint_16 {
         #[case] call_data: T,
         #[case] expected_result: Vec<u16>,
     ) {
-        let expected_result = <sol!((uint16[],))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!(uint16[])>::abi_encode(&expected_result);
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
@@ -223,7 +223,7 @@ mod reference_uint_32 {
         #[case] call_data: T,
         #[case] expected_result: u32,
     ) {
-        let expected_result = <sol!((uint32,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint32,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -235,7 +235,7 @@ mod reference_uint_32 {
         #[case] call_data: T,
         #[case] expected_result: Vec<u32>,
     ) {
-        let expected_result = <sol!((uint32[],))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!(uint32[])>::abi_encode(&expected_result);
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
@@ -278,7 +278,7 @@ mod reference_uint_64 {
         #[case] call_data: T,
         #[case] expected_result: u64,
     ) {
-        let expected_result = <sol!((uint64,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint64,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -290,7 +290,7 @@ mod reference_uint_64 {
         #[case] call_data: T,
         #[case] expected_result: Vec<u64>,
     ) {
-        let expected_result = <sol!((uint64[],))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!(uint64[])>::abi_encode(&expected_result);
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
@@ -333,7 +333,7 @@ mod reference_uint_128 {
         #[case] call_data: T,
         #[case] expected_result: u128,
     ) {
-        let expected_result = <sol!((uint128,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint128,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -345,7 +345,7 @@ mod reference_uint_128 {
         #[case] call_data: T,
         #[case] expected_result: Vec<u128>,
     ) {
-        let expected_result = <sol!((uint128[],))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!(uint128[])>::abi_encode(&expected_result);
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
@@ -388,7 +388,7 @@ mod reference_uint_256 {
         #[case] call_data: T,
         #[case] expected_result: U256,
     ) {
-        let expected_result = <sol!((uint256,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((uint256,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -400,7 +400,7 @@ mod reference_uint_256 {
         #[case] call_data: T,
         #[case] expected_result: Vec<U256>,
     ) {
-        let expected_result = <sol!((uint256[],))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!(uint256[])>::abi_encode(&expected_result);
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
@@ -443,7 +443,7 @@ mod reference_address {
         #[case] call_data: T,
         #[case] expected_result: Address,
     ) {
-        let expected_result = <sol!((address,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((address,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -455,7 +455,7 @@ mod reference_address {
         #[case] call_data: T,
         #[case] expected_result: Vec<Address>,
     ) {
-        let expected_result = <sol!((address[],))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!(address[])>::abi_encode(&expected_result);
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
@@ -484,7 +484,7 @@ mod reference_signer {
         #[case] call_data: T,
         #[case] expected_result: [u8; 20],
     ) {
-        let expected_result = <sol!((address,))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!((address,))>::abi_encode(&(expected_result,));
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
@@ -539,7 +539,7 @@ mod reference_vec_8 {
         #[case] call_data: T,
         #[case] expected_result: Vec<u8>,
     ) {
-        let expected_result = <sol!((uint8[],))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!(uint8[])>::abi_encode(&expected_result);
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -605,7 +605,7 @@ mod reference_vec_64 {
         #[case] call_data: T,
         #[case] expected_result: Vec<u64>,
     ) {
-        let expected_result = <sol!((uint64[],))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!(uint64[])>::abi_encode(&expected_result);
         println!("expected_result: {:?}", expected_result);
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
@@ -659,7 +659,7 @@ mod reference_vec_256 {
         #[case] call_data: T,
         #[case] expected_result: Vec<U256>,
     ) {
-        let expected_result = <sol!((uint256[],))>::abi_encode_params(&(expected_result,));
+        let expected_result = <sol!(uint256[])>::abi_encode(&expected_result);
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 
@@ -815,7 +815,7 @@ mod reference_structs {
         #[case] call_data: T,
         #[case] expected_result: Foo,
     ) {
-        let expected_result = expected_result.abi_encode_params();
+        let expected_result = expected_result.abi_encode();
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }
