@@ -1,9 +1,10 @@
 use crate::CompilationContext;
 use crate::UserDefinedType;
+use crate::abi_types::public_function::PublicFunction;
 use crate::abi_types::vm_handled_datatypes::TxContext;
 use crate::hostio::host_functions;
-use crate::translation::intermediate_types::IntermediateType;
-use crate::translation::table::FunctionId;
+use crate::translation::intermediate_types::{ISignature, IntermediateType};
+use crate::translation::table::{FunctionId, FunctionTable};
 use move_binary_format::file_format::{
     Ability, AbilitySet, CompiledModule, DatatypeHandleIndex, FunctionDefinition, Signature,
     SignatureToken, Visibility,
@@ -14,67 +15,101 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
+static EMPTY_SIGNATURE: ISignature = ISignature {
+    arguments: Vec::new(),
+    returns: Vec::new(),
+};
+
+/// Injects the constructor as a public function in the module, which will be accesible via the entrypoint router.
 pub fn inject_constructor(
+    function_table: &mut FunctionTable,
     module: &mut Module,
-    allocator_func: WalrusFunctionId,
+    compilation_ctx: &CompilationContext,
+    public_functions: &mut Vec<PublicFunction>,
+) {
+    let constructor_fn_id =
+        if let Some(ref init_id) = compilation_ctx.root_module_data.functions.init {
+            let wasm_init_fn = function_table
+                .get_by_function_id(init_id)
+                .unwrap()
+                .wasm_function_id
+                .unwrap();
+
+            build_constructor(module, compilation_ctx, Some(wasm_init_fn))
+        } else {
+            build_constructor(module, compilation_ctx, None)
+        };
+
+    public_functions.push(PublicFunction::new(
+        constructor_fn_id,
+        "constructor",
+        &EMPTY_SIGNATURE,
+        compilation_ctx,
+    ));
+}
+
+/// Builds the constructor function.
+///
+/// This function performs the following actions:
+/// 1. Verifies whether the constructor has been invoked before using a storage key guard.
+/// 2. If it hasn't, it calls the `init()` function.
+/// 3. Records in persistent storage that the constructor has been executed.
+///
+/// This ensures the constructor logic executes only once and safely initializes global storage.
+pub fn build_constructor(
+    module: &mut Module,
     compilation_ctx: &CompilationContext,
     init: Option<WalrusFunctionId>,
 ) -> WalrusFunctionId {
-    let (storage_load_bytes32_function, _) = host_functions::storage_load_bytes32(module);
-    let (storage_cache_bytes32_function, _) = host_functions::storage_cache_bytes32(module);
-    let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
-    let (emit_log_function, _) = host_functions::emit_log(module);
+    const STORAGE_KEY_SIZE: i32 = 32;
+    const VALUE_MARKER: i32 = 1;
 
-    // Allocate locals for key and value pointers
-    let key_ptr = module.locals.add(ValType::I32);
-    let value_ptr = module.locals.add(ValType::I32);
-    let dest_ptr = module.locals.add(ValType::I32);
+    // Host functions for storage operations
+    let (storage_load_fn, _) = host_functions::storage_load_bytes32(module);
+    let (storage_cache_fn, _) = host_functions::storage_cache_bytes32(module);
+    let (flush_cache_fn, _) = host_functions::storage_flush_cache(module);
 
+    // Allocate local variables to hold memory pointers
+    let key_ptr = module.locals.add(ValType::I32); // Pointer for the storage key
+    let value_ptr = module.locals.add(ValType::I32); // Pointer to store flag
+    let dest_ptr = module.locals.add(ValType::I32); // Pointer to receive value read from storage
+
+    // Define the constructor function with no parameters or return values
     let mut function = FunctionBuilder::new(&mut module.types, &[], &[]);
     let mut builder = function.func_body();
 
-    // TODO: how could we avoid allocating more than once, in case the constructor is called again?
-    // anyway this should be an edge case
-
-    // Allocate memory
+    // Allocate memory for key, value, and destination
     builder
-        .i32_const(32)
+        .i32_const(STORAGE_KEY_SIZE)
         .call(compilation_ctx.allocator)
         .local_set(key_ptr);
-
     builder
-        .i32_const(32)
+        .i32_const(STORAGE_KEY_SIZE)
         .call(compilation_ctx.allocator)
         .local_set(dest_ptr);
-
     builder
-        .i32_const(32)
+        .i32_const(STORAGE_KEY_SIZE)
         .call(compilation_ctx.allocator)
         .local_set(value_ptr);
 
-    // Initialize key memory with 32 bytes of zero
-    for offset in (0..32).step_by(4) {
+    // Zero-initialize the key memory
+    for offset in (0..STORAGE_KEY_SIZE).step_by(4) {
         builder.local_get(key_ptr);
         builder.i32_const(0);
         builder.store(
             compilation_ctx.memory_id,
             StoreKind::I32 { atomic: false },
-            MemArg { align: 0, offset },
+            MemArg { align: 0, offset: offset as u32},
         );
     }
 
-    // Read from storage
+    // Read from storage into dest_ptr: storage_load_bytes32(key_ptr, dest_ptr)
     builder
         .local_get(key_ptr)
         .local_get(dest_ptr)
-        .call(storage_load_bytes32_function); // Reads at key_ptr and writes at dest_ptr
+        .call(storage_load_fn);
 
-    builder.local_get(dest_ptr);
-    builder.i32_const(32);
-    builder.i32_const(0);
-    builder.call(emit_log_function);
-
-    // Load the value writen at dest_ptr and check if its zero
+    // Load the first 4 bytes at dest_ptr to check if already initialized
     builder
         .local_get(dest_ptr)
         .load(
@@ -86,14 +121,14 @@ pub fn inject_constructor(
             },
         )
         .i32_const(0)
-        .binop(BinaryOp::I32Eq);
+        .binop(BinaryOp::I32Eq); // true if storage has not been initialized
 
-    // If zero, then the memory has not been written yet, meaning the constructor has not been called yet
+    // If storage has not been initialized, proceed with initialization
     builder.if_else(
         None,
         |then| {
-            // Write 1 to memory offset 0
-            then.local_get(value_ptr).i32_const(1).store(
+            // Write the marker value into value_ptr at offset 0
+            then.local_get(value_ptr).i32_const(VALUE_MARKER).store(
                 compilation_ctx.memory_id,
                 StoreKind::I32 { atomic: false },
                 MemArg {
@@ -102,52 +137,39 @@ pub fn inject_constructor(
                 },
             );
 
-            // If there is an init function, call it
+            // If an `init()` function is present, call it
             if let Some(init_id) = init {
-                let init_type = module.funcs.get(init_id).ty();
-                let params = module.types.get(init_type).params();
+                let init_ty = module.funcs.get(init_id).ty();
+                let params = module.types.get(init_ty).params();
 
-                // If init expects an OTW, push dummy OTW
+                // If the function expects an OTW, push dummy value. 
+                // The OTW is a Move pattern used to ensure that the init function is called only once.
+                // Here we replace that logic by writing a marker value into the storage.
                 if params.len() == 2 {
-                    then.i32_const(0);
+                    then.i32_const(0); // OTW = 0 
                 }
 
-                // Inject TxContext
-                TxContext::inject_tx_context(then, allocator_func);
+                // Inject TxContext as last argument
+                TxContext::inject_tx_context(then, compilation_ctx.allocator);
 
-                // Call init
+                // Call the `init` function
                 then.call(init_id);
             }
 
-            // Write (key, value) to storage
-            then.local_get(key_ptr).local_get(value_ptr).call(storage_cache_bytes32_function);
+            // Cache the (key, value) pair to mark constructor as called
+            then.local_get(key_ptr)
+                .local_get(value_ptr)
+                .call(storage_cache_fn);
 
-            // Flush storage cache
-            then.i32_const(1).call(storage_flush_cache_function);
+            // Flush storage to persist the write
+            then.i32_const(1).call(flush_cache_fn);
         },
-        |else_| {
-
-            else_.unreachable();
-
-            // TODO: remove this, is just for testing.
-
-            // else_.local_get(value_ptr).i32_const(2).store(
-            //     compilation_ctx.memory_id,
-            //     StoreKind::I32 { atomic: false },
-            //     MemArg {
-            //         align: 0,
-            //         offset: 0,
-            //     },
-            // );
-
-            //  // Write (key, value) to storage
-            //  else_.local_get(key_ptr).local_get(value_ptr).call(storage_cache_bytes32_function);
-
-            //  // Flush storage cache
-            //  else_.i32_const(1).call(storage_flush_cache_function);
+        |_else| {
+            // Constructor already called → do nothing
         },
     );
 
+    // Finalize and insert the function into the module
     function.finish(vec![], &mut module.funcs)
 }
 

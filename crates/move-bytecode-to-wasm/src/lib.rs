@@ -10,10 +10,10 @@ use move_package::{
     source_package::parsed_manifest::PackageName,
 };
 use translation::{
-    intermediate_types::ISignature,
     table::{FunctionId, FunctionTable},
     translate_function,
 };
+
 use walrus::{Module, RefType, ValType};
 use wasm_validation::validate_stylus_wasm;
 
@@ -141,40 +141,13 @@ pub fn translate_package(
             }
         }
 
-        let empty_signature = ISignature {
-            arguments: vec![],
-            returns: vec![],
-        };
-
-        let constructor_fn_id;
-
-        if let Some(ref init_id) = root_module_data.functions.init {
-            // Get the wasm function id for the init function
-            let wasm_init_fn = function_table
-                .get_by_function_id(init_id)
-                .unwrap()
-                .wasm_function_id
-                .unwrap();
-
-            // Build constructor that calls init()
-            constructor_fn_id = inject_constructor(
-                &mut module,
-                allocator_func,
-                &compilation_ctx,
-                Some(wasm_init_fn),
-            );
-        } else {
-            // Add a no-op constructor
-            constructor_fn_id =
-                inject_constructor(&mut module, allocator_func, &compilation_ctx, None);
-        }
-
-        public_functions.push(PublicFunction::new(
-            constructor_fn_id,
-            "constructor",
-            &empty_signature,
+        // Inject constructor function.
+        inject_constructor(
+            &mut function_table,
+            &mut module,
             &compilation_ctx,
-        ));
+            &mut public_functions,
+        );
 
         hostio::build_entrypoint_router(&mut module, &public_functions, &compilation_ctx);
 

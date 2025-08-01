@@ -55,15 +55,13 @@ async fn main() -> eyre::Result<()> {
     let example = Example::new(address, client.clone());
 
     // Query slot 0x0 (the first storage slot)
+    // If the constructor has not been called yet, the storage value will be 0
     let slot = H256::zero();
     let storage_value = provider.get_storage_at(address, slot, None).await?;
-    println!(
-        "Storage value at slot 0x0 BEFORE constructor: {:?}",
-        storage_value
-    );
+    println!("Storage value at slot 0x0: {:?}", storage_value);
 
     // // Call constructor() to write 1 into slot 0x0
-    // let binding = example.constructor_2();
+    // let binding = example.konstructor();
     // let pending_tx = binding.send().await?;
     // let _receipt = pending_tx
     //     .await?

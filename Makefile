@@ -16,17 +16,17 @@ example-interaction:
 deploy-example:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
+		--no-verify \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/wasm/hello_world.wasm \
-		--no-verify
+		--wasm-file=./example/build/wasm/hello_world.wasm
 
 deploy-example-with-constructor:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
+		--no-verify \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/wasm/hello_world.wasm \
+		--wasm-file="./example/build/wasm/hello_world.wasm" \
 		--constructor-signature "constructor()" \
-		--verbose
 
 setup-stylus:
 	RUSTFLAGS="-C link-args=-rdynamic" cargo install --force cargo-stylus
