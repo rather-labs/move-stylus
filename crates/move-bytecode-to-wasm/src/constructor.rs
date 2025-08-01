@@ -99,7 +99,10 @@ pub fn build_constructor(
         builder.store(
             compilation_ctx.memory_id,
             StoreKind::I32 { atomic: false },
-            MemArg { align: 0, offset: offset as u32},
+            MemArg {
+                align: 0,
+                offset: offset as u32,
+            },
         );
     }
 
@@ -142,7 +145,7 @@ pub fn build_constructor(
                 let init_ty = module.funcs.get(init_id).ty();
                 let params = module.types.get(init_ty).params();
 
-                // If the function expects an OTW, push dummy value. 
+                // If the function expects an OTW, push dummy value.
                 // The OTW is a Move pattern used to ensure that the init function is called only once.
                 // Here we replace that logic by writing a marker value into the storage.
                 if params.len() == 2 {

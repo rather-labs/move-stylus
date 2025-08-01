@@ -117,8 +117,17 @@ impl RuntimeSandbox {
             )
             .unwrap();
 
+        // TODO: do we need to add some body to this storage related linked functions?
         linker
             .func_wrap("vm_hooks", "pay_for_memory_grow", |_pages: u32| {})
+            .unwrap();
+
+        linker
+            .func_wrap("vm_hooks", "storage_load_bytes32", |_: i32, _: i32| {})
+            .unwrap();
+
+        linker
+            .func_wrap("vm_hooks", "storage_cache_bytes32", |_: i32, _: i32| {})
             .unwrap();
 
         linker
