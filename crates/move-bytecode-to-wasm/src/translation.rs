@@ -529,12 +529,24 @@ fn translate_instruction(
             let struct_ = module_data.structs.get_by_field_handle_idx(field_id)?;
 
             // Check if in the types stack we have the correct type
-            types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
-                IntermediateType::IStruct {
-                    module_id: module_data.id.clone(),
-                    index: struct_.index(),
-                },
-            )))?;
+            let t = types_stack.pop()?;
+
+            // An immutable borrow can expect a mutable ref, the Move compiler makes all the checks
+            // to assure that is valid //TODO: Better description
+            types_stack::match_types!(
+                (
+                    (IntermediateType::IRef(ref_inner) | IntermediateType::IMutRef(ref_inner)),
+                    "reference or mutable reference",
+                    t
+                ),
+                (
+                    IntermediateType::IStruct { ref module_id, index },
+                    "struct",
+                    *ref_inner
+                )
+            );
+            assert_eq!(module_id, &module_data.id);
+            assert_eq!(struct_.index(), index);
 
             bytecodes::structs::borrow_field(
                 struct_,
@@ -565,13 +577,25 @@ fn translate_instruction(
             };
 
             // Check if in the types stack we have the correct type
-            types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
-                IntermediateType::IGenericStructInstance {
-                    module_id: module_data.id.clone(),
-                    index: struct_.index(),
-                    types: instantiation_types.to_vec(),
-                },
-            )))?;
+            let t = types_stack.pop()?;
+
+            // An immutable borrow can expect a mutable ref, the Move compiler makes all the checks
+            // to assure that is valid //TODO: Better description
+            types_stack::match_types!(
+                (
+                    (IntermediateType::IRef(ref_inner) | IntermediateType::IMutRef(ref_inner)),
+                    "reference or mutable reference",
+                    t
+                ),
+                (
+                    IntermediateType::IGenericStructInstance { ref module_id, index, ref types },
+                    "generic struct",
+                    *ref_inner
+                )
+            );
+            assert_eq!(module_id, &module_data.id);
+            assert_eq!(struct_.index(), index);
+            assert_eq!(types, instantiation_types);
 
             bytecodes::structs::borrow_field(
                 &struct_,
