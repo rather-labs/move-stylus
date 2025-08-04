@@ -8,7 +8,7 @@ use walrus::{
 
 use crate::compilation_context::ModuleId;
 
-use super::functions::MappedFunction;
+use super::{functions::MappedFunction, intermediate_types::IntermediateType};
 
 /// Identifies a function inside a module
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
@@ -16,6 +16,8 @@ pub struct FunctionId {
     pub identifier: String,
 
     pub module_id: ModuleId,
+
+    pub type_instantiations: Option<Vec<IntermediateType>>,
 }
 
 impl Display for FunctionId {

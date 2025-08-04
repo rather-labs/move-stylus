@@ -1,6 +1,8 @@
 use crate::translation::{
     functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionId,
 };
+use move_binary_format::file_format::FunctionInstantiationIndex;
+use std::collections::HashMap;
 
 #[derive(Debug, Default)]
 pub struct FunctionData {
@@ -16,6 +18,9 @@ pub struct FunctionData {
 
     /// Function information about this module's defined functions
     pub information: Vec<MappedFunction>,
+
+    /// Maps a function instantiation index to its corresponding function id
+    pub generic_function_instance: HashMap<usize, FunctionId>,
 
     /// The init function of the module
     pub init: Option<FunctionId>,

@@ -87,6 +87,8 @@ pub struct IStruct {
     /// it (if the struct contains dynamic data such as vector, the size can change depending on how
     /// many elements the vector has), just the pointers to them.
     pub heap_size: u32,
+
+    pub saved_in_storage: bool,
 }
 
 impl IStruct {
@@ -95,6 +97,7 @@ impl IStruct {
         identifier: String,
         fields: Vec<(Option<FieldHandleIndex>, IntermediateType)>,
         fields_types: HashMap<FieldHandleIndex, IntermediateType>,
+        saved_in_storage: bool,
     ) -> Self {
         let mut heap_size = 0;
         let mut field_offsets = HashMap::new();
@@ -114,6 +117,7 @@ impl IStruct {
             field_offsets,
             fields_types,
             fields: ir_fields,
+            saved_in_storage,
         }
     }
 
@@ -528,7 +532,7 @@ impl IStruct {
             struct_definition_index: StructDefinitionIndex::new(
                 self.struct_definition_index.into_index() as u16,
             ),
-            heap_size: self.heap_size,
+            ..*self
         }
     }
 }
