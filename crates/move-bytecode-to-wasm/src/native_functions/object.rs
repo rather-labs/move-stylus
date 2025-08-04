@@ -2,17 +2,16 @@ use super::NativeFunction;
 use crate::{
     CompilationContext,
     hostio::host_functions::{
-        block_number, block_timestamp, native_keccak256, storage_cache_bytes32,
+        block_number, block_timestamp, emit_log, native_keccak256, storage_cache_bytes32,
         storage_flush_cache, storage_load_bytes32,
     },
     translation::intermediate_types::address::IAddress,
+    utils::keccak_string_to_memory,
 };
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
-
-use alloy_primitives::keccak256;
 
 pub fn add_native_fresh_id_fn(
     module: &mut Module,
@@ -24,6 +23,7 @@ pub fn add_native_fresh_id_fn(
     let (storage_load_fn, _) = storage_load_bytes32(module);
     let (storage_cache_fn, _) = storage_cache_bytes32(module);
     let (storage_flush_cache_fn, _) = storage_flush_cache(module);
+    let (emit_log_fn, _) = emit_log(module);
 
     let mut function = FunctionBuilder::new(&mut module.types, &[], &[ValType::I32]);
 
@@ -41,22 +41,6 @@ pub fn add_native_fresh_id_fn(
         .i32_const(32)
         .call(compilation_ctx.allocator)
         .local_set(counter_key_ptr);
-
-    // Store each byte into linear memory at (counter_key_ptr + offset)
-    let binding = keccak256(b"global_counter_key");
-    let counter_key = binding.as_slice();
-    for (offset, byte) in counter_key.iter().enumerate() {
-        builder.local_get(counter_key_ptr); // base ptr
-        builder.i32_const(*byte as i32); // byte value
-        builder.store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: offset as u32,
-            },
-        );
-    }
 
     // Counter value
     builder
@@ -76,6 +60,14 @@ pub fn add_native_fresh_id_fn(
         .call(compilation_ctx.allocator)
         .local_set(data_to_hash_ptr);
 
+    // Store the keccak256 hash of the counter key into linear memory at #counter_key_ptr
+    keccak_string_to_memory(
+        &mut builder,
+        compilation_ctx,
+        "global_counter_key",
+        counter_key_ptr,
+    );
+
     // Load the counter from storage
     builder
         .local_get(counter_key_ptr)
@@ -94,26 +86,40 @@ pub fn add_native_fresh_id_fn(
                 offset: 0,
             },
         )
-        .i32_const(1)
-        .binop(BinaryOp::I32Add)
-        .store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
+        .i32_const(u32::MAX as i32)
+        .binop(BinaryOp::I32LtU)
+        .if_else(
+            Some(ValType::I32),
+            |then| {
+                then.local_get(counter_value_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .i32_const(1)
+                    .binop(BinaryOp::I32Add);
+            },
+            |else_| {
+                else_.i32_const(0);
             },
         );
 
-    // Update storage
-    builder
-        .local_get(counter_key_ptr)
-        .local_get(counter_value_ptr)
-        .call(storage_cache_fn)
-        .i32_const(1)
-        .call(storage_flush_cache_fn);
+    builder.store(
+        compilation_ctx.memory_id,
+        StoreKind::I32 { atomic: false },
+        MemArg {
+            align: 0,
+            offset: 0,
+        },
+    );
 
-    // Store the block timestamp in the first 8 bytes at #data_to_hash, block number in the next 8 bytes and counter in the last 4 bytes
+    // - Store the block timestamp in the first 8 bytes at #data_to_hash
+    // - Store the block number in the next 8 bytes
+    // - Store the counter in the final 32 bytes
     builder
         .local_get(data_to_hash_ptr)
         .call(block_timestamp)
@@ -160,6 +166,21 @@ pub fn add_native_fresh_id_fn(
         .i32_const(48)
         .local_get(id_ptr)
         .call(native_keccak);
+
+    // Update storage, flushing the cache
+    builder
+        .local_get(counter_key_ptr)
+        .local_get(counter_value_ptr)
+        .call(storage_cache_fn)
+        .i32_const(1)
+        .call(storage_flush_cache_fn);
+
+    // Emit log with the ID
+    builder
+        .local_get(id_ptr)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_fn);
 
     // Return the ID ptr
     builder.local_get(id_ptr);
