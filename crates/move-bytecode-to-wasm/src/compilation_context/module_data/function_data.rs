@@ -1,8 +1,6 @@
 use crate::translation::{
     functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionId,
 };
-use move_binary_format::file_format::FunctionInstantiationIndex;
-use std::collections::HashMap;
 
 #[derive(Debug, Default)]
 pub struct FunctionData {

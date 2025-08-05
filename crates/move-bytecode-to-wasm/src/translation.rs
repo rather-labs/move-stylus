@@ -428,24 +428,25 @@ fn translate_instruction(
                     .unwrap()
             };
 
-            // If the type instantaitions contains type parameters means we need to
-            // instantiate the functions with the information we have in stack. This We can
-            // encounter this situation with a chain of calls:
+            // If the type instantaitions contains type parameters means we need to instantiate the
+            // functions with the information we have in stack.
+            // We can encounter this situation with a chain of calls:
             //
-            // my_moule.move:
-            // fun test2(ctx: &mut TxContext) {
-            //    transfer(Test { id: object::new(ctx) }, @0x1)
+            // public fun echo_u16(x: u16): u16 {
+            //     test(x)
             // }
             //
-            // stylus::transfer.move
-            // public fun transfer<T: key>(obj: T, recipient: address) {
-            //    transfer_impl(obj, recipient)
+            // fun test<T>(t: T): T {
+            //     test2(t)
             // }
             //
-            // public(package) native fun transfer_impl<T: key>(obj: T, recipient: address);
+            // fun test2<T>(t: T): T {
+            //     t
+            // }
             //
-            // In this situation transfer_impl
-
+            // Here, the instantiation for T in test is u16, but in the call test2, we don't have
+            // the type information at the moment of processing the module. The type instantiations
+            // in test2 will be ITypeParameters that we will know at the moment of calling it.
             let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
             let function_information = if type_instantiations
                 .iter()
@@ -458,9 +459,10 @@ fn translate_instruction(
 
                 let instantiations: Vec<IntermediateType> = type_instantiations
                     .iter()
-                    .map(|f| {
-                        if let IntermediateType::ITypeParameter(index) = f {
-                            types[*index as usize].clone()
+                    .enumerate()
+                    .map(|(index, f)| {
+                        if let IntermediateType::ITypeParameter(_) = f {
+                            types[index].clone()
                         } else {
                             f.clone()
                         }
@@ -472,9 +474,8 @@ fn translate_instruction(
                 function_information.instantiate(type_instantiations)
             };
 
+            // Overwrite the function id because now it contains concrete types for sure
             let function_id = &function_information.function_id;
-
-            println!("2 {function_information:#?}");
 
             for argument in function_information.signature.arguments.iter().rev() {
                 types_stack.pop_expecting(argument)?;

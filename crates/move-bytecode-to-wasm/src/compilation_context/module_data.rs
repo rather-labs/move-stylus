@@ -21,8 +21,8 @@ use move_binary_format::{
     CompiledModule,
     file_format::{
         Ability, Constant, DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex,
-        FieldInstantiationIndex, FunctionDefinitionIndex, FunctionInstantiationIndex,
-        SignatureIndex, StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
+        FieldInstantiationIndex, FunctionDefinitionIndex, SignatureIndex,
+        StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
     },
     internals::ModuleIndex,
 };
@@ -596,9 +596,6 @@ impl ModuleData {
                 .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
                 .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
                 .unwrap();
-
-            println!("AAAAAAAAAAA {type_instantiations:?}");
-            println!("{move_module:#?}");
 
             let function_id = FunctionId {
                 identifier: function_name.to_string(),

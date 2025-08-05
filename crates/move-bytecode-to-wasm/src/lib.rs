@@ -252,7 +252,6 @@ fn translate_and_link_functions(
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
 ) {
-    println!("===> function_id {function_id:?}");
     // Obtain the function information and module's data
     let (function_information, module_data) = if let Some(fi) = compilation_ctx
         .root_module_data
@@ -310,7 +309,6 @@ fn translate_and_link_functions(
     // If it does not it means is a native function, we do nothing, it is linked and called
     // directly in the translation function
     if let Some(move_bytecode) = function_definition.code.as_ref() {
-        println!("a");
         let (wasm_function_id, functions_to_link) = translate_function(
             module,
             compilation_ctx,
@@ -320,8 +318,6 @@ fn translate_and_link_functions(
             move_bytecode,
         )
         .unwrap_or_else(|_| panic!("there was an error translating {}", function_id));
-
-        println!("b");
 
         function_table
             .add_to_wasm_table(module, function_id, wasm_function_id)
