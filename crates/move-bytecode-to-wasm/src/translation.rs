@@ -414,13 +414,13 @@ fn translate_instruction(
                 let dependency_data = compilation_ctx
                     .deps_data
                     .get(&function_id.module_id)
-                    .unwrap_or(&module_data);
+                    .unwrap_or(module_data);
 
                 dependency_data
                     .functions
                     .information
                     .iter()
-                    .find(|ref f| {
+                    .find(|f| {
                         f.function_id.module_id == function_id.module_id
                             && f.function_id.identifier == function_id.identifier
                             && f.function_id.type_instantiations.is_none()
@@ -510,26 +510,24 @@ fn translate_instruction(
             // If the function is not native, we add it to the table and declare it for translating
             // and linking
             // If the function IS native, we link it and call it directly
-            else {
-                if function_information.is_native {
-                    let native_function_id =
-                        NativeFunction::get(&function_id.identifier, module, compilation_ctx);
-                    builder.call(native_function_id);
-                } else {
-                    let table_id = function_table.get_table_id();
-                    let f_entry =
-                        function_table.add(module, function_id.clone(), &function_information);
-                    functions_calls_to_link.push(function_id.clone());
+            else if function_information.is_native {
+                let native_function_id =
+                    NativeFunction::get(&function_id.identifier, module, compilation_ctx);
+                builder.call(native_function_id);
+            } else {
+                let table_id = function_table.get_table_id();
+                let f_entry =
+                    function_table.add(module, function_id.clone(), &function_information);
+                functions_calls_to_link.push(function_id.clone());
 
-                    call_indirect(
-                        f_entry,
-                        &function_information.signature.returns,
-                        table_id,
-                        builder,
-                        module,
-                        compilation_ctx,
-                    );
-                }
+                call_indirect(
+                    f_entry,
+                    &function_information.signature.returns,
+                    table_id,
+                    builder,
+                    module,
+                    compilation_ctx,
+                );
             };
 
             // Insert in the stack types the types returned by the function (if any)

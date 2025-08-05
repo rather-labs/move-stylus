@@ -5,7 +5,12 @@
 //! but with Stylus, it is accessible just as a normal Solidity smart contract is via an ABI.
 
 use alloy::signers::local::PrivateKeySigner;
-use alloy::{primitives::{Address, address}, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
+use alloy::{
+    primitives::{Address, address},
+    providers::ProviderBuilder,
+    sol,
+    transports::http::reqwest::Url,
+};
 use dotenv::dotenv;
 use eyre::eyre;
 use std::str::FromStr;
@@ -45,14 +50,29 @@ async fn main() -> eyre::Result<()> {
     let ret = example.echoWithGenericFunctionU16(42).call().await?;
     println!("echoWithGenericFunctionU16 {ret}");
 
-    let ret = example.echoWithGenericFunctionVec32(vec![1,2,3]).call().await?;
+    let ret = example
+        .echoWithGenericFunctionVec32(vec![1, 2, 3])
+        .call()
+        .await?;
     println!("echoWithGenericFunctionVec32 {ret:?}");
 
-    let ret = example.echoWithGenericFunctionU16Vec32(42, vec![4,5,6]).call().await?;
+    let ret = example
+        .echoWithGenericFunctionU16Vec32(42, vec![4, 5, 6])
+        .call()
+        .await?;
     println!("echoWithGenericFunctionU16Vec32 ({}, {:?})", ret._0, ret._1);
 
-    let ret = example.echoWithGenericFunctionAddressVec128(address!("0x1234567890abcdef1234567890abcdef12345678"), vec![7,8,9]).call().await?;
-    println!("echoWithGenericFunctionAddressVec256 ({}, {:?})", ret._0, ret._1);
+    let ret = example
+        .echoWithGenericFunctionAddressVec128(
+            address!("0x1234567890abcdef1234567890abcdef12345678"),
+            vec![7, 8, 9],
+        )
+        .call()
+        .await?;
+    println!(
+        "echoWithGenericFunctionAddressVec256 ({}, {:?})",
+        ret._0, ret._1
+    );
 
     Ok(())
 }

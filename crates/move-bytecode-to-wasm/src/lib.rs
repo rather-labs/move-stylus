@@ -258,7 +258,7 @@ fn translate_and_link_functions(
         .functions
         .information
         .iter()
-        .find(|ref f| {
+        .find(|f| {
             f.function_id.module_id == function_id.module_id
                 && f.function_id.identifier == function_id.identifier
         }) {
@@ -273,7 +273,7 @@ fn translate_and_link_functions(
             .functions
             .information
             .iter()
-            .find(|ref f| f.function_id.identifier == function_id.identifier)
+            .find(|f| f.function_id.identifier == function_id.identifier)
             .unwrap();
 
         (fi, module_data)
@@ -281,7 +281,7 @@ fn translate_and_link_functions(
 
     // If the function is generic, we instantiate the concrete types so we can translate it
     let function_information = if function_information.is_generic {
-        &function_information.instantiate(&function_id.type_instantiations.as_ref().unwrap())
+        &function_information.instantiate(function_id.type_instantiations.as_ref().unwrap())
     } else {
         function_information
     };
