@@ -409,8 +409,6 @@ fn translate_instruction(
             let function_id = &module_data.functions.generic_calls
                 [function_instantiation_handle_index.into_index()];
 
-            println!("{function_id:?}");
-
             // Obtain the generic function information
             let function_information = {
                 let dependency_data = compilation_ctx
@@ -430,10 +428,53 @@ fn translate_instruction(
                     .unwrap()
             };
 
-            let function_information = function_information
-                .instantiate(&function_id.type_instantiations.as_ref().unwrap());
+            // If the type instantaitions contains type parameters means we need to
+            // instantiate the functions with the information we have in stack. This We can
+            // encounter this situation with a chain of calls:
+            //
+            // my_moule.move:
+            // fun test2(ctx: &mut TxContext) {
+            //    transfer(Test { id: object::new(ctx) }, @0x1)
+            // }
+            //
+            // stylus::transfer.move
+            // public fun transfer<T: key>(obj: T, recipient: address) {
+            //    transfer_impl(obj, recipient)
+            // }
+            //
+            // public(package) native fun transfer_impl<T: key>(obj: T, recipient: address);
+            //
+            // In this situation transfer_impl
 
-            // println!("{function_information:?}");
+            let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
+            let function_information = if type_instantiations
+                .iter()
+                .any(|t| matches!(t, IntermediateType::ITypeParameter(_)))
+            {
+                let arguments_start =
+                    types_stack.len() - function_information.signature.arguments.len();
+                // Get the last number of arguments from the types stack
+                let types = &types_stack[arguments_start..types_stack.len()];
+
+                let instantiations: Vec<IntermediateType> = type_instantiations
+                    .iter()
+                    .map(|f| {
+                        if let IntermediateType::ITypeParameter(index) = f {
+                            types[*index as usize].clone()
+                        } else {
+                            f.clone()
+                        }
+                    })
+                    .collect();
+
+                function_information.instantiate(&instantiations)
+            } else {
+                function_information.instantiate(type_instantiations)
+            };
+
+            let function_id = &function_information.function_id;
+
+            println!("2 {function_information:#?}");
 
             for argument in function_information.signature.arguments.iter().rev() {
                 types_stack.pop_expecting(argument)?;

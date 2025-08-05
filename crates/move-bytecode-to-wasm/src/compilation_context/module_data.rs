@@ -26,7 +26,10 @@ use move_binary_format::{
     },
     internals::ModuleIndex,
 };
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+};
 use struct_data::StructData;
 
 use super::{CompilationContextError, Result};
@@ -46,7 +49,7 @@ pub enum UserDefinedType {
     },
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
 #[repr(transparent)]
 pub struct Address([u8; 32]);
 
@@ -61,6 +64,12 @@ impl Display for Address {
         }
 
         Ok(())
+    }
+}
+
+impl Debug for Address {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Address[{}]", self)
     }
 }
 
@@ -587,6 +596,9 @@ impl ModuleData {
                 .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
                 .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
                 .unwrap();
+
+            println!("AAAAAAAAAAA {type_instantiations:?}");
+            println!("{move_module:#?}");
 
             let function_id = FunctionId {
                 identifier: function_name.to_string(),

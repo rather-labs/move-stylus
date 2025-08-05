@@ -125,8 +125,10 @@ impl MappedFunction {
         let signature = ISignature { arguments, returns };
         let results = signature.get_return_wasm_types();
 
+        let mut function_id = self.function_id.clone();
+        function_id.type_instantiations = Some(types.to_vec());
         Self {
-            function_id: self.function_id.clone(),
+            function_id,
             signature,
             results,
             locals,
