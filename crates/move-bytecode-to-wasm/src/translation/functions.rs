@@ -81,6 +81,40 @@ impl MappedFunction {
             &self.locals[local_index - self.signature.arguments.len()]
         }
     }
+
+    /// Replaces all type parameters in the struct with the provided types.
+    pub fn instantiate(
+        &self,
+        types: &[IntermediateType],
+    ) -> (Vec<IntermediateType>, Vec<IntermediateType>) {
+        let arguments = self
+            .signature
+            .arguments
+            .iter()
+            .map(|f| {
+                if let IntermediateType::ITypeParameter(index) = f {
+                    types[*index as usize].clone()
+                } else {
+                    f.clone()
+                }
+            })
+            .collect();
+
+        let returns = self
+            .signature
+            .returns
+            .iter()
+            .map(|f| {
+                if let IntermediateType::ITypeParameter(index) = f {
+                    types[*index as usize].clone()
+                } else {
+                    f.clone()
+                }
+            })
+            .collect();
+
+        (arguments, returns)
+    }
 }
 
 /// Adds the instructions to unpack the return values from memory
