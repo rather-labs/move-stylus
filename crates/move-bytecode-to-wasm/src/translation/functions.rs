@@ -83,10 +83,7 @@ impl MappedFunction {
     }
 
     /// Replaces all type parameters in the struct with the provided types.
-    pub fn instantiate(
-        &self,
-        types: &[IntermediateType],
-    ) -> (Vec<IntermediateType>, Vec<IntermediateType>) {
+    pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
         let arguments = self
             .signature
             .arguments
@@ -113,7 +110,28 @@ impl MappedFunction {
             })
             .collect();
 
-        (arguments, returns)
+        let locals = self
+            .locals
+            .iter()
+            .map(|f| {
+                if let IntermediateType::ITypeParameter(index) = f {
+                    types[*index as usize].clone()
+                } else {
+                    f.clone()
+                }
+            })
+            .collect();
+
+        let signature = ISignature { arguments, returns };
+        let results = signature.get_return_wasm_types();
+
+        Self {
+            function_id: self.function_id.clone(),
+            signature,
+            results,
+            locals,
+            ..*self
+        }
     }
 }
 

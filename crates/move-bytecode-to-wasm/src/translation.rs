@@ -200,7 +200,10 @@ fn translate_flow(
                         branches,
                         ctx.branch_targets,
                     )
-                    .unwrap();
+                    .unwrap_or_else(|e| {
+                        panic!("there was an error translating instruction {instruction:?}.\n{e}")
+                    });
+
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
                 // Then translate instructions of the immediate block, inside the current block
@@ -427,12 +430,12 @@ fn translate_instruction(
                     .unwrap()
             };
 
-            let (arguments, returns) = function_information
+            let function_information = function_information
                 .instantiate(&function_id.type_instantiations.as_ref().unwrap());
 
             // println!("{function_information:?}");
 
-            for argument in arguments.iter().rev() {
+            for argument in function_information.signature.arguments.iter().rev() {
                 types_stack.pop_expecting(argument)?;
 
                 if let IntermediateType::IMutRef(_) | IntermediateType::IRef(_) = argument {
@@ -451,7 +454,7 @@ fn translate_instruction(
             if let Some(f) = function_table.get_by_function_id(function_id) {
                 call_indirect(
                     f,
-                    &returns,
+                    &function_information.signature.returns,
                     function_table.get_table_id(),
                     builder,
                     module,
@@ -470,12 +473,12 @@ fn translate_instruction(
                 } else {
                     let table_id = function_table.get_table_id();
                     let f_entry =
-                        function_table.add(module, function_id.clone(), function_information);
+                        function_table.add(module, function_id.clone(), &function_information);
                     functions_calls_to_link.push(function_id.clone());
 
                     call_indirect(
                         f_entry,
-                        &returns,
+                        &function_information.signature.returns,
                         table_id,
                         builder,
                         module,
@@ -485,7 +488,7 @@ fn translate_instruction(
             };
 
             // Insert in the stack types the types returned by the function (if any)
-            types_stack.append(&returns);
+            types_stack.append(&function_information.signature.returns);
         }
         // Function calls
         Bytecode::Call(function_handle_index) => {

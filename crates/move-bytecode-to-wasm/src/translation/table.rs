@@ -20,6 +20,15 @@ pub struct FunctionId {
     pub type_instantiations: Option<Vec<IntermediateType>>,
 }
 
+impl FunctionId {
+    // TODO do this in nother way
+    pub fn get_generic_fn_id(&self) -> Self {
+        let mut id = self.clone();
+        id.type_instantiations = None;
+        id
+    }
+}
+
 impl Display for FunctionId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}::{}", self.module_id, self.identifier)

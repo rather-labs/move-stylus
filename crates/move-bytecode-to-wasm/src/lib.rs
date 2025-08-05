@@ -252,14 +252,17 @@ fn translate_and_link_functions(
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
 ) {
+    println!("===> function_id {function_id:?}");
     // Obtain the function information and module's data
     let (function_information, module_data) = if let Some(fi) = compilation_ctx
         .root_module_data
         .functions
         .information
         .iter()
-        .find(|f| &f.function_id == function_id)
-    {
+        .find(|ref f| {
+            f.function_id.module_id == function_id.module_id
+                && f.function_id.identifier == function_id.identifier
+        }) {
         (fi, compilation_ctx.root_module_data)
     } else {
         let module_data = compilation_ctx
@@ -271,10 +274,17 @@ fn translate_and_link_functions(
             .functions
             .information
             .iter()
-            .find(|f| &f.function_id == function_id)
+            .find(|ref f| f.function_id.identifier == function_id.identifier)
             .unwrap();
 
         (fi, module_data)
+    };
+
+    // If the function is generic, we instantiate the concrete types so we can translate it
+    let function_information = if function_information.is_generic {
+        &function_information.instantiate(&function_id.type_instantiations.as_ref().unwrap())
+    } else {
+        function_information
     };
 
     // Process function defined in this module
@@ -292,13 +302,15 @@ fn translate_and_link_functions(
     }
 
     let function_definition = function_definitions
-        .get(function_id)
+        // TODO do this in nother way
+        .get(&function_id.get_generic_fn_id())
         .unwrap_or_else(|| panic!("could not find function definition for {}", function_id));
 
     // If the function contains code we translate it
     // If it does not it means is a native function, we do nothing, it is linked and called
     // directly in the translation function
     if let Some(move_bytecode) = function_definition.code.as_ref() {
+        println!("a");
         let (wasm_function_id, functions_to_link) = translate_function(
             module,
             compilation_ctx,
@@ -308,6 +320,8 @@ fn translate_and_link_functions(
             move_bytecode,
         )
         .unwrap_or_else(|_| panic!("there was an error translating {}", function_id));
+
+        println!("b");
 
         function_table
             .add_to_wasm_table(module, function_id, wasm_function_id)
