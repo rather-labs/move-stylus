@@ -444,9 +444,11 @@ fn translate_instruction(
             //     t
             // }
             //
-            // Here, the instantiation for T in test is u16, but in the call test2, we don't have
-            // the type information at the moment of processing the module. The type instantiations
-            // in test2 will be ITypeParameters that we will know at the moment of calling it.
+            // In this example, the type parameter `T` in `test` is instantiated as `u16`.
+            // However, when `test2` is called from within `test`, the concrete type for `T`
+            // is not yet known at module processing time. The type instantiations for
+            // `test2` will remain as `ITypeParameters` and will only be resolved at
+            // the moment of the function call.
             let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
             let function_information = if type_instantiations
                 .iter()
@@ -454,7 +456,8 @@ fn translate_instruction(
             {
                 let arguments_start =
                     types_stack.len() - function_information.signature.arguments.len();
-                // Get the last number of arguments from the types stack
+
+                // Get the function's arguments from the types stack
                 let types = &types_stack[arguments_start..types_stack.len()];
 
                 let instantiations: Vec<IntermediateType> = type_instantiations
@@ -474,7 +477,7 @@ fn translate_instruction(
                 function_information.instantiate(type_instantiations)
             };
 
-            // Overwrite the function id because now it contains concrete types for sure
+            // Shadow the function_id variable because now it contains concrete types
             let function_id = &function_information.function_id;
 
             for argument in function_information.signature.arguments.iter().rev() {
@@ -663,8 +666,8 @@ fn translate_instruction(
             // Check if in the types stack we have the correct type
             let t = types_stack.pop()?;
 
-            // An immutable borrow can coexist with a mutable reference, as the Move compiler
-            // ensures through static checks that no invalid accesses occur.
+            // In this context, an immutable borrow can coexist with a mutable one, as the Move
+            // compiler ensures through static checks that no invalid accesses occur.
             types_stack::match_types!(
                 (
                     (IntermediateType::IRef(ref_inner) | IntermediateType::IMutRef(ref_inner)),
@@ -711,8 +714,8 @@ fn translate_instruction(
             // Check if in the types stack we have the correct type
             let t = types_stack.pop()?;
 
-            // An immutable borrow can expect a mutable ref, the Move compiler makes all the checks
-            // to assure that is valid //TODO: Better description
+            // In this context, an immutable borrow can coexist with a mutable one, as the Move
+            // compiler ensures through static checks that no invalid accesses occur.
             types_stack::match_types!(
                 (
                     (IntermediateType::IRef(ref_inner) | IntermediateType::IMutRef(ref_inner)),

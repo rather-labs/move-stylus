@@ -132,6 +132,7 @@ impl MappedFunction {
             signature,
             results,
             locals,
+            is_generic: false,
             ..*self
         }
     }
