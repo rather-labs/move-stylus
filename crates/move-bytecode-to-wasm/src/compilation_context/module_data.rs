@@ -569,8 +569,8 @@ impl ModuleData {
             function_calls.push(function_id);
         }
 
-        let mut generic_function_instance = HashMap::new();
-        for (index, function) in move_module.function_instantiations().iter().enumerate() {
+        let mut generic_function_calls = Vec::new();
+        for function in move_module.function_instantiations().iter() {
             let function_handle = move_module.function_handle_at(function.handle);
             let function_name = move_module.identifier_at(function_handle.name).as_str();
             let function_module = move_module.module_handle_at(function_handle.module);
@@ -597,15 +597,15 @@ impl ModuleData {
                 type_instantiations: Some(type_instantiations),
             };
 
-            generic_function_instance.insert(index, function_id);
+            generic_function_calls.push(function_id);
         }
 
         FunctionData {
             arguments: functions_arguments,
             returns: functions_returns,
             calls: function_calls,
+            generic_calls: generic_function_calls,
             information: function_information,
-            generic_function_instance,
             init,
         }
     }

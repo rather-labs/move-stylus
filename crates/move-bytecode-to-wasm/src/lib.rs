@@ -115,7 +115,7 @@ pub fn translate_package(
             .functions
             .information
             .iter()
-            .filter(|fi| fi.function_id.module_id == root_module_id)
+            .filter(|fi| fi.function_id.module_id == root_module_id && !fi.is_generic)
         {
             translate_and_link_functions(
                 &function_information.function_id,

@@ -16,11 +16,11 @@ pub struct FunctionData {
     /// current module or in an immediate dependency
     pub calls: Vec<FunctionId>,
 
+    /// Generic function calls. They can be from this module or from an immediate depenedency
+    pub generic_calls: Vec<FunctionId>,
+
     /// Function information about this module's defined functions
     pub information: Vec<MappedFunction>,
-
-    /// Maps a function instantiation index to its corresponding function id
-    pub generic_function_instance: HashMap<usize, FunctionId>,
 
     /// The init function of the module
     pub init: Option<FunctionId>,
