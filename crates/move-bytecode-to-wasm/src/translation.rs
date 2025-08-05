@@ -663,8 +663,8 @@ fn translate_instruction(
             // Check if in the types stack we have the correct type
             let t = types_stack.pop()?;
 
-            // An immutable borrow can expect a mutable ref, the Move compiler makes all the checks
-            // to assure that is valid //TODO: Better description
+            // An immutable borrow can coexist with a mutable reference, as the Move compiler
+            // ensures through static checks that no invalid accesses occur.
             types_stack::match_types!(
                 (
                     (IntermediateType::IRef(ref_inner) | IntermediateType::IMutRef(ref_inner)),
