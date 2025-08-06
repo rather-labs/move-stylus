@@ -67,9 +67,9 @@ pub fn build_constructor(
     compilation_ctx: &CompilationContext,
     init: Option<WalrusFunctionId>,
 ) -> WalrusFunctionId {
-    // Constants
+    // Flag to indicate if the constructor has been called.
+    // This is what we are going to be storing in the storage.
     const FLAG: i32 = 1;
-    const FLAG_OFFSET: u32 = 0;
 
     // Host functions for storage operations
     let (storage_load_fn, _) = host_functions::storage_load_bytes32(module);
@@ -106,22 +106,61 @@ pub fn build_constructor(
         .call(storage_load_fn);
 
     // Check all 32 bytes at value_ptr to see if the storage has been initialized
-    builder.i32_const(1);
-    for offset in (0..32).step_by(4) {
-        builder
-            .local_get(value_ptr)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: offset as u32,
-                },
-            )
-            .i32_const(0)
-            .binop(BinaryOp::I32Eq) // true if this chunk == 0
-            .binop(BinaryOp::I32And); // accumulator AND result
-    }
+    let offset = module.locals.add(ValType::I32); // Local variable to track the current byte offset
+    // Initialize offset to 0
+    builder.i32_const(0).local_set(offset);
+    builder.block(ValType::I32, |block| {
+        let block_id = block.id(); // ID for the outer block
+        // Loop over the 32 bytes at value_ptr
+        block.loop_(ValType::I32, |loop_| {
+            let loop_id = loop_.id(); 
+            loop_
+                .local_get(value_ptr) // Get the base pointer to the value
+                .local_get(offset) // Get the current offset
+                .binop(BinaryOp::I32Add) // Calculate the address: value_ptr + offset
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .i32_const(0) 
+                .binop(BinaryOp::I32Ne) // Check if the loaded value is non-zero
+                .if_else(
+                    ValType::I32,
+                    |then| {
+                        // Non-zero value found, push 0 and exit the block
+                        then.i32_const(0).br(block_id);
+                    },
+                    |else_| {
+                        // If offset >= 28, break the loop
+                        else_
+                            .local_get(offset) 
+                            .i32_const(28) 
+                            .binop(BinaryOp::I32GeU) 
+                            .if_else(
+                                ValType::I32,
+                                |then| {
+                                    // Reached the end of the loop + all bytes were zero, exit with 1
+                                    then.i32_const(1).br(block_id);
+                                },
+                                |inner_else| {
+                                    // Increment offset by 4 and continue the loop
+                                    inner_else
+                                        .local_get(offset) 
+                                        .i32_const(4) 
+                                        .binop(BinaryOp::I32Add) 
+                                        .local_set(offset);
+
+                                    inner_else.br(loop_id); // Continue the loop
+                                },
+                            );
+                    },
+                );
+        });
+    });
 
     // If storage has not been initialized, proceed with initialization
     builder.if_else(
@@ -135,6 +174,7 @@ pub fn build_constructor(
                 // If the function expects an OTW, push dummy value.
                 // The OTW is a Move pattern used to ensure that the init function is called only once.
                 // Here we replace that logic by writing a marker value into the storage.
+                // TODO: revisit the OTW implementation and check if this approach is correct.
                 if params.len() == 2 {
                     then.i32_const(0); // OTW = 0 
                 }
@@ -146,12 +186,13 @@ pub fn build_constructor(
                 then.call(init_id);
             }
 
+            // Write the flag at value_ptr
             then.local_get(value_ptr).i32_const(FLAG).store(
                 compilation_ctx.memory_id,
                 StoreKind::I32 { atomic: false },
                 MemArg {
                     align: 0,
-                    offset: FLAG_OFFSET,
+                    offset: 0,
                 },
             );
 
