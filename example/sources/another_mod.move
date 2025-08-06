@@ -11,4 +11,8 @@ public fun get_another_test_value(self: &AnotherTest): u8 {
     *value
 }
 
+public fun generic_identity_2<T>(t: T): T {
+    t
+}
+
 

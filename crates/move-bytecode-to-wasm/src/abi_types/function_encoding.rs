@@ -226,6 +226,7 @@ mod tests {
                 ),
             ],
             HashMap::new(),
+            false,
         );
 
         let struct_2 = IStruct::new(
@@ -236,6 +237,7 @@ mod tests {
                 (None, IntermediateType::IU128),
             ],
             HashMap::new(),
+            false,
         );
 
         let mut module_data = ModuleData::default();

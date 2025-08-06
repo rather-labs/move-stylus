@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use crate::translation::intermediate_types::IntermediateType;
 use move_binary_format::file_format::Bytecode;
 
@@ -53,6 +55,14 @@ impl TypesStack {
         }
 
         Ok(res)
+    }
+}
+
+impl Deref for TypesStack {
+    type Target = [IntermediateType];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 

@@ -8,7 +8,7 @@ use walrus::{
 
 use crate::compilation_context::ModuleId;
 
-use super::functions::MappedFunction;
+use super::{functions::MappedFunction, intermediate_types::IntermediateType};
 
 /// Identifies a function inside a module
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
@@ -16,6 +16,18 @@ pub struct FunctionId {
     pub identifier: String,
 
     pub module_id: ModuleId,
+
+    pub type_instantiations: Option<Vec<IntermediateType>>,
+}
+
+impl FunctionId {
+    /// Returns the generic function ID corresponding to a function ID with type instantiations.
+    pub fn get_generic_fn_id(&self) -> Self {
+        // TODO: clone...
+        let mut id = self.clone();
+        id.type_instantiations = None;
+        id
+    }
 }
 
 impl Display for FunctionId {

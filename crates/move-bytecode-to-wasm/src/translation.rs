@@ -200,7 +200,10 @@ fn translate_flow(
                         branches,
                         ctx.branch_targets,
                     )
-                    .unwrap();
+                    .unwrap_or_else(|e| {
+                        panic!("there was an error translating instruction {instruction:?}.\n{e}")
+                    });
+
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
                 // Then translate instructions of the immediate block, inside the current block
@@ -401,6 +404,136 @@ fn translate_instruction(
             types_stack.push(IntermediateType::IU256);
         }
         // Function calls
+        Bytecode::CallGeneric(function_instantiation_handle_index) => {
+            let function_id = &module_data.functions.generic_calls
+                [function_instantiation_handle_index.into_index()];
+
+            // Obtain the generic function information
+            let function_information = {
+                let dependency_data = compilation_ctx
+                    .deps_data
+                    .get(&function_id.module_id)
+                    .unwrap_or(module_data);
+
+                dependency_data
+                    .functions
+                    .information
+                    .iter()
+                    .find(|f| {
+                        f.function_id.module_id == function_id.module_id
+                            && f.function_id.identifier == function_id.identifier
+                            && f.function_id.type_instantiations.is_none()
+                    })
+                    .unwrap()
+            };
+
+            // If the type instantaitions contains type parameters means we need to instantiate the
+            // functions with the information we have in stack.
+            // We can encounter this situation with a chain of calls:
+            //
+            // public fun echo_u16(x: u16): u16 {
+            //     test(x)
+            // }
+            //
+            // fun test<T>(t: T): T {
+            //     test2(t)
+            // }
+            //
+            // fun test2<T>(t: T): T {
+            //     t
+            // }
+            //
+            // In this example, the type parameter `T` in `test` is instantiated as `u16`.
+            // However, when `test2` is called from within `test`, the concrete type for `T`
+            // is not yet known at module processing time. The type instantiations for
+            // `test2` will remain as `ITypeParameters` and will only be resolved at
+            // the moment of the function call.
+            let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
+            let function_information = if type_instantiations
+                .iter()
+                .any(|t| matches!(t, IntermediateType::ITypeParameter(_)))
+            {
+                let arguments_start =
+                    types_stack.len() - function_information.signature.arguments.len();
+
+                // Get the function's arguments from the types stack
+                let types = &types_stack[arguments_start..types_stack.len()];
+
+                let instantiations: Vec<IntermediateType> = type_instantiations
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, f)| {
+                        if let IntermediateType::ITypeParameter(_) = f {
+                            Some(types[index].clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                function_information.instantiate(&instantiations)
+            } else {
+                function_information.instantiate(type_instantiations)
+            };
+
+            // Shadow the function_id variable because now it contains concrete types
+            let function_id = &function_information.function_id;
+
+            // Consume from the types stack the arguments that will be used by the function call
+            for argument in function_information.signature.arguments.iter().rev() {
+                types_stack.pop_expecting(argument)?;
+
+                if let IntermediateType::IMutRef(_) | IntermediateType::IRef(_) = argument {
+                    builder.load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                }
+            }
+
+            // If the function is in the table we call it directly
+            if let Some(f) = function_table.get_by_function_id(function_id) {
+                call_indirect(
+                    f,
+                    &function_information.signature.returns,
+                    function_table.get_table_id(),
+                    builder,
+                    module,
+                    compilation_ctx,
+                );
+            }
+            // Otherwise
+            // If the function is not native, we add it to the table and declare it for translating
+            // and linking
+            // If the function IS native, we link it and call it directly
+            else if function_information.is_native {
+                let native_function_id =
+                    NativeFunction::get(&function_id.identifier, module, compilation_ctx);
+                builder.call(native_function_id);
+            } else {
+                let table_id = function_table.get_table_id();
+                let f_entry =
+                    function_table.add(module, function_id.clone(), &function_information);
+                functions_calls_to_link.push(function_id.clone());
+
+                call_indirect(
+                    f_entry,
+                    &function_information.signature.returns,
+                    table_id,
+                    builder,
+                    module,
+                    compilation_ctx,
+                );
+            };
+
+            // Insert in the stack types the types returned by the function (if any)
+            types_stack.append(&function_information.signature.returns);
+        }
+        // Function calls
         Bytecode::Call(function_handle_index) => {
             // Consume from the types stack the arguments that will be used by the function call
             let arguments = &module_data.functions.arguments[function_handle_index.into_index()];
@@ -529,12 +662,24 @@ fn translate_instruction(
             let struct_ = module_data.structs.get_by_field_handle_idx(field_id)?;
 
             // Check if in the types stack we have the correct type
-            types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
-                IntermediateType::IStruct {
-                    module_id: module_data.id.clone(),
-                    index: struct_.index(),
-                },
-            )))?;
+            let t = types_stack.pop()?;
+
+            // In this context, an immutable borrow can coexist with a mutable one, as the Move
+            // compiler ensures through static checks that no invalid accesses occur.
+            types_stack::match_types!(
+                (
+                    (IntermediateType::IRef(ref_inner) | IntermediateType::IMutRef(ref_inner)),
+                    "reference or mutable reference",
+                    t
+                ),
+                (
+                    IntermediateType::IStruct { ref module_id, index },
+                    "struct",
+                    *ref_inner
+                )
+            );
+            assert_eq!(module_id, &module_data.id);
+            assert_eq!(struct_.index(), index);
 
             bytecodes::structs::borrow_field(
                 struct_,
@@ -565,13 +710,25 @@ fn translate_instruction(
             };
 
             // Check if in the types stack we have the correct type
-            types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
-                IntermediateType::IGenericStructInstance {
-                    module_id: module_data.id.clone(),
-                    index: struct_.index(),
-                    types: instantiation_types.to_vec(),
-                },
-            )))?;
+            let t = types_stack.pop()?;
+
+            // In this context, an immutable borrow can coexist with a mutable one, as the Move
+            // compiler ensures through static checks that no invalid accesses occur.
+            types_stack::match_types!(
+                (
+                    (IntermediateType::IRef(ref_inner) | IntermediateType::IMutRef(ref_inner)),
+                    "reference or mutable reference",
+                    t
+                ),
+                (
+                    IntermediateType::IGenericStructInstance { ref module_id, index, ref types },
+                    "generic struct",
+                    *ref_inner
+                )
+            );
+            assert_eq!(module_id, &module_data.id);
+            assert_eq!(struct_.index(), index);
+            assert_eq!(types, instantiation_types);
 
             bytecodes::structs::borrow_field(
                 &struct_,

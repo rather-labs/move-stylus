@@ -20,13 +20,16 @@ use function_data::FunctionData;
 use move_binary_format::{
     CompiledModule,
     file_format::{
-        Constant, DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex,
+        Ability, Constant, DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex,
         FieldInstantiationIndex, FunctionDefinitionIndex, SignatureIndex,
         StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
     },
     internals::ModuleIndex,
 };
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+};
 use struct_data::StructData;
 
 use super::{CompilationContextError, Result};
@@ -46,7 +49,7 @@ pub enum UserDefinedType {
     },
 }
 
-#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
 #[repr(transparent)]
 pub struct Address([u8; 32]);
 
@@ -61,6 +64,12 @@ impl Display for Address {
         }
 
         Ok(())
+    }
+}
+
+impl Debug for Address {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Address[{}]", self)
     }
 }
 
@@ -285,15 +294,22 @@ impl ModuleData {
                 }
             }
 
+            let struct_datatype_handle = module.datatype_handle_at(struct_def.struct_handle);
             let identifier = module
-                .identifier_at(module.datatype_handle_at(struct_def.struct_handle).name)
+                .identifier_at(struct_datatype_handle.name)
                 .to_string();
+
+            let is_saved_in_storage = struct_datatype_handle
+                .abilities
+                .into_iter()
+                .any(|a| a == Ability::Key);
 
             module_structs.push(IStruct::new(
                 struct_index,
                 identifier,
                 all_fields,
                 fields_map,
+                is_saved_in_storage,
             ));
         }
 
@@ -506,6 +522,7 @@ impl ModuleData {
                     address: function_module_address,
                     module_name: function_module_name.to_string(),
                 },
+                type_instantiations: None,
             };
 
             // If the functions is defined in this module, we can obtain its definition and process
@@ -561,10 +578,42 @@ impl ModuleData {
             function_calls.push(function_id);
         }
 
+        let mut generic_function_calls = Vec::new();
+        for function in move_module.function_instantiations().iter() {
+            let function_handle = move_module.function_handle_at(function.handle);
+            let function_name = move_module.identifier_at(function_handle.name).as_str();
+            let function_module = move_module.module_handle_at(function_handle.module);
+            let function_module_name = move_module.identifier_at(function_module.name).as_str();
+            let function_module_address: Address = move_module
+                .address_identifier_at(function_module.address)
+                .into_bytes()
+                .into();
+
+            let type_instantiations = move_module
+                .signature_at(function.type_parameters)
+                .0
+                .iter()
+                .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
+                .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                .unwrap();
+
+            let function_id = FunctionId {
+                identifier: function_name.to_string(),
+                module_id: ModuleId {
+                    address: function_module_address,
+                    module_name: function_module_name.to_string(),
+                },
+                type_instantiations: Some(type_instantiations),
+            };
+
+            generic_function_calls.push(function_id);
+        }
+
         FunctionData {
             arguments: functions_arguments,
             returns: functions_returns,
             calls: function_calls,
+            generic_calls: generic_function_calls,
             information: function_information,
             init,
         }

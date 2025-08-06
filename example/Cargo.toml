@@ -8,6 +8,10 @@ name = "interaction"
 path = "scripts/interaction.rs"
 
 [[bin]]
+name = "features_2"
+path = "scripts/features_2.rs"
+
+[[bin]]
 name = "primitives_and_operations"
 path = "scripts/primitives_and_operations.rs"
 

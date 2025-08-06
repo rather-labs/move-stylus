@@ -11,12 +11,15 @@ pub struct FunctionData {
     pub returns: Vec<Vec<IntermediateType>>,
 
     /// Functions called inside this module. The functions on this list can be defined inside the
-    /// current module or in an immediate dependency
+    /// current module or in an immediate dependency.
     pub calls: Vec<FunctionId>,
 
-    /// Function information about this module's defined functions
+    /// Generic function calls. They can be from this module or from an immediate dependency.
+    pub generic_calls: Vec<FunctionId>,
+
+    /// Function information about this module's defined functions.
     pub information: Vec<MappedFunction>,
 
-    /// The init function of the module
+    /// The init function of the module.
     pub init: Option<FunctionId>,
 }

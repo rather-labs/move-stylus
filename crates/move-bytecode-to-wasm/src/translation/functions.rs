@@ -17,7 +17,6 @@ pub struct MappedFunction {
     pub function_id: FunctionId,
     pub signature: ISignature,
     pub locals: Vec<IntermediateType>,
-    pub arguments: Vec<IntermediateType>,
     pub results: Vec<ValType>,
 
     /// Flag that tells us if the function can be used as an entrypoint
@@ -25,6 +24,9 @@ pub struct MappedFunction {
 
     /// Flag that tells us if the function is a native function
     pub is_native: bool,
+
+    /// Flag that tells us if the function contains generic arguments or return values
+    pub is_generic: bool,
 }
 
 impl MappedFunction {
@@ -42,13 +44,6 @@ impl MappedFunction {
 
         assert!(results.len() <= 1, "Multiple return values not supported");
 
-        let arguments = move_args
-            .0
-            .iter()
-            .map(|s| IntermediateType::try_from_signature_token(s, handles_map))
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
-
         // Declared locals
         let locals = move_locals
             .iter()
@@ -56,25 +51,89 @@ impl MappedFunction {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
+        let is_generic = signature
+            .arguments
+            .iter()
+            .any(|a| matches!(a, IntermediateType::ITypeParameter(_)))
+            || signature
+                .returns
+                .iter()
+                .any(|a| matches!(a, IntermediateType::ITypeParameter(_)));
+
         Self {
             function_id,
             signature,
             locals,
-            arguments,
             results,
             // TODO: change to function_definition.is_entry
             is_entry: function_definition.visibility == Visibility::Public,
             is_native: function_definition.is_native(),
+            is_generic,
         }
     }
 }
 
 impl MappedFunction {
     pub fn get_local_ir(&self, local_index: usize) -> &IntermediateType {
-        if local_index < self.arguments.len() {
-            &self.arguments[local_index]
+        if local_index < self.signature.arguments.len() {
+            &self.signature.arguments[local_index]
         } else {
-            &self.locals[local_index - self.arguments.len()]
+            &self.locals[local_index - self.signature.arguments.len()]
+        }
+    }
+
+    /// Replaces all type parameters in the function with the provided types.
+    pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
+        let arguments = self
+            .signature
+            .arguments
+            .iter()
+            .map(|f| {
+                if let IntermediateType::ITypeParameter(index) = f {
+                    types[*index as usize].clone()
+                } else {
+                    f.clone()
+                }
+            })
+            .collect();
+
+        let returns = self
+            .signature
+            .returns
+            .iter()
+            .map(|f| {
+                if let IntermediateType::ITypeParameter(index) = f {
+                    types[*index as usize].clone()
+                } else {
+                    f.clone()
+                }
+            })
+            .collect();
+
+        let locals = self
+            .locals
+            .iter()
+            .map(|f| {
+                if let IntermediateType::ITypeParameter(index) = f {
+                    types[*index as usize].clone()
+                } else {
+                    f.clone()
+                }
+            })
+            .collect();
+
+        let signature = ISignature { arguments, returns };
+        let results = signature.get_return_wasm_types();
+
+        let mut function_id = self.function_id.clone();
+        function_id.type_instantiations = Some(types.to_vec());
+        Self {
+            function_id,
+            signature,
+            results,
+            locals,
+            is_generic: false,
+            ..*self
         }
     }
 }

@@ -161,7 +161,8 @@ pub fn pack(
                     | IntermediateType::ISigner
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
-                    | IntermediateType::IGenericStructInstance { .. } => {
+                    | IntermediateType::IGenericStructInstance { .. }
+                    | IntermediateType::IExternalUserData { .. } => {
                         builder.local_set(ptr_to_data);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -176,7 +177,6 @@ pub fn pack(
                         });
                     }
                     IntermediateType::IEnum(_) => todo!(),
-                    IntermediateType::IExternalUserData { .. } => todo!(),
                 };
 
                 builder.local_get(pointer).local_get(ptr_to_data).store(

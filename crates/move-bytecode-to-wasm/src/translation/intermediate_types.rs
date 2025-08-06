@@ -28,7 +28,7 @@ pub mod simple_integers;
 pub mod structs;
 pub mod vector;
 
-#[derive(Clone, PartialEq, Debug, Eq)]
+#[derive(Clone, PartialEq, Debug, Eq, Hash)]
 pub enum IntermediateType {
     IBool,
     IU8,
