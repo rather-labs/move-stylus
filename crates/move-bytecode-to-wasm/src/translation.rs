@@ -405,7 +405,6 @@ fn translate_instruction(
         }
         // Function calls
         Bytecode::CallGeneric(function_instantiation_handle_index) => {
-            // Consume from the types stack the arguments that will be used by the function call
             let function_id = &module_data.functions.generic_calls
                 [function_instantiation_handle_index.into_index()];
 
@@ -480,6 +479,7 @@ fn translate_instruction(
             // Shadow the function_id variable because now it contains concrete types
             let function_id = &function_information.function_id;
 
+            // Consume from the types stack the arguments that will be used by the function call
             for argument in function_information.signature.arguments.iter().rev() {
                 types_stack.pop_expecting(argument)?;
 

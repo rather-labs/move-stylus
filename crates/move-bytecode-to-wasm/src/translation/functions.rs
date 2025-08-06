@@ -82,7 +82,7 @@ impl MappedFunction {
         }
     }
 
-    /// Replaces all type parameters in the struct with the provided types.
+    /// Replaces all type parameters in the function with the provided types.
     pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
         let arguments = self
             .signature
