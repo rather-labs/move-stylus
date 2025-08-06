@@ -1,18 +1,24 @@
-use crate::CompilationContext;
-use crate::UserDefinedType;
-use crate::abi_types::public_function::PublicFunction;
-use crate::abi_types::vm_handled_datatypes::TxContext;
-use crate::hostio::host_functions;
-use crate::translation::intermediate_types::{ISignature, IntermediateType};
-use crate::translation::table::{FunctionId, FunctionTable};
+use std::collections::HashMap;
+
 use move_binary_format::file_format::{
     Ability, AbilitySet, CompiledModule, DatatypeHandleIndex, FunctionDefinition, Signature,
     SignatureToken, Visibility,
 };
-use std::collections::HashMap;
+
 use walrus::{
     FunctionBuilder, FunctionId as WalrusFunctionId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+};
+
+use crate::{
+    CompilationContext, UserDefinedType,
+    abi_types::{public_function::PublicFunction, vm_handled_datatypes::TxContext},
+    hostio::host_functions,
+    translation::{
+        intermediate_types::{ISignature, IntermediateType},
+        table::{FunctionId, FunctionTable},
+    },
+    utils::keccak_string_to_memory,
 };
 
 static EMPTY_SIGNATURE: ISignature = ISignature {
@@ -61,8 +67,9 @@ pub fn build_constructor(
     compilation_ctx: &CompilationContext,
     init: Option<WalrusFunctionId>,
 ) -> WalrusFunctionId {
-    const STORAGE_KEY_SIZE: i32 = 32;
-    const VALUE_MARKER: i32 = 1;
+    // Flag to indicate if the constructor has been called.
+    // This is what we are going to be storing in the storage.
+    const FLAG: i32 = 1;
 
     // Host functions for storage operations
     let (storage_load_fn, _) = host_functions::storage_load_bytes32(module);
@@ -72,62 +79,93 @@ pub fn build_constructor(
     // Allocate local variables to hold memory pointers
     let key_ptr = module.locals.add(ValType::I32); // Pointer for the storage key
     let value_ptr = module.locals.add(ValType::I32); // Pointer to store flag
-    let dest_ptr = module.locals.add(ValType::I32); // Pointer to receive value read from storage
 
     // Define the constructor function with no parameters or return values
     let mut function = FunctionBuilder::new(&mut module.types, &[], &[]);
     let mut builder = function.func_body();
 
-    // Allocate memory for key, value, and destination
+    // ptr to storage key
     builder
-        .i32_const(STORAGE_KEY_SIZE)
+        .i32_const(32)
         .call(compilation_ctx.allocator)
         .local_set(key_ptr);
 
-    builder
-        .i32_const(STORAGE_KEY_SIZE)
-        .call(compilation_ctx.allocator)
-        .local_set(dest_ptr);
+    // Init key is the keccak256 hash of "init_key"
+    keccak_string_to_memory(&mut builder, compilation_ctx, "init_key", key_ptr);
 
+    // ptr to value
     builder
-        .i32_const(STORAGE_KEY_SIZE)
+        .i32_const(32)
         .call(compilation_ctx.allocator)
         .local_set(value_ptr);
 
-    // Read from storage into dest_ptr: storage_load_bytes32(key_ptr, dest_ptr)
+    // Read from storage into value_ptr
     builder
         .local_get(key_ptr)
-        .local_get(dest_ptr)
+        .local_get(value_ptr)
         .call(storage_load_fn);
 
-    // Load the first 4 bytes at dest_ptr to check if already initialized
-    builder
-        .local_get(dest_ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .i32_const(0)
-        .binop(BinaryOp::I32Eq); // true if storage has not been initialized
+    // Check all 32 bytes at value_ptr to see if the storage has been initialized
+    let offset = module.locals.add(ValType::I32); // Local variable to track the current byte offset
+    // Initialize offset to 0
+    builder.i32_const(0).local_set(offset);
+    builder.block(ValType::I32, |block| {
+        let block_id = block.id(); // ID for the outer block
+        // Loop over the 32 bytes at value_ptr
+        block.loop_(ValType::I32, |loop_| {
+            let loop_id = loop_.id();
+            loop_
+                .local_get(value_ptr) // Get the base pointer to the value
+                .local_get(offset) // Get the current offset
+                .binop(BinaryOp::I32Add) // Calculate the address: value_ptr + offset
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .i32_const(0)
+                .binop(BinaryOp::I32Ne) // Check if the loaded value is non-zero
+                .if_else(
+                    ValType::I32,
+                    |then| {
+                        // Non-zero value found, push 0 and exit the block
+                        then.i32_const(0).br(block_id);
+                    },
+                    |else_| {
+                        // If offset >= 28, break the loop
+                        else_
+                            .local_get(offset)
+                            .i32_const(28)
+                            .binop(BinaryOp::I32GeU)
+                            .if_else(
+                                ValType::I32,
+                                |then| {
+                                    // Reached the end of the loop + all bytes were zero, exit with 1
+                                    then.i32_const(1).br(block_id);
+                                },
+                                |inner_else| {
+                                    // Increment offset by 4 and continue the loop
+                                    inner_else
+                                        .local_get(offset)
+                                        .i32_const(4)
+                                        .binop(BinaryOp::I32Add)
+                                        .local_set(offset);
+
+                                    inner_else.br(loop_id); // Continue the loop
+                                },
+                            );
+                    },
+                );
+        });
+    });
 
     // If storage has not been initialized, proceed with initialization
     builder.if_else(
         None,
         |then| {
-            // Write the marker value into value_ptr at offset 0
-            then.local_get(value_ptr).i32_const(VALUE_MARKER).store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-
             // If an `init()` function is present, call it
             if let Some(init_id) = init {
                 let init_ty = module.funcs.get(init_id).ty();
@@ -136,6 +174,7 @@ pub fn build_constructor(
                 // If the function expects an OTW, push dummy value.
                 // The OTW is a Move pattern used to ensure that the init function is called only once.
                 // Here we replace that logic by writing a marker value into the storage.
+                // TODO: revisit the OTW implementation and check if this approach is correct.
                 if params.len() == 2 {
                     then.i32_const(0); // OTW = 0 
                 }
@@ -147,12 +186,22 @@ pub fn build_constructor(
                 then.call(init_id);
             }
 
-            // Cache the (key, value) pair to mark constructor as called
+            // Write the flag at value_ptr
+            then.local_get(value_ptr).i32_const(FLAG).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+
+            // Cache the flag
             then.local_get(key_ptr)
                 .local_get(value_ptr)
                 .call(storage_cache_fn);
 
-            // Flush storage to persist the write
+            // Flush storage to persist the flag
             then.i32_const(1).call(flush_cache_fn);
         },
         |_else| {
