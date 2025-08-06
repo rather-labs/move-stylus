@@ -113,7 +113,7 @@ pub fn build_constructor(
         let block_id = block.id(); // ID for the outer block
         // Loop over the 32 bytes at value_ptr
         block.loop_(ValType::I32, |loop_| {
-            let loop_id = loop_.id(); 
+            let loop_id = loop_.id();
             loop_
                 .local_get(value_ptr) // Get the base pointer to the value
                 .local_get(offset) // Get the current offset
@@ -126,7 +126,7 @@ pub fn build_constructor(
                         offset: 0,
                     },
                 )
-                .i32_const(0) 
+                .i32_const(0)
                 .binop(BinaryOp::I32Ne) // Check if the loaded value is non-zero
                 .if_else(
                     ValType::I32,
@@ -137,9 +137,9 @@ pub fn build_constructor(
                     |else_| {
                         // If offset >= 28, break the loop
                         else_
-                            .local_get(offset) 
-                            .i32_const(28) 
-                            .binop(BinaryOp::I32GeU) 
+                            .local_get(offset)
+                            .i32_const(28)
+                            .binop(BinaryOp::I32GeU)
                             .if_else(
                                 ValType::I32,
                                 |then| {
@@ -149,9 +149,9 @@ pub fn build_constructor(
                                 |inner_else| {
                                     // Increment offset by 4 and continue the loop
                                     inner_else
-                                        .local_get(offset) 
-                                        .i32_const(4) 
-                                        .binop(BinaryOp::I32Add) 
+                                        .local_get(offset)
+                                        .i32_const(4)
+                                        .binop(BinaryOp::I32Add)
                                         .local_set(offset);
 
                                     inner_else.br(loop_id); // Continue the loop
