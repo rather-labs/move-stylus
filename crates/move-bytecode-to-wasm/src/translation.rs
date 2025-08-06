@@ -462,11 +462,11 @@ fn translate_instruction(
                 let instantiations: Vec<IntermediateType> = type_instantiations
                     .iter()
                     .enumerate()
-                    .map(|(index, f)| {
+                    .filter_map(|(index, f)| {
                         if let IntermediateType::ITypeParameter(_) = f {
-                            types[index].clone()
+                            Some(types[index].clone())
                         } else {
-                            f.clone()
+                            None
                         }
                     })
                     .collect();
