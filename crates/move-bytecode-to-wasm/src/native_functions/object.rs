@@ -54,9 +54,9 @@ pub fn add_native_fresh_id_fn(
         .call(compilation_ctx.allocator)
         .local_set(id_ptr);
 
-    // Data to hash: block timestamp (8 bytes) + block number (8 bytes) + storage counter (32 bytes)
+    // Data to hash: block timestamp (8 bytes) + block number (8 bytes) + counter (4 bytes)
     builder
-        .i32_const(48)
+        .i32_const(20)
         .call(compilation_ctx.allocator)
         .local_set(data_to_hash_ptr);
 
@@ -163,7 +163,7 @@ pub fn add_native_fresh_id_fn(
     // Hash the data to generate the ID
     builder
         .local_get(data_to_hash_ptr)
-        .i32_const(48)
+        .i32_const(20)
         .local_get(id_ptr)
         .call(native_keccak);
 
