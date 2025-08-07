@@ -7,7 +7,10 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    hostio::host_functions::block_number,
+    hostio::{
+        self,
+        host_functions::{block_number, storage_cache_bytes32, storage_flush_cache},
+    },
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
@@ -23,9 +26,28 @@ pub fn store(
     let mut size = 0;
     let mut slots = 1;
 
+    let (storage_cache, _) = storage_cache_bytes32(module);
+    let (storage_flush_cache, _) = storage_flush_cache(module);
+
+    let slot_ptr = module.locals.add(ValType::I32);
     let slot_data_ptr = module.locals.add(ValType::I32);
     let val_32 = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
+
+    // At the moment we use slot three for testing
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_tee(slot_ptr);
+
+    builder.i32_const(3).store(
+        compilation_ctx.memory_id,
+        StoreKind::I32 { atomic: false },
+        MemArg {
+            align: 0,
+            offset: 28,
+        },
+    );
 
     // Allocate 32 bytes to save the current slot data
     builder
@@ -34,6 +56,20 @@ pub fn store(
         .local_set(slot_data_ptr);
 
     for (index, field) in struct_.fields.iter().enumerate() {
+        let field_size = field_size(&field);
+        if size + field_size >= 32 {
+            // Wipe the data
+            builder
+                .local_get(slot_data_ptr)
+                .i32_const(0)
+                .memory_fill(compilation_ctx.memory_id);
+
+            slots += 1;
+            size += field_size;
+        } else {
+            size = field_size;
+        }
+
         // Load field's intermediate pointer
         builder.local_get(struct_ptr).load(
             compilation_ctx.memory_id,
@@ -44,7 +80,6 @@ pub fn store(
             },
         );
 
-        let field_size = field_size(&field);
         // Load the value
         let field_local = match field {
             IntermediateType::IBool
@@ -72,42 +107,48 @@ pub fn store(
                     .local_tee(val);
 
                 // Convert the value to big endian
-                builder.call(swap_fn);
+                builder.call(swap_fn).local_set(val);
 
                 // We need to shift the swapped bytes to the left because WASM is little endian. If we try
                 // to write a 16 bits number contained in a 32 bits number, without shifting, it will write
                 // the zeroed part.
                 // This only needs to be done for 32 bits (4 bytes) numbers
+
                 if field.stack_data_size() == 4 {
-                    builder.local_get(val);
                     if field_size == 1 {
-                        builder.i32_const(24);
+                        builder
+                            .local_get(val)
+                            .i32_const(24)
+                            .binop(BinaryOp::I32Shl)
+                            .local_set(val);
                     } else if field_size == 2 {
-                        builder.i32_const(16);
+                        builder
+                            .local_get(val)
+                            .i32_const(16)
+                            .binop(BinaryOp::I32Shl)
+                            .local_set(val);
                     }
-
-                    builder.binop(BinaryOp::I32Shl).local_tee(val);
-
-                    let store_kind = if field_size == 1 {
-                        StoreKind::I32_8 { atomic: false }
-                    } else if field_size == 2 {
-                        StoreKind::I32_16 { atomic: false }
-                    } else if field_size == 4 {
-                        StoreKind::I32 { atomic: false }
-                    } else {
-                        StoreKind::I64 { atomic: false }
-                    };
-
-                    // Save the value in slot data
-                    builder.local_get(slot_data_ptr).store(
-                        compilation_ctx.memory_id,
-                        store_kind,
-                        MemArg {
-                            align: 0,
-                            offset: 32 - size,
-                        },
-                    );
                 }
+
+                let store_kind = if field_size == 1 {
+                    StoreKind::I32_8 { atomic: false }
+                } else if field_size == 2 {
+                    StoreKind::I32_16 { atomic: false }
+                } else if field_size == 4 {
+                    StoreKind::I32 { atomic: false }
+                } else {
+                    StoreKind::I64 { atomic: false }
+                };
+
+                // Save the value in slot data
+                builder.local_get(slot_data_ptr).local_get(val).store(
+                    compilation_ctx.memory_id,
+                    store_kind,
+                    MemArg {
+                        align: 0,
+                        offset: 32 - size,
+                    },
+                );
 
                 val
             }
@@ -116,14 +157,14 @@ pub fn store(
                 val_32
             }
         };
-
-        if size + field_size >= 32 {
-            slots += 1;
-            size += field_size;
-        } else {
-            size = field_size;
-        }
     }
+
+    builder
+        .local_get(slot_ptr)
+        .local_get(slot_data_ptr)
+        .call(storage_cache);
+
+    builder.i32_const(0).call(storage_flush_cache);
 
     struct_ptr
 }

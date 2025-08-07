@@ -1,8 +1,6 @@
 use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
-use crate::{
-    CompilationContext, storage::encode, translation::intermediate_types::structs::IStruct,
-};
+use crate::{CompilationContext, storage, translation::intermediate_types::structs::IStruct};
 
 use super::NativeFunction;
 
@@ -18,7 +16,7 @@ pub fn add_storage_save_fn(
 
     let mut builder = function.name(name).func_body();
 
-    encode::store(module, &mut builder, compilation_ctx, struct_ptr, struct_);
+    storage::encode::store(module, &mut builder, compilation_ctx, struct_ptr, struct_);
 
     function.finish(vec![struct_ptr], &mut module.funcs)
 }
