@@ -6,9 +6,17 @@ mod object;
 mod storage;
 mod transaction;
 
+use std::{
+    hash::{DefaultHasher, Hash, Hasher},
+    panic::panic_any,
+};
+
 use walrus::{FunctionId, Module};
 
-use crate::{CompilationContext, hostio, translation::intermediate_types::IType};
+use crate::{
+    CompilationContext, hostio,
+    translation::intermediate_types::{IType, IntermediateType},
+};
 
 pub struct NativeFunction;
 
@@ -85,12 +93,41 @@ impl NativeFunction {
         }
     }
 
-    pub fn get_generic<T: IType>(
+    pub fn get_generic(
         name: &str,
         module: &mut Module,
-        compilaton_ctx: &CompilationContext,
+        compilation_ctx: &CompilationContext,
+        generics: &[IntermediateType],
     ) -> FunctionId {
-        todo!()
+        // Thid hash will uniquely identify this native fn
+        let mut hasher = DefaultHasher::new();
+        let function_hash = generics.iter().for_each(|t| t.hash(&mut hasher));
+        let function_name = format!("{name}_{:x}", hasher.finish());
+
+        if let Some(function) = module.funcs.by_name(&function_name) {
+            function
+        } else {
+            match name {
+                Self::NATIVE_STORAGE_SAVE => {
+                    assert_eq!(
+                        1,
+                        generics.len(),
+                        "there was an error linking {function_name} expected 1 type parameter, found {}",
+                        generics.len(),
+                    );
+
+                    let struct_ = match generics.get(0) {
+                        Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
+                            .get_user_data_type_by_index(module_id, *index)
+                            .unwrap(),
+                        Some(_) => todo!(),
+                        None => todo!(),
+                    };
+                    storage::add_storage_save_fn(function_name, module, compilation_ctx, struct_)
+                }
+                _ => panic!("generic native function {name} not supported yet"),
+            }
+        }
     }
 
     /// Maps the native function name to the host function name.

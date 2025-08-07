@@ -7,6 +7,7 @@ use crate::{
 use super::NativeFunction;
 
 pub fn add_storage_save_fn(
+    name: String,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     struct_: &IStruct,
@@ -15,9 +16,7 @@ pub fn add_storage_save_fn(
 
     let struct_ptr = module.locals.add(ValType::I32);
 
-    let mut builder = function
-        .name(NativeFunction::NATIVE_STORAGE_SAVE.to_owned())
-        .func_body();
+    let mut builder = function.name(name).func_body();
 
     encode::store(module, &mut builder, compilation_ctx, struct_ptr, struct_);
 
