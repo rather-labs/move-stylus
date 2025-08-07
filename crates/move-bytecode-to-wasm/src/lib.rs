@@ -1,5 +1,3 @@
-use std::{collections::HashMap, path::Path};
-
 use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use compilation_context::{ModuleData, ModuleId};
@@ -9,6 +7,7 @@ use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
     source_package::parsed_manifest::PackageName,
 };
+use std::{collections::HashMap, path::Path};
 use translation::{
     table::{FunctionId, FunctionTable},
     translate_function,
@@ -25,6 +24,7 @@ mod memory;
 mod native_functions;
 mod runtime;
 mod runtime_error_codes;
+mod storage;
 mod translation;
 mod utils;
 mod wasm_builder_extensions;
