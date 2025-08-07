@@ -3,6 +3,7 @@
 //! Native functions in Move are functions directly implemented inside the Move VM. To emulate that
 //! mechanism, we direcly implement them in WASM and limk them into the file.
 mod object;
+mod storage;
 mod transaction;
 
 use walrus::{FunctionId, Module};
@@ -21,6 +22,7 @@ impl NativeFunction {
     const NATIVE_CHAIN_ID: &str = "native_chain_id";
     const NATIVE_GAS_PRICE: &str = "native_gas_price";
     const NATIVE_FRESH_ID: &str = "fresh_id";
+    const NATIVE_STORAGE_SAVE: &str = "save_in_slot";
 
     const HOST_BLOCK_NUMBER: &str = "block_number";
     const HOST_BLOCK_GAS_LIMIT: &str = "block_gas_limit";

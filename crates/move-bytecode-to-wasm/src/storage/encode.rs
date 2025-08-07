@@ -19,7 +19,7 @@ pub fn store(
     compilation_ctx: CompilationContext,
     struct_ptr: LocalId,
     struct_: &IStruct,
-) {
+) -> LocalId {
     let mut size = 0;
     let mut slots = 1;
 
@@ -124,6 +124,8 @@ pub fn store(
             size = field_size;
         }
     }
+
+    struct_ptr
 }
 
 fn field_size(field: &IntermediateType) -> u32 {
