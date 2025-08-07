@@ -1,4 +1,4 @@
-use walrus::{FunctionBuilder, Module, ValType};
+use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
 use crate::{
     CompilationContext, storage::encode, translation::intermediate_types::structs::IStruct,

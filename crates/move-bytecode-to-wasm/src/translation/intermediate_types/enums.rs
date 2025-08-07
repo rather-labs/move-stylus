@@ -16,9 +16,9 @@
 //! data.
 use crate::translation::TranslationError;
 
-use super::IntermediateType;
+use super::{IType, IntermediateType};
 
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct IEnumVariant {
     /// Index inside the enum
     pub index: u16,
@@ -30,7 +30,7 @@ pub struct IEnumVariant {
     pub fields: Vec<IntermediateType>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct IEnum {
     pub index: u16,
 
@@ -51,6 +51,8 @@ pub struct IEnum {
     /// must be instantiated.
     pub heap_size: Option<u32>,
 }
+
+impl IType for IEnum {}
 
 impl IEnumVariant {
     pub fn new(index: u16, belongs_to: u16, fields: Vec<IntermediateType>) -> Self {

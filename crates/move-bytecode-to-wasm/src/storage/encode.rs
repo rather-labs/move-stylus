@@ -16,7 +16,7 @@ use crate::{
 pub fn store(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
-    compilation_ctx: CompilationContext,
+    compilation_ctx: &CompilationContext,
     struct_ptr: LocalId,
     struct_: &IStruct,
 ) -> LocalId {

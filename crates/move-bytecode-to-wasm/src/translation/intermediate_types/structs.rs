@@ -43,7 +43,7 @@
 //! Because fields are always accessed via references, using pointers uniformly (even for simple
 //! values) simplifies the implementation, reduces special-case logic, and ensures consistent
 //! field management across all types.
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 use crate::{
     CompilationContext,
@@ -51,7 +51,7 @@ use crate::{
     compilation_context::{ExternalModuleData, ModuleData},
 };
 
-use super::IntermediateType;
+use super::{IType, IntermediateType};
 use move_binary_format::{
     file_format::{FieldHandleIndex, StructDefinitionIndex},
     internals::ModuleIndex,
@@ -89,6 +89,16 @@ pub struct IStruct {
     pub heap_size: u32,
 
     pub saved_in_storage: bool,
+}
+
+impl IType for IStruct {}
+
+impl Hash for IStruct {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // TODO: include module id and hash that instead of fields
+        self.identifier.hash(state);
+        self.fields.hash(state);
+    }
 }
 
 impl IStruct {

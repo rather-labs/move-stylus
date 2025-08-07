@@ -5,8 +5,12 @@ use walrus::{
 
 use crate::{CompilationContext, runtime::RuntimeFunction};
 
-#[derive(Clone, Copy)]
+use super::IType;
+
+#[derive(Clone, Copy, Hash)]
 pub struct IAddress;
+
+impl IType for IAddress {}
 
 impl IAddress {
     /// Heap size (in bytes)

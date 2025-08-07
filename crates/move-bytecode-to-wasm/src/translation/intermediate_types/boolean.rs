@@ -2,8 +2,12 @@ use walrus::InstrSeqBuilder;
 
 use crate::wasm_helpers::load_i32_from_bytes_instructions;
 
-#[derive(Clone, Copy)]
+use super::IType;
+
+#[derive(Clone, Copy, Hash)]
 pub struct IBool;
+
+impl IType for IBool {}
 
 impl IBool {
     pub fn load_constant_instructions(

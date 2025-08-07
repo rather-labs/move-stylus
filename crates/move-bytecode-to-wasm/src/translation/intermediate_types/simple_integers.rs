@@ -10,12 +10,14 @@ use crate::{
 };
 
 use super::{
-    IntermediateType,
+    IType, IntermediateType,
     heap_integers::{IU128, IU256},
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash)]
 pub struct IU8;
+
+impl IType for IU8 {}
 
 impl IU8 {
     const MAX_VALUE: i32 = u8::MAX as i32;
@@ -131,8 +133,10 @@ impl IU8 {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash)]
 pub struct IU16;
+
+impl IType for IU16 {}
 
 impl IU16 {
     const MAX_VALUE: i32 = u16::MAX as i32;
@@ -248,8 +252,10 @@ impl IU16 {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash)]
 pub struct IU32;
+
+impl IType for IU32 {}
 
 impl IU32 {
     pub const MAX_VALUE: i64 = u32::MAX as i64;
@@ -346,8 +352,10 @@ impl IU32 {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash)]
 pub struct IU64;
+
+impl IType for IU64 {}
 
 impl IU64 {
     pub fn load_constant_instructions(

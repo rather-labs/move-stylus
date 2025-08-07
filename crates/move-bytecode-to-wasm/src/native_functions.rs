@@ -8,7 +8,7 @@ mod transaction;
 
 use walrus::{FunctionId, Module};
 
-use crate::{CompilationContext, hostio};
+use crate::{CompilationContext, hostio, translation::intermediate_types::IType};
 
 pub struct NativeFunction;
 
@@ -83,6 +83,14 @@ impl NativeFunction {
                 _ => panic!("native function {name} not supported yet"),
             }
         }
+    }
+
+    pub fn get_generic<T: IType>(
+        name: &str,
+        module: &mut Module,
+        compilaton_ctx: &CompilationContext,
+    ) -> FunctionId {
+        todo!()
     }
 
     /// Maps the native function name to the host function name.

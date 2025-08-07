@@ -5,7 +5,7 @@ use walrus::{
 
 use crate::{CompilationContext, runtime::RuntimeFunction};
 
-use super::IntermediateType;
+use super::{IType, IntermediateType};
 
 fn compare_heap_integers_bitwise(
     builder: &mut walrus::InstrSeqBuilder,
@@ -62,8 +62,10 @@ fn compare_heap_integers_bitwise(
     builder.local_get(pointer);
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash)]
 pub struct IU128;
+
+impl IType for IU128 {}
 
 impl IU128 {
     /// Heap size (in bytes)
@@ -352,7 +354,7 @@ impl IU128 {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash)]
 pub struct IU256;
 
 impl IU256 {

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 use crate::{
     CompilationContext, UserDefinedType,
@@ -80,6 +80,9 @@ pub enum IntermediateType {
         identifier: String,
     },
 }
+
+/// Marker trait used to recognize intermediate representations of types
+pub trait IType: Hash {}
 
 impl IntermediateType {
     /// Returns the size in bytes, that this type needs in memory to be stored
