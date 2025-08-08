@@ -152,7 +152,7 @@ pub fn translate_package(
         hostio::build_entrypoint_router(&mut module, &public_functions, &compilation_ctx);
 
         function_table.ensure_all_functions_added().unwrap();
-        // validate_stylus_wasm(&mut module).unwrap();
+        validate_stylus_wasm(&mut module).unwrap();
 
         modules.insert(module_name, module);
         modules_data.insert(root_module_id.clone(), root_module_data);

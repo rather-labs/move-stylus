@@ -34,20 +34,11 @@ pub fn store(
     let val_32 = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
 
-    // At the moment we use slot three for testing
+    // At the moment we use slot 0 for testing
     builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
-        .local_tee(slot_ptr);
-
-    builder.i32_const(3).store(
-        compilation_ctx.memory_id,
-        StoreKind::I32 { atomic: false },
-        MemArg {
-            align: 0,
-            offset: 28,
-        },
-    );
+        .local_set(slot_ptr);
 
     // Allocate 32 bytes to save the current slot data
     builder
@@ -65,9 +56,9 @@ pub fn store(
                 .memory_fill(compilation_ctx.memory_id);
 
             slots += 1;
-            size += field_size;
-        } else {
             size = field_size;
+        } else {
+            size += field_size;
         }
 
         // Load field's intermediate pointer
@@ -80,8 +71,7 @@ pub fn store(
             },
         );
 
-        // Load the value
-        let field_local = match field {
+        match field {
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
@@ -119,13 +109,13 @@ pub fn store(
                         builder
                             .local_get(val)
                             .i32_const(24)
-                            .binop(BinaryOp::I32Shl)
+                            .binop(BinaryOp::I32ShrU)
                             .local_set(val);
                     } else if field_size == 2 {
                         builder
                             .local_get(val)
                             .i32_const(16)
-                            .binop(BinaryOp::I32Shl)
+                            .binop(BinaryOp::I32ShrU)
                             .local_set(val);
                     }
                 }
@@ -149,13 +139,8 @@ pub fn store(
                         offset: 32 - size,
                     },
                 );
-
-                val
             }
-            _ => {
-                builder.local_set(val_32);
-                val_32
-            }
+            _ => {}
         };
     }
 
@@ -164,7 +149,7 @@ pub fn store(
         .local_get(slot_data_ptr)
         .call(storage_cache);
 
-    builder.i32_const(0).call(storage_flush_cache);
+    builder.i32_const(1).call(storage_flush_cache);
 
     struct_ptr
 }
