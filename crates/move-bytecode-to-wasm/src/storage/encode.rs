@@ -83,11 +83,6 @@ pub fn store(
                 allocated_u256_one = true;
 
                 let swap_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
-                // BE to LE ptr so we can make the addition
-                builder
-                    .local_get(u256_one)
-                    .local_get(u256_one)
-                    .call(swap_fn);
 
                 // Emit log with the ID
                 builder
