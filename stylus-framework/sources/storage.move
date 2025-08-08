@@ -12,4 +12,4 @@ public fun storage_read<T: key>(owner_id: address, id: UID): T {
 native fun retrieve_from_storage<T: key>(owner_id: address, id: UID): T;
 
 // TODO: remove public
-public native fun save_in_slot<T>(obj: T);
+public native fun save_in_slot<T>(obj: T, slot: u256);
