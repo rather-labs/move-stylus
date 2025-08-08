@@ -9,7 +9,7 @@ use crate::{
     CompilationContext,
     hostio::{
         self,
-        host_functions::{block_number, storage_cache_bytes32, storage_flush_cache},
+        host_functions::{block_number, emit_log, storage_cache_bytes32, storage_flush_cache},
     },
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
@@ -28,6 +28,7 @@ pub fn store(
 
     let (storage_cache, _) = storage_cache_bytes32(module);
     let (storage_flush_cache, _) = storage_flush_cache(module);
+    let (emit_log_fn, _) = emit_log(module);
 
     let slot_ptr = module.locals.add(ValType::I32);
     let slot_data_ptr = module.locals.add(ValType::I32);
@@ -70,17 +71,30 @@ pub fn store(
                     .call(compilation_ctx.allocator)
                     .local_tee(u256_one);
 
-                builder.i32_const(0x80000000_u32 as i32).store(
-                    //builder.i32_const(1).store(
+                builder.i32_const(1).store(
                     compilation_ctx.memory_id,
                     StoreKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
-                        offset: 28,
+                        offset: 0,
                     },
                 );
 
                 allocated_u256_one = true;
+
+                let swap_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
+                // BE to LE ptr so we can make the addition
+                builder
+                    .local_get(u256_one)
+                    .local_get(u256_one)
+                    .call(swap_fn);
+
+                // Emit log with the ID
+                builder
+                    .local_get(u256_one)
+                    .i32_const(32)
+                    .i32_const(0)
+                    .call(emit_log_fn);
             }
 
             // Wipe the data so we can fill it with new data
@@ -92,6 +106,14 @@ pub fn store(
 
             let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
 
+            let swap_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
+
+            // BE to LE ptr so we can make the addition
+            builder
+                .local_get(slot_ptr)
+                .local_get(slot_ptr)
+                .call(swap_fn);
+
             // Add one to slot
             builder
                 .local_get(slot_ptr)
@@ -100,8 +122,15 @@ pub fn store(
                 .call(add_u256_fn)
                 .local_set(slot_ptr);
 
+            // LE to BE ptr so we can use the storage function
+            builder
+                .local_get(slot_ptr)
+                .local_get(slot_ptr)
+                .call(swap_fn);
+
             slots += 1;
             size = field_size;
+            builder.i32_const(field_size as i32).local_set(offset);
         } else {
             builder
                 .i32_const(32)
@@ -193,7 +222,7 @@ pub fn store(
                 );
             }
             IntermediateType::IU128 => {
-                let swap_fn = RuntimeFunction::SwapMemoryBytes.get(module, Some(compilation_ctx));
+                let swap_fn = RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx));
 
                 // Load field's intermediate pointer as the origin ptr
                 builder.local_get(struct_ptr).load(
@@ -211,11 +240,11 @@ pub fn store(
                     .local_get(offset)
                     .binop(BinaryOp::I32Add);
 
-                // Data size in bytes
-                builder.i32_const(16).call(swap_fn);
+                // Transform to BE
+                builder.call(swap_fn);
             }
             IntermediateType::IU256 | IntermediateType::IAddress | IntermediateType::ISigner => {
-                let swap_fn = RuntimeFunction::SwapMemoryBytes.get(module, Some(compilation_ctx));
+                let swap_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
 
                 // Load field's intermediate pointer as the origin ptr
                 builder.local_get(struct_ptr).load(
@@ -231,8 +260,8 @@ pub fn store(
                 // 32 bytes in size)
                 builder.local_get(slot_data_ptr);
 
-                // Data size in bytes
-                builder.i32_const(32).call(swap_fn);
+                // Transform to BE
+                builder.call(swap_fn);
             }
             _ => {}
         };

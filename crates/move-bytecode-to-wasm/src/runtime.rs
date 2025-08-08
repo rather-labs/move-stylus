@@ -31,7 +31,8 @@ pub enum RuntimeFunction {
     // Swap bytes
     SwapI32Bytes,
     SwapI64Bytes,
-    SwapMemoryBytes,
+    SwapI128Bytes,
+    SwapI256Bytes,
     // Copy
     CopyU128,
     CopyU256,
@@ -73,7 +74,8 @@ impl RuntimeFunction {
             // Swap bytes
             Self::SwapI32Bytes => "swap_i32_bytes",
             Self::SwapI64Bytes => "swap_i64_bytes",
-            Self::SwapMemoryBytes => "swap_memory_bytes",
+            Self::SwapI128Bytes => "swap_i128_bytes",
+            Self::SwapI256Bytes => "swap_i256_bytes",
             // Copy
             Self::CopyU128 => "copy_u128",
             Self::CopyU256 => "copy_u256",
@@ -132,7 +134,16 @@ impl RuntimeFunction {
                     let swap_i32_f = Self::SwapI32Bytes.get(module, compilation_ctx);
                     swap::swap_i64_bytes_function(module, swap_i32_f)
                 }
-                (Self::SwapMemoryBytes, Some(ctx)) => swap::swap_memory_bytes_function(module, ctx),
+                (Self::SwapI128Bytes, Some(ctx)) => swap::swap_bytes_function::<2>(
+                    module,
+                    ctx,
+                    Self::SwapI128Bytes.name().to_owned(),
+                ),
+                (Self::SwapI256Bytes, Some(ctx)) => swap::swap_bytes_function::<4>(
+                    module,
+                    ctx,
+                    Self::SwapI256Bytes.name().to_owned(),
+                ),
                 // Bitwise
                 (Self::HeapIntShiftLeft, Some(ctx)) => {
                     integers::bitwise::heap_int_shift_left(module, ctx)
