@@ -361,7 +361,7 @@ mod tests {
 
         let linker = get_linker_with_native_keccak256();
 
-        let data = vec![slot.to_be_bytes::<32>(), key.to_be_bytes::<32>()].concat();
+        let data = [slot.to_be_bytes::<32>(), key.to_be_bytes::<32>()].concat();
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut module, data, "test_fn", Some(linker));
 
@@ -458,7 +458,7 @@ mod tests {
 
         let linker = get_linker_with_native_keccak256();
 
-        let data = vec![
+        let data = [
             slot.to_be_bytes::<32>(),
             outer_key.to_be_bytes::<32>(),
             inner_key.to_be_bytes::<32>(),
