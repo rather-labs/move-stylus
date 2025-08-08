@@ -61,22 +61,22 @@ pub fn store(
             size += field_size;
         }
 
-        // Load field's intermediate pointer
-        builder.local_get(struct_ptr).load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: index as u32 * 4,
-            },
-        );
-
         match field {
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32
             | IntermediateType::IU64 => {
+                // Load field's intermediate pointer
+                builder.local_get(struct_ptr).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: index as u32 * 4,
+                    },
+                );
+
                 let (val, load_kind, swap_fn) = if field.stack_data_size() == 8 {
                     let swap_fn = RuntimeFunction::SwapI64Bytes.get(module, None);
                     (val_64, LoadKind::I64 { atomic: false }, swap_fn)
@@ -99,11 +99,10 @@ pub fn store(
                 // Convert the value to big endian
                 builder.call(swap_fn).local_set(val);
 
-                // We need to shift the swapped bytes to the left because WASM is little endian. If we try
+                // We need to shift the swapped bytes to the right because WASM is little endian. If we try
                 // to write a 16 bits number contained in a 32 bits number, without shifting, it will write
                 // the zeroed part.
                 // This only needs to be done for 32 bits (4 bytes) numbers
-
                 if field.stack_data_size() == 4 {
                     if field_size == 1 {
                         builder
@@ -139,6 +138,45 @@ pub fn store(
                         offset: 32 - size,
                     },
                 );
+            }
+            IntermediateType::IU128 => {
+                let swap_fn = RuntimeFunction::SwapI64Bytes.get(module, None);
+
+                for i in 0..2 {
+                    // Load field's intermediate pointer
+                    builder.local_get(struct_ptr).load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: index as u32 * 4,
+                        },
+                    );
+
+                    builder
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I64 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: i * 8,
+                            },
+                        )
+                        .local_tee(val_64);
+
+                    // Convert the value to big endian
+                    builder.call(swap_fn).local_set(val_64);
+
+                    // Save the value in slot data
+                    builder.local_get(slot_data_ptr).local_get(val_64).store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 32 - size + i * 8,
+                        },
+                    );
+                }
             }
             _ => {}
         };
