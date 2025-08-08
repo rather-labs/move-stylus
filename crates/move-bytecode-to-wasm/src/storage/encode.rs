@@ -31,8 +31,15 @@ pub fn store(
 
     let slot_ptr = module.locals.add(ValType::I32);
     let slot_data_ptr = module.locals.add(ValType::I32);
+    let u256_one = module.locals.add(ValType::I32);
     let val_32 = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
+
+    let offset = module.locals.add(ValType::I32);
+
+    let mut allocated_u256_one = false;
+
+    builder.i32_const(0).local_set(offset);
 
     // At the moment we use slot 0 for testing
     builder
@@ -40,7 +47,8 @@ pub fn store(
         .call(compilation_ctx.allocator)
         .local_set(slot_ptr);
 
-    // Allocate 32 bytes to save the current slot data
+    // This just contains the number one to add it to the slot when data occupies more than 32
+    // bytes
     builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
@@ -48,18 +56,63 @@ pub fn store(
 
     for (index, field) in struct_.fields.iter().enumerate() {
         let field_size = field_size(&field);
-        if size + field_size >= 32 {
-            // Wipe the data
+        if size + field_size > 32 {
+            // Save previous slot (maybe not needed...)
+            builder
+                .local_get(slot_ptr)
+                .local_get(slot_data_ptr)
+                .call(storage_cache);
+
+            if !allocated_u256_one {
+                // Allocate 32 bytes to save the current slot data
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(u256_one);
+
+                builder.i32_const(0x80000000_u32 as i32).store(
+                    //builder.i32_const(1).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 28,
+                    },
+                );
+
+                allocated_u256_one = true;
+            }
+
+            // Wipe the data so we can fill it with new data
             builder
                 .local_get(slot_data_ptr)
                 .i32_const(0)
+                .i32_const(32)
                 .memory_fill(compilation_ctx.memory_id);
+
+            let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
+
+            // Add one to slot
+            builder
+                .local_get(slot_ptr)
+                .local_get(u256_one)
+                .i32_const(32)
+                .call(add_u256_fn)
+                .local_set(slot_ptr);
 
             slots += 1;
             size = field_size;
         } else {
+            builder
+                .i32_const(32)
+                .i32_const(field_size as i32)
+                .binop(BinaryOp::I32Sub)
+                .local_set(offset);
+
             size += field_size;
         }
+
+        println!("{field_size} {size}");
 
         match field {
             IntermediateType::IBool
@@ -140,43 +193,46 @@ pub fn store(
                 );
             }
             IntermediateType::IU128 => {
-                let swap_fn = RuntimeFunction::SwapI64Bytes.get(module, None);
+                let swap_fn = RuntimeFunction::SwapMemoryBytes.get(module, Some(compilation_ctx));
 
-                for i in 0..2 {
-                    // Load field's intermediate pointer
-                    builder.local_get(struct_ptr).load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: index as u32 * 4,
-                        },
-                    );
+                // Load field's intermediate pointer as the origin ptr
+                builder.local_get(struct_ptr).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: index as u32 * 4,
+                    },
+                );
 
-                    builder
-                        .load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: i * 8,
-                            },
-                        )
-                        .local_tee(val_64);
+                // Slot data plus offset as dest ptr
+                builder
+                    .local_get(slot_data_ptr)
+                    .local_get(offset)
+                    .binop(BinaryOp::I32Add);
 
-                    // Convert the value to big endian
-                    builder.call(swap_fn).local_set(val_64);
+                // Data size in bytes
+                builder.i32_const(16).call(swap_fn);
+            }
+            IntermediateType::IU256 | IntermediateType::IAddress | IntermediateType::ISigner => {
+                let swap_fn = RuntimeFunction::SwapMemoryBytes.get(module, Some(compilation_ctx));
 
-                    // Save the value in slot data
-                    builder.local_get(slot_data_ptr).local_get(val_64).store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I64 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 32 - size + i * 8,
-                        },
-                    );
-                }
+                // Load field's intermediate pointer as the origin ptr
+                builder.local_get(struct_ptr).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: index as u32 * 4,
+                    },
+                );
+
+                // Slot data plus offset as dest ptr (offset should be zero because data is already
+                // 32 bytes in size)
+                builder.local_get(slot_data_ptr);
+
+                // Data size in bytes
+                builder.i32_const(32).call(swap_fn);
             }
             _ => {}
         };

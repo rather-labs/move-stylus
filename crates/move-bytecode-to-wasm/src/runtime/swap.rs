@@ -1,7 +1,9 @@
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, UnaryOp},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
+
+use crate::CompilationContext;
 
 use super::RuntimeFunction;
 
@@ -106,4 +108,91 @@ pub fn swap_i64_bytes_function(
 
     function_builder.name(RuntimeFunction::SwapI64Bytes.name().to_owned());
     function_builder.finish(vec![input_param], &mut module.funcs)
+}
+
+/// TODO: Description
+///
+/// Arguments
+/// - ptr to the region
+/// - how many bytes occupies (must be multiple of 8)
+pub fn swap_memory_bytes_function(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let mut function_builder = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32, ValType::I32],
+        &[],
+    );
+    let mut function_body = function_builder.func_body();
+
+    // Arguments
+    let origin_ptr = module.locals.add(ValType::I32);
+    let dest_ptr = module.locals.add(ValType::I32);
+    let size = module.locals.add(ValType::I32);
+
+    // Locals
+    let tmp = module.locals.add(ValType::I64);
+    let counter = module.locals.add(ValType::I32);
+
+    let swap_64 = RuntimeFunction::SwapI64Bytes.get(module, None);
+
+    function_body.i32_const(0).local_set(counter);
+
+    function_body.block(None, |block| {
+        let block_id = block.id();
+        block.loop_(None, |loop_| {
+            let loop_id = loop_.id();
+
+            // Exit loop if we finished processing
+            loop_
+                .local_get(counter)
+                .local_get(size)
+                .binop(BinaryOp::I32Eq)
+                .br_if(block_id);
+
+            // Load chunk from memory
+            loop_
+                .local_get(origin_ptr)
+                .local_get(counter)
+                .binop(BinaryOp::I32Add)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .local_tee(tmp);
+
+            // Swap
+            loop_.call(swap_64).local_set(tmp);
+
+            // Save result
+            loop_
+                .local_get(dest_ptr)
+                .local_get(counter)
+                .binop(BinaryOp::I32Add)
+                .local_get(tmp)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+            loop_
+                .local_get(counter)
+                .i32_const(8)
+                .binop(BinaryOp::I32Add)
+                .local_set(counter)
+                .br(loop_id);
+        });
+    });
+
+    function_builder.name(RuntimeFunction::SwapMemoryBytes.name().to_owned());
+    function_builder.finish(vec![origin_ptr, dest_ptr, size], &mut module.funcs)
 }
