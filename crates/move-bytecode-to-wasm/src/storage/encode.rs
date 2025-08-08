@@ -220,7 +220,7 @@ pub fn store(
                 // Transform to BE
                 builder.call(swap_256_fn);
             }
-            _ => {}
+            _ => todo!(),
         };
     }
 

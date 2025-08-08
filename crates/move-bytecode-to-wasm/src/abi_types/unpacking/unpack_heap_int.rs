@@ -22,49 +22,31 @@ impl IU128 {
         compilation_ctx: &CompilationContext,
     ) {
         let encoded_size =
-            sol_data::Uint::<128>::ENCODED_SIZE.expect("U128 should have a fixed size");
+            sol_data::Uint::<128>::ENCODED_SIZE.expect("U128 should have a fixed size") as i32;
 
-        // Big-endian to Little-endian
-        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None);
-
-        block.i32_const(16);
-        block.call(compilation_ctx.allocator);
+        // The data is padded 16 bytes to the right
+        block
+            .local_get(reader_pointer)
+            .i32_const(16)
+            .binop(BinaryOp::I32Add);
 
         let unpacked_pointer = module.locals.add(ValType::I32);
-        block.local_set(unpacked_pointer);
+        block
+            .i32_const(16)
+            .call(compilation_ctx.allocator)
+            .local_tee(unpacked_pointer);
 
-        for i in 0..2 {
-            block.local_get(unpacked_pointer);
-            block.local_get(reader_pointer);
-            block.load(
-                compilation_ctx.memory_id,
-                LoadKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    // Abi encoded value is left padded to 32 bytes
-                    offset: 16 + i * 8,
-                },
-            );
-            block.call(swap_i64_bytes_function);
-        }
+        // Big-endian to Little-endian
+        let swap_i128_bytes_function =
+            RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx));
+        block.call(swap_i128_bytes_function);
 
-        // store in reverse order
-        for i in 0..2 {
-            block.store(
-                compilation_ctx.memory_id,
-                StoreKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: i * 8,
-                },
-            );
-        }
-
-        // increment reader pointer
-        block.local_get(reader_pointer);
-        block.i32_const(encoded_size as i32);
-        block.binop(BinaryOp::I32Add);
-        block.local_set(reader_pointer);
+        // Increment reader pointer
+        block
+            .local_get(reader_pointer)
+            .i32_const(encoded_size)
+            .binop(BinaryOp::I32Add)
+            .local_set(reader_pointer);
 
         block.local_get(unpacked_pointer);
     }
@@ -79,48 +61,27 @@ impl IU256 {
         compilation_ctx: &CompilationContext,
     ) {
         let encoded_size =
-            sol_data::Uint::<256>::ENCODED_SIZE.expect("U256 should have a fixed size");
+            sol_data::Uint::<256>::ENCODED_SIZE.expect("U256 should have a fixed size") as i32;
 
-        // Big-endian to Little-endian
-        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None);
-
-        block.i32_const(32);
-        block.call(compilation_ctx.allocator);
+        block.local_get(reader_pointer);
 
         let unpacked_pointer = module.locals.add(ValType::I32);
-        block.local_set(unpacked_pointer);
+        block
+            .i32_const(32)
+            .call(compilation_ctx.allocator)
+            .local_tee(unpacked_pointer);
 
-        for i in 0..4 {
-            block.local_get(unpacked_pointer);
-            block.local_get(reader_pointer);
-            block.load(
-                compilation_ctx.memory_id,
-                LoadKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: i * 8,
-                },
-            );
-            block.call(swap_i64_bytes_function);
-        }
+        // Big-endian to Little-endian
+        let swap_i256_bytes_function =
+            RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
+        block.call(swap_i256_bytes_function);
 
-        // store in reverse order
-        for i in 0..4 {
-            block.store(
-                compilation_ctx.memory_id,
-                StoreKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: i * 8,
-                },
-            );
-        }
-
-        // increment reader pointer
-        block.local_get(reader_pointer);
-        block.i32_const(encoded_size as i32);
-        block.binop(BinaryOp::I32Add);
-        block.local_set(reader_pointer);
+        // Increment reader pointer
+        block
+            .local_get(reader_pointer)
+            .i32_const(encoded_size)
+            .binop(BinaryOp::I32Add)
+            .local_set(reader_pointer);
 
         block.local_get(unpacked_pointer);
     }
