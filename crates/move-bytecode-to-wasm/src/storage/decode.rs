@@ -118,12 +118,26 @@ pub fn add_decode_storage_struct_instructions(
                         load_kind,
                         MemArg {
                             align: 0,
-                            offset: read_bytes_in_slot,
+                            offset: 32 - read_bytes_in_slot,
                         },
                     )
                     .local_tee(val)
                     .call(swap_fn)
                     .local_set(val);
+
+                if field_size == 1 {
+                    builder
+                        .local_get(val)
+                        .i32_const(24)
+                        .binop(BinaryOp::I32ShrU)
+                        .local_set(val);
+                } else if field_size == 2 {
+                    builder
+                        .local_get(val)
+                        .i32_const(16)
+                        .binop(BinaryOp::I32ShrU)
+                        .local_set(val);
+                }
 
                 // Save it to the struct
                 builder.local_get(val).store(
@@ -139,6 +153,16 @@ pub fn add_decode_storage_struct_instructions(
             IntermediateType::IU256 | IntermediateType::IAddress | IntermediateType::ISigner => {}
             _ => todo!(),
         };
+
+        // Save the ptr value to the struct
+        builder.local_get(struct_ptr).local_get(field_ptr).store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: index as u32 * 4,
+            },
+        );
     }
 
     struct_ptr
