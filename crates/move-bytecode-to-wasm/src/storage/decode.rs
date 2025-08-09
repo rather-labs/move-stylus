@@ -14,7 +14,7 @@ use crate::{
         },
     },
     runtime::RuntimeFunction,
-    translation::intermediate_types::{IntermediateType, structs::IStruct},
+    translation::intermediate_types::{IntermediateType, heap_integers::IU128, structs::IStruct},
 };
 
 /// This function adds the instruction to save in storage a structure
@@ -125,6 +125,8 @@ pub fn add_decode_storage_struct_instructions(
                     .call(swap_fn)
                     .local_set(val);
 
+                // If the field size are less than 4 or 8 bytes we need to shift them before
+                // saving
                 if field_size == 1 {
                     builder
                         .local_get(val)
@@ -149,7 +151,30 @@ pub fn add_decode_storage_struct_instructions(
                     },
                 );
             }
-            IntermediateType::IU128 => {}
+            IntermediateType::IU128 => {
+                // Create a pointer for the value
+                builder
+                    .i32_const(IU128::HEAP_SIZE)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(field_ptr);
+
+                // Source address (plus offset)
+                builder
+                    .local_get(slot_data_ptr)
+                    .i32_const(32 - read_bytes_in_slot as i32)
+                    .binop(BinaryOp::I32Add);
+
+                // Number of bytes to copy
+                builder.i32_const(IU128::HEAP_SIZE);
+
+                // Copy the chunk of memory
+                builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+                let swap_fn = RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx));
+
+                // Transform it to LE
+                builder.local_get(val_32).local_get(val_32).call(swap_fn);
+            }
             IntermediateType::IU256 | IntermediateType::IAddress | IntermediateType::ISigner => {}
             _ => todo!(),
         };
