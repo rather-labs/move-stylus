@@ -31,6 +31,7 @@ impl NativeFunction {
     const NATIVE_GAS_PRICE: &str = "native_gas_price";
     const NATIVE_FRESH_ID: &str = "fresh_id";
     const NATIVE_STORAGE_SAVE: &str = "save_in_slot";
+    const NATIVE_READ_SLOT: &str = "read_slot";
 
     const HOST_BLOCK_NUMBER: &str = "block_number";
     const HOST_BLOCK_GAS_LIMIT: &str = "block_gas_limit";
@@ -124,6 +125,26 @@ impl NativeFunction {
                         None => todo!(),
                     };
                     storage::add_storage_save_fn(function_name, module, compilation_ctx, struct_)
+                }
+                Self::NATIVE_READ_SLOT => {
+                    assert_eq!(
+                        1,
+                        generics.len(),
+                        "there was an error linking {function_name} expected 1 type parameter, found {}",
+                        generics.len(),
+                    );
+
+                    let struct_ = match generics.get(0) {
+                        Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
+                            .get_user_data_type_by_index(module_id, *index)
+                            .unwrap(),
+                        Some(_) => todo!(),
+                        None => todo!(),
+                    };
+
+                    println!("{generics:?}");
+                    println!("{function_name:?}");
+                    storage::add_read_slot_fn(function_name, module, compilation_ctx, struct_)
                 }
                 _ => panic!("generic native function {name} not supported yet"),
             }
