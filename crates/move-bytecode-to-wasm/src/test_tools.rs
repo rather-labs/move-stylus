@@ -91,6 +91,7 @@ pub fn get_linker_with_host_debug_functions<T>() -> Linker<T> {
     linker
 }
 
+// TODO: move this somewhere else
 pub fn get_linker_with_native_keccak256<T>() -> Linker<T> {
     let mut linker = Linker::new(&Engine::default());
 
