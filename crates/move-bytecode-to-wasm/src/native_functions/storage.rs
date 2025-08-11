@@ -2,7 +2,6 @@ use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
 use crate::{CompilationContext, storage, translation::intermediate_types::structs::IStruct};
 
-
 pub fn add_storage_save_fn(
     name: String,
     module: &mut Module,
@@ -16,7 +15,7 @@ pub fn add_storage_save_fn(
 
     let mut builder = function.name(name).func_body();
 
-    storage::encode::store(
+    storage::encoding::add_encode_storage_struct_instructions(
         module,
         &mut builder,
         compilation_ctx,
@@ -40,7 +39,7 @@ pub fn add_read_slot_fn(
 
     let mut builder = function.name(name).func_body();
 
-    let struct_ptr = storage::decode::add_decode_storage_struct_instructions(
+    let struct_ptr = storage::encoding::add_decode_storage_struct_instructions(
         module,
         &mut builder,
         compilation_ctx,
