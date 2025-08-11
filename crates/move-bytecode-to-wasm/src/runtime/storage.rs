@@ -72,15 +72,17 @@ pub fn derive_mapping_slot(
     )
 }
 
-/// Computes the storage slot for an element at a given index in a dynamic array,
-/// following Solidity's storage layout:
+/// Calculates the storage slot for an element in a dynamic array at a specified index,
+/// using Solidity's storage layout convention:
 ///   base = keccak256(p)
-///   element_slot = base + index * elem_size_in_slots
+///   element_slot = base + index * element_size_in_slots
 ///
-/// `array_slot_ptr` points to the u256 slot `p`.
-/// `elem_index_ptr` points to the u32 element index value (little-endian).
-/// `elem_size_ptr` points to the u32 element size in bytes (little-endian).
-/// The resulting u256 big-endian slot value is stored at `derived_elem_slot_ptr`.
+/// Parameters:
+/// - `array_slot_ptr`: A pointer to the u256 slot `p`, which is the header slot of the array.
+/// - `elem_index_ptr`: A pointer to the u32 value representing the element's index in the array (little-endian).
+/// - `elem_size_ptr`: A pointer to the u32 value representing the size of each element in bytes (little-endian).
+///
+/// The computed u256 slot value for the element, in big-endian format, is stored at `derived_elem_slot_ptr`.
 pub fn derive_dyn_array_slot(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
