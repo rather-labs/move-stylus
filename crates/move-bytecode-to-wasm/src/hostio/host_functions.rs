@@ -179,10 +179,6 @@ pub fn tx_gas_price(module: &mut Module) -> (FunctionId, ImportId) {
 /// [`SHA3`]: https://www.evm.codes/#20
 #[allow(unused)]
 pub fn native_keccak256(module: &mut Module) -> (FunctionId, ImportId) {
-    // let native_keccak256_ty = module
-    //     .types
-    //     .add(&[ValType::I32, ValType::I32, ValType::I32], &[]);
-    // module.add_import_func("vm_hooks", "native_keccak256", native_keccak256_ty)
     get_or_insert_import(
         module,
         "native_keccak256",

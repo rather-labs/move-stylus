@@ -1,116 +1,63 @@
+use super::RuntimeFunction;
+use crate::CompilationContext;
 use crate::hostio::host_functions;
 use crate::translation::intermediate_types::heap_integers::IU256;
-use crate::{CompilationContext, runtime::RuntimeFunction};
 use walrus::{
-    InstrSeqBuilder, LocalId, Module, ValType,
+    FunctionBuilder, FunctionId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-// TODO
-// - Revisit h(k), particularly for string and bytes arrays
-// - Reuse pointers when possible
-
-// The value corresponding to a mapping key k is located at keccak256(h(k) . p) where . is concatenation
-// and h is a function that is applied to the key depending on its type:
-// - for value types, h pads the value to 32 bytes in the same way as when storing the value in memory.
-// - for strings and byte arrays, h(k) is just the unpadded data.
-//
-// If the mapping value is a non-value type, the computed slot marks the start of the data.
-// If the value is of struct type, for example, you have to add an offset corresponding to the struct member to reach the member.
-
-#[allow(dead_code)]
-pub fn derive_mapping_slot_for_key(
-    builder: &mut InstrSeqBuilder,
-    compilation_ctx: &CompilationContext,
+/// The value corresponding to a mapping key k is located at keccak256(h(k) . p) where . is concatenation
+/// and h is a function that is applied to the key depending on its type:
+/// - for value types, h pads the value to 32 bytes in the same way as when storing the value in memory.
+/// - for strings and byte arrays, h(k) is just the unpadded data.
+///
+/// Arguments:
+/// - `mapping_slot_ptr`: pointer to the mapping slot (32 bytes)
+/// - `key_ptr`: pointer to the key (32 bytes)
+/// - `derived_slot_ptr`: pointer to the derived slot (32 bytes)
+pub fn derive_mapping_slot(
     module: &mut Module,
-    mapping_slot_ptr: LocalId, // pointer to the mapping slot (32 bytes)
-    key_ptr: LocalId,          // pointer to the key (32 bytes)
-    derived_slot_ptr: LocalId, // pointer to the derived slot (32 bytes)
-) {
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32, ValType::I32],
+        &[],
+    );
+
+    let mut builder = function
+        .name(RuntimeFunction::DeriveMappingSlot.name().to_owned())
+        .func_body();
+
+    // Arguments locals
+    let mapping_slot_ptr = module.locals.add(ValType::I32);
+    let key_ptr = module.locals.add(ValType::I32);
+    let derived_slot_ptr = module.locals.add(ValType::I32);
+
     let (native_keccak, _) = host_functions::native_keccak256(module);
 
     // Allocate memory for the hash data
     let data_ptr = module.locals.add(ValType::I32);
+
     builder
-        .i32_const(64)
+        .i32_const(64) // For now this is always 64 bytes as we are not dealing with dynamic keys yet
         .call(compilation_ctx.allocator)
         .local_set(data_ptr);
 
-    // Concatenate the key and slot at #data_ptr -> data = h(k) . p
-    let offset = module.locals.add(ValType::I32);
-    builder.i32_const(0).local_set(offset);
-    builder.block(None, |block| {
-        let block_id = block.id();
-        block.loop_(None, |loop_| {
-            let loop_id = loop_.id();
+    builder
+        .local_get(data_ptr)
+        .local_get(key_ptr)
+        .i32_const(32) // copy 32 bytes, for now fixed size
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-            // if offset >= 32, break
-            loop_
-                .local_get(offset)
-                .i32_const(32)
-                .binop(BinaryOp::I32GeU)
-                .br_if(block_id);
-
-            loop_
-                .local_get(data_ptr)
-                .local_get(offset)
-                .binop(BinaryOp::I32Add) // data_ptr + offset
-                .local_get(key_ptr)
-                .local_get(offset)
-                .binop(BinaryOp::I32Add) // key_ptr + offset
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I64 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I64 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-
-            // Load and store a slot chunk at #data_ptr + (i + 4) * 8
-            loop_
-                .local_get(data_ptr)
-                .local_get(offset)
-                .binop(BinaryOp::I32Add) // data_ptr + offset
-                .i32_const(32)
-                .binop(BinaryOp::I32Add) // data_ptr + offset + 32
-                .local_get(mapping_slot_ptr)
-                .local_get(offset)
-                .binop(BinaryOp::I32Add) // mapping_slot_ptr + offset
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I64 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I64 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-
-            loop_
-                .local_get(offset)
-                .i32_const(8)
-                .binop(BinaryOp::I32Add)
-                .local_set(offset);
-
-            loop_.br(loop_id);
-        });
-    });
+    builder
+        .local_get(data_ptr)
+        .i32_const(32)
+        .binop(BinaryOp::I32Add) // data_ptr + 32
+        .local_get(mapping_slot_ptr)
+        .i32_const(32) // copy 32 bytes
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     // Hash the data, this is the mapping slot we are looking for -> v = keccak256(h(k) . p)
     builder
@@ -118,6 +65,11 @@ pub fn derive_mapping_slot_for_key(
         .i32_const(64)
         .local_get(derived_slot_ptr)
         .call(native_keccak);
+
+    function.finish(
+        vec![mapping_slot_ptr, key_ptr, derived_slot_ptr],
+        &mut module.funcs,
+    )
 }
 
 /// Computes the storage slot for an element at a given index in a dynamic array,
@@ -129,21 +81,58 @@ pub fn derive_mapping_slot_for_key(
 /// `elem_index_ptr` points to the u32 element index value (little-endian).
 /// `elem_size_ptr` points to the u32 element size in bytes (little-endian).
 /// The resulting u256 big-endian slot value is stored at `derived_elem_slot_ptr`.
-#[allow(dead_code)]
-pub fn derive_dyn_array_slot_for_index(
-    builder: &mut InstrSeqBuilder,
-    compilation_ctx: &CompilationContext,
+pub fn derive_dyn_array_slot(
     module: &mut Module,
-    array_slot_ptr: LocalId,
-    elem_index_ptr: LocalId,
-    elem_size_ptr: LocalId,
-    derived_elem_slot_ptr: LocalId,
-) {
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32, ValType::I32, ValType::I32],
+        &[],
+    );
+
+    let mut builder = function
+        .name(RuntimeFunction::DeriveDynArraySlot.name().to_owned())
+        .func_body();
+
+    // Arguments locals
+    let array_slot_ptr = module.locals.add(ValType::I32);
+    let elem_index_ptr = module.locals.add(ValType::I32);
+    let elem_size_ptr = module.locals.add(ValType::I32);
+    let derived_elem_slot_ptr = module.locals.add(ValType::I32);
+
     let (native_keccak, _) = host_functions::native_keccak256(module);
     let swap_i32_bytes_fn = RuntimeFunction::SwapI32Bytes.get(module, None);
 
-    // Allocate a local for the keccak256 result (base slot)
+    // Guard: check elem_size is greater than 0
+    builder
+        .local_get(elem_size_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .i32_const(0)
+        .binop(BinaryOp::I32LeU)
+        .if_else(
+            None,
+            |then| {
+                then.unreachable();
+            },
+            |_else| {},
+        );
+
+    // Local for the pointer to keccak256(p)
     let base_slot_ptr = module.locals.add(ValType::I32);
+
+    // Allocate memory for the base slot result
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_set(base_slot_ptr);
 
     // Compute base = keccak256(p)
     builder
@@ -152,7 +141,7 @@ pub fn derive_dyn_array_slot_for_index(
         .local_get(base_slot_ptr)
         .call(native_keccak);
 
-    // Check if the element size is greater lower than 32 bytes, i.e. it fits in a storage slot
+    // Check if the element size is less than 32 bytes, i.e. it fits in a storage slot
     builder
         .local_get(elem_size_ptr)
         .load(
@@ -165,6 +154,7 @@ pub fn derive_dyn_array_slot_for_index(
         )
         .i32_const(32)
         .binop(BinaryOp::I32LtU);
+
     builder.if_else(
         ValType::I32,
         |then| {
@@ -267,12 +257,27 @@ pub fn derive_dyn_array_slot_for_index(
         );
 
     // Add base + offset → final element slot
-    builder.local_get(elem_offset_256_ptr);
-    builder.local_get(base_slot_ptr);
-    IU256::add(builder, module, compilation_ctx);
-    builder.local_set(derived_elem_slot_ptr);
+    builder.local_get(derived_elem_slot_ptr);
+    builder
+        .local_get(elem_offset_256_ptr)
+        .local_get(base_slot_ptr);
+    IU256::add(&mut builder, module, compilation_ctx); // add(base, offset) with overflow check
+    builder // copy add(base, offset) result to #derived_elem_slot_ptr
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+    function.finish(
+        vec![
+            array_slot_ptr,
+            elem_index_ptr,
+            elem_size_ptr,
+            derived_elem_slot_ptr,
+        ],
+        &mut module.funcs,
+    )
 }
 
+// The expected slot values were calculated using Remix to ensure the tests are correct.
 #[cfg(test)]
 mod tests {
     use crate::test_compilation_context;
@@ -322,11 +327,7 @@ mod tests {
             "61684305963762951884865369267618438865725240706238913880678826931473020346819"
     ).unwrap()
     )]
-    fn test_derive_mapping_slot_for_key(
-        #[case] slot: U256,
-        #[case] key: U256,
-        #[case] expected: U256,
-    ) {
+    fn test_derive_mapping_slot(#[case] slot: U256, #[case] key: U256, #[case] expected: U256) {
         let (mut module, allocator_func, memory_id) = build_module(Some(64));
 
         let slot_ptr = module.locals.add(ValType::I32);
@@ -340,22 +341,24 @@ mod tests {
         );
         let mut func_body = builder.func_body();
 
+        // Allocate memory for the result
         func_body
             .i32_const(32)
             .call(allocator_func)
             .local_set(result_ptr);
 
         let ctx = test_compilation_context!(memory_id, allocator_func);
-        derive_mapping_slot_for_key(
-            &mut func_body,
-            &ctx,
-            &mut module,
-            slot_ptr,
-            key_ptr,
-            result_ptr,
-        );
 
+        // Call derive_mapping_slot with the proper arguments
+        func_body
+            .local_get(slot_ptr)
+            .local_get(key_ptr)
+            .local_get(result_ptr)
+            .call(derive_mapping_slot(&mut module, &ctx));
+
+        // Return the result pointer
         func_body.local_get(result_ptr);
+
         let function = builder.finish(vec![slot_ptr, key_ptr], &mut module.funcs);
         module.exports.add("test_fn", function);
 
@@ -402,7 +405,7 @@ mod tests {
             "70122961159721460691158963782174993504655102344268525554192115423808014779926"
         ).unwrap()
     )]
-    fn test_derive_nested_mapping_slot_for_key(
+    fn test_derive_nested_mapping_slot(
         #[case] slot: U256,
         #[case] outer_key: U256,
         #[case] inner_key: U256,
@@ -431,23 +434,19 @@ mod tests {
             .local_set(result_ptr);
 
         let ctx = test_compilation_context!(memory_id, allocator_func);
-        derive_mapping_slot_for_key(
-            &mut func_body,
-            &ctx,
-            &mut module,
-            slot_ptr,
-            outer_key_ptr,
-            nested_mapping_slot_ptr,
-        );
 
-        derive_mapping_slot_for_key(
-            &mut func_body,
-            &ctx,
-            &mut module,
-            nested_mapping_slot_ptr,
-            inner_key_ptr,
-            result_ptr,
-        );
+        // Call derive_mapping_slot with the proper arguments
+        func_body
+            .local_get(slot_ptr)
+            .local_get(outer_key_ptr)
+            .local_get(nested_mapping_slot_ptr)
+            .call(derive_mapping_slot(&mut module, &ctx));
+
+        func_body
+            .local_get(nested_mapping_slot_ptr)
+            .local_get(inner_key_ptr)
+            .local_get(result_ptr)
+            .call(derive_mapping_slot(&mut module, &ctx));
 
         func_body.local_get(result_ptr);
         let function = builder.finish(
@@ -536,7 +535,16 @@ mod tests {
             "87903029871075914254377627908054574944891091886930582284385770809450030037087"
     ).unwrap()
     )]
-    fn test_derive_dyn_array_slot_for_index(
+    #[should_panic]
+    #[case(
+        U256::from(3),
+        2_u32,
+        0_u32,
+        U256::from_str(
+            "87903029871075914254377627908054574944891091886930582284385770809450030037087"
+    ).unwrap()
+    )]
+    fn test_derive_dyn_array_slot(
         #[case] slot: U256,
         #[case] index: u32,
         #[case] elem_size: u32,
@@ -562,15 +570,13 @@ mod tests {
             .local_set(result_ptr);
 
         let ctx = test_compilation_context!(memory_id, allocator_func);
-        derive_dyn_array_slot_for_index(
-            &mut func_body,
-            &ctx,
-            &mut module,
-            slot_ptr,
-            index_ptr,
-            elem_size_ptr,
-            result_ptr,
-        );
+
+        func_body
+            .local_get(slot_ptr)
+            .local_get(index_ptr)
+            .local_get(elem_size_ptr)
+            .local_get(result_ptr)
+            .call(derive_dyn_array_slot(&mut module, &ctx));
 
         func_body.local_get(result_ptr);
         let function = builder.finish(vec![slot_ptr, index_ptr, elem_size_ptr], &mut module.funcs);
@@ -619,7 +625,7 @@ mod tests {
             "21317519515597955722743988462724083255677628835556397468395520694449519796017"
     ).unwrap()
     )]
-    fn test_derive_nested_dyn_array_slot_for_index(
+    fn test_derive_nested_dyn_array_slot(
         #[case] slot: U256,
         #[case] outer_index: u32,
         #[case] inner_index: u32,
@@ -663,25 +669,21 @@ mod tests {
             );
 
         let ctx = test_compilation_context!(memory_id, allocator_func);
-        derive_dyn_array_slot_for_index(
-            &mut func_body,
-            &ctx,
-            &mut module,
-            slot_ptr,
-            outer_index_ptr,
-            array_header_size_ptr,
-            result_ptr,
-        );
 
-        derive_dyn_array_slot_for_index(
-            &mut func_body,
-            &ctx,
-            &mut module,
-            result_ptr,
-            inner_index_ptr,
-            elem_size_ptr,
-            result_ptr,
-        );
+        // Call derive_dyn_array_slot_for_index with the proper arguments
+        func_body
+            .local_get(slot_ptr)
+            .local_get(outer_index_ptr)
+            .local_get(array_header_size_ptr)
+            .local_get(result_ptr)
+            .call(derive_dyn_array_slot(&mut module, &ctx));
+
+        func_body
+            .local_get(result_ptr)
+            .local_get(inner_index_ptr)
+            .local_get(elem_size_ptr)
+            .local_get(result_ptr)
+            .call(derive_dyn_array_slot(&mut module, &ctx));
 
         func_body.local_get(result_ptr);
         let function = builder.finish(

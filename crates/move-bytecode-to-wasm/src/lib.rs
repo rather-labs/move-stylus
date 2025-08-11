@@ -25,7 +25,6 @@ mod memory;
 mod native_functions;
 mod runtime;
 mod runtime_error_codes;
-mod storage;
 mod translation;
 mod utils;
 mod wasm_builder_extensions;
