@@ -1,6 +1,9 @@
 use walrus::{FunctionId, Module};
 
-use crate::CompilationContext;
+use crate::{
+    CompilationContext,
+    translation::intermediate_types::heap_integers::{IU128, IU256},
+};
 
 mod copy;
 mod equality;
@@ -157,8 +160,12 @@ impl RuntimeFunction {
                     integers::bitwise::heap_int_shift_right(module, ctx)
                 }
                 // Copy
-                (Self::CopyU128, Some(ctx)) => copy::copy_u128_function(module, ctx),
-                (Self::CopyU256, Some(ctx)) => copy::copy_u256_function(module, ctx),
+                (Self::CopyU128, Some(ctx)) => {
+                    copy::copy_heap_int_function::<{ IU128::HEAP_SIZE }>(module, ctx)
+                }
+                (Self::CopyU256, Some(ctx)) => {
+                    copy::copy_heap_int_function::<{ IU256::HEAP_SIZE }>(module, ctx)
+                }
                 // Equality
                 (Self::HeapTypeEquality, Some(ctx)) => equality::a_equals_b(module, ctx),
                 (Self::VecEqualityHeapType, Some(ctx)) => {
