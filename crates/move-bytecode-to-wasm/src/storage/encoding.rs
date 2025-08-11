@@ -58,27 +58,11 @@ pub fn add_encode_storage_struct_instructions(
                 .i32_const(32)
                 .memory_fill(compilation_ctx.memory_id);
 
-            // BE to LE ptr so we can make the addition
+            let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
             builder
                 .local_get(slot_ptr)
-                .local_get(slot_ptr)
-                .call(swap_256_fn);
-
-            // Add one to slot
-            let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
-            builder
-                .local_get(slot_ptr)
-                .i32_const(DATA_U256_ONE_OFFSET)
-                .local_get(slot_ptr)
-                .i32_const(32)
-                .call(add_u256_fn)
+                .call(next_slot_fn)
                 .local_set(slot_ptr);
-
-            // LE to BE ptr so we can use the storage function
-            builder
-                .local_get(slot_ptr)
-                .local_get(slot_ptr)
-                .call(swap_256_fn);
 
             written_bytes_in_slot = field_size;
         } else {
@@ -244,28 +228,11 @@ pub fn add_decode_storage_struct_instructions(
     for (index, field) in struct_.fields.iter().enumerate() {
         let field_size = field_size(field);
         if read_bytes_in_slot + field_size > 32 {
-            let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
-
-            // BE to LE ptr so we can make the addition
+            let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
             builder
                 .local_get(slot_ptr)
-                .local_get(slot_ptr)
-                .call(swap_256_fn);
-
-            // Add one to slot
-            let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
-            builder
-                .local_get(slot_ptr)
-                .i32_const(DATA_U256_ONE_OFFSET)
-                .local_get(slot_ptr)
-                .i32_const(32)
-                .call(add_u256_fn);
-
-            // LE to BE ptr so we can use the storage function
-            builder
-                .local_get(slot_ptr)
-                .local_get(slot_ptr)
-                .call(swap_256_fn);
+                .call(next_slot_fn)
+                .local_set(slot_ptr);
 
             // Load the slot data
             builder
