@@ -535,46 +535,4 @@ impl IStruct {
             ..*self
         }
     }
-
-    /// Computes the total size (in bytes) the struct will occupy in the storage
-    pub fn storage_size(&self) -> i32 {
-        let mut size = 0;
-        let mut slots = 1;
-
-        for field in &self.fields {
-            let field_size = match field {
-                IntermediateType::IBool | IntermediateType::IU8 | IntermediateType::IEnum(_) => 1,
-                IntermediateType::IU16 => 2,
-                IntermediateType::IU32 => 4,
-                IntermediateType::IU64 => 8,
-                IntermediateType::IU128 => 16,
-                IntermediateType::IU256
-                | IntermediateType::IAddress
-                | IntermediateType::ISigner => 32,
-                // Dynamic data occupies the whole slot, but the data is saved somewhere else
-                IntermediateType::IVector(_)
-                | IntermediateType::IGenericStructInstance { .. }
-                | IntermediateType::IStruct { .. } => 32,
-
-                IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                    panic!("found reference inside struct")
-                }
-                IntermediateType::ITypeParameter(_) => {
-                    panic!("cannot know if a type parameter is dynamic, expected a concrete type");
-                }
-                IntermediateType::IExternalUserData { .. } => todo!(),
-            };
-
-            if size + field_size >= slots * 32 {
-                slots += 1;
-                let remainder = slots * 32 - size;
-                size += remainder;
-                size += field_size;
-            } else {
-                size += field_size;
-            }
-        }
-
-        size
-    }
 }

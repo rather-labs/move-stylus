@@ -161,10 +161,18 @@ impl RuntimeFunction {
                 }
                 // Copy
                 (Self::CopyU128, Some(ctx)) => {
-                    copy::copy_heap_int_function::<{ IU128::HEAP_SIZE }>(module, ctx)
+                    copy::copy_heap_int_function::<{ IU128::HEAP_SIZE }>(
+                        module,
+                        ctx,
+                        Self::CopyU128.name().to_owned(),
+                    )
                 }
                 (Self::CopyU256, Some(ctx)) => {
-                    copy::copy_heap_int_function::<{ IU256::HEAP_SIZE }>(module, ctx)
+                    copy::copy_heap_int_function::<{ IU256::HEAP_SIZE }>(
+                        module,
+                        ctx,
+                        Self::CopyU256.name().to_owned(),
+                    )
                 }
                 // Equality
                 (Self::HeapTypeEquality, Some(ctx)) => equality::a_equals_b(module, ctx),

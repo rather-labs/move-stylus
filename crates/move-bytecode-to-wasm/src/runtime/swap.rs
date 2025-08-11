@@ -110,7 +110,8 @@ pub fn swap_i64_bytes_function(
     function_builder.finish(vec![input_param], &mut module.funcs)
 }
 
-/// TODO: Description
+/// Adds a function that swaps the bytes of a heap integer
+/// Useful for converting between Big-endian and Little-endian
 ///
 /// Arguments
 /// - ptr to the region

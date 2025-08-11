@@ -3,8 +3,6 @@
 use alloy_primitives::U256;
 use walrus::{ConstExpr, DataKind, MemoryId, Module, ir::Value};
 
-use crate::CompilationContext;
-
 /// u256 one in little endian. This is used to add it to the pointer that contains a slot number
 /// when moving to the next storage slot when reading/writing it.
 pub const DATA_U256_ONE_OFFSET: i32 = 0;
