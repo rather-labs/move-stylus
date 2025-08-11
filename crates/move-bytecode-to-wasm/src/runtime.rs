@@ -5,6 +5,7 @@ use crate::CompilationContext;
 mod copy;
 mod equality;
 mod integers;
+mod storage;
 mod swap;
 mod vector;
 
@@ -45,6 +46,9 @@ pub enum RuntimeFunction {
     VecBorrow,
     VecIncrementLen,
     VecDecrementLen,
+    // Storage
+    DeriveMappingSlot,
+    DeriveDynArraySlot,
 }
 
 impl RuntimeFunction {
@@ -86,6 +90,9 @@ impl RuntimeFunction {
             Self::VecBorrow => "vec_borrow",
             Self::VecIncrementLen => "vec_increment_len",
             Self::VecDecrementLen => "vec_decrement_len",
+            // Storage
+            Self::DeriveMappingSlot => "derive_mapping_slot",
+            Self::DeriveDynArraySlot => "derive_dyn_array_slot",
         }
     }
 
@@ -156,6 +163,11 @@ impl RuntimeFunction {
                 }
                 (Self::VecDecrementLen, Some(ctx)) => {
                     vector::decrement_vec_len_function(module, ctx)
+                }
+                // Storage
+                (Self::DeriveMappingSlot, Some(ctx)) => storage::derive_mapping_slot(module, ctx),
+                (Self::DeriveDynArraySlot, Some(ctx)) => {
+                    storage::derive_dyn_array_slot(module, ctx)
                 }
                 // Error
                 _ => panic!(
