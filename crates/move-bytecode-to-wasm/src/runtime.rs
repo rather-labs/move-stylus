@@ -53,6 +53,8 @@ pub enum RuntimeFunction {
     VecDecrementLen,
     // Storage
     StorageNextSlot,
+    DeriveMappingSlot,
+    DeriveDynArraySlot,
 }
 
 impl RuntimeFunction {
@@ -98,6 +100,8 @@ impl RuntimeFunction {
             Self::VecDecrementLen => "vec_decrement_len",
             // Storage
             Self::StorageNextSlot => "storage_next_slot",
+            Self::DeriveMappingSlot => "derive_mapping_slot",
+            Self::DeriveDynArraySlot => "derive_dyn_array_slot",
         }
     }
 
@@ -194,6 +198,10 @@ impl RuntimeFunction {
                 // Storage
                 (Self::StorageNextSlot, Some(ctx)) => {
                     storage::storage_next_slot_function(module, ctx)
+                }
+                (Self::DeriveMappingSlot, Some(ctx)) => storage::derive_mapping_slot(module, ctx),
+                (Self::DeriveDynArraySlot, Some(ctx)) => {
+                    storage::derive_dyn_array_slot(module, ctx)
                 }
                 // Error
                 _ => panic!(

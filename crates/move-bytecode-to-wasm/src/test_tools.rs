@@ -91,6 +91,43 @@ pub fn get_linker_with_host_debug_functions<T>() -> Linker<T> {
     linker
 }
 
+// TODO: move this somewhere else
+pub fn get_linker_with_native_keccak256<T>() -> Linker<T> {
+    let mut linker = Linker::new(&Engine::default());
+
+    // Define the native_keccak256 function
+    linker
+        .func_wrap(
+            "vm_hooks",
+            "native_keccak256",
+            |mut caller: wasmtime::Caller<'_, T>,
+             input_data_ptr: u32,
+             data_length: u32,
+             return_data_ptr: u32| {
+                let memory = match caller.get_export("memory") {
+                    Some(wasmtime::Extern::Memory(mem)) => mem,
+                    _ => panic!("failed to find host memory"),
+                };
+
+                let mut input_data = vec![0; data_length as usize];
+                memory
+                    .read(&caller, input_data_ptr as usize, &mut input_data)
+                    .unwrap();
+
+                let hash = alloy_primitives::keccak256(input_data);
+
+                memory
+                    .write(&mut caller, return_data_ptr as usize, hash.as_slice())
+                    .unwrap();
+
+                Ok(())
+            },
+        )
+        .unwrap();
+
+    linker
+}
+
 pub fn inject_host_debug_functions(module: &mut Module) {
     let func_ty = module.types.add(&[ValType::I32], &[]);
     module.add_import_func("", "print_i32", func_ty);

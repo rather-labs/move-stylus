@@ -356,7 +356,7 @@ impl IU128 {
     }
 }
 
-#[derive(Clone, Copy, Hash)]
+#[derive(Clone, Copy)]
 pub struct IU256;
 
 impl IU256 {
