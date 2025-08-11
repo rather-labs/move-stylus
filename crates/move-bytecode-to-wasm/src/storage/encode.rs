@@ -8,8 +8,7 @@ use walrus::{
 use crate::{
     CompilationContext,
     hostio::{
-        self,
-        host_functions::{block_number, storage_cache_bytes32, storage_flush_cache},
+        host_functions::{storage_cache_bytes32, storage_flush_cache},
     },
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
@@ -54,7 +53,7 @@ pub fn store(
 
     let mut written_bytes_in_slot = 0;
     for (index, field) in struct_.fields.iter().enumerate() {
-        let field_size = field_size(&field);
+        let field_size = field_size(field);
         if written_bytes_in_slot + field_size > 32 {
             // Save previous slot (maybe not needed...)
             builder

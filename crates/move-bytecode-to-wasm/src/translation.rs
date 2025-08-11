@@ -521,7 +521,7 @@ fn translate_instruction(
                     &function_id.identifier,
                     module,
                     compilation_ctx,
-                    &type_instantiations,
+                    type_instantiations,
                 );
 
                 builder.call(native_function_id);

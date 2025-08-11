@@ -8,10 +8,7 @@ use walrus::{
 use crate::{
     CompilationContext,
     hostio::{
-        self,
-        host_functions::{
-            block_number, storage_cache_bytes32, storage_flush_cache, storage_load_bytes32,
-        },
+        host_functions::storage_load_bytes32,
     },
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, heap_integers::IU128, structs::IStruct},
@@ -60,7 +57,7 @@ pub fn add_decode_storage_struct_instructions(
 
     let mut read_bytes_in_slot = 0;
     for (index, field) in struct_.fields.iter().enumerate() {
-        let field_size = field_size(&field);
+        let field_size = field_size(field);
         if read_bytes_in_slot + field_size > 32 {
             // TODO we could have this in data
             if !allocated_u256_one {

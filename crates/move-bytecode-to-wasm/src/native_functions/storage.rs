@@ -2,7 +2,6 @@ use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
 use crate::{CompilationContext, storage, translation::intermediate_types::structs::IStruct};
 
-use super::NativeFunction;
 
 pub fn add_storage_save_fn(
     name: String,

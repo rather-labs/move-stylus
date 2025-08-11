@@ -6,10 +6,7 @@ mod object;
 mod storage;
 mod transaction;
 
-use std::{
-    hash::{DefaultHasher, Hash, Hasher},
-    panic::panic_any,
-};
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 use walrus::{FunctionId, Module};
 
@@ -99,7 +96,7 @@ impl NativeFunction {
     ) -> FunctionId {
         // Thid hash will uniquely identify this native fn
         let mut hasher = DefaultHasher::new();
-        let function_hash = generics.iter().for_each(|t| t.hash(&mut hasher));
+        generics.iter().for_each(|t| t.hash(&mut hasher));
         let function_name = format!("{name}_{:x}", hasher.finish());
 
         if let Some(function) = module.funcs.by_name(&function_name) {
@@ -114,7 +111,7 @@ impl NativeFunction {
                         generics.len(),
                     );
 
-                    let struct_ = match generics.get(0) {
+                    let struct_ = match generics.first() {
                         Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
                             .get_user_data_type_by_index(module_id, *index)
                             .unwrap(),
@@ -131,7 +128,7 @@ impl NativeFunction {
                         generics.len(),
                     );
 
-                    let struct_ = match generics.get(0) {
+                    let struct_ = match generics.first() {
                         Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
                             .get_user_data_type_by_index(module_id, *index)
                             .unwrap(),
