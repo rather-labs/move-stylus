@@ -15,7 +15,7 @@ pub fn add_storage_save_fn(
 
     let mut builder = function.name(name).func_body();
 
-    storage::encoding::add_encode_storage_struct_instructions(
+    storage::encoding::add_encode_and_save_into_storage_struct_instructions(
         module,
         &mut builder,
         compilation_ctx,
@@ -39,7 +39,7 @@ pub fn add_read_slot_fn(
 
     let mut builder = function.name(name).func_body();
 
-    let struct_ptr = storage::encoding::add_decode_storage_struct_instructions(
+    let struct_ptr = storage::encoding::add_read_and_decode_storage_struct_instructions(
         module,
         &mut builder,
         compilation_ctx,

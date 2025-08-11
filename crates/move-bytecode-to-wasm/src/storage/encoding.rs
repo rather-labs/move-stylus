@@ -1,3 +1,6 @@
+//! This module implements the logic to encode/decode data in storage slots.
+//!
+//! The encoding used is the same as the one used by Solidity.
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg, StoreKind},
@@ -15,15 +18,22 @@ use crate::{
     },
 };
 
-/// This function adds the instruction to save in storage a structure
-pub fn add_encode_storage_struct_instructions(
+/// Adds the instructions to encode and save into storage an specific struct.
+///
+/// # Arguments
+/// `module` - walrus module
+/// `builder` - insturctions sequence builder
+/// `struct_ptr` - pointer to the struct to be encoded
+/// `slot_ptr` - storage's slot where the data will be saved
+/// `struct_` - structural information of the struct to be encoded and saved
+pub fn add_encode_and_save_into_storage_struct_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     struct_ptr: LocalId,
     slot_ptr: LocalId,
     struct_: &IStruct,
-) -> LocalId {
+) {
     let (storage_cache, _) = storage_cache_bytes32(module);
     let (storage_flush_cache, _) = storage_flush_cache(module);
 
@@ -191,12 +201,19 @@ pub fn add_encode_storage_struct_instructions(
         .call(storage_cache);
 
     builder.i32_const(1).call(storage_flush_cache);
-
-    struct_ptr
 }
 
-/// This function adds the instruction to save in storage a structure
-pub fn add_decode_storage_struct_instructions(
+/// Adds the instructions to read, decode from storage and build in memory a structure.
+///
+/// # Arguments
+/// `module` - walrus module
+/// `builder` - insturctions sequence builder
+/// `slot_ptr` - storage's slot where the data will be saved
+/// `struct_` - structural information of the struct to be encoded and saved
+///
+/// # Returns
+/// pointer where the read struct is allocated
+pub fn add_read_and_decode_storage_struct_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
@@ -404,6 +421,7 @@ pub fn add_decode_storage_struct_instructions(
     struct_ptr
 }
 
+/// Return the storage-encoded field size in bytes
 fn field_size(field: &IntermediateType) -> u32 {
     match field {
         IntermediateType::IBool | IntermediateType::IU8 | IntermediateType::IEnum(_) => 1,
