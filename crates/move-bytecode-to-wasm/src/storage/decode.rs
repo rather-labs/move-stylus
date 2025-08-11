@@ -34,8 +34,11 @@ pub fn add_decode_storage_struct_instructions(
     let field_ptr = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
     let val_32 = module.locals.add(ValType::I32);
+    let u256_one = module.locals.add(ValType::I32);
 
-    let offset = module.locals.add(ValType::I32);
+    // let offset = module.locals.add(ValType::I32);
+
+    let mut allocated_u256_one = false;
 
     // Allocate space for the struct
     builder
@@ -59,20 +62,57 @@ pub fn add_decode_storage_struct_instructions(
     for (index, field) in struct_.fields.iter().enumerate() {
         let field_size = field_size(&field);
         if read_bytes_in_slot + field_size > 32 {
-            read_bytes_in_slot = field_size;
-            builder.i32_const(field_size as i32).local_set(offset);
-            // TODO: Move to the next slot and save it in slot_ptr
+            // TODO we could have this in data
+            if !allocated_u256_one {
+                // Allocate 32 bytes to save the current slot data
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(u256_one);
+
+                builder.i32_const(1).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                allocated_u256_one = true;
+            }
+
+            let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
+
+            // BE to LE ptr so we can make the addition
+            builder
+                .local_get(slot_ptr)
+                .local_get(slot_ptr)
+                .call(swap_256_fn);
+
+            // Add one to slot
+            let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
+            builder
+                .local_get(slot_ptr)
+                .local_get(u256_one)
+                .i32_const(32)
+                .call(add_u256_fn)
+                .local_set(slot_ptr);
+
+            // LE to BE ptr so we can use the storage function
+            builder
+                .local_get(slot_ptr)
+                .local_get(slot_ptr)
+                .call(swap_256_fn);
+
+            // Load the slot data
             builder
                 .local_get(slot_ptr)
                 .local_get(slot_data_ptr)
                 .call(storage_load);
-        } else {
-            builder
-                .i32_const(32)
-                .i32_const(field_size as i32)
-                .binop(BinaryOp::I32Sub)
-                .local_set(offset);
 
+            read_bytes_in_slot = field_size;
+        } else {
             read_bytes_in_slot += field_size;
         }
 
@@ -173,9 +213,35 @@ pub fn add_decode_storage_struct_instructions(
                 let swap_fn = RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx));
 
                 // Transform it to LE
-                builder.local_get(val_32).local_get(val_32).call(swap_fn);
+                builder
+                    .local_get(field_ptr)
+                    .local_get(field_ptr)
+                    .call(swap_fn);
             }
-            IntermediateType::IU256 | IntermediateType::IAddress | IntermediateType::ISigner => {}
+            IntermediateType::IU256 | IntermediateType::IAddress | IntermediateType::ISigner => {
+                // Create a pointer for the value
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(field_ptr);
+
+                // Source address (plus offset)
+                builder.local_get(slot_data_ptr);
+
+                // Number of bytes to copy
+                builder.i32_const(32);
+
+                // Copy the chunk of memory
+                builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+                let swap_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
+
+                // Transform it to LE
+                builder
+                    .local_get(field_ptr)
+                    .local_get(field_ptr)
+                    .call(swap_fn);
+            }
             _ => todo!(),
         };
 
