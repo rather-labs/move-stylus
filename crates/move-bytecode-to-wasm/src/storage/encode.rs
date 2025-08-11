@@ -25,9 +25,9 @@ pub fn store(
     let (storage_cache, _) = storage_cache_bytes32(module);
     let (storage_flush_cache, _) = storage_flush_cache(module);
 
+    // Locals
     let val_32 = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
-
     let offset = module.locals.add(ValType::I32);
 
     builder.i32_const(0).local_set(offset);
@@ -67,6 +67,7 @@ pub fn store(
             builder
                 .local_get(slot_ptr)
                 .i32_const(DATA_U256_ONE_OFFSET)
+                .local_get(slot_ptr)
                 .i32_const(32)
                 .call(add_u256_fn)
                 .local_set(slot_ptr);
@@ -78,16 +79,15 @@ pub fn store(
                 .call(swap_256_fn);
 
             written_bytes_in_slot = field_size;
-            builder.i32_const(field_size as i32).local_set(offset);
         } else {
-            builder
-                .i32_const(32)
-                .i32_const(field_size as i32)
-                .binop(BinaryOp::I32Sub)
-                .local_set(offset);
-
             written_bytes_in_slot += field_size;
         }
+
+        builder
+            .i32_const(32)
+            .i32_const(field_size as i32)
+            .binop(BinaryOp::I32Sub)
+            .local_set(offset);
 
         // Load field's intermediate pointer
         builder.local_get(struct_ptr).load(
@@ -182,13 +182,18 @@ pub fn store(
                 // Transform to BE
                 builder.call(swap_fn);
             }
-            IntermediateType::IU256 | IntermediateType::IAddress | IntermediateType::ISigner => {
+            IntermediateType::IU256 => {
                 // Slot data plus offset as dest ptr (offset should be zero because data is already
                 // 32 bytes in size)
                 builder.i32_const(DATA_SLOT_DATA_PTR_OFFSET);
 
                 // Transform to BE
                 builder.call(swap_256_fn);
+            }
+            IntermediateType::IAddress | IntermediateType::ISigner => {
+                // Slot data plus offset as dest ptr (offset should be zero because data is already
+                // 32 bytes in size)
+                builder.i32_const(DATA_SLOT_DATA_PTR_OFFSET);
             }
             _ => todo!(),
         };

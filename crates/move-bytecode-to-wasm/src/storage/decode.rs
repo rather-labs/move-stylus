@@ -10,7 +10,11 @@ use crate::{
     data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_U256_ONE_OFFSET},
     hostio::host_functions::storage_load_bytes32,
     runtime::RuntimeFunction,
-    translation::intermediate_types::{IntermediateType, heap_integers::IU128, structs::IStruct},
+    translation::intermediate_types::{
+        IntermediateType,
+        heap_integers::{IU128, IU256},
+        structs::IStruct,
+    },
 };
 
 /// This function adds the instruction to save in storage a structure
@@ -59,6 +63,7 @@ pub fn add_decode_storage_struct_instructions(
             builder
                 .local_get(slot_ptr)
                 .i32_const(DATA_U256_ONE_OFFSET)
+                .local_get(slot_ptr)
                 .i32_const(32)
                 .call(add_u256_fn)
                 .local_set(slot_ptr);
@@ -182,10 +187,10 @@ pub fn add_decode_storage_struct_instructions(
                     .local_get(field_ptr)
                     .call(swap_fn);
             }
-            IntermediateType::IU256 | IntermediateType::IAddress | IntermediateType::ISigner => {
+            IntermediateType::IU256 => {
                 // Create a pointer for the value
                 builder
-                    .i32_const(32)
+                    .i32_const(IU256::HEAP_SIZE)
                     .call(compilation_ctx.allocator)
                     .local_tee(field_ptr);
 
@@ -205,6 +210,22 @@ pub fn add_decode_storage_struct_instructions(
                     .local_get(field_ptr)
                     .local_get(field_ptr)
                     .call(swap_fn);
+            }
+            IntermediateType::IAddress | IntermediateType::ISigner => {
+                // Create a pointer for the value
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(field_ptr);
+
+                // Source address (plus offset)
+                builder.i32_const(DATA_SLOT_DATA_PTR_OFFSET);
+
+                // Number of bytes to copy
+                builder.i32_const(32);
+
+                // Copy the chunk of memory
+                builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
             }
             _ => todo!(),
         };
