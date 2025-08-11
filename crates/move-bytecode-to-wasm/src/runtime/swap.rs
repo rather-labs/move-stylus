@@ -1,7 +1,9 @@
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, UnaryOp},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind, UnaryOp},
 };
+
+use crate::CompilationContext;
 
 use super::RuntimeFunction;
 
@@ -106,4 +108,62 @@ pub fn swap_i64_bytes_function(
 
     function_builder.name(RuntimeFunction::SwapI64Bytes.name().to_owned());
     function_builder.finish(vec![input_param], &mut module.funcs)
+}
+
+/// Adds a function that swaps the bytes of a heap integer
+/// Useful for converting between Big-endian and Little-endian
+///
+/// Arguments
+/// - ptr to the region
+/// - how many bytes occupies (must be multiple of 8)
+pub fn swap_bytes_function<const N: u32>(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    name: String,
+) -> FunctionId {
+    let mut function_builder =
+        FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut function_body = function_builder.func_body();
+
+    // Arguments
+    let origin_ptr = module.locals.add(ValType::I32);
+    let dest_ptr = module.locals.add(ValType::I32);
+
+    let swap_64 = RuntimeFunction::SwapI64Bytes.get(module, None);
+
+    // We leave in stack
+    // dest ptr
+    // swapped value
+    // dest ptr
+    // swapped value
+    // ...
+    for i in 0..N {
+        function_body
+            .local_get(dest_ptr)
+            .local_get(origin_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: i * 8,
+                },
+            )
+            .call(swap_64);
+    }
+
+    // store in reverse order
+    for i in 0..N {
+        function_body.store(
+            compilation_ctx.memory_id,
+            StoreKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: i * 8,
+            },
+        );
+    }
+
+    function_builder.name(name);
+    function_builder.finish(vec![origin_ptr, dest_ptr], &mut module.funcs)
 }

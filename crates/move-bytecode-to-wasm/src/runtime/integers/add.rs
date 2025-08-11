@@ -12,13 +12,14 @@ use super::RuntimeFunction;
 /// # Arguments:
 ///    - pointer to the first number
 ///    - pointer to the second argument
+///    - pointer where the res is saved
 ///    - how many bytes the number occupies in heap
 /// # Returns:
 ///    - pointer to the result
 pub fn heap_integers_add(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
-        &[ValType::I32, ValType::I32, ValType::I32],
+        &[ValType::I32, ValType::I32, ValType::I32, ValType::I32],
         &[ValType::I32],
     );
 
@@ -29,10 +30,10 @@ pub fn heap_integers_add(module: &mut Module, compilation_ctx: &CompilationConte
     // Function arguments
     let n1_ptr = module.locals.add(ValType::I32);
     let n2_ptr = module.locals.add(ValType::I32);
+    let pointer = module.locals.add(ValType::I32);
     let type_heap_size = module.locals.add(ValType::I32);
 
     // Locals
-    let pointer = module.locals.add(ValType::I32);
     let offset = module.locals.add(ValType::I32);
     let overflowed = module.locals.add(ValType::I32);
     let partial_sum = module.locals.add(ValType::I64);
@@ -41,10 +42,6 @@ pub fn heap_integers_add(module: &mut Module, compilation_ctx: &CompilationConte
 
     // Allocate memory for the result
     builder
-        // Allocate memory for the result
-        .local_get(type_heap_size)
-        .call(compilation_ctx.allocator)
-        .local_set(pointer)
         // Set the offset to 0
         .i32_const(0)
         .local_set(offset)
@@ -175,7 +172,10 @@ pub fn heap_integers_add(module: &mut Module, compilation_ctx: &CompilationConte
             },
         );
 
-    function.finish(vec![n1_ptr, n2_ptr, type_heap_size], &mut module.funcs)
+    function.finish(
+        vec![n1_ptr, n2_ptr, pointer, type_heap_size],
+        &mut module.funcs,
+    )
 }
 
 /// Adds two u32 numbers.
@@ -334,10 +334,11 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
+        // arguments for heap_integers_add (n1_ptr, n2_ptr, where to store the result and size in heap)
         func_body
             .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
@@ -428,10 +429,11 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
+        // arguments for heap_integers_add (n1_ptr, n2_ptr, where to store the result and size in heap)
         func_body
             .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE)
+            .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);

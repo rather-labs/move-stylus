@@ -3,11 +3,14 @@
 //! Native functions in Move are functions directly implemented inside the Move VM. To emulate that
 //! mechanism, we direcly implement them in WASM and limk them into the file.
 mod object;
+mod storage;
 mod transaction;
+
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 use walrus::{FunctionId, Module};
 
-use crate::{CompilationContext, hostio};
+use crate::{CompilationContext, hostio, translation::intermediate_types::IntermediateType};
 
 pub struct NativeFunction;
 
@@ -21,6 +24,8 @@ impl NativeFunction {
     const NATIVE_CHAIN_ID: &str = "native_chain_id";
     const NATIVE_GAS_PRICE: &str = "native_gas_price";
     const NATIVE_FRESH_ID: &str = "fresh_id";
+    const NATIVE_STORAGE_SAVE: &str = "save_in_slot";
+    const NATIVE_READ_SLOT: &str = "read_slot";
 
     const HOST_BLOCK_NUMBER: &str = "block_number";
     const HOST_BLOCK_GAS_LIMIT: &str = "block_gas_limit";
@@ -79,6 +84,63 @@ impl NativeFunction {
                 Self::NATIVE_FRESH_ID => object::add_native_fresh_id_fn(module, compilaton_ctx),
 
                 _ => panic!("native function {name} not supported yet"),
+            }
+        }
+    }
+
+    pub fn get_generic(
+        name: &str,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        generics: &[IntermediateType],
+    ) -> FunctionId {
+        // Thid hash will uniquely identify this native fn
+        let mut hasher = DefaultHasher::new();
+        generics.iter().for_each(|t| t.hash(&mut hasher));
+        let function_name = format!("{name}_{:x}", hasher.finish());
+
+        if let Some(function) = module.funcs.by_name(&function_name) {
+            function
+        } else {
+            match name {
+                Self::NATIVE_STORAGE_SAVE => {
+                    assert_eq!(
+                        1,
+                        generics.len(),
+                        "there was an error linking {function_name} expected 1 type parameter, found {}",
+                        generics.len(),
+                    );
+
+                    let struct_ = match generics.first() {
+                        Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
+                            .get_user_data_type_by_index(module_id, *index)
+                            .unwrap(),
+                        Some(_) => todo!(),
+                        None => todo!(),
+                    };
+                    storage::add_storage_save_fn(function_name, module, compilation_ctx, struct_)
+                }
+                Self::NATIVE_READ_SLOT => {
+                    assert_eq!(
+                        1,
+                        generics.len(),
+                        "there was an error linking {function_name} expected 1 type parameter, found {}",
+                        generics.len(),
+                    );
+
+                    let struct_ = match generics.first() {
+                        Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
+                            .get_user_data_type_by_index(module_id, *index)
+                            .unwrap(),
+                        Some(_) => todo!(),
+                        None => todo!(),
+                    };
+
+                    println!("{generics:?}");
+                    println!("{function_name:?}");
+                    storage::add_read_slot_fn(function_name, module, compilation_ctx, struct_)
+                }
+                _ => panic!("generic native function {name} not supported yet"),
             }
         }
     }

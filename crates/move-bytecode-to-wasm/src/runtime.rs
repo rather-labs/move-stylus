@@ -1,6 +1,9 @@
 use walrus::{FunctionId, Module};
 
-use crate::CompilationContext;
+use crate::{
+    CompilationContext,
+    translation::intermediate_types::heap_integers::{IU128, IU256},
+};
 
 mod copy;
 mod equality;
@@ -32,6 +35,8 @@ pub enum RuntimeFunction {
     // Swap bytes
     SwapI32Bytes,
     SwapI64Bytes,
+    SwapI128Bytes,
+    SwapI256Bytes,
     // Copy
     CopyU128,
     CopyU256,
@@ -47,6 +52,7 @@ pub enum RuntimeFunction {
     VecIncrementLen,
     VecDecrementLen,
     // Storage
+    StorageNextSlot,
     DeriveMappingSlot,
     DeriveDynArraySlot,
 }
@@ -76,6 +82,8 @@ impl RuntimeFunction {
             // Swap bytes
             Self::SwapI32Bytes => "swap_i32_bytes",
             Self::SwapI64Bytes => "swap_i64_bytes",
+            Self::SwapI128Bytes => "swap_i128_bytes",
+            Self::SwapI256Bytes => "swap_i256_bytes",
             // Copy
             Self::CopyU128 => "copy_u128",
             Self::CopyU256 => "copy_u256",
@@ -91,6 +99,7 @@ impl RuntimeFunction {
             Self::VecIncrementLen => "vec_increment_len",
             Self::VecDecrementLen => "vec_decrement_len",
             // Storage
+            Self::StorageNextSlot => "storage_next_slot",
             Self::DeriveMappingSlot => "derive_mapping_slot",
             Self::DeriveDynArraySlot => "derive_dyn_array_slot",
         }
@@ -137,6 +146,16 @@ impl RuntimeFunction {
                     let swap_i32_f = Self::SwapI32Bytes.get(module, compilation_ctx);
                     swap::swap_i64_bytes_function(module, swap_i32_f)
                 }
+                (Self::SwapI128Bytes, Some(ctx)) => swap::swap_bytes_function::<2>(
+                    module,
+                    ctx,
+                    Self::SwapI128Bytes.name().to_owned(),
+                ),
+                (Self::SwapI256Bytes, Some(ctx)) => swap::swap_bytes_function::<4>(
+                    module,
+                    ctx,
+                    Self::SwapI256Bytes.name().to_owned(),
+                ),
                 // Bitwise
                 (Self::HeapIntShiftLeft, Some(ctx)) => {
                     integers::bitwise::heap_int_shift_left(module, ctx)
@@ -145,8 +164,20 @@ impl RuntimeFunction {
                     integers::bitwise::heap_int_shift_right(module, ctx)
                 }
                 // Copy
-                (Self::CopyU128, Some(ctx)) => copy::copy_u128_function(module, ctx),
-                (Self::CopyU256, Some(ctx)) => copy::copy_u256_function(module, ctx),
+                (Self::CopyU128, Some(ctx)) => {
+                    copy::copy_heap_int_function::<{ IU128::HEAP_SIZE }>(
+                        module,
+                        ctx,
+                        Self::CopyU128.name().to_owned(),
+                    )
+                }
+                (Self::CopyU256, Some(ctx)) => {
+                    copy::copy_heap_int_function::<{ IU256::HEAP_SIZE }>(
+                        module,
+                        ctx,
+                        Self::CopyU256.name().to_owned(),
+                    )
+                }
                 // Equality
                 (Self::HeapTypeEquality, Some(ctx)) => equality::a_equals_b(module, ctx),
                 (Self::VecEqualityHeapType, Some(ctx)) => {
@@ -165,6 +196,9 @@ impl RuntimeFunction {
                     vector::decrement_vec_len_function(module, ctx)
                 }
                 // Storage
+                (Self::StorageNextSlot, Some(ctx)) => {
+                    storage::storage_next_slot_function(module, ctx)
+                }
                 (Self::DeriveMappingSlot, Some(ctx)) => storage::derive_mapping_slot(module, ctx),
                 (Self::DeriveDynArraySlot, Some(ctx)) => {
                     storage::derive_dyn_array_slot(module, ctx)
