@@ -308,7 +308,7 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
+        // arguments for heap_integers_sub (n1_ptr, n2_ptr, where to store the result and size in heap)
         func_body
             .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE)
@@ -322,8 +322,6 @@ mod tests {
 
         let function = function_builder.finish(vec![n1_ptr, n2_ptr], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
-
-        // display_module(&mut raw_module);
 
         let data = [n1.to_le_bytes(), n2.to_le_bytes()].concat();
         let (_, instance, mut store, entrypoint) =
@@ -429,7 +427,7 @@ mod tests {
 
         let mut func_body = function_builder.func_body();
 
-        // arguments for heap_integers_add (n1_ptr, n2_ptr and size in heap)
+        // arguments for heap_integers_sub (n1_ptr, n2_ptr, where to store the result and size in heap)
         func_body
             .i32_const(0)
             .i32_const(TYPE_HEAP_SIZE)
