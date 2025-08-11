@@ -7,9 +7,8 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    hostio::{
-        host_functions::{storage_cache_bytes32, storage_flush_cache},
-    },
+    data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_U256_ONE_OFFSET},
+    hostio::host_functions::{storage_cache_bytes32, storage_flush_cache},
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
@@ -26,14 +25,10 @@ pub fn store(
     let (storage_cache, _) = storage_cache_bytes32(module);
     let (storage_flush_cache, _) = storage_flush_cache(module);
 
-    let slot_data_ptr = module.locals.add(ValType::I32);
-    let u256_one = module.locals.add(ValType::I32);
     let val_32 = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
 
     let offset = module.locals.add(ValType::I32);
-
-    let mut allocated_u256_one = false;
 
     builder.i32_const(0).local_set(offset);
 
@@ -44,13 +39,6 @@ pub fn store(
         .local_get(slot_ptr)
         .call(swap_256_fn);
 
-    // This just contains the number one to add it to the slot when data occupies more than 32
-    // bytes
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_set(slot_data_ptr);
-
     let mut written_bytes_in_slot = 0;
     for (index, field) in struct_.fields.iter().enumerate() {
         let field_size = field_size(field);
@@ -58,32 +46,12 @@ pub fn store(
             // Save previous slot (maybe not needed...)
             builder
                 .local_get(slot_ptr)
-                .local_get(slot_data_ptr)
+                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
                 .call(storage_cache);
-
-            // TODO we could have this in data
-            if !allocated_u256_one {
-                // Allocate 32 bytes to save the current slot data
-                builder
-                    .i32_const(32)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(u256_one);
-
-                builder.i32_const(1).store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-
-                allocated_u256_one = true;
-            }
 
             // Wipe the data so we can fill it with new data
             builder
-                .local_get(slot_data_ptr)
+                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
                 .i32_const(0)
                 .i32_const(32)
                 .memory_fill(compilation_ctx.memory_id);
@@ -98,7 +66,7 @@ pub fn store(
             let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
             builder
                 .local_get(slot_ptr)
-                .local_get(u256_one)
+                .i32_const(DATA_U256_ONE_OFFSET)
                 .i32_const(32)
                 .call(add_u256_fn)
                 .local_set(slot_ptr);
@@ -190,21 +158,24 @@ pub fn store(
                 };
 
                 // Save the value in slot data
-                builder.local_get(slot_data_ptr).local_get(val).store(
-                    compilation_ctx.memory_id,
-                    store_kind,
-                    MemArg {
-                        align: 0,
-                        offset: 32 - written_bytes_in_slot,
-                    },
-                );
+                builder
+                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                    .local_get(val)
+                    .store(
+                        compilation_ctx.memory_id,
+                        store_kind,
+                        MemArg {
+                            align: 0,
+                            offset: 32 - written_bytes_in_slot,
+                        },
+                    );
             }
             IntermediateType::IU128 => {
                 let swap_fn = RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx));
 
                 // Slot data plus offset as dest ptr
                 builder
-                    .local_get(slot_data_ptr)
+                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
                     .local_get(offset)
                     .binop(BinaryOp::I32Add);
 
@@ -214,7 +185,7 @@ pub fn store(
             IntermediateType::IU256 | IntermediateType::IAddress | IntermediateType::ISigner => {
                 // Slot data plus offset as dest ptr (offset should be zero because data is already
                 // 32 bytes in size)
-                builder.local_get(slot_data_ptr);
+                builder.i32_const(DATA_SLOT_DATA_PTR_OFFSET);
 
                 // Transform to BE
                 builder.call(swap_256_fn);
@@ -225,7 +196,7 @@ pub fn store(
 
     builder
         .local_get(slot_ptr)
-        .local_get(slot_data_ptr)
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .call(storage_cache);
 
     builder.i32_const(1).call(storage_flush_cache);

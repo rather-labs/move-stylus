@@ -19,6 +19,7 @@ use wasm_validation::validate_stylus_wasm;
 pub(crate) mod abi_types;
 mod compilation_context;
 mod constructor;
+mod data;
 mod hostio;
 mod memory;
 mod native_functions;

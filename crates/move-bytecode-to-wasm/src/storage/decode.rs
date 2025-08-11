@@ -7,9 +7,8 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    hostio::{
-        host_functions::storage_load_bytes32,
-    },
+    data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_U256_ONE_OFFSET},
+    hostio::host_functions::storage_load_bytes32,
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, heap_integers::IU128, structs::IStruct},
 };
@@ -25,17 +24,11 @@ pub fn add_decode_storage_struct_instructions(
     let (storage_load, _) = storage_load_bytes32(module);
 
     let struct_ptr = module.locals.add(ValType::I32);
-    let slot_data_ptr = module.locals.add(ValType::I32);
 
     // Locals
     let field_ptr = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
     let val_32 = module.locals.add(ValType::I32);
-    let u256_one = module.locals.add(ValType::I32);
-
-    // let offset = module.locals.add(ValType::I32);
-
-    let mut allocated_u256_one = false;
 
     // Allocate space for the struct
     builder
@@ -43,42 +36,16 @@ pub fn add_decode_storage_struct_instructions(
         .call(compilation_ctx.allocator)
         .local_set(struct_ptr);
 
-    // Allocate space for reading the slot
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_set(slot_data_ptr);
-
     // Load data from slot
     builder
         .local_get(slot_ptr)
-        .local_get(slot_data_ptr)
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .call(storage_load);
 
     let mut read_bytes_in_slot = 0;
     for (index, field) in struct_.fields.iter().enumerate() {
         let field_size = field_size(field);
         if read_bytes_in_slot + field_size > 32 {
-            // TODO we could have this in data
-            if !allocated_u256_one {
-                // Allocate 32 bytes to save the current slot data
-                builder
-                    .i32_const(32)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(u256_one);
-
-                builder.i32_const(1).store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-
-                allocated_u256_one = true;
-            }
-
             let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
 
             // BE to LE ptr so we can make the addition
@@ -91,7 +58,7 @@ pub fn add_decode_storage_struct_instructions(
             let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
             builder
                 .local_get(slot_ptr)
-                .local_get(u256_one)
+                .i32_const(DATA_U256_ONE_OFFSET)
                 .i32_const(32)
                 .call(add_u256_fn)
                 .local_set(slot_ptr);
@@ -105,7 +72,7 @@ pub fn add_decode_storage_struct_instructions(
             // Load the slot data
             builder
                 .local_get(slot_ptr)
-                .local_get(slot_data_ptr)
+                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
                 .call(storage_load);
 
             read_bytes_in_slot = field_size;
@@ -149,7 +116,7 @@ pub fn add_decode_storage_struct_instructions(
 
                 // Read the value and transform it to LE
                 builder
-                    .local_get(slot_data_ptr)
+                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
                     .load(
                         compilation_ctx.memory_id,
                         load_kind,
@@ -197,7 +164,7 @@ pub fn add_decode_storage_struct_instructions(
 
                 // Source address (plus offset)
                 builder
-                    .local_get(slot_data_ptr)
+                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
                     .i32_const(32 - read_bytes_in_slot as i32)
                     .binop(BinaryOp::I32Add);
 
@@ -223,7 +190,7 @@ pub fn add_decode_storage_struct_instructions(
                     .local_tee(field_ptr);
 
                 // Source address (plus offset)
-                builder.local_get(slot_data_ptr);
+                builder.i32_const(DATA_SLOT_DATA_PTR_OFFSET);
 
                 // Number of bytes to copy
                 builder.i32_const(32);
