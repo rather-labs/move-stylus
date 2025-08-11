@@ -13,10 +13,7 @@ use std::{
 
 use walrus::{FunctionId, Module};
 
-use crate::{
-    CompilationContext, hostio,
-    translation::intermediate_types::{IType, IntermediateType},
-};
+use crate::{CompilationContext, hostio, translation::intermediate_types::IntermediateType};
 
 pub struct NativeFunction;
 

@@ -1,11 +1,6 @@
-use super::IType;
-
-#[derive(Hash)]
 pub struct ISigner;
 
 impl ISigner {
     /// Memory occupied by the `signer` type in the heap (in bytes).
     pub const HEAP_SIZE: i32 = 32;
 }
-
-impl IType for ISigner {}

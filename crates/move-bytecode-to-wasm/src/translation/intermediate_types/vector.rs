@@ -7,12 +7,10 @@ use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, compilation_context::ModuleData};
 
-use super::{IType, IntermediateType};
+use super::IntermediateType;
 
-#[derive(Clone, Hash)]
+#[derive(Clone)]
 pub struct IVector;
-
-impl IType for IVector {}
 
 impl IVector {
     // Allocates memory for a vector with a header of 8 bytes.

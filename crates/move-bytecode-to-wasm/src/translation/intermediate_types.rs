@@ -81,9 +81,6 @@ pub enum IntermediateType {
     },
 }
 
-/// Marker trait used to recognize intermediate representations of types
-pub trait IType: Hash {}
-
 impl IntermediateType {
     /// Returns the size in bytes, that this type needs in memory to be stored
     pub fn stack_data_size(&self) -> u32 {
