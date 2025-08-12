@@ -6,6 +6,7 @@ use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 use crate::{
     CompilationContext,
     compilation_context::ExternalModuleData,
+    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     hostio::host_functions::tx_origin,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
@@ -181,18 +182,11 @@ impl Unpackable for IntermediateType {
                     .unwrap();
 
                 if struct_.saved_in_storage {
-                    // Generate the unpack from storage function name for the specific struct we
-                    // are looking for in the storage
-                    let mut hasher = DefaultHasher::new();
-                    self.hash(&mut hasher);
-                    let function_name = format!("unpack_from_storage_{:x}", hasher.finish());
-
-                    let unpack_from_storage =
-                        unpack_from_storage(module, compilation_ctx, &struct_, function_name);
+                    let write_object_slot_fn =
+                        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
 
                     let uid_ptr = module.locals.add(ValType::I32);
                     let owner_ptr = module.locals.add(ValType::I32);
-                    let slot_ptr = module.locals.add(ValType::I32);
                     // First we add the instructions to unpack the uid. This will leave the pointer
                     // ready for the unpack from storage function
                     IAddress::add_unpack_instructions(
@@ -218,13 +212,7 @@ impl Unpackable for IntermediateType {
 
                     function_builder.local_get(uid_ptr);
 
-                    // Save space to for the derive slot ptr
-                    function_builder
-                        .i32_const(32)
-                        .call(compilation_ctx.allocator)
-                        .local_tee(slot_ptr);
-
-                    function_builder.call(unpack_from_storage);
+                    function_builder.call(write_object_slot_fn);
 
                     let read_slot_fn = NativeFunction::get_generic(
                         "read_slot",
@@ -233,7 +221,9 @@ impl Unpackable for IntermediateType {
                         &[self.clone()],
                     );
 
-                    function_builder.local_get(slot_ptr).call(read_slot_fn);
+                    function_builder
+                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                        .call(read_slot_fn);
                 } else {
                     // TODO: Check if the struct is TxContext. If it is, panic since the only valid
                     // TxContext is the one defined in the stylus framework.

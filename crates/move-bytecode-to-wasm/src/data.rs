@@ -14,12 +14,15 @@ pub const DATA_SLOT_DATA_PTR_OFFSET: i32 = 32;
 /// Slot 0 of the storage used for the objects mapping
 pub const DATA_OBJECTS_SLOT_OFFSET: i32 = 64;
 
+/// When calculating slots numbers, we save them here
+pub const DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET: i32 = 96;
+
 /// Amount of memory reserved starting from offset 0.
 ///
 /// # WARNING
 /// This value must be kept in sync to correctly initialize the memory allocator
 /// at the proper offset.
-pub const TOTAL_RESERVED_MEMORY: i32 = 96;
+pub const TOTAL_RESERVED_MEMORY: i32 = 128;
 
 /// Initializes the module's data segment.
 pub fn setup_data_segment(module: &mut Module, memory_id: MemoryId) {
