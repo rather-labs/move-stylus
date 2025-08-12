@@ -1,11 +1,27 @@
 use super::RuntimeFunction;
 use crate::hostio::host_functions;
 use crate::translation::intermediate_types::heap_integers::IU256;
+use crate::translation::intermediate_types::structs::IStruct;
 use crate::{CompilationContext, data::DATA_U256_ONE_OFFSET};
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
+
+pub fn unpack_from_storage(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    struct_: &IStruct,
+    name: String,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut builder = function.name(name).func_body();
+
+    let uid_ptr = module.locals.add(ValType::I32);
+    let struct_ptr = module.locals.add(ValType::I32);
+
+    function.finish(vec![uid_ptr], &mut module.funcs)
+}
 
 pub fn storage_next_slot_function(
     module: &mut Module,

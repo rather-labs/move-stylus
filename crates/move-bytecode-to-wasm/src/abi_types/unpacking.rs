@@ -1,8 +1,12 @@
+use std::hash::{DefaultHasher, Hash, Hasher};
+
+use unpack_storage::unpack_from_storage;
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
     CompilationContext,
     compilation_context::ExternalModuleData,
+    runtime::RuntimeFunction,
     translation::intermediate_types::{
         IntermediateType,
         address::IAddress,
@@ -21,6 +25,7 @@ mod unpack_enum;
 mod unpack_heap_int;
 mod unpack_native_int;
 mod unpack_reference;
+mod unpack_storage;
 mod unpack_struct;
 mod unpack_vector;
 
@@ -173,16 +178,37 @@ impl Unpackable for IntermediateType {
                     .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
 
-                // TODO: Check if the struct is TxContext. If it is, panic since the only valid
-                // TxContext is the one defined in the stylus framework.
+                if struct_.saved_in_storage {
+                    // First we add the instructions to unpack the uid. This will leave the pointer
+                    // ready for the unpack from storage function
+                    IAddress::add_unpack_instructions(
+                        function_builder,
+                        module,
+                        reader_pointer,
+                        calldata_reader_pointer,
+                        compilation_ctx,
+                    );
 
-                struct_.add_unpack_instructions(
-                    function_builder,
-                    module,
-                    reader_pointer,
-                    calldata_reader_pointer,
-                    compilation_ctx,
-                );
+                    // Generate the unpack from storage function name for the specific struct we
+                    // are looking for in the storage
+                    let mut hasher = DefaultHasher::new();
+                    self.hash(&mut hasher);
+                    let function_name = format!("unpack_from_storage_{:x}", hasher.finish());
+
+                    let unpack_from_storage =
+                        unpack_from_storage(module, compilation_ctx, &struct_, function_name);
+                } else {
+                    // TODO: Check if the struct is TxContext. If it is, panic since the only valid
+                    // TxContext is the one defined in the stylus framework.
+
+                    struct_.add_unpack_instructions(
+                        function_builder,
+                        module,
+                        reader_pointer,
+                        calldata_reader_pointer,
+                        compilation_ctx,
+                    );
+                }
             }
             IntermediateType::IGenericStructInstance {
                 module_id,

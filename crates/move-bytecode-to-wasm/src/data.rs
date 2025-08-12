@@ -11,12 +11,15 @@ pub const DATA_U256_ONE_OFFSET: i32 = 0;
 /// because it is not needed, we just set the offset to mark it as reseverd space.
 pub const DATA_SLOT_DATA_PTR_OFFSET: i32 = 32;
 
+/// Slot 0 of the storage used for the objects mapping
+pub const DATA_OBJECTS_SLOT_OFFSET: i32 = 64;
+
 /// Amount of memory reserved starting from offset 0.
 ///
 /// # WARNING
 /// This value must be kept in sync to correctly initialize the memory allocator
 /// at the proper offset.
-pub const TOTAL_RESERVED_MEMORY: i32 = 64;
+pub const TOTAL_RESERVED_MEMORY: i32 = 96;
 
 /// Initializes the module's data segment.
 pub fn setup_data_segment(module: &mut Module, memory_id: MemoryId) {
