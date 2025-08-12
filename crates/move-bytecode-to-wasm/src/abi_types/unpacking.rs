@@ -6,6 +6,8 @@ use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 use crate::{
     CompilationContext,
     compilation_context::ExternalModuleData,
+    hostio::host_functions::tx_origin,
+    native_functions::NativeFunction,
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         IntermediateType,
@@ -179,6 +181,18 @@ impl Unpackable for IntermediateType {
                     .unwrap();
 
                 if struct_.saved_in_storage {
+                    // Generate the unpack from storage function name for the specific struct we
+                    // are looking for in the storage
+                    let mut hasher = DefaultHasher::new();
+                    self.hash(&mut hasher);
+                    let function_name = format!("unpack_from_storage_{:x}", hasher.finish());
+
+                    let unpack_from_storage =
+                        unpack_from_storage(module, compilation_ctx, &struct_, function_name);
+
+                    let uid_ptr = module.locals.add(ValType::I32);
+                    let owner_ptr = module.locals.add(ValType::I32);
+                    let slot_ptr = module.locals.add(ValType::I32);
                     // First we add the instructions to unpack the uid. This will leave the pointer
                     // ready for the unpack from storage function
                     IAddress::add_unpack_instructions(
@@ -189,14 +203,37 @@ impl Unpackable for IntermediateType {
                         compilation_ctx,
                     );
 
-                    // Generate the unpack from storage function name for the specific struct we
-                    // are looking for in the storage
-                    let mut hasher = DefaultHasher::new();
-                    self.hash(&mut hasher);
-                    let function_name = format!("unpack_from_storage_{:x}", hasher.finish());
+                    function_builder.local_set(uid_ptr);
 
-                    let unpack_from_storage =
-                        unpack_from_storage(module, compilation_ctx, &struct_, function_name);
+                    // First we check the tx signer
+                    // This would be the owner
+                    let (tx_origin, _) = tx_origin(module);
+
+                    function_builder
+                        .i32_const(32)
+                        .call(compilation_ctx.allocator)
+                        .local_tee(owner_ptr)
+                        .call(tx_origin)
+                        .local_get(owner_ptr);
+
+                    function_builder.local_get(uid_ptr);
+
+                    // Save space to for the derive slot ptr
+                    function_builder
+                        .i32_const(32)
+                        .call(compilation_ctx.allocator)
+                        .local_tee(slot_ptr);
+
+                    function_builder.call(unpack_from_storage);
+
+                    let read_slot_fn = NativeFunction::get_generic(
+                        "read_slot",
+                        module,
+                        compilation_ctx,
+                        &[self.clone()],
+                    );
+
+                    function_builder.local_get(slot_ptr).call(read_slot_fn);
                 } else {
                     // TODO: Check if the struct is TxContext. If it is, panic since the only valid
                     // TxContext is the one defined in the stylus framework.
