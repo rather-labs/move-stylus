@@ -21,9 +21,20 @@ public fun create(ctx: &mut TxContext) {
     value: 0xFFFFFFFF
   };
 
-  storage::save_in_slot(new_counter, 0);
 
-  // transfer::share_object(new_counter)
+  transfer::share_object(new_counter);
+
+  /*
+   let new_counter2 = Counter {
+    // id: object::new(ctx),
+    id: @0x1234,
+    owner: ctx.sender(),
+    value: 0xFFFFFFFF
+  };
+
+
+  storage::save_in_slot(new_counter2, 20);
+  */
 }
 
 /// Increment a counter by 1.

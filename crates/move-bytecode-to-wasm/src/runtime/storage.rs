@@ -1,6 +1,6 @@
 use super::RuntimeFunction;
 use crate::data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_OBJECTS_SLOT_OFFSET};
-use crate::hostio::host_functions;
+use crate::hostio::host_functions::{self, emit_log};
 use crate::translation::intermediate_types::heap_integers::IU256;
 use crate::translation::intermediate_types::structs::IStruct;
 use crate::{CompilationContext, data::DATA_U256_ONE_OFFSET};
@@ -22,6 +22,36 @@ pub fn unpack_from_storage(
     let struct_ptr = module.locals.add(ValType::I32);
 
     function.finish(vec![uid_ptr], &mut module.funcs)
+}
+
+/// Calculates the slot from the slot mapping
+pub fn write_object_slot(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::WriteObjectSlot.name().to_owned())
+        .func_body();
+
+    let uid_ptr = module.locals.add(ValType::I32);
+    let owner_ptr = module.locals.add(ValType::I32);
+
+    // Calculate the slot address
+    let derive_slot_fn = RuntimeFunction::DeriveMappingSlot.get(module, Some(compilation_ctx));
+
+    // Derive the slot for the first mapping
+    builder
+        .i32_const(DATA_OBJECTS_SLOT_OFFSET)
+        .local_get(owner_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(derive_slot_fn);
+
+    // Derive slot for ther second mapping
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .local_get(uid_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(derive_slot_fn);
+
+    function.finish(vec![owner_ptr, uid_ptr], &mut module.funcs)
 }
 
 pub fn storage_next_slot_function(
@@ -57,6 +87,14 @@ pub fn storage_next_slot_function(
         .local_get(slot_ptr)
         .local_get(slot_ptr)
         .call(swap_256_fn);
+
+    let (emit_log_fn, _) = emit_log(module);
+
+    builder
+        .local_get(slot_ptr)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_fn);
 
     function.finish(vec![slot_ptr], &mut module.funcs)
 }
@@ -772,34 +810,4 @@ mod tests {
 
         assert_eq!(result, expected);
     }
-}
-
-/// Calculates the slot from the slot mapping
-pub fn write_object_slot(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
-    let mut builder = function
-        .name(RuntimeFunction::WriteObjectSlot.name().to_owned())
-        .func_body();
-
-    let uid_ptr = module.locals.add(ValType::I32);
-    let owner_ptr = module.locals.add(ValType::I32);
-
-    // Calculate the slot address
-    let derive_slot_fn = RuntimeFunction::DeriveMappingSlot.get(module, Some(compilation_ctx));
-
-    // Derive the slot for the first mapping
-    builder
-        .i32_const(DATA_OBJECTS_SLOT_OFFSET)
-        .local_get(owner_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .call(derive_slot_fn);
-
-    // Derive slot for ther second mapping
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .local_get(uid_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .call(derive_slot_fn);
-
-    function.finish(vec![owner_ptr, uid_ptr], &mut module.funcs)
 }

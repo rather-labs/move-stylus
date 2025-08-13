@@ -115,20 +115,27 @@ pub fn add_share_object_fn(
         .i32_const(0)
         .call(emit_log_fn);
 
-    builder
-        .local_get(tmp)
-        .i32_const(32)
-        .i32_const(1)
-        .call(emit_log_fn);
-
     // Call storage save for the struct
     let storage_save_name = format!("{}_{hash}", NativeFunction::NATIVE_STORAGE_SAVE);
     let storage_save_fn = add_storage_save_fn(hash, module, compilation_ctx, struct_);
 
+    /*
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(0)
+        .i32_const(32)
+        .memory_fill(compilation_ctx.memory_id);
+
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_fn);
+    */
+
     builder
         .local_get(struct_ptr)
-        //.i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(0)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
         .call(storage_save_fn);
 
     function.finish(vec![struct_ptr], &mut module.funcs)
