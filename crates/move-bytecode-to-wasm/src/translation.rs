@@ -1123,7 +1123,17 @@ fn translate_instruction(
                                                 offset: 0,
                                             },
                                         )
+                                        .load(
+                                            compilation_ctx.memory_id,
+                                            LoadKind::I32 { atomic: false },
+                                            MemArg {
+                                                align: 0,
+                                                offset: 0,
+                                            },
+                                        )
                                         .local_tee(tmp);
+
+                                    builder.call(write_object_slot_fn);
 
                                     builder
                                         .local_get(tmp)
@@ -1131,27 +1141,23 @@ fn translate_instruction(
                                         .i32_const(0)
                                         .call(emit_log_fn);
 
-                                    builder.call(write_object_slot_fn);
-
                                     builder
                                         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                                         .i32_const(32)
                                         .i32_const(0)
                                         .call(emit_log_fn);
-                                    /*
 
-                                                                        let save_in_slot_fn = NativeFunction::get_generic(
-                                                                            "save_in_slot",
-                                                                            module,
-                                                                            compilation_ctx,
-                                                                            &[*inner.clone()],
-                                                                        );
+                                    let save_in_slot_fn = NativeFunction::get_generic(
+                                        "save_in_slot",
+                                        module,
+                                        compilation_ctx,
+                                        &[*inner.clone()],
+                                    );
 
-                                                                        builder
-                                                                            .local_get(struct_local)
-                                                                            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                                                                            .call(save_in_slot_fn);
-                                    */
+                                    builder
+                                        .local_get(struct_local)
+                                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                                        .call(save_in_slot_fn);
                                     println!("MUST PERSIST IN STORAGE");
                                 }
                             }
