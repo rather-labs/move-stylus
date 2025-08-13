@@ -19,6 +19,7 @@ sol!(
     #[allow(missing_docs)]
     contract Example {
 
+        /*
         #[derive(Debug)]
         struct Bar {
             uint32 a;
@@ -94,6 +95,8 @@ sol!(
         function getUniqueIds() external view returns (UID, UID, UID);
         function getUniqueId() external view returns (UID);
         function getFreshObjectAddress() external view returns (address);
+        */
+        function create() public view;
     }
 );
 
@@ -116,6 +119,16 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
+    let pending_tx = example.create().send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("getUniqueIds - Emitted UID: 0x{}", hex::encode(raw));
+    }
+
+
+
+    /*
     // If the constructor is called, the storage value at init_key is should be different from 0
     let init_key = alloy::primitives::U256::from_be_bytes(keccak256(b"init_key").into());
     let init_value_le = storage_value_to_le(&provider, address, init_key).await?;
@@ -270,6 +283,7 @@ async fn main() -> eyre::Result<()> {
         "echoSignerWithInt - transaction log data: {:?}",
         receipt.logs().first().map(|l| l.data())
     );
+    */
 
     Ok(())
 }

@@ -24,8 +24,9 @@ impl NativeFunction {
     const NATIVE_CHAIN_ID: &str = "native_chain_id";
     const NATIVE_GAS_PRICE: &str = "native_gas_price";
     const NATIVE_FRESH_ID: &str = "fresh_id";
-    const NATIVE_STORAGE_SAVE: &str = "save_in_slot";
+    pub const NATIVE_STORAGE_SAVE: &str = "save_in_slot";
     const NATIVE_READ_SLOT: &str = "read_slot";
+    pub const NATIVE_STORAGE_SHARE_OBJECT: &str = "share_object";
 
     const HOST_BLOCK_NUMBER: &str = "block_number";
     const HOST_BLOCK_GAS_LIMIT: &str = "block_gas_limit";
@@ -97,7 +98,8 @@ impl NativeFunction {
         // Thid hash will uniquely identify this native fn
         let mut hasher = DefaultHasher::new();
         generics.iter().for_each(|t| t.hash(&mut hasher));
-        let function_name = format!("{name}_{:x}", hasher.finish());
+        let hash = format!("{:x}", hasher.finish());
+        let function_name = format!("{name}_{hash}");
 
         if let Some(function) = module.funcs.by_name(&function_name) {
             function
@@ -118,7 +120,7 @@ impl NativeFunction {
                         Some(_) => todo!(),
                         None => todo!(),
                     };
-                    storage::add_storage_save_fn(function_name, module, compilation_ctx, struct_)
+                    storage::add_storage_save_fn(hash, module, compilation_ctx, struct_)
                 }
                 Self::NATIVE_READ_SLOT => {
                     assert_eq!(
@@ -139,6 +141,27 @@ impl NativeFunction {
                     println!("{generics:?}");
                     println!("{function_name:?}");
                     storage::add_read_slot_fn(function_name, module, compilation_ctx, struct_)
+                }
+
+                Self::NATIVE_STORAGE_SHARE_OBJECT => {
+                    assert_eq!(
+                        1,
+                        generics.len(),
+                        "there was an error linking {function_name} expected 1 type parameter, found {}",
+                        generics.len(),
+                    );
+
+                    let struct_ = match generics.first() {
+                        Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
+                            .get_user_data_type_by_index(module_id, *index)
+                            .unwrap(),
+                        Some(_) => todo!(),
+                        None => todo!(),
+                    };
+
+                    println!("{generics:?}");
+                    println!("{function_name:?}");
+                    storage::add_share_object_fn(hash, module, compilation_ctx, struct_)
                 }
                 _ => panic!("generic native function {name} not supported yet"),
             }

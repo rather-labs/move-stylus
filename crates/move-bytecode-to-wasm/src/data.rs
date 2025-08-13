@@ -17,12 +17,16 @@ pub const DATA_OBJECTS_SLOT_OFFSET: i32 = 64;
 /// When calculating slots numbers, we save them here
 pub const DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET: i32 = 96;
 
+pub const DATA_SHARED_OBJECTS_KEY_OFFSET: i32 = 128;
+
+pub const DATA_FROZEN_OBJECTS_KEY_OFFSET: i32 = 160;
+
 /// Amount of memory reserved starting from offset 0.
 ///
 /// # WARNING
 /// This value must be kept in sync to correctly initialize the memory allocator
 /// at the proper offset.
-pub const TOTAL_RESERVED_MEMORY: i32 = 128;
+pub const TOTAL_RESERVED_MEMORY: i32 = 192;
 
 /// Initializes the module's data segment.
 pub fn setup_data_segment(module: &mut Module, memory_id: MemoryId) {
@@ -32,6 +36,24 @@ pub fn setup_data_segment(module: &mut Module, memory_id: MemoryId) {
         DataKind::Active {
             memory: memory_id,
             offset: ConstExpr::Value(Value::I32(DATA_U256_ONE_OFFSET)),
+        },
+        data,
+    );
+
+    let data = U256::from(1).to_be_bytes_vec();
+    module.data.add(
+        DataKind::Active {
+            memory: memory_id,
+            offset: ConstExpr::Value(Value::I32(DATA_SHARED_OBJECTS_KEY_OFFSET)),
+        },
+        data,
+    );
+
+    let data = U256::from(2).to_be_bytes_vec();
+    module.data.add(
+        DataKind::Active {
+            memory: memory_id,
+            offset: ConstExpr::Value(Value::I32(DATA_FROZEN_OBJECTS_KEY_OFFSET)),
         },
         data,
     );

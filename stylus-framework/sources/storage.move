@@ -16,3 +16,12 @@ public native fun save_in_slot<T>(obj: T, slot: u256);
 
 // TODO: remove public
 public native fun read_slot<T>(slot: u256): T;
+
+public native fun read_shared<T>(slot: UID): &T;
+
+public native fun read_shared_mut<T>(slot: UID): &mut T;
+
+public native fun read_owned<T>(owner: signer, id: UID): &T;
+
+public native fun read_owned_mut<T>(owner: signer, id: UID): &mut T;
+

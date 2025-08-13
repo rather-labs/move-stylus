@@ -18,3 +18,5 @@ public fun new(ctx: &mut TxContext): UID {
     }
 }
 
+
+public native fun compute_id(data: vector<u8>): UID;

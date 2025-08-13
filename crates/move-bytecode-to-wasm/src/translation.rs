@@ -1105,24 +1105,14 @@ fn translate_instruction(
 
                                     // The first field is its id, so we follow the pointer of the
                                     // first field
-                                    builder
-                                        .local_get(struct_local)
-                                        .load(
-                                            compilation_ctx.memory_id,
-                                            LoadKind::I32 { atomic: false },
-                                            MemArg {
-                                                align: 0,
-                                                offset: 0,
-                                            },
-                                        )
-                                        .load(
-                                            compilation_ctx.memory_id,
-                                            LoadKind::I32 { atomic: false },
-                                            MemArg {
-                                                align: 0,
-                                                offset: 0,
-                                            },
-                                        );
+                                    builder.local_get(struct_local).load(
+                                        compilation_ctx.memory_id,
+                                        LoadKind::I32 { atomic: false },
+                                        MemArg {
+                                            align: 0,
+                                            offset: 0,
+                                        },
+                                    );
 
                                     builder.call(write_object_slot_fn);
 

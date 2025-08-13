@@ -19,3 +19,5 @@ public fun transfer<T: key>(obj: T, recipient: address) {
 public(package) native fun transfer_impl<T: key>(obj: T, recipient: address);
 
 
+
+public native fun share_object<T: key>(obj: T);
