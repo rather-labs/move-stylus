@@ -1153,9 +1153,16 @@ fn translate_instruction(
                                         compilation_ctx,
                                         &[*inner.clone()],
                                     );
-
+                                    builder.local_get(struct_local).load(
+                                        compilation_ctx.memory_id,
+                                        LoadKind::I32 { atomic: false },
+                                        MemArg {
+                                            align: 0,
+                                            offset: 0,
+                                        },
+                                    );
                                     builder
-                                        .local_get(struct_local)
+                                        //.local_get(struct_local)
                                         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                                         .call(save_in_slot_fn);
                                     println!("MUST PERSIST IN STORAGE");
