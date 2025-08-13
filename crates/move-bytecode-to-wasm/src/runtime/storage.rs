@@ -1,11 +1,12 @@
 use super::RuntimeFunction;
 use crate::data::{
-    DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_OBJECTS_SLOT_OFFSET,
-    DATA_SHARED_OBJECTS_KEY_OFFSET,
+    DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
 };
-use crate::hostio::host_functions::{self, emit_log};
+use crate::hostio::host_functions::{self, emit_log, storage_load_bytes32, tx_origin};
 use crate::translation::intermediate_types::heap_integers::IU256;
 use crate::translation::intermediate_types::structs::IStruct;
+use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, data::DATA_U256_ONE_OFFSET};
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
@@ -41,31 +42,107 @@ pub fn locate_storage_data(
         .func_body();
 
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let eq_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+    let (tx_origin, _) = tx_origin(module);
+    let (storage_load, _) = storage_load_bytes32(module);
 
     // Arguments
     let uid_ptr = module.locals.add(ValType::I32);
 
+    // Locals
+    let signer_ptr = module.locals.add(ValType::I32);
+    let zero = module.locals.add(ValType::I32);
+
     builder
-        .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
-        .local_get(uid_ptr)
-        .call(write_object_slot_fn);
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_set(zero);
+
+    // First we check the tx signer
+
+    // TODO use a constant for the owner
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_tee(signer_ptr)
+        .call(tx_origin);
+
+    builder.block(None, |block| {
+        let exit_block = block.id();
+
+        // ==
+        // Signer's objects
+        // ==
+        block
+            .local_get(signer_ptr)
+            .local_get(uid_ptr)
+            .call(write_object_slot_fn);
+
+        // Load data from slot
+        block
+            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .call(storage_load);
+
+        // Check if it is empty (all zeroes)
+        block
+            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .local_get(zero)
+            .i32_const(32)
+            .call(eq_fn)
+            .negate()
+            .br_if(exit_block);
+
+        // ==
+        // Shared objects
+        // ==
+        block
+            .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
+            .local_get(uid_ptr)
+            .call(write_object_slot_fn);
+
+        // Load data from slot
+        block
+            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .call(storage_load);
+
+        // Check if it is empty (all zeroes)
+        block
+            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .local_get(zero)
+            .i32_const(32)
+            .call(eq_fn)
+            .negate()
+            .br_if(exit_block);
+
+        // Frozen objects
+        block
+            .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+            .local_get(uid_ptr)
+            .call(write_object_slot_fn);
+
+        // Load data from slot
+        block
+            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .call(storage_load);
+
+        // Check if it is empty (all zeroes)
+        block
+            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .local_get(zero)
+            .i32_const(32)
+            .call(eq_fn)
+            .negate()
+            .br_if(exit_block);
+
+        // If we get here means the object was not found
+        block.unreachable();
+    });
 
     function.finish(vec![uid_ptr], &mut module.funcs)
 }
-
-/*
-* First we check the tx signer
-                   // This would be the owner
-                   // let (tx_origin, _) = tx_origin(module);
-
-                   // TODO use a constant for the owner
-                   function_builder
-                       .i32_const(32)
-                       .call(compilation_ctx.allocator)
-                       .local_tee(owner_ptr)
-                       .call(tx_origin)
-                       .local_get(owner_ptr);
-                   */
 
 /// Calculates the slot from the slot mapping
 pub fn write_object_slot(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
