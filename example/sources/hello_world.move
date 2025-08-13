@@ -38,10 +38,9 @@ public fun create(ctx: &mut TxContext) {
 }
 
 /// Increment a counter by 1.
-/*
 public fun increment(counter: &mut Counter) {
     counter.value = counter.value + 1;
-}*/
+}
 
 /// Read counter.
 public fun read(counter: &Counter): u64 {
