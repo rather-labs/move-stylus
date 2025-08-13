@@ -1086,89 +1086,86 @@ fn translate_instruction(
                 for (arg_index, fn_arg) in mapped_function.signature.arguments.iter().enumerate() {
                     println!("AAAAAAAAAAAAAAAAA {fn_arg:?}");
                     match fn_arg {
-                        IntermediateType::IMutRef(inner) => match &**inner {
-                            IntermediateType::IStruct { module_id, index } => {
-                                let struct_ = compilation_ctx
-                                    .get_user_data_type_by_index(&module_id, *index)
-                                    .unwrap();
+                        IntermediateType::IMutRef(inner) => if let IntermediateType::IStruct { module_id, index } = &**inner {
+                            let struct_ = compilation_ctx
+                                .get_user_data_type_by_index(module_id, *index)
+                                .unwrap();
 
-                                if struct_.saved_in_storage {
-                                    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot
-                                        .get(module, Some(compilation_ctx));
+                            if struct_.saved_in_storage {
+                                let write_object_slot_fn = RuntimeFunction::WriteObjectSlot
+                                    .get(module, Some(compilation_ctx));
 
-                                    let tmp = module.locals.add(ValType::I32);
+                                let tmp = module.locals.add(ValType::I32);
 
-                                    let struct_local = function_locals[arg_index];
-                                    // Calculate where is the owner id pointer
-                                    /*
-                                    builder
-                                        .local_get(struct_local)
-                                        .i32_const(32)
-                                        .binop(BinaryOp::I32Sub);
-                                    */
-                                    let (emit_log_fn, _) =
-                                        crate::hostio::host_functions::emit_log(module);
+                                let struct_local = function_locals[arg_index];
+                                // Calculate where is the owner id pointer
+                                /*
+                                builder
+                                    .local_get(struct_local)
+                                    .i32_const(32)
+                                    .binop(BinaryOp::I32Sub);
+                                */
+                                let (emit_log_fn, _) =
+                                    crate::hostio::host_functions::emit_log(module);
 
-                                    builder.i32_const(crate::data::DATA_SHARED_OBJECTS_KEY_OFFSET);
+                                builder.i32_const(crate::data::DATA_SHARED_OBJECTS_KEY_OFFSET);
 
-                                    // The first field is its id, so we follow the pointer of the
-                                    // first field
-                                    builder
-                                        .local_get(struct_local)
-                                        .load(
-                                            compilation_ctx.memory_id,
-                                            LoadKind::I32 { atomic: false },
-                                            MemArg {
-                                                align: 0,
-                                                offset: 0,
-                                            },
-                                        )
-                                        .load(
-                                            compilation_ctx.memory_id,
-                                            LoadKind::I32 { atomic: false },
-                                            MemArg {
-                                                align: 0,
-                                                offset: 0,
-                                            },
-                                        )
-                                        .local_tee(tmp);
-
-                                    builder.call(write_object_slot_fn);
-
-                                    builder
-                                        .local_get(tmp)
-                                        .i32_const(32)
-                                        .i32_const(0)
-                                        .call(emit_log_fn);
-
-                                    builder
-                                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                                        .i32_const(32)
-                                        .i32_const(0)
-                                        .call(emit_log_fn);
-
-                                    let save_in_slot_fn = NativeFunction::get_generic(
-                                        "save_in_slot",
-                                        module,
-                                        compilation_ctx,
-                                        &[*inner.clone()],
-                                    );
-                                    builder.local_get(struct_local).load(
+                                // The first field is its id, so we follow the pointer of the
+                                // first field
+                                builder
+                                    .local_get(struct_local)
+                                    .load(
                                         compilation_ctx.memory_id,
                                         LoadKind::I32 { atomic: false },
                                         MemArg {
                                             align: 0,
                                             offset: 0,
                                         },
-                                    );
-                                    builder
-                                        //.local_get(struct_local)
-                                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                                        .call(save_in_slot_fn);
-                                    println!("MUST PERSIST IN STORAGE");
-                                }
+                                    )
+                                    .load(
+                                        compilation_ctx.memory_id,
+                                        LoadKind::I32 { atomic: false },
+                                        MemArg {
+                                            align: 0,
+                                            offset: 0,
+                                        },
+                                    )
+                                    .local_tee(tmp);
+
+                                builder.call(write_object_slot_fn);
+
+                                builder
+                                    .local_get(tmp)
+                                    .i32_const(32)
+                                    .i32_const(0)
+                                    .call(emit_log_fn);
+
+                                builder
+                                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                                    .i32_const(32)
+                                    .i32_const(0)
+                                    .call(emit_log_fn);
+
+                                let save_in_slot_fn = NativeFunction::get_generic(
+                                    "save_in_slot",
+                                    module,
+                                    compilation_ctx,
+                                    &[*inner.clone()],
+                                );
+                                builder.local_get(struct_local).load(
+                                    compilation_ctx.memory_id,
+                                    LoadKind::I32 { atomic: false },
+                                    MemArg {
+                                        align: 0,
+                                        offset: 0,
+                                    },
+                                );
+                                builder
+                                    //.local_get(struct_local)
+                                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                                    .call(save_in_slot_fn);
+                                println!("MUST PERSIST IN STORAGE");
                             }
-                            _ => (),
                         },
                         // TODO: other structs
                         _ => (),

@@ -17,7 +17,6 @@ use crate::{
         heap_integers::{IU128, IU256},
         structs::IStruct,
     },
-    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 /// Adds the instructions to encode and save into storage an specific struct.

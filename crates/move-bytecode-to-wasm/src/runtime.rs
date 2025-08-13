@@ -1,13 +1,8 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
-
 use walrus::{FunctionId, Module};
 
 use crate::{
     CompilationContext,
-    translation::intermediate_types::{
-        IntermediateType,
-        heap_integers::{IU128, IU256},
-    },
+    translation::intermediate_types::heap_integers::{IU128, IU256},
 };
 
 mod copy;

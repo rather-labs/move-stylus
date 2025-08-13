@@ -5,7 +5,6 @@ use crate::data::{
 };
 use crate::hostio::host_functions::{self, emit_log, storage_load_bytes32, tx_origin};
 use crate::translation::intermediate_types::heap_integers::IU256;
-use crate::translation::intermediate_types::structs::IStruct;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, data::DATA_U256_ONE_OFFSET};
 use walrus::{

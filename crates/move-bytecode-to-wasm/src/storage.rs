@@ -33,10 +33,10 @@ macro_rules! get_struct {
                     .unwrap();
 
                 match external_data {
-                    crate::compilation_context::ExternalModuleData::Struct(external_struct) => {
+                    $crate::compilation_context::ExternalModuleData::Struct(external_struct) => {
                         external_struct
                     }
-                    crate::compilation_context::ExternalModuleData::Enum(_) => {
+                    $crate::compilation_context::ExternalModuleData::Enum(_) => {
                         panic!("expected struct, found {:?}", $intermediate_type)
                     }
                 }

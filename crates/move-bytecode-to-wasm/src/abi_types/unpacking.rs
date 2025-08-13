@@ -1,13 +1,10 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
 
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
     CompilationContext,
     compilation_context::ExternalModuleData,
-    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET},
-    hostio::host_functions::tx_origin,
-    native_functions::NativeFunction,
+    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     runtime::RuntimeFunction,
     storage::read::add_read_struct_from_storage_fn,
     translation::intermediate_types::{
@@ -198,7 +195,7 @@ impl Unpackable for IntermediateType {
 
                     // Read the object
                     let read_slot_fn =
-                        add_read_struct_from_storage_fn(module, compilation_ctx, &self);
+                        add_read_struct_from_storage_fn(module, compilation_ctx, self);
 
                     function_builder
                         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
