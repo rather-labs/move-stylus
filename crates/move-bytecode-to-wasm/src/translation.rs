@@ -12,7 +12,8 @@ pub mod intermediate_types;
 pub mod table;
 
 use crate::{
-    CompilationContext, compilation_context::ModuleData, native_functions::NativeFunction,
+    CompilationContext, compilation_context::ModuleData,
+    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, native_functions::NativeFunction,
     runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension,
 };
 use anyhow::Result;
@@ -1077,6 +1078,77 @@ fn translate_instruction(
         }
         // TODO: ensure this is the last instruction in the move code
         Bytecode::Ret => {
+            // If the function is entry and received as an argument an struct that must be saved in
+            // storage, we must persist it in case it had some change.
+            //
+            // We expect that the owner address is just right before the pointer
+            if mapped_function.is_entry {
+                for (arg_index, fn_arg) in mapped_function.signature.arguments.iter().enumerate() {
+                    println!("AAAAAAAAAAAAAAAAA {fn_arg:?}");
+                    match fn_arg {
+                        IntermediateType::IMutRef(inner) => match &**inner {
+                            IntermediateType::IStruct { module_id, index } => {
+                                let struct_ = compilation_ctx
+                                    .get_user_data_type_by_index(&module_id, *index)
+                                    .unwrap();
+
+                                if struct_.saved_in_storage {
+                                    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot
+                                        .get(module, Some(compilation_ctx));
+
+                                    let struct_local = function_locals[arg_index];
+                                    // Calculate where is the owner id pointer
+                                    builder
+                                        .local_get(struct_local)
+                                        .i32_const(32)
+                                        .binop(BinaryOp::I32Sub);
+
+                                    // The first field is its id, so we follow the pointer of the
+                                    // first field
+                                    builder
+                                        .local_get(struct_local)
+                                        .load(
+                                            compilation_ctx.memory_id,
+                                            LoadKind::I32 { atomic: false },
+                                            MemArg {
+                                                align: 0,
+                                                offset: 0,
+                                            },
+                                        )
+                                        .load(
+                                            compilation_ctx.memory_id,
+                                            LoadKind::I32 { atomic: false },
+                                            MemArg {
+                                                align: 0,
+                                                offset: 0,
+                                            },
+                                        );
+
+                                    builder.call(write_object_slot_fn);
+
+                                    let save_in_slot_fn = NativeFunction::get_generic(
+                                        "save_in_slot",
+                                        module,
+                                        compilation_ctx,
+                                        &[*inner.clone()],
+                                    );
+
+                                    builder
+                                        .local_get(struct_local)
+                                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                                        .call(save_in_slot_fn);
+
+                                    println!("MUST PERSIST IN STORAGE");
+                                }
+                            }
+                            _ => (),
+                        },
+                        // TODO: other structs
+                        _ => (),
+                    }
+                }
+            }
+
             prepare_function_return(
                 module,
                 builder,

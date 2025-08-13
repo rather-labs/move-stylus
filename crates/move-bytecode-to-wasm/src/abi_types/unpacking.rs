@@ -203,6 +203,7 @@ impl Unpackable for IntermediateType {
                     // This would be the owner
                     let (tx_origin, _) = tx_origin(module);
 
+                    // TODO use a constant for the owner
                     function_builder
                         .i32_const(32)
                         .call(compilation_ctx.allocator)

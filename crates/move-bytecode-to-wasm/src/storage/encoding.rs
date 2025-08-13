@@ -13,6 +13,7 @@ use crate::{
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         IntermediateType,
+        address::IAddress,
         heap_integers::{IU128, IU256},
         structs::IStruct,
     },
@@ -186,10 +187,16 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                 // Transform to BE
                 builder.call(swap_256_fn);
             }
+            // TODO: Maybe we should save 160 bits (20 bytes) only
             IntermediateType::IAddress | IntermediateType::ISigner => {
                 // Slot data plus offset as dest ptr (offset should be zero because data is already
                 // 32 bytes in size)
-                builder.i32_const(DATA_SLOT_DATA_PTR_OFFSET);
+
+                builder
+                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                    .i32_const(IAddress::HEAP_SIZE);
+
+                builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
             }
             _ => todo!(),
         };
