@@ -18,7 +18,7 @@ public fun create(ctx: &mut TxContext) {
     // id: object::new(ctx),
     id: @0x1234,
     owner: ctx.sender(),
-    value: 0xFFFFFFFF
+    value: 25
   };
 
 
@@ -38,6 +38,12 @@ public fun create(ctx: &mut TxContext) {
 }
 
 /// Increment a counter by 1.
+/*
 public fun increment(counter: &mut Counter) {
     counter.value = counter.value + 1;
+}*/
+
+/// Read counter.
+public fun read(counter: &Counter): u64 {
+    counter.value
 }

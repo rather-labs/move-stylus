@@ -5,6 +5,7 @@
 //! but with Stylus, it is accessible just as a normal Solidity smart contract is via an ABI.
 
 use alloy::hex;
+use alloy::primitives::{U256, address};
 use alloy::primitives::{keccak256, utils::parse_ether};
 use alloy::providers::Provider;
 use alloy::signers::local::PrivateKeySigner;
@@ -97,6 +98,7 @@ sol!(
         function getFreshObjectAddress() external view returns (address);
         */
         function create() public view;
+        function read(address id) public view returns (uint64);
     }
 );
 
@@ -125,6 +127,11 @@ async fn main() -> eyre::Result<()> {
         let raw = log.data().data.0.clone();
         println!("getUniqueIds - Emitted UID: 0x{}", hex::encode(raw));
     }
+
+
+    // let res = example.read(U256::from(1234).to_le_bytes().into()).call().await?;
+    let res = example.read(address!("0x0000000000000000000000000000000000001234")).call().await?;
+    println!("counter = {}", res);
 
 
 

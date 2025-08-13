@@ -6,7 +6,7 @@ use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 use crate::{
     CompilationContext,
     compilation_context::ExternalModuleData,
-    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET},
     hostio::host_functions::tx_origin,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
@@ -187,6 +187,7 @@ impl Unpackable for IntermediateType {
 
                     let uid_ptr = module.locals.add(ValType::I32);
                     let owner_ptr = module.locals.add(ValType::I32);
+
                     // First we add the instructions to unpack the uid. This will leave the pointer
                     // ready for the unpack from storage function
                     IAddress::add_unpack_instructions(
@@ -199,21 +200,29 @@ impl Unpackable for IntermediateType {
 
                     function_builder.local_set(uid_ptr);
 
+                    println!("entering read from storage");
+
                     // First we check the tx signer
                     // This would be the owner
-                    let (tx_origin, _) = tx_origin(module);
+                    // let (tx_origin, _) = tx_origin(module);
 
                     // TODO use a constant for the owner
+                    /*
                     function_builder
                         .i32_const(32)
                         .call(compilation_ctx.allocator)
                         .local_tee(owner_ptr)
                         .call(tx_origin)
                         .local_get(owner_ptr);
+                    */
+
+                    function_builder.i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET);
 
                     function_builder.local_get(uid_ptr);
 
                     function_builder.call(write_object_slot_fn);
+
+                    function_builder.local_get(uid_ptr);
 
                     let read_slot_fn = NativeFunction::get_generic(
                         "read_slot",

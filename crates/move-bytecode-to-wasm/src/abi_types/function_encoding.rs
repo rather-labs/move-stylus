@@ -49,6 +49,7 @@ pub fn move_signature_to_abi_selector<T: SolName>(
 
     let function_name = snake_to_camel(function_name);
 
+    println!("{}({})", function_name, parameter_strings);
     selector(format!("{}({})", function_name, parameter_strings))
 }
 
@@ -77,7 +78,11 @@ impl SolName for IntermediateType {
                     .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
 
-                Self::struct_fields_sol_name(struct_, compilation_ctx)
+                if struct_.saved_in_storage {
+                    Some(sol_data::Address::SOL_NAME.to_string())
+                } else {
+                    Self::struct_fields_sol_name(struct_, compilation_ctx)
+                }
             }
             IntermediateType::IGenericStructInstance {
                 module_id,
@@ -89,7 +94,11 @@ impl SolName for IntermediateType {
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
 
-                Self::struct_fields_sol_name(&struct_instance, compilation_ctx)
+                if struct_instance.saved_in_storage {
+                    Some(sol_data::Address::SOL_NAME.to_string())
+                } else {
+                    Self::struct_fields_sol_name(&struct_instance, compilation_ctx)
+                }
             }
             IntermediateType::ISigner => None,
             IntermediateType::ITypeParameter(_) => None,
@@ -109,7 +118,11 @@ impl SolName for IntermediateType {
                         Some("".to_owned())
                     }
                     ExternalModuleData::Struct(istruct) => {
-                        Self::struct_fields_sol_name(istruct, compilation_ctx)
+                        if istruct.saved_in_storage {
+                            Some(sol_data::Address::SOL_NAME.to_string())
+                        } else {
+                            Self::struct_fields_sol_name(istruct, compilation_ctx)
+                        }
                     }
                     ExternalModuleData::Enum(_ienum) => todo!(),
                 }
