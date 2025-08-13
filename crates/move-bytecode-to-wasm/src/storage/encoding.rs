@@ -17,6 +17,7 @@ use crate::{
         heap_integers::{IU128, IU256},
         structs::IStruct,
     },
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 /// Adds the instructions to encode and save into storage an specific struct.
@@ -189,11 +190,15 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             }
             // TODO: Maybe we should save 160 bits (20 bytes) only
             IntermediateType::IAddress | IntermediateType::ISigner => {
-                // Slot data plus offset as dest ptr (offset should be zero because data is already
-                // 32 bytes in size)
+                // We need to swap values before copying because memory copy takes dest pointer
+                // first
+                let tmp = module.locals.add(ValType::I32);
+                // Load the memory address
 
                 builder
+                    .local_set(tmp)
                     .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                    .local_get(tmp)
                     .i32_const(IAddress::HEAP_SIZE);
 
                 builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
