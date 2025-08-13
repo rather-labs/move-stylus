@@ -9,6 +9,7 @@ use crate::{
     hostio::host_functions::tx_origin,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
+    storage::read::add_read_struct_from_storage_fn,
     translation::intermediate_types::{
         IntermediateType,
         address::IAddress,
@@ -27,7 +28,6 @@ mod unpack_enum;
 mod unpack_heap_int;
 mod unpack_native_int;
 mod unpack_reference;
-mod unpack_storage;
 mod unpack_struct;
 mod unpack_vector;
 
@@ -191,17 +191,14 @@ impl Unpackable for IntermediateType {
                         compilation_ctx,
                     );
 
+                    // Search for the object in the objects mappings
                     let locate_storage_data_fn =
                         RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
-
                     function_builder.call(locate_storage_data_fn);
 
-                    let read_slot_fn = NativeFunction::get_generic(
-                        "read_slot",
-                        module,
-                        compilation_ctx,
-                        &[self.clone()],
-                    );
+                    // Read the object
+                    let read_slot_fn =
+                        add_read_struct_from_storage_fn(module, compilation_ctx, &self);
 
                     function_builder
                         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)

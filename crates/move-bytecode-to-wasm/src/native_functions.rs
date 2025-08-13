@@ -25,7 +25,7 @@ impl NativeFunction {
     const NATIVE_GAS_PRICE: &str = "native_gas_price";
     const NATIVE_FRESH_ID: &str = "fresh_id";
     pub const NATIVE_STORAGE_SAVE: &str = "save_in_slot";
-    const NATIVE_READ_SLOT: &str = "read_slot";
+    // const NATIVE_READ_SLOT: &str = "read_slot";
     pub const NATIVE_STORAGE_SHARE_OBJECT: &str = "share_object";
 
     const HOST_BLOCK_NUMBER: &str = "block_number";
@@ -122,27 +122,6 @@ impl NativeFunction {
                     };
                     storage::add_storage_save_fn(hash, module, compilation_ctx, struct_)
                 }
-                Self::NATIVE_READ_SLOT => {
-                    assert_eq!(
-                        1,
-                        generics.len(),
-                        "there was an error linking {function_name} expected 1 type parameter, found {}",
-                        generics.len(),
-                    );
-
-                    let struct_ = match generics.first() {
-                        Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
-                            .get_user_data_type_by_index(module_id, *index)
-                            .unwrap(),
-                        Some(_) => todo!(),
-                        None => todo!(),
-                    };
-
-                    println!("{generics:?}");
-                    println!("{function_name:?}");
-                    storage::add_read_slot_fn(function_name, module, compilation_ctx, struct_)
-                }
-
                 Self::NATIVE_STORAGE_SHARE_OBJECT => {
                     assert_eq!(
                         1,
@@ -159,8 +138,6 @@ impl NativeFunction {
                         None => todo!(),
                     };
 
-                    println!("{generics:?}");
-                    println!("{function_name:?}");
                     storage::add_share_object_fn(hash, module, compilation_ctx, struct_)
                 }
                 _ => panic!("generic native function {name} not supported yet"),

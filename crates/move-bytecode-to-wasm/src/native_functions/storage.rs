@@ -43,31 +43,6 @@ pub fn add_storage_save_fn(
     function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs)
 }
 
-pub fn add_read_slot_fn(
-    name: String,
-    module: &mut Module,
-    compilation_ctx: &CompilationContext,
-    struct_: &IStruct,
-) -> FunctionId {
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
-
-    let slot_ptr = module.locals.add(ValType::I32);
-
-    let mut builder = function.name(name).func_body();
-
-    let struct_ptr = storage::encoding::add_read_and_decode_storage_struct_instructions(
-        module,
-        &mut builder,
-        compilation_ctx,
-        slot_ptr,
-        struct_,
-    );
-
-    builder.local_get(struct_ptr);
-
-    function.finish(vec![slot_ptr], &mut module.funcs)
-}
-
 pub fn add_share_object_fn(
     hash: String,
     module: &mut Module,
@@ -118,20 +93,6 @@ pub fn add_share_object_fn(
     // Call storage save for the struct
     let storage_save_name = format!("{}_{hash}", NativeFunction::NATIVE_STORAGE_SAVE);
     let storage_save_fn = add_storage_save_fn(hash, module, compilation_ctx, struct_);
-
-    /*
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(0)
-        .i32_const(32)
-        .memory_fill(compilation_ctx.memory_id);
-
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
-    */
 
     builder
         .local_get(struct_ptr)

@@ -48,14 +48,6 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 
     let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
 
-    /*
-    // Transform to BE the slot ptr
-    builder
-        .local_get(slot_ptr)
-        .local_get(slot_ptr)
-        .call(swap_256_fn);
-    */
-
     let mut written_bytes_in_slot = 0;
     for (index, field) in struct_.fields.iter().enumerate() {
         let field_size = field_size(field);
