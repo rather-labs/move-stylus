@@ -1,6 +1,5 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-use unpack_storage::unpack_from_storage;
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
@@ -182,12 +181,6 @@ impl Unpackable for IntermediateType {
                     .unwrap();
 
                 if struct_.saved_in_storage {
-                    let write_object_slot_fn =
-                        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-
-                    let uid_ptr = module.locals.add(ValType::I32);
-                    let owner_ptr = module.locals.add(ValType::I32);
-
                     // First we add the instructions to unpack the uid. This will leave the pointer
                     // ready for the unpack from storage function
                     IAddress::add_unpack_instructions(
@@ -198,31 +191,10 @@ impl Unpackable for IntermediateType {
                         compilation_ctx,
                     );
 
-                    function_builder.local_set(uid_ptr);
+                    let locate_storage_data_fn =
+                        RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
 
-                    println!("entering read from storage");
-
-                    // First we check the tx signer
-                    // This would be the owner
-                    // let (tx_origin, _) = tx_origin(module);
-
-                    // TODO use a constant for the owner
-                    /*
-                    function_builder
-                        .i32_const(32)
-                        .call(compilation_ctx.allocator)
-                        .local_tee(owner_ptr)
-                        .call(tx_origin)
-                        .local_get(owner_ptr);
-                    */
-
-                    function_builder.i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET);
-
-                    function_builder.local_get(uid_ptr);
-
-                    function_builder.call(write_object_slot_fn);
-
-                    function_builder.local_get(uid_ptr);
+                    function_builder.call(locate_storage_data_fn);
 
                     let read_slot_fn = NativeFunction::get_generic(
                         "read_slot",
