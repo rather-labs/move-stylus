@@ -8,7 +8,7 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    data::DATA_SLOT_DATA_PTR_OFFSET,
+    data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_STORAGE_OBJECT_OWNER_OFFSET},
     hostio::host_functions::{storage_cache_bytes32, storage_flush_cache, storage_load_bytes32},
     runtime::RuntimeFunction,
     translation::intermediate_types::{
@@ -234,6 +234,18 @@ pub fn add_read_and_decode_storage_struct_instructions(
     let field_ptr = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
     let val_32 = module.locals.add(ValType::I32);
+
+    // If we are reading an struct from the storage, means this struct has an owner and that owner
+    // is saved in the DATA_STORAGE_OBJECT_OWNER_OFFSET piece of reserved memory. To be able to
+    // know its owner when manipulating the reconstructed structure (for example for the saving the
+    // changes in storage or transfering it) before its representation in memory, we save the owner
+    // id
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     // Allocate space for the struct
     builder

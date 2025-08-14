@@ -2,6 +2,7 @@ use super::RuntimeFunction;
 use crate::data::{
     DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
+    DATA_STORAGE_OBJECT_OWNER_OFFSET,
 };
 use crate::hostio::host_functions::{self, emit_log, storage_load_bytes32, tx_origin};
 use crate::translation::intermediate_types::heap_integers::IU256;
@@ -29,6 +30,8 @@ use walrus::{
 /// If no data is found an unrechable error is thrown. Otherwise the slot number to reconstruct the
 /// struct is written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET.
 ///
+/// When the data is found, the owner's ID is written in DATA_STORAGE_OBJECT_OWNER_OFFSET
+///
 /// # Arguments
 /// - object id
 pub fn locate_storage_data(
@@ -49,7 +52,6 @@ pub fn locate_storage_data(
     let uid_ptr = module.locals.add(ValType::I32);
 
     // Locals
-    let signer_ptr = module.locals.add(ValType::I32);
     let zero = module.locals.add(ValType::I32);
 
     builder
@@ -58,12 +60,8 @@ pub fn locate_storage_data(
         .local_set(zero);
 
     // First we check the tx signer
-
-    // TODO use a constant for the owner
     builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_tee(signer_ptr)
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
         .call(tx_origin);
 
     builder.block(None, |block| {
@@ -73,7 +71,7 @@ pub fn locate_storage_data(
         // Signer's objects
         // ==
         block
-            .local_get(signer_ptr)
+            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
             .local_get(uid_ptr)
             .call(write_object_slot_fn);
 
@@ -95,8 +93,16 @@ pub fn locate_storage_data(
         // ==
         // Shared objects
         // ==
+
+        // Copy the shared objects key to the owners offset
         block
+            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
             .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
+            .i32_const(32)
+            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+        block
+            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
             .local_get(uid_ptr)
             .call(write_object_slot_fn);
 
@@ -115,7 +121,16 @@ pub fn locate_storage_data(
             .negate()
             .br_if(exit_block);
 
+        // ==
         // Frozen objects
+        // ==
+        // Copy the frozen objects key to the owners offset
+        block
+            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+            .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+            .i32_const(32)
+            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
         block
             .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
             .local_get(uid_ptr)
@@ -141,6 +156,57 @@ pub fn locate_storage_data(
     });
 
     function.finish(vec![uid_ptr], &mut module.funcs)
+}
+
+pub fn locate_struct_slot(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::LocateStructSlot.name().to_owned())
+        .func_body();
+
+    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+
+    let struct_ptr = module.locals.add(ValType::I32);
+
+    // Obtain this object's owner, located 32 bytes before its
+    // pointer
+    builder
+        .local_get(struct_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .i32_const(32)
+        .binop(BinaryOp::I32Sub);
+
+    // Obtain the object's id, it must be the first field
+    builder
+        .local_get(struct_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    // Compute the slot where it should be saved
+    builder.call(write_object_slot_fn);
+
+    function.finish(vec![struct_ptr], &mut module.funcs)
 }
 
 /// Calculates the slot from the slot mapping
