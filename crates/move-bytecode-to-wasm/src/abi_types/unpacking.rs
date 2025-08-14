@@ -1,4 +1,3 @@
-
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{

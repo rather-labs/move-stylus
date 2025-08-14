@@ -2,8 +2,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use super::{encoding::add_read_and_decode_storage_struct_instructions, get_struct};
 use crate::{
-    CompilationContext,
-    storage::READ_STRUCT_FROM_STORAGE_FN_NAME,
+    CompilationContext, storage::READ_STRUCT_FROM_STORAGE_FN_NAME,
     translation::intermediate_types::IntermediateType,
 };
 use walrus::{FunctionBuilder, FunctionId, Module, ValType};

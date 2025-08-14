@@ -26,8 +26,16 @@ impl NativeFunction {
     const NATIVE_FRESH_ID: &str = "fresh_id";
     pub const NATIVE_STORAGE_SAVE: &str = "save_in_slot";
     // const NATIVE_READ_SLOT: &str = "read_slot";
-    pub const NATIVE_STORAGE_SHARE_OBJECT: &str = "share_object";
 
+    // Transfer functions
+    pub const NATIVE_TRANSFER_OBJECT: &str = "transfer_object";
+    pub const NATIVE_FREEZE_OBJECT: &str = "freeze_object";
+    pub const NATIVE_STORAGE_SHARE_OBJECT: &str = "share_object"; // TODO: rename to NATIVE_SHARE_OBJECT
+
+    // Object functions
+    pub const NATIVE_DELETE_OBJECT: &str = "delete_object";
+
+    // Host functions
     const HOST_BLOCK_NUMBER: &str = "block_number";
     const HOST_BLOCK_GAS_LIMIT: &str = "block_gas_limit";
     const HOST_BLOCK_TIMESTAMP: &str = "block_timestamp";
@@ -83,7 +91,7 @@ impl NativeFunction {
                     transaction::add_native_tx_gas_price_fn(module, compilaton_ctx)
                 }
                 Self::NATIVE_FRESH_ID => object::add_native_fresh_id_fn(module, compilaton_ctx),
-
+                Self::NATIVE_DELETE_OBJECT => object::add_delete_object_fn(module, compilaton_ctx),
                 _ => panic!("native function {name} not supported yet"),
             }
         }
@@ -139,6 +147,42 @@ impl NativeFunction {
                     };
 
                     storage::add_share_object_fn(hash, module, compilation_ctx, struct_)
+                }
+                Self::NATIVE_TRANSFER_OBJECT => {
+                    assert_eq!(
+                        1,
+                        generics.len(),
+                        "there was an error linking {function_name} expected 1 type parameter, found {}",
+                        generics.len(),
+                    );
+
+                    let struct_ = match generics.first() {
+                        Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
+                            .get_user_data_type_by_index(module_id, *index)
+                            .unwrap(),
+                        Some(_) => todo!(),
+                        None => todo!(),
+                    };
+
+                    transfer::add_transfer_object_fn(hash, module, compilation_ctx, struct_)
+                }
+                Self::NATIVE_FREEZE_OBJECT => {
+                    assert_eq!(
+                        1,
+                        generics.len(),
+                        "there was an error linking {function_name} expected 1 type parameter, found {}",
+                        generics.len(),
+                    );
+
+                    let struct_ = match generics.first() {
+                        Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
+                            .get_user_data_type_by_index(module_id, *index)
+                            .unwrap(),
+                        Some(_) => todo!(),
+                        None => todo!(),
+                    };
+
+                    transfer::add_freeze_object_fn(hash, module, compilation_ctx, struct_)
                 }
                 _ => panic!("generic native function {name} not supported yet"),
             }

@@ -187,3 +187,20 @@ pub fn add_native_fresh_id_fn(
 
     function.finish(vec![], &mut module.funcs)
 }
+
+/// Delete the object and its `UID`. This is the only way to eliminate a `UID`.
+/// This exists to inform Sui of object deletions. When an object
+/// gets unpacked, the programmer will have to do something with its
+/// `UID`. The implementation of this function emits a deleted
+/// system event so Sui knows to process the object deletion
+///
+/// public fun delete(id: UID) {
+///     let UID { id: ID { bytes } } = id;
+///     delete_impl(bytes)
+/// }
+pub fn add_delete_object_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[], &[]);
+}
