@@ -1084,7 +1084,6 @@ fn translate_instruction(
             // We expect that the owner address is just right before the pointer
             if mapped_function.is_entry {
                 for (arg_index, fn_arg) in mapped_function.signature.arguments.iter().enumerate() {
-                    println!("AAAAAAAAAAAAAAAAA {fn_arg:?}");
                     match fn_arg {
                         IntermediateType::IMutRef(inner) => {
                             if let IntermediateType::IStruct { module_id, index } = &**inner {
@@ -1590,6 +1589,10 @@ fn translate_instruction(
             }
 
             types_stack.push(t2);
+        }
+        Bytecode::Abort => {
+            types_stack.pop_expecting(&IntermediateType::IU64)?;
+            builder.return_();
         }
         Bytecode::Xor => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;

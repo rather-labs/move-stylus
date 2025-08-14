@@ -16,6 +16,12 @@ example-interaction:
 example-interaction-2:
 	cargo run -p move-hello-world-example --bin features_2
 
+example-interaction-primitives:
+	cargo run -p move-hello-world-example --bin primitives_and_operations
+
+example-counter:
+	cargo run -p move-hello-world-example --bin counter
+
 deploy-example:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
@@ -35,8 +41,11 @@ deploy-example-primitives:
 		--wasm-file=./example/build/wasm/primitives_and_operations.wasm \
 		--no-verify
 
-example-interaction-primitives:
-	cargo run -p move-hello-world-example --bin primitives_and_operations
+deploy-counter:
+	cargo stylus deploy \
+		--endpoint='http://localhost:8547' \
+		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
+		--wasm-file=./example/build/wasm/counter.wasm
 
 
 setup-stylus:
