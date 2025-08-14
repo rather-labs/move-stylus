@@ -182,36 +182,18 @@ pub fn locate_struct_slot(module: &mut Module, compilation_ctx: &CompilationCont
     // pointer
     builder
         .local_get(struct_ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
         .i32_const(32)
         .binop(BinaryOp::I32Sub);
 
     // Obtain the object's id, it must be the first field
-    builder
-        .local_get(struct_ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
+    builder.local_get(struct_ptr).load(
+        compilation_ctx.memory_id,
+        LoadKind::I32 { atomic: false },
+        MemArg {
+            align: 0,
+            offset: 0,
+        },
+    );
 
     // Compute the slot where it should be saved
     builder.call(write_object_slot_fn);
