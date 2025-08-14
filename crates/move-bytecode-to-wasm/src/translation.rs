@@ -1093,61 +1093,12 @@ fn translate_instruction(
                                     .unwrap();
 
                                 if struct_.saved_in_storage {
-                                    let (emit_log_fn, _) =
-                                        crate::hostio::host_functions::emit_log(module);
-
-                                    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot
+                                    let locate_struct_fn = RuntimeFunction::LocateStructSlot
                                         .get(module, Some(compilation_ctx));
 
-                                    let tmp = module.locals.add(ValType::I32);
-
+                                    // Compute the slot where the struct will be saved
                                     let struct_local = function_locals[arg_index];
-                                    // Calculate where is the owner id pointer
-
-                                    builder
-                                        .i32_const(0)
-                                        .i32_const(256)
-                                        .i32_const(0)
-                                        .call(emit_log_fn);
-
-                                    // Obtain this object's owner, located 32 bytes before its
-                                    // pointer
-                                    builder
-                                        .local_get(struct_local)
-                                        .load(
-                                            compilation_ctx.memory_id,
-                                            LoadKind::I32 { atomic: false },
-                                            MemArg {
-                                                align: 0,
-                                                offset: 0,
-                                            },
-                                        )
-                                        .i32_const(32)
-                                        .binop(BinaryOp::I32Sub);
-
-                                    // Obtain the object's id, it must be the first field
-                                    builder
-                                        .local_get(struct_local)
-                                        .load(
-                                            compilation_ctx.memory_id,
-                                            LoadKind::I32 { atomic: false },
-                                            MemArg {
-                                                align: 0,
-                                                offset: 0,
-                                            },
-                                        )
-                                        .load(
-                                            compilation_ctx.memory_id,
-                                            LoadKind::I32 { atomic: false },
-                                            MemArg {
-                                                align: 0,
-                                                offset: 0,
-                                            },
-                                        )
-                                        .local_tee(tmp);
-
-                                    // Compute the slot where it should be saved
-                                    builder.call(write_object_slot_fn);
+                                    builder.local_get(struct_local).call(locate_struct_fn);
 
                                     let save_in_slot_fn = NativeFunction::get_generic(
                                         "save_in_slot",
@@ -1169,8 +1120,6 @@ fn translate_instruction(
                                     builder
                                         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                                         .call(save_in_slot_fn);
-
-                                    println!("MUST PERSIST IN STORAGE");
                                 }
                             }
                         }

@@ -158,6 +158,57 @@ pub fn locate_storage_data(
     function.finish(vec![uid_ptr], &mut module.funcs)
 }
 
+pub fn locate_struct_slot(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::LocateStructSlot.name().to_owned())
+        .func_body();
+
+    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+
+    let struct_ptr = module.locals.add(ValType::I32);
+
+    // Obtain this object's owner, located 32 bytes before its
+    // pointer
+    builder
+        .local_get(struct_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .i32_const(32)
+        .binop(BinaryOp::I32Sub);
+
+    // Obtain the object's id, it must be the first field
+    builder
+        .local_get(struct_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    // Compute the slot where it should be saved
+    builder.call(write_object_slot_fn);
+
+    function.finish(vec![struct_ptr], &mut module.funcs)
+}
+
 /// Calculates the slot from the slot mapping
 pub fn write_object_slot(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
