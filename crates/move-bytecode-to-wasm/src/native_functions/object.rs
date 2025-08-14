@@ -203,4 +203,6 @@ pub fn add_delete_object_fn(
     compilation_ctx: &CompilationContext,
 ) -> FunctionId {
     let mut function = FunctionBuilder::new(&mut module.types, &[], &[]);
+
+    function.finish(vec![], &mut module.funcs)
 }

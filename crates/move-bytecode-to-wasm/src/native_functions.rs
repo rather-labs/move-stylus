@@ -5,6 +5,7 @@
 mod object;
 mod storage;
 mod transaction;
+mod transfer;
 
 use std::hash::{DefaultHasher, Hash, Hasher};
 
