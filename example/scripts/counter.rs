@@ -14,6 +14,7 @@ sol!(
         function create() public view;
         function read(address id) public view returns (uint64);
         function increment(address id) public view;
+        function setValue(address id, uint64 value) public view;
     }
 );
 
@@ -44,6 +45,26 @@ async fn main() -> eyre::Result<()> {
     }
 
     let id = address!("0x0000000000000000000000000000000000001234");
+    let res = example.read(id).call().await?;
+    println!("counter = {}", res);
+
+    let pending_tx = example.increment(id).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("increment logs 0: 0x{}", hex::encode(raw));
+    }
+
+    let res = example.read(id).call().await?;
+    println!("counter = {}", res);
+
+    let pending_tx = example.setValue(id, 42).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("increment logs 0: 0x{}", hex::encode(raw));
+    }
+
     let res = example.read(id).call().await?;
     println!("counter = {}", res);
 
