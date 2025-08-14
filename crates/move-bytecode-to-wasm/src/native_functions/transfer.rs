@@ -10,7 +10,7 @@ use crate::{
         DATA_SHARED_OBJECTS_KEY_OFFSET,
     },
     hostio::host_functions::emit_log,
-    native_functions::storage::add_storage_save_fn,
+    native_functions::{object::add_delete_object_fn, storage::add_storage_save_fn},
     runtime::RuntimeFunction,
     translation::intermediate_types::structs::IStruct,
 };
@@ -32,8 +32,11 @@ pub fn add_transfer_object_fn(
 
     // This calculates the slot number of a given (outer_key, struct_id) tupple in the objects mapping
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
+    let get_struct_id_fn = RuntimeFunction::GetStructId.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-    let storage_save_fn = add_storage_save_fn(hash, module, compilation_ctx, struct_);
+    let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
+    let add_delete_object_fn = add_delete_object_fn(hash.clone(), module, compilation_ctx, struct_);
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
@@ -71,14 +74,15 @@ pub fn add_transfer_object_fn(
             then.unreachable();
         },
         |else_| {
+            // Delete the object from the owner mapping on the storage
+            else_.local_get(struct_ptr).call(add_delete_object_fn);
+
             // The first field of any struct with the key ability is its id.
             // We load the struct_ptr, so now struct_id_ptr holds a pointer to the id.
             else_
                 .local_get(struct_ptr)
                 .call(get_struct_id_fn)
                 .local_set(struct_id_ptr);
-
-            // TODO: clear the owner storage associated with this object! Else we are just copying the object!
 
             // Calculate the slot number corresponding to the (recipient, struct_id) tupple
             // Slot number will be written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
@@ -113,7 +117,8 @@ pub fn add_freeze_object_fn(
     let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
     let get_struct_id_fn = RuntimeFunction::GetStructId.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-    let storage_save_fn = add_storage_save_fn(hash, module, compilation_ctx, struct_);
+    let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
+    let add_delete_object_fn = add_delete_object_fn(hash.clone(), module, compilation_ctx, struct_);
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
@@ -156,25 +161,26 @@ pub fn add_freeze_object_fn(
         block.if_else(
             None,
             |then| {
+                // Object cannot be shared
                 then.unreachable();
             },
             |else_| {
-                // The first field of any struct with the key ability is its id.
-                // We load the struct_ptr, so now struct_id_ptr holds a pointer to the id.
+                // Delete the object from the owner mapping on the storage
+                else_.local_get(struct_ptr).call(add_delete_object_fn);
+
+                // Get struct id
                 else_
                     .local_get(struct_ptr)
                     .call(get_struct_id_fn)
                     .local_set(struct_id_ptr);
 
-                // TODO: clear the owner storage associated with this object! Else we are just copying the object!
-
-                // Calculate the slot number corresponding to the (frozen objects key, struct_id) tupple
-                // Slot number will be written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
+                // Calculate the struct slot in the frozen objects mapping
                 else_
                     .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
                     .local_get(struct_id_ptr)
                     .call(write_object_slot_fn);
 
+                // Save the struct into the frozen objects mapping
                 else_
                     .local_get(struct_ptr)
                     .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)

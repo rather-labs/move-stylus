@@ -200,6 +200,7 @@ pub fn get_struct_owner(module: &mut Module, compilation_ctx: &CompilationContex
     // Obtain this object's owner, located 32 bytes before its
     // pointer
     builder
+        .local_get(struct_ptr)
         .load(
             compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
@@ -229,6 +230,7 @@ pub fn get_struct_id(module: &mut Module, compilation_ctx: &CompilationContext) 
     // Obtain this object's owner, located 32 bytes before its
     // pointer
     builder
+        .local_get(struct_ptr)
         .load(
             compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },

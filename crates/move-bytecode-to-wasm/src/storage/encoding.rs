@@ -8,7 +8,10 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_STORAGE_OBJECT_OWNER_OFFSET},
+    data::{
+        DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
+        DATA_STORAGE_OBJECT_OWNER_OFFSET,
+    },
     hostio::host_functions::{storage_cache_bytes32, storage_flush_cache, storage_load_bytes32},
     runtime::RuntimeFunction,
     translation::intermediate_types::{
@@ -461,4 +464,58 @@ fn field_size(field: &IntermediateType) -> u32 {
         }
         IntermediateType::IExternalUserData { .. } => todo!(),
     }
+}
+
+/// Wipes out an object from the storage
+/// So far we are not considering dynamic fields! This should be done recursively!
+pub fn add_delete_storage_struct_instructions(
+    builder: &mut InstrSeqBuilder,
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    struct_: &IStruct,
+) {
+    let (storage_cache, _) = storage_cache_bytes32(module);
+    let (storage_flush_cache, _) = storage_flush_cache(module);
+
+    let slot_ptr = module.locals.add(ValType::I32);
+
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .local_set(slot_ptr); // Ask nico if this is correct
+
+    // Wipe the slot data placeholder. We use it to erase the slots in the storage
+    builder
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .i32_const(0)
+        .i32_const(32)
+        .memory_fill(compilation_ctx.memory_id);
+
+    // Wipe out the first slot
+    builder
+        .local_get(slot_ptr)
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .call(storage_cache);
+
+    let mut slot_used_bytes = 0;
+    for (index, field) in struct_.fields.iter().enumerate() {
+        let field_size = field_size(field);
+        if slot_used_bytes + field_size > 32 {
+            let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
+            builder
+                .local_get(slot_ptr)
+                .call(next_slot_fn)
+                .local_set(slot_ptr);
+
+            builder
+                .local_get(slot_ptr)
+                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                .call(storage_cache);
+
+            slot_used_bytes = field_size;
+        } else {
+            slot_used_bytes += field_size;
+        }
+    }
+
+    builder.i32_const(1).call(storage_flush_cache);
 }

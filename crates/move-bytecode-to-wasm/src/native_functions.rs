@@ -92,7 +92,6 @@ impl NativeFunction {
                     transaction::add_native_tx_gas_price_fn(module, compilaton_ctx)
                 }
                 Self::NATIVE_FRESH_ID => object::add_native_fresh_id_fn(module, compilaton_ctx),
-                Self::NATIVE_DELETE_OBJECT => object::add_delete_object_fn(module, compilaton_ctx),
                 _ => panic!("native function {name} not supported yet"),
             }
         }
@@ -184,6 +183,24 @@ impl NativeFunction {
                     };
 
                     transfer::add_freeze_object_fn(hash, module, compilation_ctx, struct_)
+                }
+                Self::NATIVE_DELETE_OBJECT => {
+                    assert_eq!(
+                        1,
+                        generics.len(),
+                        "there was an error linking {function_name} expected 1 type parameter, found {}",
+                        generics.len(),
+                    );
+
+                    let struct_ = match generics.first() {
+                        Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
+                            .get_user_data_type_by_index(module_id, *index)
+                            .unwrap(),
+                        Some(_) => todo!(),
+                        None => todo!(),
+                    };
+
+                    object::add_delete_object_fn(hash, module, compilation_ctx, struct_)
                 }
                 _ => panic!("generic native function {name} not supported yet"),
             }

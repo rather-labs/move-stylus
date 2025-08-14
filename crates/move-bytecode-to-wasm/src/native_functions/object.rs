@@ -1,11 +1,16 @@
 use super::NativeFunction;
 use crate::{
     CompilationContext,
+    data::{DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET},
     hostio::host_functions::{
         block_number, block_timestamp, emit_log, native_keccak256, storage_cache_bytes32,
         storage_flush_cache, storage_load_bytes32,
     },
+    native_functions::storage::add_storage_save_fn,
+    runtime::RuntimeFunction,
+    storage,
     translation::intermediate_types::address::IAddress,
+    translation::intermediate_types::structs::IStruct,
     utils::keccak_string_to_memory,
 };
 use walrus::{
@@ -199,10 +204,63 @@ pub fn add_native_fresh_id_fn(
 ///     delete_impl(bytes)
 /// }
 pub fn add_delete_object_fn(
+    hash: String,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    struct_: &IStruct,
 ) -> FunctionId {
-    let mut function = FunctionBuilder::new(&mut module.types, &[], &[]);
+    let name = format!("{}_{hash}", NativeFunction::NATIVE_DELETE_OBJECT);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    };
 
-    function.finish(vec![], &mut module.funcs)
+    // This calculates the slot number of a given (outer_key, struct_id) tupple in the objects mapping
+    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
+    let get_struct_id_fn = RuntimeFunction::GetStructId.get(module, Some(compilation_ctx));
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function.name(name).func_body();
+
+    let struct_ptr = module.locals.add(ValType::I32);
+    let owner_ptr = module.locals.add(ValType::I32);
+
+    builder
+        .local_get(struct_ptr)
+        .call(get_struct_owner_fn)
+        .local_set(owner_ptr);
+
+    // Here we should check that the object is not frozen. If it is, we emit an unreacheable.
+    // Both owned and shared objects can be deleted via object::delete()!
+    builder.local_get(owner_ptr);
+    builder.i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET);
+    builder.i32_const(32);
+    builder.call(equality_fn);
+
+    builder.if_else(
+        None,
+        |then| {
+            // If the object is frozen, emit an unreacheable
+            then.unreachable();
+        },
+        |else_| {
+            // Get the object slot in the storage
+            else_
+                .local_get(owner_ptr)
+                .local_get(struct_ptr)
+                .call(get_struct_id_fn)
+                .call(write_object_slot_fn);
+
+            // Delete the object from the storage
+            storage::encoding::add_delete_storage_struct_instructions(
+                else_,
+                module,
+                compilation_ctx,
+                struct_,
+            );
+        },
+    );
+
+    function.finish(vec![struct_ptr], &mut module.funcs)
 }
