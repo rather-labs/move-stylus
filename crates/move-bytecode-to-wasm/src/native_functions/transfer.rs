@@ -1,14 +1,17 @@
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{LoadKind, MemArg, BinaryOp},
+    ir::{BinaryOp, LoadKind, MemArg},
 };
 
 use crate::{
     CompilationContext,
-    data::{DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET},
+    data::{
+        DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+        DATA_SHARED_OBJECTS_KEY_OFFSET,
+    },
     hostio::host_functions::emit_log,
-    runtime::RuntimeFunction,
     native_functions::storage::add_storage_save_fn,
+    runtime::RuntimeFunction,
     translation::intermediate_types::structs::IStruct,
 };
 
@@ -46,8 +49,7 @@ pub fn add_transfer_object_fn(
     // - The frozen objects internal key (0x2)
     builder
         .local_get(struct_ptr)
-        .i32_const(32)
-        .binop(BinaryOp::I32Sub)
+        .call(get_struct_owner_fn)
         .local_set(owner_ptr);
 
     // Here we should check that the object is not frozen or shared. If it is, we throw an unreacheable.
@@ -73,14 +75,7 @@ pub fn add_transfer_object_fn(
             // We load the struct_ptr, so now struct_id_ptr holds a pointer to the id.
             else_
                 .local_get(struct_ptr)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
+                .call(get_struct_id_fn)
                 .local_set(struct_id_ptr);
 
             // TODO: clear the owner storage associated with this object! Else we are just copying the object!
@@ -115,6 +110,8 @@ pub fn add_freeze_object_fn(
 
     // This calculates the slot number of a given (outer_key, struct_id) tupple in the objects mapping
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
+    let get_struct_id_fn = RuntimeFunction::GetStructId.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let storage_save_fn = add_storage_save_fn(hash, module, compilation_ctx, struct_);
 
@@ -133,8 +130,7 @@ pub fn add_freeze_object_fn(
         // - The frozen objects internal key (0x2)
         block
             .local_get(struct_ptr)
-            .i32_const(32)
-            .binop(BinaryOp::I32Sub)
+            .call(get_struct_owner_fn)
             .local_set(owner_ptr);
 
         // Here we should check that the object is not shared. If so, we emit an unreacheable.
@@ -147,6 +143,7 @@ pub fn add_freeze_object_fn(
             .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
             .i32_const(32)
             .call(equality_fn);
+
         block.br_if(block_id); // If the object is frozen, jump to the end of the block.
 
         // Check if the object is shared
@@ -166,14 +163,7 @@ pub fn add_freeze_object_fn(
                 // We load the struct_ptr, so now struct_id_ptr holds a pointer to the id.
                 else_
                     .local_get(struct_ptr)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
+                    .call(get_struct_id_fn)
                     .local_set(struct_id_ptr);
 
                 // TODO: clear the owner storage associated with this object! Else we are just copying the object!
