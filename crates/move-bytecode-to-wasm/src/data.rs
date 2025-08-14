@@ -21,12 +21,17 @@ pub const DATA_SHARED_OBJECTS_KEY_OFFSET: i32 = 128;
 
 pub const DATA_FROZEN_OBJECTS_KEY_OFFSET: i32 = 160;
 
+/// When searching for the object's owner in the objects mapping, we will use this piece of
+/// memory to save the owner where the object was found (an address, key 1 for shared and
+/// key 2 for frozen).
+pub const DATA_STORAGE_OBJECT_OWNER_OFFSET: i32 = 192;
+
 /// Amount of memory reserved starting from offset 0.
 ///
 /// # WARNING
 /// This value must be kept in sync to correctly initialize the memory allocator
 /// at the proper offset.
-pub const TOTAL_RESERVED_MEMORY: i32 = 192;
+pub const TOTAL_RESERVED_MEMORY: i32 = 256;
 
 /// Initializes the module's data segment.
 pub fn setup_data_segment(module: &mut Module, memory_id: MemoryId) {

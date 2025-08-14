@@ -2,6 +2,7 @@ use super::RuntimeFunction;
 use crate::data::{
     DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
+    DATA_STORAGE_OBJECT_OWNER_OFFSET,
 };
 use crate::hostio::host_functions::{self, emit_log, storage_load_bytes32, tx_origin};
 use crate::translation::intermediate_types::heap_integers::IU256;
@@ -29,6 +30,8 @@ use walrus::{
 /// If no data is found an unrechable error is thrown. Otherwise the slot number to reconstruct the
 /// struct is written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET.
 ///
+/// When the data is found, the owner's ID is written in DATA_STORAGE_OBJECT_OWNER_OFFSET
+///
 /// # Arguments
 /// - object id
 pub fn locate_storage_data(
@@ -49,7 +52,6 @@ pub fn locate_storage_data(
     let uid_ptr = module.locals.add(ValType::I32);
 
     // Locals
-    let signer_ptr = module.locals.add(ValType::I32);
     let zero = module.locals.add(ValType::I32);
 
     builder
@@ -58,12 +60,8 @@ pub fn locate_storage_data(
         .local_set(zero);
 
     // First we check the tx signer
-
-    // TODO use a constant for the owner
     builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_tee(signer_ptr)
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
         .call(tx_origin);
 
     builder.block(None, |block| {
@@ -73,7 +71,7 @@ pub fn locate_storage_data(
         // Signer's objects
         // ==
         block
-            .local_get(signer_ptr)
+            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
             .local_get(uid_ptr)
             .call(write_object_slot_fn);
 
@@ -95,8 +93,16 @@ pub fn locate_storage_data(
         // ==
         // Shared objects
         // ==
+
+        // Copy the shared objects key to the owners offset
         block
+            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
             .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
+            .i32_const(32)
+            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+        block
+            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
             .local_get(uid_ptr)
             .call(write_object_slot_fn);
 
@@ -115,7 +121,16 @@ pub fn locate_storage_data(
             .negate()
             .br_if(exit_block);
 
+        // ==
         // Frozen objects
+        // ==
+        // Copy the frozen objects key to the owners offset
+        block
+            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+            .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+            .i32_const(32)
+            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
         block
             .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
             .local_get(uid_ptr)

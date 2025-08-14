@@ -1,4 +1,3 @@
-
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
@@ -194,12 +193,12 @@ impl Unpackable for IntermediateType {
                     function_builder.call(locate_storage_data_fn);
 
                     // Read the object
-                    let read_slot_fn =
+                    let read_struct_from_storage_fn =
                         add_read_struct_from_storage_fn(module, compilation_ctx, self);
 
                     function_builder
                         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                        .call(read_slot_fn);
+                        .call(read_struct_from_storage_fn);
                 } else {
                     // TODO: Check if the struct is TxContext. If it is, panic since the only valid
                     // TxContext is the one defined in the stylus framework.
