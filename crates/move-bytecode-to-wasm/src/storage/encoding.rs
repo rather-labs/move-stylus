@@ -12,7 +12,9 @@ use crate::{
         DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
         DATA_STORAGE_OBJECT_OWNER_OFFSET,
     },
-    hostio::host_functions::{storage_cache_bytes32, storage_flush_cache, storage_load_bytes32},
+    hostio::host_functions::{
+        emit_log, storage_cache_bytes32, storage_flush_cache, storage_load_bytes32,
+    },
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         IntermediateType,
@@ -510,6 +512,14 @@ pub fn add_delete_storage_struct_instructions(
                 .local_get(slot_ptr)
                 .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
                 .call(storage_cache);
+
+            // let (emit_log_fn, _) = emit_log(module);
+
+            // builder
+            //     .local_get(slot_ptr)
+            //     .i32_const(32)
+            //     .i32_const(0)
+            //     .call(emit_log_fn);
 
             slot_used_bytes = field_size;
         } else {

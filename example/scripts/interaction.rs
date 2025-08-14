@@ -100,6 +100,7 @@ sol!(
         function create() public view;
         function read(address id) public view returns (uint64);
         function increment(address id) public view;
+        function deleter(address id) public view;
     }
 );
 
@@ -143,6 +144,9 @@ async fn main() -> eyre::Result<()> {
 
     let res = example.read(id).call().await?;
     println!("counter = {}", res);
+
+    let pending_tx = example.deleter(id).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
 
     /*
     // If the constructor is called, the storage value at init_key is should be different from 0

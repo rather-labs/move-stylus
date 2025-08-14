@@ -29,12 +29,12 @@ impl NativeFunction {
     // const NATIVE_READ_SLOT: &str = "read_slot";
 
     // Transfer functions
-    pub const NATIVE_TRANSFER_OBJECT: &str = "transfer_object";
+    pub const NATIVE_TRANSFER_OBJECT: &str = "transfer";
     pub const NATIVE_FREEZE_OBJECT: &str = "freeze_object";
     pub const NATIVE_STORAGE_SHARE_OBJECT: &str = "share_object"; // TODO: rename to NATIVE_SHARE_OBJECT
 
     // Object functions
-    pub const NATIVE_DELETE_OBJECT: &str = "delete_object";
+    pub const NATIVE_DELETE_OBJECT: &str = "delete";
 
     // Host functions
     const HOST_BLOCK_NUMBER: &str = "block_number";

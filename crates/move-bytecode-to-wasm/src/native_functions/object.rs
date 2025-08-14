@@ -220,7 +220,7 @@ pub fn add_delete_object_fn(
     let get_struct_id_fn = RuntimeFunction::GetStructId.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
 
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
 
     let struct_ptr = module.locals.add(ValType::I32);

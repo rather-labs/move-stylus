@@ -25,4 +25,4 @@ public native fun compute_id(data: vector<u8>): UID;
 /// gets unpacked, the programmer will have to do something with its
 /// `UID`. The implementation of this function emits a deleted
 /// system event so Sui knows to process the object deletion
-native fun delete<T: key>(obj: T);
+public native fun delete<T: key>(obj: T);

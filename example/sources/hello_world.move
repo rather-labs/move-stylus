@@ -46,3 +46,7 @@ public fun increment(counter: &mut Counter) {
 public fun read(counter: &Counter): u64 {
     counter.value
 }
+
+public fun deleter(counter: Counter) {
+    object::delete(counter);
+}
