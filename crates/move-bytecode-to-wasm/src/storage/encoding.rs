@@ -520,7 +520,7 @@ pub fn add_delete_storage_struct_instructions(
         .call(emit_log_fn);
 
     let mut slot_used_bytes = 0;
-    for (index, field) in struct_.fields.iter().enumerate() {
+    for field in struct_.fields.iter() {
         let field_size = field_size(field);
         if slot_used_bytes + field_size > 32 {
             let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));

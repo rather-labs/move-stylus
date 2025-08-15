@@ -1,12 +1,11 @@
 use super::NativeFunction;
 use crate::{
     CompilationContext,
-    data::{DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET},
+    data::DATA_FROZEN_OBJECTS_KEY_OFFSET,
     hostio::host_functions::{
-        block_number, block_timestamp, emit_log, native_keccak256, storage_cache_bytes32,
+        block_number, block_timestamp, native_keccak256, storage_cache_bytes32,
         storage_flush_cache, storage_load_bytes32,
     },
-    native_functions::storage::add_storage_save_fn,
     runtime::RuntimeFunction,
     storage,
     translation::intermediate_types::address::IAddress,
@@ -28,7 +27,6 @@ pub fn add_native_fresh_id_fn(
     let (storage_load_fn, _) = storage_load_bytes32(module);
     let (storage_cache_fn, _) = storage_cache_bytes32(module);
     let (storage_flush_cache_fn, _) = storage_flush_cache(module);
-    let (emit_log_fn, _) = emit_log(module);
 
     let mut function = FunctionBuilder::new(&mut module.types, &[], &[ValType::I32]);
 

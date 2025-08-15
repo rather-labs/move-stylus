@@ -31,8 +31,7 @@ pub fn move_signature_to_abi_selector<T: SolName>(
 ) -> AbiFunctionSelector {
     let parameter_strings = signature
         .iter()
-        .map(|s| s.sol_name(compilation_ctx))
-        .filter_map(|s| s)
+        .filter_map(|s| s.sol_name(compilation_ctx))
         .collect::<Vec<String>>()
         .join(",");
 

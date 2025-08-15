@@ -1,7 +1,10 @@
 use alloy::hex;
 use alloy::primitives::address;
 use alloy::signers::local::PrivateKeySigner;
-use alloy::{primitives::Address, primitives::U256, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
+use alloy::{
+    primitives::Address, primitives::U256, providers::ProviderBuilder, sol,
+    transports::http::reqwest::Url,
+};
 use dotenv::dotenv;
 use eyre::eyre;
 use std::str::FromStr;

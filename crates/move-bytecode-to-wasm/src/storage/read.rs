@@ -1,15 +1,11 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use super::{encoding::add_read_and_decode_storage_struct_instructions, get_struct};
-use crate::hostio::host_functions::emit_log;
 use crate::{
     CompilationContext, storage::READ_STRUCT_FROM_STORAGE_FN_NAME,
     translation::intermediate_types::IntermediateType,
 };
-use walrus::{
-    FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
-};
+use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
 /// Generates a function that reads an specific struct from the storage.
 pub fn add_read_struct_from_storage_fn(

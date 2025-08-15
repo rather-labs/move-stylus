@@ -9,7 +9,6 @@ use crate::{
         DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
         DATA_SHARED_OBJECTS_KEY_OFFSET,
     },
-    hostio::host_functions::emit_log,
     native_functions::{object::add_delete_object_fn, storage::add_storage_save_fn},
     runtime::RuntimeFunction,
     translation::intermediate_types::structs::IStruct,

@@ -91,7 +91,6 @@ pub fn add_share_object_fn(
         .call(emit_log_fn);
 
     // Call storage save for the struct
-    let storage_save_name = format!("{}_{hash}", NativeFunction::NATIVE_STORAGE_SAVE);
     let storage_save_fn = add_storage_save_fn(hash, module, compilation_ctx, struct_);
 
     builder
@@ -111,7 +110,6 @@ pub fn add_read_slot_fn(module: &mut Module, compilation_ctx: &CompilationContex
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
 
     let slot_ptr = module.locals.add(ValType::I32);
-    let swapped_slot_ptr = module.locals.add(ValType::I32);
     let slot_data_ptr = module.locals.add(ValType::I32);
 
     let mut builder = function
