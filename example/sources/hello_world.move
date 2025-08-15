@@ -50,3 +50,7 @@ public fun read(counter: &Counter): u64 {
 public fun deleter(counter: Counter) {
     object::delete(counter);
 }
+
+public fun slot_reader(slot: u256): u256 {
+    storage::read_slot(slot)
+}

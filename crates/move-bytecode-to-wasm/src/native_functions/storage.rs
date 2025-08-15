@@ -6,7 +6,7 @@ use walrus::{
 use crate::{
     CompilationContext,
     data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET},
-    hostio::host_functions::emit_log,
+    hostio::host_functions::{emit_log, storage_load_bytes32},
     runtime::RuntimeFunction,
     storage,
     translation::intermediate_types::structs::IStruct,
@@ -100,4 +100,41 @@ pub fn add_share_object_fn(
         .call(storage_save_fn);
 
     function.finish(vec![struct_ptr], &mut module.funcs)
+}
+
+// This function takes a slot number and reads from storage
+pub fn add_read_slot_fn(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+    let (storage_load_bytes32, _) = storage_load_bytes32(module);
+    let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
+    let (emit_log_fn, _) = emit_log(module);
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+
+    let slot_ptr = module.locals.add(ValType::I32);
+    let swapped_slot_ptr = module.locals.add(ValType::I32);
+    let slot_data_ptr = module.locals.add(ValType::I32);
+
+    let mut builder = function
+        .name(NativeFunction::NATIVE_STORAGE_READ_SLOT.to_owned())
+        .func_body();
+
+    builder
+        .local_get(slot_ptr)
+        .local_get(slot_ptr)
+        .call(swap_256_fn);
+
+    builder
+        .local_get(slot_ptr)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_fn);
+
+    builder
+        .local_get(slot_ptr)
+        .local_get(slot_data_ptr)
+        .call(storage_load_bytes32);
+
+    builder.local_get(slot_data_ptr);
+
+    function.finish(vec![slot_ptr], &mut module.funcs)
 }

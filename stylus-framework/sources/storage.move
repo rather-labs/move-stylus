@@ -25,3 +25,5 @@ public native fun read_owned<T>(owner: signer, id: UID): &T;
 
 public native fun read_owned_mut<T>(owner: signer, id: UID): &mut T;
 
+public native fun read_slot(slot: u256): u256;
+

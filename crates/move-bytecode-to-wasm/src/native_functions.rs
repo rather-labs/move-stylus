@@ -26,7 +26,7 @@ impl NativeFunction {
     const NATIVE_GAS_PRICE: &str = "native_gas_price";
     const NATIVE_FRESH_ID: &str = "fresh_id";
     pub const NATIVE_STORAGE_SAVE: &str = "save_in_slot";
-    // const NATIVE_READ_SLOT: &str = "read_slot";
+    pub const NATIVE_STORAGE_READ_SLOT: &str = "read_slot";
 
     // Transfer functions
     pub const NATIVE_TRANSFER_OBJECT: &str = "transfer";
@@ -92,6 +92,7 @@ impl NativeFunction {
                     transaction::add_native_tx_gas_price_fn(module, compilaton_ctx)
                 }
                 Self::NATIVE_FRESH_ID => object::add_native_fresh_id_fn(module, compilaton_ctx),
+                Self::NATIVE_STORAGE_READ_SLOT => storage::add_read_slot_fn(module, compilaton_ctx),
                 _ => panic!("native function {name} not supported yet"),
             }
         }

@@ -39,35 +39,6 @@ pub fn add_read_struct_from_storage_fn(
         struct_,
     );
 
-    let (emit_log_fn, _) = emit_log(module);
-    builder
-        .local_get(struct_ptr)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
-
-    builder
-        .local_get(struct_ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
-
-    builder
-        .local_get(struct_ptr)
-        .i32_const(32)
-        .binop(BinaryOp::I32Sub)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
-
     builder.local_get(struct_ptr);
 
     function.finish(vec![slot_ptr], &mut module.funcs)

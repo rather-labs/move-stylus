@@ -101,6 +101,7 @@ sol!(
         function read(address id) public view returns (uint64);
         function increment(address id) public view;
         function deleter(address id) public view;
+        function slotReader(uint256 slot) public view returns (uint256);
     }
 );
 
@@ -130,6 +131,18 @@ async fn main() -> eyre::Result<()> {
         let raw = log.data().data.0.clone();
         println!("  - 0x{}", hex::encode(raw));
     }
+    let slots = [
+        U256::from_str("0x05d0ca05d46093310ab4a19866376b885c66147ea78c86c5ac6a70e8d0cfeb54")
+            .unwrap(),
+        U256::from_str("0x05d0ca05d46093310ab4a19866376b885c66147ea78c86c5ac6a70e8d0cfeb55")
+            .unwrap(),
+        U256::from_str("0x05d0ca05d46093310ab4a19866376b885c66147ea78c86c5ac6a70e8d0cfeb56")
+            .unwrap(),
+    ];
+    for slot in slots {
+        let res = example.slotReader(slot).call().await?;
+        println!("slotReader = {}", res);
+    }
 
     let id = address!("0x0000000000000000000000000000000000001234");
     // let res = example.read(U256::from(1234).to_le_bytes().into()).call().await?;
@@ -147,6 +160,11 @@ async fn main() -> eyre::Result<()> {
     let res = example.read(id).call().await?;
     println!("counter = {}", res);
 
+    for slot in slots {
+        let res = example.slotReader(slot).call().await?;
+        println!("slotReader = {}", res);
+    }
+
     let pending_tx = example.deleter(id).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     println!("Deleter Logs:");
@@ -155,8 +173,13 @@ async fn main() -> eyre::Result<()> {
         println!("  - 0x{}", hex::encode(raw));
     }
 
-    let res = example.read(id).call().await?;
-    println!("counter = {}", res);
+    for slot in slots {
+        let res = example.slotReader(slot).call().await?;
+        println!("slotReader = {}", res);
+    }
+
+    // let res = example.read(id).call().await?;
+    // println!("counter = {}", res);
 
     /*
     // If the constructor is called, the storage value at init_key is should be different from 0
