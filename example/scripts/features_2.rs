@@ -91,7 +91,6 @@ async fn main() -> eyre::Result<()> {
         ret._0, ret._1
     );
 
-
     // If the constructor is called, the storage value at init_key is should be different from 0
     let init_key = alloy::primitives::U256::from_be_bytes(keccak256(b"init_key").into());
     let init_value_le = storage_value_to_le(&provider, address, init_key).await?;

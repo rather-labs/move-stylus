@@ -8,10 +8,7 @@ pub mod uid;
 
 use walrus::{InstrSeqBuilder, Module};
 
-use crate::{
-    CompilationContext,
-    compilation_context::ModuleId,
-};
+use crate::{CompilationContext, compilation_context::ModuleId};
 
 pub trait VmHandledType {
     const IDENTIFIER: &str;

@@ -65,7 +65,6 @@ async fn main() -> eyre::Result<()> {
     let res = example.read(counter_id).call().await?;
     println!("counter = {}", res);
 
-
     println!("\nSetting counter to number 42");
     let pending_tx = example.setValue(counter_id, 42).send().await?;
     let receipt = pending_tx.get_receipt().await?;
