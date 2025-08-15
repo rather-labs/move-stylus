@@ -220,47 +220,4 @@ impl RuntimeFunction {
             }
         }
     }
-
-    /*
-     pub fn get_generic(
-         &self,
-         module: &mut Module,
-         compilation_ctx: &CompilationContext,
-         generics: &[IntermediateType],
-     ) -> FunctionId {
-         // Thid hash will uniquely identify this native fn
-         let mut hasher = DefaultHasher::new();
-         generics.iter().for_each(|t| t.hash(&mut hasher));
-         let function_name = format!("{}_{:x}", self.name(), hasher.finish());
-
-         println!("------> {function_name}");
-
-         if let Some(function) = module.funcs.by_name(&function_name) {
-             function
-         } else {
-             match self {
-                 Self::UnpackFromStorage => {
-                     assert_eq!(
-                         1,
-                         generics.len(),
-                         "there was an error linking {function_name} expected 1 type parameter, found {}",
-                         generics.len(),
-                     );
-
-                     let struct_ = match generics.first() {
-                         Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
-                             .get_user_data_type_by_index(module_id, *index)
-                             .unwrap(),
-                         Some(_) => todo!(),
-                         None => todo!(),
-                     };
-
-                     storage::unpack_from_storage(module, compilation_ctx, struct_, function_name)
-                 }
-                 // Error
-                 _ => panic!(r#"there was an error linking "{function_name}" generic function"#,),
-             }
-         }
-     }
-    */
 }

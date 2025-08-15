@@ -29,7 +29,7 @@ pub fn build_entrypoint_router(
 
     let mut router = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
 
-    let mut router_builder = router.name("entrypoint_router".to_owned()).func_body();
+    let mut router_builder = router.func_body();
 
     // TODO: handle case where no args data, now we just panic
     router_builder.block(None, |block| {

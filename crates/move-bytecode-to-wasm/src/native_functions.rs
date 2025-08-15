@@ -25,7 +25,6 @@ impl NativeFunction {
     const NATIVE_GAS_PRICE: &str = "native_gas_price";
     const NATIVE_FRESH_ID: &str = "fresh_id";
     pub const NATIVE_STORAGE_SAVE: &str = "save_in_slot";
-    // const NATIVE_READ_SLOT: &str = "read_slot";
     pub const NATIVE_STORAGE_SHARE_OBJECT: &str = "share_object";
 
     const HOST_BLOCK_NUMBER: &str = "block_number";

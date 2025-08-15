@@ -17,8 +17,10 @@ pub const DATA_OBJECTS_SLOT_OFFSET: i32 = 64;
 /// When calculating slots numbers, we save them here
 pub const DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET: i32 = 96;
 
+/// This is the shared objects mapping key. It is a u256 containing the number 1
 pub const DATA_SHARED_OBJECTS_KEY_OFFSET: i32 = 128;
 
+/// This is the frozen objects mapping key. It is a u256 containing the number 2
 pub const DATA_FROZEN_OBJECTS_KEY_OFFSET: i32 = 160;
 
 /// When searching for the object's owner in the objects mapping, we will use this piece of

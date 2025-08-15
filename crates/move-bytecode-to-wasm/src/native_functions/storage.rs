@@ -64,8 +64,19 @@ pub fn add_share_object_fn(
     // Shared object key (owner ptr)
     builder.i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET);
 
-    // The first field is its id, so we follow the pointer of the
-    // first field
+    // Obtain the object's id, it must be the first field containing a UID struct
+    // The UID struct has the following form
+    //
+    // UID { id: ID { bytes: <bytes> } }
+    //
+    // The first load instruction puts in stack the first pointer value of the strucure, that is a
+    // pointer to the UID struct
+    //
+    // The second load instruction puts in stack the pointer to the ID struct
+    //
+    // The third load instruction loads the ID's bytes field pointer
+    //
+    // At the end of the load chain we point to the 32 bytes holding the data
     builder
         .local_get(struct_ptr)
         .load(

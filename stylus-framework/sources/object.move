@@ -17,6 +17,3 @@ public fun new(ctx: &mut TxContext): UID {
         id: ID { bytes: ctx.fresh_object_address() },
     }
 }
-
-
-public native fun compute_id(data: vector<u8>): UID;
