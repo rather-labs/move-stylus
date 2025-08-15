@@ -15,9 +15,12 @@ path = "scripts/features_2.rs"
 name = "primitives_and_operations"
 path = "scripts/primitives_and_operations.rs"
 
+[[bin]]
+name = "counter"
+path = "scripts/counter.rs"
+
 [dependencies]
 dotenv = "0.15.0"
-ethers = "2.0"
 eyre = "0.6.8"
 tokio = { version = "1.44.2", features = ["macros", "rt-multi-thread"] }
 alloy = "1.0.23"

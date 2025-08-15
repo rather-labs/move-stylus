@@ -1096,10 +1096,9 @@ fn translate_instruction(
                                     let locate_struct_fn = RuntimeFunction::LocateStructSlot
                                         .get(module, Some(compilation_ctx));
 
-                                    // Compute the slot where the struct will be saved
-                                    let struct_local = function_locals[arg_index];
+                                    let struct_ptr = module.locals.add(ValType::I32);
                                     builder
-                                        .local_get(struct_local)
+                                        .local_get(function_locals[arg_index])
                                         .load(
                                             compilation_ctx.memory_id,
                                             LoadKind::I32 { atomic: false },
@@ -1108,7 +1107,11 @@ fn translate_instruction(
                                                 offset: 0,
                                             },
                                         )
-                                        .call(locate_struct_fn);
+                                        .local_tee(struct_ptr);
+
+                                    // Compute the slot where the struct will be saved
+
+                                    builder.call(locate_struct_fn);
 
                                     let save_in_slot_fn = NativeFunction::get_generic(
                                         "save_in_slot",
@@ -1119,15 +1122,8 @@ fn translate_instruction(
 
                                     // Load the struct memory representation to pass it to the save
                                     // function
-                                    builder.local_get(struct_local).load(
-                                        compilation_ctx.memory_id,
-                                        LoadKind::I32 { atomic: false },
-                                        MemArg {
-                                            align: 0,
-                                            offset: 0,
-                                        },
-                                    );
                                     builder
+                                        .local_get(struct_ptr)
                                         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                                         .call(save_in_slot_fn);
                                 }
@@ -1594,6 +1590,10 @@ fn translate_instruction(
             }
 
             types_stack.push(t2);
+        }
+        Bytecode::Abort => {
+            types_stack.pop_expecting(&IntermediateType::IU64)?;
+            builder.return_();
         }
         Bytecode::Xor => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;

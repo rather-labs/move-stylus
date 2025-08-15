@@ -4,6 +4,9 @@
 //! and check the value again. The deployed contract is fully written in Rust and compiled to WASM
 //! but with Stylus, it is accessible just as a normal Solidity smart contract is via an ABI.
 
+use alloy::hex;
+use alloy::primitives::keccak256;
+use alloy::providers::Provider;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{
     primitives::{Address, address},
@@ -20,10 +23,25 @@ sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract Example {
+        // TODO: Not sure if use address or bytes32
+        #[derive(Debug)]
+        struct ID {
+           bytes32 bytes;
+        }
+
+        #[derive(Debug)]
+        struct UID {
+           ID id;
+        }
+
+
         function echoWithGenericFunctionU16(uint16 x) external view returns (uint16);
         function echoWithGenericFunctionVec32(uint32[] x) external view returns (uint32[]);
         function echoWithGenericFunctionU16Vec32(uint16 x, uint32[] y) external view returns (uint16, uint32[]);
         function echoWithGenericFunctionAddressVec128(address x, uint128[] y) external view returns (address, uint128[]);
+        function getUniqueIds() external view returns (UID, UID, UID);
+        function getUniqueId() external view returns (UID);
+        function getFreshObjectAddress() external view returns (address);
     }
 );
 
@@ -74,5 +92,62 @@ async fn main() -> eyre::Result<()> {
         ret._0, ret._1
     );
 
+
+    // If the constructor is called, the storage value at init_key is should be different from 0
+    let init_key = alloy::primitives::U256::from_be_bytes(keccak256(b"init_key").into());
+    let init_value_le = storage_value_to_le(&provider, address, init_key).await?;
+    println!("Storage value at init_key: {:?}", init_value_le);
+
+    // Storage key for the counter
+    let counter_key =
+        alloy::primitives::U256::from_be_bytes(keccak256(b"global_counter_key").into());
+
+    let pending_tx = example.getUniqueIds().send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("getUniqueIds - Emitted UID: 0x{}", hex::encode(raw));
+    }
+
+    let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
+    println!("Counter value: {:?}", storage_value_le);
+
+    let pending_tx = example.getUniqueId().send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("getUniqueId - Emitted UID: 0x{}", hex::encode(raw));
+    }
+    let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
+    println!("Counter value: {:?}", storage_value_le);
+
+    let pending_tx = example.getUniqueId().send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("getUniqueId - Emitted UID: 0x{}", hex::encode(raw));
+    }
+
+    let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
+    println!("Counter value: {:?}", storage_value_le);
+
+    let ret = example.getFreshObjectAddress().call().await?;
+    println!("fresh new id {ret:?}");
+
+    let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
+    println!("Counter value: {:?}", storage_value_le);
+
     Ok(())
+}
+
+/// Converts a storage value from big-endian (as read from storage) to little-endian (as stored)
+async fn storage_value_to_le<T: Provider>(
+    provider: &T,
+    address: Address,
+    key: alloy::primitives::U256,
+) -> eyre::Result<alloy::primitives::U256> {
+    let value = provider.get_storage_at(address, key).await?;
+    Ok(alloy::primitives::U256::from_le_bytes(
+        value.to_be_bytes::<32>(),
+    ))
 }

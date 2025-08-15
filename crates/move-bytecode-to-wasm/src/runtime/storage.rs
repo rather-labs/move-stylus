@@ -157,10 +157,16 @@ pub fn locate_storage_data(
     function.finish(vec![uid_ptr], &mut module.funcs)
 }
 
-/// Given a struct in memory, it calculates the slot where that struct is saved in the storage.
+/// Computes the storage slot number where the struct should be persisted.
+///
+/// When working with a struct in memory that has the `key` ability,
+/// once processing is complete, its storage slot must be calculated
+/// so the changes can be saved.
+///
+/// The slot number is written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET.
 ///
 /// # Arguments
-/// - struct pointer
+/// - struct_ptr - pointer to the struct
 pub fn locate_struct_slot(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function
@@ -176,7 +182,7 @@ pub fn locate_struct_slot(module: &mut Module, compilation_ctx: &CompilationCont
         .i32_const(32)
         .binop(BinaryOp::I32Sub);
 
-    // Obtain the object's id (first field of the struct)
+    // Obtain the object's id, it must be the first field
     builder.local_get(struct_ptr).load(
         compilation_ctx.memory_id,
         LoadKind::I32 { atomic: false },
