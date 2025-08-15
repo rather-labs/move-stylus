@@ -125,9 +125,10 @@ async fn main() -> eyre::Result<()> {
 
     let pending_tx = example.create().send().await?;
     let receipt = pending_tx.get_receipt().await?;
+    println!("Create Logs:");
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
-        println!("getUniqueIds - Emitted UID: 0x{}", hex::encode(raw));
+        println!("  - 0x{}", hex::encode(raw));
     }
 
     let id = address!("0x0000000000000000000000000000000000001234");
@@ -137,9 +138,10 @@ async fn main() -> eyre::Result<()> {
 
     let pending_tx = example.increment(id).send().await?;
     let receipt = pending_tx.get_receipt().await?;
+    println!("Increment Logs:");
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
+        println!("  - 0x{}", hex::encode(raw));
     }
 
     let res = example.read(id).call().await?;
@@ -147,6 +149,14 @@ async fn main() -> eyre::Result<()> {
 
     let pending_tx = example.deleter(id).send().await?;
     let receipt = pending_tx.get_receipt().await?;
+    println!("Deleter Logs:");
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("  - 0x{}", hex::encode(raw));
+    }
+
+    let res = example.read(id).call().await?;
+    println!("counter = {}", res);
 
     /*
     // If the constructor is called, the storage value at init_key is should be different from 0

@@ -13,8 +13,9 @@ pub mod table;
 
 use crate::{
     CompilationContext, compilation_context::ModuleData,
-    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, native_functions::NativeFunction,
-    runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension,
+    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, hostio::host_functions::emit_log,
+    native_functions::NativeFunction, runtime::RuntimeFunction,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 use anyhow::Result;
 use flow::Flow;
@@ -1084,7 +1085,6 @@ fn translate_instruction(
             // We expect that the owner address is just right before the pointer
             if mapped_function.is_entry {
                 for (arg_index, fn_arg) in mapped_function.signature.arguments.iter().enumerate() {
-                    println!("AAAAAAAAAAAAAAAAA {fn_arg:?}");
                     match fn_arg {
                         IntermediateType::IMutRef(inner) => {
                             if let IntermediateType::IStruct { module_id, index } = &**inner {
@@ -1098,7 +1098,17 @@ fn translate_instruction(
 
                                     // Compute the slot where the struct will be saved
                                     let struct_local = function_locals[arg_index];
-                                    builder.local_get(struct_local).call(locate_struct_fn);
+                                    builder
+                                        .local_get(struct_local)
+                                        .load(
+                                            compilation_ctx.memory_id,
+                                            LoadKind::I32 { atomic: false },
+                                            MemArg {
+                                                align: 0,
+                                                offset: 0,
+                                            },
+                                        )
+                                        .call(locate_struct_fn);
 
                                     let save_in_slot_fn = NativeFunction::get_generic(
                                         "save_in_slot",

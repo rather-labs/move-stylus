@@ -42,6 +42,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 ) {
     let (storage_cache, _) = storage_cache_bytes32(module);
     let (storage_flush_cache, _) = storage_flush_cache(module);
+    let (emit_log_fn, _) = emit_log(module);
 
     // Locals
     let val_32 = module.locals.add(ValType::I32);
@@ -51,6 +52,12 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     builder.i32_const(0).local_set(offset);
 
     let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
+
+    builder
+        .local_get(slot_ptr)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_fn);
 
     let mut written_bytes_in_slot = 0;
     for (index, field) in struct_.fields.iter().enumerate() {
@@ -74,6 +81,12 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                 .local_get(slot_ptr)
                 .call(next_slot_fn)
                 .local_set(slot_ptr);
+
+            builder
+                .local_get(slot_ptr)
+                .i32_const(32)
+                .i32_const(0)
+                .call(emit_log_fn);
 
             written_bytes_in_slot = field_size;
         } else {
@@ -483,7 +496,7 @@ pub fn add_delete_storage_struct_instructions(
 
     builder
         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .local_set(slot_ptr); // Ask nico if this is correct
+        .local_set(slot_ptr);
 
     // Wipe the slot data placeholder. We use it to erase the slots in the storage
     builder
@@ -497,6 +510,14 @@ pub fn add_delete_storage_struct_instructions(
         .local_get(slot_ptr)
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .call(storage_cache);
+
+    let (emit_log_fn, _) = emit_log(module);
+
+    builder
+        .local_get(slot_ptr)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_fn);
 
     let mut slot_used_bytes = 0;
     for (index, field) in struct_.fields.iter().enumerate() {
@@ -513,13 +534,11 @@ pub fn add_delete_storage_struct_instructions(
                 .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
                 .call(storage_cache);
 
-            // let (emit_log_fn, _) = emit_log(module);
-
-            // builder
-            //     .local_get(slot_ptr)
-            //     .i32_const(32)
-            //     .i32_const(0)
-            //     .call(emit_log_fn);
+            builder
+                .local_get(slot_ptr)
+                .i32_const(32)
+                .i32_const(0)
+                .call(emit_log_fn);
 
             slot_used_bytes = field_size;
         } else {

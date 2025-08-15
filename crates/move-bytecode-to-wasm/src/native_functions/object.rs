@@ -180,13 +180,6 @@ pub fn add_native_fresh_id_fn(
         .i32_const(1)
         .call(storage_flush_cache_fn);
 
-    // Emit log with the ID
-    builder
-        .local_get(id_ptr)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
-
     // Return the ID ptr
     builder.local_get(id_ptr);
 
@@ -215,28 +208,24 @@ pub fn add_delete_object_fn(
     };
 
     // This calculates the slot number of a given (outer_key, struct_id) tupple in the objects mapping
-    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
-    let get_struct_id_fn = RuntimeFunction::GetStructId.get(module, Some(compilation_ctx));
+
+    let locate_struct_fn = RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
 
     let struct_ptr = module.locals.add(ValType::I32);
-    let owner_ptr = module.locals.add(ValType::I32);
-
-    builder
-        .local_get(struct_ptr)
-        .call(get_struct_owner_fn)
-        .local_set(owner_ptr);
 
     // Here we should check that the object is not frozen. If it is, we emit an unreacheable.
     // Both owned and shared objects can be deleted via object::delete()!
-    builder.local_get(owner_ptr);
-    builder.i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET);
-    builder.i32_const(32);
-    builder.call(equality_fn);
+    builder
+        .local_get(struct_ptr)
+        .i32_const(32)
+        .binop(BinaryOp::I32Sub)
+        .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+        .i32_const(32)
+        .call(equality_fn);
 
     builder.if_else(
         None,
@@ -245,12 +234,8 @@ pub fn add_delete_object_fn(
             then.unreachable();
         },
         |else_| {
-            // Get the object slot in the storage
-            else_
-                .local_get(owner_ptr)
-                .local_get(struct_ptr)
-                .call(get_struct_id_fn)
-                .call(write_object_slot_fn);
+            // Compute the slot where the struct will be saved
+            else_.local_get(struct_ptr).call(locate_struct_fn);
 
             // Delete the object from the storage
             storage::encoding::add_delete_storage_struct_instructions(

@@ -32,8 +32,6 @@ pub fn add_transfer_object_fn(
 
     // This calculates the slot number of a given (outer_key, struct_id) tupple in the objects mapping
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
-    let get_struct_id_fn = RuntimeFunction::GetStructId.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
     let add_delete_object_fn = add_delete_object_fn(hash.clone(), module, compilation_ctx, struct_);
@@ -52,7 +50,8 @@ pub fn add_transfer_object_fn(
     // - The frozen objects internal key (0x2)
     builder
         .local_get(struct_ptr)
-        .call(get_struct_owner_fn)
+        .i32_const(32)
+        .binop(BinaryOp::I32Sub)
         .local_set(owner_ptr);
 
     // Here we should check that the object is not frozen or shared. If it is, we throw an unreacheable.
@@ -81,7 +80,14 @@ pub fn add_transfer_object_fn(
             // We load the struct_ptr, so now struct_id_ptr holds a pointer to the id.
             else_
                 .local_get(struct_ptr)
-                .call(get_struct_id_fn)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
                 .local_set(struct_id_ptr);
 
             // Calculate the slot number corresponding to the (recipient, struct_id) tupple
@@ -114,8 +120,6 @@ pub fn add_freeze_object_fn(
 
     // This calculates the slot number of a given (outer_key, struct_id) tupple in the objects mapping
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
-    let get_struct_id_fn = RuntimeFunction::GetStructId.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
     let add_delete_object_fn = add_delete_object_fn(hash.clone(), module, compilation_ctx, struct_);
@@ -135,7 +139,8 @@ pub fn add_freeze_object_fn(
         // - The frozen objects internal key (0x2)
         block
             .local_get(struct_ptr)
-            .call(get_struct_owner_fn)
+            .i32_const(32)
+            .binop(BinaryOp::I32Sub)
             .local_set(owner_ptr);
 
         // Here we should check that the object is not shared. If so, we emit an unreacheable.
@@ -171,7 +176,14 @@ pub fn add_freeze_object_fn(
                 // Get struct id
                 else_
                     .local_get(struct_ptr)
-                    .call(get_struct_id_fn)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
                     .local_set(struct_id_ptr);
 
                 // Calculate the struct slot in the frozen objects mapping

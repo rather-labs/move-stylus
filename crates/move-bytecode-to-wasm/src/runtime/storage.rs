@@ -168,85 +168,26 @@ pub fn locate_struct_slot(module: &mut Module, compilation_ctx: &CompilationCont
         .func_body();
 
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
-    let get_struct_id_fn = RuntimeFunction::GetStructId.get(module, Some(compilation_ctx));
-
     let struct_ptr = module.locals.add(ValType::I32);
 
     // Obtain this object's owner
-    builder.local_get(struct_ptr).call(get_struct_owner_fn);
-
-    // Obtain the object's id, it must be the first field
-    builder.local_get(struct_ptr).call(get_struct_id_fn);
-
-    // Compute the slot where it should be saved
-    builder.call(write_object_slot_fn);
-
-    function.finish(vec![struct_ptr], &mut module.funcs)
-}
-
-/// Given a struct in memory, it retrieves its owner.
-///
-/// # Arguments
-/// - struct pointer
-pub fn get_struct_owner(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
-    let mut builder = function
-        .name(RuntimeFunction::GetStructOwner.name().to_owned())
-        .func_body();
-
-    let struct_ptr = module.locals.add(ValType::I32);
-
-    // Obtain this object's owner, located 32 bytes before its
-    // pointer
     builder
         .local_get(struct_ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
         .i32_const(32)
         .binop(BinaryOp::I32Sub);
 
-    function.finish(vec![struct_ptr], &mut module.funcs)
-}
+    // Obtain the object's id (first field of the struct)
+    builder.local_get(struct_ptr).load(
+        compilation_ctx.memory_id,
+        LoadKind::I32 { atomic: false },
+        MemArg {
+            align: 0,
+            offset: 0,
+        },
+    );
 
-/// Given a struct in memory, it retrieves its id.
-///
-/// # Arguments
-/// - struct pointer
-pub fn get_struct_id(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
-    let mut builder = function
-        .name(RuntimeFunction::GetStructId.name().to_owned())
-        .func_body();
-
-    let struct_ptr = module.locals.add(ValType::I32);
-
-    // Obtain this object's owner, located 32 bytes before its
-    // pointer
-    builder
-        .local_get(struct_ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
+    // Compute the slot where it should be saved
+    builder.call(write_object_slot_fn);
 
     function.finish(vec![struct_ptr], &mut module.funcs)
 }
@@ -314,14 +255,6 @@ pub fn storage_next_slot_function(
         .local_get(slot_ptr)
         .local_get(slot_ptr)
         .call(swap_256_fn);
-
-    let (emit_log_fn, _) = emit_log(module);
-
-    builder
-        .local_get(slot_ptr)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
 
     function.finish(vec![slot_ptr], &mut module.funcs)
 }
