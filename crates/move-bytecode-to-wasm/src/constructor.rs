@@ -12,13 +12,14 @@ use walrus::{
 
 use crate::{
     CompilationContext, UserDefinedType,
-    abi_types::{public_function::PublicFunction, vm_handled_datatypes::TxContext},
+    abi_types::public_function::PublicFunction,
     hostio::host_functions,
     translation::{
         intermediate_types::{ISignature, IntermediateType},
         table::{FunctionId, FunctionTable},
     },
     utils::keccak_string_to_memory,
+    vm_handled_types::{VmHandledType, tx_context::TxContext},
 };
 
 static EMPTY_SIGNATURE: ISignature = ISignature {
@@ -176,11 +177,11 @@ pub fn build_constructor(
                 // Here we replace that logic by writing a marker value into the storage.
                 // TODO: revisit the OTW implementation and check if this approach is correct.
                 if params.len() == 2 {
-                    then.i32_const(0); // OTW = 0 
+                    then.i32_const(0); // OTW = 0
                 }
 
                 // Inject TxContext as last argument
-                TxContext::inject_tx_context(then, compilation_ctx.allocator);
+                TxContext::inject(then, module, compilation_ctx);
 
                 // Call the `init` function
                 then.call(init_id);
@@ -269,7 +270,7 @@ pub fn is_init(
                     if matches!(
                         inner.as_ref(),
                         IntermediateType::IExternalUserData { module_id, identifier }
-                            if TxContext::struct_is_tx_context(module_id, identifier)
+                            if TxContext::is_vm_type(module_id, identifier)
                     )
             )
         })

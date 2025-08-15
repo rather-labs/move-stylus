@@ -6,9 +6,8 @@ use crate::{
     compilation_context::ExternalModuleData,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
     utils::snake_to_camel,
+    vm_handled_types::{VmHandledType, tx_context::TxContext},
 };
-
-use super::vm_handled_datatypes::TxContext;
 
 pub type AbiFunctionSelector = [u8; 4];
 
@@ -31,8 +30,7 @@ pub fn move_signature_to_abi_selector<T: SolName>(
 ) -> AbiFunctionSelector {
     let parameter_strings = signature
         .iter()
-        .map(|s| s.sol_name(compilation_ctx))
-        .filter_map(|s| s)
+        .filter_map(|s| s.sol_name(compilation_ctx))
         .collect::<Vec<String>>()
         .join(",");
 
@@ -67,7 +65,7 @@ impl SolName for IntermediateType {
                     .unwrap();
 
                 if struct_.saved_in_storage {
-                    Some(sol_data::Address::SOL_NAME.to_string())
+                    Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
                 } else {
                     Self::struct_fields_sol_name(struct_, compilation_ctx)
                 }
@@ -83,7 +81,7 @@ impl SolName for IntermediateType {
                 let struct_instance = struct_.instantiate(types);
 
                 if struct_instance.saved_in_storage {
-                    Some(sol_data::Address::SOL_NAME.to_string())
+                    Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
                 } else {
                     Self::struct_fields_sol_name(&struct_instance, compilation_ctx)
                 }
@@ -101,13 +99,13 @@ impl SolName for IntermediateType {
                     // TxContext should not be part of the function signature, since it is injected
                     // by the VM.
                     ExternalModuleData::Struct(_)
-                        if TxContext::struct_is_tx_context(module_id, identifier) =>
+                        if TxContext::is_vm_type(module_id, identifier) =>
                     {
                         None
                     }
                     ExternalModuleData::Struct(istruct) => {
                         if istruct.saved_in_storage {
-                            Some(sol_data::Address::SOL_NAME.to_string())
+                            Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
                         } else {
                             Self::struct_fields_sol_name(istruct, compilation_ctx)
                         }

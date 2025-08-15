@@ -6,7 +6,6 @@ use walrus::{
 use crate::{
     CompilationContext,
     data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET},
-    hostio::host_functions::emit_log,
     runtime::RuntimeFunction,
     storage,
     translation::intermediate_types::structs::IStruct,
@@ -77,21 +76,28 @@ pub fn add_share_object_fn(
                 offset: 0,
             },
         )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
         .local_tee(tmp);
 
     // Slot number is in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
     builder.call(write_object_slot_fn);
 
-    // Emit log of which slot was written
-    let (emit_log_fn, _) = emit_log(module);
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
-
     // Call storage save for the struct
-    let storage_save_name = format!("{}_{hash}", NativeFunction::NATIVE_STORAGE_SAVE);
     let storage_save_fn = add_storage_save_fn(hash, module, compilation_ctx, struct_);
 
     builder

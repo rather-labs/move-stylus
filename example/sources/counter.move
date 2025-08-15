@@ -7,26 +7,24 @@ use stylus::transfer as transfer;
 use stylus::storage as storage;
 
 public struct Counter has key {
-    // TODO: This should be a UID but we need to handle that case specifically
-    id: address,
+    id: UID,
     owner: address,
     value: u64
 }
 
 public fun create(ctx: &mut TxContext) {
-  let new_counter = Counter {
-    id: @0x1234,
+  transfer::share_object(Counter {
+    id: object::new(ctx),
     owner: ctx.sender(),
     value: 25
-  };
-
-  transfer::share_object(new_counter);
+  });
 }
 
 /// Increment a counter by 1.
 public fun increment(counter: &mut Counter) {
     counter.value = counter.value + 1;
 }
+
 
 /// Read counter.
 public fun read(counter: &Counter): u64 {

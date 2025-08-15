@@ -53,6 +53,12 @@ pub enum UserDefinedType {
 #[repr(transparent)]
 pub struct Address([u8; 32]);
 
+impl Address {
+    pub const fn from_bytes(bytes: [u8; 32]) -> Self {
+        Address(bytes)
+    }
+}
+
 impl Display for Address {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(last_nonzero) = self.0.iter().rposition(|&b| b != 0) {

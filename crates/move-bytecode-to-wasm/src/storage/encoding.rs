@@ -8,6 +8,9 @@ use walrus::{
 
 use crate::{
     CompilationContext,
+    compilation_context::{
+        ExternalModuleData, ModuleId, reserved_modules::STYLUS_FRAMEWORK_ADDRESS,
+    },
     data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_STORAGE_OBJECT_OWNER_OFFSET},
     hostio::host_functions::{storage_cache_bytes32, storage_flush_cache, storage_load_bytes32},
     runtime::RuntimeFunction,
@@ -17,6 +20,7 @@ use crate::{
         heap_integers::{IU128, IU256},
         structs::IStruct,
     },
+    vm_handled_types::{VmHandledType, uid::UID},
 };
 
 /// Adds the instructions to encode and save into storage an specific struct.
@@ -49,7 +53,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 
     let mut written_bytes_in_slot = 0;
     for (index, field) in struct_.fields.iter().enumerate() {
-        let field_size = field_size(field);
+        let field_size = field_size(field, compilation_ctx);
         if written_bytes_in_slot + field_size > 32 {
             // Save previous slot (maybe not needed...)
             builder
@@ -197,7 +201,51 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 
                 builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
             }
-            _ => todo!(),
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } if UID::is_vm_type(module_id, identifier) => {
+                let tmp = module.locals.add(ValType::I32);
+
+                // The UID struct has the following form
+                //
+                // UID { id: ID { bytes: <bytes> } }
+                //
+                // At this point we have in stack a pointer to field we are processing. The
+                // field's value is a pointer to the ID struct.
+                //
+                // The first load instruction puts in stack the pointer to the ID struct
+                // The second load instruction loads the ID's bytes field pointer
+                //
+                // At the end of the load chain we point to the 32 bytes holding the data
+                builder
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(tmp);
+
+                // Load the memory address
+                builder
+                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                    .local_get(tmp)
+                    .i32_const(32);
+
+                builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+            }
+            e => todo!("{e:?}"),
         };
     }
 
@@ -261,7 +309,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
 
     let mut read_bytes_in_slot = 0;
     for (index, field) in struct_.fields.iter().enumerate() {
-        let field_size = field_size(field);
+        let field_size = field_size(field, compilation_ctx);
         if read_bytes_in_slot + field_size > 32 {
             let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
             builder
@@ -422,6 +470,71 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 // Copy the chunk of memory
                 builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
             }
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } if UID::is_vm_type(module_id, identifier) => {
+                // Here we need to reconstruct the UID struct. To do that we first allocate 4 bytes
+                // that will contain the pointer to the UID struct data
+                //
+                // After that we need to create the ID struct. So we allocate 4 bytes for the first
+                // field's pointer, and 32 bytes that will hold the actual data.
+
+                // Create a pointer for the value. This pointer will point to the struct ID
+                builder
+                    .i32_const(4)
+                    .call(compilation_ctx.allocator)
+                    .local_set(field_ptr);
+
+                let id_struct_ptr = module.locals.add(ValType::I32);
+                let id_field_ptr = module.locals.add(ValType::I32);
+
+                // Recreate the ID struct
+
+                // First, 4 bytes for the pointer that points to the ID
+                builder
+                    .i32_const(4)
+                    .call(compilation_ctx.allocator)
+                    .local_set(id_struct_ptr);
+
+                // 32 bytes to save the actual id
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(id_field_ptr);
+
+                // Source address (plus offset)
+                builder.i32_const(DATA_SLOT_DATA_PTR_OFFSET);
+
+                // Number of bytes to copy
+                builder.i32_const(32);
+
+                // Copy the chunk of memory
+                builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+                // Point the id_field_ptr to the data
+                builder
+                    .local_get(id_struct_ptr)
+                    .local_get(id_field_ptr)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                // Write the field_ptr with the address of the ID struct
+                builder.local_get(field_ptr).local_get(id_struct_ptr).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
             _ => todo!(),
         };
 
@@ -440,7 +553,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
 }
 
 /// Return the storage-encoded field size in bytes
-fn field_size(field: &IntermediateType) -> u32 {
+fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext) -> u32 {
     match field {
         IntermediateType::IBool | IntermediateType::IU8 | IntermediateType::IEnum(_) => 1,
         IntermediateType::IU16 => 2,
@@ -452,6 +565,16 @@ fn field_size(field: &IntermediateType) -> u32 {
         IntermediateType::IVector(_)
         | IntermediateType::IGenericStructInstance { .. }
         | IntermediateType::IStruct { .. } => 32,
+        IntermediateType::IExternalUserData {
+            module_id,
+            identifier,
+        } => match compilation_ctx
+            .get_external_module_data(module_id, identifier)
+            .unwrap()
+        {
+            ExternalModuleData::Struct(_) => 32,
+            ExternalModuleData::Enum(_) => 1,
+        },
 
         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
             panic!("found reference inside struct")
@@ -459,6 +582,5 @@ fn field_size(field: &IntermediateType) -> u32 {
         IntermediateType::ITypeParameter(_) => {
             panic!("cannot know if a type parameter is dynamic, expected a concrete type");
         }
-        IntermediateType::IExternalUserData { .. } => todo!(),
     }
 }
