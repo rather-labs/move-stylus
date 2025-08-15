@@ -80,19 +80,6 @@ async fn main() -> eyre::Result<()> {
         println!("slotReader = {}", res);
     }
 
-    let pending_tx = example.deleteCounter(id).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    println!("Deleter Logs:");
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("  - 0x{}", hex::encode(raw));
-    }
-
-    for slot in slots {
-        let res = example.slotReader(slot).call().await?;
-        println!("slotReader = {}", res);
-    }
-
     let pending_tx = example.setValue(id, 42).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
@@ -112,6 +99,19 @@ async fn main() -> eyre::Result<()> {
 
     let res = example.read(id).call().await?;
     println!("counter = {}", res);
+
+    let pending_tx = example.deleteCounter(id).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    println!("Deleter Logs:");
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("  - 0x{}", hex::encode(raw));
+    }
+
+    for slot in slots {
+        let res = example.slotReader(slot).call().await?;
+        println!("slotReader = {}", res);
+    }
 
     Ok(())
 }
