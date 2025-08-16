@@ -4,7 +4,6 @@ use crate::{
     CompilationContext,
     compilation_context::ExternalModuleData,
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
-    hostio::host_functions::emit_log,
     runtime::RuntimeFunction,
     storage::read::add_read_struct_from_storage_fn,
     translation::intermediate_types::{
@@ -192,12 +191,6 @@ impl Unpackable for IntermediateType {
                     let locate_storage_data_fn =
                         RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
                     function_builder.call(locate_storage_data_fn);
-
-                    let (emit_log_fn, _) = emit_log(module);
-                    function_builder.i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET);
-                    function_builder.i32_const(32);
-                    function_builder.i32_const(0);
-                    function_builder.call(emit_log_fn);
 
                     // Read the object
                     let read_struct_from_storage_fn =

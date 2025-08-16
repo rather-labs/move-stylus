@@ -14,8 +14,9 @@ sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract Example {
-        function create() public view;
+        function create(bool share) public view;
         function read(address id) public view returns (uint64);
+        function readOwner(address id) public view returns (address);
         function increment(address id) public view;
         function setValue(address id, uint64 value) public view;
         function deleteCounter(address id) public view;
@@ -42,19 +43,34 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
-    let pending_tx = example.create().send().await?;
+    let share_flag = false;
+    let pending_tx = example.create(share_flag).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     println!("Create Logs:");
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
         println!("  - 0x{}", hex::encode(raw));
     }
+    let id = address!("0x0000000000000000000000000000000000001234");
+
+    let pending_tx = example.readOwner(id).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    println!("Read Owner Logs:");
+
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("  - 0x{}", hex::encode(raw));
+    }
+
+    let res = example.readOwner(id).call().await?;
+    println!("owner = {}", res);
+
     let slots = [
-        U256::from_str("0x05d0ca05d46093310ab4a19866376b885c66147ea78c86c5ac6a70e8d0cfeb54")
+        U256::from_str("0x221689f749568568ffabb655ec216a45ca02fc4d4a4e7184a9569d4cd6113749")
             .unwrap(),
-        U256::from_str("0x05d0ca05d46093310ab4a19866376b885c66147ea78c86c5ac6a70e8d0cfeb55")
+        U256::from_str("0x221689f749568568ffabb655ec216a45ca02fc4d4a4e7184a9569d4cd611374a")
             .unwrap(),
-        U256::from_str("0x05d0ca05d46093310ab4a19866376b885c66147ea78c86c5ac6a70e8d0cfeb56")
+        U256::from_str("0x221689f749568568ffabb655ec216a45ca02fc4d4a4e7184a9569d4cd611374b")
             .unwrap(),
     ];
     for slot in slots {
@@ -62,7 +78,6 @@ async fn main() -> eyre::Result<()> {
         println!("slotReader = {}", res);
     }
 
-    let id = address!("0x0000000000000000000000000000000000001234");
     // let res = example.read(U256::from(1234).to_le_bytes().into()).call().await?;
     let res = example.read(id).call().await?;
     println!("counter = {}", res);

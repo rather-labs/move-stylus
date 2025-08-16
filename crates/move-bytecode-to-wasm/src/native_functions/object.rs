@@ -207,7 +207,8 @@ pub fn add_delete_object_fn(
 
     // This calculates the slot number of a given (outer_key, struct_id) tupple in the objects mapping
 
-    let locate_struct_fn = RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx));
+    let locate_struct_slot_fn =
+        RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
@@ -233,7 +234,7 @@ pub fn add_delete_object_fn(
         },
         |else_| {
             // Compute the slot where the struct will be saved
-            else_.local_get(struct_ptr).call(locate_struct_fn);
+            else_.local_get(struct_ptr).call(locate_struct_slot_fn);
 
             // Delete the object from the storage
             storage::encoding::add_delete_storage_struct_instructions(

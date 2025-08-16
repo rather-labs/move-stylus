@@ -42,7 +42,9 @@ pub fn locate_storage_data(
         .name(RuntimeFunction::LocateStorageData.name().to_owned())
         .func_body();
 
+    let shift_right_fn = RuntimeFunction::HeapIntShiftRight.get(module, Some(compilation_ctx));
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
     let eq_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let (tx_origin, _) = tx_origin(module);
     let (storage_load, _) = storage_load_bytes32(module);
@@ -58,10 +60,26 @@ pub fn locate_storage_data(
         .call(compilation_ctx.allocator)
         .local_set(zero);
 
+    // TODO: CHECK THIS PART. WHY WE NEED TO CHANGE THE PADDING?
     // First we check the tx signer
+    // This is writting the addres like this 0x03f1eae7d46d88f08fc2f8ed27fcb2ab183eb2d0e00000000000000000000000
     builder
         .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
         .call(tx_origin);
+
+    // Copy the first 20 bytes in the last 20 bytes
+    builder
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET + 12)
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+        .i32_const(20)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+    // Wipe the first 12 bytes (to the left of the address)
+    builder
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+        .i32_const(0)
+        .i32_const(12) 
+        .memory_fill(compilation_ctx.memory_id);
 
     builder.block(None, |block| {
         let exit_block = block.id();
@@ -151,7 +169,7 @@ pub fn locate_storage_data(
             .br_if(exit_block);
 
         // If we get here means the object was not found
-        block.unreachable();
+        // block.unreachable();
     });
 
     function.finish(vec![uid_ptr], &mut module.funcs)

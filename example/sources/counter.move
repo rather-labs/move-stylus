@@ -13,14 +13,18 @@ public struct Counter has key {
     value: u64
 }
 
-public fun create(ctx: &mut TxContext) {
+public fun create(share: bool, ctx: &mut TxContext) {
   let new_counter = Counter {
     id: @0x1234,
     owner: ctx.sender(),
     value: 25
   };
 
-  transfer::share_object(new_counter);
+  if (share) {
+    transfer::share_object(new_counter);
+  } else {
+    transfer::transfer(new_counter, ctx.sender());
+  }
 }
 
 /// Increment a counter by 1.
@@ -31,6 +35,10 @@ public fun increment(counter: &mut Counter) {
 /// Read counter.
 public fun read(counter: &Counter): u64 {
     counter.value
+}
+
+public fun read_owner(counter: &Counter): address {
+    counter.owner
 }
 
 /// Set value (only runnable by the Counter owner)

@@ -1,6 +1,6 @@
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use crate::{
@@ -142,7 +142,7 @@ pub fn add_freeze_object_fn(
             .binop(BinaryOp::I32Sub)
             .local_set(owner_ptr);
 
-        // Here we should check that the object is not shared. If so, we emit an unreacheable.
+        // Check that the object is not shared. If so, emit an unreacheable.
         // We dont need to check if the owner is the tx sender because this is implicitly done when unpacking the struct.
         // If the object is already frozen, we skip the rest of the function. Its a no-op.
 

@@ -6,7 +6,7 @@ use walrus::{
 use crate::{
     CompilationContext,
     data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET},
-    hostio::host_functions::{emit_log, storage_load_bytes32},
+    hostio::host_functions::storage_load_bytes32,
     runtime::RuntimeFunction,
     storage,
     translation::intermediate_types::structs::IStruct,
@@ -82,14 +82,6 @@ pub fn add_share_object_fn(
     // Slot number is in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
     builder.call(write_object_slot_fn);
 
-    // Emit log of which slot was written
-    let (emit_log_fn, _) = emit_log(module);
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
-
     // Call storage save for the struct
     let storage_save_fn = add_storage_save_fn(hash, module, compilation_ctx, struct_);
 
@@ -105,7 +97,6 @@ pub fn add_share_object_fn(
 pub fn add_read_slot_fn(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let (storage_load_bytes32, _) = storage_load_bytes32(module);
     let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
-    let (emit_log_fn, _) = emit_log(module);
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
 
@@ -120,12 +111,6 @@ pub fn add_read_slot_fn(module: &mut Module, compilation_ctx: &CompilationContex
         .local_get(slot_ptr)
         .local_get(slot_ptr)
         .call(swap_256_fn);
-
-    builder
-        .local_get(slot_ptr)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
 
     builder
         .local_get(slot_ptr)
