@@ -54,3 +54,7 @@ public fun delete_counter(counter: Counter) {
 public fun slot_reader(slot: u256): u256 {
     storage::read_slot(slot)
 }
+
+public fun freeze_counter(counter: Counter) {
+    transfer::freeze_object(counter);
+}

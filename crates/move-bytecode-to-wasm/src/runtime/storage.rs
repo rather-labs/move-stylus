@@ -60,26 +60,17 @@ pub fn locate_storage_data(
         .call(compilation_ctx.allocator)
         .local_set(zero);
 
-    // TODO: CHECK THIS PART. WHY WE NEED TO CHANGE THE PADDING?
-    // First we check the tx signer
-    // This is writting the addres like this 0x03f1eae7d46d88f08fc2f8ed27fcb2ab183eb2d0e00000000000000000000000
-    builder
-        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-        .call(tx_origin);
-
-    // Copy the first 20 bytes in the last 20 bytes
-    builder
-        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET + 12)
-        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-        .i32_const(20)
-        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
-    // Wipe the first 12 bytes (to the left of the address)
+    // Wipe the memory first, and then write the tx signer address
     builder
         .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
         .i32_const(0)
-        .i32_const(12) 
+        .i32_const(12)
         .memory_fill(compilation_ctx.memory_id);
+
+    // Write the tx signer (20 bytes) left padded
+    builder
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET + 12)
+        .call(tx_origin);
 
     builder.block(None, |block| {
         let exit_block = block.id();
@@ -169,7 +160,7 @@ pub fn locate_storage_data(
             .br_if(exit_block);
 
         // If we get here means the object was not found
-        // block.unreachable();
+        block.unreachable();
     });
 
     function.finish(vec![uid_ptr], &mut module.funcs)

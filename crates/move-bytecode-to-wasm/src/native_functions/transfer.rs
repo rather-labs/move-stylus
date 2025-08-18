@@ -9,6 +9,7 @@ use crate::{
         DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
         DATA_SHARED_OBJECTS_KEY_OFFSET,
     },
+    hostio::host_functions::emit_log,
     native_functions::{object::add_delete_object_fn, storage::add_storage_save_fn},
     runtime::RuntimeFunction,
     translation::intermediate_types::structs::IStruct,
@@ -34,6 +35,7 @@ pub fn add_transfer_object_fn(
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
     let add_delete_object_fn = add_delete_object_fn(hash.clone(), module, compilation_ctx, struct_);
+    let (emit_log_fn, _) = emit_log(module);
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
@@ -97,6 +99,12 @@ pub fn add_transfer_object_fn(
                 .call(write_object_slot_fn);
 
             else_
+                .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                .i32_const(32)
+                .i32_const(0)
+                .call(emit_log_fn);
+
+            else_
                 .local_get(struct_ptr)
                 .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                 .call(storage_save_fn);
@@ -122,6 +130,7 @@ pub fn add_freeze_object_fn(
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
     let add_delete_object_fn = add_delete_object_fn(hash.clone(), module, compilation_ctx, struct_);
+    let (emit_log_fn, _) = emit_log(module);
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
@@ -190,6 +199,12 @@ pub fn add_freeze_object_fn(
                     .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
                     .local_get(struct_id_ptr)
                     .call(write_object_slot_fn);
+
+                else_
+                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .i32_const(32)
+                    .i32_const(0)
+                    .call(emit_log_fn);
 
                 // Save the struct into the frozen objects mapping
                 else_

@@ -21,6 +21,7 @@ sol!(
         function setValue(address id, uint64 value) public view;
         function deleteCounter(address id) public view;
         function slotReader(uint256 slot) public view returns (uint256);
+        function freezeCounter(address id) public view;
     }
 );
 
@@ -43,7 +44,7 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
-    let share_flag = false;
+    let share_flag = true;
     let pending_tx = example.create(share_flag).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     println!("Create Logs:");
@@ -65,6 +66,7 @@ async fn main() -> eyre::Result<()> {
     let res = example.readOwner(id).call().await?;
     println!("owner = {}", res);
 
+    // Owned-counter slots
     let slots = [
         U256::from_str("0x221689f749568568ffabb655ec216a45ca02fc4d4a4e7184a9569d4cd6113749")
             .unwrap(),
@@ -118,9 +120,22 @@ async fn main() -> eyre::Result<()> {
     let res = example.read(id).call().await?;
     println!("counter = {}", res);
 
-    let pending_tx = example.deleteCounter(id).send().await?;
+    // let pending_tx = example.deleteCounter(id).send().await?;
+    // let receipt = pending_tx.get_receipt().await?;
+    // println!("Deleter Logs:");
+    // for log in receipt.logs() {
+    //     let raw = log.data().data.0.clone();
+    //     println!("  - 0x{}", hex::encode(raw));
+    // }
+
+    // for slot in slots {
+    //     let res = example.slotReader(slot).call().await?;
+    //     println!("slotReader = {}", res);
+    // }
+
+    let pending_tx = example.freezeCounter(id).send().await?;
     let receipt = pending_tx.get_receipt().await?;
-    println!("Deleter Logs:");
+    println!("Freeze Logs:");
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
         println!("  - 0x{}", hex::encode(raw));
@@ -130,6 +145,17 @@ async fn main() -> eyre::Result<()> {
         let res = example.slotReader(slot).call().await?;
         println!("slotReader = {}", res);
     }
-
+    let slots = [
+        U256::from_str("0xdca5c11f8ec9f23e8e03a6fc9f17888355076c2393f6b59f5fd691bf1c79e95c")
+            .unwrap(),
+        U256::from_str("0xdca5c11f8ec9f23e8e03a6fc9f17888355076c2393f6b59f5fd691bf1c79e95d")
+            .unwrap(),
+        U256::from_str("0xdca5c11f8ec9f23e8e03a6fc9f17888355076c2393f6b59f5fd691bf1c79e95e")
+            .unwrap(),
+    ];
+    for slot in slots {
+        let res = example.slotReader(slot).call().await?;
+        println!("slotReader = {}", res);
+    }
     Ok(())
 }
