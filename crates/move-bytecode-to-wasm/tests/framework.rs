@@ -82,8 +82,6 @@ mod tx_context {
     }
 
     #[rstest]
-    // TODO: this case is panicking because the storage functions are not implemented in the sandbox, so all UIDs are the same
-    #[should_panic]
     #[case(
         getFreshObjectAddressCall::new(()),
         (
@@ -103,7 +101,6 @@ mod tx_context {
         #[case] call_data: T,
         #[case] expected_result: ([u8; 32], [u8; 32], [u8; 32]),
     ) {
-        // let expected_result: [u8; 32] = expected_result.try_into().unwrap();
         run_test(
             runtime,
             call_data.abi_encode(),

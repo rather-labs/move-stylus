@@ -28,6 +28,8 @@ pub struct RuntimeSandbox {
     linker: Linker<ModuleData>,
     module: WasmModule,
     pub log_events: Arc<Mutex<mpsc::Receiver<Vec<u8>>>>,
+    current_tx_origin: Arc<Mutex<[u8; 20]>>,
+    current_msg_sender: Arc<Mutex<[u8; 20]>>,
 }
 
 macro_rules! link_fn_ret_constant {
@@ -74,6 +76,8 @@ impl RuntimeSandbox {
         let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
 
         let storage: Arc<Mutex<HashMap<[u8; 32], [u8; 32]>>> = Arc::new(Mutex::new(HashMap::new()));
+        let current_tx_origin = Arc::new(Mutex::new(SIGNER_ADDRESS));
+        let current_msg_sender = Arc::new(Mutex::new(MSG_SENDER_ADDRESS));
 
         let (log_sender, log_receiver) = mpsc::channel::<Vec<u8>>();
         let mut linker = Linker::new(&engine);
@@ -232,8 +236,44 @@ impl RuntimeSandbox {
             )
             .unwrap();
 
-        link_fn_write_constant!(linker, "tx_origin", SIGNER_ADDRESS);
-        link_fn_write_constant!(linker, "msg_sender", MSG_SENDER_ADDRESS);
+        let tx_orign = current_tx_origin.clone();
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "tx_origin",
+                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
+                    println!("tx_origin called, writing in {ptr}");
+
+                    let mem = match caller.get_export("memory") {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    let data = tx_orign.lock().unwrap();
+                    mem.write(&mut caller, ptr as usize, &*data).unwrap();
+                },
+            )
+            .unwrap();
+
+        let msg_sender = current_msg_sender.clone();
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "msg_sender",
+                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
+                    println!("msg_sender called, writing in {ptr}");
+
+                    let mem = match caller.get_export("memory") {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    let data = msg_sender.lock().unwrap();
+                    mem.write(&mut caller, ptr as usize, &*data).unwrap();
+                },
+            )
+            .unwrap();
+
         link_fn_write_constant!(linker, "msg_value", MSG_VALUE.to_le_bytes::<32>());
         link_fn_write_constant!(linker, "block_basefee", BLOCK_BASEFEE.to_le_bytes::<32>());
         link_fn_write_constant!(linker, "tx_gas_price", GAS_PRICE.to_le_bytes::<32>());
@@ -335,6 +375,8 @@ impl RuntimeSandbox {
             linker,
             module,
             log_events: Arc::new(Mutex::new(log_receiver)),
+            current_tx_origin,
+            current_msg_sender,
         }
     }
 
@@ -359,5 +401,13 @@ impl RuntimeSandbox {
             .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
 
         Ok((result, store.data().return_data.clone()))
+    }
+
+    pub fn set_tx_origin(&self, new_address: [u8; 20]) {
+        *self.current_tx_origin.lock().unwrap() = new_address;
+    }
+
+    pub fn set_msg_sender(&self, new_address: [u8; 20]) {
+        *self.current_msg_sender.lock().unwrap() = new_address;
     }
 }
