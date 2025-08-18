@@ -12,7 +12,8 @@ pub mod intermediate_types;
 pub mod table;
 
 use crate::{
-    CompilationContext, compilation_context::ModuleData, native_functions::NativeFunction,
+    CompilationContext, compilation_context::ModuleData,
+    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, native_functions::NativeFunction,
     runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension,
 };
 use anyhow::Result;
@@ -107,7 +108,9 @@ pub fn translate_function(
     let params = function_information.signature.get_argument_wasm_types();
     let results = function_information.signature.get_return_wasm_types();
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
-    let mut builder = function.func_body();
+    let mut builder = function
+        .name(function_information.function_id.identifier.clone())
+        .func_body();
 
     let (arguments, locals) = process_fn_local_variables(function_information, module);
 
@@ -1077,6 +1080,61 @@ fn translate_instruction(
         }
         // TODO: ensure this is the last instruction in the move code
         Bytecode::Ret => {
+            // If the function is entry and received as an argument an struct that must be saved in
+            // storage, we must persist it in case it had some change.
+            //
+            // We expect that the owner address is just right before the pointer
+            if mapped_function.is_entry {
+                for (arg_index, fn_arg) in mapped_function.signature.arguments.iter().enumerate() {
+                    match fn_arg {
+                        IntermediateType::IMutRef(inner) => {
+                            if let IntermediateType::IStruct { module_id, index } = &**inner {
+                                let struct_ = compilation_ctx
+                                    .get_user_data_type_by_index(module_id, *index)
+                                    .unwrap();
+
+                                if struct_.saved_in_storage {
+                                    let locate_struct_fn = RuntimeFunction::LocateStructSlot
+                                        .get(module, Some(compilation_ctx));
+
+                                    let struct_ptr = module.locals.add(ValType::I32);
+                                    builder
+                                        .local_get(function_locals[arg_index])
+                                        .load(
+                                            compilation_ctx.memory_id,
+                                            LoadKind::I32 { atomic: false },
+                                            MemArg {
+                                                align: 0,
+                                                offset: 0,
+                                            },
+                                        )
+                                        .local_tee(struct_ptr);
+
+                                    // Compute the slot where the struct will be saved
+                                    builder.call(locate_struct_fn);
+
+                                    let save_in_slot_fn = NativeFunction::get_generic(
+                                        "save_in_slot",
+                                        module,
+                                        compilation_ctx,
+                                        &[*inner.clone()],
+                                    );
+
+                                    // Load the struct memory representation to pass it to the save
+                                    // function
+                                    builder
+                                        .local_get(struct_ptr)
+                                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                                        .call(save_in_slot_fn);
+                                }
+                            }
+                        }
+                        // TODO: other structs
+                        _ => (),
+                    }
+                }
+            }
+
             prepare_function_return(
                 module,
                 builder,
@@ -1532,6 +1590,10 @@ fn translate_instruction(
             }
 
             types_stack.push(t2);
+        }
+        Bytecode::Abort => {
+            types_stack.pop_expecting(&IntermediateType::IU64)?;
+            builder.return_();
         }
         Bytecode::Xor => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;

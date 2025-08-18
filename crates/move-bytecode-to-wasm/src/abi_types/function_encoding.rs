@@ -6,9 +6,8 @@ use crate::{
     compilation_context::ExternalModuleData,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
     utils::snake_to_camel,
+    vm_handled_types::{VmHandledType, tx_context::TxContext},
 };
-
-use super::vm_handled_datatypes::TxContext;
 
 pub type AbiFunctionSelector = [u8; 4];
 
@@ -29,23 +28,11 @@ pub fn move_signature_to_abi_selector<T: SolName>(
     signature: &[T],
     compilation_ctx: &CompilationContext,
 ) -> AbiFunctionSelector {
-    let mut parameter_strings = Vec::new();
-    for (i, signature_token) in signature.iter().enumerate() {
-        if let Some(sol_name) = signature_token.sol_name(compilation_ctx) {
-            parameter_strings.push(sol_name);
-        }
-        // This error should never happen. The panic! placed here is just a safeguard. If this code
-        // gets executed means two things:
-        // 1. A check failed in PublicFunction::check_signature_arguments.
-        // 2. A `signer` type was found in a public function signature, but it is not the first
-        //    argument.
-        else if i != 0 {
-            panic!(
-                r#"function signature "{function_name}" can't be represented in Solidity's ABI format"#
-            );
-        }
-    }
-    let parameter_strings = parameter_strings.join(",");
+    let parameter_strings = signature
+        .iter()
+        .filter_map(|s| s.sol_name(compilation_ctx))
+        .collect::<Vec<String>>()
+        .join(",");
 
     let function_name = snake_to_camel(function_name);
 
@@ -77,7 +64,11 @@ impl SolName for IntermediateType {
                     .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
 
-                Self::struct_fields_sol_name(struct_, compilation_ctx)
+                if struct_.saved_in_storage {
+                    Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
+                } else {
+                    Self::struct_fields_sol_name(struct_, compilation_ctx)
+                }
             }
             IntermediateType::IGenericStructInstance {
                 module_id,
@@ -89,7 +80,11 @@ impl SolName for IntermediateType {
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
 
-                Self::struct_fields_sol_name(&struct_instance, compilation_ctx)
+                if struct_instance.saved_in_storage {
+                    Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
+                } else {
+                    Self::struct_fields_sol_name(&struct_instance, compilation_ctx)
+                }
             }
             IntermediateType::ISigner => None,
             IntermediateType::ITypeParameter(_) => None,
@@ -104,12 +99,16 @@ impl SolName for IntermediateType {
                     // TxContext should not be part of the function signature, since it is injected
                     // by the VM.
                     ExternalModuleData::Struct(_)
-                        if TxContext::struct_is_tx_context(module_id, identifier) =>
+                        if TxContext::is_vm_type(module_id, identifier) =>
                     {
-                        Some("".to_owned())
+                        None
                     }
                     ExternalModuleData::Struct(istruct) => {
-                        Self::struct_fields_sol_name(istruct, compilation_ctx)
+                        if istruct.saved_in_storage {
+                            Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
+                        } else {
+                            Self::struct_fields_sol_name(istruct, compilation_ctx)
+                        }
                     }
                     ExternalModuleData::Enum(_ienum) => todo!(),
                 }
@@ -263,75 +262,5 @@ mod tests {
                 "testStruct((address,uint32[],uint128[],bool,uint8,uint16,uint32,uint64,uint128,uint256,(uint32,uint128)),(uint32,uint128)[])"
             )
         );
-    }
-
-    #[test]
-    #[should_panic(
-        expected = r#"function signature "test_invalid_signature" can't be represented in Solidity's ABI format"#
-    )]
-    fn test_move_signature_to_abi_selector_invalid_1() {
-        let (_, allocator_func, memory_id) = build_module(None);
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
-
-        let signature: &[IntermediateType] = &[
-            IntermediateType::IU64,
-            IntermediateType::ISigner,
-            IntermediateType::IAddress,
-            IntermediateType::IU64,
-        ];
-        move_signature_to_abi_selector("test_invalid_signature", signature, &compilation_ctx);
-    }
-
-    #[test]
-    #[should_panic(
-        expected = r#"function signature "test_invalid_signature" can't be represented in Solidity's ABI format"#
-    )]
-    fn test_move_signature_to_abi_selector_invalid_2() {
-        let (_, allocator_func, memory_id) = build_module(None);
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
-
-        let signature: &[IntermediateType] = &[
-            IntermediateType::ISigner,
-            IntermediateType::IAddress,
-            IntermediateType::IU64,
-            IntermediateType::ISigner,
-            IntermediateType::IVector(Box::new(IntermediateType::IBool)),
-            IntermediateType::ISigner,
-        ];
-        move_signature_to_abi_selector("test_invalid_signature", signature, &compilation_ctx);
-    }
-
-    #[test]
-    #[should_panic(
-        expected = r#"function signature "test_invalid_signature" can't be represented in Solidity's ABI format"#
-    )]
-    fn test_move_signature_to_abi_selector_invalid_3() {
-        let (_, allocator_func, memory_id) = build_module(None);
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
-
-        let signature: &[IntermediateType] = &[
-            IntermediateType::IAddress,
-            IntermediateType::IU64,
-            IntermediateType::IVector(Box::new(IntermediateType::ISigner)),
-        ];
-        move_signature_to_abi_selector("test_invalid_signature", signature, &compilation_ctx);
-    }
-
-    #[test]
-    #[should_panic(
-        expected = r#"function signature "test_invalid_signature" can't be represented in Solidity's ABI format"#
-    )]
-    fn test_move_signature_to_abi_selector_invalid_4() {
-        let (_, allocator_func, memory_id) = build_module(None);
-        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
-
-        let signature: &[IntermediateType] = &[
-            IntermediateType::IAddress,
-            IntermediateType::IU64,
-            IntermediateType::IVector(Box::new(IntermediateType::IVector(Box::new(
-                IntermediateType::ISigner,
-            )))),
-        ];
-        move_signature_to_abi_selector("test_invalid_signature", signature, &compilation_ctx);
     }
 }

@@ -3,9 +3,7 @@
 //! Then, it attempts to check the current counter value, increment it via a tx,
 //! and check the value again. The deployed contract is fully written in Rust and compiled to WASM
 //! but with Stylus, it is accessible just as a normal Solidity smart contract is via an ABI.
-
-use alloy::hex;
-use alloy::primitives::{keccak256, utils::parse_ether};
+use alloy::primitives::utils::parse_ether;
 use alloy::providers::Provider;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
@@ -63,17 +61,6 @@ sol!(
             AnotherTest pos1;
         }
 
-        // TODO: Not sure if use address or bytes32
-        #[derive(Debug)]
-        struct ID {
-           bytes32 bytes;
-        }
-
-        #[derive(Debug)]
-        struct UID {
-           ID id;
-        }
-
         function createFooU16(uint16 x, uint16 y) external view returns (Foo);
         function createFoo2U16(uint16 x, uint16 y) external view returns (Foo,Foo);
         function createBazU16(uint16 x, uint16 y) external view returns (Baz);
@@ -91,9 +78,6 @@ sol!(
         function txContextProperties() public view returns (address, uint256, uint64, uint256, uint64, uint64, uint64, uint256);
         function fibonacci(uint64 n) external view returns (uint64);
         function sumSpecial(uint64 n) external view returns (uint64);
-        function getUniqueIds() external view returns (UID, UID, UID);
-        function getUniqueId() external view returns (UID);
-        function getFreshObjectAddress() external view returns (address);
     }
 );
 
@@ -115,15 +99,6 @@ async fn main() -> eyre::Result<()> {
     );
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
-
-    // If the constructor is called, the storage value at init_key is should be different from 0
-    let init_key = alloy::primitives::U256::from_be_bytes(keccak256(b"init_key").into());
-    let init_value_le = storage_value_to_le(&provider, address, init_key).await?;
-    println!("Storage value at init_key: {:?}", init_value_le);
-
-    // Storage key for the counter
-    let counter_key =
-        alloy::primitives::U256::from_be_bytes(keccak256(b"global_counter_key").into());
 
     let num = example.echo(123).call().await?;
     println!("echo(123) = {}", num);
@@ -220,41 +195,6 @@ async fn main() -> eyre::Result<()> {
     let ret = example.echoSignerWithInt(42).call().await?;
     println!("echoSignerWithInt = ({}, {})", ret._0, ret._1);
 
-    let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
-    println!("Counter value: {:?}", storage_value_le);
-
-    let pending_tx = example.getUniqueIds().send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("getUniqueIds - Emitted UID: 0x{}", hex::encode(raw));
-    }
-
-    let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
-    println!("Counter value: {:?}", storage_value_le);
-
-    let pending_tx = example.getUniqueId().send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("getUniqueId - Emitted UID: 0x{}", hex::encode(raw));
-    }
-    let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
-    println!("Counter value: {:?}", storage_value_le);
-
-    let pending_tx = example.getUniqueId().send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("getUniqueId - Emitted UID: 0x{}", hex::encode(raw));
-    }
-
-    let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
-    println!("Counter value: {:?}", storage_value_le);
-
-    let ret = example.getFreshObjectAddress().call().await?;
-    println!("fresh new id {ret:?}");
-
     // A real tx should write in the logs the signer's address
     // 0x3f1eae7d46d88f08fc2f8ed27fcb2ab183eb2d0e
     let tx = example
@@ -272,16 +212,4 @@ async fn main() -> eyre::Result<()> {
     );
 
     Ok(())
-}
-
-/// Converts a storage value from big-endian (as read from storage) to little-endian (as stored)
-async fn storage_value_to_le<T: Provider>(
-    provider: &T,
-    address: Address,
-    key: alloy::primitives::U256,
-) -> eyre::Result<alloy::primitives::U256> {
-    let value = provider.get_storage_at(address, key).await?;
-    Ok(alloy::primitives::U256::from_le_bytes(
-        value.to_be_bytes::<32>(),
-    ))
 }

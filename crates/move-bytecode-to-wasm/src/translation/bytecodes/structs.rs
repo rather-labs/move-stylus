@@ -111,6 +111,13 @@ pub fn pack(
     let val_64 = module.locals.add(ValType::I64);
     let mut offset = struct_.heap_size;
 
+    // If the struct is saved in storage (has key ability), the owner's id must be prepended to the
+    // struct memory representation. Since we are packing it, means it is a new structure, so it
+    // has no owner (all zeroes). We just allocate the space
+    if struct_.saved_in_storage {
+        builder.i32_const(32).call(compilation_ctx.allocator).drop();
+    }
+
     builder
         .i32_const(struct_.heap_size as i32)
         .call(compilation_ctx.allocator)

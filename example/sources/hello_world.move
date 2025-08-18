@@ -231,36 +231,3 @@ public fun echo_variant(x:  TestEnum): TestEnum {
 public fun test_values(test: &Test): (u8, u8) {
     test.get_test_values()
 }
-
-public fun get_fresh_object_address(ctx: &mut TxContext): address {
-    ctx.fresh_object_address()
-}
-
-public fun get_unique_ids(ctx: &mut TxContext): (UID, UID, UID) {
-    (
-        object::new(ctx),
-        object::new(ctx),
-        object::new(ctx),
-    )
-}
-
-public fun get_unique_id(ctx: &mut TxContext): UID {
-    object::new(ctx)
-}
-
-// Usage of generic functions
-public fun echo_with_generic_function_u16(x: u16): u16 {
-    generic_identity(x)
-}
-
-public fun echo_with_generic_function_vec32(x: vector<u32>): vector<u32> {
-    generic_identity(x)
-}
-
-public fun echo_with_generic_function_u16_vec32(x: u16, y: vector<u32>): (u16, vector<u32>) {
-    generic_identity_two_types(x, y)
-}
-
-public fun echo_with_generic_function_address_vec256(x: address, y: vector<u256>): (address, vector<u256>) {
-    generic_identity_two_types(x, y)
-}

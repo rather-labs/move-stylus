@@ -55,6 +55,9 @@ pub enum RuntimeFunction {
     StorageNextSlot,
     DeriveMappingSlot,
     DeriveDynArraySlot,
+    WriteObjectSlot,
+    LocateStorageData,
+    LocateStructSlot,
 }
 
 impl RuntimeFunction {
@@ -102,6 +105,9 @@ impl RuntimeFunction {
             Self::StorageNextSlot => "storage_next_slot",
             Self::DeriveMappingSlot => "derive_mapping_slot",
             Self::DeriveDynArraySlot => "derive_dyn_array_slot",
+            Self::LocateStorageData => "locate_storage_data",
+            Self::WriteObjectSlot => "write_object_slot",
+            Self::LocateStructSlot => "locate_struct_slot",
         }
     }
 
@@ -203,6 +209,9 @@ impl RuntimeFunction {
                 (Self::DeriveDynArraySlot, Some(ctx)) => {
                     storage::derive_dyn_array_slot(module, ctx)
                 }
+                (Self::WriteObjectSlot, Some(ctx)) => storage::write_object_slot(module, ctx),
+                (Self::LocateStorageData, Some(ctx)) => storage::locate_storage_data(module, ctx),
+                (Self::LocateStructSlot, Some(ctx)) => storage::locate_struct_slot(module, ctx),
                 // Error
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,

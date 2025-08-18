@@ -17,4 +17,3 @@ public fun new(ctx: &mut TxContext): UID {
         id: ID { bytes: ctx.fresh_object_address() },
     }
 }
-

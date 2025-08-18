@@ -3,6 +3,9 @@ use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 use crate::{
     CompilationContext,
     compilation_context::ExternalModuleData,
+    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    runtime::RuntimeFunction,
+    storage::read::add_read_struct_from_storage_fn,
     translation::intermediate_types::{
         IntermediateType,
         address::IAddress,
@@ -13,9 +16,8 @@ use crate::{
         simple_integers::{IU8, IU16, IU32, IU64},
         vector::IVector,
     },
+    vm_handled_types::{VmHandledType, tx_context::TxContext},
 };
-
-use super::vm_handled_datatypes::TxContext;
 
 mod unpack_enum;
 mod unpack_heap_int;
@@ -173,16 +175,41 @@ impl Unpackable for IntermediateType {
                     .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
 
-                // TODO: Check if the struct is TxContext. If it is, panic since the only valid
-                // TxContext is the one defined in the stylus framework.
+                if struct_.saved_in_storage {
+                    // First we add the instructions to unpack the uid. This will leave the pointer
+                    // ready for the unpack from storage function
+                    IAddress::add_unpack_instructions(
+                        function_builder,
+                        module,
+                        reader_pointer,
+                        calldata_reader_pointer,
+                        compilation_ctx,
+                    );
 
-                struct_.add_unpack_instructions(
-                    function_builder,
-                    module,
-                    reader_pointer,
-                    calldata_reader_pointer,
-                    compilation_ctx,
-                );
+                    // Search for the object in the objects mappings
+                    let locate_storage_data_fn =
+                        RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
+                    function_builder.call(locate_storage_data_fn);
+
+                    // Read the object
+                    let read_struct_from_storage_fn =
+                        add_read_struct_from_storage_fn(module, compilation_ctx, self);
+
+                    function_builder
+                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                        .call(read_struct_from_storage_fn);
+                } else {
+                    // TODO: Check if the struct is TxContext. If it is, panic since the only valid
+                    // TxContext is the one defined in the stylus framework.
+
+                    struct_.add_unpack_instructions(
+                        function_builder,
+                        module,
+                        reader_pointer,
+                        calldata_reader_pointer,
+                        compilation_ctx,
+                    );
+                }
             }
             IntermediateType::IGenericStructInstance {
                 module_id,
@@ -230,11 +257,8 @@ impl Unpackable for IntermediateType {
 
                 match external_data {
                     ExternalModuleData::Struct(istruct) => {
-                        if TxContext::struct_is_tx_context(module_id, identifier) {
-                            TxContext::inject_tx_context(
-                                function_builder,
-                                compilation_ctx.allocator,
-                            );
+                        if TxContext::is_vm_type(module_id, identifier) {
+                            TxContext::inject(function_builder, module, compilation_ctx);
                         } else {
                             istruct.add_unpack_instructions(
                                 function_builder,
