@@ -1,49 +1,27 @@
-use alloy_sol_types::SolValue;
-use alloy_sol_types::abi::TokenSeq;
-use alloy_sol_types::{SolCall, SolType, sol};
-use anyhow::Result;
-use common::runtime_sandbox::RuntimeSandbox;
-use rstest::{fixture, rstest};
-
 mod common;
 
-fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
-    let (result, return_data) = runtime.call_entrypoint(call_data)?;
-    anyhow::ensure!(
-        result == 0,
-        "Function returned non-zero exit code: {result}"
-    );
-    anyhow::ensure!(
-        return_data == expected_result,
-        "return data mismatch:\nreturned:{return_data:?}\nexpected:{expected_result:?}"
-    );
+use common::{runtime_sandbox::RuntimeSandbox, translate_test_package_with_framework};
+use rstest::{fixture, rstest};
 
-    Ok(())
+// NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
+// channel. If we use this as #[once], there's a possibility this runtime is used in more than one
+// thread. If that happens, messages from test A can be received by test B.
+// Using once instance per thread assures this won't happen.
+#[fixture]
+fn runtime() -> RuntimeSandbox {
+    const MODULE_NAME: &str = "counter";
+    const SOURCE_PATH: &str = "tests/storage/counter.move";
+
+    let mut translated_package = translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+    RuntimeSandbox::new(&mut translated_package)
 }
 
 mod storage {
-    use alloy_primitives::{Address, FixedBytes, hex};
-
-    use crate::common::{
-        runtime_sandbox::constants::{
-            BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, GAS_PRICE,
-            MSG_SENDER_ADDRESS, MSG_VALUE,
-        },
-        translate_test_package_with_framework,
-    };
+    use alloy_primitives::FixedBytes;
+    use alloy_sol_types::{SolCall, sol};
 
     use super::*;
-
-    #[fixture]
-    fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "counter";
-        const SOURCE_PATH: &str = "tests/storage/counter.move";
-
-        let mut translated_package =
-            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
-
-        RuntimeSandbox::new(&mut translated_package)
-    }
 
     sol!(
         #[allow(missing_docs)]
@@ -57,7 +35,8 @@ mod storage {
     fn test_storage_counter(runtime: RuntimeSandbox) {
         // Create a new counter
         let call_data = createCall::new(()).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
         let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
@@ -68,35 +47,42 @@ mod storage {
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = readCall::abi_decode_returns(&return_data).unwrap();
         assert_eq!(25, return_data);
+        assert_eq!(0, result);
 
         // Increment
         let call_data = incrementCall::new((object_id,)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
 
         // Read value
         let call_data = readCall::new((object_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = readCall::abi_decode_returns(&return_data).unwrap();
         assert_eq!(26, return_data);
+        assert_eq!(0, result);
 
         // Set value to 42
         let call_data = setValueCall::new((object_id, 42)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
 
         // Read value
         let call_data = readCall::new((object_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = readCall::abi_decode_returns(&return_data).unwrap();
         assert_eq!(42, return_data);
+        assert_eq!(0, result);
 
         // Increment
         let call_data = incrementCall::new((object_id,)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
 
         // Read value
         let call_data = readCall::new((object_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = readCall::abi_decode_returns(&return_data).unwrap();
         assert_eq!(43, return_data);
+        assert_eq!(0, result);
     }
 }

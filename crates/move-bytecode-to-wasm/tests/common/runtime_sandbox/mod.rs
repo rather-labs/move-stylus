@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex, mpsc},
 };
 
-use alloy_primitives::{U256, hex, keccak256};
+use alloy_primitives::{hex, keccak256};
 use anyhow::Result;
 use constants::{
     BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, CHAIN_ID, GAS_PRICE,
@@ -177,7 +177,7 @@ impl RuntimeSandbox {
                     mem.read(&mut caller, ptr as usize, &mut buffer).unwrap();
 
                     println!("read memory: {buffer:?}");
-                    log_sender.send(buffer.to_vec());
+                    log_sender.send(buffer.to_vec()).unwrap();
                 },
             )
             .unwrap();
@@ -202,8 +202,8 @@ impl RuntimeSandbox {
                     let mut storage = storage_for_cache.lock().unwrap();
                     (*storage).insert(key_buffer, value_buffer);
 
-                    println!("read memory key: {key_buffer:?}");
-                    println!("read memory value: {value_ptr:?}");
+                    // println!("read memory key: {key_buffer:?}");
+                    // println!("read memory value: {value_ptr:?}");
                 },
             )
             .unwrap();
@@ -221,10 +221,10 @@ impl RuntimeSandbox {
                     mem.read(&mut caller, key_ptr as usize, &mut key_buffer)
                         .unwrap();
 
-                    println!("read memory key: {key_buffer:?}");
+                    // println!("read memory key: {key_buffer:?}");
                     let storage = storage_for_cache.lock().unwrap();
                     let value = (*storage).get(&key_buffer).unwrap_or(&[0; 32]);
-                    println!("read memory value: {value:?}");
+                    // println!("read memory value: {value:?}");
 
                     mem.write(&mut caller, dest_ptr as usize, value.as_slice())
                         .unwrap();
