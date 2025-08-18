@@ -1,6 +1,4 @@
-use walrus::{
-    FunctionBuilder, FunctionId, Module, ValType,
-};
+use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
 use crate::{
     CompilationContext,
