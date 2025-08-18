@@ -8,14 +8,12 @@ use walrus::{
 
 use crate::{
     CompilationContext,
+    compilation_context::ExternalModuleData,
     data::{
         DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
         DATA_STORAGE_OBJECT_OWNER_OFFSET,
     },
-    hostio::host_functions::{
-        emit_log, storage_cache_bytes32, storage_flush_cache, storage_load_bytes32,
-    },
-    compilation_context::ExternalModuleData,
+    hostio::host_functions::{storage_cache_bytes32, storage_flush_cache, storage_load_bytes32},
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         IntermediateType,
@@ -44,7 +42,6 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 ) {
     let (storage_cache, _) = storage_cache_bytes32(module);
     let (storage_flush_cache, _) = storage_flush_cache(module);
-    let (emit_log_fn, _) = emit_log(module);
 
     // Locals
     let val_32 = module.locals.add(ValType::I32);
@@ -279,7 +276,6 @@ pub fn add_read_and_decode_storage_struct_instructions(
     struct_: &IStruct,
 ) -> LocalId {
     let (storage_load, _) = storage_load_bytes32(module);
-    let (emit_log_fn, _) = emit_log(module);
 
     let struct_ptr = module.locals.add(ValType::I32);
 
@@ -600,7 +596,6 @@ pub fn add_delete_storage_struct_instructions(
 ) {
     let (storage_cache, _) = storage_cache_bytes32(module);
     let (storage_flush_cache, _) = storage_flush_cache(module);
-    let (emit_log_fn, _) = emit_log(module);
 
     let slot_ptr = module.locals.add(ValType::I32);
 

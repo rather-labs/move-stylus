@@ -35,3 +35,11 @@ public fun set_value(counter: &mut Counter, value: u64, ctx: &TxContext) {
     assert!(counter.owner == ctx.sender(), 0);
     counter.value = value;
 }
+
+public fun freeze_counter(counter: Counter) {
+    transfer::freeze_object(counter);
+}
+
+public fun delete_counter(counter: Counter) {
+    object::delete(counter);
+}

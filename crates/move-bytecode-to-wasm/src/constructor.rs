@@ -177,7 +177,7 @@ pub fn build_constructor(
             }
 
             // Inject TxContext as last argument
-            TxContext::inject(then, module,compilation_ctx);
+            TxContext::inject(then, module, compilation_ctx);
 
             // Call the `init` function
             then.call(init);

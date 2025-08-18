@@ -1,7 +1,4 @@
-use walrus::{
-    FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
-};
+use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
 
 use crate::{
     CompilationContext,
@@ -35,6 +32,7 @@ pub fn add_transfer_object_fn(
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
     let add_delete_object_fn = add_delete_object_fn(hash.clone(), module, compilation_ctx, struct_);
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
     let (emit_log_fn, _) = emit_log(module);
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
@@ -43,7 +41,7 @@ pub fn add_transfer_object_fn(
     let struct_ptr = module.locals.add(ValType::I32);
     let owner_ptr = module.locals.add(ValType::I32);
     let recipient_ptr = module.locals.add(ValType::I32);
-    let struct_id_ptr = module.locals.add(ValType::I32);
+    let id_bytes_ptr = module.locals.add(ValType::I32);
 
     // Get the owner key, which is stored in the 32 bytes prefixing the struct, which can either be:
     // - An actual account address
@@ -77,25 +75,17 @@ pub fn add_transfer_object_fn(
             // Delete the object from the owner mapping on the storage
             else_.local_get(struct_ptr).call(add_delete_object_fn);
 
-            // The first field of any struct with the key ability is its id.
-            // We load the struct_ptr, so now struct_id_ptr holds a pointer to the id.
+            // Get the pointer to the 32 bytes holding the data of the id
             else_
                 .local_get(struct_ptr)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .local_set(struct_id_ptr);
+                .call(get_id_bytes_ptr_fn)
+                .local_set(id_bytes_ptr);
 
             // Calculate the slot number corresponding to the (recipient, struct_id) tupple
             // Slot number will be written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
             else_
                 .local_get(recipient_ptr)
-                .local_get(struct_id_ptr)
+                .local_get(id_bytes_ptr)
                 .call(write_object_slot_fn);
 
             else_
@@ -127,6 +117,7 @@ pub fn add_freeze_object_fn(
 
     // This calculates the slot number of a given (outer_key, struct_id) tupple in the objects mapping
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
     let add_delete_object_fn = add_delete_object_fn(hash.clone(), module, compilation_ctx, struct_);
@@ -137,7 +128,7 @@ pub fn add_freeze_object_fn(
 
     let struct_ptr = module.locals.add(ValType::I32);
     let owner_ptr = module.locals.add(ValType::I32);
-    let struct_id_ptr = module.locals.add(ValType::I32);
+    let id_bytes_ptr = module.locals.add(ValType::I32);
 
     builder.block(None, |block| {
         let block_id = block.id();
@@ -184,20 +175,13 @@ pub fn add_freeze_object_fn(
                 // Get struct id
                 else_
                     .local_get(struct_ptr)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_set(struct_id_ptr);
+                    .call(get_id_bytes_ptr_fn)
+                    .local_set(id_bytes_ptr);
 
                 // Calculate the struct slot in the frozen objects mapping
                 else_
                     .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
-                    .local_get(struct_id_ptr)
+                    .local_get(id_bytes_ptr)
                     .call(write_object_slot_fn);
 
                 else_

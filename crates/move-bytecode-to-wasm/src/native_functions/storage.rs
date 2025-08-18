@@ -1,11 +1,9 @@
-use walrus::{
-    FunctionBuilder, FunctionId, Module, ValType,
-    ir::{LoadKind, MemArg},
-};
+use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
 use crate::{
     CompilationContext,
     data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET},
+    hostio::host_functions::emit_log,
     runtime::RuntimeFunction,
     storage,
     translation::intermediate_types::structs::IStruct,
@@ -53,64 +51,32 @@ pub fn add_share_object_fn(
         return function;
     };
 
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let storage_save_fn = add_storage_save_fn(hash, module, compilation_ctx, struct_);
+    let (emit_log_fn, _) = emit_log(module);
+
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
 
     let struct_ptr = module.locals.add(ValType::I32);
-    let tmp = module.locals.add(ValType::I32);
-
-    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
 
     // Shared object key (owner ptr)
     builder.i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET);
 
-    // Obtain the object's id, it must be the first field containing a UID struct
-    // The UID struct has the following form
-    //
-    // UID { id: ID { bytes: <bytes> } }
-    //
-    // The first load instruction puts in stack the first pointer value of the strucure, that is a
-    // pointer to the UID struct
-    //
-    // The second load instruction puts in stack the pointer to the ID struct
-    //
-    // The third load instruction loads the ID's bytes field pointer
-    //
-    // At the end of the load chain we point to the 32 bytes holding the data
-    builder
-        .local_get(struct_ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .local_tee(tmp);
+    // Obtain the object's id bytes pointer
+    builder.local_get(struct_ptr).call(get_id_bytes_ptr_fn);
 
     // Slot number is in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
     builder.call(write_object_slot_fn);
 
-    // Call storage save for the struct
-    let storage_save_fn = add_storage_save_fn(hash, module, compilation_ctx, struct_);
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_fn);
 
+    // Call storage save for the struct
     builder
         .local_get(struct_ptr)
         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)

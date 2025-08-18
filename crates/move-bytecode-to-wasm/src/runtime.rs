@@ -58,6 +58,7 @@ pub enum RuntimeFunction {
     WriteObjectSlot,
     LocateStorageData,
     LocateStructSlot,
+    GetIdBytesPtr,
 }
 
 impl RuntimeFunction {
@@ -108,6 +109,7 @@ impl RuntimeFunction {
             Self::LocateStorageData => "locate_storage_data",
             Self::WriteObjectSlot => "write_object_slot",
             Self::LocateStructSlot => "locate_struct_slot",
+            Self::GetIdBytesPtr => "get_id_bytes_ptr",
         }
     }
 
@@ -212,6 +214,7 @@ impl RuntimeFunction {
                 (Self::WriteObjectSlot, Some(ctx)) => storage::write_object_slot(module, ctx),
                 (Self::LocateStorageData, Some(ctx)) => storage::locate_storage_data(module, ctx),
                 (Self::LocateStructSlot, Some(ctx)) => storage::locate_struct_slot(module, ctx),
+                (Self::GetIdBytesPtr, Some(ctx)) => storage::get_id_bytes_ptr(module, ctx),
                 // Error
                 _ => panic!(
                     r#"there was an error linking "{}" function, missing compilation context?"#,
