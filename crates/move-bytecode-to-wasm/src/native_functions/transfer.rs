@@ -1,6 +1,6 @@
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, LoadKind, MemArg},
 };
 
 use crate::{
