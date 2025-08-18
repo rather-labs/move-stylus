@@ -177,7 +177,7 @@ pub fn locate_storage_data(
             .br_if(exit_block);
 
         // If we get here means the object was not found
-        // block.unreachable();
+        block.unreachable();
     });
 
     function.finish(vec![uid_ptr], &mut module.funcs)
