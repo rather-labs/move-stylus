@@ -5,9 +5,9 @@ use crate::{
 };
 use walrus::{InstrSeqBuilder, Module};
 
-pub struct UID;
+pub struct Uid;
 
-impl VmHandledType for UID {
+impl VmHandledType for Uid {
     const IDENTIFIER: &str = "UID";
 
     fn inject(

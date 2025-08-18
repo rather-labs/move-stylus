@@ -18,7 +18,7 @@ use crate::{
         heap_integers::{IU128, IU256},
         structs::IStruct,
     },
-    vm_handled_types::{VmHandledType, uid::UID},
+    vm_handled_types::{VmHandledType, uid::Uid},
 };
 
 /// Adds the instructions to encode and save into storage an specific struct.
@@ -202,7 +202,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
-            } if UID::is_vm_type(module_id, identifier) => {
+            } if Uid::is_vm_type(module_id, identifier) => {
                 let tmp = module.locals.add(ValType::I32);
 
                 // The UID struct has the following form
@@ -471,7 +471,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
-            } if UID::is_vm_type(module_id, identifier) => {
+            } if Uid::is_vm_type(module_id, identifier) => {
                 // Here we need to reconstruct the UID struct. To do that we first allocate 4 bytes
                 // that will contain the pointer to the UID struct data
                 //

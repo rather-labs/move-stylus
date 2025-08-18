@@ -65,6 +65,7 @@ impl<'a> PublicFunction<'a> {
     /// Builds the router block for the function
     ///
     /// Executes the wrapped function if the selector matches
+    #[allow(clippy::too_many_arguments)]
     pub fn build_router_block(
         &self,
         router_builder: &mut InstrSeqBuilder,
