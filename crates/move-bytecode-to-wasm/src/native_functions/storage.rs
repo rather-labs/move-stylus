@@ -6,7 +6,6 @@ use walrus::{
 use crate::{
     CompilationContext,
     data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET},
-    hostio::host_functions::storage_load_bytes32,
     runtime::RuntimeFunction,
     storage,
     translation::intermediate_types::structs::IStruct,
@@ -65,10 +64,37 @@ pub fn add_share_object_fn(
     // Shared object key (owner ptr)
     builder.i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET);
 
-    // The first field is its id, so we follow the pointer of the
-    // first field
+    // Obtain the object's id, it must be the first field containing a UID struct
+    // The UID struct has the following form
+    //
+    // UID { id: ID { bytes: <bytes> } }
+    //
+    // The first load instruction puts in stack the first pointer value of the strucure, that is a
+    // pointer to the UID struct
+    //
+    // The second load instruction puts in stack the pointer to the ID struct
+    //
+    // The third load instruction loads the ID's bytes field pointer
+    //
+    // At the end of the load chain we point to the 32 bytes holding the data
     builder
         .local_get(struct_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
         .load(
             compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
@@ -91,33 +117,4 @@ pub fn add_share_object_fn(
         .call(storage_save_fn);
 
     function.finish(vec![struct_ptr], &mut module.funcs)
-}
-
-// This function takes a slot number and reads from storage
-pub fn add_read_slot_fn(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
-    let (storage_load_bytes32, _) = storage_load_bytes32(module);
-    let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
-
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
-
-    let slot_ptr = module.locals.add(ValType::I32);
-    let slot_data_ptr = module.locals.add(ValType::I32);
-
-    let mut builder = function
-        .name(NativeFunction::NATIVE_STORAGE_READ_SLOT.to_owned())
-        .func_body();
-
-    builder
-        .local_get(slot_ptr)
-        .local_get(slot_ptr)
-        .call(swap_256_fn);
-
-    builder
-        .local_get(slot_ptr)
-        .local_get(slot_data_ptr)
-        .call(storage_load_bytes32);
-
-    builder.local_get(slot_data_ptr);
-
-    function.finish(vec![slot_ptr], &mut module.funcs)
 }

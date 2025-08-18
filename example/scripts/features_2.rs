@@ -23,7 +23,6 @@ sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract Example {
-        // TODO: Not sure if use address or bytes32
         #[derive(Debug)]
         struct ID {
            bytes32 bytes;

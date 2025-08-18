@@ -1,5 +1,6 @@
 mod error;
 pub mod module_data;
+pub mod reserved_modules;
 
 use crate::translation::intermediate_types::{enums::IEnum, structs::IStruct};
 pub use error::CompilationContextError;

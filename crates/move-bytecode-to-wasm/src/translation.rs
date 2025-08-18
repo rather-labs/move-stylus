@@ -108,7 +108,9 @@ pub fn translate_function(
     let params = function_information.signature.get_argument_wasm_types();
     let results = function_information.signature.get_return_wasm_types();
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
-    let mut builder = function.func_body();
+    let mut builder = function
+        .name(function_information.function_id.identifier.clone())
+        .func_body();
 
     let (arguments, locals) = process_fn_local_variables(function_information, module);
 
@@ -1109,7 +1111,6 @@ fn translate_instruction(
                                         .local_tee(struct_ptr);
 
                                     // Compute the slot where the struct will be saved
-
                                     builder.call(locate_struct_fn);
 
                                     let save_in_slot_fn = NativeFunction::get_generic(

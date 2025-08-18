@@ -191,15 +191,47 @@ pub fn locate_struct_slot(module: &mut Module, compilation_ctx: &CompilationCont
         .i32_const(32)
         .binop(BinaryOp::I32Sub);
 
-    // Obtain the object's id, it must be the first field
-    builder.local_get(struct_ptr).load(
-        compilation_ctx.memory_id,
-        LoadKind::I32 { atomic: false },
-        MemArg {
-            align: 0,
-            offset: 0,
-        },
-    );
+    // Obtain the object's id, it must be the first field containing a UID struct
+    // The UID struct has the following form
+    //
+    // UID { id: ID { bytes: <bytes> } }
+    //
+    // At this point we have in stack a pointer to the beggining of the struct.
+    //
+    // The first load instruction puts in stack the first pointer value of the strucure, that is a
+    // pointer to the UID struct
+    //
+    // The second load instruction puts in stack the pointer to the ID struct
+    //
+    // The third load instruction loads the ID's bytes field pointer
+    //
+    // At the end of the load chain we point to the 32 bytes holding the data
+    builder
+        .local_get(struct_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
 
     // Compute the slot where it should be saved
     builder.call(write_object_slot_fn);

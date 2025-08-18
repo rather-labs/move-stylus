@@ -16,9 +16,8 @@ use crate::{
         simple_integers::{IU8, IU16, IU32, IU64},
         vector::IVector,
     },
+    vm_handled_types::{VmHandledType, tx_context::TxContext},
 };
-
-use super::vm_handled_datatypes::TxContext;
 
 mod unpack_enum;
 mod unpack_heap_int;
@@ -258,11 +257,8 @@ impl Unpackable for IntermediateType {
 
                 match external_data {
                     ExternalModuleData::Struct(istruct) => {
-                        if TxContext::struct_is_tx_context(module_id, identifier) {
-                            TxContext::inject_tx_context(
-                                function_builder,
-                                compilation_ctx.allocator,
-                            );
+                        if TxContext::is_vm_type(module_id, identifier) {
+                            TxContext::inject(function_builder, module, compilation_ctx);
                         } else {
                             istruct.add_unpack_instructions(
                                 function_builder,
