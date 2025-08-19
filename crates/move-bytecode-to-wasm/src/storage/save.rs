@@ -8,6 +8,7 @@ use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
 use super::encoding::add_encode_and_save_into_storage_struct_instructions;
 
+// TODO: move to runtime
 /// Generates a function that reads an specific struct from the storage.
 pub fn add_save_struct_into_storage_fn(
     module: &mut Module,

@@ -7,6 +7,7 @@ use crate::{
 };
 use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
+// TODO: move to runtime
 /// Generates a function that reads an specific struct from the storage.
 pub fn add_read_struct_from_storage_fn(
     module: &mut Module,
