@@ -1,0 +1,50 @@
+module hello_world::modified_counter;
+
+use stylus::tx_context::TxContext;
+use stylus::object as object;
+use stylus::object::UID;
+use stylus::transfer as transfer;
+
+public struct Counter has key {
+    id: UID,
+    owner: address,
+    value: u64
+}
+
+public fun create(share: bool, ctx: &mut TxContext) {
+  let counter = Counter {
+    id: object::new(ctx),
+    owner: ctx.sender(),
+    value: 25
+  };
+  if (share) {
+    transfer::share_object(counter);
+  } else {
+    transfer::transfer(counter, ctx.sender());
+  }
+}
+
+/// Increment a counter by 1.
+public fun increment(counter: &mut Counter) {
+    counter.value = counter.value + 1;
+}
+
+
+/// Read counter.
+public fun read(counter: &Counter): u64 {
+    counter.value
+}
+
+/// Set value (only runnable by the Counter owner)
+public fun set_value(counter: &mut Counter, value: u64, ctx: &TxContext) {
+    assert!(counter.owner == ctx.sender(), 0);
+    counter.value = value;
+}
+
+public fun delete_counter(counter: Counter) {
+    object::delete(counter);
+}
+
+public fun freeze_counter(counter: Counter) { 
+  transfer::freeze_object(counter);
+}
