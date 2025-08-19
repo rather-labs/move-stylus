@@ -78,7 +78,7 @@ impl CompilationContext<'_> {
     /// The information to reconstruct the `IStruct` object is in different places within the
     /// compilation contect. With this macro we can easily avoid all the boilerplate and obtain
     /// a reference to the `IStruct` directly.
-    pub fn get_struct_by_intermediate_type<'a>(
+    pub fn get_struct_by_intermediate_type(
         &self,
         itype: &IntermediateType,
     ) -> Result<Cow<IStruct>> {

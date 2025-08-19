@@ -1089,7 +1089,7 @@ fn translate_instruction(
                     let (itype, struct_) = match fn_arg {
                         IntermediateType::IMutRef(inner) => (
                             &**inner,
-                            compilation_ctx.get_struct_by_intermediate_type(&**inner),
+                            compilation_ctx.get_struct_by_intermediate_type(inner),
                         ),
                         t => (fn_arg, compilation_ctx.get_struct_by_intermediate_type(t)),
                     };

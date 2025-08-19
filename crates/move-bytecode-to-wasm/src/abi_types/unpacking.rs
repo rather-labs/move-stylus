@@ -256,25 +256,23 @@ impl Unpackable for IntermediateType {
                     ExternalModuleData::Struct(istruct) => {
                         if TxContext::is_vm_type(module_id, identifier) {
                             TxContext::inject(function_builder, module, compilation_ctx);
+                        } else if istruct.saved_in_storage {
+                            add_unpack_from_storage_instructions(
+                                function_builder,
+                                module,
+                                reader_pointer,
+                                calldata_reader_pointer,
+                                compilation_ctx,
+                                self,
+                            );
                         } else {
-                            if istruct.saved_in_storage {
-                                add_unpack_from_storage_instructions(
-                                    function_builder,
-                                    module,
-                                    reader_pointer,
-                                    calldata_reader_pointer,
-                                    compilation_ctx,
-                                    self,
-                                );
-                            } else {
-                                istruct.add_unpack_instructions(
-                                    function_builder,
-                                    module,
-                                    reader_pointer,
-                                    calldata_reader_pointer,
-                                    compilation_ctx,
-                                )
-                            }
+                            istruct.add_unpack_instructions(
+                                function_builder,
+                                module,
+                                reader_pointer,
+                                calldata_reader_pointer,
+                                compilation_ctx,
+                            )
                         }
                     }
                     ExternalModuleData::Enum(ienum) => {
