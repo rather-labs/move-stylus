@@ -123,7 +123,7 @@ pub fn add_share_object_fn(
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-    
+
     let storage_save_fn = add_storage_save_fn(hash, module, compilation_ctx, struct_);
     let (emit_log_fn, _) = emit_log(module);
 

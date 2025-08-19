@@ -195,16 +195,16 @@ pub fn add_native_fresh_id_fn(
     function.finish(vec![], &mut module.funcs)
 }
 
-/// Delete the object and its `UID`. This is the only way to eliminate a `UID`.
-/// This exists to inform Sui of object deletions. When an object
-/// gets unpacked, the programmer will have to do something with its
-/// `UID`. The implementation of this function emits a deleted
-/// system event so Sui knows to process the object deletion
+/// Generates a function that deletes an object from storage.
 ///
-/// public fun delete(id: UID) {
-///     let UID { id: ID { bytes } } = id;
-///     delete_impl(bytes)
-/// }
+/// This function:
+/// 1. Validates the object is not frozen (frozen objects cannot be deleted).
+/// 2. Locates the storage slot of the object.
+/// 3. Clears the storage slot and any additional slots occupied by the struct fields.
+/// 4. Flushes the cache to finalize the deletion.
+///
+/// Arguments:
+/// - struct_ptr
 pub fn add_delete_object_fn(
     hash: String,
     module: &mut Module,
@@ -216,8 +216,7 @@ pub fn add_delete_object_fn(
         return function;
     };
 
-    // This calculates the slot number of a given (outer_key, struct_id) tupple in the objects mapping
-
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
     let locate_struct_slot_fn =
         RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
@@ -228,10 +227,10 @@ pub fn add_delete_object_fn(
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
 
+    let slot_ptr = module.locals.add(ValType::I32);
     let struct_ptr = module.locals.add(ValType::I32);
 
-    // Here we should check that the object is not frozen. If it is, we emit an unreacheable.
-    // Both owned and shared objects can be deleted via object::delete()!
+    // Verify if the object is frozen; if not, continue.
     builder
         .local_get(struct_ptr)
         .i32_const(32)
@@ -243,21 +242,18 @@ pub fn add_delete_object_fn(
     builder.if_else(
         None,
         |then| {
-            // If the object is frozen, emit an unreacheable
+            // Emit an unreachable if the object is frozen
             then.unreachable();
         },
         |else_| {
-            // Compute the slot where the struct will be saved
-            else_.local_get(struct_ptr).call(locate_struct_slot_fn);
-
-            // Delete the object from the storage
-            let slot_ptr = module.locals.add(ValType::I32);
-
+            // Calculate the object slot in the storage (saved in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
             else_
+                .local_get(struct_ptr)
+                .call(locate_struct_slot_fn)
                 .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                 .local_set(slot_ptr);
 
-            // Wipe the slot data placeholder. We use it to erase the slots in the storage
+            // Wipe the slot data placeholder. We will use it to erase the slots in the storage
             else_
                 .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
                 .i32_const(0)
@@ -270,19 +266,15 @@ pub fn add_delete_object_fn(
                 .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
                 .call(storage_cache);
 
+            // Loop through each field in the struct and clear the corresponding storage slots.
             let mut slot_used_bytes = 0;
             for field in struct_.fields.iter() {
                 let field_size = storage::encoding::field_size(field, compilation_ctx);
                 if slot_used_bytes + field_size > 32 {
-                    let next_slot_fn =
-                        RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
                     else_
                         .local_get(slot_ptr)
                         .call(next_slot_fn)
-                        .local_set(slot_ptr);
-
-                    else_
-                        .local_get(slot_ptr)
+                        .local_tee(slot_ptr)
                         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
                         .call(storage_cache);
 
