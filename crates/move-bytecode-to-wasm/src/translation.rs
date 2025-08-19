@@ -1086,51 +1086,48 @@ fn translate_instruction(
             // We expect that the owner address is just right before the pointer
             if mapped_function.is_entry {
                 for (arg_index, fn_arg) in mapped_function.signature.arguments.iter().enumerate() {
-                    match fn_arg {
+                    let type_ = match fn_arg {
                         IntermediateType::IMutRef(inner) => {
-                            if let IntermediateType::IStruct { module_id, index } = &**inner {
-                                let struct_ = compilation_ctx
-                                    .get_user_data_type_by_index(module_id, *index)
-                                    .unwrap();
-
-                                if struct_.saved_in_storage {
-                                    let locate_struct_fn = RuntimeFunction::LocateStructSlot
-                                        .get(module, Some(compilation_ctx));
-
-                                    let struct_ptr = module.locals.add(ValType::I32);
-                                    builder
-                                        .local_get(function_locals[arg_index])
-                                        .load(
-                                            compilation_ctx.memory_id,
-                                            LoadKind::I32 { atomic: false },
-                                            MemArg {
-                                                align: 0,
-                                                offset: 0,
-                                            },
-                                        )
-                                        .local_tee(struct_ptr);
-
-                                    // Compute the slot where the struct will be saved
-                                    builder.call(locate_struct_fn);
-
-                                    let save_in_slot_fn = NativeFunction::get_generic(
-                                        "save_in_slot",
-                                        module,
-                                        compilation_ctx,
-                                        &[*inner.clone()],
-                                    );
-
-                                    // Load the struct memory representation to pass it to the save
-                                    // function
-                                    builder
-                                        .local_get(struct_ptr)
-                                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                                        .call(save_in_slot_fn);
-                                }
-                            }
+                            compilation_ctx.get_struct_by_intermediate_type(&**inner)
                         }
-                        // TODO: other structs
-                        _ => (),
+                        t => compilation_ctx.get_struct_by_intermediate_type(t),
+                    };
+
+                    if let Ok(struct_) = type_ {
+                        if struct_.saved_in_storage {
+                            let locate_struct_fn = RuntimeFunction::LocateStructSlot
+                                .get(module, Some(compilation_ctx));
+
+                            let struct_ptr = module.locals.add(ValType::I32);
+                            builder
+                                .local_get(function_locals[arg_index])
+                                .load(
+                                    compilation_ctx.memory_id,
+                                    LoadKind::I32 { atomic: false },
+                                    MemArg {
+                                        align: 0,
+                                        offset: 0,
+                                    },
+                                )
+                                .local_tee(struct_ptr);
+
+                            // Compute the slot where the struct will be saved
+                            builder.call(locate_struct_fn);
+
+                            let save_in_slot_fn = NativeFunction::get_generic(
+                                "save_in_slot",
+                                module,
+                                compilation_ctx,
+                                &[fn_arg.clone()],
+                            );
+
+                            // Load the struct memory representation to pass it to the save
+                            // function
+                            builder
+                                .local_get(struct_ptr)
+                                .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                                .call(save_in_slot_fn);
+                        }
                     }
                 }
             }
