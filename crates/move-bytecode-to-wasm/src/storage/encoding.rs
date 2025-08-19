@@ -9,10 +9,7 @@ use walrus::{
 use crate::{
     CompilationContext,
     compilation_context::ExternalModuleData,
-    data::{
-        DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
-        DATA_STORAGE_OBJECT_OWNER_OFFSET,
-    },
+    data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_STORAGE_OBJECT_OWNER_OFFSET},
     hostio::host_functions::{storage_cache_bytes32, storage_flush_cache, storage_load_bytes32},
     runtime::RuntimeFunction,
     translation::intermediate_types::{
