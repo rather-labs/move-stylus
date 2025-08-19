@@ -34,25 +34,22 @@ pub fn inject_constructor(
     compilation_ctx: &CompilationContext,
     public_functions: &mut Vec<PublicFunction>,
 ) {
-    let constructor_fn_id =
-        if let Some(ref init_id) = compilation_ctx.root_module_data.functions.init {
-            let wasm_init_fn = function_table
-                .get_by_function_id(init_id)
-                .unwrap()
-                .wasm_function_id
-                .unwrap();
+    if let Some(ref init_id) = compilation_ctx.root_module_data.functions.init {
+        let wasm_init_fn = function_table
+            .get_by_function_id(init_id)
+            .unwrap()
+            .wasm_function_id
+            .unwrap();
 
-            build_constructor(module, compilation_ctx, Some(wasm_init_fn))
-        } else {
-            build_constructor(module, compilation_ctx, None)
-        };
+        let constructor_fn_id = build_constructor(module, compilation_ctx, wasm_init_fn);
 
-    public_functions.push(PublicFunction::new(
-        constructor_fn_id,
-        "constructor",
-        &EMPTY_SIGNATURE,
-        compilation_ctx,
-    ));
+        public_functions.push(PublicFunction::new(
+            constructor_fn_id,
+            "constructor",
+            &EMPTY_SIGNATURE,
+            compilation_ctx,
+        ));
+    };
 }
 
 /// Builds the constructor function.
@@ -66,7 +63,7 @@ pub fn inject_constructor(
 pub fn build_constructor(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-    init: Option<WalrusFunctionId>,
+    init: WalrusFunctionId,
 ) -> WalrusFunctionId {
     // Flag to indicate if the constructor has been called.
     // This is what we are going to be storing in the storage.
@@ -168,24 +165,22 @@ pub fn build_constructor(
         None,
         |then| {
             // If an `init()` function is present, call it
-            if let Some(init_id) = init {
-                let init_ty = module.funcs.get(init_id).ty();
-                let params = module.types.get(init_ty).params();
+            let init_ty = module.funcs.get(init).ty();
+            let params = module.types.get(init_ty).params();
 
-                // If the function expects an OTW, push dummy value.
-                // The OTW is a Move pattern used to ensure that the init function is called only once.
-                // Here we replace that logic by writing a marker value into the storage.
-                // TODO: revisit the OTW implementation and check if this approach is correct.
-                if params.len() == 2 {
-                    then.i32_const(0); // OTW = 0
-                }
-
-                // Inject TxContext as last argument
-                TxContext::inject(then, module, compilation_ctx);
-
-                // Call the `init` function
-                then.call(init_id);
+            // If the function expects an OTW, push dummy value.
+            // The OTW is a Move pattern used to ensure that the init function is called only once.
+            // Here we replace that logic by writing a marker value into the storage.
+            // TODO: revisit the OTW implementation and check if this approach is correct.
+            if params.len() == 2 {
+                then.i32_const(0); // OTW = 0 
             }
+
+            // Inject TxContext as last argument
+            TxContext::inject(then, module, compilation_ctx);
+
+            // Call the `init` function
+            then.call(init);
 
             // Write the flag at value_ptr
             then.local_get(value_ptr).i32_const(FLAG).store(

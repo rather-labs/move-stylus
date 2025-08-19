@@ -19,6 +19,10 @@ path = "scripts/primitives_and_operations.rs"
 name = "counter"
 path = "scripts/counter.rs"
 
+[[bin]]
+name = "modified_counter"
+path = "scripts/modified_counter.rs"
+
 [dependencies]
 dotenv = "0.15.0"
 eyre = "0.6.8"

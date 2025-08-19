@@ -4,7 +4,7 @@ use crate::data::{
     DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
     DATA_STORAGE_OBJECT_OWNER_OFFSET,
 };
-use crate::hostio::host_functions::{self, storage_load_bytes32, tx_origin};
+use crate::hostio::host_functions::{self, emit_log, storage_load_bytes32, tx_origin};
 use crate::translation::intermediate_types::heap_integers::IU256;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, data::DATA_U256_ONE_OFFSET};
@@ -13,8 +13,7 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-/// Looks for an struct inside the objects mappings. The objects mappings have the following form
-/// in solidity notation:
+/// Looks for an struct inside the objects mappings. The objects mappings follows the solidity notation:
 /// mapping(bytes32 => mapping(bytes32 => T)) public moveObjects;
 ///
 /// Where:
@@ -47,6 +46,7 @@ pub fn locate_storage_data(
     let eq_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let (tx_origin, _) = tx_origin(module);
     let (storage_load, _) = storage_load_bytes32(module);
+    let (emit_log_fn, _) = emit_log(module);
 
     // Arguments
     let uid_ptr = module.locals.add(ValType::I32);
@@ -59,10 +59,31 @@ pub fn locate_storage_data(
         .call(compilation_ctx.allocator)
         .local_set(zero);
 
-    // First we check the tx signer
+    // Wipe the first 12 bytes, and then write the tx signer address
     builder
         .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+        .i32_const(0)
+        .i32_const(12)
+        .memory_fill(compilation_ctx.memory_id);
+
+    // Write the tx signer (20 bytes) left padded
+    builder
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET + 12)
         .call(tx_origin);
+
+    // TODO: remove after adding tests
+    builder
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_fn);
+
+    // TODO: remove after adding tests
+    builder
+        .local_get(uid_ptr)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_fn);
 
     builder.block(None, |block| {
         let exit_block = block.id();
@@ -74,6 +95,13 @@ pub fn locate_storage_data(
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
             .local_get(uid_ptr)
             .call(write_object_slot_fn);
+
+        // TODO: remove after adding tests
+        block
+            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+            .i32_const(32)
+            .i32_const(0)
+            .call(emit_log_fn);
 
         // Load data from slot
         block
@@ -175,57 +203,17 @@ pub fn locate_struct_slot(module: &mut Module, compilation_ctx: &CompilationCont
         .func_body();
 
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
     let struct_ptr = module.locals.add(ValType::I32);
 
-    // Obtain this object's owner, located 32 bytes before its
-    // pointer
+    // Obtain this object's owner
     builder
         .local_get(struct_ptr)
         .i32_const(32)
         .binop(BinaryOp::I32Sub);
 
-    // Obtain the object's id, it must be the first field containing a UID struct
-    // The UID struct has the following form
-    //
-    // UID { id: ID { bytes: <bytes> } }
-    //
-    // At this point we have in stack a pointer to the beggining of the struct.
-    //
-    // The first load instruction puts in stack the first pointer value of the strucure, that is a
-    // pointer to the UID struct
-    //
-    // The second load instruction puts in stack the pointer to the ID struct
-    //
-    // The third load instruction loads the ID's bytes field pointer
-    //
-    // At the end of the load chain we point to the 32 bytes holding the data
-    builder
-        .local_get(struct_ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
+    // Get the pointer to the 32 bytes holding the data of the id
+    builder.local_get(struct_ptr).call(get_id_bytes_ptr_fn);
 
     // Compute the slot where it should be saved
     builder.call(write_object_slot_fn);
@@ -298,6 +286,58 @@ pub fn storage_next_slot_function(
         .call(swap_256_fn);
 
     function.finish(vec![slot_ptr], &mut module.funcs)
+}
+
+// This function returns a pointer to the 32 bytes holding the data of the id, given a struct pointer as input
+pub fn get_id_bytes_ptr(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut builder = function
+        .name(RuntimeFunction::GetIdBytesPtr.name().to_owned())
+        .func_body();
+
+    let struct_ptr = module.locals.add(ValType::I32);
+
+    // Obtain the object's id, it must be the first field containing a UID struct
+    // The UID struct has the following form
+    //
+    // UID { id: ID { bytes: <bytes> } }
+    //
+    // The first load instruction puts in stack the first pointer value of the strucure, that is a
+    // pointer to the UID struct
+    //
+    // The second load instruction puts in stack the pointer to the ID struct
+    //
+    // The third load instruction loads the ID's bytes field pointer
+    //
+    // At the end of the load chain we point to the 32 bytes holding the data
+    builder
+        .local_get(struct_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    function.finish(vec![struct_ptr], &mut module.funcs)
 }
 
 /// The value corresponding to a mapping key k is located at keccak256(h(k) . p) where . is concatenation

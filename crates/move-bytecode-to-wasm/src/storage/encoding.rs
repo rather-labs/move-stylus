@@ -551,7 +551,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
 }
 
 /// Return the storage-encoded field size in bytes
-fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext) -> u32 {
+pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext) -> u32 {
     match field {
         IntermediateType::IBool | IntermediateType::IU8 | IntermediateType::IEnum(_) => 1,
         IntermediateType::IU16 => 2,

@@ -7,11 +7,13 @@ module stylus::transfer;
 /// This function has custom rules performed by the Sui Move bytecode verifier that ensures
 /// that `T` is an object defined in the module where `transfer` is invoked. Use
 /// `public_transfer` to transfer an object with `store` outside of its module.
-public fun transfer<T: key>(obj: T, recipient: address) {
-    transfer_impl(obj, recipient)
-}
+public native fun transfer<T: key>(obj: T, recipient: address);
 
-/// This function perform the transfers
-public(package) native fun transfer_impl<T: key>(obj: T, recipient: address);
+/// Freeze `obj`. After freezing `obj` becomes immutable and can no longer be transferred or
+/// mutated.
+/// This function has custom rules performed by the Sui Move bytecode verifier that ensures
+/// that `T` is an object defined in the module where `freeze_object` is invoked. Use
+/// `public_freeze_object` to freeze an object with `store` outside of its module.
+public native fun freeze_object<T: key>(obj: T);
 
 public native fun share_object<T: key>(obj: T);
