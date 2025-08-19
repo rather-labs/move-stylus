@@ -14,7 +14,8 @@ pub mod table;
 use crate::{
     CompilationContext, compilation_context::ModuleData,
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, native_functions::NativeFunction,
-    runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension,
+    runtime::RuntimeFunction, storage::save::add_save_struct_into_storage_fn,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 use anyhow::Result;
 use flow::Flow;
@@ -1086,14 +1087,15 @@ fn translate_instruction(
             // We expect that the owner address is just right before the pointer
             if mapped_function.is_entry {
                 for (arg_index, fn_arg) in mapped_function.signature.arguments.iter().enumerate() {
-                    let type_ = match fn_arg {
-                        IntermediateType::IMutRef(inner) => {
-                            compilation_ctx.get_struct_by_intermediate_type(&**inner)
-                        }
-                        t => compilation_ctx.get_struct_by_intermediate_type(t),
+                    let (itype, struct_) = match fn_arg {
+                        IntermediateType::IMutRef(inner) => (
+                            &**inner,
+                            compilation_ctx.get_struct_by_intermediate_type(&**inner),
+                        ),
+                        t => (fn_arg, compilation_ctx.get_struct_by_intermediate_type(t)),
                     };
 
-                    if let Ok(struct_) = type_ {
+                    if let Ok(struct_) = struct_ {
                         if struct_.saved_in_storage {
                             let locate_struct_fn = RuntimeFunction::LocateStructSlot
                                 .get(module, Some(compilation_ctx));
@@ -1114,12 +1116,8 @@ fn translate_instruction(
                             // Compute the slot where the struct will be saved
                             builder.call(locate_struct_fn);
 
-                            let save_in_slot_fn = NativeFunction::get_generic(
-                                "save_in_slot",
-                                module,
-                                compilation_ctx,
-                                &[fn_arg.clone()],
-                            );
+                            let save_in_slot_fn =
+                                add_save_struct_into_storage_fn(module, compilation_ctx, itype);
 
                             // Load the struct memory representation to pass it to the save
                             // function
