@@ -120,8 +120,10 @@ pub fn add_share_object_fn(
         return function;
     };
 
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    
     let storage_save_fn = add_storage_save_fn(hash, module, compilation_ctx, struct_);
     let (emit_log_fn, _) = emit_log(module);
 
@@ -129,28 +131,63 @@ pub fn add_share_object_fn(
     let mut builder = function.name(name).func_body();
 
     let struct_ptr = module.locals.add(ValType::I32);
+    let owner_ptr = module.locals.add(ValType::I32);
 
-    // Shared object key (owner ptr)
-    builder.i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET);
+    builder.block(None, |block| {
+        let block_id = block.id();
 
-    // Obtain the object's id bytes pointer
-    builder.local_get(struct_ptr).call(get_id_bytes_ptr_fn);
+        block
+            .local_get(struct_ptr)
+            .i32_const(32)
+            .binop(BinaryOp::I32Sub)
+            .local_set(owner_ptr);
 
-    // Slot number is in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
-    builder.call(write_object_slot_fn);
+        // Check that the object is not frozen or shared.
+        // We dont need to check if the owner is the tx sender because this is implicitly done when unpacking the struct.
+        block
+            .local_get(owner_ptr)
+            .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
+            .i32_const(32)
+            .call(equality_fn)
+            .br_if(block_id);
 
-    // TODO: remove after adding tests
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
+        block
+            .local_get(owner_ptr)
+            .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+            .i32_const(32)
+            .call(equality_fn);
 
-    // Call storage save for the struct
-    builder
-        .local_get(struct_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .call(storage_save_fn);
+        block.if_else(
+            None,
+            |then| {
+                // Object cannot be frozen
+                then.unreachable();
+            },
+            |else_| {
+                // Shared object key (owner ptr)
+                else_.i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET);
+
+                // Obtain the object's id bytes pointer
+                else_.local_get(struct_ptr).call(get_id_bytes_ptr_fn);
+
+                // Slot number is in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
+                else_.call(write_object_slot_fn);
+
+                // TODO: remove after adding tests
+                else_
+                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .i32_const(32)
+                    .i32_const(0)
+                    .call(emit_log_fn);
+
+                // Call storage save for the struct
+                else_
+                    .local_get(struct_ptr)
+                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .call(storage_save_fn);
+            },
+        );
+    });
 
     function.finish(vec![struct_ptr], &mut module.funcs)
 }
