@@ -14,8 +14,7 @@ pub mod table;
 use crate::{
     CompilationContext, compilation_context::ModuleData,
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, native_functions::NativeFunction,
-    runtime::RuntimeFunction, storage::save::add_save_struct_into_storage_fn,
-    wasm_builder_extensions::WasmBuilderExtension,
+    runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension,
 };
 use anyhow::Result;
 use flow::Flow;

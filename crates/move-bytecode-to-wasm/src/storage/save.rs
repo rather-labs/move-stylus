@@ -10,6 +10,7 @@ use super::encoding::add_encode_and_save_into_storage_struct_instructions;
 
 // TODO: move to runtime
 /// Generates a function that reads an specific struct from the storage.
+#[allow(dead_code)]
 pub fn add_save_struct_into_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
