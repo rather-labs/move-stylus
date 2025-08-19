@@ -1,6 +1,11 @@
 #![allow(dead_code)]
 pub mod constants;
 
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex, mpsc},
+};
+
 use alloy_primitives::{hex, keccak256};
 use anyhow::Result;
 use constants::{
@@ -22,6 +27,9 @@ pub struct RuntimeSandbox {
     engine: Engine,
     linker: Linker<ModuleData>,
     module: WasmModule,
+    pub log_events: Arc<Mutex<mpsc::Receiver<Vec<u8>>>>,
+    current_tx_origin: Arc<Mutex<[u8; 20]>>,
+    current_msg_sender: Arc<Mutex<[u8; 20]>>,
 }
 
 macro_rules! link_fn_ret_constant {
@@ -67,6 +75,11 @@ impl RuntimeSandbox {
 
         let module = WasmModule::from_binary(&engine, &module.emit_wasm()).unwrap();
 
+        let storage: Arc<Mutex<HashMap<[u8; 32], [u8; 32]>>> = Arc::new(Mutex::new(HashMap::new()));
+        let current_tx_origin = Arc::new(Mutex::new(SIGNER_ADDRESS));
+        let current_msg_sender = Arc::new(Mutex::new(MSG_SENDER_ADDRESS));
+
+        let (log_sender, log_receiver) = mpsc::channel::<Vec<u8>>();
         let mut linker = Linker::new(&engine);
 
         let mem_export = module.get_export_index("memory").unwrap();
@@ -118,17 +131,8 @@ impl RuntimeSandbox {
             )
             .unwrap();
 
-        // TODO: do we need to add some body to this storage related linked functions?
         linker
             .func_wrap("vm_hooks", "pay_for_memory_grow", |_pages: u32| {})
-            .unwrap();
-
-        linker
-            .func_wrap("vm_hooks", "storage_load_bytes32", |_: i32, _: i32| {})
-            .unwrap();
-
-        linker
-            .func_wrap("vm_hooks", "storage_cache_bytes32", |_: i32, _: i32| {})
             .unwrap();
 
         linker
@@ -177,12 +181,99 @@ impl RuntimeSandbox {
                     mem.read(&mut caller, ptr as usize, &mut buffer).unwrap();
 
                     println!("read memory: {buffer:?}");
+                    log_sender.send(buffer.to_vec()).unwrap();
                 },
             )
             .unwrap();
 
-        link_fn_write_constant!(linker, "tx_origin", SIGNER_ADDRESS);
-        link_fn_write_constant!(linker, "msg_sender", MSG_SENDER_ADDRESS);
+        let storage_for_cache = storage.clone();
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "storage_cache_bytes32",
+                move |mut caller: Caller<'_, ModuleData>, key_ptr: u32, value_ptr: u32| {
+                    println!("storage_cache_bytes32, key ptr {key_ptr}, value ptr {value_ptr}");
+
+                    let mem = get_memory(&mut caller);
+                    let mut key_buffer = [0; 32];
+                    mem.read(&mut caller, key_ptr as usize, &mut key_buffer)
+                        .unwrap();
+
+                    let mut value_buffer = [0; 32];
+                    mem.read(&mut caller, value_ptr as usize, &mut value_buffer)
+                        .unwrap();
+
+                    let mut storage = storage_for_cache.lock().unwrap();
+                    (*storage).insert(key_buffer, value_buffer);
+
+                    // println!("read memory key: {key_buffer:?}");
+                    // println!("read memory value: {value_ptr:?}");
+                },
+            )
+            .unwrap();
+
+        let storage_for_cache = storage.clone();
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "storage_load_bytes32",
+                move |mut caller: Caller<'_, ModuleData>, key_ptr: u32, dest_ptr: u32| {
+                    println!("storage_load_bytes32 key ptr {key_ptr}, dest ptr {dest_ptr}");
+
+                    let mem = get_memory(&mut caller);
+                    let mut key_buffer = [0; 32];
+                    mem.read(&mut caller, key_ptr as usize, &mut key_buffer)
+                        .unwrap();
+
+                    // println!("read memory key: {key_buffer:?}");
+                    let storage = storage_for_cache.lock().unwrap();
+                    let value = (*storage).get(&key_buffer).unwrap_or(&[0; 32]);
+                    // println!("read memory value: {value:?}");
+
+                    mem.write(&mut caller, dest_ptr as usize, value.as_slice())
+                        .unwrap();
+                },
+            )
+            .unwrap();
+
+        let tx_orign = current_tx_origin.clone();
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "tx_origin",
+                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
+                    println!("tx_origin called, writing in {ptr}");
+
+                    let mem = match caller.get_export("memory") {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    let data = tx_orign.lock().unwrap();
+                    mem.write(&mut caller, ptr as usize, &*data).unwrap();
+                },
+            )
+            .unwrap();
+
+        let msg_sender = current_msg_sender.clone();
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "msg_sender",
+                move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
+                    println!("msg_sender called, writing in {ptr}");
+
+                    let mem = match caller.get_export("memory") {
+                        Some(Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    let data = msg_sender.lock().unwrap();
+                    mem.write(&mut caller, ptr as usize, &*data).unwrap();
+                },
+            )
+            .unwrap();
+
         link_fn_write_constant!(linker, "msg_value", MSG_VALUE.to_le_bytes::<32>());
         link_fn_write_constant!(linker, "block_basefee", BLOCK_BASEFEE.to_le_bytes::<32>());
         link_fn_write_constant!(linker, "tx_gas_price", GAS_PRICE.to_le_bytes::<32>());
@@ -283,6 +374,9 @@ impl RuntimeSandbox {
             engine,
             linker,
             module,
+            log_events: Arc::new(Mutex::new(log_receiver)),
+            current_tx_origin,
+            current_msg_sender,
         }
     }
 
@@ -307,5 +401,13 @@ impl RuntimeSandbox {
             .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
 
         Ok((result, store.data().return_data.clone()))
+    }
+
+    pub fn set_tx_origin(&self, new_address: [u8; 20]) {
+        *self.current_tx_origin.lock().unwrap() = new_address;
+    }
+
+    pub fn set_msg_sender(&self, new_address: [u8; 20]) {
+        *self.current_msg_sender.lock().unwrap() = new_address;
     }
 }
