@@ -14,8 +14,7 @@ use crate::{
 
 use super::NativeFunction;
 
-// TODO: add_share_object_fn should be moved here
-
+/// Adds the instructions to transfer an object to a recipient.
 pub fn add_transfer_object_fn(
     hash: String,
     module: &mut Module,
@@ -27,7 +26,7 @@ pub fn add_transfer_object_fn(
         return function;
     };
 
-    // This calculates the slot number of a given (outer_key, struct_id) tupple in the objects mapping
+    // This calculates the slot number of a given (outer_key, struct_id) tuple in the objects mapping
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
@@ -53,22 +52,25 @@ pub fn add_transfer_object_fn(
         .binop(BinaryOp::I32Sub)
         .local_set(owner_ptr);
 
-    // Here we should check that the object is not frozen or shared. If it is, we throw an unreacheable.
+    // Check that the object is not frozen or shared.
     // We dont need to check if the owner is the tx sender because this is implicitly done when unpacking the struct.
-    builder.local_get(owner_ptr);
-    builder.i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET);
-    builder.i32_const(32); // How many bytes to compare
-    builder.call(equality_fn);
+    builder
+        .local_get(owner_ptr)
+        .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
+        .i32_const(32)
+        .call(equality_fn);
 
-    builder.local_get(owner_ptr);
-    builder.i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET);
-    builder.i32_const(32);
-    builder.call(equality_fn);
+    builder
+        .local_get(owner_ptr)
+        .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+        .i32_const(32)
+        .call(equality_fn);
 
-    builder.binop(BinaryOp::I32Or); // If the object is frozen or shared, the result will be 1 and we emit an unreacheable
+    builder.binop(BinaryOp::I32Or);
     builder.if_else(
         None,
         |then| {
+            // If the object is frozen or shared, emit an unreacheable.
             then.unreachable();
         },
         |else_| {
@@ -81,13 +83,14 @@ pub fn add_transfer_object_fn(
                 .call(get_id_bytes_ptr_fn)
                 .local_set(id_bytes_ptr);
 
-            // Calculate the slot number corresponding to the (recipient, struct_id) tupple
+            // Calculate the slot number corresponding to the (recipient, struct_id) tuple
             // Slot number will be written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
             else_
                 .local_get(recipient_ptr)
                 .local_get(id_bytes_ptr)
                 .call(write_object_slot_fn);
 
+            // TODO: remove after adding tests
             else_
                 .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                 .i32_const(32)
@@ -104,6 +107,54 @@ pub fn add_transfer_object_fn(
     function.finish(vec![struct_ptr, recipient_ptr], &mut module.funcs)
 }
 
+/// Adds the instructions to share an object.
+/// Shouln't emit an unreachable if the object is frozen?
+pub fn add_share_object_fn(
+    hash: String,
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    struct_: &IStruct,
+) -> FunctionId {
+    let name = format!("{}_{hash}", NativeFunction::NATIVE_SHARE_OBJECT);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    };
+
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let storage_save_fn = add_storage_save_fn(hash, module, compilation_ctx, struct_);
+    let (emit_log_fn, _) = emit_log(module);
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
+    let mut builder = function.name(name).func_body();
+
+    let struct_ptr = module.locals.add(ValType::I32);
+
+    // Shared object key (owner ptr)
+    builder.i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET);
+
+    // Obtain the object's id bytes pointer
+    builder.local_get(struct_ptr).call(get_id_bytes_ptr_fn);
+
+    // Slot number is in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
+    builder.call(write_object_slot_fn);
+
+    // TODO: remove after adding tests
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_fn);
+
+    // Call storage save for the struct
+    builder
+        .local_get(struct_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(storage_save_fn);
+
+    function.finish(vec![struct_ptr], &mut module.funcs)
+}
+
 pub fn add_freeze_object_fn(
     hash: String,
     module: &mut Module,
@@ -115,7 +166,7 @@ pub fn add_freeze_object_fn(
         return function;
     };
 
-    // This calculates the slot number of a given (outer_key, struct_id) tupple in the objects mapping
+    // This calculates the slot number of a given (outer_key, struct_id) tuple in the objects mapping
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
@@ -184,6 +235,7 @@ pub fn add_freeze_object_fn(
                     .local_get(id_bytes_ptr)
                     .call(write_object_slot_fn);
 
+                // TODO: remove after adding tests
                 else_
                     .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                     .i32_const(32)

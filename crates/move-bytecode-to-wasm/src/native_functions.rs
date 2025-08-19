@@ -26,10 +26,10 @@ impl NativeFunction {
     const NATIVE_GAS_PRICE: &str = "native_gas_price";
     const NATIVE_FRESH_ID: &str = "fresh_id";
     pub const NATIVE_STORAGE_SAVE: &str = "save_in_slot";
-    pub const NATIVE_STORAGE_SHARE_OBJECT: &str = "share_object";
 
     // Transfer functions
     pub const NATIVE_TRANSFER_OBJECT: &str = "transfer";
+    pub const NATIVE_SHARE_OBJECT: &str = "share_object";
     pub const NATIVE_FREEZE_OBJECT: &str = "freeze_object";
 
     // Object functions
@@ -129,7 +129,7 @@ impl NativeFunction {
                     };
                     storage::add_storage_save_fn(hash, module, compilation_ctx, struct_)
                 }
-                Self::NATIVE_STORAGE_SHARE_OBJECT => {
+                Self::NATIVE_SHARE_OBJECT => {
                     assert_eq!(
                         1,
                         generics.len(),
@@ -145,7 +145,7 @@ impl NativeFunction {
                         None => todo!(),
                     };
 
-                    storage::add_share_object_fn(hash, module, compilation_ctx, struct_)
+                    transfer::add_share_object_fn(hash, module, compilation_ctx, struct_)
                 }
                 Self::NATIVE_TRANSFER_OBJECT => {
                     assert_eq!(

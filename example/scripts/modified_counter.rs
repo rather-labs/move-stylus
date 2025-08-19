@@ -44,7 +44,7 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
-    let share_flag = false;
+    let share_flag = true;
     let pending_tx = example.create(share_flag).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     println!("Create Logs:");

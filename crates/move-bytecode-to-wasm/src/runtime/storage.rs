@@ -59,7 +59,7 @@ pub fn locate_storage_data(
         .call(compilation_ctx.allocator)
         .local_set(zero);
 
-    // Wipe the memory first, and then write the tx signer address
+    // Wipe the first 12 bytes, and then write the tx signer address
     builder
         .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
         .i32_const(0)

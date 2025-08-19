@@ -1,7 +1,10 @@
 use super::NativeFunction;
 use crate::{
     CompilationContext,
-    data::DATA_FROZEN_OBJECTS_KEY_OFFSET,
+    data::{
+        DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+        DATA_SLOT_DATA_PTR_OFFSET,
+    },
     hostio::host_functions::{
         block_number, block_timestamp, emit_log, native_keccak256, storage_cache_bytes32,
         storage_flush_cache, storage_load_bytes32,
@@ -219,6 +222,9 @@ pub fn add_delete_object_fn(
         RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
 
+    let (storage_cache, _) = storage_cache_bytes32(module);
+    let (storage_flush_cache, _) = storage_flush_cache(module);
+
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
 
@@ -245,12 +251,48 @@ pub fn add_delete_object_fn(
             else_.local_get(struct_ptr).call(locate_struct_slot_fn);
 
             // Delete the object from the storage
-            storage::encoding::add_delete_storage_struct_instructions(
-                else_,
-                module,
-                compilation_ctx,
-                struct_,
-            );
+            let slot_ptr = module.locals.add(ValType::I32);
+
+            else_
+                .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                .local_set(slot_ptr);
+
+            // Wipe the slot data placeholder. We use it to erase the slots in the storage
+            else_
+                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                .i32_const(0)
+                .i32_const(32)
+                .memory_fill(compilation_ctx.memory_id);
+
+            // Wipe out the first slot
+            else_
+                .local_get(slot_ptr)
+                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                .call(storage_cache);
+
+            let mut slot_used_bytes = 0;
+            for field in struct_.fields.iter() {
+                let field_size = storage::encoding::field_size(field, compilation_ctx);
+                if slot_used_bytes + field_size > 32 {
+                    let next_slot_fn =
+                        RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
+                    else_
+                        .local_get(slot_ptr)
+                        .call(next_slot_fn)
+                        .local_set(slot_ptr);
+
+                    else_
+                        .local_get(slot_ptr)
+                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                        .call(storage_cache);
+
+                    slot_used_bytes = field_size;
+                } else {
+                    slot_used_bytes += field_size;
+                }
+            }
+
+            else_.i32_const(1).call(storage_flush_cache);
         },
     );
 
