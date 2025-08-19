@@ -1,4 +1,7 @@
-use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::{BinaryOp, UnaryOp}};
+use walrus::{
+    FunctionBuilder, FunctionId, Module, ValType,
+    ir::{BinaryOp, UnaryOp},
+};
 
 use crate::{
     CompilationContext,
@@ -71,9 +74,12 @@ pub fn add_transfer_object_fn(
             .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
             .i32_const(32)
             .call(equality_fn);
-        
+
         // If the object is neither shared nor frozen, jump to the end of the block.
-        block.binop(BinaryOp::I32Add).unop(UnaryOp::I32Eqz).br_if(block_id);
+        block
+            .binop(BinaryOp::I32Add)
+            .unop(UnaryOp::I32Eqz)
+            .br_if(block_id);
 
         block.unreachable();
     });
