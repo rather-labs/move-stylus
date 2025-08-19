@@ -71,12 +71,14 @@ pub fn locate_storage_data(
         .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET + 12)
         .call(tx_origin);
 
+    // TODO: remove after adding tests
     builder
         .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
         .i32_const(32)
         .i32_const(0)
         .call(emit_log_fn);
 
+    // TODO: remove after adding tests
     builder
         .local_get(uid_ptr)
         .i32_const(32)
@@ -94,6 +96,7 @@ pub fn locate_storage_data(
             .local_get(uid_ptr)
             .call(write_object_slot_fn);
 
+        // TODO: remove after adding tests
         block
             .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
             .i32_const(32)
