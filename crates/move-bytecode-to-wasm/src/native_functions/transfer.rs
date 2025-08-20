@@ -13,6 +13,7 @@ use crate::{
     native_functions::{object::add_delete_object_fn, storage::add_storage_save_fn},
     runtime::RuntimeFunction,
     translation::intermediate_types::structs::IStruct,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 use super::NativeFunction;
@@ -49,6 +50,7 @@ pub fn add_transfer_object_fn(
     // Locals
     let owner_ptr = module.locals.add(ValType::I32);
     let id_bytes_ptr = module.locals.add(ValType::I32);
+    let zero = module.locals.add(ValType::I32);
 
     builder.block(None, |block| {
         let block_id = block.id();
@@ -85,8 +87,25 @@ pub fn add_transfer_object_fn(
         block.unreachable();
     });
 
-    // Delete the object from the owner mapping on the storage
-    builder.local_get(struct_ptr).call(delete_object_fn);
+    // Alloc 32 zeros to check if the owner is zero (means there's no owner, so we don't need to
+    // delete anything)
+    // TODO: Create a runtime function is zero...
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_get(owner_ptr)
+        .i32_const(32)
+        .call(equality_fn)
+        .negate();
+
+    // Delete the object from the owner mapping on the storage if the owner addres is not all zeros
+    builder.if_else(
+        None,
+        |then| {
+            then.local_get(struct_ptr).call(delete_object_fn);
+        },
+        |_| {},
+    );
 
     // Get the pointer to the 32 bytes holding the data of the id
     builder
