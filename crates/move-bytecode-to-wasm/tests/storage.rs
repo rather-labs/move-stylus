@@ -107,7 +107,7 @@ mod capability {
     use alloy_primitives::{FixedBytes, address};
     use alloy_sol_types::{SolCall, sol};
 
-    use crate::common::runtime_sandbox::constants::{MSG_SENDER_ADDRESS, SIGNER_ADDRESS};
+    use crate::common::runtime_sandbox::constants::SIGNER_ADDRESS;
 
     use super::*;
 

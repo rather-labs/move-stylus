@@ -22,7 +22,8 @@ sol!(
 async fn main() -> eyre::Result<()> {
     dotenv().ok();
     let priv_key = std::env::var("PRIV_KEY").map_err(|_| eyre!("No {} env var set", "PRIV_KEY"))?;
-    let priv_key_2 = std::env::var("PRIV_KEY_2").map_err(|_| eyre!("No {} env var set", "PRIV_KEY"))?;
+    let priv_key_2 =
+        std::env::var("PRIV_KEY_2").map_err(|_| eyre!("No {} env var set", "PRIV_KEY"))?;
     let rpc_url = std::env::var("RPC_URL").map_err(|_| eyre!("No {} env var set", "RPC_URL"))?;
     let contract_address = std::env::var("CONTRACT_ADDRESS_DOG_WALKER")
         .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_DOG_WALKER"))?;
@@ -39,13 +40,13 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
-
     println!("Creating a new capability and capturing its id");
     let tx = example.create().into_transaction_request().from(sender);
     let pending_tx = provider.send_transaction(tx).await?;
     let receipt = pending_tx.get_receipt().await?;
     let capability_id = receipt.logs()[0].data().data.0.clone();
-    let capability_id = FixedBytes::<32>::new(<[u8; 32]>::try_from(capability_id.to_vec()).unwrap());
+    let capability_id =
+        FixedBytes::<32>::new(<[u8; 32]>::try_from(capability_id.to_vec()).unwrap());
     println!("Captured capability {:?}", capability_id);
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();

@@ -111,7 +111,7 @@ mod tx_context {
 }
 
 mod event {
-    use alloy_primitives::{Address, address, hex};
+    use alloy_primitives::address;
 
     use crate::common::translate_test_package_with_framework;
 
