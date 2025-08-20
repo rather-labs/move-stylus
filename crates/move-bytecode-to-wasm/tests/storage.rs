@@ -136,7 +136,7 @@ mod storage_transfer {
     #[rstest]
     #[case(false)]
     #[case(true)]
-    fn test_storage_transfer(runtime: RuntimeSandbox, #[case] share: bool) {
+    fn test_transfer_or_share(runtime: RuntimeSandbox, #[case] share: bool) {
         // TODO: remove this.
         runtime.set_msg_sender(SIGNER_ADDRESS);
 
@@ -210,10 +210,11 @@ mod storage_transfer {
 
     // Tests the freeze of an object in both owned and shared cases.
     #[rstest]
+    #[should_panic(expected = "unreachable")]
     #[case(false)]
     #[should_panic(expected = "unreachable")]
     #[case(true)]
-    fn test_storage_freeze(runtime: RuntimeSandbox, #[case] share: bool) {
+    fn test_freeze(runtime: RuntimeSandbox, #[case] share: bool) {
         // TODO: remove this.
         runtime.set_msg_sender(SIGNER_ADDRESS);
 
@@ -230,6 +231,9 @@ mod storage_transfer {
         let object_slot = runtime.log_events.lock().unwrap().recv().unwrap();
         let object_slot = FixedBytes::<32>::from_slice(&object_slot);
 
+        // Read the storage on the original slot before the freeze
+        let value_before_freeze = runtime.get_storage_at_slot(object_slot.0);
+
         // Read initial value (should be 101)
         let call_data = readValueCall::new((object_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -242,6 +246,24 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
+        // Read the storage on the original slot after the freeze
+        let value_after_freeze = runtime.get_storage_at_slot(object_slot.0);
+        assert_eq!(
+            [0u8; 32], value_after_freeze,
+            "Expected storage value to be 32 zeros"
+        );
+
+        // Read the object id emmited from the contract's events
+        let frozen_slot = runtime.log_events.lock().unwrap().recv().unwrap();
+        let frozen_slot = FixedBytes::<32>::from_slice(&frozen_slot);
+
+        // Read the storage on the frozen slot after the freeze
+        let frozen_value = runtime.get_storage_at_slot(frozen_slot.0);
+        assert_eq!(
+            value_before_freeze, frozen_value,
+            "Expected storage value to be the same"
+        );
+
         // Read value
         let call_data = readValueCall::new((object_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -249,16 +271,19 @@ mod storage_transfer {
         assert_eq!(101, return_data);
         assert_eq!(0, result);
 
-        // Read the storage on the original slot after the freeze. It should be empty.
-        let value = runtime.get_storage_at_slot(object_slot.0);
-        assert_eq!([0u8; 32], value, "Expected storage value to be 32 zeros");
-        println!("Data at original slot after freeze: {:?}", value);
+        // Set value. This should fail because the object is frozen.
+        let call_data = setValueCall::new((object_id, 111)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
     }
 
-    // Freeze and then try to share the object.
+    // Freeze and then try to share or transfer the object.
     #[rstest]
     #[should_panic(expected = "unreachable")]
-    fn test_storage_freeze_and_share(runtime: RuntimeSandbox) {
+    #[case(false)]
+    #[should_panic(expected = "unreachable")]
+    #[case(true)]
+    fn test_share_or_transfer_after_freeze(runtime: RuntimeSandbox, #[case] share: bool) {
         // TODO: remove this.
         runtime.set_msg_sender(SIGNER_ADDRESS);
 
@@ -271,106 +296,46 @@ mod storage_transfer {
         let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let object_id = FixedBytes::<32>::from_slice(&object_id);
 
-        println!("object_id {:?}", object_id);
-
-        // Read the object slot emmited from the contract's events
-        let delete_slot = runtime.log_events.lock().unwrap().recv().unwrap();
-        let delete_slot = FixedBytes::<32>::from_slice(&delete_slot);
-
-        println!("Deleting slot {:?}", delete_slot);
-
-        // Read the storage on the original slot before the freeze
-        let value = runtime.get_storage_at_slot(delete_slot.0);
-        // assert_eq!([0u8; 32], value, "Expected storage value to be 32 zeros");
-        println!("Data at slot: {:?} after deleting: {:?}", delete_slot, value);
-
         // Read the object slot emmited from the contract's events
         let object_slot = runtime.log_events.lock().unwrap().recv().unwrap();
         let object_slot = FixedBytes::<32>::from_slice(&object_slot);
 
-        println!("Owned object slot {:?}", object_slot);
-
         // Read the storage on the original slot before the freeze
-        let value = runtime.get_storage_at_slot(object_slot.0);
-        // assert_eq!([0u8; 32], value, "Expected storage value to be 32 zeros");
-        println!("Data at owned object slot before freeze: {:?}", value);
+        let value_before_freeze = runtime.get_storage_at_slot(object_slot.0);
 
         // Freeze the object. Only possible if the object is owned by the signer!
         let call_data = freezeObjCall::new((object_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-
-        // Read the object slot emmited from the contract's events
-        let delete_slot = runtime.log_events.lock().unwrap().recv().unwrap();
-        let delete_slot = FixedBytes::<32>::from_slice(&delete_slot);
-
-        println!("Deleting slot due to freeze {:?}", delete_slot);
-
-        // Read the storage on the original slot before the freeze
-        let value = runtime.get_storage_at_slot(delete_slot.0);
-        // assert_eq!([0u8; 32], value, "Expected storage value to be 32 zeros");
-        println!("Data at slot: {:?} after deleting due to freeze: {:?}", delete_slot, value);
 
         // Read the storage on the original slot after the freeze
-        let value = runtime.get_storage_at_slot(object_slot.0);
-        // assert_eq!([0u8; 32], value, "Expected storage value to be 32 zeros");
-        println!("Data at owned object slot: {:?} after freeze: {:?}", object_slot, value);
+        let value_after_freeze = runtime.get_storage_at_slot(object_slot.0);
+        assert_eq!(
+            [0u8; 32], value_after_freeze,
+            "Expected storage value to be 32 zeros"
+        );
 
         // Read the object id emmited from the contract's events
-        let slot = runtime.log_events.lock().unwrap().recv().unwrap();
-        let slot = FixedBytes::<32>::from_slice(&slot);
-
-        println!("Frozen mapping slot {:?}", slot);
+        let frozen_slot = runtime.log_events.lock().unwrap().recv().unwrap();
+        let frozen_slot = FixedBytes::<32>::from_slice(&frozen_slot);
 
         // Read the storage on the frozen slot after the freeze
-        let value = runtime.get_storage_at_slot(slot.0);
-        // assert_eq!([0u8; 32], value, "Expected storage value to be 32 zeros");
-        println!("Data at frozen slot after freeze: {:?}", value);
+        let frozen_value = runtime.get_storage_at_slot(frozen_slot.0);
+        assert_eq!(
+            value_before_freeze, frozen_value,
+            "Expected storage value to be the same"
+        );
 
-        // Try to share the object.
-        let call_data = shareObjCall::new((object_id,)).abi_encode();
-        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
-
-        let owner = runtime.log_events.lock().unwrap().recv().unwrap();
-        let owner = FixedBytes::<32>::from_slice(&owner);
-
-        println!("Owner before sharing the object {:?}", owner);
-
-        let new_slot = runtime.log_events.lock().unwrap().recv().unwrap();
-        let new_slot = FixedBytes::<32>::from_slice(&new_slot);
-
-        println!("slot {:?}", new_slot);
-    }
-
-    // Freeze and then try to transfer the object.
-    #[rstest]
-    #[should_panic(expected = "unreachable")]
-    fn test_storage_freeze_and_transfer(runtime: RuntimeSandbox) {
-        // TODO: remove this.
-        runtime.set_msg_sender(SIGNER_ADDRESS);
-
-        // Create a new object
-        let call_data = createCall::new((false,)).abi_encode();
-        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
-
-        // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
-
-        // Read the object slot emmited from the contract's events
-        let object_slot = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_slot = FixedBytes::<32>::from_slice(&object_slot);
-
-        // Freeze the object. Only possible if the object is owned by the signer!
-        let call_data = freezeObjCall::new((object_id,)).abi_encode();
-        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
-
-        // Try to share the object.
-        let call_data = transferObjCall::new((object_id, SIGNER_ADDRESS.into())).abi_encode();
-        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
+        if share {
+            // Try to share the object.
+            let call_data = shareObjCall::new((object_id,)).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+        } else {
+            // Try to transfer the object.
+            let call_data = transferObjCall::new((object_id, SIGNER_ADDRESS.into())).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+        }
     }
 }

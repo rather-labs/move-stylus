@@ -221,9 +221,7 @@ pub fn add_delete_object_fn(
         RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
 
-    let (emit_log_fn, _) = emit_log(module);
     let (storage_cache, _) = storage_cache_bytes32(module);
-    let (storage_flush_cache, _) = storage_flush_cache(module);
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
@@ -253,12 +251,6 @@ pub fn add_delete_object_fn(
                 .call(locate_struct_slot_fn)
                 .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                 .local_set(slot_ptr);
-
-            else_
-                .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                .i32_const(32)
-                .i32_const(0)
-                .call(emit_log_fn);
 
             // Wipe the slot data placeholder. We will use it to erase the slots in the storage
             else_
@@ -290,8 +282,6 @@ pub fn add_delete_object_fn(
                     slot_used_bytes += field_size;
                 }
             }
-
-            else_.i32_const(1).call(storage_flush_cache);
         },
     );
 

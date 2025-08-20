@@ -183,6 +183,7 @@ impl Unpackable for IntermediateType {
                         calldata_reader_pointer,
                         compilation_ctx,
                         self,
+                        false,
                     );
                 } else {
                     // TODO: Check if the struct is TxContext. If it is, panic since the only valid
@@ -214,6 +215,7 @@ impl Unpackable for IntermediateType {
                         calldata_reader_pointer,
                         compilation_ctx,
                         self,
+                        false,
                     );
                 } else {
                     struct_instance.add_unpack_instructions(
@@ -264,6 +266,7 @@ impl Unpackable for IntermediateType {
                                 calldata_reader_pointer,
                                 compilation_ctx,
                                 self,
+                                false,
                             );
                         } else {
                             istruct.add_unpack_instructions(
@@ -307,6 +310,7 @@ fn add_unpack_from_storage_instructions(
     calldata_reader_pointer: LocalId,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
+    unpack_frozen: bool,
 ) {
     // First we add the instructions to unpack the UID. We use address to unpack it because ids are
     // 32 bytes static, same as an address
@@ -321,7 +325,12 @@ fn add_unpack_from_storage_instructions(
     // Search for the object in the objects mappings
     let locate_storage_data_fn =
         RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
-    function_builder.call(locate_storage_data_fn);
+
+    if unpack_frozen {
+        function_builder.i32_const(1).call(locate_storage_data_fn);
+    } else {
+        function_builder.i32_const(0).call(locate_storage_data_fn);
+    }
 
     // Read the object
     let read_struct_from_storage_fn =

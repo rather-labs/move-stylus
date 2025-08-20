@@ -10,7 +10,7 @@ use crate::{
     CompilationContext,
     compilation_context::ExternalModuleData,
     data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_STORAGE_OBJECT_OWNER_OFFSET},
-    hostio::host_functions::{storage_cache_bytes32, storage_flush_cache, storage_load_bytes32},
+    hostio::host_functions::{storage_cache_bytes32, storage_load_bytes32},
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         IntermediateType,
@@ -38,7 +38,6 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     struct_: &IStruct,
 ) {
     let (storage_cache, _) = storage_cache_bytes32(module);
-    let (storage_flush_cache, _) = storage_flush_cache(module);
 
     // Locals
     let val_32 = module.locals.add(ValType::I32);
@@ -251,8 +250,6 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
         .local_get(slot_ptr)
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .call(storage_cache);
-
-    builder.i32_const(1).call(storage_flush_cache);
 }
 
 /// Adds the instructions to read, decode from storage and build in memory a structure.

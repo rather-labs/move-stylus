@@ -87,6 +87,13 @@ pub fn add_transfer_object_fn(
     // Delete the object from the owner mapping on the storage
     builder.local_get(struct_ptr).call(add_delete_object_fn);
 
+    // Update the object ownership in memory to the recipient's address
+    builder
+        .local_get(owner_ptr)
+        .local_get(recipient_ptr)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
     // Get the pointer to the 32 bytes holding the data of the id
     builder
         .local_get(struct_ptr)
@@ -154,13 +161,6 @@ pub fn add_share_object_fn(
             .binop(BinaryOp::I32Sub)
             .local_set(owner_ptr);
 
-        // TODO: remove after adding tests
-        block
-            .local_get(owner_ptr)
-            .i32_const(32)
-            .i32_const(0)
-            .call(emit_log_fn);
-
         // If the object is already shared, skip to the end of the block since no action is needed.
         block
             .local_get(owner_ptr)
@@ -185,6 +185,13 @@ pub fn add_share_object_fn(
             |else_| {
                 // Delete the object from owner mapping on the storage
                 else_.local_get(struct_ptr).call(add_delete_object_fn);
+
+                // Update the object ownership in memory to the shared objects key
+                else_
+                    .local_get(owner_ptr)
+                    .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
                 // Calculate the slot number in the shared objects mapping
                 else_
@@ -283,6 +290,13 @@ pub fn add_freeze_object_fn(
             |else_| {
                 // Delete the object from the owner mapping on the storage
                 else_.local_get(struct_ptr).call(add_delete_object_fn);
+
+                // Update the object ownership in memory to the frozen objects key
+                else_
+                    .local_get(owner_ptr)
+                    .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
                 // Calculate the struct slot in the frozen objects mapping
                 else_

@@ -46,13 +46,14 @@ pub fn locate_storage_data(
     let (storage_load, _) = storage_load_bytes32(module);
 
     // Function declaration
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut builder = function
         .name(RuntimeFunction::LocateStorageData.name().to_owned())
         .func_body();
 
     // Arguments
     let uid_ptr = module.locals.add(ValType::I32);
+    let search_frozen = module.locals.add(ValType::I32);
 
     // Locals
     let zero = module.locals.add(ValType::I32);
@@ -73,13 +74,6 @@ pub fn locate_storage_data(
     builder
         .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET + 12)
         .call(tx_origin);
-
-    // // TODO: remove after adding tests
-    // builder
-    //     .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-    //     .i32_const(32)
-    //     .i32_const(0)
-    //     .call(emit_log_fn);
 
     builder.block(None, |block| {
         let exit_block = block.id();
@@ -142,37 +136,46 @@ pub fn locate_storage_data(
         // Frozen objects
         // ==
         // Copy the frozen objects key to the owners offset
-        block
-            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-            .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
-            .i32_const(32)
-            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+        block.block(None, |frozen_block| {
+            let exit_frozen_block = frozen_block.id();
+            frozen_block
+                .local_get(search_frozen)
+                .i32_const(0)
+                .binop(BinaryOp::I32Eq)
+                .br_if(exit_frozen_block);
 
-        block
-            .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
-            .local_get(uid_ptr)
-            .call(write_object_slot_fn);
+            frozen_block
+                .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+                .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+                .i32_const(32)
+                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-        // Load data from slot
-        block
-            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-            .call(storage_load);
+            frozen_block
+                .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+                .local_get(uid_ptr)
+                .call(write_object_slot_fn);
 
-        // Check if it is empty (all zeroes)
-        block
-            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-            .local_get(zero)
-            .i32_const(32)
-            .call(eq_fn)
-            .negate()
-            .br_if(exit_block);
+            // Load data from slot
+            frozen_block
+                .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                .call(storage_load);
+
+            // Check if it is empty (all zeroes)
+            frozen_block
+                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                .local_get(zero)
+                .i32_const(32)
+                .call(eq_fn)
+                .negate()
+                .br_if(exit_block);
+        });
 
         // If we get here means the object was not found
         block.unreachable();
     });
 
-    function.finish(vec![uid_ptr], &mut module.funcs)
+    function.finish(vec![uid_ptr, search_frozen], &mut module.funcs)
 }
 
 /// Computes the storage slot number where the struct should be persisted.

@@ -1,5 +1,6 @@
 use super::Unpackable;
 use crate::CompilationContext;
+use crate::abi_types::unpacking::add_unpack_from_storage_instructions;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::reference::{IMutRef, IRef};
 use walrus::{
@@ -22,10 +23,7 @@ impl IRef {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IExternalUserData { .. } => {
+            | IntermediateType::IU256 => {
                 inner.add_unpack_instructions(
                     builder,
                     module,
@@ -33,6 +31,34 @@ impl IRef {
                     calldata_reader_pointer,
                     compilation_ctx,
                 );
+            }
+            IntermediateType::IStruct { .. }
+            | IntermediateType::IGenericStructInstance { .. }
+            | IntermediateType::IExternalUserData { .. } => {
+                let struct_ = compilation_ctx
+                    .get_struct_by_intermediate_type(inner)
+                    .unwrap();
+
+                // aca se pasa la flag unpack_frozen = true!
+                if struct_.saved_in_storage {
+                    add_unpack_from_storage_instructions(
+                        builder,
+                        module,
+                        reader_pointer,
+                        calldata_reader_pointer,
+                        compilation_ctx,
+                        inner,
+                        true,
+                    );
+                } else {
+                    inner.add_unpack_instructions(
+                        builder,
+                        module,
+                        reader_pointer,
+                        calldata_reader_pointer,
+                        compilation_ctx,
+                    );
+                }
             }
             // For immediates, allocate and store
             IntermediateType::IU8
