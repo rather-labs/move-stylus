@@ -9,7 +9,6 @@ use crate::{
         DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
         DATA_SHARED_OBJECTS_KEY_OFFSET,
     },
-    declare_host_debug_functions,
     hostio::host_functions::emit_log,
     native_functions::{object::add_delete_object_fn, storage::add_storage_save_fn},
     runtime::RuntimeFunction,
@@ -36,9 +35,8 @@ pub fn add_transfer_object_fn(
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
 
     // Native functions
-    let (emit_log_fn, _) = emit_log(module);
     let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
-    let add_delete_object_fn = add_delete_object_fn(hash, module, compilation_ctx, struct_);
+    let delete_object_fn = add_delete_object_fn(hash, module, compilation_ctx, struct_);
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
@@ -51,8 +49,6 @@ pub fn add_transfer_object_fn(
     // Locals
     let owner_ptr = module.locals.add(ValType::I32);
     let id_bytes_ptr = module.locals.add(ValType::I32);
-
-    let (_, _, print_m, _, _) = declare_host_debug_functions!(module);
 
     builder.block(None, |block| {
         let block_id = block.id();
@@ -90,16 +86,13 @@ pub fn add_transfer_object_fn(
     });
 
     // Delete the object from the owner mapping on the storage
-    builder.local_get(struct_ptr).call(add_delete_object_fn);
+    builder.local_get(struct_ptr).call(delete_object_fn);
 
     // Get the pointer to the 32 bytes holding the data of the id
     builder
         .local_get(struct_ptr)
         .call(get_id_bytes_ptr_fn)
         .local_set(id_bytes_ptr);
-
-    builder.local_get(id_bytes_ptr).call(print_m);
-    builder.local_get(recipient_ptr).call(print_m);
 
     // Calculate the slot number corresponding to the (recipient, struct_id) tuple
     builder

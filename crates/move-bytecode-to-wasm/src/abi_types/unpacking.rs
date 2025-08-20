@@ -4,6 +4,7 @@ use crate::{
     CompilationContext,
     compilation_context::ExternalModuleData,
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    hostio::host_functions::emit_log,
     runtime::RuntimeFunction,
     storage::read::add_read_struct_from_storage_fn,
     translation::intermediate_types::{
@@ -308,6 +309,8 @@ fn add_unpack_from_storage_instructions(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) {
+    let (emit_log, _) = emit_log(module);
+
     // First we add the instructions to unpack the UID. We use address to unpack it because ids are
     // 32 bytes static, same as an address
     IAddress::add_unpack_instructions(
