@@ -4,7 +4,7 @@ use crate::data::{
     DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
     DATA_STORAGE_OBJECT_OWNER_OFFSET,
 };
-use crate::hostio::host_functions::{self, emit_log, storage_load_bytes32, tx_origin};
+use crate::hostio::host_functions::{self, storage_load_bytes32, tx_origin};
 use crate::translation::intermediate_types::heap_integers::IU256;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, data::DATA_U256_ONE_OFFSET};
@@ -46,7 +46,6 @@ pub fn locate_storage_data(
     let eq_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let (tx_origin, _) = tx_origin(module);
     let (storage_load, _) = storage_load_bytes32(module);
-    let (emit_log_fn, _) = emit_log(module);
 
     // Arguments
     let uid_ptr = module.locals.add(ValType::I32);

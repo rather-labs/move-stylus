@@ -50,7 +50,6 @@ pub fn add_transfer_object_fn(
     // Locals
     let owner_ptr = module.locals.add(ValType::I32);
     let id_bytes_ptr = module.locals.add(ValType::I32);
-    let zero = module.locals.add(ValType::I32);
 
     builder.block(None, |block| {
         let block_id = block.id();

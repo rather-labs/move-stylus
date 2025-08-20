@@ -17,7 +17,7 @@ pub fn add_emit_log_fn(
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function
-        .name(NativeFunction::NATIVE_EMIT.to_owned())
+        .name(format!("{}_{hash}", NativeFunction::NATIVE_EMIT))
         .func_body();
 
     // Function arguments

@@ -61,10 +61,9 @@ async fn main() -> eyre::Result<()> {
     }
 
     // Testing capability with another user
-
     let signer_2 = PrivateKeySigner::from_str(&priv_key_2)?;
     let sender_2 = signer_2.address();
-    println!("Fund {sender_2} with some ETH to pay for the gas");
+    println!("\nFund {sender_2} with some ETH to pay for the gas");
 
     let tx = TransactionRequest::default()
         .from(sender)

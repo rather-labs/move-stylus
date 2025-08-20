@@ -1,9 +1,7 @@
 module hello_world::hello_world;
 
 use stylus::tx_context::TxContext;
-use stylus::object as object;
-use stylus::object::UID;
-use hello_world::other_mod::{Test, generic_identity, generic_identity_two_types};
+use hello_world::other_mod::Test;
 
 const INT_AS_CONST: u128 = 128128128;
 
@@ -63,11 +61,11 @@ public fun get_copied_local(): u128 {
   let x: u128 = 100;
 
   let y = x; // copy
-  let mut z = x; // move
+  let mut _z = x; // move
   identity(y);
-  identity(z);
+  identity(_z);
 
-  z = 111;
+  _z = 111;
   y
 }
 
@@ -188,7 +186,7 @@ public fun create_foo2_u16(a: u16, b: u16): (Foo<u16>, Foo<u16>) {
     (foo, copy(foo))
 }
 
-public fun create_baz_u16(a: u16, b: u16): Baz<u16> {
+public fun create_baz_u16(a: u16, _b: u16): Baz<u16> {
     let baz = Baz {
         c: a,
         d: Bar { a: 42, b: 4242 },
@@ -201,7 +199,7 @@ public fun create_baz_u16(a: u16, b: u16): Baz<u16> {
     baz
 }
 
-public fun create_baz2_u16(a: u16, b: u16): (Baz<u16>, Baz<u16>) {
+public fun create_baz2_u16(a: u16, _b: u16): (Baz<u16>, Baz<u16>) {
     let baz = Baz {
         c: a,
         d: Bar { a: 42, b: 4242 },
