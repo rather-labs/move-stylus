@@ -109,3 +109,114 @@ mod tx_context {
         .unwrap();
     }
 }
+
+mod event {
+    use alloy_primitives::{Address, address, hex};
+
+    use crate::common::translate_test_package_with_framework;
+
+    use super::*;
+
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "event";
+        const SOURCE_PATH: &str = "tests/framework/event.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+
+        struct TestEvent1 {
+            uint32 n;
+        }
+
+        struct TestEvent2 {
+            uint32 a;
+            address b;
+            uint128 c;
+        }
+
+        struct TestEvent3 {
+            uint32 a;
+            address b;
+            uint128 c;
+            uint8[] d;
+        }
+
+        struct TestEvent4 {
+            uint32 a;
+            address b;
+            uint128 c;
+            uint8[] d;
+            TestEvent2 e;
+        }
+
+
+        function emitTestEvent1(uint32 n) external;
+        function emitTestEvent2(uint32 a, address b, uint128 c) external;
+        function emitTestEvent3(uint32 a, address b, uint128 c, uint8[] d) external;
+        function emitTestEvent4(uint32 a, address b, uint128 c, uint8[] d, TestEvent2 e) external;
+    );
+
+    #[rstest]
+    #[case(emitTestEvent1Call::new((42,)), TestEvent1 { n: 42 })]
+    #[case(emitTestEvent2Call::new((
+        42,
+        address!("0xcafe000000000000000000000000000000007357"),
+        u128::MAX
+    )), TestEvent2 {
+        a: 42,
+        b: address!("0xcafe000000000000000000000000000000007357"),
+        c: u128::MAX,
+    })]
+    #[case(emitTestEvent3Call::new((
+        42,
+        address!("0xcafe000000000000000000000000000000007357"),
+        u128::MAX,
+        vec![1, 2, 3, 4, 5]
+    )), TestEvent3 {
+        a: 42,
+        b: address!("0xcafe000000000000000000000000000000007357"),
+        c: u128::MAX,
+        d: vec![1, 2, 3, 4, 5],
+    })]
+    #[case(emitTestEvent4Call::new((
+        42,
+        address!("0xcafe000000000000000000000000000000007357"),
+        u128::MAX,
+        vec![1, 2, 3, 4, 5],
+        TestEvent2 {
+            a: 42,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        }
+    )), TestEvent4 {
+        a: 42,
+        b: address!("0xcafe000000000000000000000000000000007357"),
+        c: u128::MAX,
+        d: vec![1, 2, 3, 4, 5],
+        e: TestEvent2 {
+            a: 42,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        }
+    })]
+    fn test_emit_event<T: SolCall, V: SolValue>(
+        runtime: RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        let (result, _) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
+        assert_eq!(result, 0, "Function returned non-zero exit code: {result}");
+
+        let event = runtime.log_events.lock().unwrap().recv().unwrap();
+        assert_eq!(event, expected_result.abi_encode());
+    }
+}

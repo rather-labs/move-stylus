@@ -42,15 +42,27 @@ pub fn add_emit_log_fn(
         .local_set(packed_data_begin);
 
     // ABI pack the struct before emitting the event
-    struct_.add_pack_instructions(
-        &mut builder,
-        module,
-        struct_ptr,
-        writer_pointer,
-        calldata_reference_pointer,
-        compilation_ctx,
-        None,
-    );
+    if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
+        struct_.add_pack_instructions(
+            &mut builder,
+            module,
+            struct_ptr,
+            writer_pointer,
+            calldata_reference_pointer,
+            compilation_ctx,
+            Some(calldata_reference_pointer),
+        );
+    } else {
+        struct_.add_pack_instructions(
+            &mut builder,
+            module,
+            struct_ptr,
+            writer_pointer,
+            calldata_reference_pointer,
+            compilation_ctx,
+            None,
+        );
+    }
 
     // Emit the event with the ABI packed struct
 
