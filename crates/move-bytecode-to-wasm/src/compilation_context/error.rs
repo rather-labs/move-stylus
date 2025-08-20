@@ -34,4 +34,7 @@ pub enum CompilationContextError {
 
     #[error("external module {0:?} not found")]
     ExternalModuleNotFound(ModuleId),
+
+    #[error("expected struct")]
+    ExpectedStruct,
 }

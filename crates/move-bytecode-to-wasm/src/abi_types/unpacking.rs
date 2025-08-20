@@ -176,28 +176,14 @@ impl Unpackable for IntermediateType {
                     .unwrap();
 
                 if struct_.saved_in_storage {
-                    // First we add the instructions to unpack the uid. This will leave the pointer
-                    // ready for the unpack from storage function
-                    IAddress::add_unpack_instructions(
+                    add_unpack_from_storage_instructions(
                         function_builder,
                         module,
                         reader_pointer,
                         calldata_reader_pointer,
                         compilation_ctx,
+                        self,
                     );
-
-                    // Search for the object in the objects mappings
-                    let locate_storage_data_fn =
-                        RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
-                    function_builder.call(locate_storage_data_fn);
-
-                    // Read the object
-                    let read_struct_from_storage_fn =
-                        add_read_struct_from_storage_fn(module, compilation_ctx, self);
-
-                    function_builder
-                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                        .call(read_struct_from_storage_fn);
                 } else {
                     // TODO: Check if the struct is TxContext. If it is, panic since the only valid
                     // TxContext is the one defined in the stylus framework.
@@ -220,13 +206,24 @@ impl Unpackable for IntermediateType {
                     .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
-                struct_instance.add_unpack_instructions(
-                    function_builder,
-                    module,
-                    reader_pointer,
-                    calldata_reader_pointer,
-                    compilation_ctx,
-                )
+                if struct_instance.saved_in_storage {
+                    add_unpack_from_storage_instructions(
+                        function_builder,
+                        module,
+                        reader_pointer,
+                        calldata_reader_pointer,
+                        compilation_ctx,
+                        self,
+                    );
+                } else {
+                    struct_instance.add_unpack_instructions(
+                        function_builder,
+                        module,
+                        reader_pointer,
+                        calldata_reader_pointer,
+                        compilation_ctx,
+                    )
+                }
             }
             IntermediateType::IEnum(enum_index) => {
                 let enum_ = compilation_ctx
@@ -259,6 +256,15 @@ impl Unpackable for IntermediateType {
                     ExternalModuleData::Struct(istruct) => {
                         if TxContext::is_vm_type(module_id, identifier) {
                             TxContext::inject(function_builder, module, compilation_ctx);
+                        } else if istruct.saved_in_storage {
+                            add_unpack_from_storage_instructions(
+                                function_builder,
+                                module,
+                                reader_pointer,
+                                calldata_reader_pointer,
+                                compilation_ctx,
+                                self,
+                            );
                         } else {
                             istruct.add_unpack_instructions(
                                 function_builder,
@@ -290,6 +296,40 @@ impl Unpackable for IntermediateType {
             }
         }
     }
+}
+
+/// This function searches in the storage for the structure that belongs to the object UID passed
+/// as argument.
+fn add_unpack_from_storage_instructions(
+    function_builder: &mut InstrSeqBuilder,
+    module: &mut Module,
+    reader_pointer: LocalId,
+    calldata_reader_pointer: LocalId,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) {
+    // First we add the instructions to unpack the UID. We use address to unpack it because ids are
+    // 32 bytes static, same as an address
+    IAddress::add_unpack_instructions(
+        function_builder,
+        module,
+        reader_pointer,
+        calldata_reader_pointer,
+        compilation_ctx,
+    );
+
+    // Search for the object in the objects mappings
+    let locate_storage_data_fn =
+        RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
+    function_builder.call(locate_storage_data_fn);
+
+    // Read the object
+    let read_struct_from_storage_fn =
+        add_read_struct_from_storage_fn(module, compilation_ctx, itype);
+
+    function_builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(read_struct_from_storage_fn);
 }
 
 #[cfg(test)]

@@ -120,14 +120,11 @@ impl NativeFunction {
                         generics.len(),
                     );
 
-                    let struct_ = match generics.first() {
-                        Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
-                            .get_user_data_type_by_index(module_id, *index)
-                            .unwrap(),
-                        Some(_) => todo!(),
-                        None => todo!(),
-                    };
-                    storage::add_storage_save_fn(hash, module, compilation_ctx, struct_)
+                    let struct_ = compilation_ctx
+                        .get_struct_by_intermediate_type(generics.first().unwrap())
+                        .unwrap();
+
+                    storage::add_storage_save_fn(hash, module, compilation_ctx, &struct_)
                 }
                 Self::NATIVE_SHARE_OBJECT => {
                     assert_eq!(
@@ -137,15 +134,11 @@ impl NativeFunction {
                         generics.len(),
                     );
 
-                    let struct_ = match generics.first() {
-                        Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
-                            .get_user_data_type_by_index(module_id, *index)
-                            .unwrap(),
-                        Some(_) => todo!(),
-                        None => todo!(),
-                    };
+                    let struct_ = compilation_ctx
+                        .get_struct_by_intermediate_type(generics.first().unwrap())
+                        .unwrap();
 
-                    transfer::add_share_object_fn(hash, module, compilation_ctx, struct_)
+                    transfer::add_share_object_fn(hash, module, compilation_ctx, &struct_)
                 }
                 Self::NATIVE_TRANSFER_OBJECT => {
                     assert_eq!(
@@ -155,15 +148,11 @@ impl NativeFunction {
                         generics.len(),
                     );
 
-                    let struct_ = match generics.first() {
-                        Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
-                            .get_user_data_type_by_index(module_id, *index)
-                            .unwrap(),
-                        Some(_) => todo!(),
-                        None => todo!(),
-                    };
+                    let struct_ = compilation_ctx
+                        .get_struct_by_intermediate_type(generics.first().unwrap())
+                        .unwrap();
 
-                    transfer::add_transfer_object_fn(hash, module, compilation_ctx, struct_)
+                    transfer::add_transfer_object_fn(hash, module, compilation_ctx, &struct_)
                 }
                 Self::NATIVE_FREEZE_OBJECT => {
                     assert_eq!(
@@ -173,15 +162,11 @@ impl NativeFunction {
                         generics.len(),
                     );
 
-                    let struct_ = match generics.first() {
-                        Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
-                            .get_user_data_type_by_index(module_id, *index)
-                            .unwrap(),
-                        Some(_) => todo!(),
-                        None => todo!(),
-                    };
+                    let struct_ = compilation_ctx
+                        .get_struct_by_intermediate_type(generics.first().unwrap())
+                        .unwrap();
 
-                    transfer::add_freeze_object_fn(hash, module, compilation_ctx, struct_)
+                    transfer::add_freeze_object_fn(hash, module, compilation_ctx, &struct_)
                 }
                 Self::NATIVE_DELETE_OBJECT => {
                     assert_eq!(
@@ -191,15 +176,11 @@ impl NativeFunction {
                         generics.len(),
                     );
 
-                    let struct_ = match generics.first() {
-                        Some(IntermediateType::IStruct { module_id, index }) => compilation_ctx
-                            .get_user_data_type_by_index(module_id, *index)
-                            .unwrap(),
-                        Some(_) => todo!(),
-                        None => todo!(),
-                    };
+                    let struct_ = compilation_ctx
+                        .get_struct_by_intermediate_type(generics.first().unwrap())
+                        .unwrap();
 
-                    object::add_delete_object_fn(hash, module, compilation_ctx, struct_)
+                    object::add_delete_object_fn(hash, module, compilation_ctx, &struct_)
                 }
                 _ => panic!("generic native function {name} not supported yet"),
             }
