@@ -9,6 +9,7 @@ use crate::{
         DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
         DATA_SHARED_OBJECTS_KEY_OFFSET,
     },
+    declare_host_debug_functions,
     hostio::host_functions::emit_log,
     native_functions::{object::add_delete_object_fn, storage::add_storage_save_fn},
     runtime::RuntimeFunction,
@@ -43,11 +44,15 @@ pub fn add_transfer_object_fn(
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
 
-    // Locals
+    // Arguments
     let struct_ptr = module.locals.add(ValType::I32);
-    let owner_ptr = module.locals.add(ValType::I32);
     let recipient_ptr = module.locals.add(ValType::I32);
+
+    // Locals
+    let owner_ptr = module.locals.add(ValType::I32);
     let id_bytes_ptr = module.locals.add(ValType::I32);
+
+    let (_, _, print_m, _, _) = declare_host_debug_functions!(module);
 
     builder.block(None, |block| {
         let block_id = block.id();
@@ -93,18 +98,14 @@ pub fn add_transfer_object_fn(
         .call(get_id_bytes_ptr_fn)
         .local_set(id_bytes_ptr);
 
+    builder.local_get(id_bytes_ptr).call(print_m);
+    builder.local_get(recipient_ptr).call(print_m);
+
     // Calculate the slot number corresponding to the (recipient, struct_id) tuple
     builder
         .local_get(recipient_ptr)
         .local_get(id_bytes_ptr)
         .call(write_object_slot_fn);
-
-    // TODO: remove after adding tests
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
 
     // Store the struct in the slot associated with the new owner's mapping
     builder

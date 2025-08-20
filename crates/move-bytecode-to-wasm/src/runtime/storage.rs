@@ -18,7 +18,7 @@ use walrus::{
 ///
 /// Where:
 /// - The outer mapping key is the id of the owner (could be an address or object id).
-/// - The Inner mapping key is the object id itself.
+/// - The inner mapping key is the object id itself.
 /// - The value is the encoded structure.
 ///
 /// The lookup is done in the following order:
@@ -71,20 +71,6 @@ pub fn locate_storage_data(
         .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET + 12)
         .call(tx_origin);
 
-    // TODO: remove after adding tests
-    builder
-        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
-
-    // TODO: remove after adding tests
-    builder
-        .local_get(uid_ptr)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
-
     builder.block(None, |block| {
         let exit_block = block.id();
 
@@ -95,13 +81,6 @@ pub fn locate_storage_data(
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
             .local_get(uid_ptr)
             .call(write_object_slot_fn);
-
-        // TODO: remove after adding tests
-        block
-            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-            .i32_const(32)
-            .i32_const(0)
-            .call(emit_log_fn);
 
         // Load data from slot
         block
