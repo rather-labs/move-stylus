@@ -1,6 +1,7 @@
 use alloy::hex;
-use alloy::primitives::FixedBytes;
+use alloy::primitives::{FixedBytes, U256};
 use alloy::providers::Provider;
+use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
@@ -38,6 +39,7 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
+
     println!("Creating a new capability and capturing its id");
     let tx = example.create().into_transaction_request().from(sender);
     let pending_tx = provider.send_transaction(tx).await?;
@@ -58,18 +60,28 @@ async fn main() -> eyre::Result<()> {
         println!("walking the dog logs: 0x{}", hex::encode(raw));
     }
 
-    let signer = PrivateKeySigner::from_str(&priv_key_2)?;
-    let sender = signer.address();
-    println!("\nWalking the dog with another user {sender} (should fail)");
+    // Testing capability with another user
 
-    let provider = Arc::new(
+    let signer_2 = PrivateKeySigner::from_str(&priv_key_2)?;
+    let sender_2 = signer_2.address();
+    println!("Fund {sender_2} with some ETH to pay for the gas");
+
+    let tx = TransactionRequest::default()
+        .from(sender)
+        .to(sender_2)
+        .value(U256::from(5_000_000_000_000_000_000u128)); // 5 eth in wei
+    let pending_tx = provider.send_transaction(tx).await?;
+    pending_tx.get_receipt().await?;
+
+    println!("\nWalking the dog with another user {sender_2} (should fail)");
+    let provider_2 = Arc::new(
         ProviderBuilder::new()
-            .wallet(signer)
+            .wallet(signer_2)
             .with_chain_id(412346)
             .connect_http(Url::from_str(&rpc_url).unwrap()),
     );
 
-    let example_2 = Example::new(address, provider.clone());
+    let example_2 = Example::new(address, provider_2.clone());
 
     let pending_tx = example_2.walkTheDog(capability_id).send().await;
     println!("Tx failed?: {:?}", pending_tx.is_err());

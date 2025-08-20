@@ -28,9 +28,14 @@ pub fn add_emit_log_fn(
     let calldata_reference_pointer = module.locals.add(ValType::I32);
     let packed_data_begin = module.locals.add(ValType::I32);
 
+    let size = if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
+        32
+    } else {
+        struct_.solidity_abi_encode_size(compilation_ctx) as i32
+    };
     // Use the allocator to get a pointer to the end of the calldata
     builder
-        .i32_const(struct_.solidity_abi_encode_size(compilation_ctx) as i32)
+        .i32_const(size)
         .call(compilation_ctx.allocator)
         .local_tee(writer_pointer)
         .local_tee(calldata_reference_pointer)
@@ -51,9 +56,6 @@ pub fn add_emit_log_fn(
 
     // Beginning of the packed data
     builder.local_get(packed_data_begin);
-
-    // Call the allocator function to store in stack the end of the calldata
-    // builder.i32_const(0).call(compilation_ctx.allocator);
 
     // Use the allocator to get a pointer to the end of the calldata
     builder
