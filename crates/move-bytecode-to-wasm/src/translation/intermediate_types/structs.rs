@@ -61,7 +61,7 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IStruct {
     /// Struct identifier
     pub identifier: String,
