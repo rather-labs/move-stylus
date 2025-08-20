@@ -154,6 +154,13 @@ pub fn add_share_object_fn(
             .binop(BinaryOp::I32Sub)
             .local_set(owner_ptr);
 
+        // TODO: remove after adding tests
+        block
+            .local_get(owner_ptr)
+            .i32_const(32)
+            .i32_const(0)
+            .call(emit_log_fn);
+
         // If the object is already shared, skip to the end of the block since no action is needed.
         block
             .local_get(owner_ptr)

@@ -40,7 +40,7 @@ macro_rules! link_fn_ret_constant {
                 "vm_hooks",
                 $name,
                 move |_caller: Caller<'_, ModuleData>| -> $constant_type {
-                    println!("{} called", $name);
+                    // println!("{} called", $name);
                     $constant as $constant_type
                 },
             )
@@ -55,7 +55,7 @@ macro_rules! link_fn_write_constant {
                 "vm_hooks",
                 $name,
                 move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
-                    println!("{} called, writing in {ptr}", $name);
+                    // println!("{} called, writing in {ptr}", $name);
 
                     let mem = match caller.get_export("memory") {
                         Some(Extern::Memory(mem)) => mem,
@@ -157,7 +157,7 @@ impl RuntimeSandbox {
                     mem.read(&caller, input_data_ptr as usize, &mut input_data)
                         .unwrap();
 
-                    println!("input data to hash: {}", hex::encode(&input_data));
+                    // println!("input data to hash: {}", hex::encode(&input_data));
 
                     let hash = keccak256(input_data);
 
@@ -174,14 +174,14 @@ impl RuntimeSandbox {
                 "vm_hooks",
                 "emit_log",
                 move |mut caller: Caller<'_, ModuleData>, ptr: u32, len: u32, _topic: u32| {
-                    println!("emit_log, reading from {ptr}, length: {len}");
+                    // println!("emit_log, reading from {ptr}, length: {len}");
 
                     let mem = get_memory(&mut caller);
                     let mut buffer = vec![0; len as usize];
 
                     mem.read(&mut caller, ptr as usize, &mut buffer).unwrap();
 
-                    println!("read memory: {buffer:?}");
+                    // println!("read memory: {buffer:?}");
                     log_sender.send(buffer.to_vec()).unwrap();
                 },
             )
@@ -193,7 +193,7 @@ impl RuntimeSandbox {
                 "vm_hooks",
                 "storage_cache_bytes32",
                 move |mut caller: Caller<'_, ModuleData>, key_ptr: u32, value_ptr: u32| {
-                    println!("storage_cache_bytes32, key ptr {key_ptr}, value ptr {value_ptr}");
+                    // println!("storage_cache_bytes32, key ptr {key_ptr}, value ptr {value_ptr}");
 
                     let mem = get_memory(&mut caller);
                     let mut key_buffer = [0; 32];
@@ -219,7 +219,7 @@ impl RuntimeSandbox {
                 "vm_hooks",
                 "storage_load_bytes32",
                 move |mut caller: Caller<'_, ModuleData>, key_ptr: u32, dest_ptr: u32| {
-                    println!("storage_load_bytes32 key ptr {key_ptr}, dest ptr {dest_ptr}");
+                    // println!("storage_load_bytes32 key ptr {key_ptr}, dest ptr {dest_ptr}");
 
                     let mem = get_memory(&mut caller);
                     let mut key_buffer = [0; 32];
@@ -243,7 +243,7 @@ impl RuntimeSandbox {
                 "vm_hooks",
                 "tx_origin",
                 move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
-                    println!("tx_origin called, writing in {ptr}");
+                    // println!("tx_origin called, writing in {ptr}");
 
                     let mem = match caller.get_export("memory") {
                         Some(Extern::Memory(mem)) => mem,
@@ -262,7 +262,7 @@ impl RuntimeSandbox {
                 "vm_hooks",
                 "msg_sender",
                 move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
-                    println!("msg_sender called, writing in {ptr}");
+                    // println!("msg_sender called, writing in {ptr}");
 
                     let mem = match caller.get_export("memory") {
                         Some(Extern::Memory(mem)) => mem,
