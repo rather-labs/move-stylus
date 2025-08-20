@@ -30,6 +30,7 @@ pub struct RuntimeSandbox {
     pub log_events: Arc<Mutex<mpsc::Receiver<Vec<u8>>>>,
     current_tx_origin: Arc<Mutex<[u8; 20]>>,
     current_msg_sender: Arc<Mutex<[u8; 20]>>,
+    storage: Arc<Mutex<HashMap<[u8; 32], [u8; 32]>>>,
 }
 
 macro_rules! link_fn_ret_constant {
@@ -377,6 +378,7 @@ impl RuntimeSandbox {
             log_events: Arc::new(Mutex::new(log_receiver)),
             current_tx_origin,
             current_msg_sender,
+            storage,
         }
     }
 
@@ -409,5 +411,9 @@ impl RuntimeSandbox {
 
     pub fn set_msg_sender(&self, new_address: [u8; 20]) {
         *self.current_msg_sender.lock().unwrap() = new_address;
+    }
+
+    pub fn get_storage_at_slot(&self, slot: [u8; 32]) -> [u8; 32] {
+        self.storage.lock().unwrap().get(&slot).unwrap().clone()
     }
 }
