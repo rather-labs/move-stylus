@@ -1,4 +1,4 @@
-use walrus::{FunctionBuilder, FunctionId, Module, ValType};
+use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
 
 use crate::{
     CompilationContext, hostio::host_functions::emit_log,
@@ -30,7 +30,7 @@ pub fn add_emit_log_fn(
 
     // Use the allocator to get a pointer to the end of the calldata
     builder
-        .i32_const(0)
+        .i32_const(struct_.solidity_abi_encode_size(compilation_ctx) as i32)
         .call(compilation_ctx.allocator)
         .local_tee(writer_pointer)
         .local_tee(calldata_reference_pointer)
@@ -53,7 +53,14 @@ pub fn add_emit_log_fn(
     builder.local_get(packed_data_begin);
 
     // Call the allocator function to store in stack the end of the calldata
-    builder.i32_const(0).call(compilation_ctx.allocator);
+    // builder.i32_const(0).call(compilation_ctx.allocator);
+
+    // Use the allocator to get a pointer to the end of the calldata
+    builder
+        .i32_const(0)
+        .call(compilation_ctx.allocator)
+        .local_get(packed_data_begin)
+        .binop(BinaryOp::I32Sub);
 
     // Log 0
     builder.i32_const(0).call(emit_log_fn);
