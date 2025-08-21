@@ -1,5 +1,3 @@
-use std::hash::Hasher;
-
 use super::RuntimeFunction;
 use crate::data::{
     DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
@@ -7,7 +5,10 @@ use crate::data::{
     DATA_STORAGE_OBJECT_OWNER_OFFSET,
 };
 use crate::hostio::host_functions::{self, storage_cache_bytes32, storage_load_bytes32, tx_origin};
-use crate::storage::encoding::add_encode_and_save_into_storage_struct_instructions;
+use crate::storage::encoding::{
+    add_encode_and_save_into_storage_struct_instructions,
+    add_read_and_decode_storage_struct_instructions,
+};
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::heap_integers::IU256;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
@@ -629,6 +630,39 @@ pub fn add_save_struct_into_storage_fn(
     );
 
     function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs)
+}
+
+pub fn add_read_struct_from_storage_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) -> FunctionId {
+    let name =
+        get_generic_function_name(RuntimeFunction::DecodeAndReadFromStorage.name(), &[itype]);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    }
+
+    let struct_ = compilation_ctx
+        .get_struct_by_intermediate_type(itype)
+        .unwrap();
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut builder = function.name(name).func_body();
+
+    let slot_ptr = module.locals.add(ValType::I32);
+
+    let struct_ptr = add_read_and_decode_storage_struct_instructions(
+        module,
+        &mut builder,
+        compilation_ctx,
+        slot_ptr,
+        &struct_,
+    );
+
+    builder.local_get(struct_ptr);
+
+    function.finish(vec![slot_ptr], &mut module.funcs)
 }
 
 /// Generates a function that deletes an object from storage.

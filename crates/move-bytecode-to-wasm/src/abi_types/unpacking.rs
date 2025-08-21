@@ -5,7 +5,6 @@ use crate::{
     compilation_context::ExternalModuleData,
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     runtime::RuntimeFunction,
-    storage::read::add_read_struct_from_storage_fn,
     translation::intermediate_types::{
         IntermediateType,
         address::IAddress,
@@ -336,7 +335,7 @@ fn add_unpack_from_storage_instructions(
 
     // Read the object
     let read_struct_from_storage_fn =
-        add_read_struct_from_storage_fn(module, compilation_ctx, itype);
+        RuntimeFunction::DecodeAndReadFromStorage.get_generic(module, compilation_ctx, &[itype]);
 
     function_builder
         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)

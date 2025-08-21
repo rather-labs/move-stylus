@@ -254,6 +254,17 @@ impl RuntimeFunction {
 
                 storage::add_save_struct_into_storage_fn(module, compilation_ctx, generics[0])
             }
+            Self::DecodeAndReadFromStorage => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {} expected 1 type parameter, found {}",
+                    self.name(),
+                    generics.len(),
+                );
+
+                storage::add_read_struct_from_storage_fn(module, compilation_ctx, generics[0])
+            }
             Self::DeleteFromStorage => {
                 assert_eq!(
                     1,
