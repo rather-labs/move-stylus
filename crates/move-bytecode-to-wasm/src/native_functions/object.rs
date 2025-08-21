@@ -222,7 +222,6 @@ pub fn add_delete_object_fn(
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
 
     let (storage_cache, _) = storage_cache_bytes32(module);
-    let (storage_flush_cache, _) = storage_flush_cache(module);
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
@@ -283,8 +282,6 @@ pub fn add_delete_object_fn(
                     slot_used_bytes += field_size;
                 }
             }
-
-            else_.i32_const(1).call(storage_flush_cache);
         },
     );
 
