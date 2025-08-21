@@ -164,7 +164,7 @@ mod capability {
 }
 
 mod storage_transfer {
-    use alloy_primitives::{FixedBytes, address};
+    use alloy_primitives::{FixedBytes, address, keccak256};
     use alloy_sol_types::{SolCall, sol};
 
     use super::*;
@@ -193,6 +193,46 @@ mod storage_transfer {
         function shareObj(bytes32 id) public view;
         function transferObj(bytes32 id, address recipient) public view;
     );
+
+    const SHARED: [u8; 20] = {
+        let mut b = [0u8; 20];
+        b[19] = 1;
+        b
+    };
+
+    const FROZEN: [u8; 20] = {
+        let mut b = [0u8; 20];
+        b[19] = 2;
+        b
+    };
+
+    /// Right-align `data` into a 32-byte word (EVM storage encoding for value types).
+    #[inline]
+    fn pad32_right(data: &[u8]) -> [u8; 32] {
+        let mut out = [0u8; 32];
+        let n = data.len().min(32);
+        out[32 - n..].copy_from_slice(&data[..n]); // <-- right-align
+        out
+    }
+
+    /// mapping(address => mapping(bytes32 => V)) at base slot 0
+    /// slot(owner, id) = keccak256( pad32(id) || keccak256( pad32(owner) || pad32(0) ) )
+    pub fn derive_object_slot(owner: &[u8], object_id: &[u8]) -> FixedBytes<32> {
+        // parent = keccak256( pad32(owner) || pad32(0) )
+        let owner_padded = pad32_right(owner);
+        let zero_slot = [0u8; 32];
+
+        let mut buf = [0u8; 64];
+        buf[..32].copy_from_slice(&owner_padded);
+        buf[32..].copy_from_slice(&zero_slot);
+        let parent = keccak256(buf);
+
+        // slot = keccak256( pad32(id) || pad32(parent) )
+        let id_padded = pad32_right(object_id); // object_id is already 32B, this is a no-op
+        buf[..32].copy_from_slice(&id_padded);
+        buf[32..].copy_from_slice(parent.as_slice());
+        keccak256(buf)
+    }
 
     // Tests operations on a shared object: reading, updating values, etc.
     #[rstest]
@@ -306,14 +346,6 @@ mod storage_transfer {
         let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let object_id = FixedBytes::<32>::from_slice(&object_id);
 
-        // Read the object slot emmited from the contract's events
-        let object_slot = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_slot = FixedBytes::<32>::from_slice(&object_slot);
-
-        // Read the storage on the original slot before the share
-        let value = runtime.get_storage_at_slot(object_slot.0);
-        println!("value  {:?}", value);
-
         // Read initial value (should be 101)
         let call_data = readValueCall::new((object_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -386,14 +418,11 @@ mod storage_transfer {
         let object_id = FixedBytes::<32>::from_slice(&object_id);
 
         // Read the object slot emmited from the contract's events
-        let object_slot = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_slot = FixedBytes::<32>::from_slice(&object_slot);
-
-        println!("object slot {:?}", object_slot);
+        let owner = runtime.get_tx_origin();
+        let object_slot = derive_object_slot(&owner, &object_id.0);
 
         // Read the storage on the original slot before the freeze
         let value_before_share = runtime.get_storage_at_slot(object_slot.0);
-        println!("value before share {:?}", value_before_share);
 
         // Freeze the object. Only possible if the object is owned by the signer!
         let call_data = shareObjCall::new((object_id,)).abi_encode();
@@ -402,15 +431,13 @@ mod storage_transfer {
 
         // Read the storage on the original slot after the freeze
         let value_after_share = runtime.get_storage_at_slot(object_slot.0);
-        println!("value after share {:?}", value_after_share);
         assert_eq!(
             [0u8; 32], value_after_share,
             "Expected storage value to be 32 zeros"
         );
 
         // Read the object id emmited from the contract's events
-        let shared_slot = runtime.log_events.lock().unwrap().recv().unwrap();
-        let shared_slot = FixedBytes::<32>::from_slice(&shared_slot);
+        let shared_slot = derive_object_slot(&SHARED, &object_id.0);
 
         // Read the storage on the shared slot after the share
         let shared_value = runtime.get_storage_at_slot(shared_slot.0);
@@ -448,14 +475,11 @@ mod storage_transfer {
         let object_id = FixedBytes::<32>::from_slice(&object_id);
 
         // Read the object slot emmited from the contract's events
-        let object_slot = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_slot = FixedBytes::<32>::from_slice(&object_slot);
-
-        println!("object slot {:?}", object_slot);
+        let owner = runtime.get_tx_origin();
+        let object_slot = derive_object_slot(&owner, &object_id.0);
 
         // Read the storage on the original slot before the freeze
         let value_before_freeze = runtime.get_storage_at_slot(object_slot.0);
-        println!("value before freeze {:?}", value_before_freeze);
 
         // Freeze the object. Only possible if the object is owned by the signer!
         let call_data = freezeObjCall::new((object_id,)).abi_encode();
@@ -464,15 +488,13 @@ mod storage_transfer {
 
         // Read the storage on the original slot after the freeze
         let value_after_freeze = runtime.get_storage_at_slot(object_slot.0);
-        println!("value after freeze {:?}", value_after_freeze);
         assert_eq!(
             [0u8; 32], value_after_freeze,
             "Expected storage value to be 32 zeros"
         );
 
         // Read the object id emmited from the contract's events
-        let frozen_slot = runtime.log_events.lock().unwrap().recv().unwrap();
-        let frozen_slot = FixedBytes::<32>::from_slice(&frozen_slot);
+        let frozen_slot = derive_object_slot(&FROZEN, &object_id.0);
 
         // Read the storage on the frozen slot after the freeze
         let frozen_value = runtime.get_storage_at_slot(frozen_slot.0);

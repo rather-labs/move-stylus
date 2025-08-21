@@ -9,7 +9,6 @@ use crate::{
         DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
         DATA_SHARED_OBJECTS_KEY_OFFSET,
     },
-    hostio::host_functions::emit_log,
     native_functions::{object::add_delete_object_fn, storage::add_storage_save_fn},
     runtime::RuntimeFunction,
     translation::intermediate_types::structs::IStruct,
@@ -37,7 +36,6 @@ pub fn add_transfer_object_fn(
     // Native functions
     let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
     let delete_object_fn = add_delete_object_fn(hash, module, compilation_ctx, struct_);
-    let (emit_log_fn, _) = emit_log(module);
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
@@ -129,13 +127,6 @@ pub fn add_transfer_object_fn(
         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
         .call(storage_save_fn);
 
-    // TODO: remove after adding tests
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
-
     function.finish(vec![struct_ptr, recipient_ptr], &mut module.funcs)
 }
 
@@ -157,7 +148,6 @@ pub fn add_share_object_fn(
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
 
     // Native functions
-    let (emit_log_fn, _) = emit_log(module);
     let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
     let add_delete_object_fn = add_delete_object_fn(hash, module, compilation_ctx, struct_);
 
@@ -226,13 +216,6 @@ pub fn add_share_object_fn(
         );
     });
 
-    // TODO: remove after adding tests
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
-
     function.finish(vec![struct_ptr], &mut module.funcs)
 }
 
@@ -254,7 +237,6 @@ pub fn add_freeze_object_fn(
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
 
     // Native functions
-    let (emit_log_fn, _) = emit_log(module);
     let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
     let add_delete_object_fn = add_delete_object_fn(hash, module, compilation_ctx, struct_);
 
@@ -330,13 +312,6 @@ pub fn add_freeze_object_fn(
             },
         );
     });
-
-    // TODO: remove after adding tests
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
 
     function.finish(vec![struct_ptr], &mut module.funcs)
 }

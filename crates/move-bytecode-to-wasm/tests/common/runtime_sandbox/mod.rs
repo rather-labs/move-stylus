@@ -388,6 +388,10 @@ impl RuntimeSandbox {
         *self.current_tx_origin.lock().unwrap() = new_address;
     }
 
+    pub fn get_tx_origin(&self) -> [u8; 20] {
+        *self.current_tx_origin.lock().unwrap()
+    }
+
     pub fn set_msg_sender(&self, new_address: [u8; 20]) {
         *self.current_msg_sender.lock().unwrap() = new_address;
     }
