@@ -1,8 +1,7 @@
 use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
 
 use crate::{
-    CompilationContext, get_generic_function_name,
-    hostio::host_functions::emit_log,
+    CompilationContext, get_generic_function_name, hostio::host_functions::emit_log,
     translation::intermediate_types::IntermediateType,
 };
 
