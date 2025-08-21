@@ -4,7 +4,7 @@ use crate::data::{
     DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
     DATA_STORAGE_OBJECT_OWNER_OFFSET,
 };
-use crate::hostio::host_functions::{self, emit_log, storage_load_bytes32, tx_origin};
+use crate::hostio::host_functions::{self, storage_load_bytes32, tx_origin};
 use crate::translation::intermediate_types::heap_integers::IU256;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, data::DATA_U256_ONE_OFFSET};
@@ -18,7 +18,7 @@ use walrus::{
 ///
 /// Where:
 /// - The outer mapping key is the id of the owner (could be an address or object id).
-/// - The Inner mapping key is the object id itself.
+/// - The inner mapping key is the object id itself.
 /// - The value is the encoded structure.
 ///
 /// The lookup is done in the following order:
@@ -46,7 +46,6 @@ pub fn locate_storage_data(
     let eq_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let (tx_origin, _) = tx_origin(module);
     let (storage_load, _) = storage_load_bytes32(module);
-    let (emit_log_fn, _) = emit_log(module);
 
     // Arguments
     let uid_ptr = module.locals.add(ValType::I32);
@@ -71,20 +70,6 @@ pub fn locate_storage_data(
         .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET + 12)
         .call(tx_origin);
 
-    // TODO: remove after adding tests
-    builder
-        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
-
-    // TODO: remove after adding tests
-    builder
-        .local_get(uid_ptr)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
-
     builder.block(None, |block| {
         let exit_block = block.id();
 
@@ -95,13 +80,6 @@ pub fn locate_storage_data(
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
             .local_get(uid_ptr)
             .call(write_object_slot_fn);
-
-        // TODO: remove after adding tests
-        block
-            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-            .i32_const(32)
-            .i32_const(0)
-            .call(emit_log_fn);
 
         // Load data from slot
         block
