@@ -41,7 +41,7 @@ public fun read_value(foo: &Foo): u64 {
     foo.value
 }
 
-public fun set_value(foo: &mut Foo, value: u64, ctx: &TxContext) {
+public fun set_value(foo: &mut Foo, value: u64) {
     foo.value = value;
 }
 

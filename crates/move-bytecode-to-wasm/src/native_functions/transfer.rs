@@ -13,7 +13,6 @@ use crate::{
     native_functions::{object::add_delete_object_fn, storage::add_storage_save_fn},
     runtime::RuntimeFunction,
     translation::intermediate_types::structs::IStruct,
-    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 use super::NativeFunction;
@@ -38,6 +37,7 @@ pub fn add_transfer_object_fn(
     // Native functions
     let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
     let delete_object_fn = add_delete_object_fn(hash, module, compilation_ctx, struct_);
+    let (emit_log_fn, _) = emit_log(module);
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
@@ -86,25 +86,23 @@ pub fn add_transfer_object_fn(
         block.unreachable();
     });
 
-    // Alloc 32 zeros to check if the owner is zero (means there's no owner, so we don't need to
-    // delete anything)
-    // TODO: Create a runtime function is zero...
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_get(owner_ptr)
-        .i32_const(32)
-        .call(equality_fn)
-        .negate();
+    builder.block(None, |block| {
+        let block_id = block.id();
 
-    // Delete the object from the owner mapping on the storage if the owner addres is not all zeros
-    builder.if_else(
-        None,
-        |then| {
-            then.local_get(struct_ptr).call(delete_object_fn);
-        },
-        |_| {},
-    );
+        // Alloc 32 zeros to check if the owner is zero (means there's no owner, so we don't need to
+        // delete anything)
+        // TODO: Create a runtime function is zero...
+        block
+            .i32_const(32)
+            .call(compilation_ctx.allocator)
+            .local_get(owner_ptr)
+            .i32_const(32)
+            .call(equality_fn);
+
+        block.br_if(block_id);
+
+        block.local_get(struct_ptr).call(delete_object_fn);
+    });
 
     // Update the object ownership in memory to the recipient's address
     builder
@@ -130,6 +128,13 @@ pub fn add_transfer_object_fn(
         .local_get(struct_ptr)
         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
         .call(storage_save_fn);
+
+    // TODO: remove after adding tests
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_fn);
 
     function.finish(vec![struct_ptr, recipient_ptr], &mut module.funcs)
 }
@@ -212,13 +217,6 @@ pub fn add_share_object_fn(
                     .call(get_id_bytes_ptr_fn)
                     .call(write_object_slot_fn);
 
-                // TODO: remove after adding tests
-                else_
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                    .i32_const(32)
-                    .i32_const(0)
-                    .call(emit_log_fn);
-
                 // Save the struct in the shared objects mapping
                 else_
                     .local_get(struct_ptr)
@@ -227,6 +225,13 @@ pub fn add_share_object_fn(
             },
         );
     });
+
+    // TODO: remove after adding tests
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_fn);
 
     function.finish(vec![struct_ptr], &mut module.funcs)
 }
@@ -317,13 +322,6 @@ pub fn add_freeze_object_fn(
                     .call(get_id_bytes_ptr_fn)
                     .call(write_object_slot_fn);
 
-                // TODO: remove after adding tests
-                else_
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                    .i32_const(32)
-                    .i32_const(0)
-                    .call(emit_log_fn);
-
                 // Save the struct into the frozen objects mapping
                 else_
                     .local_get(struct_ptr)
@@ -332,6 +330,13 @@ pub fn add_freeze_object_fn(
             },
         );
     });
+
+    // TODO: remove after adding tests
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_fn);
 
     function.finish(vec![struct_ptr], &mut module.funcs)
 }

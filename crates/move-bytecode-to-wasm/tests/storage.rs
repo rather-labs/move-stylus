@@ -197,9 +197,6 @@ mod storage_transfer {
     // Tests operations on a shared object: reading, updating values, etc.
     #[rstest]
     fn test_shared_object(runtime: RuntimeSandbox) {
-        // TODO: remove this.
-        runtime.set_msg_sender(SIGNER_ADDRESS);
-
         // Create a new counter
         let call_data = createSharedCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -309,6 +306,14 @@ mod storage_transfer {
         let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let object_id = FixedBytes::<32>::from_slice(&object_id);
 
+        // Read the object slot emmited from the contract's events
+        let object_slot = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_slot = FixedBytes::<32>::from_slice(&object_slot);
+
+        // Read the storage on the original slot before the share
+        let value = runtime.get_storage_at_slot(object_slot.0);
+        println!("value  {:?}", value);
+
         // Read initial value (should be 101)
         let call_data = readValueCall::new((object_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -360,7 +365,7 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        // Assert that the value did not change
+        // Assert that the value was changes correctly
         let call_data = readValueCall::new((object_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
@@ -368,10 +373,10 @@ mod storage_transfer {
         assert_eq!(0, result);
     }
 
-    // Tests trying to read an owned object with a signer that is not the owner.
+    // Tests the share of an object in both owned and shared cases.
     #[rstest]
-    #[should_panic(expected = "unreachable")]
-    fn test_signer_owner_mismatch(runtime: RuntimeSandbox) {
+    fn test_share_owned_object(runtime: RuntimeSandbox) {
+        // Create a new object
         let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -380,21 +385,54 @@ mod storage_transfer {
         let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let object_id = FixedBytes::<32>::from_slice(&object_id);
 
-        // Read initial value (should be 101)
+        // Read the object slot emmited from the contract's events
+        let object_slot = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_slot = FixedBytes::<32>::from_slice(&object_slot);
+
+        println!("object slot {:?}", object_slot);
+
+        // Read the storage on the original slot before the freeze
+        let value_before_share = runtime.get_storage_at_slot(object_slot.0);
+        println!("value before share {:?}", value_before_share);
+
+        // Freeze the object. Only possible if the object is owned by the signer!
+        let call_data = shareObjCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the storage on the original slot after the freeze
+        let value_after_share = runtime.get_storage_at_slot(object_slot.0);
+        println!("value after share {:?}", value_after_share);
+        assert_eq!(
+            [0u8; 32], value_after_share,
+            "Expected storage value to be 32 zeros"
+        );
+
+        // Read the object id emmited from the contract's events
+        let shared_slot = runtime.log_events.lock().unwrap().recv().unwrap();
+        let shared_slot = FixedBytes::<32>::from_slice(&shared_slot);
+
+        // Read the storage on the shared slot after the share
+        let shared_value = runtime.get_storage_at_slot(shared_slot.0);
+        assert_eq!(
+            value_before_share, shared_value,
+            "Expected storage value to be the same"
+        );
+
+        // Read value
         let call_data = readValueCall::new((object_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
         assert_eq!(101, return_data);
         assert_eq!(0, result);
 
-        // change the signer
+        // Change the signer and read again
         runtime.set_tx_origin(address!("0x00000000000000000000000000000000abababab").0.0);
-
-        // This should hit an unreachable due to the signer differing from the owner!
         let call_data = readValueCall::new((object_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
         assert_eq!(101, return_data);
+        assert_eq!(0, result);
     }
 
     // Tests the freeze of an object in both owned and shared cases.
@@ -436,12 +474,12 @@ mod storage_transfer {
         let frozen_slot = runtime.log_events.lock().unwrap().recv().unwrap();
         let frozen_slot = FixedBytes::<32>::from_slice(&frozen_slot);
 
-        // // Read the storage on the frozen slot after the freeze
-        // let frozen_value = runtime.get_storage_at_slot(frozen_slot.0);
-        // assert_eq!(
-        //     value_before_freeze, frozen_value,
-        //     "Expected storage value to be the same"
-        // );
+        // Read the storage on the frozen slot after the freeze
+        let frozen_value = runtime.get_storage_at_slot(frozen_slot.0);
+        assert_eq!(
+            value_before_freeze, frozen_value,
+            "Expected storage value to be the same"
+        );
 
         // Read value
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -457,6 +495,43 @@ mod storage_transfer {
         let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
         assert_eq!(101, return_data);
         assert_eq!(0, result);
+
+        // Change the msg sender and read again
+        runtime.set_msg_sender(address!("0x00000000000000000000000000000000abababab").0.0);
+        let call_data = readValueCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+    }
+
+    // Tests trying to read an owned object with a signer that is not the owner.
+    #[rstest]
+    #[should_panic(expected = "unreachable")]
+    fn test_signer_owner_mismatch(runtime: RuntimeSandbox) {
+        let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the object id emmited from the contract's events
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        // Read initial value (should be 101)
+        let call_data = readValueCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // change the signer
+        runtime.set_tx_origin(address!("0x00000000000000000000000000000000abababab").0.0);
+
+        // This should hit an unreachable due to the signer differing from the owner!
+        let call_data = readValueCall::new((object_id,)).abi_encode();
+        let (_, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
     }
 
     // Tests the freeze of an object that is not owned by the signer.
