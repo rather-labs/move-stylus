@@ -161,3 +161,121 @@ mod capability {
         assert!(result.is_err());
     }
 }
+
+mod data {
+    use alloy_primitives::{FixedBytes, address};
+    use alloy_sol_types::{SolCall, SolValue, sol};
+
+    use crate::common::runtime_sandbox::constants::SIGNER_ADDRESS;
+
+    use super::*;
+
+    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
+    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
+    // thread. If that happens, messages from test A can be received by test B.
+    // Using once instance per thread assures this won't happen.
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "data";
+        const SOURCE_PATH: &str = "tests/storage/data.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+
+        #[derive(Debug)]
+        struct ID {
+           bytes32 bytes;
+        }
+
+        #[derive(Debug)]
+        struct UID {
+           ID id;
+        }
+
+        struct Foo {
+            UID id;
+            uint64 value;
+        }
+
+        struct Bar {
+            uint64 a;
+            address b;
+        }
+
+        struct FooBar {
+            UID id;
+            uint64 value;
+            Bar bar;
+        }
+
+        function createFoo(uint64 value) public view;
+        function getFoo(bytes32 id) public view returns (Foo);
+        function createFooBar(uint64 value, uint64 a, address b) public view;
+        function getFooBar(bytes32 id) public view returns (FooBar);
+    );
+
+    #[rstest]
+    fn test_data_storage_simple(runtime: RuntimeSandbox) {
+        // Create a new counter
+        let call_data = createFooCall::new((42,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the object id emmited from the contract's events
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        // Set value to 111 with a sender that is not the owner
+        let call_data = getFooCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Foo::abi_encode(&Foo {
+            id: UID {
+                id: ID { bytes: object_id },
+            },
+            value: 42,
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+    }
+
+    #[rstest]
+    fn test_data_storage_nested_struct(runtime: RuntimeSandbox) {
+        // Create a new counter
+        let call_data = createFooBarCall::new((
+            42,
+            100,
+            address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+        ))
+        .abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the object id emmited from the contract's events
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        /*
+        // Set value to 111 with a sender that is not the owner
+        let call_data = getFooBarCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = FooBar::abi_encode(&FooBar {
+            id: UID {
+                id: ID { bytes: object_id },
+            },
+            value: 42,
+            bar: Bar {
+                a: 100,
+                b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+            },
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+        */
+    }
+}

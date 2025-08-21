@@ -30,6 +30,11 @@ use crate::{
 /// `struct_ptr` - pointer to the struct to be encoded
 /// `slot_ptr` - storage's slot where the data will be saved
 /// `struct_` - structural information of the struct to be encoded and saved
+/// `written_bytes_in_slot` - number of bytes already written in the slot. This will be != 0 if
+/// this function is recusively called to save a struct inside another struct.
+///
+/// # Returns
+/// The written_bytes_in_slot value. Used to update the caller of the recursive call
 pub fn add_encode_and_save_into_storage_struct_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
@@ -37,7 +42,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     struct_ptr: LocalId,
     slot_ptr: LocalId,
     struct_: &IStruct,
-) {
+    written_bytes_in_slot: u32,
+) -> u32 {
     let (storage_cache, _) = storage_cache_bytes32(module);
     let (storage_flush_cache, _) = storage_flush_cache(module);
 
@@ -50,7 +56,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 
     let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
 
-    let mut written_bytes_in_slot = 0;
+    let mut written_bytes_in_slot = written_bytes_in_slot;
     for (index, field) in struct_.fields.iter().enumerate() {
         let field_size = field_size(field, compilation_ctx);
         if written_bytes_in_slot + field_size > 32 {
@@ -206,6 +212,49 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 
                 builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
             }
+            IntermediateType::IStruct { module_id, index } => {
+                let child_struct = compilation_ctx
+                    .get_user_data_type_by_index(module_id, *index)
+                    .unwrap();
+
+                // The struct ptr
+                let tmp = module.locals.add(ValType::I32);
+                builder.local_set(tmp);
+
+                written_bytes_in_slot = add_encode_and_save_into_storage_struct_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    slot_ptr,
+                    tmp,
+                    child_struct,
+                    written_bytes_in_slot,
+                );
+            }
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+            } => {
+                let child_struct = compilation_ctx
+                    .get_user_data_type_by_index(module_id, *index)
+                    .unwrap();
+                let child_struct = child_struct.instantiate(types);
+
+                // The struct ptr
+                let tmp = module.locals.add(ValType::I32);
+                builder.local_set(tmp);
+
+                written_bytes_in_slot = add_encode_and_save_into_storage_struct_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    slot_ptr,
+                    tmp,
+                    &child_struct,
+                    written_bytes_in_slot,
+                );
+            }
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
@@ -250,6 +299,41 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 
                 builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
             }
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } => {
+                let external_data = compilation_ctx
+                    .get_external_module_data(module_id, identifier)
+                    .unwrap();
+
+                match external_data {
+                    ExternalModuleData::Struct(struct_) => {
+                        // The struct ptr
+                        let tmp = module.locals.add(ValType::I32);
+                        builder.local_set(tmp);
+
+                        written_bytes_in_slot =
+                            add_encode_and_save_into_storage_struct_instructions(
+                                module,
+                                builder,
+                                compilation_ctx,
+                                slot_ptr,
+                                tmp,
+                                struct_,
+                                written_bytes_in_slot,
+                            );
+                    }
+                    ExternalModuleData::Enum(enum_) => {
+                        if !enum_.is_simple {
+                            panic!(
+                                "cannot abi pack enum, it contains at least one variant with fields"
+                            );
+                        }
+                        todo!();
+                    }
+                }
+            }
             e => todo!("{e:?}"),
         };
     }
@@ -260,6 +344,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
         .call(storage_cache);
 
     builder.i32_const(1).call(storage_flush_cache);
+
+    written_bytes_in_slot
 }
 
 /// Adds the instructions to read, decode from storage and build in memory a structure.
@@ -481,6 +567,33 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 // Copy the chunk of memory
                 builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
             }
+            IntermediateType::IStruct { module_id, index } => {
+                let child_struct = compilation_ctx
+                    .get_user_data_type_by_index(module_id, *index)
+                    .unwrap();
+
+                // Read the child struct
+                let child_struct_ptr = add_read_and_decode_storage_struct_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    slot_ptr,
+                    child_struct,
+                );
+
+                // Save the pointer to the child struct in the field_ptr
+                builder
+                    .local_get(field_ptr)
+                    .local_get(child_struct_ptr)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            }
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
@@ -574,9 +687,16 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
         IntermediateType::IU256 => 32,
         IntermediateType::IAddress | IntermediateType::ISigner => 20,
         // Dynamic data occupies the whole slot, but the data is saved somewhere else
-        IntermediateType::IVector(_)
-        | IntermediateType::IGenericStructInstance { .. }
-        | IntermediateType::IStruct { .. } => 32,
+        IntermediateType::IVector(_) => 32,
+
+        // Structs are 0 because we don't know how much they will occupy, this depends on the
+        // fields of the child struct, whether they are dynamic or static. The store function
+        // called will take care of this.
+        IntermediateType::IGenericStructInstance { .. } | IntermediateType::IStruct { .. } => 0,
+        IntermediateType::IExternalUserData {
+            module_id,
+            identifier,
+        } if Uid::is_vm_type(module_id, identifier) => 32,
         IntermediateType::IExternalUserData {
             module_id,
             identifier,
@@ -584,7 +704,7 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
             .get_external_module_data(module_id, identifier)
             .unwrap()
         {
-            ExternalModuleData::Struct(_) => 32,
+            ExternalModuleData::Struct(_) => 0,
             ExternalModuleData::Enum(_) => 1,
         },
 
@@ -595,4 +715,14 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
             panic!("cannot know if a type parameter is dynamic, expected a concrete type");
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use walrus::Module;
+
+    use crate::{
+        CompilationContext,
+        translation::intermediate_types::{IntermediateType, enums::IEnum, structs::IStruct},
+    };
 }

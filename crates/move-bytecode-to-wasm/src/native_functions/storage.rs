@@ -28,6 +28,7 @@ pub fn add_storage_save_fn(
         struct_ptr,
         slot_ptr,
         struct_,
+        0,
     );
 
     function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs)
