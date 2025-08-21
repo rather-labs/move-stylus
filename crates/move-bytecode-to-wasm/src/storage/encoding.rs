@@ -1,6 +1,8 @@
 //! This module implements the logic to encode/decode data in storage slots.
 //!
 //! The encoding used is the same as the one used by Solidity.
+//! For more information:
+//! https://docs.soliditylang.org/en/latest/internals/layout_in_storage.html
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg, StoreKind},
@@ -14,7 +16,6 @@ use crate::{
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         IntermediateType,
-        address::IAddress,
         heap_integers::{IU128, IU256},
         structs::IStruct,
     },
@@ -184,18 +185,24 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                 // Transform to BE
                 builder.call(swap_256_fn);
             }
-            // TODO: Maybe we should save 160 bits (20 bytes) only
             IntermediateType::IAddress | IntermediateType::ISigner => {
                 // We need to swap values before copying because memory copy takes dest pointer
                 // first
                 let tmp = module.locals.add(ValType::I32);
+                builder.local_set(tmp);
                 // Load the memory address
 
+                // Slot data plus offset as dest ptr
                 builder
-                    .local_set(tmp)
                     .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                    .local_get(tmp)
-                    .i32_const(IAddress::HEAP_SIZE);
+                    .local_get(offset)
+                    .binop(BinaryOp::I32Add);
+
+                // Grab the last 20 bytes of the address
+                builder.local_get(tmp).i32_const(12).binop(BinaryOp::I32Add);
+
+                // Amount of bytes to copy
+                builder.i32_const(20);
 
                 builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
             }
@@ -459,11 +466,17 @@ pub fn add_read_and_decode_storage_struct_instructions(
                     .call(compilation_ctx.allocator)
                     .local_tee(field_ptr);
 
+                // Add 12 to the offset to write the last 20 bytes of the address
+                builder.i32_const(12).binop(BinaryOp::I32Add);
+
                 // Source address (plus offset)
-                builder.i32_const(DATA_SLOT_DATA_PTR_OFFSET);
+                builder
+                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                    .i32_const(32 - read_bytes_in_slot as i32)
+                    .binop(BinaryOp::I32Add);
 
                 // Number of bytes to copy
-                builder.i32_const(32);
+                builder.i32_const(20);
 
                 // Copy the chunk of memory
                 builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
@@ -558,7 +571,8 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
         IntermediateType::IU32 => 4,
         IntermediateType::IU64 => 8,
         IntermediateType::IU128 => 16,
-        IntermediateType::IU256 | IntermediateType::IAddress | IntermediateType::ISigner => 32,
+        IntermediateType::IU256 => 32,
+        IntermediateType::IAddress | IntermediateType::ISigner => 20,
         // Dynamic data occupies the whole slot, but the data is saved somewhere else
         IntermediateType::IVector(_)
         | IntermediateType::IGenericStructInstance { .. }
