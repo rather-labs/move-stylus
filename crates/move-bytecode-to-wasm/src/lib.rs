@@ -7,7 +7,6 @@ use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
     source_package::parsed_manifest::PackageName,
 };
-use native_functions::NativeFunction;
 use std::{
     collections::HashMap,
     hash::{DefaultHasher, Hash, Hasher},

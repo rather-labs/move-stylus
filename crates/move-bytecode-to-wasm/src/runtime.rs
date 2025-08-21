@@ -1,5 +1,3 @@
-use std::hash::DefaultHasher;
-
 use walrus::{FunctionId, Module};
 
 use crate::{
@@ -254,7 +252,7 @@ impl RuntimeFunction {
                     generics.len(),
                 );
 
-                storage::add_save_struct_into_storage_fn(module, compilation_ctx, &generics[0])
+                storage::add_save_struct_into_storage_fn(module, compilation_ctx, generics[0])
             }
             Self::DeleteFromStorage => {
                 assert_eq!(
@@ -265,7 +263,7 @@ impl RuntimeFunction {
                     generics.len(),
                 );
 
-                storage::add_delete_struct_from_storage_fn(module, compilation_ctx, &generics[0])
+                storage::add_delete_struct_from_storage_fn(module, compilation_ctx, generics[0])
             }
             _ => panic!(
                 r#"there was an error linking "{}" runtime function, is this function generic?"#,

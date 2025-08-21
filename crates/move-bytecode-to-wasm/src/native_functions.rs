@@ -7,11 +7,12 @@ mod object;
 mod transaction;
 mod transfer;
 
-use std::hash::{DefaultHasher, Hash, Hasher};
-
 use walrus::{FunctionId, Module};
 
-use crate::{CompilationContext, hostio, translation::intermediate_types::IntermediateType};
+use crate::{
+    CompilationContext, hostio, runtime::RuntimeFunction,
+    translation::intermediate_types::IntermediateType,
+};
 
 pub struct NativeFunction;
 
@@ -33,6 +34,9 @@ impl NativeFunction {
 
     // Event functions
     const NATIVE_EMIT: &str = "emit";
+
+    // Object functions
+    pub const NATIVE_DELETE_OBJECT: &str = "delete";
 
     // Host functions
     const HOST_BLOCK_NUMBER: &str = "block_number";
@@ -110,10 +114,6 @@ impl NativeFunction {
                     generics.len(),
                 );
 
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(generics.first().unwrap())
-                    .unwrap();
-
                 transfer::add_share_object_fn(module, compilation_ctx, &generics[0])
             }
             Self::NATIVE_TRANSFER_OBJECT => {
@@ -123,10 +123,6 @@ impl NativeFunction {
                     "there was an error linking {name} expected 1 type parameter, found {}",
                     generics.len(),
                 );
-
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(generics.first().unwrap())
-                    .unwrap();
 
                 transfer::add_transfer_object_fn(module, compilation_ctx, &generics[0])
             }
@@ -138,11 +134,23 @@ impl NativeFunction {
                     generics.len(),
                 );
 
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(generics.first().unwrap())
-                    .unwrap();
-
                 transfer::add_freeze_object_fn(module, compilation_ctx, &generics[0])
+            }
+            Self::NATIVE_DELETE_OBJECT => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {name} expected 1 type parameter, found {}",
+                    generics.len(),
+                );
+
+                // In this case the native function implementation is the same as the runtime one.
+                // So we reuse the runtime function.
+                RuntimeFunction::DeleteFromStorage.get_generic(
+                    module,
+                    compilation_ctx,
+                    &[&generics[0]],
+                )
             }
             Self::NATIVE_EMIT => {
                 assert_eq!(
@@ -151,10 +159,6 @@ impl NativeFunction {
                     "there was an error linking {name} expected 1 type parameter, found {}",
                     generics.len(),
                 );
-
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(generics.first().unwrap())
-                    .unwrap();
 
                 event::add_emit_log_fn(module, compilation_ctx, &generics[0])
             }

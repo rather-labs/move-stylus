@@ -11,7 +11,7 @@ use crate::{
     },
     get_generic_function_name,
     runtime::RuntimeFunction,
-    translation::intermediate_types::{IntermediateType, structs::IStruct},
+    translation::intermediate_types::IntermediateType,
 };
 
 use super::NativeFunction;
