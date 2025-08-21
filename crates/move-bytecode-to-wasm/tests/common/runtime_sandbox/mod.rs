@@ -40,7 +40,6 @@ macro_rules! link_fn_ret_constant {
                 "vm_hooks",
                 $name,
                 move |_caller: Caller<'_, ModuleData>| -> $constant_type {
-                    // println!("{} called", $name);
                     $constant as $constant_type
                 },
             )
@@ -55,8 +54,6 @@ macro_rules! link_fn_write_constant {
                 "vm_hooks",
                 $name,
                 move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
-                    // println!("{} called, writing in {ptr}", $name);
-
                     let mem = match caller.get_export("memory") {
                         Some(Extern::Memory(mem)) => mem,
                         _ => panic!("failed to find host memory"),
@@ -174,14 +171,11 @@ impl RuntimeSandbox {
                 "vm_hooks",
                 "emit_log",
                 move |mut caller: Caller<'_, ModuleData>, ptr: u32, len: u32, _topic: u32| {
-                    // println!("emit_log, reading from {ptr}, length: {len}");
-
                     let mem = get_memory(&mut caller);
                     let mut buffer = vec![0; len as usize];
 
                     mem.read(&mut caller, ptr as usize, &mut buffer).unwrap();
 
-                    // println!("read memory: {buffer:?}");
                     log_sender.send(buffer.to_vec()).unwrap();
                 },
             )
@@ -193,8 +187,6 @@ impl RuntimeSandbox {
                 "vm_hooks",
                 "storage_cache_bytes32",
                 move |mut caller: Caller<'_, ModuleData>, key_ptr: u32, value_ptr: u32| {
-                    // println!("storage_cache_bytes32, key ptr {key_ptr}, value ptr {value_ptr}");
-
                     let mem = get_memory(&mut caller);
                     let mut key_buffer = [0; 32];
                     mem.read(&mut caller, key_ptr as usize, &mut key_buffer)
@@ -206,9 +198,6 @@ impl RuntimeSandbox {
 
                     let mut storage = storage_for_cache.lock().unwrap();
                     (*storage).insert(key_buffer, value_buffer);
-
-                    // println!("read memory key: {key_buffer:?}");
-                    // println!("read memory value: {value_ptr:?}");
                 },
             )
             .unwrap();
@@ -219,17 +208,13 @@ impl RuntimeSandbox {
                 "vm_hooks",
                 "storage_load_bytes32",
                 move |mut caller: Caller<'_, ModuleData>, key_ptr: u32, dest_ptr: u32| {
-                    // println!("storage_load_bytes32 key ptr {key_ptr}, dest ptr {dest_ptr}");
-
                     let mem = get_memory(&mut caller);
                     let mut key_buffer = [0; 32];
                     mem.read(&mut caller, key_ptr as usize, &mut key_buffer)
                         .unwrap();
 
-                    // println!("read memory key: {key_buffer:?}");
                     let storage = storage_for_cache.lock().unwrap();
                     let value = (*storage).get(&key_buffer).unwrap_or(&[0; 32]);
-                    // println!("read memory value: {value:?}");
 
                     mem.write(&mut caller, dest_ptr as usize, value.as_slice())
                         .unwrap();
@@ -243,8 +228,6 @@ impl RuntimeSandbox {
                 "vm_hooks",
                 "tx_origin",
                 move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
-                    // println!("tx_origin called, writing in {ptr}");
-
                     let mem = match caller.get_export("memory") {
                         Some(Extern::Memory(mem)) => mem,
                         _ => panic!("failed to find host memory"),
@@ -262,8 +245,6 @@ impl RuntimeSandbox {
                 "vm_hooks",
                 "msg_sender",
                 move |mut caller: Caller<'_, ModuleData>, ptr: u32| {
-                    // println!("msg_sender called, writing in {ptr}");
-
                     let mem = match caller.get_export("memory") {
                         Some(Extern::Memory(mem)) => mem,
                         _ => panic!("failed to find host memory"),

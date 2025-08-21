@@ -22,9 +22,6 @@ example-interaction-primitives:
 example-counter:
 	cargo run -p move-hello-world-example --bin counter
 
-example-modified-counter:
-	cargo run -p move-hello-world-example --bin modified_counter
-
 deploy-example:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
@@ -49,13 +46,7 @@ deploy-counter:
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/wasm/counter.wasm
-
-deploy-modified-counter:
-	cargo stylus deploy \
-		--endpoint='http://localhost:8547' \
-		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/wasm/modified_counter.wasm
-
+		
 setup-stylus:
 	RUSTFLAGS="-C link-args=-rdynamic" cargo install --force cargo-stylus
 

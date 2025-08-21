@@ -7,21 +7,34 @@ use stylus::transfer as transfer;
 
 public struct Foo has key {
     id: UID,
-    owner: address,
     value: u64
 }
 
-public fun create(share: bool, ctx: &mut TxContext) {
+public fun create_shared(ctx: &mut TxContext) {
   let foo = Foo {
     id: object::new(ctx),
-    owner: ctx.sender(),
     value: 101,
   };
-  if (share) {
-    transfer::share_object(foo);
-  } else {
-    transfer::transfer(foo, ctx.sender());
-  }
+
+  transfer::share_object(foo);
+}
+
+public fun create_owned(recipient: address, ctx: &mut TxContext) {
+  let foo = Foo {
+    id: object::new(ctx),
+    value: 101,
+  };
+
+  transfer::transfer(foo, recipient);
+}
+
+public fun create_frozen(ctx: &mut TxContext) {
+  let foo = Foo {
+    id: object::new(ctx),
+    value: 101,
+  };
+
+  transfer::freeze_object(foo);
 }
 
 public fun read_value(foo: &Foo): u64 {
@@ -29,7 +42,6 @@ public fun read_value(foo: &Foo): u64 {
 }
 
 public fun set_value(foo: &mut Foo, value: u64, ctx: &TxContext) {
-    assert!(foo.owner == ctx.sender(), 0);
     foo.value = value;
 }
 

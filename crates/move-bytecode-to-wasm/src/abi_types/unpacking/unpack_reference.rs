@@ -39,7 +39,9 @@ impl IRef {
                     .get_struct_by_intermediate_type(inner)
                     .unwrap();
 
-                // aca se pasa la flag unpack_frozen = true!
+                // This is the only place where we pass the flag unpack_frozen = true.
+                // This is because we only want to unpack frozen objects from the storage
+                // if the object is passed as an immutable reference to the function arguments.
                 if struct_.saved_in_storage {
                     add_unpack_from_storage_instructions(
                         builder,

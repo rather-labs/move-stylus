@@ -327,10 +327,12 @@ fn add_unpack_from_storage_instructions(
         RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
 
     if unpack_frozen {
-        function_builder.i32_const(1).call(locate_storage_data_fn);
+        function_builder.i32_const(1);
     } else {
-        function_builder.i32_const(0).call(locate_storage_data_fn);
+        function_builder.i32_const(0);
     }
+
+    function_builder.call(locate_storage_data_fn);
 
     // Read the object
     let read_struct_from_storage_fn =
