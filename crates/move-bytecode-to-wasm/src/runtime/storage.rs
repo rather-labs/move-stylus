@@ -1,4 +1,4 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::Hasher;
 
 use super::RuntimeFunction;
 use crate::data::{
@@ -598,6 +598,135 @@ pub fn derive_dyn_array_slot(
     )
 }
 
+/// Generates a function that reads an specific struct from the storage.
+pub fn add_save_struct_into_storage_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) -> FunctionId {
+    let name = get_generic_function_name(RuntimeFunction::EncodeAndSaveInStorage.name(), &[itype]);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    }
+
+    let struct_ = compilation_ctx
+        .get_struct_by_intermediate_type(itype)
+        .unwrap();
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function.name(name).func_body();
+
+    let struct_ptr = module.locals.add(ValType::I32);
+    let slot_ptr = module.locals.add(ValType::I32);
+
+    add_encode_and_save_into_storage_struct_instructions(
+        module,
+        &mut builder,
+        compilation_ctx,
+        struct_ptr,
+        slot_ptr,
+        &struct_,
+    );
+
+    function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs)
+}
+
+/// Generates a function that deletes an object from storage.
+///
+/// This function:
+/// 1. Validates the object is not frozen (frozen objects cannot be deleted).
+/// 2. Locates the storage slot of the object.
+/// 3. Clears the storage slot and any additional slots occupied by the struct fields.
+/// 4. Flushes the cache to finalize the deletion.
+///
+/// Arguments:
+/// - struct_ptr
+pub fn add_delete_struct_from_storage_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) -> FunctionId {
+    let name = get_generic_function_name(RuntimeFunction::DeleteFromStorage.name(), &[itype]);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    };
+
+    let struct_ = compilation_ctx
+        .get_struct_by_intermediate_type(itype)
+        .unwrap();
+
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
+    let locate_struct_slot_fn =
+        RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx));
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+
+    let (storage_cache, _) = storage_cache_bytes32(module);
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
+    let mut builder = function.name(name).func_body();
+
+    let slot_ptr = module.locals.add(ValType::I32);
+    let struct_ptr = module.locals.add(ValType::I32);
+
+    // Verify if the object is frozen; if not, continue.
+    builder
+        .local_get(struct_ptr)
+        .i32_const(32)
+        .binop(BinaryOp::I32Sub)
+        .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+        .i32_const(32)
+        .call(equality_fn);
+
+    builder.if_else(
+        None,
+        |then| {
+            // Emit an unreachable if the object is frozen
+            then.unreachable();
+        },
+        |else_| {
+            // Calculate the object slot in the storage (saved in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+            else_
+                .local_get(struct_ptr)
+                .call(locate_struct_slot_fn)
+                .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                .local_set(slot_ptr);
+
+            // Wipe the slot data placeholder. We will use it to erase the slots in the storage
+            else_
+                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                .i32_const(0)
+                .i32_const(32)
+                .memory_fill(compilation_ctx.memory_id);
+
+            // Wipe out the first slot
+            else_
+                .local_get(slot_ptr)
+                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                .call(storage_cache);
+
+            // Loop through each field in the struct and clear the corresponding storage slots.
+            let mut slot_used_bytes = 0;
+            for field in struct_.fields.iter() {
+                let field_size = storage::encoding::field_size(field, compilation_ctx);
+                if slot_used_bytes + field_size > 32 {
+                    else_
+                        .local_get(slot_ptr)
+                        .call(next_slot_fn)
+                        .local_tee(slot_ptr)
+                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                        .call(storage_cache);
+
+                    slot_used_bytes = field_size;
+                } else {
+                    slot_used_bytes += field_size;
+                }
+            }
+        },
+    );
+
+    function.finish(vec![struct_ptr], &mut module.funcs)
+}
+
 // The expected slot values were calculated using Remix to ensure the tests are correct.
 #[cfg(test)]
 mod tests {
@@ -1037,133 +1166,4 @@ mod tests {
 
         assert_eq!(result, expected);
     }
-}
-
-/// Generates a function that reads an specific struct from the storage.
-pub fn add_save_struct_into_storage_fn(
-    module: &mut Module,
-    compilation_ctx: &CompilationContext,
-    itype: &IntermediateType,
-) -> FunctionId {
-    let name = get_generic_function_name(RuntimeFunction::EncodeAndSaveInStorage.name(), &[itype]);
-    if let Some(function) = module.funcs.by_name(&name) {
-        return function;
-    }
-
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
-
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
-    let mut builder = function.name(name).func_body();
-
-    let struct_ptr = module.locals.add(ValType::I32);
-    let slot_ptr = module.locals.add(ValType::I32);
-
-    add_encode_and_save_into_storage_struct_instructions(
-        module,
-        &mut builder,
-        compilation_ctx,
-        struct_ptr,
-        slot_ptr,
-        &struct_,
-    );
-
-    function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs)
-}
-
-/// Generates a function that deletes an object from storage.
-///
-/// This function:
-/// 1. Validates the object is not frozen (frozen objects cannot be deleted).
-/// 2. Locates the storage slot of the object.
-/// 3. Clears the storage slot and any additional slots occupied by the struct fields.
-/// 4. Flushes the cache to finalize the deletion.
-///
-/// Arguments:
-/// - struct_ptr
-pub fn add_delete_struct_from_storage_fn(
-    module: &mut Module,
-    compilation_ctx: &CompilationContext,
-    itype: &IntermediateType,
-) -> FunctionId {
-    let name = get_generic_function_name(RuntimeFunction::DeleteFromStorage.name(), &[itype]);
-    if let Some(function) = module.funcs.by_name(&name) {
-        return function;
-    };
-
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
-
-    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
-    let locate_struct_slot_fn =
-        RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx));
-    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-
-    let (storage_cache, _) = storage_cache_bytes32(module);
-
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
-    let mut builder = function.name(name).func_body();
-
-    let slot_ptr = module.locals.add(ValType::I32);
-    let struct_ptr = module.locals.add(ValType::I32);
-
-    // Verify if the object is frozen; if not, continue.
-    builder
-        .local_get(struct_ptr)
-        .i32_const(32)
-        .binop(BinaryOp::I32Sub)
-        .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
-        .i32_const(32)
-        .call(equality_fn);
-
-    builder.if_else(
-        None,
-        |then| {
-            // Emit an unreachable if the object is frozen
-            then.unreachable();
-        },
-        |else_| {
-            // Calculate the object slot in the storage (saved in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-            else_
-                .local_get(struct_ptr)
-                .call(locate_struct_slot_fn)
-                .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                .local_set(slot_ptr);
-
-            // Wipe the slot data placeholder. We will use it to erase the slots in the storage
-            else_
-                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                .i32_const(0)
-                .i32_const(32)
-                .memory_fill(compilation_ctx.memory_id);
-
-            // Wipe out the first slot
-            else_
-                .local_get(slot_ptr)
-                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                .call(storage_cache);
-
-            // Loop through each field in the struct and clear the corresponding storage slots.
-            let mut slot_used_bytes = 0;
-            for field in struct_.fields.iter() {
-                let field_size = storage::encoding::field_size(field, compilation_ctx);
-                if slot_used_bytes + field_size > 32 {
-                    else_
-                        .local_get(slot_ptr)
-                        .call(next_slot_fn)
-                        .local_tee(slot_ptr)
-                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                        .call(storage_cache);
-
-                    slot_used_bytes = field_size;
-                } else {
-                    slot_used_bytes += field_size;
-                }
-            }
-        },
-    );
-
-    function.finish(vec![struct_ptr], &mut module.funcs)
 }

@@ -1,18 +1,11 @@
 use super::NativeFunction;
 use crate::{
     CompilationContext,
-    data::{
-        DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
-        DATA_SLOT_DATA_PTR_OFFSET,
-    },
     hostio::host_functions::{
         block_number, block_timestamp, emit_log, native_keccak256, storage_cache_bytes32,
         storage_flush_cache, storage_load_bytes32,
     },
-    runtime::RuntimeFunction,
-    storage,
     translation::intermediate_types::address::IAddress,
-    translation::intermediate_types::structs::IStruct,
     utils::keccak_string_to_memory,
 };
 use walrus::{
