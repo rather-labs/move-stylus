@@ -1,6 +1,6 @@
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg},
+    ir::{BinaryOp, LoadKind, MemArg},
 };
 
 use super::RuntimeFunction;
@@ -229,8 +229,8 @@ pub fn vec_equality_heap_type(
 /// Determines if all bytes at a specified address are zero
 ///
 /// # Arguments
-///    - pointer to the bytes
-///    - length of the bytes
+///    - pointer to the data
+///    - length of the data
 /// # Returns:
 ///    - 1 if all the bytes are zero, 0 otherwise
 pub fn is_zero(module: &mut Module, compilation_ctx: &crate::CompilationContext) -> FunctionId {
@@ -280,23 +280,21 @@ pub fn is_zero(module: &mut Module, compilation_ctx: &crate::CompilationContext)
             lp.binop(BinaryOp::I32GeU);
             lp.br_if(outer_id);
 
-            // Load one byte: *(ptr + i)
+            // Load 4 bytes at once: *(ptr + i) as u32
             lp.local_get(ptr);
             lp.local_get(i);
             lp.binop(BinaryOp::I32Add);
 
             lp.load(
                 compilation_ctx.memory_id,
-                LoadKind::I32_8 {
-                    kind: ExtendedLoad::ZeroExtend,
-                },
+                LoadKind::I32 { atomic: false },
                 MemArg {
                     align: 0,
                     offset: 0,
                 },
             );
 
-            // if (byte != 0) { out = 0; break outer; }
+            // if (4 bytes != 0) { out = 0; break outer; }
             lp.i32_const(0);
             lp.binop(BinaryOp::I32Ne);
             lp.if_else(
@@ -306,9 +304,9 @@ pub fn is_zero(module: &mut Module, compilation_ctx: &crate::CompilationContext)
                     then_nonzero.br(outer_id);
                 },
                 |else_zero| {
-                    // i++
+                    // i += 4 (increment by 4 bytes)
                     else_zero.local_get(i);
-                    else_zero.i32_const(1);
+                    else_zero.i32_const(4);
                     else_zero.binop(BinaryOp::I32Add);
                     else_zero.local_set(i);
 

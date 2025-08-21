@@ -38,7 +38,7 @@ pub fn locate_storage_data(
     compilation_ctx: &CompilationContext,
 ) -> FunctionId {
     // Runtime functions
-    let eq_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
 
     // Host functions
@@ -54,14 +54,6 @@ pub fn locate_storage_data(
     // Arguments
     let uid_ptr = module.locals.add(ValType::I32);
     let search_frozen = module.locals.add(ValType::I32);
-
-    // Locals
-    let zero = module.locals.add(ValType::I32);
-
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_set(zero);
 
     // Wipe the first 12 bytes, and then write the tx signer address
     builder
@@ -95,9 +87,8 @@ pub fn locate_storage_data(
         // Check if it is empty (all zeroes)
         block
             .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-            .local_get(zero)
             .i32_const(32)
-            .call(eq_fn)
+            .call(is_zero_fn)
             .negate()
             .br_if(exit_block);
 
@@ -126,9 +117,8 @@ pub fn locate_storage_data(
         // Check if it is empty (all zeroes)
         block
             .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-            .local_get(zero)
             .i32_const(32)
-            .call(eq_fn)
+            .call(is_zero_fn)
             .negate()
             .br_if(exit_block);
 
@@ -164,9 +154,8 @@ pub fn locate_storage_data(
             // Check if it is empty (all zeroes)
             frozen_block
                 .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                .local_get(zero)
                 .i32_const(32)
-                .call(eq_fn)
+                .call(is_zero_fn)
                 .negate()
                 .br_if(exit_block);
         });
