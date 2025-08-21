@@ -1,6 +1,5 @@
 module test::capability;
 
-use stylus::event::emit;
 use stylus::transfer as transfer;
 use stylus::object as object;
 use stylus::object::UID;
@@ -16,6 +15,5 @@ public fun create(ctx: &mut TxContext) {
     );
 }
 
-public fun admin_cap_fn(_: &AdminCap ) {
-}
+public fun admin_cap_fn(_: &AdminCap ) {}
 

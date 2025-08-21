@@ -194,17 +194,8 @@ mod storage_transfer {
         function transferObj(bytes32 id, address recipient) public view;
     );
 
-    const SHARED: [u8; 20] = {
-        let mut b = [0u8; 20];
-        b[19] = 1;
-        b
-    };
-
-    const FROZEN: [u8; 20] = {
-        let mut b = [0u8; 20];
-        b[19] = 2;
-        b
-    };
+    const SHARED: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+    const FROZEN: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2];
 
     /// Right-align `data` into a 32-byte word (EVM storage encoding for value types).
     #[inline]
@@ -289,7 +280,7 @@ mod storage_transfer {
         assert_eq!(43, return_data);
         assert_eq!(0, result);
 
-        // change the signer
+        // Change the signer
         runtime.set_tx_origin(address!("0x00000000000000000000000000000000abababab").0.0);
 
         // Set value to 111
@@ -304,10 +295,10 @@ mod storage_transfer {
         assert_eq!(111, return_data);
         assert_eq!(0, result);
 
-        // change the signer
+        // Change the signer
         runtime.set_tx_origin(address!("0x00000000000000000000000000000000acacacac").0.0);
 
-        // Set value to 111
+        // Increment
         let call_data = incrementValueCall::new((object_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -319,7 +310,7 @@ mod storage_transfer {
         assert_eq!(112, return_data);
         assert_eq!(0, result);
 
-        // change the msg sender
+        // Change the msg sender
         runtime.set_msg_sender(address!("0x00000000000000000000000000000000abababab").0.0);
 
         // Set value to 1111 with a sender that is not the owner
@@ -389,7 +380,8 @@ mod storage_transfer {
         assert_eq!(43, return_data);
         assert_eq!(0, result);
 
-        // change the msg sender
+        // Change the msg sender
+        // Should still work since the signer is the owner
         runtime.set_msg_sender(address!("0x00000000000000000000000000000000abababab").0.0);
 
         // Set value to 111 with a sender that is not the owner
@@ -417,29 +409,31 @@ mod storage_transfer {
         let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let object_id = FixedBytes::<32>::from_slice(&object_id);
 
-        // Read the object slot emmited from the contract's events
+        // Compute the object slot using the owner and the object id
         let owner = runtime.get_tx_origin();
         let object_slot = derive_object_slot(&owner, &object_id.0);
 
         // Read the storage on the original slot before the freeze
         let value_before_share = runtime.get_storage_at_slot(object_slot.0);
 
-        // Freeze the object. Only possible if the object is owned by the signer!
+        // Share the object. Only possible if the object is owned by the signer!
         let call_data = shareObjCall::new((object_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        // Read the storage on the original slot after the freeze
+        // Read the storage on the original slot after the share
+        // Should be zeroes since the object moved from the owner space to the shared space
         let value_after_share = runtime.get_storage_at_slot(object_slot.0);
         assert_eq!(
             [0u8; 32], value_after_share,
             "Expected storage value to be 32 zeros"
         );
 
-        // Read the object id emmited from the contract's events
+        // Get the slot number for the shared object
         let shared_slot = derive_object_slot(&SHARED, &object_id.0);
 
         // Read the storage on the shared slot after the share
+        // Should be the same as the original slot before the share
         let shared_value = runtime.get_storage_at_slot(shared_slot.0);
         assert_eq!(
             value_before_share, shared_value,
@@ -454,6 +448,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Change the signer and read again
+        // Should still work since the object is shared
         runtime.set_tx_origin(address!("0x00000000000000000000000000000000abababab").0.0);
         let call_data = readValueCall::new((object_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -462,7 +457,7 @@ mod storage_transfer {
         assert_eq!(0, result);
     }
 
-    // Tests the freeze of an object in both owned and shared cases.
+    // Tests the freeze of an object in both owned case.
     #[rstest]
     fn test_freeze_owned_object(runtime: RuntimeSandbox) {
         // Create a new object
@@ -474,7 +469,7 @@ mod storage_transfer {
         let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let object_id = FixedBytes::<32>::from_slice(&object_id);
 
-        // Read the object slot emmited from the contract's events
+        // Compute the object slot using the owner and the object id
         let owner = runtime.get_tx_origin();
         let object_slot = derive_object_slot(&owner, &object_id.0);
 
@@ -487,13 +482,14 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the storage on the original slot after the freeze
+        // Should be zeroes since the object moved from the owner space to the frozen space
         let value_after_freeze = runtime.get_storage_at_slot(object_slot.0);
         assert_eq!(
             [0u8; 32], value_after_freeze,
             "Expected storage value to be 32 zeros"
         );
 
-        // Read the object id emmited from the contract's events
+        // Compute the object slot using the FROZEN address and the object id
         let frozen_slot = derive_object_slot(&FROZEN, &object_id.0);
 
         // Read the storage on the frozen slot after the freeze
@@ -511,6 +507,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Change the signer and read again
+        // Should still work since the object is frozen
         runtime.set_tx_origin(address!("0x00000000000000000000000000000000abababab").0.0);
         let call_data = readValueCall::new((object_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -519,6 +516,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Change the msg sender and read again
+        // Should still work since the object is frozen
         runtime.set_msg_sender(address!("0x00000000000000000000000000000000abababab").0.0);
         let call_data = readValueCall::new((object_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -551,9 +549,7 @@ mod storage_transfer {
 
         // This should hit an unreachable due to the signer differing from the owner!
         let call_data = readValueCall::new((object_id,)).abi_encode();
-        let (_, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
-        assert_eq!(101, return_data);
+        runtime.call_entrypoint(call_data).unwrap();
     }
 
     // Tests the freeze of an object that is not owned by the signer.
@@ -572,8 +568,7 @@ mod storage_transfer {
 
         // Freeze the object. Only possible if the object is owned by the signer!
         let call_data = freezeObjCall::new((object_id,)).abi_encode();
-        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
+        runtime.call_entrypoint(call_data).unwrap();
     }
 
     // Tests the freeze of a shared object.
@@ -591,8 +586,7 @@ mod storage_transfer {
 
         // Freeze the object. Only possible if the object is owned by the signer!
         let call_data = freezeObjCall::new((object_id,)).abi_encode();
-        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
+        runtime.call_entrypoint(call_data).unwrap();
     }
 
     // Freeze and then try to share or transfer the object.
@@ -618,13 +612,11 @@ mod storage_transfer {
         if share {
             // Try to share the object.
             let call_data = shareObjCall::new((object_id,)).abi_encode();
-            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-            assert_eq!(0, result);
+            runtime.call_entrypoint(call_data).unwrap();
         } else {
             // Try to transfer the object.
             let call_data = transferObjCall::new((object_id, SIGNER_ADDRESS.into())).abi_encode();
-            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-            assert_eq!(0, result);
+            runtime.call_entrypoint(call_data).unwrap();
         }
     }
 }

@@ -236,8 +236,8 @@ pub fn vec_equality_heap_type(
 pub fn is_zero(module: &mut Module, compilation_ctx: &crate::CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
-        &[ValType::I32, ValType::I32], // (ptr, len)
-        &[ValType::I32],               // returns i32 (1 = all zero, 0 = found non-zero)
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
     );
 
     let mut builder = function
@@ -251,22 +251,11 @@ pub fn is_zero(module: &mut Module, compilation_ctx: &crate::CompilationContext)
     let i = module.locals.add(ValType::I32);
     let out = module.locals.add(ValType::I32);
 
-    builder.block(None, |block| {
-        let block_id = block.id();
-
-        // if len == 0, emit unreachable
-        block.local_get(len);
-        block.i32_const(0);
-        block.binop(BinaryOp::I32Ne);
-        block.br_if(block_id);
-
-        block.unreachable();
-    });
-
     // outer block to break out with a final result in `out`
     builder.block(None, |outer| {
         let outer_id = outer.id();
 
+        // Initialize i to 0 and out to 1 (true)
         outer.i32_const(0).local_set(i);
         outer.i32_const(1).local_set(out);
 
@@ -275,17 +264,13 @@ pub fn is_zero(module: &mut Module, compilation_ctx: &crate::CompilationContext)
             let loop_id = lp.id();
 
             // if (i >= len) break outer;
-            lp.local_get(i);
-            lp.local_get(len);
-            lp.binop(BinaryOp::I32GeU);
-            lp.br_if(outer_id);
+            lp.local_get(i)
+                .local_get(len)
+                .binop(BinaryOp::I32GeU)
+                .br_if(outer_id);
 
             // Load 4 bytes at once: *(ptr + i) as u32
-            lp.local_get(ptr);
-            lp.local_get(i);
-            lp.binop(BinaryOp::I32Add);
-
-            lp.load(
+            lp.local_get(ptr).local_get(i).binop(BinaryOp::I32Add).load(
                 compilation_ctx.memory_id,
                 LoadKind::I32 { atomic: false },
                 MemArg {
@@ -295,20 +280,21 @@ pub fn is_zero(module: &mut Module, compilation_ctx: &crate::CompilationContext)
             );
 
             // if (4 bytes != 0) { out = 0; break outer; }
-            lp.i32_const(0);
-            lp.binop(BinaryOp::I32Ne);
-            lp.if_else(
+            lp.i32_const(0).binop(BinaryOp::I32Ne).if_else(
                 None,
                 |then_nonzero| {
+                    // Set out to 0 and break the outer loop
                     then_nonzero.i32_const(0).local_set(out);
+
                     then_nonzero.br(outer_id);
                 },
                 |else_zero| {
                     // i += 4 (increment by 4 bytes)
-                    else_zero.local_get(i);
-                    else_zero.i32_const(4);
-                    else_zero.binop(BinaryOp::I32Add);
-                    else_zero.local_set(i);
+                    else_zero
+                        .local_get(i)
+                        .i32_const(4)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(i);
 
                     // continue loop
                     else_zero.br(loop_id);
@@ -317,7 +303,6 @@ pub fn is_zero(module: &mut Module, compilation_ctx: &crate::CompilationContext)
         });
     });
 
-    // push result
     builder.local_get(out);
 
     function.finish(vec![ptr, len], &mut module.funcs)
