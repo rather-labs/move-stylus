@@ -29,6 +29,7 @@ pub fn add_transfer_object_fn(
     };
 
     // Runtime functions
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
@@ -87,15 +88,8 @@ pub fn add_transfer_object_fn(
     builder.block(None, |block| {
         let block_id = block.id();
 
-        // Alloc 32 zeros to check if the owner is zero (means there's no owner, so we don't need to
-        // delete anything)
-        // TODO: Create a runtime function is zero...
-        block
-            .i32_const(32)
-            .call(compilation_ctx.allocator)
-            .local_get(owner_ptr)
-            .i32_const(32)
-            .call(equality_fn);
+        // Check if the owner is zero (means there's no owner, so we don't need to delete anything)
+        block.local_get(owner_ptr).i32_const(32).call(is_zero_fn);
 
         block.br_if(block_id);
 
