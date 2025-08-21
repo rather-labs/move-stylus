@@ -99,6 +99,11 @@ impl NativeFunction {
         }
     }
 
+    /// Links the function into the module and returns its id. The function generated depends on
+    /// the types passed in the `generics` parameter.
+    ///
+    /// The idempotency of this function depends on the generator functions. This is designed this
+    /// way to avoid errors when calculating the function name based on the types.
     pub fn get_generic(
         name: &str,
         module: &mut Module,
