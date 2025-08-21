@@ -18,7 +18,7 @@ use walrus::{
 ///
 /// Where:
 /// - The outer mapping key is the id of the owner (could be an address or object id).
-/// - The Inner mapping key is the object id itself.
+/// - The inner mapping key is the object id itself.
 /// - The value is the encoded structure.
 ///
 /// The lookup is done in the following order:

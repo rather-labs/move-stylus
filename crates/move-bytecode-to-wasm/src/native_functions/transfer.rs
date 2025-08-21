@@ -13,6 +13,7 @@ use crate::{
     native_functions::{object::add_delete_object_fn, storage::add_storage_save_fn},
     runtime::RuntimeFunction,
     translation::intermediate_types::structs::IStruct,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 use super::NativeFunction;
@@ -35,18 +36,19 @@ pub fn add_transfer_object_fn(
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
 
     // Native functions
-    let (emit_log_fn, _) = emit_log(module);
     let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
-    let add_delete_object_fn = add_delete_object_fn(hash, module, compilation_ctx, struct_);
+    let delete_object_fn = add_delete_object_fn(hash, module, compilation_ctx, struct_);
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
 
-    // Locals
+    // Arguments
     let struct_ptr = module.locals.add(ValType::I32);
-    let owner_ptr = module.locals.add(ValType::I32);
     let recipient_ptr = module.locals.add(ValType::I32);
+
+    // Locals
+    let owner_ptr = module.locals.add(ValType::I32);
     let id_bytes_ptr = module.locals.add(ValType::I32);
 
     builder.block(None, |block| {
@@ -84,8 +86,25 @@ pub fn add_transfer_object_fn(
         block.unreachable();
     });
 
-    // Delete the object from the owner mapping on the storage
-    builder.local_get(struct_ptr).call(add_delete_object_fn);
+    // Alloc 32 zeros to check if the owner is zero (means there's no owner, so we don't need to
+    // delete anything)
+    // TODO: Create a runtime function is zero...
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_get(owner_ptr)
+        .i32_const(32)
+        .call(equality_fn)
+        .negate();
+
+    // Delete the object from the owner mapping on the storage if the owner addres is not all zeros
+    builder.if_else(
+        None,
+        |then| {
+            then.local_get(struct_ptr).call(delete_object_fn);
+        },
+        |_| {},
+    );
 
     // Update the object ownership in memory to the recipient's address
     builder
@@ -105,13 +124,6 @@ pub fn add_transfer_object_fn(
         .local_get(recipient_ptr)
         .local_get(id_bytes_ptr)
         .call(write_object_slot_fn);
-
-    // TODO: remove after adding tests
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
 
     // Store the struct in the slot associated with the new owner's mapping
     builder
