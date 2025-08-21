@@ -2,6 +2,7 @@
 //!
 //! Native functions in Move are functions directly implemented inside the Move VM. To emulate that
 //! mechanism, we direcly implement them in WASM and limk them into the file.
+mod event;
 mod object;
 mod storage;
 mod transaction;
@@ -34,6 +35,9 @@ impl NativeFunction {
 
     // Object functions
     pub const NATIVE_DELETE_OBJECT: &str = "delete";
+
+    // Event functions
+    const NATIVE_EMIT: &str = "emit";
 
     // Host functions
     const HOST_BLOCK_NUMBER: &str = "block_number";
@@ -181,6 +185,20 @@ impl NativeFunction {
                         .unwrap();
 
                     object::add_delete_object_fn(hash, module, compilation_ctx, &struct_)
+                }
+                Self::NATIVE_EMIT => {
+                    assert_eq!(
+                        1,
+                        generics.len(),
+                        "there was an error linking {function_name} expected 1 type parameter, found {}",
+                        generics.len(),
+                    );
+
+                    let struct_ = compilation_ctx
+                        .get_struct_by_intermediate_type(generics.first().unwrap())
+                        .unwrap();
+
+                    event::add_emit_log_fn(hash, module, compilation_ctx, &struct_)
                 }
                 _ => panic!("generic native function {name} not supported yet"),
             }
