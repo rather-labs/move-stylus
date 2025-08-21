@@ -13,8 +13,9 @@ pub mod table;
 
 use crate::{
     CompilationContext, compilation_context::ModuleData,
-    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, native_functions::NativeFunction,
-    runtime::RuntimeFunction, wasm_builder_extensions::WasmBuilderExtension,
+    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, hostio::host_functions::storage_flush_cache,
+    native_functions::NativeFunction, runtime::RuntimeFunction,
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 use anyhow::Result;
 use flow::Flow;
@@ -1129,6 +1130,9 @@ fn translate_instruction(
                                 .local_get(struct_ptr)
                                 .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                                 .call(save_in_slot_fn);
+
+                            let (storage_flush_cache, _) = storage_flush_cache(module);
+                            builder.i32_const(1).call(storage_flush_cache);
                         }
                     }
                 }

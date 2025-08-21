@@ -9,11 +9,9 @@ use crate::{
         DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
         DATA_SHARED_OBJECTS_KEY_OFFSET,
     },
-    hostio::host_functions::emit_log,
     native_functions::{object::add_delete_object_fn, storage::add_storage_save_fn},
     runtime::RuntimeFunction,
     translation::intermediate_types::structs::IStruct,
-    wasm_builder_extensions::WasmBuilderExtension,
 };
 
 use super::NativeFunction;
@@ -31,6 +29,7 @@ pub fn add_transfer_object_fn(
     };
 
     // Runtime functions
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
@@ -86,25 +85,23 @@ pub fn add_transfer_object_fn(
         block.unreachable();
     });
 
-    // Alloc 32 zeros to check if the owner is zero (means there's no owner, so we don't need to
-    // delete anything)
-    // TODO: Create a runtime function is zero...
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_get(owner_ptr)
-        .i32_const(32)
-        .call(equality_fn)
-        .negate();
+    builder.block(None, |block| {
+        let block_id = block.id();
 
-    // Delete the object from the owner mapping on the storage if the owner addres is not all zeros
-    builder.if_else(
-        None,
-        |then| {
-            then.local_get(struct_ptr).call(delete_object_fn);
-        },
-        |_| {},
-    );
+        // Check if the owner is zero (means there's no owner, so we don't need to delete anything)
+        block.local_get(owner_ptr).i32_const(32).call(is_zero_fn);
+
+        block.br_if(block_id);
+
+        block.local_get(struct_ptr).call(delete_object_fn);
+    });
+
+    // Update the object ownership in memory to the recipient's address
+    builder
+        .local_get(owner_ptr)
+        .local_get(recipient_ptr)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     // Get the pointer to the 32 bytes holding the data of the id
     builder
@@ -145,7 +142,6 @@ pub fn add_share_object_fn(
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
 
     // Native functions
-    let (emit_log_fn, _) = emit_log(module);
     let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
     let add_delete_object_fn = add_delete_object_fn(hash, module, compilation_ctx, struct_);
 
@@ -191,19 +187,19 @@ pub fn add_share_object_fn(
                 // Delete the object from owner mapping on the storage
                 else_.local_get(struct_ptr).call(add_delete_object_fn);
 
+                // Update the object ownership in memory to the shared objects key
+                else_
+                    .local_get(owner_ptr)
+                    .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
                 // Calculate the slot number in the shared objects mapping
                 else_
                     .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
                     .local_get(struct_ptr)
                     .call(get_id_bytes_ptr_fn)
                     .call(write_object_slot_fn);
-
-                // TODO: remove after adding tests
-                else_
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                    .i32_const(32)
-                    .i32_const(0)
-                    .call(emit_log_fn);
 
                 // Save the struct in the shared objects mapping
                 else_
@@ -235,7 +231,6 @@ pub fn add_freeze_object_fn(
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
 
     // Native functions
-    let (emit_log_fn, _) = emit_log(module);
     let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
     let add_delete_object_fn = add_delete_object_fn(hash, module, compilation_ctx, struct_);
 
@@ -289,19 +284,19 @@ pub fn add_freeze_object_fn(
                 // Delete the object from the owner mapping on the storage
                 else_.local_get(struct_ptr).call(add_delete_object_fn);
 
+                // Update the object ownership in memory to the frozen objects key
+                else_
+                    .local_get(owner_ptr)
+                    .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
                 // Calculate the struct slot in the frozen objects mapping
                 else_
                     .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
                     .local_get(struct_ptr)
                     .call(get_id_bytes_ptr_fn)
                     .call(write_object_slot_fn);
-
-                // TODO: remove after adding tests
-                else_
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                    .i32_const(32)
-                    .i32_const(0)
-                    .call(emit_log_fn);
 
                 // Save the struct into the frozen objects mapping
                 else_

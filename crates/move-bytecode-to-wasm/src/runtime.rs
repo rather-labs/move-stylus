@@ -43,6 +43,7 @@ pub enum RuntimeFunction {
     // Equality
     HeapTypeEquality,
     VecEqualityHeapType,
+    IsZero,
     // Vector
     VecSwap32,
     VecSwap64,
@@ -94,6 +95,7 @@ impl RuntimeFunction {
             // Equality
             Self::HeapTypeEquality => "heap_type_equality",
             Self::VecEqualityHeapType => "vec_equality_heap_type",
+            Self::IsZero => "is_zero",
             // Vector
             Self::VecSwap32 => "vec_swap_32",
             Self::VecSwap64 => "vec_swap_64",
@@ -191,6 +193,7 @@ impl RuntimeFunction {
                 (Self::VecEqualityHeapType, Some(ctx)) => {
                     equality::vec_equality_heap_type(module, ctx)
                 }
+                (Self::IsZero, Some(ctx)) => equality::is_zero(module, ctx),
                 // Vector
                 (Self::VecSwap32, Some(ctx)) => vector::vec_swap_32_function(module, ctx),
                 (Self::VecSwap64, Some(ctx)) => vector::vec_swap_64_function(module, ctx),
