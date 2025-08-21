@@ -10,18 +10,19 @@ use stylus::object::UID;
 use stylus::tx_context::TxContext;
 use stylus::tx_context as tx_context;
 
-public struct IWalkTheDog has copy, drop { n: u32 }
+public struct IWalkTheDog has copy, drop { }
 
-public struct CanWalkDogCap has key { id: UID, n: u32 }
+public struct CanWalkDogCap has key { id: UID }
 
+// We replaced the constructor with a create function so we can use it more than once.
 public fun create(ctx: &mut TxContext) {
     transfer::transfer(
-        CanWalkDogCap { id: object::new(ctx), n: 42 },
+        CanWalkDogCap { id: object::new(ctx) },
         tx_context::sender(ctx)
     );
 }
 
-public fun walk_the_dog(d: &CanWalkDogCap) {
-    emit(IWalkTheDog { n: d.n });
+public fun walk_the_dog(_: &CanWalkDogCap) {
+    emit(IWalkTheDog { });
 }
 
