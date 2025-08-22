@@ -1,5 +1,6 @@
 mod common;
 
+use alloy_primitives::{FixedBytes, keccak256};
 use common::runtime_sandbox::constants::SIGNER_ADDRESS;
 use common::{runtime_sandbox::RuntimeSandbox, translate_test_package_with_framework};
 use rstest::{fixture, rstest};
@@ -617,6 +618,112 @@ mod storage_transfer {
             // Try to transfer the object.
             let call_data = transferObjCall::new((object_id, SIGNER_ADDRESS.into())).abi_encode();
             runtime.call_entrypoint(call_data).unwrap();
+        }
+    }
+}
+
+mod storage_encoding {
+    use alloy_primitives::{U256, address};
+    use alloy_sol_types::{SolCall, sol};
+
+    use super::*;
+
+    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
+    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
+    // thread. If that happens, messages from test A can be received by test B.
+    // Using once instance per thread assures this won't happen.
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "storage_encoding";
+        const SOURCE_PATH: &str = "tests/storage/encoding.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    const OBJECT_ID: [u8; 32] = [0u8; 32];
+
+    sol!(
+        #[derive(Debug)]
+        struct ID {
+           address bytes;
+        }
+
+        #[derive(Debug)]
+        struct UID {
+           ID id;
+        }
+
+        #[allow(missing_docs)]
+        struct StaticFields {
+            UID id;
+            uint256 a;
+            uint128 b;
+            uint64 c;
+            uint32 d;
+            uint16 e;
+            uint8 f;
+            address g;
+        }
+
+        function saveStaticFields(
+            UID id,
+            uint256 a,
+            uint128 b,
+            uint64 c,
+            uint32 d,
+            uint16 e,
+            uint8 f,
+            address g
+        ) public view;
+    );
+
+    #[rstest]
+    #[case(saveStaticFieldsCall::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        U256::from_str_radix("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 16).unwrap(),
+        0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+        0xcccccccccccccccc,
+        0xdddddddd,
+        0xeeee,
+        0xff,
+        address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+    )), vec![
+        [0x00; 32],
+        [0xaa; 32],
+        U256::from_str_radix("ffeeeeddddddddccccccccccccccccbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
+
+    ])]
+    #[case(saveStaticFieldsCall::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        U256::from(1),
+        2,
+        3,
+        4,
+        5,
+        6,
+        address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+    )), vec![
+        [0x00; 32],
+        U256::from(1).to_be_bytes(),
+        U256::from_str_radix("06000500000004000000000000000300000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
+
+    ])]
+    fn test_static_fields<T: SolCall>(
+        runtime: RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected: Vec<[u8; 32]>,
+    ) {
+        let (result, _) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
+        assert_eq!(0, result);
+
+        for i in 0..expected.len() {
+            let storage = runtime.get_storage_at_slot(U256::from(i).to_be_bytes());
+            assert_eq!(expected[i], storage, "Mismatch at slot {}", i);
         }
     }
 }
