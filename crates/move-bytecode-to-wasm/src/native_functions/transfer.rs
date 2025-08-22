@@ -9,21 +9,20 @@ use crate::{
         DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
         DATA_SHARED_OBJECTS_KEY_OFFSET,
     },
-    native_functions::{object::add_delete_object_fn, storage::add_storage_save_fn},
+    get_generic_function_name,
     runtime::RuntimeFunction,
-    translation::intermediate_types::structs::IStruct,
+    translation::intermediate_types::IntermediateType,
 };
 
 use super::NativeFunction;
 
 /// Adds the instructions to transfer an object to a recipient.
 pub fn add_transfer_object_fn(
-    hash: String,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-    struct_: &IStruct,
+    itype: &IntermediateType,
 ) -> FunctionId {
-    let name = format!("{}_{hash}", NativeFunction::NATIVE_TRANSFER_OBJECT);
+    let name = get_generic_function_name(NativeFunction::NATIVE_TRANSFER_OBJECT, &[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -33,10 +32,10 @@ pub fn add_transfer_object_fn(
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-
-    // Native functions
-    let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
-    let delete_object_fn = add_delete_object_fn(hash, module, compilation_ctx, struct_);
+    let storage_save_fn =
+        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
+    let delete_object_fn =
+        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype]);
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
@@ -126,12 +125,11 @@ pub fn add_transfer_object_fn(
 
 /// Adds the instructions to share an object.
 pub fn add_share_object_fn(
-    hash: String,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-    struct_: &IStruct,
+    itype: &IntermediateType,
 ) -> FunctionId {
-    let name = format!("{}_{hash}", NativeFunction::NATIVE_SHARE_OBJECT);
+    let name = get_generic_function_name(NativeFunction::NATIVE_SHARE_OBJECT, &[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -140,10 +138,10 @@ pub fn add_share_object_fn(
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-
-    // Native functions
-    let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
-    let add_delete_object_fn = add_delete_object_fn(hash, module, compilation_ctx, struct_);
+    let storage_save_fn =
+        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
+    let delete_object_fn =
+        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype]);
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
@@ -185,7 +183,7 @@ pub fn add_share_object_fn(
             },
             |else_| {
                 // Delete the object from owner mapping on the storage
-                else_.local_get(struct_ptr).call(add_delete_object_fn);
+                else_.local_get(struct_ptr).call(delete_object_fn);
 
                 // Update the object ownership in memory to the shared objects key
                 else_
@@ -215,12 +213,11 @@ pub fn add_share_object_fn(
 
 /// Adds the instructions to freeze an object.
 pub fn add_freeze_object_fn(
-    hash: String,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-    struct_: &IStruct,
+    itype: &IntermediateType,
 ) -> FunctionId {
-    let name = format!("{}_{hash}", NativeFunction::NATIVE_FREEZE_OBJECT);
+    let name = get_generic_function_name(NativeFunction::NATIVE_FREEZE_OBJECT, &[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -229,10 +226,10 @@ pub fn add_freeze_object_fn(
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-
-    // Native functions
-    let storage_save_fn = add_storage_save_fn(hash.clone(), module, compilation_ctx, struct_);
-    let add_delete_object_fn = add_delete_object_fn(hash, module, compilation_ctx, struct_);
+    let storage_save_fn =
+        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
+    let delete_object_fn =
+        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype]);
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
@@ -282,7 +279,7 @@ pub fn add_freeze_object_fn(
             },
             |else_| {
                 // Delete the object from the owner mapping on the storage
-                else_.local_get(struct_ptr).call(add_delete_object_fn);
+                else_.local_get(struct_ptr).call(delete_object_fn);
 
                 // Update the object ownership in memory to the frozen objects key
                 else_

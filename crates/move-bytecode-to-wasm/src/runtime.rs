@@ -2,7 +2,10 @@ use walrus::{FunctionId, Module};
 
 use crate::{
     CompilationContext,
-    translation::intermediate_types::heap_integers::{IU128, IU256},
+    translation::intermediate_types::{
+        IntermediateType,
+        heap_integers::{IU128, IU256},
+    },
 };
 
 mod copy;
@@ -60,6 +63,9 @@ pub enum RuntimeFunction {
     LocateStorageData,
     LocateStructSlot,
     GetIdBytesPtr,
+    EncodeAndSaveInStorage,
+    DecodeAndReadFromStorage,
+    DeleteFromStorage,
 }
 
 impl RuntimeFunction {
@@ -112,6 +118,9 @@ impl RuntimeFunction {
             Self::WriteObjectSlot => "write_object_slot",
             Self::LocateStructSlot => "locate_struct_slot",
             Self::GetIdBytesPtr => "get_id_bytes_ptr",
+            Self::EncodeAndSaveInStorage => "encode_and_save_in_storage",
+            Self::DecodeAndReadFromStorage => "decode_and_read_from_storage",
+            Self::DeleteFromStorage => "delete_from_storage",
         }
     }
 
@@ -220,10 +229,62 @@ impl RuntimeFunction {
                 (Self::GetIdBytesPtr, Some(ctx)) => storage::get_id_bytes_ptr(module, ctx),
                 // Error
                 _ => panic!(
-                    r#"there was an error linking "{}" function, missing compilation context?"#,
+                    r#"there was an error linking "{}" runtime function, missing compilation context?"#,
                     self.name()
                 ),
             }
+        }
+    }
+
+    /// Links the function into the module and returns its id. The function generated depends on
+    /// the types passed in the `generics` parameter.
+    ///
+    /// The idempotency of this function depends on the generator functions. This is designed this
+    /// way to avoid errors when calculating the function name based on the types.
+    pub fn get_generic(
+        &self,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        generics: &[&IntermediateType],
+    ) -> FunctionId {
+        match self {
+            Self::EncodeAndSaveInStorage => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {} expected 1 type parameter, found {}",
+                    self.name(),
+                    generics.len(),
+                );
+
+                storage::add_save_struct_into_storage_fn(module, compilation_ctx, generics[0])
+            }
+            Self::DecodeAndReadFromStorage => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {} expected 1 type parameter, found {}",
+                    self.name(),
+                    generics.len(),
+                );
+
+                storage::add_read_struct_from_storage_fn(module, compilation_ctx, generics[0])
+            }
+            Self::DeleteFromStorage => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {} expected 1 type parameter, found {}",
+                    self.name(),
+                    generics.len(),
+                );
+
+                storage::add_delete_struct_from_storage_fn(module, compilation_ctx, generics[0])
+            }
+            _ => panic!(
+                r#"there was an error linking "{}" runtime function, is this function generic?"#,
+                self.name()
+            ),
         }
     }
 }

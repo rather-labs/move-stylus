@@ -1,24 +1,30 @@
 use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
 
 use crate::{
-    CompilationContext, hostio::host_functions::emit_log,
-    translation::intermediate_types::structs::IStruct,
+    CompilationContext, get_generic_function_name, hostio::host_functions::emit_log,
+    translation::intermediate_types::IntermediateType,
 };
 
 use super::NativeFunction;
 
 pub fn add_emit_log_fn(
-    hash: String,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-    struct_: &IStruct,
+    itype: &IntermediateType,
 ) -> FunctionId {
-    let (emit_log_fn, _) = emit_log(module);
+    let name = get_generic_function_name(NativeFunction::NATIVE_EMIT, &[itype]);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    };
+
+    let struct_ = compilation_ctx
+        .get_struct_by_intermediate_type(itype)
+        .unwrap();
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
-    let mut builder = function
-        .name(format!("{}_{hash}", NativeFunction::NATIVE_EMIT))
-        .func_body();
+    let mut builder = function.name(name).func_body();
+
+    let (emit_log_fn, _) = emit_log(module);
 
     // Function arguments
     let struct_ptr = module.locals.add(ValType::I32);
