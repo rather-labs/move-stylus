@@ -78,9 +78,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
         }
 
         builder
-            .i32_const(32)
-            .i32_const(field_size as i32)
-            .binop(BinaryOp::I32Sub)
+            .i32_const(32 - written_bytes_in_slot as i32)
             .local_set(offset);
 
         // Load field's intermediate pointer

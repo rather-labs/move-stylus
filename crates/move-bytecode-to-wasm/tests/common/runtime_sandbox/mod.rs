@@ -397,8 +397,6 @@ impl RuntimeSandbox {
     }
 
     pub fn get_storage_at_slot(&self, slot: [u8; 32]) -> [u8; 32] {
-        let storage = self.storage.lock().unwrap();
-        println!("{:?}", &storage.keys());
-        *storage.get(&slot).unwrap()
+        *self.storage.lock().unwrap().get(&slot).unwrap()
     }
 }

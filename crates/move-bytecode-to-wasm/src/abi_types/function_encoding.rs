@@ -36,7 +36,6 @@ pub fn move_signature_to_abi_selector<T: SolName>(
 
     let function_name = snake_to_camel(function_name);
 
-    println!("{}({})", function_name, parameter_strings);
     selector(format!("{}({})", function_name, parameter_strings))
 }
 
