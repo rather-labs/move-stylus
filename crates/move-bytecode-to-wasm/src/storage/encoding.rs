@@ -584,6 +584,32 @@ pub fn add_read_and_decode_storage_struct_instructions(
 
                 builder.local_get(child_struct_ptr).local_set(field_ptr);
             }
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+            } => {
+                let child_struct = compilation_ctx
+                    .get_user_data_type_by_index(module_id, *index)
+                    .unwrap();
+                let child_struct = child_struct.instantiate(types);
+
+                // Read the child struct
+                let (child_struct_ptr, read_bytes) =
+                    add_read_and_decode_storage_struct_instructions(
+                        module,
+                        builder,
+                        compilation_ctx,
+                        slot_ptr,
+                        &child_struct,
+                        true,
+                        read_bytes_in_slot,
+                    );
+
+                read_bytes_in_slot = read_bytes;
+
+                builder.local_get(child_struct_ptr).local_set(field_ptr);
+            }
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
@@ -648,6 +674,37 @@ pub fn add_read_and_decode_storage_struct_instructions(
                         offset: 0,
                     },
                 );
+            }
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } => {
+                let external_data = compilation_ctx
+                    .get_external_module_data(module_id, identifier)
+                    .unwrap();
+
+                match external_data {
+                    ExternalModuleData::Struct(child_struct) => {
+                        // Read the child struct
+                        let (child_struct_ptr, read_bytes) =
+                            add_read_and_decode_storage_struct_instructions(
+                                module,
+                                builder,
+                                compilation_ctx,
+                                slot_ptr,
+                                child_struct,
+                                true,
+                                read_bytes_in_slot,
+                            );
+
+                        read_bytes_in_slot = read_bytes;
+
+                        builder.local_get(child_struct_ptr).local_set(field_ptr);
+                    }
+                    ExternalModuleData::Enum(_) => {
+                        todo!();
+                    }
+                }
             }
             _ => todo!(),
         };
