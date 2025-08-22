@@ -9,6 +9,10 @@ public fun deref_u64_ref(y: &u64): u64 {
   *y
 }
 
+public fun identity_u64_ref(x: &u64): &u64 {
+    x
+}
+
 public fun call_deref_u64_ref(x: u64): u64 {
     deref_u64_ref(&x)
 }

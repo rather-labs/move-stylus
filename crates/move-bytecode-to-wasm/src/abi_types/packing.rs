@@ -434,7 +434,7 @@ impl Packable for IntermediateType {
     ) {
         match self {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
-                // If the inner type is dynamic, then we need to load the intermediate pointer
+                // Dynamic types can only be heap types, so we load the intermediate pointer
                 // And then pack the inner type dynamically
                 builder
                     .local_get(local)
@@ -472,7 +472,6 @@ impl Packable for IntermediateType {
                     Some(calldata_reference_pointer),
                 );
             }
-
             IntermediateType::IGenericStructInstance {
                 module_id,
                 index,
@@ -689,6 +688,8 @@ mod tests {
             assert_eq!(buffer, data);
         }
     }
+
+    // TODO: add a reference type on the tests 
 
     #[test]
     fn test_build_pack_instructions() {

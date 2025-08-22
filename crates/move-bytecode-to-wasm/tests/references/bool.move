@@ -9,6 +9,10 @@ public fun deref_bool_ref(y: &bool): bool {
   *y
 }
 
+public fun identity_bool_ref(x: &bool): &bool {
+    x
+}
+
 public fun call_deref_bool_ref(x: bool): bool {
   deref_bool_ref(&x)
 }

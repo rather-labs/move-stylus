@@ -9,6 +9,10 @@ public fun deref_u32_ref(y: &u32): u32 {
   *y
 }
 
+public fun identity_u32_ref(x: &u32): &u32 {
+    x
+}
+
 public fun call_deref_u32_ref(x: u32): u32 {
   deref_u32_ref(&x)
 }

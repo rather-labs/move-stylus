@@ -9,6 +9,10 @@ public fun deref_address_ref(y: &address): address {
   *y
 }
 
+public fun identity_address_ref(x: &address): &address {
+    x
+}
+
 public fun call_deref_address_ref(x: address): address {
     deref_address_ref(&x)
 }

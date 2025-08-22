@@ -9,6 +9,10 @@ public fun deref_u256_ref(y: &u256): u256 {
   *y
 }
 
+public fun identity_u256_ref(x: &u256): &u256 {
+    x
+}
+
 public fun call_deref_u256_ref(x: u256): u256 {
     deref_u256_ref(&x)
 }
