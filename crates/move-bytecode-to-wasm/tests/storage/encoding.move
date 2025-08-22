@@ -35,18 +35,18 @@ public struct StaticFields2 has key {
     a: u8,
     b: address,
     c: u64,
-    e: u16,
-    f: u8,
+    d: u16,
+    e: u8,
 }
 
-public fun save_static_fields2(
+public fun save_static_fields_2(
     id: UID,
     a: u8,
     b: address,
     c: u64,
-    e: u16,
-    f: u8
+    d: u16,
+    e: u8
 ) {
-    let struct_ = StaticFields2 { id, a, b, c, e, f };
+    let struct_ = StaticFields2 { id, a, b, c, d, e };
     save_in_slot(struct_, 0);
 }

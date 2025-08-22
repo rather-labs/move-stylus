@@ -646,6 +646,8 @@ mod storage_encoding {
     const OBJECT_ID: [u8; 32] = [0u8; 32];
 
     sol!(
+        #[allow(missing_docs)]
+
         #[derive(Debug)]
         struct ID {
            address bytes;
@@ -656,7 +658,6 @@ mod storage_encoding {
            ID id;
         }
 
-        #[allow(missing_docs)]
         struct StaticFields {
             UID id;
             uint256 a;
@@ -668,6 +669,15 @@ mod storage_encoding {
             address g;
         }
 
+        struct StaticFields2 {
+            UID id;
+            uint8 a;
+            address b;
+            uint64 c;
+            uint16 d;
+            uint8 e;
+        }
+
         function saveStaticFields(
             UID id,
             uint256 a,
@@ -677,6 +687,15 @@ mod storage_encoding {
             uint16 e,
             uint8 f,
             address g
+        ) public view;
+
+        function saveStaticFields2(
+            UID id,
+            uint8 a,
+            address b,
+            uint64 c,
+            uint16 d,
+            uint8 e
         ) public view;
     );
 
@@ -713,6 +732,18 @@ mod storage_encoding {
         U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
 
     ])]
+    #[case(saveStaticFields2Call::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        1,
+        address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+        2,
+        3,
+        4,
+    )), vec![
+        [0x00; 32],
+        U256::from_str_radix("0400030000000000000002cafecafecafecafecafecafecafecafecafecafe01", 16).unwrap().to_be_bytes(),
+    ])]
+
     fn test_static_fields<T: SolCall>(
         runtime: RuntimeSandbox,
         #[case] call_data: T,
