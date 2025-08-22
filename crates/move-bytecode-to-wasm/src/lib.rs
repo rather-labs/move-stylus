@@ -18,7 +18,7 @@ use translation::{
     translate_function,
 };
 
-use walrus::{Module, RefType, ValType};
+use walrus::{Module, RefType};
 use wasm_validation::validate_stylus_wasm;
 
 pub(crate) mod abi_types;
@@ -37,6 +37,9 @@ mod vm_handled_types;
 mod wasm_builder_extensions;
 mod wasm_helpers;
 mod wasm_validation;
+
+#[cfg(feature = "inject-host-debug-fns")]
+use walrus::ValType;
 
 #[cfg(test)]
 mod test_tools;
@@ -90,6 +93,8 @@ pub fn translate_package(
         };
 
         let (mut module, allocator_func, memory_id) = hostio::new_module_with_host();
+
+        #[cfg(feature = "inject-host-debug-fns")]
         inject_debug_fns(&mut module);
 
         // Function table
@@ -355,6 +360,7 @@ pub fn get_generic_function_name(base_name: &str, generics: &[&IntermediateType]
     format!("{base_name}_{hash}")
 }
 
+#[cfg(feature = "inject-host-debug-fns")]
 fn inject_debug_fns(module: &mut walrus::Module) {
     if cfg!(feature = "inject-host-debug-fns") {
         let func_ty = module.types.add(&[ValType::I32], &[]);
