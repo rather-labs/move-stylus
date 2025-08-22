@@ -1116,13 +1116,8 @@ fn translate_instruction(
                             // Compute the slot where the struct will be saved
                             builder.call(locate_struct_fn);
 
-                            // TODO: use runtime fn
-                            let save_in_slot_fn = NativeFunction::get_generic(
-                                "save_in_slot",
-                                module,
-                                compilation_ctx,
-                                &[itype.clone()],
-                            );
+                            let save_in_slot_fn = RuntimeFunction::EncodeAndSaveInStorage
+                                .get_generic(module, compilation_ctx, &[itype]);
 
                             // Load the struct memory representation to pass it to the save
                             // function
