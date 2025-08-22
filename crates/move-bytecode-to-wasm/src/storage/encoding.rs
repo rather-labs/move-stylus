@@ -215,8 +215,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                     module,
                     builder,
                     compilation_ctx,
-                    slot_ptr,
                     tmp,
+                    slot_ptr,
                     child_struct,
                     written_bytes_in_slot,
                 );
@@ -239,8 +239,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                     module,
                     builder,
                     compilation_ctx,
-                    slot_ptr,
                     tmp,
+                    slot_ptr,
                     &child_struct,
                     written_bytes_in_slot,
                 );
@@ -308,8 +308,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                                 module,
                                 builder,
                                 compilation_ctx,
-                                slot_ptr,
                                 tmp,
+                                slot_ptr,
                                 struct_,
                                 written_bytes_in_slot,
                             );
