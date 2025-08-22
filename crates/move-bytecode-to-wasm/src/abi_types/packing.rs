@@ -689,7 +689,7 @@ mod tests {
         }
     }
 
-    // TODO: add a reference type on the tests 
+    // TODO: add a reference type on the tests
 
     #[test]
     fn test_build_pack_instructions() {
