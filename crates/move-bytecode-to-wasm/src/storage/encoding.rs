@@ -343,6 +343,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 /// `builder` - insturctions sequence builder
 /// `slot_ptr` - storage's slot where the data will be saved
 /// `struct_` - structural information of the struct to be encoded and saved
+/// `reading_nested_struct` - if true, this function is called to read a nested struct inside
+/// another struct.
 ///
 /// # Returns
 /// pointer where the read struct is allocated
@@ -352,6 +354,8 @@ pub fn add_read_and_decode_storage_struct_instructions(
     compilation_ctx: &CompilationContext,
     slot_ptr: LocalId,
     struct_: &IStruct,
+    reading_nested_struct: bool,
+    read_bytes_in_slot: u32,
 ) -> LocalId {
     let (storage_load, _) = storage_load_bytes32(module);
 
@@ -367,12 +371,14 @@ pub fn add_read_and_decode_storage_struct_instructions(
     // know its owner when manipulating the reconstructed structure (for example for the saving the
     // changes in storage or transfering it) before its representation in memory, we save the owner
     // id
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-        .i32_const(32)
-        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+    if !reading_nested_struct {
+        builder
+            .i32_const(32)
+            .call(compilation_ctx.allocator)
+            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+            .i32_const(32)
+            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+    }
 
     // Allocate space for the struct
     builder
@@ -381,12 +387,14 @@ pub fn add_read_and_decode_storage_struct_instructions(
         .local_set(struct_ptr);
 
     // Load data from slot
-    builder
-        .local_get(slot_ptr)
-        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-        .call(storage_load);
+    if !reading_nested_struct {
+        builder
+            .local_get(slot_ptr)
+            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .call(storage_load);
+    }
 
-    let mut read_bytes_in_slot = 0;
+    let mut read_bytes_in_slot = read_bytes_in_slot;
     for (index, field) in struct_.fields.iter().enumerate() {
         let field_size = field_size(field, compilation_ctx);
         if read_bytes_in_slot + field_size > 32 {
@@ -567,20 +575,11 @@ pub fn add_read_and_decode_storage_struct_instructions(
                     compilation_ctx,
                     slot_ptr,
                     child_struct,
+                    true,
+                    read_bytes_in_slot,
                 );
 
-                // Save the pointer to the child struct in the field_ptr
-                builder
-                    .local_get(field_ptr)
-                    .local_get(child_struct_ptr)
-                    .store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
+                builder.local_get(child_struct_ptr).local_set(field_ptr);
             }
             IntermediateType::IExternalUserData {
                 module_id,

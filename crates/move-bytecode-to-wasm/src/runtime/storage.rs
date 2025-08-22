@@ -675,6 +675,8 @@ pub fn add_read_struct_from_storage_fn(
         compilation_ctx,
         slot_ptr,
         &struct_,
+        false,
+        0,
     );
 
     builder.local_get(struct_ptr);

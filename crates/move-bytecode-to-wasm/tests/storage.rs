@@ -874,6 +874,26 @@ mod storage_encoding {
     )]
     #[case(saveStaticNestedStructCall::new((
         UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        1,
+        2,
+        address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+    )), vec![
+        [0x00; 32],
+        U256::from_str_radix("00000000000000020000000000000001", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
+    ],
+        readStaticNestedStructCall::new(()),
+        StaticNestedStruct {
+           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           a: 1,
+           b: StaticNestedStructChild {
+                c: 2,
+                d: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+           }
+        }
+    )]
+    #[case(saveStaticNestedStructCall::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         0xcccccccccccccccc,
         0xffffffffffffffff,
         address!("0xcafecafecafecafecafecafecafecafecafecafe"),
@@ -885,9 +905,9 @@ mod storage_encoding {
         readStaticNestedStructCall::new(()),
         StaticNestedStruct {
            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
-           a: 1,
+           a: 0xcccccccccccccccc,
            b: StaticNestedStructChild {
-                c: 2,
+                c: 0xffffffffffffffff,
                 d: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
            }
         }
