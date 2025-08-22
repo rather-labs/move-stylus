@@ -43,11 +43,6 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     // Locals
     let val_32 = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
-    let offset = module.locals.add(ValType::I32);
-
-    builder.i32_const(0).local_set(offset);
-
-    let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
 
     let mut written_bytes_in_slot = 0;
     for (index, field) in struct_.fields.iter().enumerate() {
@@ -76,10 +71,6 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
         } else {
             written_bytes_in_slot += field_size;
         }
-
-        builder
-            .i32_const(32 - written_bytes_in_slot as i32)
-            .local_set(offset);
 
         // Load field's intermediate pointer
         builder.local_get(struct_ptr).load(
@@ -168,19 +159,21 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                 // Slot data plus offset as dest ptr
                 builder
                     .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                    .local_get(offset)
+                    .i32_const(32 - written_bytes_in_slot as i32)
                     .binop(BinaryOp::I32Add);
 
                 // Transform to BE
                 builder.call(swap_fn);
             }
             IntermediateType::IU256 => {
+                let swap_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
+
                 // Slot data plus offset as dest ptr (offset should be zero because data is already
                 // 32 bytes in size)
                 builder.i32_const(DATA_SLOT_DATA_PTR_OFFSET);
 
                 // Transform to BE
-                builder.call(swap_256_fn);
+                builder.call(swap_fn);
             }
             IntermediateType::IAddress | IntermediateType::ISigner => {
                 // We need to swap values before copying because memory copy takes dest pointer
@@ -192,7 +185,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                 // Slot data plus offset as dest ptr
                 builder
                     .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                    .local_get(offset)
+                    .i32_const(32 - written_bytes_in_slot as i32)
                     .binop(BinaryOp::I32Add);
 
                 // Grab the last 20 bytes of the address

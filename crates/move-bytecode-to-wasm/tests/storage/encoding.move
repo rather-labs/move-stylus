@@ -50,3 +50,22 @@ public fun save_static_fields_2(
     let struct_ = StaticFields2 { id, a, b, c, d, e };
     save_in_slot(struct_, 0);
 }
+
+public struct StaticFields3 has key {
+    id: UID,
+    a: u8,
+    b: address,
+    c: u64,
+    d: address,
+}
+
+public fun save_static_fields_3(
+    id: UID,
+    a: u8,
+    b: address,
+    c: u64,
+    d: address
+) {
+    let struct_ = StaticFields3 { id, a, b, c, d };
+    save_in_slot(struct_, 0);
+}

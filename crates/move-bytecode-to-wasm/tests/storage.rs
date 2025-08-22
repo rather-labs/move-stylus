@@ -1,6 +1,5 @@
 mod common;
 
-use alloy_primitives::{FixedBytes, keccak256};
 use common::runtime_sandbox::constants::SIGNER_ADDRESS;
 use common::{runtime_sandbox::RuntimeSandbox, translate_test_package_with_framework};
 use rstest::{fixture, rstest};
@@ -643,8 +642,6 @@ mod storage_encoding {
         RuntimeSandbox::new(&mut translated_package)
     }
 
-    const OBJECT_ID: [u8; 32] = [0u8; 32];
-
     sol!(
         #[allow(missing_docs)]
 
@@ -678,6 +675,14 @@ mod storage_encoding {
             uint8 e;
         }
 
+        struct StaticFields3 {
+            UID id;
+            uint8 a;
+            address b;
+            uint64 c;
+            address d;
+        }
+
         function saveStaticFields(
             UID id,
             uint256 a,
@@ -696,6 +701,14 @@ mod storage_encoding {
             uint64 c,
             uint16 d,
             uint8 e
+        ) public view;
+
+        function saveStaticFields3(
+            UID id,
+            uint8 a,
+            address b,
+            uint64 c,
+            address d
         ) public view;
     );
 
@@ -734,6 +747,17 @@ mod storage_encoding {
     ])]
     #[case(saveStaticFields2Call::new((
         UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        0xff,
+        address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+        0xcccccccccccccccc,
+        0xeeee,
+        0xff,
+    )), vec![
+        [0x00; 32],
+        U256::from_str_radix("ffeeeecccccccccccccccccafecafecafecafecafecafecafecafecafecafeff", 16).unwrap().to_be_bytes(),
+    ])]
+    #[case(saveStaticFields2Call::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         1,
         address!("0xcafecafecafecafecafecafecafecafecafecafe"),
         2,
@@ -742,6 +766,28 @@ mod storage_encoding {
     )), vec![
         [0x00; 32],
         U256::from_str_radix("0400030000000000000002cafecafecafecafecafecafecafecafecafecafe01", 16).unwrap().to_be_bytes(),
+    ])]
+    #[case(saveStaticFields3Call::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        1,
+        address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+        2,
+        address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
+    )), vec![
+        [0x00; 32],
+        U256::from_str_radix("0000000000000000000002cafecafecafecafecafecafecafecafecafecafe01", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeef", 16).unwrap().to_be_bytes(),
+    ])]
+    #[case(saveStaticFields3Call::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        0xff,
+        address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+        0xcccccccccccccccc,
+        address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
+    )), vec![
+        [0x00; 32],
+        U256::from_str_radix("000000cccccccccccccccccafecafecafecafecafecafecafecafecafecafeff", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeef", 16).unwrap().to_be_bytes(),
     ])]
 
     fn test_static_fields<T: SolCall>(
