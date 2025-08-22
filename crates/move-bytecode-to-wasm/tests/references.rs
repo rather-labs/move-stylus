@@ -507,6 +507,7 @@ mod reference_vec_8 {
         function miscellaneous4() external returns (uint8[]);
         function miscellaneous5() external returns (uint8[]);
         function freezeRef(uint8[] x) external returns (uint8[]);
+        function identityVecRef(uint8[] x) external returns (uint8[]);
     );
 
     #[fixture]
@@ -534,6 +535,7 @@ mod reference_vec_8 {
     #[case(miscellaneous3Call::new((vec![1, 2, 3],)), vec![99, 1, 3])]
     #[case(miscellaneous4Call::new(()), vec![1, 12, 111, 12, 11, 112])]
     #[case(miscellaneous5Call::new(()), vec![1, 12, 112, 11, 112, 113, 112])]
+    #[case(identityVecRefCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
     fn test_vec_8_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -574,6 +576,7 @@ mod reference_vec_64 {
         function miscellaneous3(uint64[] x) external returns (uint64[]);
         function miscellaneous4() external returns (uint64[]);
         function freezeRef(uint64[] x) external returns (uint64[]);
+        function identityVecRef(uint64[] x) external returns (uint64[]);
     );
 
     #[fixture]
@@ -600,6 +603,7 @@ mod reference_vec_64 {
     #[case(miscellaneous2Call::new(()), vec![1, 4, 7])]
     #[case(miscellaneous3Call::new((vec![1, 2, 3],)), vec![99, 1, 3])]
     #[case(miscellaneous4Call::new(()), vec![1, 12, 111, 12, 11, 112])]
+    #[case(identityVecRefCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
     fn test_vec_64_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -628,6 +632,7 @@ mod reference_vec_256 {
         function miscellaneous3(uint256[] x) external returns (uint256[]);
         function miscellaneous4() external returns (uint256[]);
         function freezeRef(uint256[] x) external returns (uint256[]);
+        function identityVecRef(uint256[] x) external returns (uint256[]);
     );
 
     #[fixture]
@@ -654,6 +659,7 @@ mod reference_vec_256 {
     #[case(miscellaneous2Call::new(()), vec![U256::from(1), U256::from(4), U256::from(7)])]
     #[case(miscellaneous3Call::new((vec![U256::from(1), U256::from(2), U256::from(3)],)), vec![U256::from(99), U256::from(1), U256::from(3)])]
     #[case(miscellaneous4Call::new(()), vec![U256::from(1), U256::from(12), U256::from(111), U256::from(12), U256::from(11), U256::from(112)])]
+    #[case(identityVecRefCall::new((vec![U256::from(1), U256::from(2), U256::from(3)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
     fn test_vec_256_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

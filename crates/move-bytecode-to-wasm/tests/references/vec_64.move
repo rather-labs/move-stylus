@@ -9,6 +9,10 @@ public fun deref_arg(y: &vector<u64>): vector<u64> {
   *y
 }
 
+public fun identity_vec_ref(x: &vector<u64>): &vector<u64> {
+    x
+}
+
 public fun call_deref_arg(x: vector<u64>): vector<u64> {
   deref_arg(&x)
 }

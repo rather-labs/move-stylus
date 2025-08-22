@@ -434,24 +434,19 @@ impl Packable for IntermediateType {
     ) {
         match self {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
-                // TODO: find a way to make this less verbose
-                match &**inner {
-                    IntermediateType::IStruct { .. }
-                    | IntermediateType::IGenericStructInstance { .. } => {
-                        builder
-                            .local_get(local)
-                            .load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            )
-                            .local_set(local);
-                    }
-                    _ => {}
-                }
+                // If the inner type is dynamic, then we need to load the intermediate pointer
+                // And then pack the inner type dynamically
+                builder
+                    .local_get(local)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(local);
 
                 inner.add_pack_instructions_dynamic(
                     builder,
