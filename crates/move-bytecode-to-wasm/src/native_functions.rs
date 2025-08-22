@@ -4,15 +4,15 @@
 //! mechanism, we direcly implement them in WASM and limk them into the file.
 mod event;
 mod object;
-mod storage;
 mod transaction;
 mod transfer;
 
-use std::hash::{DefaultHasher, Hash, Hasher};
-
 use walrus::{FunctionId, Module};
 
-use crate::{CompilationContext, hostio, translation::intermediate_types::IntermediateType};
+use crate::{
+    CompilationContext, hostio, runtime::RuntimeFunction,
+    translation::intermediate_types::IntermediateType,
+};
 
 pub struct NativeFunction;
 
@@ -26,18 +26,23 @@ impl NativeFunction {
     const NATIVE_CHAIN_ID: &str = "native_chain_id";
     const NATIVE_GAS_PRICE: &str = "native_gas_price";
     const NATIVE_FRESH_ID: &str = "fresh_id";
-    pub const NATIVE_STORAGE_SAVE: &str = "save_in_slot";
 
     // Transfer functions
     pub const NATIVE_TRANSFER_OBJECT: &str = "transfer";
     pub const NATIVE_SHARE_OBJECT: &str = "share_object";
     pub const NATIVE_FREEZE_OBJECT: &str = "freeze_object";
 
-    // Object functions
-    pub const NATIVE_DELETE_OBJECT: &str = "delete";
+    // Storage
+    #[cfg(debug_assertions)]
+    pub const SAVE_IN_SLOT: &str = "save_in_slot";
+    #[cfg(debug_assertions)]
+    pub const READ_SLOT: &str = "read_slot";
 
     // Event functions
     const NATIVE_EMIT: &str = "emit";
+
+    // Object functions
+    pub const NATIVE_DELETE_OBJECT: &str = "delete";
 
     // Host functions
     const HOST_BLOCK_NUMBER: &str = "block_number";
@@ -100,108 +105,113 @@ impl NativeFunction {
         }
     }
 
+    /// Links the function into the module and returns its id. The function generated depends on
+    /// the types passed in the `generics` parameter.
+    ///
+    /// The idempotency of this function depends on the generator functions. This is designed this
+    /// way to avoid errors when calculating the function name based on the types.
     pub fn get_generic(
         name: &str,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
         generics: &[IntermediateType],
     ) -> FunctionId {
-        // Thid hash will uniquely identify this native fn
-        let mut hasher = DefaultHasher::new();
-        generics.iter().for_each(|t| t.hash(&mut hasher));
-        let hash = format!("{:x}", hasher.finish());
-        let function_name = format!("{name}_{hash}");
+        match name {
+            Self::NATIVE_SHARE_OBJECT => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {name} expected 1 type parameter, found {}",
+                    generics.len(),
+                );
 
-        if let Some(function) = module.funcs.by_name(&function_name) {
-            function
-        } else {
-            match name {
-                Self::NATIVE_STORAGE_SAVE => {
-                    assert_eq!(
-                        1,
-                        generics.len(),
-                        "there was an error linking {function_name} expected 1 type parameter, found {}",
-                        generics.len(),
-                    );
-
-                    let struct_ = compilation_ctx
-                        .get_struct_by_intermediate_type(generics.first().unwrap())
-                        .unwrap();
-
-                    storage::add_storage_save_fn(hash, module, compilation_ctx, &struct_)
-                }
-                Self::NATIVE_SHARE_OBJECT => {
-                    assert_eq!(
-                        1,
-                        generics.len(),
-                        "there was an error linking {function_name} expected 1 type parameter, found {}",
-                        generics.len(),
-                    );
-
-                    let struct_ = compilation_ctx
-                        .get_struct_by_intermediate_type(generics.first().unwrap())
-                        .unwrap();
-
-                    transfer::add_share_object_fn(hash, module, compilation_ctx, &struct_)
-                }
-                Self::NATIVE_TRANSFER_OBJECT => {
-                    assert_eq!(
-                        1,
-                        generics.len(),
-                        "there was an error linking {function_name} expected 1 type parameter, found {}",
-                        generics.len(),
-                    );
-
-                    let struct_ = compilation_ctx
-                        .get_struct_by_intermediate_type(generics.first().unwrap())
-                        .unwrap();
-
-                    transfer::add_transfer_object_fn(hash, module, compilation_ctx, &struct_)
-                }
-                Self::NATIVE_FREEZE_OBJECT => {
-                    assert_eq!(
-                        1,
-                        generics.len(),
-                        "there was an error linking {function_name} expected 1 type parameter, found {}",
-                        generics.len(),
-                    );
-
-                    let struct_ = compilation_ctx
-                        .get_struct_by_intermediate_type(generics.first().unwrap())
-                        .unwrap();
-
-                    transfer::add_freeze_object_fn(hash, module, compilation_ctx, &struct_)
-                }
-                Self::NATIVE_DELETE_OBJECT => {
-                    assert_eq!(
-                        1,
-                        generics.len(),
-                        "there was an error linking {function_name} expected 1 type parameter, found {}",
-                        generics.len(),
-                    );
-
-                    let struct_ = compilation_ctx
-                        .get_struct_by_intermediate_type(generics.first().unwrap())
-                        .unwrap();
-
-                    object::add_delete_object_fn(hash, module, compilation_ctx, &struct_)
-                }
-                Self::NATIVE_EMIT => {
-                    assert_eq!(
-                        1,
-                        generics.len(),
-                        "there was an error linking {function_name} expected 1 type parameter, found {}",
-                        generics.len(),
-                    );
-
-                    let struct_ = compilation_ctx
-                        .get_struct_by_intermediate_type(generics.first().unwrap())
-                        .unwrap();
-
-                    event::add_emit_log_fn(hash, module, compilation_ctx, &struct_)
-                }
-                _ => panic!("generic native function {name} not supported yet"),
+                transfer::add_share_object_fn(module, compilation_ctx, &generics[0])
             }
+            Self::NATIVE_TRANSFER_OBJECT => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {name} expected 1 type parameter, found {}",
+                    generics.len(),
+                );
+
+                transfer::add_transfer_object_fn(module, compilation_ctx, &generics[0])
+            }
+            Self::NATIVE_FREEZE_OBJECT => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {name} expected 1 type parameter, found {}",
+                    generics.len(),
+                );
+
+                transfer::add_freeze_object_fn(module, compilation_ctx, &generics[0])
+            }
+            Self::NATIVE_DELETE_OBJECT => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {name} expected 1 type parameter, found {}",
+                    generics.len(),
+                );
+
+                // In this case the native function implementation is the same as the runtime one.
+                // So we reuse the runtime function.
+                RuntimeFunction::DeleteFromStorage.get_generic(
+                    module,
+                    compilation_ctx,
+                    &[&generics[0]],
+                )
+            }
+            Self::NATIVE_EMIT => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {name} expected 1 type parameter, found {}",
+                    generics.len(),
+                );
+
+                event::add_emit_log_fn(module, compilation_ctx, &generics[0])
+            }
+            // This native function is only available in debug mode to help with testing. It should
+            // not be compiled in release mode.
+            #[cfg(debug_assertions)]
+            Self::SAVE_IN_SLOT => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {name} expected 1 type parameter, found {}",
+                    generics.len(),
+                );
+
+                // In this case the native function implementation is the same as the runtime one.
+                // So we reuse the runtime function.
+                RuntimeFunction::EncodeAndSaveInStorage.get_generic(
+                    module,
+                    compilation_ctx,
+                    &[&generics[0]],
+                )
+            }
+            // This native function is only available in debug mode to help with testing. It should
+            // not be compiled in release mode.
+            #[cfg(debug_assertions)]
+            Self::READ_SLOT => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {name} expected 1 type parameter, found {}",
+                    generics.len(),
+                );
+
+                // In this case the native function implementation is the same as the runtime one.
+                // So we reuse the runtime function.
+                RuntimeFunction::DecodeAndReadFromStorage.get_generic(
+                    module,
+                    compilation_ctx,
+                    &[&generics[0]],
+                )
+            }
+            _ => panic!("generic native function {name} not supported yet"),
         }
     }
 

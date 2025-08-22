@@ -23,10 +23,6 @@ path = "scripts/counter.rs"
 name = "dog_walker"
 path = "scripts/dog_walker.rs"
 
-[[bin]]
-name = "modified_counter"
-path = "scripts/modified_counter.rs"
-
 [dependencies]
 dotenv = "0.15.0"
 eyre = "0.6.8"

@@ -34,9 +34,31 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 
 pub fn reroot_path(path: &Path) -> PathBuf {
     // Copy files to temp to avoid file locks
+    // Use a more unique identifier to prevent conflicts between concurrent tests
+    use std::thread;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+
+    // Use a random number instead of thread ID for uniqueness
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let mut hasher = DefaultHasher::new();
+    thread::current().id().hash(&mut hasher);
+    let thread_hash = hasher.finish();
+
     let temp_install_directory = std::env::temp_dir()
         .join("move-bytecode-to-wasm")
-        .join(path);
+        .join(format!(
+            "{}_{}_{}",
+            path.file_name().unwrap().to_string_lossy(),
+            timestamp,
+            thread_hash
+        ));
 
     // copy source file to dir
     let _ = fs::create_dir_all(temp_install_directory.join("sources"));
