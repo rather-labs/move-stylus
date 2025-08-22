@@ -623,6 +623,7 @@ mod storage_transfer {
 
 mod storage_encoding {
     use alloy_primitives::{U256, address};
+    use alloy_sol_types::SolValue;
     use alloy_sol_types::{SolCall, sol};
 
     use super::*;
@@ -693,6 +694,7 @@ mod storage_encoding {
             uint8 f,
             address g
         ) public view;
+        function readStaticFields() public view returns (StaticFields);
 
         function saveStaticFields2(
             UID id,
@@ -702,6 +704,7 @@ mod storage_encoding {
             uint16 d,
             uint8 e
         ) public view;
+        function readStaticFields2() public view returns (StaticFields2);
 
         function saveStaticFields3(
             UID id,
@@ -710,6 +713,7 @@ mod storage_encoding {
             uint64 c,
             address d
         ) public view;
+        function readStaticFields3() public view returns (StaticFields3);
     );
 
     #[rstest]
@@ -727,8 +731,19 @@ mod storage_encoding {
         [0xaa; 32],
         U256::from_str_radix("ffeeeeddddddddccccccccccccccccbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
-
-    ])]
+    ],
+        readStaticFieldsCall::new(()),
+        StaticFields {
+            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+            a: U256::from_str_radix("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 16).unwrap(),
+            b: 0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+            c: 0xcccccccccccccccc,
+            d: 0xdddddddd,
+            e: 0xeeee,
+            f: 0xff,
+            g: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+        }
+    )]
     #[case(saveStaticFieldsCall::new((
         UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         U256::from(1),
@@ -743,8 +758,19 @@ mod storage_encoding {
         U256::from(1).to_be_bytes(),
         U256::from_str_radix("06000500000004000000000000000300000000000000000000000000000002", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
-
-    ])]
+    ],
+        readStaticFieldsCall::new(()),
+        StaticFields {
+            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+            a: U256::from(1),
+            b: 2,
+            c: 3,
+            d: 4,
+            e: 5,
+            f: 6,
+            g: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+        }
+    )]
     #[case(saveStaticFields2Call::new((
         UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         0xff,
@@ -755,7 +781,17 @@ mod storage_encoding {
     )), vec![
         [0x00; 32],
         U256::from_str_radix("ffeeeecccccccccccccccccafecafecafecafecafecafecafecafecafecafeff", 16).unwrap().to_be_bytes(),
-    ])]
+    ],
+        readStaticFields2Call::new(()),
+        StaticFields2 {
+            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+            a: 0xff,
+            b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+            c: 0xcccccccccccccccc,
+            d: 0xeeee,
+            e: 0xff,
+        }
+    )]
     #[case(saveStaticFields2Call::new((
         UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         1,
@@ -766,7 +802,17 @@ mod storage_encoding {
     )), vec![
         [0x00; 32],
         U256::from_str_radix("0400030000000000000002cafecafecafecafecafecafecafecafecafecafe01", 16).unwrap().to_be_bytes(),
-    ])]
+    ],
+        readStaticFields2Call::new(()),
+        StaticFields2 {
+            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+            a: 1,
+            b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+            c: 2,
+            d: 3,
+            e: 4,
+        }
+    )]
     #[case(saveStaticFields3Call::new((
         UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         1,
@@ -777,7 +823,16 @@ mod storage_encoding {
         [0x00; 32],
         U256::from_str_radix("0000000000000000000002cafecafecafecafecafecafecafecafecafecafe01", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeef", 16).unwrap().to_be_bytes(),
-    ])]
+    ],
+        readStaticFields3Call::new(()),
+        StaticFields3 {
+           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           a: 1,
+           b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+           c: 2,
+           d: address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
+        }
+    )]
     #[case(saveStaticFields3Call::new((
         UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         0xff,
@@ -788,19 +843,39 @@ mod storage_encoding {
         [0x00; 32],
         U256::from_str_radix("000000cccccccccccccccccafecafecafecafecafecafecafecafecafecafeff", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeef", 16).unwrap().to_be_bytes(),
-    ])]
-
-    fn test_static_fields<T: SolCall>(
+    ],
+        readStaticFields3Call::new(()),
+        StaticFields3 {
+            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+            a: 0xff,
+            b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+            c: 0xcccccccccccccccc,
+            d: address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
+        }
+    )]
+    fn test_static_fields<T: SolCall, U: SolCall, V: SolValue>(
         runtime: RuntimeSandbox,
-        #[case] call_data: T,
-        #[case] expected: Vec<[u8; 32]>,
+        #[case] call_data_encode: T,
+        #[case] expected_encode: Vec<[u8; 32]>,
+        #[case] call_data_decode: U,
+        #[case] expected_decode: V,
     ) {
-        let (result, _) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
+        let (result, _) = runtime
+            .call_entrypoint(call_data_encode.abi_encode())
+            .unwrap();
         assert_eq!(0, result);
 
-        for i in 0..expected.len() {
+        // Check if it is encoded correctly in storage
+        for i in 0..expected_encode.len() {
             let storage = runtime.get_storage_at_slot(U256::from(i).to_be_bytes());
-            assert_eq!(expected[i], storage, "Mismatch at slot {}", i);
+            assert_eq!(expected_encode[i], storage, "Mismatch at slot {}", i);
         }
+
+        // Use the read function to check if it decodes correctly
+        let (result, result_data) = runtime
+            .call_entrypoint(call_data_decode.abi_encode())
+            .unwrap();
+        assert_eq!(0, result);
+        assert_eq!(expected_decode.abi_encode(), result_data);
     }
 }

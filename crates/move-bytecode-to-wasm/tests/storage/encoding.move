@@ -4,6 +4,7 @@ use stylus::object::UID;
 
 // This function will facilitate the reading from the test.
 native fun save_in_slot<T: key>(value: T, slot: u256);
+native fun read_slot<T: key>(slot: u256): T;
 
 public struct StaticFields has key {
     id: UID,
@@ -30,6 +31,10 @@ public fun save_static_fields(
     save_in_slot(struct_, 0);
 }
 
+public fun read_static_fields(): StaticFields {
+    read_slot<StaticFields>(0)
+}
+
 public struct StaticFields2 has key {
     id: UID,
     a: u8,
@@ -51,6 +56,10 @@ public fun save_static_fields_2(
     save_in_slot(struct_, 0);
 }
 
+public fun read_static_fields_2(): StaticFields2 {
+    read_slot<StaticFields2>(0)
+}
+
 public struct StaticFields3 has key {
     id: UID,
     a: u8,
@@ -68,4 +77,8 @@ public fun save_static_fields_3(
 ) {
     let struct_ = StaticFields3 { id, a, b, c, d };
     save_in_slot(struct_, 0);
+}
+
+public fun read_static_fields_3(): StaticFields3 {
+    read_slot<StaticFields3>(0)
 }

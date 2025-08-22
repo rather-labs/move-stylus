@@ -33,7 +33,10 @@ impl NativeFunction {
     pub const NATIVE_FREEZE_OBJECT: &str = "freeze_object";
 
     // Storage
+    #[cfg(debug_assertions)]
     pub const SAVE_IN_SLOT: &str = "save_in_slot";
+    #[cfg(debug_assertions)]
+    pub const READ_SLOT: &str = "read_slot";
 
     // Event functions
     const NATIVE_EMIT: &str = "emit";
@@ -170,6 +173,9 @@ impl NativeFunction {
 
                 event::add_emit_log_fn(module, compilation_ctx, &generics[0])
             }
+            // This native function is only available in debug mode to help with testing. It should
+            // not be compiled in release mode.
+            #[cfg(debug_assertions)]
             Self::SAVE_IN_SLOT => {
                 assert_eq!(
                     1,
@@ -181,6 +187,25 @@ impl NativeFunction {
                 // In this case the native function implementation is the same as the runtime one.
                 // So we reuse the runtime function.
                 RuntimeFunction::EncodeAndSaveInStorage.get_generic(
+                    module,
+                    compilation_ctx,
+                    &[&generics[0]],
+                )
+            }
+            // This native function is only available in debug mode to help with testing. It should
+            // not be compiled in release mode.
+            #[cfg(debug_assertions)]
+            Self::READ_SLOT => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {name} expected 1 type parameter, found {}",
+                    generics.len(),
+                );
+
+                // In this case the native function implementation is the same as the runtime one.
+                // So we reuse the runtime function.
+                RuntimeFunction::DecodeAndReadFromStorage.get_generic(
                     module,
                     compilation_ctx,
                     &[&generics[0]],

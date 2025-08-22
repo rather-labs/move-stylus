@@ -599,7 +599,11 @@ pub fn derive_dyn_array_slot(
     )
 }
 
-/// Generates a function that reads an specific struct from the storage.
+/// Generates a function that encodes and saves an specific struct into the storage.
+///
+/// Arguments:
+/// - struct_ptr
+/// - slot_ptr
 pub fn add_save_struct_into_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -632,6 +636,18 @@ pub fn add_save_struct_into_storage_fn(
     function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs)
 }
 
+// Generates a function that reads an specific struct from the storage.
+//
+// This function:
+// 1. Locates the storage slot of the object.
+// 2. Reads and decodes the struct from storage.
+// 3. Returns a pointer to the in-memory representation of the struct.
+//
+// Arguments:
+// - slot_ptr
+//
+// Returns:
+// - struct_ptr
 pub fn add_read_struct_from_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
