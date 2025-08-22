@@ -21,12 +21,33 @@ impl IRef {
         match inner {
             // Heap types: just forward the pointer
             IntermediateType::IVector(_)
-            | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::ISigner
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress => {
+                inner.add_pack_instructions(
+                    builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    compilation_ctx,
+                );
+            }
+            IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
+                // TODO: why does this work?
+                builder
+                    .local_get(local)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(local);
+
                 inner.add_pack_instructions(
                     builder,
                     module,
@@ -100,9 +121,30 @@ impl IMutRef {
             | IntermediateType::ISigner
             | IntermediateType::IU128
             | IntermediateType::IU256
-            | IntermediateType::IAddress
-            | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. } => {
+            | IntermediateType::IAddress => {
+                inner.add_pack_instructions(
+                    builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    compilation_ctx,
+                );
+            }
+            IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
+                // TODO: why does this work?
+                builder
+                    .local_get(local)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(local);
+
                 inner.add_pack_instructions(
                     builder,
                     module,

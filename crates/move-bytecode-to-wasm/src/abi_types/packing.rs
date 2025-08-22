@@ -1,6 +1,9 @@
 use alloy_sol_types::{SolType, sol_data};
 use pack_native_int::{pack_i32_type_instructions, pack_i64_type_instructions};
-use walrus::{InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
+use walrus::{
+    InstrSeqBuilder, LocalId, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg},
+};
 
 use crate::{
     CompilationContext,
@@ -430,6 +433,35 @@ impl Packable for IntermediateType {
         compilation_ctx: &CompilationContext,
     ) {
         match self {
+            IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+                // TODO: find a way to make this less verbose
+                match &**inner {
+                    IntermediateType::IStruct { .. }
+                    | IntermediateType::IGenericStructInstance { .. } => {
+                        builder
+                            .local_get(local)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            )
+                            .local_set(local);
+                    }
+                    _ => {}
+                }
+
+                inner.add_pack_instructions_dynamic(
+                    builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    compilation_ctx,
+                );
+            }
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
                     .get_user_data_type_by_index(module_id, *index)
@@ -445,6 +477,7 @@ impl Packable for IntermediateType {
                     Some(calldata_reference_pointer),
                 );
             }
+
             IntermediateType::IGenericStructInstance {
                 module_id,
                 index,
@@ -577,9 +610,7 @@ impl Packable for IntermediateType {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::ISigner
-            | IntermediateType::IRef(_)
-            | IntermediateType::IEnum(_)
-            | IntermediateType::IMutRef(_) => false,
+            | IntermediateType::IEnum(_) => false,
             IntermediateType::IVector(_) => true,
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
@@ -615,6 +646,10 @@ impl Packable for IntermediateType {
                     }
                     ExternalModuleData::Enum(_) => false,
                 }
+            }
+            // References are dynamic if the inner type is dynamic!
+            IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+                inner.is_dynamic(compilation_ctx)
             }
         }
     }

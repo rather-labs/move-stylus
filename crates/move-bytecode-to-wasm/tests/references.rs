@@ -718,6 +718,7 @@ mod reference_structs {
         function writeMutRef(Foo x) external returns (Foo);
         function writeMutRef2(Foo x) external returns (Foo);
         function freezeRef(Foo x) external returns (Foo);
+        function identityStructRef(Foo x) external returns (Foo);
     );
 
     fn get_foo() -> Foo {
@@ -810,6 +811,7 @@ mod reference_structs {
             },
         }
     )]
+    #[case(identityStructRefCall::new((get_foo(),)),get_foo())]
     fn test_struct_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

@@ -36,6 +36,10 @@ public fun deref_struct_ref(y: &Foo): Foo {
   *y
 }
 
+public fun identity_struct_ref(x: &Foo): &Foo {
+    x
+}
+
 public fun call_deref_struct_ref(x: Foo): Foo {
     deref_struct_ref(&x)
 }
