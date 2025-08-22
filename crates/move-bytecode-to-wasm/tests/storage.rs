@@ -866,9 +866,9 @@ mod storage_encoding {
         assert_eq!(0, result);
 
         // Check if it is encoded correctly in storage
-        for i in 0..expected_encode.len() {
+        for (i, expected) in expected_encode.iter().enumerate() {
             let storage = runtime.get_storage_at_slot(U256::from(i).to_be_bytes());
-            assert_eq!(expected_encode[i], storage, "Mismatch at slot {}", i);
+            assert_eq!(expected, &storage, "Mismatch at slot {}", i);
         }
 
         // Use the read function to check if it decodes correctly
