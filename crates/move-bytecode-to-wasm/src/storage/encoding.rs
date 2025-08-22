@@ -356,7 +356,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
     struct_: &IStruct,
     reading_nested_struct: bool,
     read_bytes_in_slot: u32,
-) -> LocalId {
+) -> (LocalId, u32) {
     let (storage_load, _) = storage_load_bytes32(module);
 
     let struct_ptr = module.locals.add(ValType::I32);
@@ -569,15 +569,18 @@ pub fn add_read_and_decode_storage_struct_instructions(
                     .unwrap();
 
                 // Read the child struct
-                let child_struct_ptr = add_read_and_decode_storage_struct_instructions(
-                    module,
-                    builder,
-                    compilation_ctx,
-                    slot_ptr,
-                    child_struct,
-                    true,
-                    read_bytes_in_slot,
-                );
+                let (child_struct_ptr, read_bytes) =
+                    add_read_and_decode_storage_struct_instructions(
+                        module,
+                        builder,
+                        compilation_ctx,
+                        slot_ptr,
+                        child_struct,
+                        true,
+                        read_bytes_in_slot,
+                    );
+
+                read_bytes_in_slot = read_bytes;
 
                 builder.local_get(child_struct_ptr).local_set(field_ptr);
             }
@@ -660,7 +663,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
         );
     }
 
-    struct_ptr
+    (struct_ptr, read_bytes_in_slot)
 }
 
 /// Return the storage-encoded field size in bytes
@@ -702,14 +705,4 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
             panic!("cannot know if a type parameter is dynamic, expected a concrete type");
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use walrus::Module;
-
-    use crate::{
-        CompilationContext,
-        translation::intermediate_types::{IntermediateType, enums::IEnum, structs::IStruct},
-    };
 }

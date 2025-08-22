@@ -669,7 +669,7 @@ pub fn add_read_struct_from_storage_fn(
 
     let slot_ptr = module.locals.add(ValType::I32);
 
-    let struct_ptr = add_read_and_decode_storage_struct_instructions(
+    let (struct_ptr, _) = add_read_and_decode_storage_struct_instructions(
         module,
         &mut builder,
         compilation_ctx,

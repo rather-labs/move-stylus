@@ -86,21 +86,28 @@ public fun read_static_fields_3(): StaticFields3 {
 public struct StaticNestedStruct has key {
     id: UID,
     a: u64,
-    b: StaticNestedStructChild,
+    b: bool,
+    c: StaticNestedStructChild,
+    f: u128,
+    g: u32,
 }
 
 public struct StaticNestedStructChild has store {
-    c: u64,
-    d: address
+    d: u64,
+    e: address
 }
 
 public fun save_static_nested_struct(
     id: UID,
     a: u64,
-    c: u64,
-    d: address
+    b: bool,
+    d: u64,
+    e: address,
+    f: u128,
+    g: u32
 ) {
-    let struct_ = StaticNestedStruct { id, a, b: StaticNestedStructChild { c, d } };
+    let child = StaticNestedStructChild { d, e };
+    let struct_ = StaticNestedStruct { id, a, b, c: child, f, g };
     save_in_slot(struct_, 0);
 }
 
