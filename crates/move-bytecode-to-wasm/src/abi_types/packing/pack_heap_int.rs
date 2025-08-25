@@ -8,7 +8,6 @@ use crate::{
     translation::intermediate_types::{
         address::IAddress,
         heap_integers::{IU128, IU256},
-        signer::ISigner,
     },
 };
 
@@ -121,18 +120,6 @@ impl IAddress {
                 },
             );
         }
-    }
-}
-
-impl ISigner {
-    pub fn add_pack_instructions(
-        block: &mut InstrSeqBuilder,
-        module: &mut Module,
-        local: LocalId,
-        writer_pointer: LocalId,
-        memory: MemoryId,
-    ) {
-        IAddress::add_pack_instructions(block, module, local, writer_pointer, memory)
     }
 }
 
@@ -273,27 +260,6 @@ mod tests {
     fn test_pack_address() {
         type SolType = sol!((address,));
         let int_type = IntermediateType::IAddress;
-
-        let expected_result = SolType::abi_encode_params(&(Address::ZERO,));
-        test_uint(int_type.clone(), &expected_result, &expected_result);
-
-        let expected_result =
-            SolType::abi_encode_params(&(address!("0x1234567890abcdef1234567890abcdef12345678"),));
-        test_uint(int_type.clone(), &expected_result, &expected_result);
-
-        let expected_result =
-            SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"),));
-        test_uint(int_type.clone(), &expected_result, &expected_result);
-
-        let expected_result =
-            SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE"),));
-        test_uint(int_type.clone(), &expected_result, &expected_result);
-    }
-
-    #[test]
-    fn test_pack_signer() {
-        type SolType = sol!((address,));
-        let int_type = IntermediateType::ISigner;
 
         let expected_result = SolType::abi_encode_params(&(Address::ZERO,));
         test_uint(int_type.clone(), &expected_result, &expected_result);

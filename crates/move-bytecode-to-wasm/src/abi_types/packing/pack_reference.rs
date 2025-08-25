@@ -340,6 +340,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn test_pack_ref_signer() {
         type SolType = sol!((address,));
         let ref_type = IntermediateType::IRef(Box::new(IntermediateType::ISigner));

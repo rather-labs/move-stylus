@@ -494,6 +494,7 @@ mod reference_signer {
     }
 
     #[rstest]
+    #[should_panic]
     #[case(useDummyCall::new(()), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 3, 5, 7])]
     fn test_signer_immutable_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
