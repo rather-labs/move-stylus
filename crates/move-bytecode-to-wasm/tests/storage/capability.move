@@ -1,3 +1,4 @@
+//! This module tests the capability pattern.
 module test::capability;
 
 use stylus::transfer as transfer;

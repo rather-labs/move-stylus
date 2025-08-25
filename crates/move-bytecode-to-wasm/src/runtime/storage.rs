@@ -631,6 +631,7 @@ pub fn add_save_struct_into_storage_fn(
         struct_ptr,
         slot_ptr,
         &struct_,
+        0,
     );
 
     function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs)
@@ -668,12 +669,14 @@ pub fn add_read_struct_from_storage_fn(
 
     let slot_ptr = module.locals.add(ValType::I32);
 
-    let struct_ptr = add_read_and_decode_storage_struct_instructions(
+    let (struct_ptr, _) = add_read_and_decode_storage_struct_instructions(
         module,
         &mut builder,
         compilation_ctx,
         slot_ptr,
         &struct_,
+        false,
+        0,
     );
 
     builder.local_get(struct_ptr);

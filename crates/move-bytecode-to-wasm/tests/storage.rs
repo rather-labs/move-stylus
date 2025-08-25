@@ -684,6 +684,20 @@ mod storage_encoding {
             address d;
         }
 
+        struct StaticNestedStruct {
+            UID id;
+            uint64 a;
+            bool b;
+            StaticNestedStructChild c;
+            uint128 f;
+            uint32 g;
+        }
+
+        struct StaticNestedStructChild {
+            uint64 d;
+            address e;
+        }
+
         function saveStaticFields(
             UID id,
             uint256 a,
@@ -714,6 +728,17 @@ mod storage_encoding {
             address d
         ) public view;
         function readStaticFields3() public view returns (StaticFields3);
+
+        function saveStaticNestedStruct(
+            UID id,
+            uint64 a,
+            bool b,
+            uint64 d,
+            address e,
+            uint128 f,
+            uint32 g
+        ) public view;
+        function readStaticNestedStruct() public view returns (StaticNestedStruct);
     );
 
     #[rstest]
@@ -851,6 +876,60 @@ mod storage_encoding {
             b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
             c: 0xcccccccccccccccc,
             d: address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
+        }
+    )]
+    #[case(saveStaticNestedStructCall::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        1,
+        true,
+        2,
+        address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+        3,
+        4
+    )), vec![
+        [0x00; 32],
+        U256::from_str_radix("0000000000000002010000000000000001", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000400000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+    ],
+        readStaticNestedStructCall::new(()),
+        StaticNestedStruct {
+           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           a: 1,
+           b: true,
+           c: StaticNestedStructChild {
+                d: 2,
+                e: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+           },
+           f: 3,
+           g: 4,
+        }
+    )]
+    #[case(saveStaticNestedStructCall::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        0xaaaaaaaaaaaaaaaa,
+        true,
+        0xbbbbbbbbbbbbbbbb,
+        address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+        0xcccccccccccccccccccccccccccccccc,
+        0xdddddddd,
+    )), vec![
+        [0x00; 32],
+        U256::from_str_radix("000000000000000000000000000000bbbbbbbbbbbbbbbb01aaaaaaaaaaaaaaaa", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000ddddddddcccccccccccccccccccccccccccccccc", 16).unwrap().to_be_bytes(),
+    ],
+        readStaticNestedStructCall::new(()),
+        StaticNestedStruct {
+           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           a: 0xaaaaaaaaaaaaaaaa,
+           b: true,
+           c: StaticNestedStructChild {
+                d: 0xbbbbbbbbbbbbbbbb,
+                e: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+           },
+           f: 0xcccccccccccccccccccccccccccccccc,
+           g: 0xdddddddd,
         }
     )]
     fn test_static_fields<T: SolCall, U: SolCall, V: SolValue>(
