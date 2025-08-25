@@ -434,7 +434,7 @@ impl Packable for IntermediateType {
     ) {
         match self {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
-                // Dynamic types can only be heap types, so we load the intermediate pointer
+                // Load the intermediate pointer
                 // And then pack the inner type dynamically
                 builder
                     .local_get(local)
