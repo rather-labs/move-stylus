@@ -7,13 +7,14 @@ use move_binary_format::file_format::{
 
 use walrus::{
     FunctionBuilder, FunctionId as WalrusFunctionId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    ir::{MemArg, StoreKind},
 };
 
 use crate::{
     CompilationContext, UserDefinedType,
     abi_types::public_function::PublicFunction,
     hostio::host_functions,
+    runtime::RuntimeFunction,
     translation::{
         intermediate_types::{ISignature, IntermediateType},
         table::{FunctionId, FunctionTable},
@@ -26,6 +27,14 @@ static EMPTY_SIGNATURE: ISignature = ISignature {
     arguments: Vec::new(),
     returns: Vec::new(),
 };
+
+// Constants
+const INIT_FUNCTION_NAME: &str = "init";
+
+// Error messages
+pub const BAD_ARGS_ERROR_MESSAGE: &str = "invalid arguments";
+pub const BAD_VISIBILITY_ERROR_MESSAGE: &str = "expected private visibility";
+pub const BAD_RETURN_ERROR_MESSAGE: &str = "expected no return values";
 
 /// Injects the constructor as a public function in the module, which will be accesible via the entrypoint router.
 pub fn inject_constructor(
@@ -69,6 +78,9 @@ pub fn build_constructor(
     // This is what we are going to be storing in the storage.
     const FLAG: i32 = 1;
 
+    // Host function for checking if all bytes are zero
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
+
     // Host functions for storage operations
     let (storage_load_fn, _) = host_functions::storage_load_bytes32(module);
     let (storage_cache_fn, _) = host_functions::storage_cache_bytes32(module);
@@ -103,62 +115,8 @@ pub fn build_constructor(
         .local_get(value_ptr)
         .call(storage_load_fn);
 
-    // Check all 32 bytes at value_ptr to see if the storage has been initialized
-    let offset = module.locals.add(ValType::I32); // Local variable to track the current byte offset
-    // Initialize offset to 0
-    builder.i32_const(0).local_set(offset);
-    builder.block(ValType::I32, |block| {
-        let block_id = block.id(); // ID for the outer block
-        // Loop over the 32 bytes at value_ptr
-        block.loop_(ValType::I32, |loop_| {
-            let loop_id = loop_.id();
-            loop_
-                .local_get(value_ptr) // Get the base pointer to the value
-                .local_get(offset) // Get the current offset
-                .binop(BinaryOp::I32Add) // Calculate the address: value_ptr + offset
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .i32_const(0)
-                .binop(BinaryOp::I32Ne) // Check if the loaded value is non-zero
-                .if_else(
-                    ValType::I32,
-                    |then| {
-                        // Non-zero value found, push 0 and exit the block
-                        then.i32_const(0).br(block_id);
-                    },
-                    |else_| {
-                        // If offset >= 28, break the loop
-                        else_
-                            .local_get(offset)
-                            .i32_const(28)
-                            .binop(BinaryOp::I32GeU)
-                            .if_else(
-                                ValType::I32,
-                                |then| {
-                                    // Reached the end of the loop + all bytes were zero, exit with 1
-                                    then.i32_const(1).br(block_id);
-                                },
-                                |inner_else| {
-                                    // Increment offset by 4 and continue the loop
-                                    inner_else
-                                        .local_get(offset)
-                                        .i32_const(4)
-                                        .binop(BinaryOp::I32Add)
-                                        .local_set(offset);
-
-                                    inner_else.br(loop_id); // Continue the loop
-                                },
-                            );
-                    },
-                );
-        });
-    });
+    // Check if the storage is empty, else it has been initialized
+    builder.local_get(value_ptr).i32_const(32).call(is_zero_fn);
 
     // If storage has not been initialized, proceed with initialization
     builder.if_else(
@@ -209,8 +167,6 @@ pub fn build_constructor(
     function.finish(vec![], &mut module.funcs)
 }
 
-const INIT_FUNCTION_NAME: &str = "init";
-
 // The init() function is a special function that is called once when the module is first deployed,
 // so it is a good place to put the code that initializes module's objects and sets up the environment and configuration.
 //
@@ -244,15 +200,13 @@ pub fn is_init(
     assert_eq!(
         function_def.visibility,
         Visibility::Private,
-        "init() functions must be private"
+        "{}",
+        BAD_VISIBILITY_ERROR_MESSAGE
     );
 
     // Must have 1 or 2 arguments
     let arg_count = move_function_arguments.len();
-    assert!(
-        (1..=2).contains(&arg_count),
-        "init() functions must have 1 or 2 arguments"
-    );
+    assert!((1..=2).contains(&arg_count), "{}", BAD_ARGS_ERROR_MESSAGE);
 
     // Check TxContext in the last argument
     let is_tx_context_ref = move_function_arguments
@@ -271,24 +225,19 @@ pub fn is_init(
         })
         .unwrap_or(false);
 
-    assert!(
-        is_tx_context_ref,
-        "Last argument must be &TxContext or &mut TxContext"
-    );
+    assert!(is_tx_context_ref, "{}", BAD_ARGS_ERROR_MESSAGE);
 
     // Check OTW if 2 arguments
     if arg_count == 2 {
         assert!(
             is_one_time_witness(module, &move_function_arguments.0[0]),
-            "First argument must be a valid one-time witness type"
+            "{}",
+            BAD_ARGS_ERROR_MESSAGE
         );
     }
 
     // Must not return any values
-    assert!(
-        move_function_return.is_empty(),
-        "init() functions must return no values"
-    );
+    assert!(move_function_return.is_empty(), "{}", BAD_RETURN_ERROR_MESSAGE);
 
     true
 }
