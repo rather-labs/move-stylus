@@ -62,6 +62,7 @@ pub fn reroot_path(path: &Path) -> PathBuf {
 
     // copy source file to dir
     let _ = fs::create_dir_all(temp_install_directory.join("sources"));
+
     // If the path is a directory, we copy all the move files to the temp dir
     if path.is_dir() {
         for entry in fs::read_dir(path).unwrap() {
@@ -167,7 +168,6 @@ pub fn translate_test_package(path: &str, module_name: &str) -> Module {
     translate_single_module(package, module_name)
 }
 
-// TODO: rename to translate_test_complete_package when translate_test_package is renamed
 #[allow(dead_code)]
 /// Translates a complete package. It outputs all the corresponding wasm modules
 pub fn translate_test_complete_package(path: &str) -> HashMap<String, Module> {
@@ -176,7 +176,6 @@ pub fn translate_test_complete_package(path: &str) -> HashMap<String, Module> {
     let rerooted_path = reroot_path(path);
     create_move_toml(&rerooted_path);
 
-    std::env::set_current_dir(&rerooted_path).unwrap();
     let package = get_build_confing()
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
