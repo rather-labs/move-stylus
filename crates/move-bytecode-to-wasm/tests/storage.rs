@@ -165,7 +165,7 @@ mod capability {
 
 mod storage_transfer {
     use alloy_primitives::{FixedBytes, address, keccak256};
-    use alloy_sol_types::{SolCall, sol};
+    use alloy_sol_types::{SolCall, SolValue, sol};
 
     use super::*;
 
@@ -182,6 +182,23 @@ mod storage_transfer {
 
     sol!(
         #[allow(missing_docs)]
+
+        #[derive(Debug)]
+        struct ID {
+           bytes32 bytes;
+        }
+
+        #[derive(Debug)]
+        struct UID {
+           ID id;
+        }
+
+        struct Foo {
+            UID id;
+            uint64 value;
+        }
+
+        #[allow(missing_docs)]
         function createShared() public view;
         function createOwned(address recipient) public view;
         function createFrozen() public view;
@@ -192,6 +209,7 @@ mod storage_transfer {
         function freezeObj(bytes32 id) public view;
         function shareObj(bytes32 id) public view;
         function transferObj(bytes32 id, address recipient) public view;
+        function getFoo(bytes32 id) public view returns (Foo);
     );
 
     const SHARED: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
@@ -618,6 +636,30 @@ mod storage_transfer {
             let call_data = transferObjCall::new((object_id, SIGNER_ADDRESS.into())).abi_encode();
             runtime.call_entrypoint(call_data).unwrap();
         }
+    }
+
+    #[rstest]
+    fn test_get_foo(runtime: RuntimeSandbox) {
+        // Create a new counter
+        let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the object id emmited from the contract's events
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        // Set value to 111 with a sender that is not the owner
+        let call_data = getFooCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Foo::abi_encode(&Foo {
+            id: UID {
+                id: ID { bytes: object_id },
+            },
+            value: 101,
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
     }
 }
 

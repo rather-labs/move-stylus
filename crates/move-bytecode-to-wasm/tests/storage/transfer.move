@@ -65,3 +65,7 @@ public fun share_obj(foo: Foo) {
 public fun transfer_obj(foo: Foo, recipient: address) { 
   transfer::transfer(foo, recipient);
 }
+
+public fun get_foo(foo: &Foo): &Foo {
+    foo
+}

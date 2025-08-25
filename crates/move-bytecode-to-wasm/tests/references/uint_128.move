@@ -9,6 +9,10 @@ public fun deref_u128_ref(y: &u128): u128 {
   *y
 }
 
+public fun identity_u128_ref(x: &u128): &u128 {
+    x
+}
+
 public fun call_deref_u128_ref(x: u128): u128 {
     deref_u128_ref(&x)
 }

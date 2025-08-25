@@ -34,6 +34,7 @@ mod reference_bool {
         function writeMutRef(bool x) external returns (bool);
         function miscellaneous0() external returns (bool[]);
         function miscellaneous1() external returns (bool[]);
+        function identityBoolRef(bool x) external returns (bool);
     );
 
     #[fixture]
@@ -53,6 +54,7 @@ mod reference_bool {
     #[case(derefNestedBoolCall::new((false,)), false)]
     #[case(derefMutArgCall::new((true,)), true)]
     #[case(writeMutRefCall::new((false,)), true)]
+    #[case(identityBoolRefCall::new((true,)), true)]
     fn test_bool_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -88,6 +90,7 @@ mod reference_uint_8 {
         function miscellaneous0() external returns (uint8[]);
         function miscellaneous1() external returns (uint8[]);
         function freezeRef(uint8 x) external returns (uint8);
+        function identityU8Ref(uint8 x) external returns (uint8);
     );
 
     #[fixture]
@@ -108,6 +111,7 @@ mod reference_uint_8 {
     #[case(derefMutArgCall::new((1,)), 1)]
     #[case(writeMutRefCall::new((2,)), 1)]
     #[case(freezeRefCall::new((3,)), 3)]
+    #[case(identityU8RefCall::new((4,)), 4)]
     fn test_uint_8_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -143,6 +147,7 @@ mod reference_uint_16 {
         function miscellaneous0() external returns (uint16[]);
         function miscellaneous1() external returns (uint16[]);
         function freezeRef(uint16 x) external returns (uint16);
+        function identityU16Ref(uint16 x) external returns (uint16);
     );
 
     #[fixture]
@@ -163,6 +168,7 @@ mod reference_uint_16 {
     #[case(derefMutArgCall::new((1,)), 1)]
     #[case(writeMutRefCall::new((2,)), 1)]
     #[case(freezeRefCall::new((3,)), 3)]
+    #[case(identityU16RefCall::new((4,)), 4)]
     fn test_uint_16_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -198,6 +204,7 @@ mod reference_uint_32 {
         function miscellaneous0() external returns (uint32[]);
         function miscellaneous1() external returns (uint32[]);
         function freezeRef(uint32 x) external returns (uint32[]);
+        function identityU32Ref(uint32 x) external returns (uint32);
     );
 
     #[fixture]
@@ -218,6 +225,7 @@ mod reference_uint_32 {
     #[case(derefMutArgCall::new((1,)), 1)]
     #[case(writeMutRefCall::new((2,)), 1)]
     #[case(freezeRefCall::new((3,)), 3)]
+    #[case(identityU32RefCall::new((4,)), 4)]
     fn test_uint_32_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -253,6 +261,7 @@ mod reference_uint_64 {
         function miscellaneous0() external returns (uint64[]);
         function miscellaneous1() external returns (uint64[]);
         function freezeRef(uint64 x) external returns (uint64[]);
+        function identityU64Ref(uint64 x) external returns (uint64);
     );
 
     #[fixture]
@@ -273,6 +282,7 @@ mod reference_uint_64 {
     #[case(derefMutArgCall::new((1,)), 1)]
     #[case(writeMutRefCall::new((2,)), 1)]
     #[case(freezeRefCall::new((3,)), 3)]
+    #[case(identityU64RefCall::new((4,)), 4)]
     fn test_uint_64_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -308,6 +318,7 @@ mod reference_uint_128 {
         function miscellaneous0() external returns (uint128[]);
         function miscellaneous1() external returns (uint128[]);
         function freezeRef(uint128 x) external returns (uint128[]);
+        function identityU128Ref(uint128 x) external returns (uint128);
     );
 
     #[fixture]
@@ -328,6 +339,7 @@ mod reference_uint_128 {
     #[case(derefMutArgCall::new((1,)), 1)]
     #[case(writeMutRefCall::new((2,)), 1)]
     #[case(freezeRefCall::new((3,)), 3)]
+    #[case(identityU128RefCall::new((4,)), 4)]
     fn test_uint_128_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -363,6 +375,7 @@ mod reference_uint_256 {
         function miscellaneous0() external returns (uint256[]);
         function miscellaneous1() external returns (uint256[]);
         function freezeRef(uint256 x) external returns (uint256[]);
+        function identityU256Ref(uint256 x) external returns (uint256);
     );
 
     #[fixture]
@@ -383,6 +396,7 @@ mod reference_uint_256 {
     #[case(derefMutArgCall::new((U256::from(1),)), U256::from(1))]
     #[case(writeMutRefCall::new((U256::from(2),)), U256::from(1))]
     #[case(freezeRefCall::new((U256::from(3),)), U256::from(3))]
+    #[case(identityU256RefCall::new((U256::from(4),)), U256::from(4))]
     fn test_uint_256_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -419,6 +433,7 @@ mod reference_address {
         function miscellaneous0() external returns (address[]);
         function miscellaneous1() external returns (address[]);
         function freezeRef(address x) external returns (address);
+        function identityAddressRef(address x) external returns (address);
     );
 
     #[fixture]
@@ -438,6 +453,7 @@ mod reference_address {
     #[case(derefMutArgCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x1234567890abcdef1234567890abcdef12345678"))]
     #[case(writeMutRefCall::new((address!("0x1234567890abcdef1234567890abcdef12345678"),)), address!("0x0000000000000000000000000000000000000001"))]
     #[case(freezeRefCall::new((address!("0x0000000000000000000000000000000000000003"),)), address!("0x0000000000000000000000000000000000000003"))]
+    #[case(identityAddressRefCall::new((address!("0x0000000000000000000000000000000000000004"),)), address!("0x0000000000000000000000000000000000000004"))]
     fn test_address_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -507,6 +523,7 @@ mod reference_vec_8 {
         function miscellaneous4() external returns (uint8[]);
         function miscellaneous5() external returns (uint8[]);
         function freezeRef(uint8[] x) external returns (uint8[]);
+        function identityVecRef(uint8[] x) external returns (uint8[]);
     );
 
     #[fixture]
@@ -534,6 +551,7 @@ mod reference_vec_8 {
     #[case(miscellaneous3Call::new((vec![1, 2, 3],)), vec![99, 1, 3])]
     #[case(miscellaneous4Call::new(()), vec![1, 12, 111, 12, 11, 112])]
     #[case(miscellaneous5Call::new(()), vec![1, 12, 112, 11, 112, 113, 112])]
+    #[case(identityVecRefCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
     fn test_vec_8_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -574,6 +592,7 @@ mod reference_vec_64 {
         function miscellaneous3(uint64[] x) external returns (uint64[]);
         function miscellaneous4() external returns (uint64[]);
         function freezeRef(uint64[] x) external returns (uint64[]);
+        function identityVecRef(uint64[] x) external returns (uint64[]);
     );
 
     #[fixture]
@@ -600,6 +619,7 @@ mod reference_vec_64 {
     #[case(miscellaneous2Call::new(()), vec![1, 4, 7])]
     #[case(miscellaneous3Call::new((vec![1, 2, 3],)), vec![99, 1, 3])]
     #[case(miscellaneous4Call::new(()), vec![1, 12, 111, 12, 11, 112])]
+    #[case(identityVecRefCall::new((vec![1, 2, 3],)), vec![1, 2, 3])]
     fn test_vec_64_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -628,6 +648,7 @@ mod reference_vec_256 {
         function miscellaneous3(uint256[] x) external returns (uint256[]);
         function miscellaneous4() external returns (uint256[]);
         function freezeRef(uint256[] x) external returns (uint256[]);
+        function identityVecRef(uint256[] x) external returns (uint256[]);
     );
 
     #[fixture]
@@ -654,6 +675,7 @@ mod reference_vec_256 {
     #[case(miscellaneous2Call::new(()), vec![U256::from(1), U256::from(4), U256::from(7)])]
     #[case(miscellaneous3Call::new((vec![U256::from(1), U256::from(2), U256::from(3)],)), vec![U256::from(99), U256::from(1), U256::from(3)])]
     #[case(miscellaneous4Call::new(()), vec![U256::from(1), U256::from(12), U256::from(111), U256::from(12), U256::from(11), U256::from(112)])]
+    #[case(identityVecRefCall::new((vec![U256::from(1), U256::from(2), U256::from(3)],)), vec![U256::from(1), U256::from(2), U256::from(3)])]
     fn test_vec_256_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -718,6 +740,7 @@ mod reference_structs {
         function writeMutRef(Foo x) external returns (Foo);
         function writeMutRef2(Foo x) external returns (Foo);
         function freezeRef(Foo x) external returns (Foo);
+        function identityStructRef(Foo x) external returns (Foo);
     );
 
     fn get_foo() -> Foo {
@@ -810,6 +833,7 @@ mod reference_structs {
             },
         }
     )]
+    #[case(identityStructRefCall::new((get_foo(),)),get_foo())]
     fn test_struct_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

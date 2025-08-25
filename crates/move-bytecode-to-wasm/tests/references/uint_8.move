@@ -9,6 +9,10 @@ public fun deref_u8_ref(y: &u8): u8 {
   *y
 }
 
+public fun identity_u8_ref(x: &u8): &u8 {
+    x
+}
+
 public fun call_deref_u8_ref(x: u8): u8 {
   deref_u8_ref(&x)
 }

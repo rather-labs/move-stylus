@@ -19,14 +19,26 @@ impl IRef {
         compilation_ctx: &CompilationContext,
     ) {
         match inner {
-            // Heap types: just forward the pointer
-            IntermediateType::IVector(_)
-            | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::ISigner
+            IntermediateType::ISigner
             | IntermediateType::IU128
             | IntermediateType::IU256
-            | IntermediateType::IAddress => {
+            | IntermediateType::IAddress
+            | IntermediateType::IVector(_)
+            | IntermediateType::IStruct { .. }
+            | IntermediateType::IGenericStructInstance { .. } => {
+                // Load the intermediate pointer and pack
+                builder
+                    .local_get(local)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(local);
+
                 inner.add_pack_instructions(
                     builder,
                     module,
@@ -36,13 +48,24 @@ impl IRef {
                     compilation_ctx,
                 );
             }
-            // Immediate types: deref the pointer and pass the value as LocalId
             IntermediateType::IU8
             | IntermediateType::IU16
             | IntermediateType::IU32
             | IntermediateType::IU64
             | IntermediateType::IBool => {
-                builder.local_get(local);
+                // Load the intermediate pointer
+                builder
+                    .local_get(local)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_tee(local);
+
                 builder.load(
                     compilation_ctx.memory_id,
                     match inner.stack_data_size() {
@@ -95,7 +118,6 @@ impl IMutRef {
         compilation_ctx: &CompilationContext,
     ) {
         match inner {
-            // Heap types: just forward the pointer
             IntermediateType::IVector(_)
             | IntermediateType::ISigner
             | IntermediateType::IU128
@@ -103,6 +125,18 @@ impl IMutRef {
             | IntermediateType::IAddress
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. } => {
+                builder
+                    .local_get(local)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(local);
+
                 inner.add_pack_instructions(
                     builder,
                     module,
@@ -118,7 +152,18 @@ impl IMutRef {
             | IntermediateType::IU32
             | IntermediateType::IU64
             | IntermediateType::IBool => {
-                builder.local_get(local);
+                builder
+                    .local_get(local)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_tee(local);
+
                 builder.load(
                     compilation_ctx.memory_id,
                     match inner.stack_data_size() {
@@ -195,15 +240,25 @@ mod tests {
         func_body.local_tee(writer_pointer);
         func_body.local_set(calldata_reference_pointer);
 
-        // Pack the data to calldata memory
-        ref_type.add_pack_instructions(
-            &mut func_body,
-            &mut raw_module,
-            local,
-            writer_pointer,
-            calldata_reference_pointer,
-            &compilation_ctx,
-        );
+        if ref_type.is_dynamic(&compilation_ctx) {
+            ref_type.add_pack_instructions_dynamic(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            );
+        } else {
+            ref_type.add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            );
+        };
 
         // Return the writer pointer for reading the calldata back
         func_body.local_get(writer_pointer);
@@ -232,7 +287,9 @@ mod tests {
     fn test_pack_ref_u8() {
         type SolType = sol!((uint8,));
         let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IU8));
-        let heap_data = 88u32.to_le_bytes().to_vec();
+        let mut heap_data = Vec::new();
+        heap_data.extend(&4u32.to_le_bytes()); // Pointer to the u8 data
+        heap_data.extend(&88u8.to_le_bytes()); // Actual u8 data
         let expected = SolType::abi_encode_params(&(88u8,));
         test_pack(&heap_data, ref_type.clone(), &expected);
     }
@@ -241,7 +298,9 @@ mod tests {
     fn test_pack_ref_u32() {
         type SolType = sol!((uint32,));
         let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IU32));
-        let heap_data = 88u32.to_le_bytes().to_vec();
+        let mut heap_data = Vec::new();
+        heap_data.extend(&4u32.to_le_bytes()); // Pointer to the u32 data
+        heap_data.extend(&88u32.to_le_bytes()); // Actual u32 data
         let expected = SolType::abi_encode_params(&(88u32,));
         test_pack(&heap_data, ref_type.clone(), &expected);
     }
@@ -250,7 +309,9 @@ mod tests {
     fn test_pack_ref_u64() {
         type SolType = sol!((uint64,));
         let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IU64));
-        let heap_data = 88u64.to_le_bytes().to_vec();
+        let mut heap_data = Vec::new();
+        heap_data.extend(&4u32.to_le_bytes()); // Pointer to the u64 data
+        heap_data.extend(&88u64.to_le_bytes()); // Actual u64 data
         let expected = SolType::abi_encode_params(&(88u64,));
         test_pack(&heap_data, ref_type.clone(), &expected);
     }
@@ -259,7 +320,9 @@ mod tests {
     fn test_pack_ref_u128() {
         type SolType = sol!((uint128,));
         let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IU128));
-        let heap_data = 88u128.to_le_bytes().to_vec();
+        let mut heap_data = Vec::new();
+        heap_data.extend(&4u32.to_le_bytes()); // Pointer to the u128 data
+        heap_data.extend(&88u128.to_le_bytes()); // Actual u128 data
         let expected = SolType::abi_encode_params(&(88u128,));
         test_pack(&heap_data, ref_type.clone(), &expected);
     }
@@ -268,9 +331,12 @@ mod tests {
     fn test_pack_ref_address() {
         type SolType = sol!((address,));
         let ref_type = IntermediateType::IRef(Box::new(IntermediateType::IAddress));
+        let mut heap_data = Vec::new();
         let expected =
             SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"),));
-        test_pack(&expected, ref_type.clone(), &expected);
+        heap_data.extend(&4u32.to_le_bytes()); // Pointer to the address data
+        heap_data.extend(&expected); // Actual address data
+        test_pack(&heap_data, ref_type.clone(), &expected);
     }
 
     #[test]
@@ -278,9 +344,12 @@ mod tests {
         type SolType = sol!((address,));
         let ref_type = IntermediateType::IRef(Box::new(IntermediateType::ISigner));
 
-        let expected_result =
+        let mut heap_data = Vec::new();
+        let expected =
             SolType::abi_encode_params(&(address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"),));
-        test_pack(&expected_result, ref_type.clone(), &expected_result);
+        heap_data.extend(&4u32.to_le_bytes()); // Pointer to the address data
+        heap_data.extend(&expected); // Actual address data
+        test_pack(&heap_data, ref_type.clone(), &expected);
     }
 
     #[test]
@@ -294,6 +363,7 @@ mod tests {
 
         test_pack(
             &[
+                4u32.to_le_bytes().as_slice(), // pointer to the vector
                 3u32.to_le_bytes().as_slice(),
                 3u32.to_le_bytes().as_slice(),
                 1u32.to_le_bytes().as_slice(),
@@ -314,15 +384,16 @@ mod tests {
         ))));
 
         let mut heap_data = Vec::new();
+        heap_data.extend(&4u32.to_le_bytes()); // pointer to the vector
 
         // 1. Length = 3
         heap_data.extend(&3u32.to_le_bytes());
         heap_data.extend(&4u32.to_le_bytes());
 
         // 2. Pointers to heap-allocated u128 values
-        heap_data.extend(&24u32.to_le_bytes());
-        heap_data.extend(&40u32.to_le_bytes());
-        heap_data.extend(&56u32.to_le_bytes());
+        heap_data.extend(&28u32.to_le_bytes());
+        heap_data.extend(&44u32.to_le_bytes());
+        heap_data.extend(&60u32.to_le_bytes());
         heap_data.extend(&0u32.to_le_bytes());
 
         // 3. Actual values at those pointers (u128 little endian)
@@ -346,10 +417,11 @@ mod tests {
         let expected_result = SolType::abi_encode_params(&(vec![vec![1, 2, 3], vec![4, 5, 6]],));
 
         let data = [
+            4u32.to_le_bytes().as_slice(), // pointer to the vector
             2u32.to_le_bytes().as_slice(),
             4u32.to_le_bytes().as_slice(),  // capacity
-            24u32.to_le_bytes().as_slice(), // pointer to first element
-            56u32.to_le_bytes().as_slice(), // pointer to second element
+            28u32.to_le_bytes().as_slice(), // pointer to first element
+            60u32.to_le_bytes().as_slice(), // pointer to second element
             0u32.to_le_bytes().as_slice(),  // first buffer mem
             0u32.to_le_bytes().as_slice(),  // second buffer mem
             3u32.to_le_bytes().as_slice(),
@@ -382,23 +454,24 @@ mod tests {
 
         let expected_result = SolType::abi_encode_params(&(vec![vec![1, 2, 3], vec![4, 5, 6]],));
         let data = [
+            4u32.to_le_bytes().as_slice(), // pointer to the vector
             2u32.to_le_bytes().as_slice(),
             2u32.to_le_bytes().as_slice(),
-            16u32.to_le_bytes().as_slice(),
-            84u32.to_le_bytes().as_slice(),
+            20u32.to_le_bytes().as_slice(),
+            88u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            36u32.to_le_bytes().as_slice(),
-            52u32.to_le_bytes().as_slice(),
-            68u32.to_le_bytes().as_slice(),
+            40u32.to_le_bytes().as_slice(),
+            56u32.to_le_bytes().as_slice(),
+            72u32.to_le_bytes().as_slice(),
             1u128.to_le_bytes().as_slice(),
             2u128.to_le_bytes().as_slice(),
             3u128.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
             3u32.to_le_bytes().as_slice(),
-            104u32.to_le_bytes().as_slice(),
-            120u32.to_le_bytes().as_slice(),
-            136u32.to_le_bytes().as_slice(),
+            108u32.to_le_bytes().as_slice(),
+            124u32.to_le_bytes().as_slice(),
+            140u32.to_le_bytes().as_slice(),
             4u128.to_le_bytes().as_slice(),
             5u128.to_le_bytes().as_slice(),
             6u128.to_le_bytes().as_slice(),

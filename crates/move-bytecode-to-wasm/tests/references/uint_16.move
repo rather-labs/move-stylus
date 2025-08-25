@@ -9,6 +9,10 @@ public fun deref_u16_ref(y: &u16): u16 {
   *y
 }
 
+public fun identity_u16_ref(x: &u16): &u16 {
+    x
+}
+
 public fun call_deref_u16_ref(x: u16): u16 {
   deref_u16_ref(&x)
 }
