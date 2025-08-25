@@ -689,8 +689,6 @@ mod tests {
         }
     }
 
-    // TODO: add a reference type on the tests
-
     #[test]
     fn test_build_pack_instructions() {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
