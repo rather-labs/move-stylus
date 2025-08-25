@@ -499,6 +499,26 @@ impl IStruct {
             .map(|f| {
                 if let IntermediateType::ITypeParameter(index) = f {
                     types[*index as usize].clone()
+                } else if let IntermediateType::IGenericStructInstance {
+                    module_id,
+                    index,
+                    types: generic_types,
+                } = f
+                {
+                    IntermediateType::IGenericStructInstance {
+                        module_id: module_id.clone(),
+                        index: *index,
+                        types: generic_types
+                            .iter()
+                            .map(|t| {
+                                if let IntermediateType::ITypeParameter(index) = t {
+                                    types[*index as usize].clone()
+                                } else {
+                                    t.clone()
+                                }
+                            })
+                            .collect(),
+                    }
                 } else {
                     f.clone()
                 }
@@ -512,6 +532,29 @@ impl IStruct {
                 let key = FieldHandleIndex::new(k.into_index() as u16);
                 if let IntermediateType::ITypeParameter(index) = v {
                     (key, types[*index as usize].clone())
+                } else if let IntermediateType::IGenericStructInstance {
+                    module_id,
+                    index,
+                    types: generic_types,
+                } = v
+                {
+                    (
+                        key,
+                        IntermediateType::IGenericStructInstance {
+                            module_id: module_id.clone(),
+                            index: *index,
+                            types: generic_types
+                                .iter()
+                                .map(|t| {
+                                    if let IntermediateType::ITypeParameter(index) = t {
+                                        types[*index as usize].clone()
+                                    } else {
+                                        t.clone()
+                                    }
+                                })
+                                .collect(),
+                        },
+                    )
                 } else {
                     (key, v.clone())
                 }
