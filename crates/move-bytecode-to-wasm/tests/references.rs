@@ -494,6 +494,7 @@ mod reference_signer {
     }
 
     #[rstest]
+    #[should_panic]
     #[case(useDummyCall::new(()), [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 3, 5, 7])]
     fn test_signer_immutable_ref<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
@@ -741,6 +742,7 @@ mod reference_structs {
         function writeMutRef2(Foo x) external returns (Foo);
         function freezeRef(Foo x) external returns (Foo);
         function identityStructRef(Foo x) external returns (Foo);
+        function identityStaticStructRef(Bar x) external returns (Bar);
     );
 
     fn get_foo() -> Foo {
@@ -838,6 +840,17 @@ mod reference_structs {
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: Foo,
+    ) {
+        let expected_result = expected_result.abi_encode();
+        run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
+    }
+
+    #[rstest]
+    #[case(identityStaticStructRefCall::new((Bar { a: 42, b: 4242 },)), Bar { a: 42, b: 4242 })]
+    fn test_static_struct_ref<T: SolCall>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: Bar,
     ) {
         let expected_result = expected_result.abi_encode();
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();

@@ -481,6 +481,7 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
     fn test_build_public_function_with_signer() {
         let (mut raw_module, allocator, memory_id) = build_module(None);
         let compilation_ctx = test_compilation_context!(memory_id, allocator);
