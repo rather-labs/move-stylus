@@ -567,7 +567,7 @@ impl IStruct {
             .map(|(k, v)| (FieldHandleIndex::new(k.into_index() as u16), *v))
             .collect();
 
-        let res = Self {
+        Self {
             fields,
             identifier: self.identifier.clone(),
             fields_types,
@@ -576,9 +576,6 @@ impl IStruct {
                 self.struct_definition_index.into_index() as u16,
             ),
             ..*self
-        };
-
-        println!("Resulting struct {:#?}", res);
-        res
+        }
     }
 }
