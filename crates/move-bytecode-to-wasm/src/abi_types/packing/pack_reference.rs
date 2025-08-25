@@ -119,7 +119,6 @@ impl IMutRef {
     ) {
         match inner {
             IntermediateType::IVector(_)
-            // TODO: Is it okey to pack a signer?
             | IntermediateType::ISigner
             | IntermediateType::IU128
             | IntermediateType::IU256
