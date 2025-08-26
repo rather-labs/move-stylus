@@ -956,7 +956,7 @@ impl IntermediateType {
             Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner),
             Self::IStruct { index, module_id } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(&module_id, *index)
+                    .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
                 struct_.equality(builder, module, compilation_ctx, module_data)
             }
@@ -966,7 +966,7 @@ impl IntermediateType {
                 types,
             } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(&module_id, *index)
+                    .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
                 struct_
                     .instantiate(types)
