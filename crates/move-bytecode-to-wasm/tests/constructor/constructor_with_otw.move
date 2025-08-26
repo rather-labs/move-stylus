@@ -17,7 +17,7 @@ public struct CONSTRUCTOR_WITH_OTW has drop {}
 // To be considered a constructor.
 fun init(otw: CONSTRUCTOR_WITH_OTW, ctx: &mut TxContext) {
 
-  assert!(types::is_one_time_witness(otw), 0);
+  assert!(types::is_one_time_witness(&otw), 0);
 
   let foo = Foo {
     id: object::new(ctx),

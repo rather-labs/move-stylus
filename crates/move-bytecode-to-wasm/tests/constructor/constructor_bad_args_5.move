@@ -18,8 +18,6 @@ public struct CONSTRUCTOR_BAD_ARGS_5 has drop {}
 // To be considered a constructor.
 fun init(ctx: &mut TxContext, otw: CONSTRUCTOR_BAD_ARGS_5) {
 
-  assert!(types::is_one_time_witness(otw), 0);
-  
   let foo = Foo {
     id: object::new(ctx),
     value: 101,

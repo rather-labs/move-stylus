@@ -453,10 +453,14 @@ fn translate_instruction(
             // `test2` will remain as `ITypeParameters` and will only be resolved at
             // the moment of the function call.
             let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
-            let function_information = if type_instantiations
-                .iter()
-                .any(|t| matches!(t, IntermediateType::ITypeParameter(_)))
-            {
+            // TODO: do we need to check for IRef too?
+            let function_information = if type_instantiations.iter().any(|t| match t {
+                IntermediateType::ITypeParameter(_) => true,
+                IntermediateType::IRef(inner) => {
+                    matches!(inner.as_ref(), IntermediateType::ITypeParameter(_))
+                }
+                _ => false,
+            }) {
                 let arguments_start =
                     types_stack.len() - function_information.signature.arguments.len();
 

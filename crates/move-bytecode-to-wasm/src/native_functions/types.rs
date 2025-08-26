@@ -19,7 +19,9 @@ pub fn add_is_one_time_witness_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
+    // TODO: should we check if itype is a reference to a struct here?
     let name = get_generic_function_name(NativeFunction::NATIVE_IS_ONE_TIME_WITNESS, &[itype]);
+
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -32,11 +34,13 @@ pub fn add_is_one_time_witness_fn(
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
     let mut builder = function.name(name).func_body();
 
+    let ptr = module.locals.add(ValType::I32);
+
     if struct_.is_one_time_witness {
         builder.i32_const(1);
     } else {
         builder.i32_const(0);
     }
 
-    function.finish(vec![], &mut module.funcs)
+    function.finish(vec![ptr], &mut module.funcs)
 }

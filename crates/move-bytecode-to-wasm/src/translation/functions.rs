@@ -88,12 +88,20 @@ impl MappedFunction {
             .signature
             .arguments
             .iter()
-            .map(|f| {
-                if let IntermediateType::ITypeParameter(index) = f {
-                    types[*index as usize].clone()
-                } else {
-                    f.clone()
+            .map(|arg_type| match arg_type {
+                // Direct type parameter: T -> concrete_type
+                IntermediateType::ITypeParameter(index) => types[*index as usize].clone(),
+                // Reference type parameter: &T -> &concrete_type
+                IntermediateType::IRef(inner) => {
+                    if let IntermediateType::ITypeParameter(index) = inner.as_ref() {
+                        let concrete_type = types[*index as usize].clone();
+                        IntermediateType::IRef(Box::new(concrete_type))
+                    } else {
+                        arg_type.clone()
+                    }
                 }
+                // Non-generic type: keep as is
+                _ => arg_type.clone(),
             })
             .collect();
 
