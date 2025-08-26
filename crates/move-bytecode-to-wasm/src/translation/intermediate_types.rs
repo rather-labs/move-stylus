@@ -658,15 +658,31 @@ impl IntermediateType {
                     .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
-                IStruct::copy_local_instructions(
-                    &struct_instance,
+                struct_instance.copy_local_instructions(
                     module,
                     builder,
                     compilation_ctx,
                     module_data,
                 );
             }
-            IntermediateType::IExternalUserData { .. } => todo!(),
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } => {
+                let external_data = compilation_ctx
+                    .get_external_module_data(module_id, identifier)
+                    .unwrap();
+
+                match external_data {
+                    ExternalModuleData::Struct(struct_) => struct_.copy_local_instructions(
+                        module,
+                        builder,
+                        compilation_ctx,
+                        module_data,
+                    ),
+                    ExternalModuleData::Enum(_) => todo!(),
+                }
+            }
             IntermediateType::ISigner => {
                 // Signer type is read-only, we push the pointer only
             }
@@ -775,7 +791,8 @@ impl IntermediateType {
             // in memory
             IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. } => {
+            | IntermediateType::IGenericStructInstance { .. }
+            | IntermediateType::IExternalUserData { .. } => {
                 // Since the memory needed for vectors might differ, we don't overwrite it.
                 // We update the inner pointer to point to the location where the new vector is already allocated.
                 let src_ptr = module.locals.add(ValType::I32);
@@ -806,7 +823,6 @@ impl IntermediateType {
                 panic!("cannot write to a type parameter, expected a concrete type");
             }
             IntermediateType::IEnum(_) => todo!(),
-            IntermediateType::IExternalUserData { .. } => todo!(),
         }
     }
 
