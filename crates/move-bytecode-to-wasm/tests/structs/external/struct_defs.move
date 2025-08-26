@@ -3,7 +3,6 @@ module test::external_struct_defs;
 public struct Foo has drop, copy {
     q: address,
     r: vector<u32>,
-    /*
     s: vector<u128>,
     t: bool,
     u: u8,
@@ -14,7 +13,6 @@ public struct Foo has drop, copy {
     z: u256,
     bar: Bar,
     baz: Baz,
-            */
 }
 
 // Static abi sub-struct
@@ -33,7 +31,6 @@ public fun create_foo(): Foo {
     Foo {
         q: @0xdeadbeef,
         r : vector[0, 3, 0, 3, 4, 5, 6],
-    /*
         s : vector[6, 5, 4, 3, 0, 3, 0],
         t : false,
         u : 42,
@@ -44,6 +41,5 @@ public fun create_foo(): Foo {
         z : 424242424242,
         bar: Bar { a: 42, b: 4242 },
         baz: Baz { a: 4242, b: vector[3] },
-        */
     }
 }

@@ -2194,7 +2194,6 @@ mod external_struct_copy {
         struct Foo {
             address q;
             uint32[] r;
-            /*
             uint128[] s;
             bool t;
             uint8 u;
@@ -2205,7 +2204,6 @@ mod external_struct_copy {
             uint256 z;
             Bar bar;
             Baz baz;
-            */
         }
 
         struct Bar {
@@ -2234,7 +2232,6 @@ mod external_struct_copy {
         Foo {
             q: address!("0x00000000000000000000000000000000deadbeef"),
             r: vec![0, 3, 0, 3, 4, 5, 6],
-            /*
             s: vec![6, 5, 4, 3, 0, 3, 0],
             t: false,
             u: 42,
@@ -2253,12 +2250,10 @@ mod external_struct_copy {
                     U256::from(3),
                 ]
             },
-            */
         },
         Foo {
             q: address!("0x00000000000000000000000000000000deadbeef"),
             r: vec![0, 3, 0, 3, 4, 5, 6],
-            /*
             s: vec![6, 5, 4, 3, 0, 3, 0],
             t: false,
             u: 42,
@@ -2267,7 +2262,6 @@ mod external_struct_copy {
             x: 42424242,
             y: 4242424242,
             z: U256::from(424242424242_u128),
-
             bar: Bar {
                 a: 42,
                 b: 4242
@@ -2278,8 +2272,6 @@ mod external_struct_copy {
                     U256::from(3),
                 ]
             },
-
-            */
         }
     ))]
     #[case(structCopy2Call::new(
@@ -2290,7 +2282,6 @@ mod external_struct_copy {
             b: Foo {
                 q: address!("0x00000000000000000000000000000000deadbeef"),
                 r: vec![0, 3, 0, 3, 4, 5, 6],
-            /*
                 s: vec![6, 5, 4, 3, 0, 3, 0],
                 t: false,
                 u: 42,
@@ -2299,7 +2290,6 @@ mod external_struct_copy {
                 x: 42424242,
                 y: 4242424242,
                 z: U256::from(424242424242_u128),
-
                 bar: Bar {
                     a: 42,
                     b: 4242
@@ -2310,7 +2300,6 @@ mod external_struct_copy {
                         U256::from(3),
                     ]
                 },
-            */
             },
         },
         LocalStruct {
@@ -2318,7 +2307,6 @@ mod external_struct_copy {
             b: Foo {
                 q: address!("0x00000000000000000000000000000000deadbeef"),
                 r: vec![0, 3, 0, 3, 4, 5, 6],
-            /*
                 s: vec![6, 5, 4, 3, 0, 3, 0],
                 t: false,
                 u: 42,
@@ -2327,7 +2315,6 @@ mod external_struct_copy {
                 x: 42424242,
                 y: 4242424242,
                 z: U256::from(424242424242_u128),
-
                 bar: Bar {
                     a: 42,
                     b: 4242
@@ -2338,7 +2325,6 @@ mod external_struct_copy {
                         U256::from(3),
                     ]
                 },
-            */
             }
         }
     ))]

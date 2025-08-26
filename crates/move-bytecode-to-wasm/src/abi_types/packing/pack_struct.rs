@@ -90,6 +90,7 @@ use walrus::{
 use crate::{
     CompilationContext,
     abi_types::packing::pack_native_int::pack_i32_type_instructions,
+    compilation_context::ExternalModuleData,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
 
@@ -268,6 +269,53 @@ impl IStruct {
                             None,
                         );
                         field.encoded_size(compilation_ctx)
+                    }
+                }
+                IntermediateType::IExternalUserData {
+                    module_id,
+                    identifier,
+                } => {
+                    let external_data = compilation_ctx
+                        .get_external_module_data(module_id, identifier)
+                        .unwrap();
+
+                    match external_data {
+                        ExternalModuleData::Struct(child_struct) => {
+                            if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
+                                child_struct.add_pack_instructions(
+                                    block,
+                                    module,
+                                    field_local,
+                                    data_ptr,
+                                    inner_data_reference,
+                                    compilation_ctx,
+                                    Some(inner_data_reference),
+                                );
+                                32
+                            } else {
+                                child_struct.add_pack_instructions(
+                                    block,
+                                    module,
+                                    field_local,
+                                    data_ptr,
+                                    inner_data_reference,
+                                    compilation_ctx,
+                                    None,
+                                );
+                                field.encoded_size(compilation_ctx)
+                            }
+                        }
+                        _ => {
+                            field.add_pack_instructions(
+                                block,
+                                module,
+                                field_local,
+                                data_ptr,
+                                inner_data_reference,
+                                compilation_ctx,
+                            );
+                            32
+                        }
                     }
                 }
                 _ => {
