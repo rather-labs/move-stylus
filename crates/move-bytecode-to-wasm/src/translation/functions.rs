@@ -84,51 +84,60 @@ impl MappedFunction {
 
     /// Replaces all type parameters in the function with the provided types.
     pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
-        let arguments = self
-            .signature
-            .arguments
-            .iter()
-            .map(|arg_type| match arg_type {
+        // Helper function to instantiate a single type
+        let instantiate_type = |t: &IntermediateType| -> IntermediateType {
+            match t {
                 // Direct type parameter: T -> concrete_type
                 IntermediateType::ITypeParameter(index) => types[*index as usize].clone(),
                 // Reference type parameter: &T -> &concrete_type
                 IntermediateType::IRef(inner) => {
                     if let IntermediateType::ITypeParameter(index) = inner.as_ref() {
                         let concrete_type = types[*index as usize].clone();
-                        IntermediateType::IRef(Box::new(concrete_type))
+                        // TODO: this should be done during translation?
+                        // If the concrete type is already a reference, return it as is
+                        // Otherwise, wrap it in a reference
+                        if let IntermediateType::IRef(_) = &concrete_type {
+                            concrete_type
+                        } else {
+                            IntermediateType::IRef(Box::new(concrete_type))
+                        }
                     } else {
-                        arg_type.clone()
+                        t.clone()
+                    }
+                }
+                // Mutable reference type parameter: &mut T -> &mut concrete_type
+                IntermediateType::IMutRef(inner) => {
+                    if let IntermediateType::ITypeParameter(index) = inner.as_ref() {
+                        let concrete_type = types[*index as usize].clone();
+                        if let IntermediateType::IMutRef(_) = &concrete_type {
+                            concrete_type
+                        } else {
+                            IntermediateType::IMutRef(Box::new(concrete_type))
+                        }
+                    } else {
+                        t.clone()
                     }
                 }
                 // Non-generic type: keep as is
-                _ => arg_type.clone(),
-            })
+                _ => t.clone(),
+            }
+        };
+
+        let arguments = self
+            .signature
+            .arguments
+            .iter()
+            .map(instantiate_type)
             .collect();
 
         let returns = self
             .signature
             .returns
             .iter()
-            .map(|f| {
-                if let IntermediateType::ITypeParameter(index) = f {
-                    types[*index as usize].clone()
-                } else {
-                    f.clone()
-                }
-            })
+            .map(instantiate_type)
             .collect();
 
-        let locals = self
-            .locals
-            .iter()
-            .map(|f| {
-                if let IntermediateType::ITypeParameter(index) = f {
-                    types[*index as usize].clone()
-                } else {
-                    f.clone()
-                }
-            })
-            .collect();
+        let locals = self.locals.iter().map(instantiate_type).collect();
 
         let signature = ISignature { arguments, returns };
         let results = signature.get_return_wasm_types();

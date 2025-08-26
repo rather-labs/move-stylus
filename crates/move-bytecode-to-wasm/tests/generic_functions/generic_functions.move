@@ -20,6 +20,14 @@ public fun echo_struct(x: Foo): Foo {
     generic_1(x)
 }
 
+public fun echo_struct_ref(x: &Foo): &Foo {
+    generic_4(x)
+}
+
+public fun echo_struct_mut_ref(x: &mut Foo): &mut Foo {
+    generic_5(x)
+}
+
 public fun echo_u8(x: u8): u8 {
     generic_1(x)
 }
@@ -56,6 +64,14 @@ public fun echo_vec_u128(x: vector<u128>): vector<u128> {
     generic_1(x)
 }
 
+public fun echo_vec_u128_ref(x: &vector<u128>): &vector<u128> {
+    generic_4(x)
+}
+
+public fun echo_vec_u128_mut_ref(x: &mut vector<u128>): &mut vector<u128> {
+    generic_5(x)
+}
+
 public fun echo_u32_u128(x: u32, y: u128): (u32, u128) {
     generic_3(x, y)
 }
@@ -80,3 +96,20 @@ fun generic_3<T, U>(t: T, u: U): (T, U) {
     (generic_2(t), generic_2(u))
 }
 
+fun generic_4<T>(t: &T): &T {
+    inner_generic_4(t)
+    // t
+}
+
+fun inner_generic_4<T>(t: &T): &T {
+    t
+}
+
+fun generic_5<T>(t: &mut T): &mut T {
+    // t
+    inner_generic_5(t)
+}
+
+fun inner_generic_5<T>(t: &mut T): &mut T {
+    t
+}
