@@ -14,7 +14,6 @@ use crate::{
         enums::IEnum,
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
-        signer::ISigner,
         vector::IVector,
     },
 };
@@ -289,13 +288,9 @@ impl Packable for IntermediateType {
                 writer_pointer,
                 compilation_ctx.memory_id,
             ),
-            IntermediateType::ISigner => ISigner::add_pack_instructions(
-                builder,
-                module,
-                local,
-                writer_pointer,
-                compilation_ctx.memory_id,
-            ),
+            IntermediateType::ISigner => {
+                panic!("signer type cannot be packed as it has no ABI representation")
+            }
             IntermediateType::IAddress => IAddress::add_pack_instructions(
                 builder,
                 module,

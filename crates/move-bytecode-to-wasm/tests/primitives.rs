@@ -161,15 +161,12 @@ mod signer_type {
     }
 
     #[rstest]
+    #[should_panic]
     #[case(echoCall::new(()), (address!("0x0000000000000000000000000000000007030507"),))]
-    #[case(
-        echoIdentityCall::new(()),
-        (address!("0x0000000000000000000000000000000007030507"),)
-    )]
-    #[case(
-        echoWithIntCall::new((42,)),
-        (42, address!("0x0000000000000000000000000000000007030507"))
-    )]
+    #[should_panic]
+    #[case(echoIdentityCall::new(()), (address!("0x0000000000000000000000000000000007030507"),))]
+    #[should_panic]
+    #[case(echoWithIntCall::new((42,)), (42, address!("0x0000000000000000000000000000000007030507")))]
     fn test_signer<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
