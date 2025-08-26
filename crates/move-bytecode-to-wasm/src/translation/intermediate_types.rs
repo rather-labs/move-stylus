@@ -441,7 +441,35 @@ impl IntermediateType {
                     module_data,
                 );
             }
-            IntermediateType::IExternalUserData { .. } => todo!(),
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } => {
+                let external_data = compilation_ctx
+                    .get_external_module_data(module_id, identifier)
+                    .unwrap();
+
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                match external_data {
+                    ExternalModuleData::Struct(struct_) => {
+                        struct_.copy_local_instructions(
+                            module,
+                            builder,
+                            compilation_ctx,
+                            module_data,
+                        );
+                    }
+                    ExternalModuleData::Enum(_) => todo!(),
+                }
+            }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 // Nothing to be done, pointer is already correct
             }
