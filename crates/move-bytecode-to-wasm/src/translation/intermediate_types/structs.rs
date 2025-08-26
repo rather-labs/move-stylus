@@ -122,14 +122,12 @@ impl IStruct {
     }
 
     pub fn equality(
+        &self,
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-        index: u16,
     ) {
-        let struct_ = module_data.structs.get_by_index(index).unwrap();
-
         let s1_ptr = module.locals.add(ValType::I32);
         let s2_ptr = module.locals.add(ValType::I32);
         let result = module.locals.add(ValType::I32);
@@ -161,7 +159,7 @@ impl IStruct {
 
         builder.block(None, |block| {
             let block_id = block.id();
-            for (index, field) in struct_.fields.iter().enumerate() {
+            for (index, field) in self.fields.iter().enumerate() {
                 // Offset of the field's pointer
                 let offset = index as u32 * 4;
 
