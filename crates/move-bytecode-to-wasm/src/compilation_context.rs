@@ -54,6 +54,12 @@ impl CompilationContext<'_> {
         }
     }
 
+    pub fn get_module_data_by_id(&self, module_id: &ModuleId) -> &ModuleData {
+        self.deps_data
+            .get(module_id)
+            .unwrap_or(self.root_module_data)
+    }
+
     pub fn get_user_data_type_by_index(
         &self,
         module_id: &ModuleId,

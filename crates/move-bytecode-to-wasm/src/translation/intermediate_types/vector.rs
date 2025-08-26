@@ -473,25 +473,107 @@ impl IVector {
                             .binop(BinaryOp::I32Add)
                             .call(equality_f_id);
                     }
-                    t @ (IntermediateType::IU128
+                    IntermediateType::IU128
                     | IntermediateType::IU256
-                    | IntermediateType::IAddress
-                    | IntermediateType::IStruct { .. }
-                    | IntermediateType::IGenericStructInstance { .. }) => {
+                    | IntermediateType::IAddress => {
                         let vec_equality_heap_type_f_id =
                             RuntimeFunction::VecEqualityHeapType.get(module, Some(compilation_ctx));
 
                         then.local_get(v1_ptr)
                             .local_get(v2_ptr)
                             .local_get(len)
-                            .i32_const(if *t == IntermediateType::IU128 {
+                            .i32_const(if *inner == IntermediateType::IU128 {
                                 16
                             } else {
                                 32
                             })
                             .call(vec_equality_heap_type_f_id);
                     }
+                    IntermediateType::IStruct { module_id, index } => {
+                        let module_data = compilation_ctx.get_module_data_by_id(module_id);
+                        let struct_ = compilation_ctx
+                            .get_user_data_type_by_index(module_id, *index)
+                            .unwrap();
 
+                        then.local_get(v1_ptr)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            )
+                            .local_get(v2_ptr)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+
+                        struct_.equality(then, module, compilation_ctx, module_data);
+                    }
+                    IntermediateType::IGenericStructInstance { module_id, index, types } => {
+                        let module_data = compilation_ctx.get_module_data_by_id(module_id);
+                        let struct_ = compilation_ctx.get_user_data_type_by_index(module_id, *index).unwrap();
+                        let struct_instance = struct_.instantiate(types);
+
+                        then.local_get(v1_ptr)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            )
+                            .local_get(v2_ptr)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+
+                        struct_instance.equality(then, module, compilation_ctx, module_data);
+                    }
+                    IntermediateType::IExternalUserData { module_id, identifier } => {
+                        let module_data = compilation_ctx.get_module_data_by_id(module_id);
+                        let external_data = compilation_ctx
+                            .get_external_module_data(module_id, identifier)
+                            .unwrap();
+
+                        match external_data {
+                            ExternalModuleData::Struct(struct_) => {
+                                then.local_get(v1_ptr)
+                                    .load(
+                                        compilation_ctx.memory_id,
+                                        LoadKind::I32 { atomic: false },
+                                        MemArg {
+                                            align: 0,
+                                            offset: 0,
+                                        },
+                                    )
+                                    .local_get(v2_ptr)
+                                    .load(
+                                        compilation_ctx.memory_id,
+                                        LoadKind::I32 { atomic: false },
+                                        MemArg {
+                                            align: 0,
+                                            offset: 0,
+                                        },
+                                    );
+
+                                struct_.equality(then, module, compilation_ctx, module_data);
+                            },
+                            ExternalModuleData::Enum(_) => todo!(),
+                        }
+                    }
                     IntermediateType::IVector(inner_v) => {
                         let res = module.locals.add(ValType::I32);
                         let offset = module.locals.add(ValType::I32);
@@ -584,7 +666,6 @@ impl IVector {
                     IntermediateType::ITypeParameter(_) => {
                         panic!("cannot check the equality of a vector of type parameters, expected a concrete type");
                     }
-                IntermediateType::IExternalUserData { .. } => todo!(),
                 }
             },
             |else_| {

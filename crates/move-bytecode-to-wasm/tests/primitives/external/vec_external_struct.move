@@ -72,3 +72,11 @@ public fun vec_push_and_pop_back(x: vector<Foo>, y: Foo): vector<Foo> {
   z.pop_back();
   z
 }
+
+public fun vec_eq(x: vector<Foo>, y: vector<Foo>): bool {
+    x == y
+}
+
+public fun vec_neq(x: vector<Foo>, y: vector<Foo>): bool {
+    x != y
+}
