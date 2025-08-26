@@ -279,3 +279,34 @@ mod constructor_bad_args_4 {
         assert_eq!(0, result);
     }
 }
+
+mod constructor_bad_args_5 {
+    use alloy_sol_types::{SolCall, sol};
+
+    use super::*;
+
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "constructor_bad_args_5";
+        const SOURCE_PATH: &str = "tests/constructor/constructor_bad_args_5.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+        function constructor() public view;
+        function read(bytes32 id) public view returns (uint64);
+    );
+
+    #[rstest]
+    #[should_panic(expected = "invalid arguments")]
+    fn test_constructor_bad_args_5(runtime: RuntimeSandbox) {
+        let call_data = constructorCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+    }
+}

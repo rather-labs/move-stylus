@@ -29,7 +29,7 @@ pub fn add_is_one_time_witness_fn(
         .unwrap();
 
     // Function declaration
-    let mut function = FunctionBuilder::new(&mut module.types, &[], &[ValType::I32]);
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
     let mut builder = function.name(name).func_body();
 
     if struct_.is_one_time_witness {
