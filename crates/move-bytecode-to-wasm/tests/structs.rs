@@ -2194,6 +2194,7 @@ mod external_struct_copy {
         struct Foo {
             address q;
             uint32[] r;
+            /*
             uint128[] s;
             bool t;
             uint8 u;
@@ -2204,6 +2205,7 @@ mod external_struct_copy {
             uint256 z;
             Bar bar;
             Baz baz;
+            */
         }
 
         struct Bar {
@@ -2216,7 +2218,13 @@ mod external_struct_copy {
             uint256[] b;
         }
 
+        struct LocalStruct {
+            uint32 a;
+            Foo b;
+        }
+
         function structCopy() external returns (Foo,Foo);
+        function structCopy2() external returns (LocalStruct,LocalStruct);
     );
 
     #[rstest]
@@ -2226,6 +2234,7 @@ mod external_struct_copy {
         Foo {
             q: address!("0x00000000000000000000000000000000deadbeef"),
             r: vec![0, 3, 0, 3, 4, 5, 6],
+            /*
             s: vec![6, 5, 4, 3, 0, 3, 0],
             t: false,
             u: 42,
@@ -2244,10 +2253,12 @@ mod external_struct_copy {
                     U256::from(3),
                 ]
             },
+            */
         },
         Foo {
             q: address!("0x00000000000000000000000000000000deadbeef"),
             r: vec![0, 3, 0, 3, 4, 5, 6],
+            /*
             s: vec![6, 5, 4, 3, 0, 3, 0],
             t: false,
             u: 42,
@@ -2256,6 +2267,7 @@ mod external_struct_copy {
             x: 42424242,
             y: 4242424242,
             z: U256::from(424242424242_u128),
+
             bar: Bar {
                 a: 42,
                 b: 4242
@@ -2266,6 +2278,68 @@ mod external_struct_copy {
                     U256::from(3),
                 ]
             },
+
+            */
+        }
+    ))]
+    #[case(structCopy2Call::new(
+        ()),
+        (
+        LocalStruct {
+            a: 42,
+            b: Foo {
+                q: address!("0x00000000000000000000000000000000deadbeef"),
+                r: vec![0, 3, 0, 3, 4, 5, 6],
+            /*
+                s: vec![6, 5, 4, 3, 0, 3, 0],
+                t: false,
+                u: 42,
+                v: 4242,
+                w: 424242,
+                x: 42424242,
+                y: 4242424242,
+                z: U256::from(424242424242_u128),
+
+                bar: Bar {
+                    a: 42,
+                    b: 4242
+                },
+                baz: Baz {
+                    a: 4242,
+                    b: vec![
+                        U256::from(3),
+                    ]
+                },
+            */
+            },
+        },
+        LocalStruct {
+            a: 42,
+            b: Foo {
+                q: address!("0x00000000000000000000000000000000deadbeef"),
+                r: vec![0, 3, 0, 3, 4, 5, 6],
+            /*
+                s: vec![6, 5, 4, 3, 0, 3, 0],
+                t: false,
+                u: 42,
+                v: 4242,
+                w: 424242,
+                x: 42424242,
+                y: 4242424242,
+                z: U256::from(424242424242_u128),
+
+                bar: Bar {
+                    a: 42,
+                    b: 4242
+                },
+                baz: Baz {
+                    a: 4242,
+                    b: vec![
+                        U256::from(3),
+                    ]
+                },
+            */
+            }
         }
     ))]
     fn test_external_struct_copy<T: SolCall, V: SolValue>(

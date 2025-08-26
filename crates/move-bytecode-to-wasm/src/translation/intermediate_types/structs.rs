@@ -280,6 +280,7 @@ impl IStruct {
                 }
                 IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. }
+                | IntermediateType::IExternalUserData { .. }
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
                 | IntermediateType::IU128
@@ -311,7 +312,6 @@ impl IStruct {
                     );
                 }
                 IntermediateType::IEnum(_) => todo!(),
-                IntermediateType::IExternalUserData { .. } => todo!(),
             }
 
             // Store the middle pointer in the place of the struct field
