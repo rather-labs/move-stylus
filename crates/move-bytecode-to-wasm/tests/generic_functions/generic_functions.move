@@ -20,12 +20,12 @@ public fun echo_struct(x: Foo): Foo {
     generic_1(x)
 }
 
-public fun echo_struct_ref(x: &Foo): &Foo {
-    generic_4(x)
+public fun echo_struct_ref(inner: bool, x: &Foo): &Foo {
+    generic_4(inner, x)
 }
 
-public fun echo_struct_mut_ref(x: &mut Foo): &mut Foo {
-    generic_5(x)
+public fun echo_struct_mut_ref(inner: bool, x: &mut Foo): &mut Foo {
+    generic_5(inner, x)
 }
 
 public fun echo_u8(x: u8): u8 {
@@ -65,11 +65,11 @@ public fun echo_vec_u128(x: vector<u128>): vector<u128> {
 }
 
 public fun echo_vec_u128_ref(x: &vector<u128>): &vector<u128> {
-    generic_4(x)
+    generic_4(false, x)
 }
 
 public fun echo_vec_u128_mut_ref(x: &mut vector<u128>): &mut vector<u128> {
-    generic_5(x)
+    generic_5(false, x)
 }
 
 public fun echo_u32_u128(x: u32, y: u128): (u32, u128) {
@@ -96,18 +96,24 @@ fun generic_3<T, U>(t: T, u: U): (T, U) {
     (generic_2(t), generic_2(u))
 }
 
-fun generic_4<T>(t: &T): &T {
-    inner_generic_4(t)
-    // t
+fun generic_4<T>(inner: bool, t: &T): &T {
+    if (inner) {
+        inner_generic_4(t)
+    } else {
+        t
+    }
 }
 
 fun inner_generic_4<T>(t: &T): &T {
     t
 }
 
-fun generic_5<T>(t: &mut T): &mut T {
-    // t
-    inner_generic_5(t)
+fun generic_5<T>(inner: bool, t: &mut T): &mut T {
+    if (inner) {
+        inner_generic_5(t)
+    } else {
+        t
+    }
 }
 
 fun inner_generic_5<T>(t: &mut T): &mut T {

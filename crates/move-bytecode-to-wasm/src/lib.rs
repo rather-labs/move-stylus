@@ -293,13 +293,11 @@ fn translate_and_link_functions(
 
     // If the function is generic, we instantiate the concrete types so we can translate it
     let function_information = if function_information.is_generic {
-        println!("LIB");
         &function_information.instantiate(function_id.type_instantiations.as_ref().unwrap())
     } else {
         function_information
     };
 
-    println!("LIB ID: {:?}", function_information.function_id);
     // Process function defined in this module
     // First we check if there is already an entry for this function
     if let Some(table_entry) = function_table.get_by_function_id(&function_information.function_id)

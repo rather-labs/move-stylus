@@ -106,14 +106,12 @@ impl MappedFunction {
                 IntermediateType::IRef(inner) => {
                     if let IntermediateType::ITypeParameter(index) = inner.as_ref() {
                         let concrete_type = types[*index as usize].clone();
-                        // TODO: this should be done during translation?
+
                         // If the concrete type is already a reference, return it as is
                         // Otherwise, wrap it in a reference
                         if let IntermediateType::IRef(_) = &concrete_type {
-                            println!("1 {concrete_type:?} {types:?}");
                             concrete_type
                         } else {
-                            println!("2 {concrete_type:?} {types:?}");
                             IntermediateType::IRef(Box::new(concrete_type))
                         }
                     } else {
@@ -159,6 +157,7 @@ impl MappedFunction {
 
         let mut function_id = self.function_id.clone();
         function_id.type_instantiations = Some(types.to_vec());
+
         Self {
             function_id,
             signature,
