@@ -124,7 +124,8 @@ impl IMutRef {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. } => {
+            | IntermediateType::IGenericStructInstance { .. }
+            | IntermediateType::IExternalUserData { .. } => {
                 builder
                     .local_get(local)
                     .load(
@@ -199,7 +200,6 @@ impl IMutRef {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
             }
-            IntermediateType::IExternalUserData { .. } => todo!(),
         }
     }
 }
