@@ -176,7 +176,6 @@ pub fn translate_test_complete_package(path: &str) -> HashMap<String, Module> {
     let rerooted_path = reroot_path(path);
     create_move_toml(&rerooted_path);
 
-    std::env::set_current_dir(&rerooted_path).unwrap();
     let package = get_build_confing()
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
