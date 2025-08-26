@@ -3,9 +3,9 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, compilation_context::ModuleData};
+use crate::{compilation_context::ExternalModuleData, runtime::RuntimeFunction};
 
 use super::IntermediateType;
 
@@ -356,7 +356,35 @@ impl IVector {
                     );
                 }
 
-                IntermediateType::IExternalUserData { .. } => todo!(),
+                IntermediateType::IExternalUserData {
+                    module_id,
+                    identifier,
+                } => {
+                    let external_data = compilation_ctx
+                        .get_external_module_data(module_id, identifier)
+                        .unwrap();
+
+                    match external_data {
+                        ExternalModuleData::Struct(struct_) => {
+                            loop_block.load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+
+                            struct_.copy_local_instructions(
+                                module,
+                                loop_block,
+                                compilation_ctx,
+                                module_data,
+                            );
+                        }
+                        ExternalModuleData::Enum(_) => todo!(),
+                    }
+                }
                 t => panic!("unsupported vector type {t:?}"),
             }
 
