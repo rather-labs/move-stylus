@@ -2,7 +2,7 @@ use std::{collections::HashMap, hash::Hash};
 
 use crate::{
     CompilationContext, UserDefinedType,
-    compilation_context::{ModuleData, ModuleId},
+    compilation_context::{ExternalModuleData, ModuleData, ModuleId},
     runtime::RuntimeFunction,
     wasm_builder_extensions::WasmBuilderExtension,
 };
@@ -658,15 +658,31 @@ impl IntermediateType {
                     .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
-                IStruct::copy_local_instructions(
-                    &struct_instance,
+                struct_instance.copy_local_instructions(
                     module,
                     builder,
                     compilation_ctx,
                     module_data,
                 );
             }
-            IntermediateType::IExternalUserData { .. } => todo!(),
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } => {
+                let external_data = compilation_ctx
+                    .get_external_module_data(module_id, identifier)
+                    .unwrap();
+
+                match external_data {
+                    ExternalModuleData::Struct(struct_) => struct_.copy_local_instructions(
+                        module,
+                        builder,
+                        compilation_ctx,
+                        module_data,
+                    ),
+                    ExternalModuleData::Enum(_) => todo!(),
+                }
+            }
             IntermediateType::ISigner => {
                 // Signer type is read-only, we push the pointer only
             }
@@ -775,7 +791,8 @@ impl IntermediateType {
             // in memory
             IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. } => {
+            | IntermediateType::IGenericStructInstance { .. }
+            | IntermediateType::IExternalUserData { .. } => {
                 // Since the memory needed for vectors might differ, we don't overwrite it.
                 // We update the inner pointer to point to the location where the new vector is already allocated.
                 let src_ptr = module.locals.add(ValType::I32);
@@ -806,7 +823,6 @@ impl IntermediateType {
                 panic!("cannot write to a type parameter, expected a concrete type");
             }
             IntermediateType::IEnum(_) => todo!(),
-            IntermediateType::IExternalUserData { .. } => todo!(),
         }
     }
 
@@ -938,11 +954,23 @@ impl IntermediateType {
                 builder.i32_const(1);
             }
             Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner),
-            Self::IStruct { index, .. } => {
-                IStruct::equality(builder, module, compilation_ctx, module_data, *index)
+            Self::IStruct { index, module_id } => {
+                let struct_ = compilation_ctx
+                    .get_user_data_type_by_index(module_id, *index)
+                    .unwrap();
+                struct_.equality(builder, module, compilation_ctx, module_data)
             }
-            Self::IGenericStructInstance { index, .. } => {
-                IStruct::equality(builder, module, compilation_ctx, module_data, *index)
+            Self::IGenericStructInstance {
+                index,
+                module_id,
+                types,
+            } => {
+                let struct_ = compilation_ctx
+                    .get_user_data_type_by_index(module_id, *index)
+                    .unwrap();
+                struct_
+                    .instantiate(types)
+                    .equality(builder, module, compilation_ctx, module_data)
             }
             Self::IEnum(_) => todo!(),
             Self::IRef(inner) | Self::IMutRef(inner) => {
@@ -1013,7 +1041,8 @@ impl IntermediateType {
                     | IntermediateType::ISigner
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
-                    | IntermediateType::IGenericStructInstance { .. } => {
+                    | IntermediateType::IGenericStructInstance { .. }
+                    | IntermediateType::IExternalUserData { .. } => {
                         builder.local_get(ptr1).local_get(ptr2);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -1023,15 +1052,29 @@ impl IntermediateType {
                         panic!("Cannot compare a type parameter, expected a concrete type");
                     }
                     IntermediateType::IEnum(_) => todo!(),
-                    IntermediateType::IExternalUserData { .. } => todo!(),
                 }
 
                 inner.load_equality_instructions(module, builder, compilation_ctx, module_data)
             }
+
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } => {
+                let external_data = compilation_ctx
+                    .get_external_module_data(module_id, identifier)
+                    .unwrap();
+
+                match external_data {
+                    ExternalModuleData::Struct(struct_) => {
+                        struct_.equality(builder, module, compilation_ctx, module_data)
+                    }
+                    ExternalModuleData::Enum(_) => todo!(),
+                }
+            }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot compare a type parameter, expected a concrete type");
             }
-            IntermediateType::IExternalUserData { .. } => todo!(),
         }
     }
 
