@@ -1744,6 +1744,9 @@ fn translate_instruction(
                 }
             }
         }
+        Bytecode::Nop => {
+            // Just do nothing
+        }
         //**
         // Enums
         //**
