@@ -109,9 +109,7 @@ pub fn translate_function(
     let params = function_information.signature.get_argument_wasm_types();
     let results = function_information.signature.get_return_wasm_types();
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
-    let mut builder = function
-        .name(function_information.function_id.identifier.clone())
-        .func_body();
+    let mut builder = function.func_body();
 
     let (arguments, locals) = process_fn_local_variables(function_information, module);
 
@@ -458,6 +456,7 @@ fn translate_instruction(
                 .iter()
                 .any(|t| matches!(t, IntermediateType::ITypeParameter(_)))
             {
+                println!("TRANSLATE 1");
                 let arguments_start =
                     types_stack.len() - function_information.signature.arguments.len();
 
@@ -468,6 +467,7 @@ fn translate_instruction(
                     .iter()
                     .enumerate()
                     .filter_map(|(index, f)| {
+                        println!("===> {f:?} {types:?}");
                         if let IntermediateType::ITypeParameter(_) = f {
                             Some(types[index].clone())
                         } else {
@@ -478,8 +478,11 @@ fn translate_instruction(
 
                 function_information.instantiate(&instantiations)
             } else {
+                println!("TRANSLATE 2");
                 function_information.instantiate(type_instantiations)
             };
+
+            println!("TRANSLATE F ID: {:?}", function_information.function_id);
 
             // Shadow the function_id variable because now it contains concrete types
             let function_id = &function_information.function_id;
@@ -546,6 +549,7 @@ fn translate_instruction(
                 );
             };
 
+            println!("ACAAA {:?}", &function_information.signature.returns);
             // Insert in the stack types the types returned by the function (if any)
             types_stack.append(&function_information.signature.returns);
         }

@@ -51,14 +51,27 @@ impl MappedFunction {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
-        let is_generic = signature
-            .arguments
-            .iter()
-            .any(|a| matches!(a, IntermediateType::ITypeParameter(_)))
-            || signature
-                .returns
-                .iter()
-                .any(|a| matches!(a, IntermediateType::ITypeParameter(_)));
+        let is_generic = signature.arguments.iter().any(|a| match a {
+            IntermediateType::IRef(intermediate_type)
+            | IntermediateType::IMutRef(intermediate_type) => {
+                matches!(
+                    intermediate_type.as_ref(),
+                    IntermediateType::ITypeParameter(_)
+                )
+            }
+            IntermediateType::ITypeParameter(_) => true,
+            _ => false,
+        }) || signature.returns.iter().any(|a| match a {
+            IntermediateType::IRef(intermediate_type)
+            | IntermediateType::IMutRef(intermediate_type) => {
+                matches!(
+                    intermediate_type.as_ref(),
+                    IntermediateType::ITypeParameter(_)
+                )
+            }
+            IntermediateType::ITypeParameter(_) => true,
+            _ => false,
+        });
 
         Self {
             function_id,
@@ -97,8 +110,10 @@ impl MappedFunction {
                         // If the concrete type is already a reference, return it as is
                         // Otherwise, wrap it in a reference
                         if let IntermediateType::IRef(_) = &concrete_type {
+                            println!("1 {concrete_type:?} {types:?}");
                             concrete_type
                         } else {
+                            println!("2 {concrete_type:?} {types:?}");
                             IntermediateType::IRef(Box::new(concrete_type))
                         }
                     } else {
