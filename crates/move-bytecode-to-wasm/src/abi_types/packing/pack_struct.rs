@@ -310,6 +310,7 @@ impl IStruct {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn pack_child_struct(
     child_struct: &IStruct,
     module: &mut Module,
