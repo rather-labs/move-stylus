@@ -213,29 +213,17 @@ impl IStruct {
                     let child_struct = compilation_ctx
                         .get_user_data_type_by_index(module_id, *index)
                         .unwrap();
-                    if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                        child_struct.add_pack_instructions(
-                            block,
-                            module,
-                            field_local,
-                            data_ptr,
-                            inner_data_reference,
-                            compilation_ctx,
-                            Some(inner_data_reference),
-                        );
-                        32
-                    } else {
-                        child_struct.add_pack_instructions(
-                            block,
-                            module,
-                            field_local,
-                            data_ptr,
-                            inner_data_reference,
-                            compilation_ctx,
-                            None,
-                        );
-                        field.encoded_size(compilation_ctx)
-                    }
+
+                    pack_child_struct(
+                        child_struct,
+                        module,
+                        compilation_ctx,
+                        block,
+                        field_local,
+                        data_ptr,
+                        inner_data_reference,
+                        field,
+                    )
                 }
                 IntermediateType::IGenericStructInstance {
                     module_id,
@@ -247,29 +235,16 @@ impl IStruct {
                         .unwrap();
                     let child_struct_instance = child_struct.instantiate(types);
 
-                    if child_struct_instance.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                        child_struct_instance.add_pack_instructions(
-                            block,
-                            module,
-                            field_local,
-                            data_ptr,
-                            inner_data_reference,
-                            compilation_ctx,
-                            Some(inner_data_reference),
-                        );
-                        32
-                    } else {
-                        child_struct_instance.add_pack_instructions(
-                            block,
-                            module,
-                            field_local,
-                            data_ptr,
-                            inner_data_reference,
-                            compilation_ctx,
-                            None,
-                        );
-                        field.encoded_size(compilation_ctx)
-                    }
+                    pack_child_struct(
+                        &child_struct_instance,
+                        module,
+                        compilation_ctx,
+                        block,
+                        field_local,
+                        data_ptr,
+                        inner_data_reference,
+                        field,
+                    )
                 }
                 IntermediateType::IExternalUserData {
                     module_id,
@@ -280,31 +255,16 @@ impl IStruct {
                         .unwrap();
 
                     match external_data {
-                        ExternalModuleData::Struct(child_struct) => {
-                            if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                                child_struct.add_pack_instructions(
-                                    block,
-                                    module,
-                                    field_local,
-                                    data_ptr,
-                                    inner_data_reference,
-                                    compilation_ctx,
-                                    Some(inner_data_reference),
-                                );
-                                32
-                            } else {
-                                child_struct.add_pack_instructions(
-                                    block,
-                                    module,
-                                    field_local,
-                                    data_ptr,
-                                    inner_data_reference,
-                                    compilation_ctx,
-                                    None,
-                                );
-                                field.encoded_size(compilation_ctx)
-                            }
-                        }
+                        ExternalModuleData::Struct(child_struct) => pack_child_struct(
+                            child_struct,
+                            module,
+                            compilation_ctx,
+                            block,
+                            field_local,
+                            data_ptr,
+                            inner_data_reference,
+                            field,
+                        ),
                         _ => {
                             field.add_pack_instructions(
                                 block,
@@ -347,5 +307,40 @@ impl IStruct {
                 .binop(BinaryOp::I32Add)
                 .local_set(data_ptr);
         }
+    }
+}
+
+fn pack_child_struct(
+    child_struct: &IStruct,
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    block: &mut InstrSeqBuilder,
+    field_local: LocalId,
+    data_ptr: LocalId,
+    inner_data_reference: LocalId,
+    field: &IntermediateType,
+) -> usize {
+    if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
+        child_struct.add_pack_instructions(
+            block,
+            module,
+            field_local,
+            data_ptr,
+            inner_data_reference,
+            compilation_ctx,
+            Some(inner_data_reference),
+        );
+        32
+    } else {
+        child_struct.add_pack_instructions(
+            block,
+            module,
+            field_local,
+            data_ptr,
+            inner_data_reference,
+            compilation_ctx,
+            None,
+        );
+        field.encoded_size(compilation_ctx)
     }
 }
