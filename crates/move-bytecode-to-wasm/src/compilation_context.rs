@@ -11,7 +11,7 @@ use walrus::{FunctionId, MemoryId};
 type Result<T> = std::result::Result<T, CompilationContextError>;
 
 pub enum ExternalModuleData<'a> {
-    Struct(&'a IStruct),
+    Struct(Cow<'a, IStruct>),
     Enum(&'a IEnum),
 }
 
@@ -37,6 +37,7 @@ impl CompilationContext<'_> {
         &self,
         module_id: &ModuleId,
         identifier: &str,
+        types: &Option<Vec<IntermediateType>>,
     ) -> Result<ExternalModuleData> {
         let module = self
             .deps_data
@@ -49,7 +50,12 @@ impl CompilationContext<'_> {
             .iter()
             .find(|s| s.identifier == identifier)
         {
-            Ok(ExternalModuleData::Struct(struct_))
+            if let Some(instantiation_types) = types {
+                let struct_instance = struct_.instantiate(instantiation_types);
+                Ok(ExternalModuleData::Struct(Cow::Owned(struct_instance)))
+            } else {
+                Ok(ExternalModuleData::Struct(Cow::Borrowed(struct_)))
+            }
         } else {
             todo!("enum case and empty case")
         }
@@ -110,13 +116,12 @@ impl CompilationContext<'_> {
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
+                types,
             } => {
-                let external_data = self.get_external_module_data(module_id, identifier)?;
+                let external_data = self.get_external_module_data(module_id, identifier, types)?;
 
                 match external_data {
-                    ExternalModuleData::Struct(external_struct) => {
-                        Ok(Cow::Borrowed(external_struct))
-                    }
+                    ExternalModuleData::Struct(external_struct) => Ok(external_struct),
                     ExternalModuleData::Enum(_) => Err(CompilationContextError::ExpectedStruct),
                 }
             }

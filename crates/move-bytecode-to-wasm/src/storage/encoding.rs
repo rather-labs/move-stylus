@@ -248,6 +248,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
+                types,
             } if Uid::is_vm_type(module_id, identifier) => {
                 let tmp = module.locals.add(ValType::I32);
 
@@ -292,9 +293,10 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
+                types,
             } => {
                 let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier)
+                    .get_external_module_data(module_id, identifier, types)
                     .unwrap();
 
                 match external_data {
@@ -310,7 +312,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                                 compilation_ctx,
                                 tmp,
                                 slot_ptr,
-                                struct_,
+                                &struct_,
                                 written_bytes_in_slot,
                             );
                     }
@@ -613,6 +615,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
+                types,
             } if Uid::is_vm_type(module_id, identifier) => {
                 // Here we need to reconstruct the UID struct. To do that we first allocate 4 bytes
                 // that will contain the pointer to the UID struct data
@@ -678,9 +681,10 @@ pub fn add_read_and_decode_storage_struct_instructions(
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
+                types,
             } => {
                 let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier)
+                    .get_external_module_data(module_id, identifier, types)
                     .unwrap();
 
                 match external_data {
@@ -692,7 +696,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
                                 builder,
                                 compilation_ctx,
                                 slot_ptr,
-                                child_struct,
+                                &child_struct,
                                 true,
                                 read_bytes_in_slot,
                             );
@@ -743,12 +747,14 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
         IntermediateType::IExternalUserData {
             module_id,
             identifier,
+            types,
         } if Uid::is_vm_type(module_id, identifier) => 32,
         IntermediateType::IExternalUserData {
             module_id,
             identifier,
+            types,
         } => match compilation_ctx
-            .get_external_module_data(module_id, identifier)
+            .get_external_module_data(module_id, identifier, types)
             .unwrap()
         {
             ExternalModuleData::Struct(_) => 0,
