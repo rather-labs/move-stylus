@@ -51,6 +51,13 @@ async fn main() -> eyre::Result<()> {
         println!("create tx 0x{}", hex::encode(&raw));
     }
 
+    // Call it a second time to make sure the constructor is not called again
+    let pending_tx = example.constructor().send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+
+    // Check no log is emitted, meaning the constructor logic is not executed again
+    assert_eq!(receipt.logs().len(), 0);
+
     println!("\nReading value before increment");
     let res = example.read(counter_id).call().await?;
     println!("counter = {}", res);
