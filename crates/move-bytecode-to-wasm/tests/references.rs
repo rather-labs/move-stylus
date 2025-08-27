@@ -1,6 +1,6 @@
 use alloy_primitives::U256;
-use alloy_sol_types::{SolCall, SolType, SolValue, sol};
 use alloy_sol_types::abi::TokenSeq;
+use alloy_sol_types::{SolCall, SolType, SolValue, sol};
 use anyhow::Result;
 use common::{runtime_sandbox::RuntimeSandbox, translate_test_package};
 use rstest::{fixture, rstest};
