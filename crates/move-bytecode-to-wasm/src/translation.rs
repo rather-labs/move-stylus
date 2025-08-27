@@ -190,6 +190,8 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
+                    println!("\nTranslating {instruction:?}");
+                    println!("Typestack BEFORE {:?}", ctx.types_stack.0);
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -206,6 +208,7 @@ fn translate_flow(
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
                     });
+                    println!("Typestack AFTER {:?}\n", ctx.types_stack.0);
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
@@ -626,6 +629,8 @@ fn translate_instruction(
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             local_type.move_local_instructions(builder, compilation_ctx, local);
+
+            println!("MOVE LOC |{local_type:?}|");
             types_stack.push(local_type);
         }
         Bytecode::CopyLoc(local_id) => {
@@ -1652,23 +1657,58 @@ fn translate_instruction(
             });
         }
         Bytecode::PackGeneric(struct_definition_index) => {
+            println!("|1|");
             let struct_ = module_data
                 .structs
                 .get_struct_instance_by_struct_definition_idx(struct_definition_index)?;
 
+            let (struct_, types) = if struct_
+                .fields
+                .iter()
+                .any(|t| matches!(t, IntermediateType::ITypeParameter(_)))
+            {
+                let types_start = types_stack.len() - struct_.fields.len();
+
+                // Get the function's arguments from the types stack
+                let types = &types_stack[types_start..types_stack.len()];
+
+                let instantiations: Vec<IntermediateType> = struct_
+                    .fields
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, f)| {
+                        if let IntermediateType::ITypeParameter(_) = f {
+                            Some(types[index].clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                (struct_.instantiate(&instantiations), instantiations)
+            } else {
+                let types = module_data
+                    .structs
+                    .get_generic_struct_types_instances(struct_definition_index)?
+                    .to_vec();
+
+                (struct_, types)
+            };
+
+            println!("|2| {struct_:?}");
             bytecodes::structs::pack(&struct_, module, builder, compilation_ctx, types_stack)?;
 
+            println!("|3|");
             let idx = module_data
                 .structs
                 .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
-            let types = module_data
-                .structs
-                .get_generic_struct_types_instances(struct_definition_index)?;
+            println!("|4|");
+            println!("===> {types:?}");
 
             types_stack.push(IntermediateType::IGenericStructInstance {
                 module_id: module_data.id.clone(),
                 index: idx,
-                types: types.to_vec(),
+                types,
             });
         }
         Bytecode::Unpack(struct_definition_index) => {
