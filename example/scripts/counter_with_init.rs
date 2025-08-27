@@ -46,17 +46,11 @@ async fn main() -> eyre::Result<()> {
     let counter_id = receipt.logs()[0].data().data.0.clone();
     let counter_id = FixedBytes::<32>::new(<[u8; 32]>::try_from(counter_id.to_vec()).unwrap());
     println!("Captured counter_id {:?}", counter_id);
+
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
         println!("create tx 0x{}", hex::encode(&raw));
     }
-
-    // Call it a second time to make sure the constructor is not called again
-    let pending_tx = example.constructor().send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-
-    // Check no log is emitted, meaning the constructor logic is not executed again
-    assert_eq!(receipt.logs().len(), 0);
 
     println!("\nReading value before increment");
     let res = example.read(counter_id).call().await?;
@@ -64,11 +58,25 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nSending increment tx");
     let pending_tx = example.increment(counter_id).send().await?;
+    let _ = pending_tx.get_receipt().await?;
+
+    println!("\nReading value after increment");
+    let res = example.read(counter_id).call().await?;
+    println!("counter = {}", res);
+
+    // Call it a second time to make sure the constructor is not called again
+    let pending_tx = example.constructor().send().await?;
     let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
+
+    // Check no log is emitted, meaning the constructor logic is not executed again
+    assert_eq!(receipt.logs().len(), 0);
+    // Read again and check the value has not changed
+    let res = example.read(counter_id).call().await?;
+    assert_eq!(res, 26);
+
+    println!("\nSending increment tx");
+    let pending_tx = example.increment(counter_id).send().await?;
+    let _ = pending_tx.get_receipt().await?;
 
     println!("\nReading value after increment");
     let res = example.read(counter_id).call().await?;
