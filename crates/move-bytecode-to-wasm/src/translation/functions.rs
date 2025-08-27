@@ -4,9 +4,11 @@ use move_binary_format::file_format::{
     DatatypeHandleIndex, FunctionDefinition, Signature, SignatureToken, Visibility,
 };
 use walrus::{
-    InstrSeqBuilder, MemoryId, Module, ValType,
+    InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
     ir::{LoadKind, MemArg, StoreKind},
 };
+
+use super::types_stack::TypesStack;
 
 use crate::{CompilationContext, UserDefinedType, translation::intermediate_types::ISignature};
 
@@ -259,4 +261,55 @@ pub fn prepare_function_return(
     }
 
     builder.return_();
+}
+
+/// This function sets up the arguments for a function call in the WebAssembly module.
+///
+/// It processes each argument type, checking if it is an immutable (`IRef`) or mutable (`IMutRef`) reference.
+/// If a reference is detected, the function ensures that the pointer to the referenced data is loaded.
+pub fn prepare_function_arguments(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    arguments: &[IntermediateType],
+    compilation_ctx: &CompilationContext,
+    types_stack: &mut TypesStack,
+) {
+    // Check if the function has any reference arguments -> we need to load the Ref pointer before calling the function
+    let has_ref = arguments.iter().rev().any(|arg| {
+        // TODO: review this
+        let _ = types_stack.pop_expecting(arg).is_ok();
+
+        matches!(
+            arg,
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_)
+        )
+    });
+
+    if has_ref {
+        // 1) Spill all args from the value stack into locals (last arg first)
+        let mut spilled: Vec<LocalId> = Vec::new();
+
+        for arg_ty in arguments.iter().rev() {
+            if matches!(
+                arg_ty,
+                IntermediateType::IRef(_) | IntermediateType::IMutRef(_)
+            ) {
+                // If the argument is a Ref, load the pointer
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+            spilled.push(arg_ty.add_stack_to_local_instructions(module, builder));
+        }
+
+        // 2) Rebuild the operand stack in call order (first .. last)
+        for loc in spilled.into_iter().rev() {
+            builder.local_get(loc);
+        }
+    };
 }
