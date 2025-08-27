@@ -263,7 +263,7 @@ pub fn prepare_function_return(
     builder.return_();
 }
 
-/// This function sets up the arguments for a function call in the WebAssembly module.
+/// This function sets up the arguments for a function call.
 ///
 /// It processes each argument type, checking if it is an immutable (`IRef`) or mutable (`IMutRef`) reference.
 /// If a reference is detected, the function ensures that the pointer to the referenced data is loaded.

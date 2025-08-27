@@ -252,10 +252,21 @@ mod generic_functions_args {
             uint128 b;
         }
 
+        struct Foo {
+            Bar c;
+            address d;
+            uint128[] e;
+            bool f;
+            uint16 g;
+            uint256 h;
+        }
+
         function testForward(uint32 x, bool inner) external returns (bool, uint32);
         function test(uint32 x, bool inner) external returns (bool, uint32);
         function testInv(bool inner, uint32 x) external returns (bool, uint32);
         function testMix(uint32 x, bool inner, uint64 v, uint64 w) external returns (bool, uint32, uint64, uint64);
+        function testForwardGenerics(uint32 x, bool inner, uint64 y) external returns (bool, uint64, uint32);
+        function testForwardGenerics2(Bar x, uint128 b, Foo y) external returns (uint128, Foo, Bar);
     }
 
     #[rstest]
@@ -274,6 +285,34 @@ mod generic_functions_args {
     #[case(testMixCall::new((
         55, true, 66, 77)),
         (true, 55, 66, 77))]
+    #[case(testForwardGenericsCall::new((
+        55, true, 66)),
+        (true, 66, 55))]
+    #[case(testForwardGenericsCall::new((
+        55, false, 66)),
+        (false, 66, 55))]
+    #[case(testForwardGenerics2Call::new((
+        Bar { a: 55, b: 66 },
+        77,
+        Foo {
+            c: Bar { a: 88, b: 99 },
+            d: address!("0xcafe000000000000000000000000000000007357"),
+            e: vec![77],
+            f: true,
+            g: u16::MAX,
+            h: U256::MAX,
+        },
+    )),
+        (77, Foo {
+            c: Bar { a: 88, b: 99 },
+            d: address!("0xcafe000000000000000000000000000000007357"),
+            e: vec![77],
+            f: true,
+            g: u16::MAX,
+            h: U256::MAX,
+        },
+        Bar { a: 55, b: 66 }
+    ,))]
     fn test_generic_args<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
