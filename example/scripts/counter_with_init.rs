@@ -23,8 +23,8 @@ async fn main() -> eyre::Result<()> {
     dotenv().ok();
     let priv_key = std::env::var("PRIV_KEY").map_err(|_| eyre!("No {} env var set", "PRIV_KEY"))?;
     let rpc_url = std::env::var("RPC_URL").map_err(|_| eyre!("No {} env var set", "RPC_URL"))?;
-    let contract_address = std::env::var("CONTRACT_ADDRESS_COUNTER")
-        .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_COUNTER"))?;
+    let contract_address = std::env::var("CONTRACT_ADDRESS_COUNTER_WITH_INIT")
+        .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_COUNTER_WITH_INIT"))?;
 
     let signer = PrivateKeySigner::from_str(&priv_key)?;
 
