@@ -1,11 +1,15 @@
 module hello_world::hello_world;
 
-use hello_world::external_generic_struct_defs::{Foo, create_foo};
+// use hello_world::external_generic_struct_defs::{Foo, create_foo};
 
-public struct LocalStruct<T: copy> has drop, copy {
+public struct Foo<T: copy> has drop, copy {
     g: T,
-    a: u32,
-    b: Foo<T>,
+}
+
+public fun create_foo<T: copy>(g: T): Foo<T> {
+    Foo {
+        g,
+    }
 }
 
 public fun structCopy(): Foo<u16> {

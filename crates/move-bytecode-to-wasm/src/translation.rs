@@ -537,10 +537,10 @@ fn translate_instruction(
 
             let return_types =
                 &module_data.functions.returns[function_instantiation_handle_index.0 as usize];
-            // println!("---> {return_types:?}");
-            // println!("---> {:?}", &function_information.signature.returns);
+            println!("---> 1 {return_types:?}");
+            println!("---> 2 {:?}", &function_information.signature.returns);
             // Insert in the stack types the types returned by the function (if any)
-            types_stack.append(&return_types);
+            types_stack.append(&function_information.signature.returns);
         }
         // Function calls
         Bytecode::Call(function_handle_index) => {
@@ -1122,7 +1122,9 @@ fn translate_instruction(
             // We dont pop the return values from the stack, we just check if the types match
             assert!(
                 types_stack.0.ends_with(&mapped_function.signature.returns),
-                "types stack does not match function return types"
+                "types stack does not match function return types\ntypes stack {:?}\nfunction return {:?}",
+                types_stack.0.last(),
+                &mapped_function.signature.returns,
             );
         }
         Bytecode::CastU8 => {
