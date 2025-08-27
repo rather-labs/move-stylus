@@ -89,6 +89,8 @@ pub struct IStruct {
     pub heap_size: u32,
 
     pub saved_in_storage: bool,
+
+    pub is_one_time_witness: bool,
 }
 
 impl IStruct {
@@ -98,6 +100,7 @@ impl IStruct {
         fields: Vec<(Option<FieldHandleIndex>, IntermediateType)>,
         fields_types: HashMap<FieldHandleIndex, IntermediateType>,
         saved_in_storage: bool,
+        is_one_time_witness: bool,
     ) -> Self {
         let mut heap_size = 0;
         let mut field_offsets = HashMap::new();
@@ -118,6 +121,7 @@ impl IStruct {
             fields_types,
             fields: ir_fields,
             saved_in_storage,
+            is_one_time_witness,
         }
     }
 

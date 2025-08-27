@@ -109,9 +109,7 @@ pub fn translate_function(
     let params = function_information.signature.get_argument_wasm_types();
     let results = function_information.signature.get_return_wasm_types();
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
-    let mut builder = function
-        .name(function_information.function_id.identifier.clone())
-        .func_body();
+    let mut builder = function.func_body();
 
     let (arguments, locals) = process_fn_local_variables(function_information, module);
 
@@ -453,6 +451,7 @@ fn translate_instruction(
             // `test2` will remain as `ITypeParameters` and will only be resolved at
             // the moment of the function call.
             let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
+
             let function_information = if type_instantiations
                 .iter()
                 .any(|t| matches!(t, IntermediateType::ITypeParameter(_)))
@@ -463,6 +462,8 @@ fn translate_instruction(
                 // Get the function's arguments from the types stack
                 let types = &types_stack[arguments_start..types_stack.len()];
 
+                // These types represent the instantiated types that correspond to the return values of the parent function.
+                // This is crucial because we may encounter an IRef<T> or IMutRef<T>, and we need to extract the underlying type T.
                 let instantiations: Vec<IntermediateType> = type_instantiations
                     .iter()
                     .enumerate()

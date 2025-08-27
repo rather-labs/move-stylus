@@ -6,6 +6,7 @@ mod event;
 mod object;
 mod transaction;
 mod transfer;
+mod types;
 
 use walrus::{FunctionId, Module};
 
@@ -31,6 +32,9 @@ impl NativeFunction {
     pub const NATIVE_TRANSFER_OBJECT: &str = "transfer";
     pub const NATIVE_SHARE_OBJECT: &str = "share_object";
     pub const NATIVE_FREEZE_OBJECT: &str = "freeze_object";
+
+    // Types functions
+    pub const NATIVE_IS_ONE_TIME_WITNESS: &str = "is_one_time_witness";
 
     // Storage
     #[cfg(debug_assertions)]
@@ -210,6 +214,17 @@ impl NativeFunction {
                     compilation_ctx,
                     &[&generics[0]],
                 )
+            }
+
+            Self::NATIVE_IS_ONE_TIME_WITNESS => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {name} expected 1 type parameter, found {}",
+                    generics.len(),
+                );
+
+                types::add_is_one_time_witness_fn(module, compilation_ctx, &generics[0])
             }
             _ => panic!("generic native function {name} not supported yet"),
         }

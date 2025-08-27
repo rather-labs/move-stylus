@@ -51,14 +51,27 @@ impl MappedFunction {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
-        let is_generic = signature
-            .arguments
-            .iter()
-            .any(|a| matches!(a, IntermediateType::ITypeParameter(_)))
-            || signature
-                .returns
-                .iter()
-                .any(|a| matches!(a, IntermediateType::ITypeParameter(_)));
+        let is_generic = signature.arguments.iter().any(|a| match a {
+            IntermediateType::IRef(intermediate_type)
+            | IntermediateType::IMutRef(intermediate_type) => {
+                matches!(
+                    intermediate_type.as_ref(),
+                    IntermediateType::ITypeParameter(_)
+                )
+            }
+            IntermediateType::ITypeParameter(_) => true,
+            _ => false,
+        }) || signature.returns.iter().any(|a| match a {
+            IntermediateType::IRef(intermediate_type)
+            | IntermediateType::IMutRef(intermediate_type) => {
+                matches!(
+                    intermediate_type.as_ref(),
+                    IntermediateType::ITypeParameter(_)
+                )
+            }
+            IntermediateType::ITypeParameter(_) => true,
+            _ => false,
+        });
 
         Self {
             function_id,
@@ -84,49 +97,67 @@ impl MappedFunction {
 
     /// Replaces all type parameters in the function with the provided types.
     pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
+        // Helper function to instantiate a single type
+        let instantiate_type = |t: &IntermediateType| -> IntermediateType {
+            match t {
+                // Direct type parameter: T -> concrete_type
+                IntermediateType::ITypeParameter(index) => types[*index as usize].clone(),
+                // Reference type parameter: &T -> &concrete_type
+                IntermediateType::IRef(inner) => {
+                    if let IntermediateType::ITypeParameter(index) = inner.as_ref() {
+                        let concrete_type = types[*index as usize].clone();
+
+                        // If the concrete type is already a reference, return it as is
+                        // Otherwise, wrap it in a reference
+                        if let IntermediateType::IRef(_) = &concrete_type {
+                            concrete_type
+                        } else {
+                            IntermediateType::IRef(Box::new(concrete_type))
+                        }
+                    } else {
+                        t.clone()
+                    }
+                }
+                // Mutable reference type parameter: &mut T -> &mut concrete_type
+                IntermediateType::IMutRef(inner) => {
+                    if let IntermediateType::ITypeParameter(index) = inner.as_ref() {
+                        let concrete_type = types[*index as usize].clone();
+                        if let IntermediateType::IMutRef(_) = &concrete_type {
+                            concrete_type
+                        } else {
+                            IntermediateType::IMutRef(Box::new(concrete_type))
+                        }
+                    } else {
+                        t.clone()
+                    }
+                }
+                // Non-generic type: keep as is
+                _ => t.clone(),
+            }
+        };
+
         let arguments = self
             .signature
             .arguments
             .iter()
-            .map(|f| {
-                if let IntermediateType::ITypeParameter(index) = f {
-                    types[*index as usize].clone()
-                } else {
-                    f.clone()
-                }
-            })
+            .map(instantiate_type)
             .collect();
 
         let returns = self
             .signature
             .returns
             .iter()
-            .map(|f| {
-                if let IntermediateType::ITypeParameter(index) = f {
-                    types[*index as usize].clone()
-                } else {
-                    f.clone()
-                }
-            })
+            .map(instantiate_type)
             .collect();
 
-        let locals = self
-            .locals
-            .iter()
-            .map(|f| {
-                if let IntermediateType::ITypeParameter(index) = f {
-                    types[*index as usize].clone()
-                } else {
-                    f.clone()
-                }
-            })
-            .collect();
+        let locals = self.locals.iter().map(instantiate_type).collect();
 
         let signature = ISignature { arguments, returns };
         let results = signature.get_return_wasm_types();
 
         let mut function_id = self.function_id.clone();
         function_id.type_instantiations = Some(types.to_vec());
+
         Self {
             function_id,
             signature,
