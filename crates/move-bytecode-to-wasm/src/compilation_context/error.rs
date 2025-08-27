@@ -32,8 +32,8 @@ pub enum CompilationContextError {
     #[error("enum with enum id {0} not found in compilation context")]
     EnumWithVariantIdxNotFound(u16),
 
-    #[error("external module {0:?} not found")]
-    ExternalModuleNotFound(ModuleId),
+    #[error("module {0:?} not found")]
+    ModuleNotFound(ModuleId),
 
     #[error("expected struct")]
     ExpectedStruct,

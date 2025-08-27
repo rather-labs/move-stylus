@@ -490,7 +490,9 @@ impl IVector {
                             .call(vec_equality_heap_type_f_id);
                     }
                     IntermediateType::IStruct { module_id, index } => {
-                        let module_data = compilation_ctx.get_module_data_by_id(module_id);
+                        let module_data = compilation_ctx
+                            .get_module_data_by_id(module_id)
+                            .unwrap();
                         let struct_ = compilation_ctx
                             .get_user_data_type_by_index(module_id, *index)
                             .unwrap();
@@ -517,7 +519,9 @@ impl IVector {
                         struct_.equality(then, module, compilation_ctx, module_data);
                     }
                     IntermediateType::IGenericStructInstance { module_id, index, types } => {
-                        let module_data = compilation_ctx.get_module_data_by_id(module_id);
+                        let module_data = compilation_ctx
+                            .get_module_data_by_id(module_id)
+                            .unwrap();
                         let struct_ = compilation_ctx.get_user_data_type_by_index(module_id, *index).unwrap();
                         let struct_instance = struct_.instantiate(types);
 
@@ -543,7 +547,9 @@ impl IVector {
                         struct_instance.equality(then, module, compilation_ctx, module_data);
                     }
                     IntermediateType::IExternalUserData { module_id, identifier } => {
-                        let module_data = compilation_ctx.get_module_data_by_id(module_id);
+                        let module_data = compilation_ctx
+                            .get_module_data_by_id(module_id)
+                            .unwrap();
                         let external_data = compilation_ctx
                             .get_external_module_data(module_id, identifier)
                             .unwrap();

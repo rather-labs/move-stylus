@@ -1746,6 +1746,8 @@ mod vec_struct {
         function vecSwap(Foo[] x, uint64 id1, uint64 id2) external returns (Foo[]);
         function vecPushBack(Foo[] x, Foo y) external returns (Foo[]);
         function vecPushAndPopBack(Foo[] x, Foo y) external returns (Foo[]);
+        function vecEq(Foo[] x, Foo[] y) external returns (bool);
+        function vecNeq(Foo[] x, Foo[] y) external returns (bool);
     );
 
     fn get_foo_vector() -> Vec<Foo> {
@@ -2143,6 +2145,58 @@ mod vec_struct {
         [get_foo_vector(), vec![get_new_fooo(), get_new_fooo()]].concat()
     )]
     #[case(vecPushAndPopBackCall::new((get_foo_vector(), get_new_fooo())), get_foo_vector())]
+    #[case(vecEqCall::new((get_foo_vector(), get_foo_vector())), (true,))]
+    #[case(
+        vecEqCall::new((
+            get_foo_vector(),
+            vec![
+                Foo {
+                    q: address!("0x00000000000000000000000000000004deadbeef"),
+                    r: vec![4, 3, 0, 3, 4, 5, 6],
+                    s: vec![4, 5, 4, 3, 0, 3, 0],
+                    t: true,
+                    u: 44,
+                    v: 44242,
+                    w: 4424242,
+                    x: 442424242,
+                    y: 44242424242,
+                    z: U256::from(4424242424242_u128),
+                    bar: Bar { a: 442, b: 44242 },
+                    baz: Baz {
+                        a: 44242,
+                        b: vec![U256::from(4)],
+                    },
+                }
+            ]
+        )),
+        (false,)
+    )]
+    #[case(vecNeqCall::new((get_foo_vector(), get_foo_vector())), (false,))]
+    #[case(
+        vecNeqCall::new((
+            get_foo_vector(),
+            vec![
+                Foo {
+                    q: address!("0x00000000000000000000000000000004deadbeef"),
+                    r: vec![4, 3, 0, 3, 4, 5, 6],
+                    s: vec![4, 5, 4, 3, 0, 3, 0],
+                    t: true,
+                    u: 44,
+                    v: 44242,
+                    w: 4424242,
+                    x: 442424242,
+                    y: 44242424242,
+                    z: U256::from(4424242424242_u128),
+                    bar: Bar { a: 442, b: 44242 },
+                    baz: Baz {
+                        a: 44242,
+                        b: vec![U256::from(4)],
+                    },
+                }
+            ]
+        )),
+        (true,)
+    )]
     fn test_vec_struct<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

@@ -38,9 +38,10 @@ impl CompilationContext<'_> {
         module_id: &ModuleId,
         identifier: &str,
     ) -> Result<ExternalModuleData> {
-        let module = self.deps_data.get(module_id).ok_or(
-            CompilationContextError::ExternalModuleNotFound(module_id.clone()),
-        )?;
+        let module = self
+            .deps_data
+            .get(module_id)
+            .ok_or(CompilationContextError::ModuleNotFound(module_id.clone()))?;
 
         if let Some(struct_) = module
             .structs
@@ -54,10 +55,14 @@ impl CompilationContext<'_> {
         }
     }
 
-    pub fn get_module_data_by_id(&self, module_id: &ModuleId) -> &ModuleData {
-        self.deps_data
-            .get(module_id)
-            .unwrap_or(self.root_module_data)
+    pub fn get_module_data_by_id(&self, module_id: &ModuleId) -> Result<&ModuleData> {
+        if let Some(m) = self.deps_data.get(module_id) {
+            Ok(m)
+        } else if &self.root_module_data.id == module_id {
+            Ok(self.root_module_data)
+        } else {
+            Err(CompilationContextError::ModuleNotFound(module_id.clone()))
+        }
     }
 
     pub fn get_user_data_type_by_index(
