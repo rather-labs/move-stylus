@@ -1,4 +1,4 @@
-module 0x00::generic_functions_args;
+module 0x00::reference_args;
 
 #[allow(unused_field)]
 public struct Bar has drop {
