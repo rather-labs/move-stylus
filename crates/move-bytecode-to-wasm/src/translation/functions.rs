@@ -279,8 +279,12 @@ pub fn prepare_function_arguments(
     let mut has_ref = false;
     for arg in arguments.iter().rev() {
         types_stack.pop_expecting(arg)?;
-        has_ref = has_ref || matches!(arg, IntermediateType::IRef(_) | IntermediateType::IMutRef(_));
-    }    
+        has_ref = has_ref
+            || matches!(
+                arg,
+                IntermediateType::IRef(_) | IntermediateType::IMutRef(_)
+            );
+    }
 
     // If the function has any reference arguments, we need to load the Ref pointer before calling the function
     if has_ref {
@@ -310,6 +314,6 @@ pub fn prepare_function_arguments(
             builder.local_get(loc);
         }
     };
-    
+
     Ok(())
 }
