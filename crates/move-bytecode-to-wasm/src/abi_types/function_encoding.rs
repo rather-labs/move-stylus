@@ -229,6 +229,7 @@ mod tests {
             ],
             HashMap::new(),
             false,
+            false,
         );
 
         let struct_2 = IStruct::new(
@@ -239,6 +240,7 @@ mod tests {
                 (None, IntermediateType::IU128),
             ],
             HashMap::new(),
+            false,
             false,
         );
 

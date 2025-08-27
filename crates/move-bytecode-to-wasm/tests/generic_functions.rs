@@ -65,6 +65,10 @@ mod generic_functions {
         function echoU32U128(uint32 x, uint128) external returns (uint32, uint128);
         function echoAddressVecU128(address x, uint128[]) external returns (address, uint128[]);
         function echoStructVecU128(Foo x, uint128[]) external returns (Foo, uint128[]);
+        function echoStructRef(bool inner, Foo x) external returns (Foo);
+        function echoStructMutRef(bool inner, Foo x) external returns (Foo);
+        function echoVecU128Ref(uint128[] x) external returns (uint128[]);
+        function echoVecU128MutRef(uint128[] x) external returns (uint128[]);
     }
 
     #[rstest]
@@ -128,6 +132,88 @@ mod generic_functions {
             },
             vec![1,2,3,4,5]
     ))]
+    #[case(echoStructRefCall::new((
+        true,
+        Foo {
+            c: Bar { a: 1, b: 2 },
+            d: address!("0xcafe000000000000000000000000000000007357"),
+            e: vec![1,2,3],
+            f: true,
+            g: u16::MAX,
+            h: U256::MAX,
+    })),
+        (Foo {
+            c: Bar { a: 1, b: 2 },
+            d: address!("0xcafe000000000000000000000000000000007357"),
+            e: vec![1,2,3],
+            f: true,
+            g: u16::MAX,
+            h: U256::MAX,
+        }
+    ,))]
+    #[case(echoStructRefCall::new((
+        false,
+        Foo {
+            c: Bar { a: 1, b: 2 },
+            d: address!("0xcafe000000000000000000000000000000007357"),
+            e: vec![1,2,3],
+            f: true,
+            g: u16::MAX,
+            h: U256::MAX,
+    })),
+        (Foo {
+            c: Bar { a: 1, b: 2 },
+            d: address!("0xcafe000000000000000000000000000000007357"),
+            e: vec![1,2,3],
+            f: true,
+            g: u16::MAX,
+            h: U256::MAX,
+        }
+    ,))]
+    #[case(echoStructMutRefCall::new((true,
+        Foo {
+            c: Bar { a: 1, b: 2 },
+            d: address!("0xcafe000000000000000000000000000000007357"),
+            e: vec![1,2,3],
+            f: true,
+            g: u16::MAX,
+            h: U256::MAX,
+    })),
+        (Foo {
+            c: Bar { a: 1, b: 2 },
+            d: address!("0xcafe000000000000000000000000000000007357"),
+            e: vec![1,2,3],
+            f: true,
+            g: u16::MAX,
+            h: U256::MAX,
+        }
+    ,))]
+    #[case(echoStructMutRefCall::new((false,
+        Foo {
+            c: Bar { a: 1, b: 2 },
+            d: address!("0xcafe000000000000000000000000000000007357"),
+            e: vec![1,2,3],
+            f: true,
+            g: u16::MAX,
+            h: U256::MAX,
+    })),
+        (Foo {
+            c: Bar { a: 1, b: 2 },
+            d: address!("0xcafe000000000000000000000000000000007357"),
+            e: vec![1,2,3],
+            f: true,
+            g: u16::MAX,
+            h: U256::MAX,
+        }
+    ,))]
+    #[case(echoVecU128RefCall::new((
+        vec![1,2,3],
+    )),
+        (vec![1,2,3],))]
+    #[case(echoVecU128MutRefCall::new((
+        vec![1,2,3],
+    )),
+        (vec![1,2,3],))]
     fn test_generic_calls<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

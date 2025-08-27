@@ -1,23 +1,14 @@
-use std::collections::HashMap;
-
-use move_binary_format::file_format::{
-    Ability, AbilitySet, CompiledModule, DatatypeHandleIndex, FunctionDefinition, Signature,
-    SignatureToken, Visibility,
-};
-
 use walrus::{
     FunctionBuilder, FunctionId as WalrusFunctionId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    ir::{MemArg, StoreKind},
 };
 
 use crate::{
-    CompilationContext, UserDefinedType,
+    CompilationContext,
     abi_types::public_function::PublicFunction,
     hostio::host_functions,
-    translation::{
-        intermediate_types::{ISignature, IntermediateType},
-        table::{FunctionId, FunctionTable},
-    },
+    runtime::RuntimeFunction,
+    translation::{intermediate_types::ISignature, table::FunctionTable},
     utils::keccak_string_to_memory,
     vm_handled_types::{VmHandledType, tx_context::TxContext},
 };
@@ -69,6 +60,9 @@ pub fn build_constructor(
     // This is what we are going to be storing in the storage.
     const FLAG: i32 = 1;
 
+    // Host function for checking if all bytes are zero
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
+
     // Host functions for storage operations
     let (storage_load_fn, _) = host_functions::storage_load_bytes32(module);
     let (storage_cache_fn, _) = host_functions::storage_cache_bytes32(module);
@@ -103,62 +97,8 @@ pub fn build_constructor(
         .local_get(value_ptr)
         .call(storage_load_fn);
 
-    // Check all 32 bytes at value_ptr to see if the storage has been initialized
-    let offset = module.locals.add(ValType::I32); // Local variable to track the current byte offset
-    // Initialize offset to 0
-    builder.i32_const(0).local_set(offset);
-    builder.block(ValType::I32, |block| {
-        let block_id = block.id(); // ID for the outer block
-        // Loop over the 32 bytes at value_ptr
-        block.loop_(ValType::I32, |loop_| {
-            let loop_id = loop_.id();
-            loop_
-                .local_get(value_ptr) // Get the base pointer to the value
-                .local_get(offset) // Get the current offset
-                .binop(BinaryOp::I32Add) // Calculate the address: value_ptr + offset
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .i32_const(0)
-                .binop(BinaryOp::I32Ne) // Check if the loaded value is non-zero
-                .if_else(
-                    ValType::I32,
-                    |then| {
-                        // Non-zero value found, push 0 and exit the block
-                        then.i32_const(0).br(block_id);
-                    },
-                    |else_| {
-                        // If offset >= 28, break the loop
-                        else_
-                            .local_get(offset)
-                            .i32_const(28)
-                            .binop(BinaryOp::I32GeU)
-                            .if_else(
-                                ValType::I32,
-                                |then| {
-                                    // Reached the end of the loop + all bytes were zero, exit with 1
-                                    then.i32_const(1).br(block_id);
-                                },
-                                |inner_else| {
-                                    // Increment offset by 4 and continue the loop
-                                    inner_else
-                                        .local_get(offset)
-                                        .i32_const(4)
-                                        .binop(BinaryOp::I32Add)
-                                        .local_set(offset);
-
-                                    inner_else.br(loop_id); // Continue the loop
-                                },
-                            );
-                    },
-                );
-        });
-    });
+    // Check if the storage is empty, else it has been initialized
+    builder.local_get(value_ptr).i32_const(32).call(is_zero_fn);
 
     // If storage has not been initialized, proceed with initialization
     builder.if_else(
@@ -207,147 +147,4 @@ pub fn build_constructor(
 
     // Finalize and insert the function into the module
     function.finish(vec![], &mut module.funcs)
-}
-
-const INIT_FUNCTION_NAME: &str = "init";
-
-// The init() function is a special function that is called once when the module is first deployed,
-// so it is a good place to put the code that initializes module's objects and sets up the environment and configuration.
-//
-// For the init() function to be considered valid, it must adhere to the following requirements:
-// 1. It must be named `init`.
-// 2. It must be private.
-// 3. It must have &TxContext or &mut TxContext as its last argument, with an optional One Time Witness (OTW) as its first argument.
-// 4. It must not return any values.
-//
-// fun init(ctx: &TxContext) { /* ... */}
-// fun init(otw: OTW, ctx: &mut TxContext) { /* ... */ }
-//
-
-/// Checks if the given function (by index) is a valid `init` function.
-// TODO: Note that we currently trigger a panic if a function named 'init' fails to satisfy certain criteria to qualify as a constructor.
-// This behavior is not enforced by the move compiler itself.
-pub fn is_init(
-    function_id: &FunctionId,
-    move_function_arguments: &Signature,
-    move_function_return: &Signature,
-    function_def: &FunctionDefinition,
-    datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-    module: &CompiledModule,
-) -> bool {
-    // Must be named `init`
-    if function_id.identifier != INIT_FUNCTION_NAME {
-        return false;
-    }
-
-    // Must be private
-    assert_eq!(
-        function_def.visibility,
-        Visibility::Private,
-        "init() functions must be private"
-    );
-
-    // Must have 1 or 2 arguments
-    let arg_count = move_function_arguments.len();
-    assert!(
-        (1..=2).contains(&arg_count),
-        "init() functions must have 1 or 2 arguments"
-    );
-
-    // Check TxContext in the last argument
-    let is_tx_context_ref = move_function_arguments
-        .0
-        .last()
-        .map(|last| {
-            matches!(
-                IntermediateType::try_from_signature_token(last, datatype_handles_map).unwrap(),
-                IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner)
-                    if matches!(
-                        inner.as_ref(),
-                        IntermediateType::IExternalUserData { module_id, identifier }
-                            if TxContext::is_vm_type(module_id, identifier)
-                    )
-            )
-        })
-        .unwrap_or(false);
-
-    assert!(
-        is_tx_context_ref,
-        "Last argument must be &TxContext or &mut TxContext"
-    );
-
-    // Check OTW if 2 arguments
-    if arg_count == 2 {
-        assert!(
-            is_one_time_witness(module, &move_function_arguments.0[0]),
-            "First argument must be a valid one-time witness type"
-        );
-    }
-
-    // Must not return any values
-    assert!(
-        move_function_return.is_empty(),
-        "init() functions must return no values"
-    );
-
-    true
-}
-
-/// Checks if the given signature token is a one-time witness type.
-//
-// OTW (One-time witness) types are structs with the following requirements:
-// i. Their name is the upper-case version of the module's name.
-// ii. They have no fields (or a single boolean field).
-// iii. They have no type parameters.
-// iv. They have only the 'drop' ability.
-pub fn is_one_time_witness(module: &CompiledModule, tok: &SignatureToken) -> bool {
-    // 1. Argument must be a struct
-    let struct_idx = match tok {
-        SignatureToken::Datatype(idx) => idx,
-        _ => return false,
-    };
-
-    let handle = module.datatype_handle_at(*struct_idx);
-
-    // 2. Name must match uppercase module name
-    let module_handle = module.module_handle_at(handle.module);
-    let module_name = module.identifier_at(module_handle.name).as_str();
-    let struct_name = module.identifier_at(handle.name).as_str();
-    if struct_name != module_name.to_ascii_uppercase() {
-        return false;
-    }
-
-    // 3. Must have only the Drop ability
-    if handle.abilities != (AbilitySet::EMPTY | Ability::Drop) {
-        return false;
-    }
-
-    // 4. Must have no type parameters
-    if !handle.type_parameters.is_empty() {
-        return false;
-    }
-
-    // 5. Must have 0 or 1 field (and if 1, it must be Bool)
-    let struct_def = match module
-        .struct_defs
-        .iter()
-        .find(|def| def.struct_handle == *struct_idx)
-    {
-        Some(def) => def,
-        None => return false,
-    };
-
-    let field_count = struct_def.declared_field_count().unwrap_or(0);
-    if field_count > 1 {
-        return false;
-    }
-
-    if field_count == 1 {
-        let field = struct_def.field(0).unwrap();
-        if field.signature.0 != SignatureToken::Bool {
-            return false;
-        }
-    }
-
-    true
 }
