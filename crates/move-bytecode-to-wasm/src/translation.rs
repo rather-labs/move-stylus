@@ -20,7 +20,8 @@ use crate::{
 use anyhow::Result;
 use flow::Flow;
 use functions::{
-    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_return,
+    MappedFunction, add_unpack_function_return_values_instructions, prepare_function_arguments,
+    prepare_function_return,
 };
 use intermediate_types::{
     IntermediateType,
@@ -483,22 +484,9 @@ fn translate_instruction(
 
             // Shadow the function_id variable because now it contains concrete types
             let function_id = &function_information.function_id;
+            let arguments = &function_information.signature.arguments;
 
-            // Consume from the types stack the arguments that will be used by the function call
-            for argument in function_information.signature.arguments.iter().rev() {
-                types_stack.pop_expecting(argument)?;
-
-                if let IntermediateType::IMutRef(_) | IntermediateType::IRef(_) = argument {
-                    builder.load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-                }
-            }
+            prepare_function_arguments(module, builder, arguments, compilation_ctx, types_stack)?;
 
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {
@@ -551,25 +539,10 @@ fn translate_instruction(
         }
         // Function calls
         Bytecode::Call(function_handle_index) => {
-            // Consume from the types stack the arguments that will be used by the function call
+            let function_id = &module_data.functions.calls[function_handle_index.into_index()];
             let arguments = &module_data.functions.arguments[function_handle_index.into_index()];
 
-            for argument in arguments.iter().rev() {
-                types_stack.pop_expecting(argument)?;
-
-                if let IntermediateType::IMutRef(_) | IntermediateType::IRef(_) = argument {
-                    builder.load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-                }
-            }
-
-            let function_id = &module_data.functions.calls[function_handle_index.into_index()];
+            prepare_function_arguments(module, builder, arguments, compilation_ctx, types_stack)?;
 
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {

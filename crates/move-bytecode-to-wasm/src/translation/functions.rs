@@ -4,9 +4,11 @@ use move_binary_format::file_format::{
     DatatypeHandleIndex, FunctionDefinition, Signature, SignatureToken, Visibility,
 };
 use walrus::{
-    InstrSeqBuilder, MemoryId, Module, ValType,
+    InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
     ir::{LoadKind, MemArg, StoreKind},
 };
+
+use super::types_stack::{TypesStack, TypesStackError};
 
 use crate::{CompilationContext, UserDefinedType, translation::intermediate_types::ISignature};
 
@@ -259,4 +261,59 @@ pub fn prepare_function_return(
     }
 
     builder.return_();
+}
+
+/// This function sets up the arguments for a function call.
+///
+/// It processes each argument type, checking if it is an immutable (`IRef`) or mutable (`IMutRef`) reference.
+/// If a reference is detected, the function ensures that the pointer to the referenced data is loaded.
+pub fn prepare_function_arguments(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    arguments: &[IntermediateType],
+    compilation_ctx: &CompilationContext,
+    types_stack: &mut TypesStack,
+) -> Result<(), TypesStackError> {
+    // Verify that the types currently on the types stack correspond to the expected argument types.
+    // Additionally, determine if any of these arguments are references.
+    let mut has_ref = false;
+    for arg in arguments.iter().rev() {
+        types_stack.pop_expecting(arg)?;
+        has_ref = has_ref
+            || matches!(
+                arg,
+                IntermediateType::IRef(_) | IntermediateType::IMutRef(_)
+            );
+    }
+
+    // If the function has any reference arguments, we need to load the Ref pointer before calling the function
+    if has_ref {
+        // i. Spill all args from the value stack into locals (last arg first)
+        let mut spilled: Vec<LocalId> = Vec::new();
+
+        for arg_ty in arguments.iter().rev() {
+            if matches!(
+                arg_ty,
+                IntermediateType::IRef(_) | IntermediateType::IMutRef(_)
+            ) {
+                // If the argument is a Ref, load the pointer
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+            spilled.push(arg_ty.add_stack_to_local_instructions(module, builder));
+        }
+
+        // ii. Rebuild the operand stack in call order (first .. last)
+        for loc in spilled.into_iter().rev() {
+            builder.local_get(loc);
+        }
+    };
+
+    Ok(())
 }
