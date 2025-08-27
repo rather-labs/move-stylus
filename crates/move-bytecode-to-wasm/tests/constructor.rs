@@ -144,7 +144,6 @@ mod constructor_with_return {
     sol!(
         #[allow(missing_docs)]
         function constructor() public view;
-        function read(bytes32 id) public view returns (uint64);
     );
 
     #[rstest]
@@ -175,7 +174,6 @@ mod constructor_bad_args_1 {
     sol!(
         #[allow(missing_docs)]
         function constructor() public view;
-        function read(bytes32 id) public view returns (uint64);
     );
 
     #[rstest]
@@ -206,7 +204,6 @@ mod constructor_bad_args_2 {
     sol!(
         #[allow(missing_docs)]
         function constructor() public view;
-        function read(bytes32 id) public view returns (uint64);
     );
 
     #[rstest]
@@ -237,7 +234,6 @@ mod constructor_bad_args_3 {
     sol!(
         #[allow(missing_docs)]
         function constructor() public view;
-        function read(bytes32 id) public view returns (uint64);
     );
 
     #[rstest]
@@ -268,7 +264,6 @@ mod constructor_bad_args_4 {
     sol!(
         #[allow(missing_docs)]
         function constructor() public view;
-        function read(bytes32 id) public view returns (uint64);
     );
 
     #[rstest]
@@ -299,7 +294,6 @@ mod constructor_bad_args_5 {
     sol!(
         #[allow(missing_docs)]
         function constructor() public view;
-        function read(bytes32 id) public view returns (uint64);
     );
 
     #[rstest]
