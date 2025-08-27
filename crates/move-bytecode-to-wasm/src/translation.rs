@@ -486,13 +486,7 @@ fn translate_instruction(
             let function_id = &function_information.function_id;
             let arguments = &function_information.signature.arguments;
 
-            prepare_function_arguments(
-                module,
-                builder,
-                arguments,
-                compilation_ctx,
-                types_stack,
-            );
+            prepare_function_arguments(module, builder, arguments, compilation_ctx, types_stack)?;
 
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {
@@ -548,13 +542,7 @@ fn translate_instruction(
             let function_id = &module_data.functions.calls[function_handle_index.into_index()];
             let arguments = &module_data.functions.arguments[function_handle_index.into_index()];
 
-            prepare_function_arguments(
-                module,
-                builder,
-                arguments,
-                compilation_ctx,
-                types_stack,
-            );
+            prepare_function_arguments(module, builder, arguments, compilation_ctx, types_stack)?;
 
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {

@@ -8,7 +8,7 @@ use walrus::{
     ir::{LoadKind, MemArg, StoreKind},
 };
 
-use super::types_stack::TypesStack;
+use super::types_stack::{TypesStack, TypesStackError};
 
 use crate::{CompilationContext, UserDefinedType, translation::intermediate_types::ISignature};
 
@@ -273,20 +273,18 @@ pub fn prepare_function_arguments(
     arguments: &[IntermediateType],
     compilation_ctx: &CompilationContext,
     types_stack: &mut TypesStack,
-) {
-    // Check if the function has any reference arguments -> we need to load the Ref pointer before calling the function
-    let has_ref = arguments.iter().rev().any(|arg| {
-        // TODO: review this
-        let _ = types_stack.pop_expecting(arg).is_ok();
+) -> Result<(), TypesStackError> {
+    // Verify that the types currently on the types stack correspond to the expected argument types.
+    // Additionally, determine if any of these arguments are references.
+    let mut has_ref = false;
+    for arg in arguments.iter().rev() {
+        types_stack.pop_expecting(arg)?;
+        has_ref = has_ref || matches!(arg, IntermediateType::IRef(_) | IntermediateType::IMutRef(_));
+    }    
 
-        matches!(
-            arg,
-            IntermediateType::IRef(_) | IntermediateType::IMutRef(_)
-        )
-    });
-
+    // If the function has any reference arguments, we need to load the Ref pointer before calling the function
     if has_ref {
-        // 1) Spill all args from the value stack into locals (last arg first)
+        // i. Spill all args from the value stack into locals (last arg first)
         let mut spilled: Vec<LocalId> = Vec::new();
 
         for arg_ty in arguments.iter().rev() {
@@ -307,9 +305,11 @@ pub fn prepare_function_arguments(
             spilled.push(arg_ty.add_stack_to_local_instructions(module, builder));
         }
 
-        // 2) Rebuild the operand stack in call order (first .. last)
+        // ii. Rebuild the operand stack in call order (first .. last)
         for loc in spilled.into_iter().rev() {
             builder.local_get(loc);
         }
     };
+    
+    Ok(())
 }
