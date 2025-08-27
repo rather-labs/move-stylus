@@ -463,8 +463,9 @@ fn translate_instruction(
                 // Get the function's arguments from the types stack
                 let types = &types_stack[arguments_start..types_stack.len()];
 
-                // These types represent the instantiated types that correspond to the return values of the parent function.
-                // This is crucial because we may encounter an IRef<T> or IMutRef<T>, and we need to extract the underlying type T.
+                // These types represent the instantiated types that correspond to the return values
+                // of the parent function. This is crucial because we may encounter an IRef<T> or
+                // IMutRef<T>, and we need to extract the underlying type T.
                 let instantiations: Vec<IntermediateType> = type_instantiations
                     .iter()
                     .enumerate()
@@ -534,8 +535,12 @@ fn translate_instruction(
                 );
             };
 
+            let return_types =
+                &module_data.functions.returns[function_instantiation_handle_index.0 as usize];
+            // println!("---> {return_types:?}");
+            // println!("---> {:?}", &function_information.signature.returns);
             // Insert in the stack types the types returned by the function (if any)
-            types_stack.append(&function_information.signature.returns);
+            types_stack.append(&return_types);
         }
         // Function calls
         Bytecode::Call(function_handle_index) => {

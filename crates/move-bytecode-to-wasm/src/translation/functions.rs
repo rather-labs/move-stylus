@@ -99,8 +99,10 @@ impl MappedFunction {
 
     /// Replaces all type parameters in the function with the provided types.
     pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
+        println!("2 {types:?}");
         // Helper function to instantiate a single type
         let instantiate_type = |t: &IntermediateType| -> IntermediateType {
+            println!("itype: {t:?}");
             match t {
                 // Direct type parameter: T -> concrete_type
                 IntermediateType::ITypeParameter(index) => types[*index as usize].clone(),
@@ -133,6 +135,27 @@ impl MappedFunction {
                         t.clone()
                     }
                 }
+                IntermediateType::IGenericStructInstance {
+                    module_id,
+                    index,
+                    types: struct_types,
+                } => {
+                    println!("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+                    IntermediateType::IGenericStructInstance {
+                        module_id: module_id.clone(),
+                        index: *index,
+                        types: struct_types
+                            .iter()
+                            .map(|t| {
+                                if let IntermediateType::ITypeParameter(index) = t {
+                                    types[*index as usize].clone()
+                                } else {
+                                    t.clone()
+                                }
+                            })
+                            .collect(),
+                    }
+                }
                 // Non-generic type: keep as is
                 _ => t.clone(),
             }
@@ -145,12 +168,16 @@ impl MappedFunction {
             .map(instantiate_type)
             .collect();
 
+        println!("3 {:?}", self.signature.returns);
+
         let returns = self
             .signature
             .returns
             .iter()
             .map(instantiate_type)
             .collect();
+
+        println!("4 {returns:?}");
 
         let locals = self.locals.iter().map(instantiate_type).collect();
 

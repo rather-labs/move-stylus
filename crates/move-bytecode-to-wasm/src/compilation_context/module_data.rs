@@ -694,7 +694,7 @@ impl ModuleData {
                     IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner)
                         if matches!(
                             inner.as_ref(),
-                            IntermediateType::IExternalUserData { module_id, identifier, types }
+                            IntermediateType::IExternalUserData { module_id, identifier, .. }
                                 if TxContext::is_vm_type(module_id, identifier)
                         )
                 )
