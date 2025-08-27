@@ -183,3 +183,11 @@ public fun vec_eq(x: vector<Foo>, y: vector<Foo>): bool {
 public fun vec_neq(x: vector<Foo>, y: vector<Foo>): bool {
     x != y
 }
+
+public fun vec_borrow(x: &vector<Foo>): &Foo {
+    &x[0]
+}
+
+public fun vec_mut_borrow(x: &mut vector<Foo>): &mut Foo {
+    &mut x[0]
+}
