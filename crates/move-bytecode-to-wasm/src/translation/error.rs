@@ -1,6 +1,6 @@
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
 
-use crate::compilation_context::CompilationContextError;
+use crate::compilation_context::{CompilationContextError, ModuleId};
 
 use super::{intermediate_types::IntermediateType, types_stack::TypesStackError};
 
@@ -59,6 +59,12 @@ pub enum TranslationError {
     FoundTypeParameterInsideStruct {
         struct_index: u16,
         type_parameter_index: u16,
+    },
+
+    #[error(r#"found external struct "{identifier}" from module "{module_id}" inside struct when unpacking"#)]
+    UnpackingStructFoundExternalStruct {
+        identifier: String,
+        module_id: ModuleId,
     },
 
     #[error("found reference inside enum with index {enum_index}")]

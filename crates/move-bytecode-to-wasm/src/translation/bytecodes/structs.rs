@@ -6,6 +6,7 @@ use walrus::{
 
 use crate::{
     CompilationContext,
+    compilation_context::ExternalModuleData,
     translation::{
         TranslationError,
         intermediate_types::{IntermediateType, structs::IStruct},
@@ -206,8 +207,7 @@ pub fn pack(
 
 /// Unpack an struct.
 ///
-/// This function is used with Pack and PackGeneric bytecodes to allocate memory for a struct and
-/// save its fields into the allocated memory.
+/// This function is used with Unpack and UnpackGeneric bytecodes
 pub fn unpack(
     struct_: &IStruct,
     module: &mut Module,
@@ -271,7 +271,22 @@ pub fn unpack(
                 });
             }
             IntermediateType::IEnum(_) => todo!(),
-            IntermediateType::IExternalUserData { .. } => todo!(),
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+            } => {
+                let external_data =
+                    compilation_ctx.get_external_module_data(module_id, identifier)?;
+                match external_data {
+                    ExternalModuleData::Struct(_) => {
+                        return Err(TranslationError::UnpackingStructFoundExternalStruct {
+                            identifier: identifier.to_owned(),
+                            module_id: module_id.clone(),
+                        });
+                    }
+                    ExternalModuleData::Enum(_) => todo!(),
+                }
+            }
         }
 
         types_stack.push(field.clone());
