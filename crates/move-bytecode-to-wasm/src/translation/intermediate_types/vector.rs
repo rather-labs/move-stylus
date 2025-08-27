@@ -755,7 +755,8 @@ impl IVector {
             | IntermediateType::ISigner
             | IntermediateType::IAddress
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. } => {
+            | IntermediateType::IGenericStructInstance { .. }
+            | IntermediateType::IExternalUserData { .. } => {
                 builder.call(downcast_f);
                 builder.i32_const(1);
             }
@@ -763,7 +764,6 @@ impl IVector {
                 panic!("cannot borrow generic type parameters, expected a concrete type");
             }
             IntermediateType::IEnum(_) => todo!(),
-            IntermediateType::IExternalUserData { .. } => todo!(),
         }
 
         builder.i32_const(inner.stack_data_size() as i32);
@@ -1079,7 +1079,8 @@ mod tests {
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IStruct { .. } => {
+            | IntermediateType::IStruct { .. }
+            | IntermediateType::IExternalUserData { .. } => {
                 let swap_f =
                     RuntimeFunction::VecPopBack32.get(&mut raw_module, Some(&compilation_ctx));
                 builder.call(swap_f);
@@ -1096,7 +1097,6 @@ mod tests {
                 panic!("cannot pop back a vector of type parameters, expected a concrete type");
             }
             IntermediateType::IEnum(_) => todo!(),
-            IntermediateType::IExternalUserData { .. } => todo!(),
         }
 
         if inner_type == IntermediateType::IU64 {
