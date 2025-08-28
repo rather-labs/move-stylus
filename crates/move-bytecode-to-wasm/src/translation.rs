@@ -1717,7 +1717,7 @@ fn translate_instruction(
             // }
             //
             // public fun create_foo_u32(n: u32): Foo<u32> {
-            //     Foo { field: n }
+            //     create_foo(n)
             // }
             // ```
             //  In `create_foo` the compiler does not have any information about what T could be,
