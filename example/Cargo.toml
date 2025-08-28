@@ -27,14 +27,9 @@ path = "scripts/counter_with_init.rs"
 name = "dog_walker"
 path = "scripts/dog_walker.rs"
 
-[[bin]]
-name = "events"
-path = "scripts/events.rs"
-
 [dependencies]
 dotenv = "0.15.0"
 eyre = "0.6.8"
 tokio = { version = "1.44.2", features = ["macros", "rt-multi-thread"] }
 alloy = "1.0.23"
-alloy-sol-types = "1.0.0"
-alloy-contract = "1.0.0"
+
