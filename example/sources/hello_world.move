@@ -1,77 +1,231 @@
 module hello_world::hello_world;
 
-// use hello_world::external_generic_struct_defs::{Foo, create_foo};
+use stylus::tx_context::TxContext;
+use hello_world::other_mod::Test;
 
-/*
-public struct Foo<T: copy> has drop, copy {
-    g: T,
-}
+const INT_AS_CONST: u128 = 128128128;
 
-public fun create_foo<T: copy>(g: T): Foo<T> {
-    Foo {       g,
-    }
-}
-
-public fun structCopy(): Foo<u16> {
-    create_foo(314)
-}
-*/
-public struct Foo<T: copy> has drop, copy {
-    g: T,
-    q: address,
-    r: vector<u32>,
-    s: vector<u128>,
-    t: bool,
-    u: u8,
-    v: u16,
-    w: u32,
-    x: u64,
-    y: u128,
-    z: u256,
-    bar: Bar<T>,
-    baz: Baz<T>,
-}
-
-// Static abi sub-struct
-public struct Bar<T: copy> has drop, copy {
-    g: T,
-    a: u16,
+/// Struct with generic type T
+public struct Bar has drop, copy {
+    a: u32,
     b: u128,
 }
 
-// Dynamic abi substruct
-public struct Baz<T: copy> has drop, copy {
-    g: T,
-    a: u16,
-    b: vector<u256>,
+public struct Foo<T> has drop, copy {
+    c: T,
+    d: Bar,
+    e: address,
+    f: bool,
+    g: u64,
+    h: u256,
+    i: vector<u32>,
 }
 
-// This will create an struct instantiation in the Move module that contains a generic type parameter.
-// That is because we don't have any information about what T could be, so, when called from
-// `create_foo_u32` the compiler will find a TypeParameter instead of a u16. The TypeParameter will
-// replaced by the u16 using the types stack information.
-public fun create_foo<T: copy>(g: T): Foo<T> {
-    Foo {
-        g,
-        q: @0xcafe000000000000000000000000000000007357,
-        r: vector[0, 3, 0, 3, 4, 5, 6],
-        s: vector[6, 5, 4, 3, 0, 3, 0],
-        t: true,
-        u: 42,
-        v: 4242,
-        w: 424242,
-        x: 42424242,
-        y: 4242424242,
-        z: 424242424242,
-        bar: Bar { g, a: 42, b: 4242 },
-        baz: Baz { g, a: 4242, b: vector[3] },
-    }
+public struct Baz<T> has drop, copy {
+    c: T,
+    d: Bar,
+    e: address,
+    f: bool,
+    g: u64,
+    h: u256,
 }
 
-public fun create_foo_u32(g: u32): Foo<u32> {
-    create_foo(g)
+// Enum
+public enum TestEnum has drop {
+    FirstVariant,
+    SecondVariant,
 }
 
-public fun create_foo_vec_u32(g: vector<u32>): Foo<vector<u32>> {
-    create_foo(g)
+/// Return a constant
+public fun get_constant(): u128 {
+  INT_AS_CONST
+}
+
+/// Set constant as local
+public fun get_constant_local(): u128 {
+  let x: u128 = INT_AS_CONST;
+  x
+}
+
+// Forces the compiler to store literals on locals
+public fun get_local(_z: u128): u128 {
+  let x: u128 = 100;
+  let y: u128 = 50;
+  identity(x);
+
+  identity_2(x, y)
+}
+
+// Forces the compiler to store literals on locals
+public fun get_copied_local(): u128 {
+  let x: u128 = 100;
+
+  let y = x; // copy
+  let mut _z = x; // move
+  identity(y);
+  identity(_z);
+
+  _z = 111;
+  y
+}
+
+public fun echo(x: u128): u128 {
+  identity(x)
+}
+
+public fun echo_2(x: u128, y: u128): u128 {
+  identity_2(x, y)
+}
+
+fun identity(x: u128): u128 {
+  x
+}
+
+fun identity_2(_x: u128, y: u128): u128 {
+  y
+}
+
+// Inteaction with signer
+public fun echo_signer_with_int(x: signer, y: u8): (u8, signer) {
+    (y, x)
+}
+
+/// Exposition of EVM global variables through TxContext object
+public fun tx_context_properties(ctx: &TxContext): (address, u256, u64, u256, u64, u64, u64, u256) {
+    (
+        ctx.sender(),
+        ctx.msg_value(),
+        ctx.block_number(),
+        ctx.block_basefee(),
+        ctx.block_gas_limit(),
+        ctx.block_timestamp(),
+        ctx.chain_id(),
+        ctx.gas_price(),
+    )
+}
+
+// Control Flow
+public fun fibonacci(n: u64): u64 {
+    if (n == 0) return 0;
+    if (n == 1) return 1;
+    let mut a = 0;
+    let mut b = 1;
+    let mut count = 2;
+    while (count <= n) {
+        let temp = a + b;
+        a = b;
+        b = temp;
+        count = count + 1;
+    };
+    b
+}
+
+// Just an intrincated contrl flow example
+public fun sum_special(n: u64): u64 {
+    let mut total = 0;
+    let mut i = 1;
+
+    'outer: loop {
+        if (i > n) {
+            break
+        };
+
+        if (i > 1) {
+            let mut j = 2;
+            let mut x = 1;
+            while (j * j <= i) {
+                if (i % j == 0) {
+                    x = 0;
+                    break
+                };
+                j = j + 1;
+            };
+
+            if (x == 1) {
+                total = total + 7;
+            };
+        };
+
+        i = i + 1;
+    };
+
+    total
+}
+
+
+// Structs
+public fun create_foo_u16(a: u16, b: u16): Foo<u16> {
+    let mut foo = Foo {
+        c: a,
+        d: Bar { a: 42, b: 4242 },
+        e: @0x7357,
+        f: true,
+        g: 1,
+        h: 2,
+        i: vector[0xFFFFFFFF],
+    };
+
+    foo.c = b;
+
+    foo
+}
+
+public fun create_foo2_u16(a: u16, b: u16): (Foo<u16>, Foo<u16>) {
+    let mut foo = Foo {
+        c: a,
+        d: Bar { a: 42, b: 4242 },
+        e: @0x7357,
+        f: true,
+        g: 1,
+        h: 2,
+        i: vector[0xFFFFFFFF],
+    };
+
+    foo.c = b;
+
+    (foo, copy(foo))
+}
+
+public fun create_baz_u16(a: u16, _b: u16): Baz<u16> {
+    let baz = Baz {
+        c: a,
+        d: Bar { a: 42, b: 4242 },
+        e: @0x7357,
+        f: true,
+        g: 1,
+        h: 2,
+    };
+
+    baz
+}
+
+public fun create_baz2_u16(a: u16, _b: u16): (Baz<u16>, Baz<u16>) {
+    let baz = Baz {
+        c: a,
+        d: Bar { a: 42, b: 4242 },
+        e: @0x7357,
+        f: true,
+        g: 1,
+        h: 2,
+    };
+
+    (baz, copy(baz))
+}
+
+public fun multi_values_1(): (vector<u32>, vector<u128>, bool, u64) {
+    (vector[0xFFFFFFFF, 0xFFFFFFFF], vector[0xFFFFFFFFFF_u128], true, 42)
+}
+
+public fun multi_values_2(): (u8, bool, u64) {
+    (84, true, 42)
+}
+
+// Enums
+public fun echo_variant(x:  TestEnum): TestEnum {
+    x
+}
+
+// Use structs from other modules defined by us
+public fun test_values(test: &Test): (u8, u8) {
+    test.get_test_values()
 }
