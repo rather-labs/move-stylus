@@ -50,7 +50,7 @@ public fun emit_test_event4(a: u32, b: address, c: u128, d: vector<u8>, e: TestE
     emit(TestEvent4 { a, b, c, d, e });
 }
 
-public fun emit_generic_event_1(n: vector<u32>, o: bool, p: &address, q: u128) {
+public fun emit_generic_event_1(n: vector<u32>, o: bool, p: address, q: u128) {
     emit(TestEventGeneric { n, o, p, q })
 }
 

@@ -147,7 +147,7 @@ async fn main() -> eyre::Result<()> {
         let decoded_event = <Example::TestGenericEvent1 as SolValue>::abi_decode(&data)?;
         println!("Decoded event data = {:?}", decoded_event);
         assert_eq!(event, decoded_event);
-    };
+    }
 
     Ok(())
 }
