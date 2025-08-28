@@ -890,10 +890,10 @@ fn translate_instruction(
         Bytecode::VecPack(signature_index, num_elements) => {
             // If the inner type is a type parameter, replace it with the last type in the types stack.
 
-            // Example: 
-            // The function create_foo uses a generic type T that is not known at compilation time. As a result, 
+            // Example:
+            // The function create_foo uses a generic type T that is not known at compilation time. As a result,
             // the VecPack instruction generated for packing the b vector field includes a type parameter instead of a concrete type.
-            // When create_foo_u32 is called, it places the specific type onto the types stack. We must substitute the type parameter 
+            // When create_foo_u32 is called, it places the specific type onto the types stack. We must substitute the type parameter
             // with the specific type found at the top of the types stack.
             // ```
             // public struct Foo<T: copy> has drop, copy {
