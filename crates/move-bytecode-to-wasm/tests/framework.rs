@@ -156,11 +156,26 @@ mod event {
             TestEvent2 e;
         }
 
+        struct GenericEvent1 {
+            uint32[] n;
+            bool o;
+            address p;
+            uint128 q;
+        }
+
+        struct GenericEvent2 {
+            uint64 n;
+            bool o;
+            TestEvent1 p;
+            TestEvent2 q;
+        }
 
         function emitTestEvent1(uint32 n) external;
         function emitTestEvent2(uint32 a, address b, uint128 c) external;
         function emitTestEvent3(uint32 a, address b, uint128 c, uint8[] d) external;
         function emitTestEvent4(uint32 a, address b, uint128 c, uint8[] d, TestEvent2 e) external;
+        function emitGenericEvent1(uint32[] n, bool o, address p, uint128 q) external;
+        function emitGenericEvent2(uint64 n, bool o, TestEvent1 p, TestEvent2 q) external;
     );
 
     #[rstest]
@@ -205,6 +220,22 @@ mod event {
             b: address!("0xcafe000000000000000000000000000000007357"),
             c: u128::MAX,
         }
+    })]
+    #[case(emitGenericEvent1Call::new((
+        vec![1, 2, 3, 4, 5], false, address!("0xcafe000000000000000000000000000000007357"), u128::MAX
+    )), GenericEvent1 {
+        n: vec![1, 2, 3, 4, 5],
+        o: false,
+        p: address!("0xcafe000000000000000000000000000000007357"),
+        q: u128::MAX
+    })]
+    #[case(emitGenericEvent2Call::new((
+        u64::MAX, true, TestEvent1 { n: 42 }, TestEvent2 { a: 42, b: address!("0xcafe000000000000000000000000000000007357"), c: u128::MAX }
+    )), GenericEvent2 {
+        n: u64::MAX,
+        o: true,
+        p: TestEvent1 { n: 42 },
+        q: TestEvent2 { a: 42, b: address!("0xcafe000000000000000000000000000000007357"), c: u128::MAX }
     })]
     fn test_emit_event<T: SolCall, V: SolValue>(
         runtime: RuntimeSandbox,
