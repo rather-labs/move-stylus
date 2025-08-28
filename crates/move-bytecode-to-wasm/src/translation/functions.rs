@@ -85,7 +85,7 @@ impl MappedFunction {
                 types: Some(gtypes),
                 ..
             } => gtypes.iter().any(Self::itype_is_generic),
-            IntermediateType::IVector(inner) => Self::itype_is_generic(&inner),
+            IntermediateType::IVector(inner) => Self::itype_is_generic(inner),
             _ => false,
         }
     }
