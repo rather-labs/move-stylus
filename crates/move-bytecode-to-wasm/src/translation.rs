@@ -463,8 +463,9 @@ fn translate_instruction(
                 // Get the function's arguments from the types stack
                 let types = &types_stack[arguments_start..types_stack.len()];
 
-                // These types represent the instantiated types that correspond to the return values of the parent function.
-                // This is crucial because we may encounter an IRef<T> or IMutRef<T>, and we need to extract the underlying type T.
+                // These types represent the instantiated types that correspond to the return values
+                // of the parent function. This is crucial because we may encounter an IRef<T> or
+                // IMutRef<T>, and we need to extract the underlying type T.
                 let instantiations: Vec<IntermediateType> = type_instantiations
                     .iter()
                     .enumerate()
@@ -534,8 +535,61 @@ fn translate_instruction(
                 );
             };
 
+            // If the called function returns a user defined data (struct or enum), and that
+            // datatype is not defined in the current module, we need to change the return type
+            // from a IGenericStructInstance or IGenericEnumInstance to a IExternalUserData:
+            //
+            // - From the caller perspective the called function is returning a foreign data type.
+            // - From the callee perspective, the function is just returning a data type defined in
+            // its module.
+            //
+            // Subsequent opcodes that work with the return value of the caller will expect a
+            // IExternalUserData in the types stack.
+
+            let return_types = function_information
+                .signature
+                .returns
+                .iter()
+                .map(|it| match it {
+                    IntermediateType::IStruct { module_id, .. } => {
+                        if module_id != &module_data.id {
+                            // TODO: Add identifier to IntermediateType::IStruct
+                            let struct_ =
+                                compilation_ctx.get_struct_by_intermediate_type(it).unwrap();
+
+                            IntermediateType::IExternalUserData {
+                                module_id: module_id.clone(),
+                                identifier: struct_.identifier.clone(),
+                                types: None,
+                            }
+                        } else {
+                            it.clone()
+                        }
+                    }
+                    IntermediateType::IGenericStructInstance {
+                        module_id, types, ..
+                    } => {
+                        if module_id != &module_data.id {
+                            // TODO: Add identifier to IntermediateType::IGenericStruct
+                            let struct_ =
+                                compilation_ctx.get_struct_by_intermediate_type(it).unwrap();
+
+                            IntermediateType::IExternalUserData {
+                                module_id: module_id.clone(),
+                                identifier: struct_.identifier.clone(),
+                                types: Some(types.to_vec()),
+                            }
+                        } else {
+                            it.clone()
+                        }
+                    }
+                    // TODO enum cases
+                    _ => it.clone(),
+                })
+                .collect::<Vec<IntermediateType>>();
+
             // Insert in the stack types the types returned by the function (if any)
-            types_stack.append(&function_information.signature.returns);
+            types_stack.append(&return_types);
         }
         // Function calls
         Bytecode::Call(function_handle_index) => {
@@ -1117,7 +1171,9 @@ fn translate_instruction(
             // We dont pop the return values from the stack, we just check if the types match
             assert!(
                 types_stack.0.ends_with(&mapped_function.signature.returns),
-                "types stack does not match function return types"
+                "types stack does not match function return types\ntypes stack {:?}\nfunction return {:?}",
+                types_stack.0.last(),
+                &mapped_function.signature.returns,
             );
         }
         Bytecode::CastU8 => {
@@ -1649,19 +1705,67 @@ fn translate_instruction(
                 .structs
                 .get_struct_instance_by_struct_definition_idx(struct_definition_index)?;
 
+            // In some situations a struct instantiation in the Move module that contains a generic type
+            // parameter. For example:
+            // ```
+            // public struct Foo<T> {
+            //     field: T
+            // }
+            //
+            // public fun create_foo<T>(f: T): Foo<T> {
+            //     Foo { field: f }
+            // }
+            //
+            // public fun create_foo_u32(n: u32): Foo<u32> {
+            //     create_foo(n)
+            // }
+            // ```
+            //  In `create_foo` the compiler does not have any information about what T could be,
+            //  so, when called from `create_foo_u32` it will find a TypeParameter instead of a u32.
+            //  The TypeParameter will replaced by the u32 using the types stack information.
+            let (struct_, types) = if struct_
+                .fields
+                .iter()
+                .any(|t| matches!(t, IntermediateType::ITypeParameter(_)))
+            {
+                let types_start = types_stack.len() - struct_.fields.len();
+
+                // Get the function's arguments from the types stack
+                let types = &types_stack[types_start..types_stack.len()];
+
+                let instantiations: Vec<IntermediateType> = struct_
+                    .fields
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, f)| {
+                        if let IntermediateType::ITypeParameter(_) = f {
+                            Some(types[index].clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                (struct_.instantiate(&instantiations), instantiations)
+            } else {
+                let types = module_data
+                    .structs
+                    .get_generic_struct_types_instances(struct_definition_index)?
+                    .to_vec();
+
+                (struct_, types)
+            };
+
             bytecodes::structs::pack(&struct_, module, builder, compilation_ctx, types_stack)?;
 
             let idx = module_data
                 .structs
                 .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
-            let types = module_data
-                .structs
-                .get_generic_struct_types_instances(struct_definition_index)?;
 
             types_stack.push(IntermediateType::IGenericStructInstance {
                 module_id: module_data.id.clone(),
                 index: idx,
-                types: types.to_vec(),
+                types,
             });
         }
         Bytecode::Unpack(struct_definition_index) => {

@@ -75,9 +75,12 @@ pub enum IntermediateType {
     /// the type (whether is a struct or an enum, its fields, etc), so we save a refrence to it. At
     /// the moment of processing it, we should have all the dependencies processed with its
     /// corresponding data.
+    ///
+    /// If the `types` field is some, means tthat the datatype is a generic instantiation.
     IExternalUserData {
         module_id: ModuleId,
         identifier: String,
+        types: Option<Vec<IntermediateType>>,
     },
 }
 
@@ -147,6 +150,7 @@ impl IntermediateType {
                         } => IntermediateType::IExternalUserData {
                             module_id: module_id.clone(),
                             identifier: identifier.clone(),
+                            types: None,
                         },
                     })
                 } else {
@@ -178,6 +182,7 @@ impl IntermediateType {
                         } => IntermediateType::IExternalUserData {
                             module_id: module_id.clone(),
                             identifier: identifier.clone(),
+                            types: Some(types),
                         },
                     })
                 } else {
@@ -444,9 +449,10 @@ impl IntermediateType {
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
+                types,
             } => {
                 let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier)
+                    .get_external_module_data(module_id, identifier, types)
                     .unwrap();
 
                 builder.load(
@@ -696,9 +702,10 @@ impl IntermediateType {
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
+                types,
             } => {
                 let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier)
+                    .get_external_module_data(module_id, identifier, types)
                     .unwrap();
 
                 match external_data {
@@ -1088,9 +1095,10 @@ impl IntermediateType {
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
+                types,
             } => {
                 let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier)
+                    .get_external_module_data(module_id, identifier, types)
                     .unwrap();
 
                 match external_data {
