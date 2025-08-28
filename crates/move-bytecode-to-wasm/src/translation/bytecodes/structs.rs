@@ -274,9 +274,10 @@ pub fn unpack(
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
+                types,
             } => {
                 let external_data =
-                    compilation_ctx.get_external_module_data(module_id, identifier)?;
+                    compilation_ctx.get_external_module_data(module_id, identifier, types)?;
                 match external_data {
                     ExternalModuleData::Struct(_) => {
                         return Err(TranslationError::UnpackingStructFoundExternalStruct {

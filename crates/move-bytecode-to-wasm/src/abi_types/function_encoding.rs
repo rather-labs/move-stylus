@@ -91,9 +91,10 @@ impl SolName for IntermediateType {
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
+                types,
             } => {
                 let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier)
+                    .get_external_module_data(module_id, identifier, types)
                     .unwrap();
                 match external_data {
                     // TxContext should not be part of the function signature, since it is injected
@@ -107,7 +108,7 @@ impl SolName for IntermediateType {
                         if istruct.saved_in_storage {
                             Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
                         } else {
-                            Self::struct_fields_sol_name(istruct, compilation_ctx)
+                            Self::struct_fields_sol_name(&istruct, compilation_ctx)
                         }
                     }
                     // TODO: check if the enum is simple

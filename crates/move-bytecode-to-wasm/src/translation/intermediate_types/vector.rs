@@ -359,9 +359,10 @@ impl IVector {
                 IntermediateType::IExternalUserData {
                     module_id,
                     identifier,
+                    types,
                 } => {
                     let external_data = compilation_ctx
-                        .get_external_module_data(module_id, identifier)
+                        .get_external_module_data(module_id, identifier, types)
                         .unwrap();
 
                     match external_data {
@@ -546,12 +547,12 @@ impl IVector {
 
                         struct_instance.equality(then, module, compilation_ctx, module_data);
                     }
-                    IntermediateType::IExternalUserData { module_id, identifier } => {
+                    IntermediateType::IExternalUserData { module_id, identifier, types } => {
                         let module_data = compilation_ctx
                             .get_module_data_by_id(module_id)
                             .unwrap();
                         let external_data = compilation_ctx
-                            .get_external_module_data(module_id, identifier)
+                            .get_external_module_data(module_id, identifier, types)
                             .unwrap();
 
                         match external_data {

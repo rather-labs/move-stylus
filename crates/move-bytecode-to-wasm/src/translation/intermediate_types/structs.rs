@@ -396,9 +396,10 @@ impl IStruct {
                 IntermediateType::IExternalUserData {
                     module_id,
                     identifier,
+                    types,
                 } => {
                     let external_data = compilation_ctx
-                        .get_external_module_data(module_id, identifier)
+                        .get_external_module_data(module_id, identifier, types)
                         .unwrap();
 
                     match external_data {
@@ -471,9 +472,10 @@ impl IStruct {
                 IntermediateType::IExternalUserData {
                     module_id,
                     identifier,
+                    types,
                 } => {
                     let external_data = compilation_ctx
-                        .get_external_module_data(module_id, identifier)
+                        .get_external_module_data(module_id, identifier, types)
                         .unwrap();
 
                     match external_data {
@@ -493,38 +495,53 @@ impl IStruct {
         size
     }
 
+    /// Auxiliary functiion that recursively looks for not instantiated type parameters and
+    /// replaces them
+    fn replace_type_parameters(
+        f: &IntermediateType,
+        instance_types: &[IntermediateType],
+    ) -> IntermediateType {
+        match f {
+            IntermediateType::ITypeParameter(index) => instance_types[*index as usize].clone(),
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+            } => IntermediateType::IGenericStructInstance {
+                module_id: module_id.clone(),
+                index: *index,
+                types: types
+                    .iter()
+                    .map(|t| Self::replace_type_parameters(t, instance_types))
+                    .collect(),
+            },
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+                types: Some(generic_types),
+            } => IntermediateType::IExternalUserData {
+                module_id: module_id.clone(),
+                identifier: identifier.clone(),
+                types: Some(
+                    generic_types
+                        .iter()
+                        .map(|t| Self::replace_type_parameters(t, instance_types))
+                        .collect(),
+                ),
+            },
+            IntermediateType::IVector(inner) => IntermediateType::IVector(Box::new(
+                Self::replace_type_parameters(inner, instance_types),
+            )),
+            _ => f.clone(),
+        }
+    }
+
     /// Replaces all type parameters in the struct with the provided types.
     pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
         let fields = self
             .fields
             .iter()
-            .map(|f| {
-                if let IntermediateType::ITypeParameter(index) = f {
-                    types[*index as usize].clone()
-                } else if let IntermediateType::IGenericStructInstance {
-                    module_id,
-                    index,
-                    types: generic_types,
-                } = f
-                {
-                    IntermediateType::IGenericStructInstance {
-                        module_id: module_id.clone(),
-                        index: *index,
-                        types: generic_types
-                            .iter()
-                            .map(|t| {
-                                if let IntermediateType::ITypeParameter(index) = t {
-                                    types[*index as usize].clone()
-                                } else {
-                                    t.clone()
-                                }
-                            })
-                            .collect(),
-                    }
-                } else {
-                    f.clone()
-                }
-            })
+            .map(|itype| Self::replace_type_parameters(itype, types))
             .collect();
 
         let fields_types = self
@@ -532,34 +549,8 @@ impl IStruct {
             .iter()
             .map(|(k, v)| {
                 let key = FieldHandleIndex::new(k.into_index() as u16);
-                if let IntermediateType::ITypeParameter(index) = v {
-                    (key, types[*index as usize].clone())
-                } else if let IntermediateType::IGenericStructInstance {
-                    module_id,
-                    index,
-                    types: generic_types,
-                } = v
-                {
-                    (
-                        key,
-                        IntermediateType::IGenericStructInstance {
-                            module_id: module_id.clone(),
-                            index: *index,
-                            types: generic_types
-                                .iter()
-                                .map(|t| {
-                                    if let IntermediateType::ITypeParameter(index) = t {
-                                        types[*index as usize].clone()
-                                    } else {
-                                        t.clone()
-                                    }
-                                })
-                                .collect(),
-                        },
-                    )
-                } else {
-                    (key, v.clone())
-                }
+                let value = Self::replace_type_parameters(v, types);
+                (key, value)
             })
             .collect();
 
