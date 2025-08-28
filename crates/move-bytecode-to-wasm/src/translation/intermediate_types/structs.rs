@@ -529,6 +529,9 @@ impl IStruct {
                         .collect(),
                 ),
             },
+            IntermediateType::IVector(inner) => IntermediateType::IVector(Box::new(
+                Self::replace_type_parameters(inner, instance_types),
+            )),
             _ => f.clone(),
         }
     }

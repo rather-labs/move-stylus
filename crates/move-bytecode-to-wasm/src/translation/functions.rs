@@ -161,7 +161,9 @@ impl MappedFunction {
                         .collect(),
                 ),
             },
-
+            IntermediateType::IVector(inner) => IntermediateType::IVector(Box::new(
+                Self::replace_type_parameters(inner, instance_types),
+            )),
             // Non-generic type: keep as is
             _ => itype.clone(),
         }
