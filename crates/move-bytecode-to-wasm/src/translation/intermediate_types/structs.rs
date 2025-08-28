@@ -495,38 +495,73 @@ impl IStruct {
         size
     }
 
+    fn replace_type_parameters(
+        f: &IntermediateType,
+        instance_types: &[IntermediateType],
+    ) -> IntermediateType {
+        match f {
+            IntermediateType::ITypeParameter(index) => instance_types[*index as usize].clone(),
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+            } => IntermediateType::IGenericStructInstance {
+                module_id: module_id.clone(),
+                index: *index,
+                types: types
+                    .iter()
+                    .map(|t| Self::replace_type_parameters(t, instance_types))
+                    .collect(),
+            },
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+                types: Some(generic_types),
+            } => IntermediateType::IExternalUserData {
+                module_id: module_id.clone(),
+                identifier: identifier.clone(),
+                types: Some(
+                    generic_types
+                        .iter()
+                        .map(|t| Self::replace_type_parameters(t, instance_types))
+                        .collect(),
+                ),
+            },
+            _ => f.clone(),
+        }
+    }
+
     /// Replaces all type parameters in the struct with the provided types.
     pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
+        /*
+        let replace_type_parameters = |f: &IntermediateType| match f {
+            IntermediateType::ITypeParameter(index) => types[*index as usize].clone(),
+            IntermediateType::IStruct { module_id, index } => todo!(),
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types: generic_types,
+            } => IntermediateType::IGenericStructInstance {
+                module_id: module_id.clone(),
+                index: *index,
+                types: generic_types
+                    .iter()
+                    .map(|t| {
+                        if let IntermediateType::ITypeParameter(index) = t {
+                            types[*index as usize].clone()
+                        } else {
+                            t.clone()
+                        }
+                    })
+                    .collect(),
+            },
+            _ => f.clone(),
+        };
+        */
         let fields = self
             .fields
             .iter()
-            .map(|f| {
-                if let IntermediateType::ITypeParameter(index) = f {
-                    types[*index as usize].clone()
-                } else if let IntermediateType::IGenericStructInstance {
-                    module_id,
-                    index,
-                    types: generic_types,
-                } = f
-                {
-                    IntermediateType::IGenericStructInstance {
-                        module_id: module_id.clone(),
-                        index: *index,
-                        types: generic_types
-                            .iter()
-                            .map(|t| {
-                                if let IntermediateType::ITypeParameter(index) = t {
-                                    types[*index as usize].clone()
-                                } else {
-                                    t.clone()
-                                }
-                            })
-                            .collect(),
-                    }
-                } else {
-                    f.clone()
-                }
-            })
+            .map(|itype| Self::replace_type_parameters(itype, types))
             .collect();
 
         let fields_types = self
@@ -534,34 +569,8 @@ impl IStruct {
             .iter()
             .map(|(k, v)| {
                 let key = FieldHandleIndex::new(k.into_index() as u16);
-                if let IntermediateType::ITypeParameter(index) = v {
-                    (key, types[*index as usize].clone())
-                } else if let IntermediateType::IGenericStructInstance {
-                    module_id,
-                    index,
-                    types: generic_types,
-                } = v
-                {
-                    (
-                        key,
-                        IntermediateType::IGenericStructInstance {
-                            module_id: module_id.clone(),
-                            index: *index,
-                            types: generic_types
-                                .iter()
-                                .map(|t| {
-                                    if let IntermediateType::ITypeParameter(index) = t {
-                                        types[*index as usize].clone()
-                                    } else {
-                                        t.clone()
-                                    }
-                                })
-                                .collect(),
-                        },
-                    )
-                } else {
-                    (key, v.clone())
-                }
+                let value = Self::replace_type_parameters(v, types);
+                (key, value)
             })
             .collect();
 

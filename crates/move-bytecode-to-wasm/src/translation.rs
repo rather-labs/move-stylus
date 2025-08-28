@@ -538,12 +538,63 @@ fn translate_instruction(
                 );
             };
 
-            let return_types =
-                &module_data.functions.returns[function_instantiation_handle_index.0 as usize];
-            println!("---> 1 {return_types:?}");
-            println!("---> 2 {:?}", &function_information.signature.returns);
+            // If the called function returns a user defined data (struct or enum), and that
+            // datatype is not defined in the current module, we need to change the return type
+            // from a IGenericStructInstance or IGenericEnumInstance to a IExternalUserData:
+            //
+            // - From the caller perspective the called function is returning a foreign data type.
+            // - From the callee perspective, the function is just returning a data type defined in
+            // its module.
+            //
+            // Subsequent opcodes that work with the return value of the caller will expect a
+            // IExternalUserData in the types stack.
+
+            let return_types = function_information
+                .signature
+                .returns
+                .iter()
+                .map(|it| match it {
+                    IntermediateType::IStruct { module_id, index } => {
+                        if module_id != &module_data.id {
+                            let struct_ = compilation_ctx
+                                .get_struct_by_intermediate_type(&it)
+                                .unwrap();
+
+                            IntermediateType::IExternalUserData {
+                                module_id: module_id.clone(),
+                                identifier: struct_.identifier.clone(),
+                                types: None,
+                            }
+                        } else {
+                            it.clone()
+                        }
+                    }
+                    IntermediateType::IGenericStructInstance {
+                        module_id,
+                        index,
+                        types,
+                    } => {
+                        if module_id != &module_data.id {
+                            let struct_ = compilation_ctx
+                                .get_struct_by_intermediate_type(&it)
+                                .unwrap();
+
+                            IntermediateType::IExternalUserData {
+                                module_id: module_id.clone(),
+                                identifier: struct_.identifier.clone(),
+                                types: Some(types.to_vec()),
+                            }
+                        } else {
+                            it.clone()
+                        }
+                    }
+                    // TODO enum cases
+                    _ => it.clone(),
+                })
+                .collect::<Vec<IntermediateType>>();
+
             // Insert in the stack types the types returned by the function (if any)
-            types_stack.append(&function_information.signature.returns);
+            types_stack.append(&return_types);
         }
         // Function calls
         Bytecode::Call(function_handle_index) => {
@@ -1684,6 +1735,7 @@ fn translate_instruction(
                 .iter()
                 .any(|t| matches!(t, IntermediateType::ITypeParameter(_)))
             {
+                println!("1");
                 let types_start = types_stack.len() - struct_.fields.len();
 
                 // Get the function's arguments from the types stack
@@ -1704,15 +1756,18 @@ fn translate_instruction(
 
                 (struct_.instantiate(&instantiations), instantiations)
             } else {
+                println!("2");
                 let types = module_data
                     .structs
                     .get_generic_struct_types_instances(struct_definition_index)?
                     .to_vec();
 
-                (struct_, types)
+                (struct_.instantiate(&types), types)
             };
 
+            println!("ACA {types:?} {struct_:?}");
             bytecodes::structs::pack(&struct_, module, builder, compilation_ctx, types_stack)?;
+            println!("ACA2");
 
             let idx = module_data
                 .structs
