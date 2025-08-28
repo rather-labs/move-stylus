@@ -190,8 +190,6 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
-                    println!("\nTranslating {instruction:?}");
-                    println!("Typestack BEFORE {:?}", ctx.types_stack.0);
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -208,7 +206,6 @@ fn translate_flow(
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
                     });
-                    println!("Typestack AFTER {:?}\n", ctx.types_stack.0);
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
@@ -678,8 +675,6 @@ fn translate_instruction(
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             local_type.move_local_instructions(builder, compilation_ctx, local);
-
-            println!("MOVE LOC |{local_type:?}|");
             types_stack.push(local_type);
         }
         Bytecode::CopyLoc(local_id) => {

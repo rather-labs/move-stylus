@@ -147,6 +147,21 @@ impl MappedFunction {
                     .map(|t| Self::replace_type_parameters(t, instance_types))
                     .collect(),
             },
+            IntermediateType::IExternalUserData {
+                module_id,
+                identifier,
+                types: Some(generic_types),
+            } => IntermediateType::IExternalUserData {
+                module_id: module_id.clone(),
+                identifier: identifier.clone(),
+                types: Some(
+                    generic_types
+                        .iter()
+                        .map(|t| Self::replace_type_parameters(t, instance_types))
+                        .collect(),
+                ),
+            },
+
             // Non-generic type: keep as is
             _ => itype.clone(),
         }
