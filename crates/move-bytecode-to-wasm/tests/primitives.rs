@@ -1748,6 +1748,8 @@ mod vec_struct {
         function vecPushAndPopBack(Foo[] x, Foo y) external returns (Foo[]);
         function vecEq(Foo[] x, Foo[] y) external returns (bool);
         function vecNeq(Foo[] x, Foo[] y) external returns (bool);
+        function vecBorrow(Foo[] x) external returns (Foo);
+        function vecMutBorrow(Foo[] x) external returns (Foo);
     );
 
     fn get_foo_vector() -> Vec<Foo> {
@@ -2197,6 +2199,8 @@ mod vec_struct {
         )),
         (true,)
     )]
+    #[case(vecBorrowCall::new((get_foo_vector(),)), get_foo_vector()[0].clone())]
+    #[case(vecMutBorrowCall::new((get_foo_vector(),)), get_foo_vector()[0].clone())]
     fn test_vec_struct<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -2268,6 +2272,8 @@ mod vec_external_struct {
         function vecPushAndPopBack(Foo[] x, Foo y) external returns (Foo[]);
         function vecEq(Foo[] x, Foo[] y) external returns (bool);
         function vecNeq(Foo[] x, Foo[] y) external returns (bool);
+        function vecBorrow(Foo[] x) external returns (Foo);
+        function vecMutBorrow(Foo[] x) external returns (Foo);
     );
 
     fn get_foo_vector() -> Vec<Foo> {
@@ -2717,6 +2723,8 @@ mod vec_external_struct {
         )),
         (true,)
     )]
+    #[case(vecBorrowCall::new((get_foo_vector(),)), get_foo_vector()[0].clone())]
+    #[case(vecMutBorrowCall::new((get_foo_vector(),)), get_foo_vector()[0].clone())]
     fn test_vec_external_struct<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
