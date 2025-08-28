@@ -10,7 +10,10 @@ use walrus::{
 
 use super::types_stack::{TypesStack, TypesStackError};
 
-use crate::{CompilationContext, UserDefinedType, translation::intermediate_types::ISignature};
+use crate::{
+    CompilationContext, UserDefinedType, generics::type_contains_generics,
+    translation::intermediate_types::ISignature,
+};
 
 use super::{intermediate_types::IntermediateType, table::FunctionId};
 
@@ -53,8 +56,8 @@ impl MappedFunction {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
-        let is_generic = signature.arguments.iter().any(Self::itype_is_generic)
-            || signature.returns.iter().any(Self::itype_is_generic);
+        let is_generic = signature.arguments.iter().any(type_contains_generics)
+            || signature.returns.iter().any(type_contains_generics);
 
         Self {
             function_id,
@@ -65,28 +68,6 @@ impl MappedFunction {
             is_entry: function_definition.visibility == Visibility::Public,
             is_native: function_definition.is_native(),
             is_generic,
-        }
-    }
-
-    fn itype_is_generic(a: &IntermediateType) -> bool {
-        match a {
-            IntermediateType::IRef(intermediate_type)
-            | IntermediateType::IMutRef(intermediate_type) => {
-                matches!(
-                    intermediate_type.as_ref(),
-                    IntermediateType::ITypeParameter(_)
-                )
-            }
-            IntermediateType::ITypeParameter(_) => true,
-            IntermediateType::IGenericStructInstance { types, .. } => {
-                types.iter().any(Self::itype_is_generic)
-            }
-            IntermediateType::IExternalUserData {
-                types: Some(gtypes),
-                ..
-            } => gtypes.iter().any(Self::itype_is_generic),
-            IntermediateType::IVector(inner) => Self::itype_is_generic(inner),
-            _ => false,
         }
     }
 }

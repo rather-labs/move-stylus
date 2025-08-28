@@ -1,0 +1,115 @@
+use crate::translation::intermediate_types::IntermediateType;
+
+/// Thid function returns true if there is a type parameter in some of the intermediate types and
+/// `false` otherwise.
+pub fn type_contains_generics(itype: &IntermediateType) -> bool {
+    match itype {
+        IntermediateType::IRef(intermediate_type)
+        | IntermediateType::IMutRef(intermediate_type) => {
+            type_contains_generics(intermediate_type.as_ref())
+        }
+        IntermediateType::ITypeParameter(_) => true,
+        IntermediateType::IGenericStructInstance { types, .. } => {
+            types.iter().any(type_contains_generics)
+        }
+        IntermediateType::IExternalUserData {
+            types: Some(gtypes),
+            ..
+        } => gtypes.iter().any(type_contains_generics),
+        IntermediateType::IVector(inner) => type_contains_generics(inner),
+        _ => false,
+    }
+}
+
+/// This function extracts the instance type so we can pass it to the instantiation functions. For
+/// example:
+///
+/// If we have:
+///
+/// `generic_type` = `IVector(ITypeParameter(0))`
+/// `instantiated_type` = `IVector(IU64)`
+///
+/// this function will return `IU64`, since the instantiation needs to replace `ITypeParameter(0)`
+/// with `IU64`.
+///
+/// If we have:
+///
+/// `generic_type` = `IVector(ITypeParameter(0))`
+/// `instantiated_type` = `IVector(IVector(IU64))`
+///
+/// this function will return `IVector(IU64)`, since the instantiation needs to replace
+/// `ITypeParameter(0)` with `IVector(IU64)`.
+///
+/// The index corresponds to which generic type paramneter we are extracting
+pub fn extract_type_instances_from_stack(
+    generic_type: &IntermediateType,
+    instantiated_type: &IntermediateType,
+    index: u16,
+) -> Option<IntermediateType> {
+    match generic_type {
+        IntermediateType::ITypeParameter(i) if *i == index => Some(instantiated_type.clone()),
+        IntermediateType::IVector(inner) => {
+            if let IntermediateType::IVector(instantiated_inner) = instantiated_type {
+                extract_type_instances_from_stack(inner, &instantiated_inner, index)
+            } else {
+                None
+            }
+        }
+        IntermediateType::IRef(inner) => {
+            if let IntermediateType::IRef(instantiated_inner) = instantiated_type {
+                extract_type_instances_from_stack(inner, &instantiated_inner, index)
+            } else {
+                None
+            }
+        }
+        IntermediateType::IMutRef(inner) => {
+            if let IntermediateType::IMutRef(instantiated_inner) = instantiated_type {
+                extract_type_instances_from_stack(inner, &instantiated_inner, index)
+            } else {
+                None
+            }
+        }
+        IntermediateType::IGenericStructInstance {
+            types: generic_types,
+            ..
+        } => {
+            if let IntermediateType::IGenericStructInstance {
+                types: instantaited_types,
+                ..
+            } = instantiated_type
+            {
+                for (gt, it) in generic_types.iter().zip(instantaited_types) {
+                    let res = extract_type_instances_from_stack(gt, &it, index);
+                    if res.is_some() {
+                        return res;
+                    }
+                }
+                None
+            } else {
+                None
+            }
+        }
+        IntermediateType::IExternalUserData {
+            types: Some(generic_types),
+            ..
+        } => {
+            if let IntermediateType::IExternalUserData {
+                types: Some(instantaited_types),
+                ..
+            } = instantiated_type
+            {
+                for (gt, it) in generic_types.iter().zip(instantaited_types) {
+                    let res = extract_type_instances_from_stack(gt, &it, index);
+                    if res.is_some() {
+                        return res;
+                    }
+                }
+                None
+            } else {
+                None
+            }
+        }
+
+        _ => None,
+    }
+}

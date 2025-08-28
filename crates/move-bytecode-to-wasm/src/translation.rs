@@ -12,9 +12,13 @@ pub mod intermediate_types;
 pub mod table;
 
 use crate::{
-    CompilationContext, compilation_context::ModuleData,
-    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, hostio::host_functions::storage_flush_cache,
-    native_functions::NativeFunction, runtime::RuntimeFunction,
+    CompilationContext,
+    compilation_context::ModuleData,
+    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    generics::{extract_type_instances_from_stack, type_contains_generics},
+    hostio::host_functions::storage_flush_cache,
+    native_functions::NativeFunction,
+    runtime::RuntimeFunction,
     wasm_builder_extensions::WasmBuilderExtension,
 };
 use anyhow::Result;
@@ -1750,11 +1754,7 @@ fn translate_instruction(
             //  In `create_foo` the compiler does not have any information about what T could be,
             //  so, when called from `create_foo_u32` it will find a TypeParameter instead of a u32.
             //  The TypeParameter will replaced by the u32 using the types stack information.
-            let (struct_, types) = if struct_
-                .fields
-                .iter()
-                .any(|t| matches!(t, IntermediateType::ITypeParameter(_)))
-            {
+            let (struct_, types) = if struct_.fields.iter().any(type_contains_generics) {
                 let types_start = types_stack.len() - struct_.fields.len();
 
                 // Get the function's arguments from the types stack
@@ -1764,12 +1764,8 @@ fn translate_instruction(
                     .fields
                     .iter()
                     .enumerate()
-                    .filter_map(|(index, f)| {
-                        if let IntermediateType::ITypeParameter(_) = f {
-                            Some(types[index].clone())
-                        } else {
-                            None
-                        }
+                    .filter_map(|(index, t)| {
+                        extract_type_instances_from_stack(t, &types[index], index as u16)
                     })
                     .collect();
 
