@@ -888,8 +888,30 @@ fn translate_instruction(
             types_stack.push(IntermediateType::IMutRef(Box::new(*vec_inner)));
         }
         Bytecode::VecPack(signature_index, num_elements) => {
+            // If the inner type is a type parameter, we use the last type in the stack
+
+            // Example: create_fu takes a generic type T. The VecPack instruction 
+
+            // `public struct Fu<T: copy> has drop, copy {
+            //     a: T,
+            //     b: vector<T>,
+            // }`
+            
+            // public fun create_fu<T: copy>(t: T): Fu<T> {
+            //     Fu {a: t, b: vector[t, t, t]}
+            // }`
+
+            // public fun create_fu_u32(t: u32): Fu<u32> {
+            //     create_fu(t)
+            // }
             let inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
+
+            let inner = if let IntermediateType::ITypeParameter(_) = inner {
+                types_stack.0.last().unwrap().clone()
+            } else {
+                inner
+            };
 
             IVector::vec_pack_instructions(
                 &inner,
