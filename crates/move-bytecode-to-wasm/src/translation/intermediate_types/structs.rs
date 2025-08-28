@@ -495,6 +495,8 @@ impl IStruct {
         size
     }
 
+    /// Auxiliary functiion that recursively looks for not instantiated type parameters and
+    /// replaces them
     fn replace_type_parameters(
         f: &IntermediateType,
         instance_types: &[IntermediateType],
@@ -533,31 +535,6 @@ impl IStruct {
 
     /// Replaces all type parameters in the struct with the provided types.
     pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
-        /*
-        let replace_type_parameters = |f: &IntermediateType| match f {
-            IntermediateType::ITypeParameter(index) => types[*index as usize].clone(),
-            IntermediateType::IStruct { module_id, index } => todo!(),
-            IntermediateType::IGenericStructInstance {
-                module_id,
-                index,
-                types: generic_types,
-            } => IntermediateType::IGenericStructInstance {
-                module_id: module_id.clone(),
-                index: *index,
-                types: generic_types
-                    .iter()
-                    .map(|t| {
-                        if let IntermediateType::ITypeParameter(index) = t {
-                            types[*index as usize].clone()
-                        } else {
-                            t.clone()
-                        }
-                    })
-                    .collect(),
-            },
-            _ => f.clone(),
-        };
-        */
         let fields = self
             .fields
             .iter()

@@ -1735,7 +1735,6 @@ fn translate_instruction(
                 .iter()
                 .any(|t| matches!(t, IntermediateType::ITypeParameter(_)))
             {
-                println!("1");
                 let types_start = types_stack.len() - struct_.fields.len();
 
                 // Get the function's arguments from the types stack
@@ -1756,18 +1755,15 @@ fn translate_instruction(
 
                 (struct_.instantiate(&instantiations), instantiations)
             } else {
-                println!("2");
                 let types = module_data
                     .structs
                     .get_generic_struct_types_instances(struct_definition_index)?
                     .to_vec();
 
-                (struct_.instantiate(&types), types)
+                (struct_, types)
             };
 
-            println!("ACA {types:?} {struct_:?}");
             bytecodes::structs::pack(&struct_, module, builder, compilation_ctx, types_stack)?;
-            println!("ACA2");
 
             let idx = module_data
                 .structs
