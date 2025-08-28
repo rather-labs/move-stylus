@@ -1661,6 +1661,24 @@ fn translate_instruction(
                 .structs
                 .get_struct_instance_by_struct_definition_idx(struct_definition_index)?;
 
+            // In some situations a struct instantiation in the Move module that contains a generic type
+            // parameter. For example:
+            // ```
+            // public struct Foo<T> {
+            //     field: T
+            // }
+            //
+            // public fun create_foo<T>(f: T): Foo<T> {
+            //     Foo { field: f }
+            // }
+            //
+            // public fun create_foo_u32(n: u32): Foo<u32> {
+            //     Foo { field: n }
+            // }
+            // ```
+            //  In `create_foo` the compiler does not have any information about what T could be,
+            //  so, when called from `create_foo_u32` it will find a TypeParameter instead of a u32.
+            //  The TypeParameter will replaced by the u32 using the types stack information.
             let (struct_, types) = if struct_
                 .fields
                 .iter()
