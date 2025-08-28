@@ -53,27 +53,8 @@ impl MappedFunction {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
-        let is_generic = signature.arguments.iter().any(|a| match a {
-            IntermediateType::IRef(intermediate_type)
-            | IntermediateType::IMutRef(intermediate_type) => {
-                matches!(
-                    intermediate_type.as_ref(),
-                    IntermediateType::ITypeParameter(_)
-                )
-            }
-            IntermediateType::ITypeParameter(_) => true,
-            _ => false,
-        }) || signature.returns.iter().any(|a| match a {
-            IntermediateType::IRef(intermediate_type)
-            | IntermediateType::IMutRef(intermediate_type) => {
-                matches!(
-                    intermediate_type.as_ref(),
-                    IntermediateType::ITypeParameter(_)
-                )
-            }
-            IntermediateType::ITypeParameter(_) => true,
-            _ => false,
-        });
+        let is_generic = signature.arguments.iter().any(Self::itype_is_generic)
+            || signature.returns.iter().any(Self::itype_is_generic);
 
         Self {
             function_id,
@@ -84,6 +65,28 @@ impl MappedFunction {
             is_entry: function_definition.visibility == Visibility::Public,
             is_native: function_definition.is_native(),
             is_generic,
+        }
+    }
+
+    fn itype_is_generic(a: &IntermediateType) -> bool {
+        match a {
+            IntermediateType::IRef(intermediate_type)
+            | IntermediateType::IMutRef(intermediate_type) => {
+                matches!(
+                    intermediate_type.as_ref(),
+                    IntermediateType::ITypeParameter(_)
+                )
+            }
+            IntermediateType::ITypeParameter(_) => true,
+            IntermediateType::IGenericStructInstance { types, .. } => {
+                types.iter().any(Self::itype_is_generic)
+            }
+            IntermediateType::IExternalUserData {
+                types: Some(gtypes),
+                ..
+            } => gtypes.iter().any(Self::itype_is_generic),
+            IntermediateType::IVector(inner) => Self::itype_is_generic(&inner),
+            _ => false,
         }
     }
 }
