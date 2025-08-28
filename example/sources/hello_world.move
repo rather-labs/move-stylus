@@ -85,11 +85,6 @@ fun identity_2(_x: u128, y: u128): u128 {
   y
 }
 
-// Inteaction with signer
-public fun echo_signer_with_int(x: signer, y: u8): (u8, signer) {
-    (y, x)
-}
-
 /// Exposition of EVM global variables through TxContext object
 public fun tx_context_properties(ctx: &TxContext): (address, u256, u64, u256, u64, u64, u64, u256) {
     (
