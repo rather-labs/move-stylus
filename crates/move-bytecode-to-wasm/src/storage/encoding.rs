@@ -248,7 +248,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
-                types,
+                ..
             } if Uid::is_vm_type(module_id, identifier) => {
                 let tmp = module.locals.add(ValType::I32);
 
@@ -615,7 +615,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
-                types,
+                ..
             } if Uid::is_vm_type(module_id, identifier) => {
                 // Here we need to reconstruct the UID struct. To do that we first allocate 4 bytes
                 // that will contain the pointer to the UID struct data
@@ -747,7 +747,7 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
         IntermediateType::IExternalUserData {
             module_id,
             identifier,
-            types,
+            ..
         } if Uid::is_vm_type(module_id, identifier) => 32,
         IntermediateType::IExternalUserData {
             module_id,

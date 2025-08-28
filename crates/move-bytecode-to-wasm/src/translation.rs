@@ -554,11 +554,11 @@ fn translate_instruction(
                 .returns
                 .iter()
                 .map(|it| match it {
-                    IntermediateType::IStruct { module_id, index } => {
+                    IntermediateType::IStruct { module_id, .. } => {
                         if module_id != &module_data.id {
-                            let struct_ = compilation_ctx
-                                .get_struct_by_intermediate_type(&it)
-                                .unwrap();
+                            // TODO: Add identifier to IntermediateType::IStruct
+                            let struct_ =
+                                compilation_ctx.get_struct_by_intermediate_type(it).unwrap();
 
                             IntermediateType::IExternalUserData {
                                 module_id: module_id.clone(),
@@ -570,14 +570,12 @@ fn translate_instruction(
                         }
                     }
                     IntermediateType::IGenericStructInstance {
-                        module_id,
-                        index,
-                        types,
+                        module_id, types, ..
                     } => {
                         if module_id != &module_data.id {
-                            let struct_ = compilation_ctx
-                                .get_struct_by_intermediate_type(&it)
-                                .unwrap();
+                            // TODO: Add identifier to IntermediateType::IGenericStruct
+                            let struct_ =
+                                compilation_ctx.get_struct_by_intermediate_type(it).unwrap();
 
                             IntermediateType::IExternalUserData {
                                 module_id: module_id.clone(),
