@@ -3308,6 +3308,8 @@ name = "move-hello-world-example"
 version = "0.1.11"
 dependencies = [
  "alloy",
+ "alloy-contract",
+ "alloy-sol-types",
  "dotenv",
  "eyre",
  "tokio",
