@@ -1657,7 +1657,6 @@ fn translate_instruction(
             });
         }
         Bytecode::PackGeneric(struct_definition_index) => {
-            println!("|1|");
             let struct_ = module_data
                 .structs
                 .get_struct_instance_by_struct_definition_idx(struct_definition_index)?;
@@ -1695,15 +1694,11 @@ fn translate_instruction(
                 (struct_, types)
             };
 
-            println!("|2| {struct_:?}");
             bytecodes::structs::pack(&struct_, module, builder, compilation_ctx, types_stack)?;
 
-            println!("|3|");
             let idx = module_data
                 .structs
                 .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
-            println!("|4|");
-            println!("===> {types:?}");
 
             types_stack.push(IntermediateType::IGenericStructInstance {
                 module_id: module_data.id.clone(),
