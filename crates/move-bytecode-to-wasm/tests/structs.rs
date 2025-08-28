@@ -2154,8 +2154,14 @@ mod generic_struct_misc {
             uint256[] b;
         }
 
+        struct Fu2 {
+            uint32 a;
+            uint32[] b;
+        }
+
         function createFooU32(uint32 g) external returns (Foo);
         function createFooVecU32(uint32[] g) external returns (Foo2);
+        function createFuU32(uint32 t) external returns (Fu2);
     }
 
     #[rstest]
@@ -2174,7 +2180,7 @@ mod generic_struct_misc {
             y: 4242424242,
             z: U256::from(424242424242_u128),
             bar: Bar { g: 314, a: 42, b: 4242 },
-            baz: Baz { g: 314, a: 4242, b: vec![U256::from(3)] }
+            baz: Baz { g: 314, a: 4242, b: vec![U256::from(3)] },
         }
     )]
     #[case(
@@ -2192,8 +2198,12 @@ mod generic_struct_misc {
             y: 4242424242,
             z: U256::from(424242424242_u128),
             bar: Bar2 { g: vec![u32::MAX], a: 42, b: 4242 },
-            baz: Baz2 { g: vec![u32::MAX], a: 4242, b: vec![U256::from(3)] }
+            baz: Baz2 { g: vec![u32::MAX], a: 4242, b: vec![U256::from(3)] },
         }
+    )]
+    #[case(
+        createFuU32Call::new((42,)),
+        Fu2 { a: 42, b: vec![42, 42, 42] }
     )]
     fn test_generic_struct_misc<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,

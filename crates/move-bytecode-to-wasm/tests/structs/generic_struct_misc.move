@@ -23,7 +23,7 @@ public struct Bar<T: copy> has drop, copy {
     b: u128,
 }
 
-// Dynamic abi substruct
+// Dynamic abi sub-struct
 public struct Baz<T: copy> has drop, copy {
     g: T,
     a: u16,
@@ -58,4 +58,17 @@ public fun create_foo_u32(g: u32): Foo<u32> {
 
 public fun create_foo_vec_u32(g: vector<u32>): Foo<vector<u32>> {
     create_foo(g)
+}
+
+public struct Fu<T: copy> has drop, copy {
+    a: T,
+    b: vector<T>,
+}
+
+public fun create_fu<T: copy>(t: T): Fu<T> {
+    Fu {a: t, b: vector[t, t, t]}
+}
+
+public fun create_fu_u32(t: u32): Fu<u32> {
+    create_fu(t)
 }
