@@ -23,7 +23,7 @@ public struct Bar<T: copy> has drop, copy {
     b: u128,
 }
 
-// Dynamic abi substruct
+// Dynamic abi sub-struct
 public struct Baz<T: copy> has drop, copy {
     g: T,
     a: u16,
