@@ -162,12 +162,7 @@ async fn main() -> eyre::Result<()> {
 
     // Emit test event with generics 2
     let pending_tx = example
-        .emitTestEventGeneric2(
-            43,
-            true,
-            Example::TestEvent1 { n: 43 },
-            vec![1, 2, 3],
-        )
+        .emitTestEventGeneric2(43, true, Example::TestEvent1 { n: 43 }, vec![1, 2, 3])
         .send()
         .await?;
     let receipt = pending_tx.get_receipt().await?;
