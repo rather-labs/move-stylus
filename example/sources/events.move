@@ -22,7 +22,14 @@ public struct TestGenericEvent<T, U, V> has copy, drop {
     o: T,
     p: U,
     q: V,
-    // r: vector<T>,
+}
+
+public struct TestGenericEvent2<T, U, V> has copy, drop {
+    o: T,
+    p: U,
+    q: V,
+    r: vector<T>,
+    s: TestGenericEvent<T, U, V>,
 }
 
 public fun emit_test_event1(n: u32) {
@@ -39,4 +46,9 @@ public fun emit_test_event3(a: TestEvent1, b: TestEvent2) {
 
 public fun emit_test_event_generic_1(o: u32, p: bool, q: TestEvent1) {
     emit(TestGenericEvent { o, p, q });
+}
+
+public fun emit_test_event_generic_2(o: u32, p: bool, q: TestEvent1, r: vector<u32>) {
+    let s = TestGenericEvent {o, p, q};
+    emit(TestGenericEvent2 { o, p, q, r, s });
 }
