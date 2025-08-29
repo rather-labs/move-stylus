@@ -781,13 +781,8 @@ fn translate_instruction(
                 },
             )))?;
 
-            let field_type = bytecodes::structs::mut_borrow_field(
-                struct_,
-                field_id,
-                builder,
-                compilation_ctx,
-                types_stack,
-            );
+            let field_type =
+                bytecodes::structs::mut_borrow_field(struct_, field_id, builder, compilation_ctx);
 
             types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
         }
@@ -838,7 +833,6 @@ fn translate_instruction(
                 struct_field_id,
                 builder,
                 compilation_ctx,
-                types_stack,
             );
 
             let field_type = replace_type_parameters(&field_type, &instantiation_types);
@@ -2102,7 +2096,7 @@ pub fn fix_call_type(
                     index: struct_.index(),
                     types: types.to_vec(),
                 },
-                ExternalModuleData::Enum(ienum) => todo!(),
+                ExternalModuleData::Enum(_ienum) => todo!(),
             }
         }
         IntermediateType::IExternalUserData {
@@ -2119,7 +2113,7 @@ pub fn fix_call_type(
                     module_id: module_id.clone(),
                     index: struct_.index(),
                 },
-                ExternalModuleData::Enum(ienum) => todo!(),
+                ExternalModuleData::Enum(_ienum) => todo!(),
             }
         }
         // TODO enum cases

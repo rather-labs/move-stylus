@@ -61,7 +61,6 @@ pub fn mut_borrow_field(
     field_id: &FieldHandleIndex,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
-    types_stack: &mut TypesStack,
 ) -> IntermediateType {
     let Some(field_type) = struct_.fields_types.get(field_id) else {
         panic!(

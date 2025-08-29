@@ -130,11 +130,11 @@ pub fn replace_type_parameters(
         IntermediateType::ITypeParameter(index) => instance_types[*index as usize].clone(),
         // Reference type parameter: &T -> &concrete_type
         IntermediateType::IRef(inner) => {
-            IntermediateType::IRef(Box::new(replace_type_parameters(&inner, instance_types)))
+            IntermediateType::IRef(Box::new(replace_type_parameters(inner, instance_types)))
         }
         // Mutable reference type parameter: &mut T -> &mut concrete_type
         IntermediateType::IMutRef(inner) => {
-            IntermediateType::IMutRef(Box::new(replace_type_parameters(&inner, instance_types)))
+            IntermediateType::IMutRef(Box::new(replace_type_parameters(inner, instance_types)))
         }
         IntermediateType::IGenericStructInstance {
             module_id,

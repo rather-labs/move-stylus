@@ -8,14 +8,11 @@ use walrus::{
     ir::{LoadKind, MemArg, StoreKind},
 };
 
-use super::{
-    fix_return_type,
-    types_stack::{TypesStack, TypesStackError},
-};
+use super::types_stack::{TypesStack, TypesStackError};
 
 use crate::{
     CompilationContext, UserDefinedType,
-    compilation_context::{ModuleData, module_data},
+    compilation_context::ModuleData,
     generics::{replace_type_parameters, type_contains_generics},
     translation::{fix_call_type, intermediate_types::ISignature},
 };
@@ -234,18 +231,12 @@ fn look_for_external_data(itype: &IntermediateType) -> Option<&IntermediateType>
         | IntermediateType::IRef(inner)
         | IntermediateType::IMutRef(inner) => look_for_external_data(inner),
         IntermediateType::ITypeParameter(_) => None,
-        IntermediateType::IStruct { module_id, index } => None,
-        IntermediateType::IGenericStructInstance {
-            module_id,
-            index,
-            types,
-        } => types.iter().find(|t| look_for_external_data(*t).is_some()),
+        IntermediateType::IStruct { .. } => None,
+        IntermediateType::IGenericStructInstance { types, .. } => {
+            types.iter().find(|t| look_for_external_data(t).is_some())
+        }
         IntermediateType::IEnum(_) => todo!(),
-        IntermediateType::IExternalUserData {
-            module_id,
-            identifier,
-            types,
-        } => Some(itype),
+        IntermediateType::IExternalUserData { .. } => Some(itype),
     }
 }
 
