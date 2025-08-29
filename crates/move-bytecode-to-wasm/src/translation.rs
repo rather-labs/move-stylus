@@ -1023,6 +1023,7 @@ fn translate_instruction(
                     builder.call(pop_back_f);
                 }
                 IntermediateType::ITypeParameter(_)
+                | IntermediateType::IUnknown
                 | IntermediateType::IRef(_)
                 | IntermediateType::IMutRef(_) => {
                     return Err(TranslationError::InvalidOperation {

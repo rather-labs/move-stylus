@@ -104,6 +104,9 @@ impl IRef {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot unpack generic type parameter");
             }
+            IntermediateType::IUnknown => {
+                panic!("cannot unpack unknown type parameter");
+            }
             IntermediateType::IEnum(_) => todo!(),
         }
     }
@@ -177,6 +180,9 @@ impl IMutRef {
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot unpack generic type parameter");
+            }
+            IntermediateType::IUnknown => {
+                panic!("cannot unpack unknown type parameter");
             }
             IntermediateType::IEnum(_) => todo!(),
         }

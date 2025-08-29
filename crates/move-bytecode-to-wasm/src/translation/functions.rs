@@ -230,8 +230,9 @@ fn look_for_external_data(itype: &IntermediateType) -> Option<&IntermediateType>
         IntermediateType::IVector(inner)
         | IntermediateType::IRef(inner)
         | IntermediateType::IMutRef(inner) => look_for_external_data(inner),
-        IntermediateType::ITypeParameter(_) => None,
-        IntermediateType::IStruct { .. } => None,
+        IntermediateType::ITypeParameter(_)
+        | IntermediateType::IUnknown
+        | IntermediateType::IStruct { .. } => None,
         IntermediateType::IGenericStructInstance { types, .. } => {
             types.iter().find(|t| look_for_external_data(t).is_some())
         }

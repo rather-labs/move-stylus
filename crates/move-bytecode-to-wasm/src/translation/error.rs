@@ -61,6 +61,9 @@ pub enum TranslationError {
         type_parameter_index: u16,
     },
 
+    #[error("found unknown type inside struct with index {struct_index}")]
+    FoundUnknownTypeInsideStruct { struct_index: u16 },
+
     #[error(r#"found external struct "{identifier}" from module "{module_id}" inside struct when unpacking"#)]
     UnpackingStructFoundExternalStruct {
         identifier: String,

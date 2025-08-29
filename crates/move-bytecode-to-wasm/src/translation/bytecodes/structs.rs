@@ -182,6 +182,11 @@ pub fn pack(
                             type_parameter_index: *index,
                         });
                     }
+                    IntermediateType::IUnknown => {
+                        return Err(TranslationError::FoundUnknownTypeInsideStruct {
+                            struct_index: struct_.index(),
+                        });
+                    }
                     IntermediateType::IEnum(_) => todo!(),
                 };
 
@@ -266,6 +271,11 @@ pub fn unpack(
                 return Err(TranslationError::FoundTypeParameterInsideStruct {
                     struct_index: struct_.index(),
                     type_parameter_index: *index,
+                });
+            }
+            IntermediateType::IUnknown => {
+                return Err(TranslationError::FoundUnknownTypeInsideStruct {
+                    struct_index: struct_.index(),
                 });
             }
             IntermediateType::IEnum(_) => todo!(),
