@@ -50,21 +50,21 @@ pub fn extract_type_instances_from_stack(
         IntermediateType::ITypeParameter(i) if *i == index => Some(instantiated_type.clone()),
         IntermediateType::IVector(inner) => {
             if let IntermediateType::IVector(instantiated_inner) = instantiated_type {
-                extract_type_instances_from_stack(inner, &instantiated_inner, index)
+                extract_type_instances_from_stack(inner, instantiated_inner, index)
             } else {
                 None
             }
         }
         IntermediateType::IRef(inner) => {
             if let IntermediateType::IRef(instantiated_inner) = instantiated_type {
-                extract_type_instances_from_stack(inner, &instantiated_inner, index)
+                extract_type_instances_from_stack(inner, instantiated_inner, index)
             } else {
                 None
             }
         }
         IntermediateType::IMutRef(inner) => {
             if let IntermediateType::IMutRef(instantiated_inner) = instantiated_type {
-                extract_type_instances_from_stack(inner, &instantiated_inner, index)
+                extract_type_instances_from_stack(inner, instantiated_inner, index)
             } else {
                 None
             }
@@ -79,7 +79,7 @@ pub fn extract_type_instances_from_stack(
             } = instantiated_type
             {
                 for (gt, it) in generic_types.iter().zip(instantaited_types) {
-                    let res = extract_type_instances_from_stack(gt, &it, index);
+                    let res = extract_type_instances_from_stack(gt, it, index);
                     if res.is_some() {
                         return res;
                     }
@@ -99,7 +99,7 @@ pub fn extract_type_instances_from_stack(
             } = instantiated_type
             {
                 for (gt, it) in generic_types.iter().zip(instantaited_types) {
-                    let res = extract_type_instances_from_stack(gt, &it, index);
+                    let res = extract_type_instances_from_stack(gt, it, index);
                     if res.is_some() {
                         return res;
                     }
