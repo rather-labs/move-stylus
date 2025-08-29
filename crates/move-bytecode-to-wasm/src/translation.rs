@@ -196,6 +196,7 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
+                    println!("TRANSLATING {instruction:?}");
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -466,24 +467,29 @@ fn translate_instruction(
                 // Get the function's arguments from the types stack
                 let types = &types_stack[arguments_start..types_stack.len()];
 
-                // These types represent the instantiated types that correspond to the return values
-                // of the parent function. This is crucial because we may encounter an IRef<T> or
-                // IMutRef<T>, and we need to extract the underlying type T.
-                let mut instantiations = HashSet::new();
-                for (index, field) in type_instantiations.iter().enumerate() {
-                    if let Some(res) = extract_type_instances_from_stack(field, &types[index]) {
-                        instantiations.insert(res);
+                if types.len() > 0 {
+                    println!("-----> {types_stack:?}");
+                    // These types represent the instantiated types that correspond to the return values
+                    // of the parent function. This is crucial because we may encounter an IRef<T> or
+                    // IMutRef<T>, and we need to extract the underlying type T.
+                    let mut instantiations = HashSet::new();
+                    for (index, field) in type_instantiations.iter().enumerate() {
+                        if let Some(res) = extract_type_instances_from_stack(field, &types[index]) {
+                            instantiations.insert(res);
+                        }
                     }
+                    // TODO assert the same index is not repreated twice (meaning there is two or more
+                    // different types for the same type parameter)
+
+                    let instantiations = instantiations
+                        .into_iter()
+                        .map(|(_, t)| t)
+                        .collect::<Vec<IntermediateType>>();
+
+                    function_information.instantiate(&instantiations)
+                } else {
+                    function_information.instantiate(type_instantiations)
                 }
-                // TODO assert the same index is not repreated twice (meaning there is two or more
-                // different types for the same type parameter)
-
-                let instantiations = instantiations
-                    .into_iter()
-                    .map(|(_, t)| t)
-                    .collect::<Vec<IntermediateType>>();
-
-                function_information.instantiate(&instantiations)
             } else {
                 function_information.instantiate(type_instantiations)
             };
@@ -657,7 +663,8 @@ fn translate_instruction(
             } else {
                 local_type.box_local_instructions(module, builder, compilation_ctx, local);
             }
-            types_stack.pop_expecting(local_type)?;
+            //types_stack.pop_expecting(local_type)?;
+            types_stack.pop()?;
         }
         Bytecode::MoveLoc(local_id) => {
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
@@ -713,13 +720,9 @@ fn translate_instruction(
             assert_eq!(module_id, &module_data.id);
             assert_eq!(struct_.index(), index);
 
-            bytecodes::structs::borrow_field(
-                struct_,
-                field_id,
-                builder,
-                compilation_ctx,
-                types_stack,
-            );
+            let field_type =
+                bytecodes::structs::borrow_field(struct_, field_id, builder, compilation_ctx);
+            types_stack.push(IntermediateType::IRef(Box::new(field_type)));
         }
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = module_data
@@ -727,6 +730,31 @@ fn translate_instruction(
                 .instantiated_fields_to_generic_fields
                 .get(field_id)
                 .unwrap();
+
+            let instantiation_types = if instantiation_types.iter().any(type_contains_generics) {
+                println!("{:?}", &types_stack.last());
+                match &types_stack.last().unwrap() {
+                    IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+                        match &**inner {
+                            IntermediateType::IGenericStructInstance { types, .. } => types.clone(),
+                            _ => panic!(),
+                        }
+                    }
+                    _ => panic!(),
+                }
+                /*
+                if let Some(IntermediateType::IRef(inner)) = &types_stack.last() {
+                    match &**inner {
+                        IntermediateType::IGenericStructInstance { types, .. } => types.clone(),
+                        _ => panic!(),
+                    }
+                } else {
+                    panic!()
+                }
+                */
+            } else {
+                instantiation_types.clone()
+            };
 
             let struct_ = if let Ok(struct_) = module_data
                 .structs
@@ -738,7 +766,7 @@ fn translate_instruction(
                     .structs
                     .get_by_field_handle_idx(struct_field_id)?;
 
-                generic_stuct.instantiate(instantiation_types)
+                generic_stuct.instantiate(&instantiation_types)
             };
 
             // Check if in the types stack we have the correct type
@@ -760,15 +788,16 @@ fn translate_instruction(
             );
             assert_eq!(module_id, &module_data.id);
             assert_eq!(struct_.index(), index);
-            assert_eq!(types, instantiation_types);
+            assert_eq!(types, &instantiation_types);
 
-            bytecodes::structs::borrow_field(
+            let field_type = bytecodes::structs::borrow_field(
                 &struct_,
                 struct_field_id,
                 builder,
                 compilation_ctx,
-                types_stack,
             );
+            let field_type = replace_type_parameters(&field_type, &instantiation_types);
+            types_stack.push(IntermediateType::IRef(Box::new(field_type)));
         }
         Bytecode::MutBorrowField(field_id) => {
             let struct_ = module_data.structs.get_by_field_handle_idx(field_id)?;
@@ -783,7 +812,6 @@ fn translate_instruction(
 
             let field_type =
                 bytecodes::structs::mut_borrow_field(struct_, field_id, builder, compilation_ctx);
-
             types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
         }
         Bytecode::MutBorrowFieldGeneric(field_id) => {
@@ -912,15 +940,18 @@ fn translate_instruction(
             //     create_foo(t)
             // }
             // ```
+            println!("1");
+
             let inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             let inner = if let IntermediateType::ITypeParameter(_) = inner {
-                types_stack.0.last().unwrap().clone()
+                types_stack.0.last().unwrap_or(&inner).clone()
             } else {
                 inner
             };
 
+            println!("2");
             IVector::vec_pack_instructions(
                 &inner,
                 module,
@@ -929,6 +960,7 @@ fn translate_instruction(
                 *num_elements as i32,
             );
 
+            println!("3");
             // Remove the packing values from types stack and check if the types are correct
             let mut n = *num_elements as usize;
             while n > 0 {
@@ -936,6 +968,7 @@ fn translate_instruction(
                 n -= 1;
             }
 
+            println!("4");
             types_stack.push(IntermediateType::IVector(Box::new(inner)));
         }
         Bytecode::VecPopBack(signature_index) => {
@@ -953,9 +986,16 @@ fn translate_instruction(
             let expected_vec_inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
-            if *vec_inner != expected_vec_inner {
+            let expected_vec_inner = if let IntermediateType::ITypeParameter(_) = expected_vec_inner
+            {
+                &*vec_inner
+            } else {
+                &expected_vec_inner
+            };
+
+            if *vec_inner != *expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
-                    expected: expected_vec_inner,
+                    expected: expected_vec_inner.clone(),
                     found: *vec_inner,
                 });
             }
@@ -1078,9 +1118,17 @@ fn translate_instruction(
             let elem_ir_type =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
-            types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
-                IntermediateType::IVector(Box::new(elem_ir_type)),
-            )))?;
+            if let IntermediateType::ITypeParameter(_) = elem_ir_type {
+                let ref_ty = types_stack.pop()?;
+                types_stack::match_types!(
+                    (IntermediateType::IRef(inner), "vector reference", ref_ty),
+                    (IntermediateType::IVector(_vec_inner), "vector", *inner)
+                );
+            } else {
+                types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
+                    IntermediateType::IVector(Box::new(elem_ir_type)),
+                )))?;
+            };
 
             builder
                 .load(

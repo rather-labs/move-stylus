@@ -4,6 +4,8 @@ use stylus::tx_context::TxContext;
 use stylus::object as object;
 use stylus::object::UID;
 use stylus::event::emit;
+use hello_world::stack::Stack;
+use hello_world::stack;
 
 use hello_world::other_mod::{generic_identity, generic_identity_two_types};
 
@@ -40,7 +42,7 @@ public fun get_unique_id(ctx: &mut TxContext): UID {
     object::new(ctx)
 }
 
-// Events 
+// Events
 
 public struct TestEvent1 has copy, drop {
     n: u32
@@ -90,4 +92,28 @@ public fun emit_test_event_generic_1(o: u32, p: bool, q: TestEvent1) {
 public fun emit_test_event_generic_2(o: u32, p: bool, q: TestEvent1, r: vector<u32>) {
     let s = TestGenericEvent {o, p, q};
     emit(TestGenericEvent2 { o, p, q, r, s });
+}
+
+
+public fun test_stack_1(): (Stack<u32>, u64) {
+    let mut s = stack::new(vector[1, 2, 3]);
+    s.push_back(5);
+    s.push_back(6);
+    (s, s.size())
+}
+
+public fun test_stack_2(): (Stack<u32>, u64){
+    let mut s = stack::new(vector[]);
+    s.push_back(5);
+    s.push_back(6);
+    (s, s.size())
+}
+
+public fun test_stack_3(): (Stack<u32>, u64){
+    let mut s = stack::new(vector[3,1,4,1,5]);
+    s.push_back(5);
+    s.push_back(6);
+    s.pop_back();
+    s.pop_back();
+    (s, s.size())
 }

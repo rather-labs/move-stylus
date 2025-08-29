@@ -23,46 +23,58 @@ impl IVector {
         capacity: LocalId,
         data_size: i32,
     ) {
-        // This is a failsafe to prevent UB if static checks failed
-        builder
-            .local_get(len)
-            .local_get(capacity)
-            .binop(BinaryOp::I32GtU)
-            .if_else(
-                None,
-                |then_| {
-                    then_.unreachable(); // Trap if len > capacity
-                },
-                |_| {},
-            );
-
-        // Allocate memory: capacity * element size + 8 bytes for header
-        builder
-            .local_get(capacity)
-            .i32_const(data_size)
-            .binop(BinaryOp::I32Mul)
-            .i32_const(8)
-            .binop(BinaryOp::I32Add)
-            .call(compilation_ctx.allocator)
-            .local_set(pointer);
-
-        // Write length at offset 0
-        builder.local_get(pointer).local_get(len).store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
+        // If the len is 0 we just allocate 16 bytes representing 0 length and 0 capacity
+        builder.local_get(len).i32_const(0).binop(BinaryOp::I32Eq);
+        builder.if_else(
+            None,
+            |then| {
+                then.i32_const(16)
+                    .call(compilation_ctx.allocator)
+                    .local_set(pointer);
             },
-        );
+            |else_| {
+                // This is a failsafe to prevent UB if static checks failed
+                else_
+                    .local_get(len)
+                    .local_get(capacity)
+                    .binop(BinaryOp::I32GtU)
+                    .if_else(
+                        None,
+                        |then_| {
+                            then_.unreachable(); // Trap if len > capacity
+                        },
+                        |_| {},
+                    );
 
-        // Write capacity at offset 4
-        builder.local_get(pointer).local_get(capacity).store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 4,
+                // Allocate memory: capacity * element size + 8 bytes for header
+                else_
+                    .local_get(capacity)
+                    .i32_const(data_size)
+                    .binop(BinaryOp::I32Mul)
+                    .i32_const(8)
+                    .binop(BinaryOp::I32Add)
+                    .call(compilation_ctx.allocator)
+                    .local_set(pointer);
+
+                // Write length at offset 0
+                else_.local_get(pointer).local_get(len).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                // Write capacity at offset 4
+                else_.local_get(pointer).local_get(capacity).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 4,
+                    },
+                );
             },
         );
     }
@@ -688,15 +700,21 @@ impl IVector {
         compilation_ctx: &CompilationContext,
         num_elements: i32,
     ) {
+        println!("1 0 {num_elements}");
         // Local declarations
         let ptr_local = module.locals.add(ValType::I32);
         let len_local = module.locals.add(ValType::I32);
-        let temp_local = module.locals.add(inner.into());
-        let data_size = inner.stack_data_size() as i32;
+        let data_size = if num_elements == 0 {
+            0
+        } else {
+            inner.stack_data_size() as i32
+        };
 
+        println!("1 1");
         // Set length
         builder.i32_const(num_elements).local_set(len_local);
 
+        println!("1 2");
         IVector::allocate_vector_with_header(
             builder,
             compilation_ctx,
@@ -706,25 +724,29 @@ impl IVector {
             data_size,
         );
 
-        for i in 0..num_elements {
-            builder.local_get(ptr_local);
-            builder.swap(ptr_local, temp_local);
+        if num_elements != 0 {
+            let temp_local = module.locals.add(inner.into());
+            println!("1 3");
+            for i in 0..num_elements {
+                builder.local_get(ptr_local);
+                builder.swap(ptr_local, temp_local);
 
-            // Store at computed address
-            builder.store(
-                compilation_ctx.memory_id,
-                match inner.into() {
-                    ValType::I64 => StoreKind::I64 { atomic: false },
-                    ValType::I32 => StoreKind::I32 { atomic: false },
-                    _ => panic!("Unsupported ValType"),
-                },
-                MemArg {
-                    align: 0,
-                    offset: (8 + (num_elements - 1 - i) * data_size) as u32,
-                },
-            );
+                // Store at computed address
+                builder.store(
+                    compilation_ctx.memory_id,
+                    match inner.into() {
+                        ValType::I64 => StoreKind::I64 { atomic: false },
+                        ValType::I32 => StoreKind::I32 { atomic: false },
+                        _ => panic!("Unsupported ValType"),
+                    },
+                    MemArg {
+                        align: 0,
+                        offset: (8 + (num_elements - 1 - i) * data_size) as u32,
+                    },
+                );
+            }
         }
-
+        println!("1 4");
         builder.local_get(ptr_local);
     }
 

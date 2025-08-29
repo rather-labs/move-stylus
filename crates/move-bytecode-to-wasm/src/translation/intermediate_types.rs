@@ -82,6 +82,9 @@ pub enum IntermediateType {
         identifier: String,
         types: Option<Vec<IntermediateType>>,
     },
+    // This represents a type that is unknown. This is useful when working with generics, there
+    // are cases where the type cannot be deduced
+    // Unknown,
 }
 
 impl IntermediateType {
