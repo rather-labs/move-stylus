@@ -273,6 +273,8 @@ pub fn prepare_function_return(
     builder.return_();
 }
 
+/// Looks for an IExtnernalUserData in the IntermediateType tree. If it finds it, returns it,
+/// otherwise retuns None
 fn look_for_external_data(itype: &IntermediateType) -> Option<&IntermediateType> {
     match itype {
         IntermediateType::IBool
@@ -316,37 +318,53 @@ pub fn prepare_function_arguments(
     function_module_data: &ModuleData,
     caller_module: &ModuleData,
 ) -> Result<(), TypesStackError> {
-    println!(
-        "GGGGGGGGGGGGGGGGGGgg {:?} {:?}",
-        caller_module.id, function_module_data.id
-    );
     // Verify that the types currently on the types stack correspond to the expected argument types.
     // Additionally, determine if any of these arguments are references.
     let mut has_ref = false;
     for arg in arguments.iter().rev() {
-        // If the caller is not in the same module as the
+        // Here we compute the type we expect to be on the stack. The expected type can be represented
+        // by two variants of the `IntermediateType` enum: `IExternalUserData` and one of the variants
+        // corresponding to generic or concrete structs/enums.
+        //
+        // `IExternalUserData` and those variants have a one-to-one correspondence: one is used from the
+        // perspective of a module that did not define the datatype, and the other is used from the
+        // perspective of the module that defined it.
+        //
+        // There are cases where we encounter an `IExternalUserData` but the function expects an
+        // `IGenericStructInstance` (or another struct/enum variant), and vice versa.
+        //
+        // This happens when the caller of the function and the callee are in different modules...
         let stack_type = if caller_module.id != function_module_data.id {
             let type_ = types_stack.pop()?;
-            println!("\n ASDFFDSFDSFSFDSFL 1  {type_:?}\n");
+
             match &look_for_external_data(&type_) {
+                // If we find an `IExternalUserData` at the top of the stack (or inside another type) and the
+                // `IExternalUserData`’s module matches the callee’s module, then the callee will expect an
+                // `IntermediateType` defined within its own module (for example, an `IGenericStructInstance`
+                // that corresponds to the encountered `IExternalUserData`).
+                //
+                // In this case, we simply return `arg`, since it already matches what the callee expects.
                 Some(IntermediateType::IExternalUserData { module_id, .. })
                     if *module_id == function_module_data.id =>
                 {
-                    println!("\n ASDFFDSFDSFSFDSFL 2 \n");
                     arg.clone()
                 }
+                // Otherwise, if the data type’s module does not match the callee’s module, we
+                // return it directly.
                 _ => type_,
             }
-        } else {
+        }
+        // If the caller’s module and the callee’s module do not match, but we encounter an
+        // `IExternalUserData` that belongs to the callee’s module, the callee will expect an
+        // `IntermediateType` defined within its own module (for example, an `IGenericStructInstance`
+        // corresponding to the `IExternalUserData`).
+        //
+        // In this case, the `fix_call_type` function returns the expected `IntermediateType`.
+        else {
             fix_call_type(&types_stack.pop()?, compilation_ctx, function_module_data)
         };
-        // let stack_type = fix_call_type(&types_stack.pop()?, compilation_ctx, function_module_data);
 
-        println!("BEFORE ARG: {arg:?}");
-        println!("AFTER ARG: {arg:?}");
         assert_eq!(&stack_type, arg);
-
-        //types_stack.pop_expecting(arg)?;
 
         has_ref = has_ref
             || matches!(

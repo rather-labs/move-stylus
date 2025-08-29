@@ -2082,12 +2082,18 @@ pub fn fix_return_type(
     }
 }
 
+// If the called function receives an `IExternalUserData` as an argument, and the data type is
+// defined in the same module as the function, the function will actually expect the internal
+// variant corresponding to that `IExternalUserData` (for example `IGenericStructInstance`).
+//
+// In other words, the type stack may contain an `IExternalUserData`, but since both the data
+// structure and the function are defined in the same module, the internal representation is
+// required.
 pub fn fix_call_type(
     itype: &IntermediateType,
     compilation_ctx: &CompilationContext,
     module_data: &ModuleData,
 ) -> IntermediateType {
-    println!("CHEEEE {itype:?} {:?}", module_data.id);
     match itype {
         IntermediateType::IRef(inner) => {
             IntermediateType::IRef(Box::new(fix_call_type(inner, compilation_ctx, module_data)))
