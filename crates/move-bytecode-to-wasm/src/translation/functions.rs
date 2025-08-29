@@ -273,6 +273,36 @@ pub fn prepare_function_return(
     builder.return_();
 }
 
+fn look_for_external_data(itype: &IntermediateType) -> Option<&IntermediateType> {
+    match itype {
+        IntermediateType::IBool
+        | IntermediateType::IU8
+        | IntermediateType::IU16
+        | IntermediateType::IU32
+        | IntermediateType::IU64
+        | IntermediateType::IU128
+        | IntermediateType::IU256
+        | IntermediateType::IAddress
+        | IntermediateType::ISigner => None,
+        IntermediateType::IVector(inner)
+        | IntermediateType::IRef(inner)
+        | IntermediateType::IMutRef(inner) => look_for_external_data(inner),
+        IntermediateType::ITypeParameter(_) => None,
+        IntermediateType::IStruct { module_id, index } => None,
+        IntermediateType::IGenericStructInstance {
+            module_id,
+            index,
+            types,
+        } => types.iter().find(|t| look_for_external_data(*t).is_some()),
+        IntermediateType::IEnum(_) => todo!(),
+        IntermediateType::IExternalUserData {
+            module_id,
+            identifier,
+            types,
+        } => Some(itype),
+    }
+}
+
 /// This function sets up the arguments for a function call.
 ///
 /// It processes each argument type, checking if it is an immutable (`IRef`) or mutable (`IMutRef`) reference.
@@ -296,17 +326,25 @@ pub fn prepare_function_arguments(
     for arg in arguments.iter().rev() {
         // If the caller is not in the same module as the
         let stack_type = if caller_module.id != function_module_data.id {
-            println!("GGG 1");
-            types_stack.pop()?
+            let type_ = types_stack.pop()?;
+            println!("\n ASDFFDSFDSFSFDSFL 1  {type_:?}\n");
+            match &look_for_external_data(&type_) {
+                Some(IntermediateType::IExternalUserData { module_id, .. })
+                    if *module_id == function_module_data.id =>
+                {
+                    println!("\n ASDFFDSFDSFSFDSFL 2 \n");
+                    arg.clone()
+                }
+                _ => type_,
+            }
         } else {
-            println!("GGG 2");
             fix_call_type(&types_stack.pop()?, compilation_ctx, function_module_data)
         };
         // let stack_type = fix_call_type(&types_stack.pop()?, compilation_ctx, function_module_data);
 
         println!("BEFORE ARG: {arg:?}");
         println!("AFTER ARG: {arg:?}");
-        // assert_eq!(&stack_type, arg);
+        assert_eq!(&stack_type, arg);
 
         //types_stack.pop_expecting(arg)?;
 
