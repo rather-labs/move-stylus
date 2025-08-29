@@ -510,6 +510,7 @@ fn translate_instruction(
                 compilation_ctx,
                 types_stack,
                 function_module,
+                module_data,
             )?;
 
             println!("7");
@@ -594,6 +595,7 @@ fn translate_instruction(
                 compilation_ctx,
                 types_stack,
                 function_module,
+                module_data,
             )?;
 
             // If the function is in the table we call it directly
@@ -2082,7 +2084,7 @@ pub fn fix_call_type(
     compilation_ctx: &CompilationContext,
     module_data: &ModuleData,
 ) -> IntermediateType {
-    println!("CHEEEE {itype:?}");
+    println!("CHEEEE {itype:?} {:?}", module_data.id);
     match itype {
         IntermediateType::IRef(inner) => {
             IntermediateType::IRef(Box::new(fix_call_type(inner, compilation_ctx, module_data)))

@@ -283,13 +283,22 @@ pub fn prepare_function_arguments(
     arguments: &[IntermediateType],
     compilation_ctx: &CompilationContext,
     types_stack: &mut TypesStack,
-    module_data: &ModuleData,
+    function_module_data: &ModuleData,
+    caller_module: &ModuleData,
 ) -> Result<(), TypesStackError> {
     // Verify that the types currently on the types stack correspond to the expected argument types.
     // Additionally, determine if any of these arguments are references.
     let mut has_ref = false;
+    println!("EFFFE {:?} {:?}", caller_module.id, function_module_data.id);
     for arg in arguments.iter().rev() {
-        let stack_type = fix_call_type(&types_stack.pop()?, compilation_ctx, module_data);
+        // If the caller function module is different from the fuction module we are calling, then
+        // we expect in the stack an IExternalUserData, otherwise, if caller and callee are from
+        // the same modulem they spect the concrete struct
+        let stack_type = if caller_module.id != function_module_data.id {
+            types_stack.pop()?
+        } else {
+            fix_call_type(&types_stack.pop()?, compilation_ctx, caller_module)
+        };
 
         println!("BEFORE ARG: {arg:?}");
         println!("AFTER ARG: {arg:?}");
