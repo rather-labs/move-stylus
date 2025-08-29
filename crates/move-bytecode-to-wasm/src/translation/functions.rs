@@ -87,9 +87,19 @@ impl MappedFunction {
         itype: &IntermediateType,
         instance_types: &[IntermediateType],
     ) -> IntermediateType {
+        println!("---> {itype:?} {instance_types:?}");
         match itype {
             // Direct type parameter: T -> concrete_type
             IntermediateType::ITypeParameter(index) => instance_types[*index as usize].clone(),
+            // Reference type parameter: &T -> &concrete_type
+            IntermediateType::IRef(inner) => IntermediateType::IRef(Box::new(
+                Self::replace_type_parameters(&inner, instance_types),
+            )),
+            // Mutable reference type parameter: &mut T -> &mut concrete_type
+            IntermediateType::IMutRef(inner) => IntermediateType::IMutRef(Box::new(
+                Self::replace_type_parameters(&inner, instance_types),
+            )),
+            /*
             // Reference type parameter: &T -> &concrete_type
             IntermediateType::IRef(inner) => {
                 if let IntermediateType::ITypeParameter(index) = inner.as_ref() {
@@ -108,6 +118,11 @@ impl MappedFunction {
             }
             // Mutable reference type parameter: &mut T -> &mut concrete_type
             IntermediateType::IMutRef(inner) => {
+                println!("aca?");
+                IntermediateType::IMutRef(Box::new(Self::replace_type_parameters(
+                    &inner,
+                    instance_types,
+                )))
                 if let IntermediateType::ITypeParameter(index) = inner.as_ref() {
                     let concrete_type = instance_types[*index as usize].clone();
                     if let IntermediateType::IMutRef(_) = &concrete_type {
@@ -119,6 +134,7 @@ impl MappedFunction {
                     itype.clone()
                 }
             }
+            */
             IntermediateType::IGenericStructInstance {
                 module_id,
                 index,
@@ -181,14 +197,18 @@ impl MappedFunction {
         let mut function_id = self.function_id.clone();
         function_id.type_instantiations = Some(types.to_vec());
 
-        Self {
+        let ret = Self {
             function_id,
             signature,
             results,
             locals,
             is_generic: false,
             ..*self
-        }
+        };
+
+        println!("{ret:?}");
+
+        ret
     }
 }
 

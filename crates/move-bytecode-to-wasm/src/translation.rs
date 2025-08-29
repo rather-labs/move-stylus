@@ -194,6 +194,7 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
+                    // println!("BEFORE \n{instruction:?}\n{:?}\n", ctx.types_stack);
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -210,6 +211,7 @@ fn translate_flow(
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
                     });
+                    // println!("AFTER \n{instruction:?}\n{:?}\n", ctx.types_stack);
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
@@ -457,10 +459,8 @@ fn translate_instruction(
             // the moment of the function call.
             let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
 
-            let function_information = if type_instantiations
-                .iter()
-                .any(|t| matches!(t, IntermediateType::ITypeParameter(_)))
-            {
+            let function_information = if type_instantiations.iter().any(type_contains_generics) {
+                // println!("1 1 {function_id:?} {type_instantiations:?}");
                 let arguments_start =
                     types_stack.len() - function_information.signature.arguments.len();
 
@@ -470,29 +470,35 @@ fn translate_instruction(
                 // These types represent the instantiated types that correspond to the return values
                 // of the parent function. This is crucial because we may encounter an IRef<T> or
                 // IMutRef<T>, and we need to extract the underlying type T.
-                let instantiations: Vec<IntermediateType> = type_instantiations
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, f)| {
-                        if let IntermediateType::ITypeParameter(_) = f {
-                            Some(types[index].clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
+                let mut instantiations = HashSet::new();
+                for (index, field) in type_instantiations.iter().enumerate() {
+                    if let Some(res) = extract_type_instances_from_stack(field, &types[index]) {
+                        instantiations.insert(res);
+                    }
+                }
+                // TODO assert the same index is not repreated twice (meaning there is two or more
+                // different types for the same type parameter)
+
+                let instantiations = instantiations
+                    .into_iter()
+                    .map(|(_, t)| t)
+                    .collect::<Vec<IntermediateType>>();
 
                 function_information.instantiate(&instantiations)
             } else {
+                // println!("1 2 {type_instantiations:?}");
                 function_information.instantiate(type_instantiations)
             };
+            // println!("2");
 
             // Shadow the function_id variable because now it contains concrete types
             let function_id = &function_information.function_id;
             let arguments = &function_information.signature.arguments;
 
+            // println!("3 {arguments:?}");
             prepare_function_arguments(module, builder, arguments, compilation_ctx, types_stack)?;
 
+            // println!("4");
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {
                 call_indirect(
@@ -1725,14 +1731,20 @@ fn translate_instruction(
                 // Get the function's arguments from the types stack
                 let types = &types_stack[types_start..types_stack.len()];
 
-                let instantiations: Vec<IntermediateType> = struct_
-                    .fields
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, t)| {
-                        extract_type_instances_from_stack(t, &types[index], index as u16)
-                    })
-                    .collect();
+                let mut instantiations = HashSet::new();
+                for (index, field) in struct_.fields.iter().enumerate() {
+                    if let Some(res) = extract_type_instances_from_stack(field, &types[index]) {
+                        instantiations.insert(res);
+                    }
+                }
+
+                let instantiations = instantiations
+                    .into_iter()
+                    .map(|(_, t)| t)
+                    .collect::<Vec<IntermediateType>>();
+
+                // TODO assert the same index is not repreated twice (meaning there is two or more
+                // different types for the same type parameter)
 
                 (struct_.instantiate(&instantiations), instantiations)
             } else {
