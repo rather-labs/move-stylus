@@ -45,7 +45,6 @@ pub fn extract_type_instances_from_stack(
     generic_type: &IntermediateType,
     instantiated_type: &IntermediateType,
 ) -> Option<(u16, IntermediateType)> {
-    println!("PEDRO 0 {generic_type:?} {instantiated_type:?}");
     match generic_type {
         IntermediateType::ITypeParameter(i) => match instantiated_type {
             IntermediateType::IRef(instantiated_inner)
@@ -126,7 +125,6 @@ pub fn replace_type_parameters(
     itype: &IntermediateType,
     instance_types: &[IntermediateType],
 ) -> IntermediateType {
-    println!("---> {itype:?} {instance_types:?}");
     match itype {
         // Direct type parameter: T -> concrete_type
         IntermediateType::ITypeParameter(index) => instance_types[*index as usize].clone(),

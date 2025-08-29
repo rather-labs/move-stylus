@@ -204,21 +204,14 @@ impl ModuleData {
     ) -> HashMap<DatatypeHandleIndex, UserDefinedType> {
         let mut datatype_handles_map = HashMap::new();
 
-        let module_identifier = module.name();
         for (index, datatype_handle) in module.datatype_handles().iter().enumerate() {
             let idx = DatatypeHandleIndex::new(index as u16);
 
             // Assert the index we constructed is ok
             assert_eq!(datatype_handle, module.datatype_handle_at(idx));
 
-            let datatype_module = module.module_handle_at(datatype_handle.module);
-
-            let datatype_module_identifier = module.identifier_at(datatype_module.name);
-            println!("OOOOOOOOOOOO {module_identifier}, {datatype_module_identifier}",);
             // Check if the datatype is constructed in this module.
-            if datatype_handle.module == module.self_handle_idx()
-                && module_identifier == datatype_module_identifier
-            {
+            if datatype_handle.module == module.self_handle_idx() {
                 if let Some(position) = module
                     .struct_defs()
                     .iter()

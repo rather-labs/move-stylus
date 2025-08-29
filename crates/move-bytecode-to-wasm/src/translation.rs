@@ -196,7 +196,6 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
-                    println!("BEFORE \n{instruction:?}\n{:?}\n", ctx.types_stack);
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -213,7 +212,6 @@ fn translate_flow(
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
                     });
-                    println!("AFTER \n{instruction:?}\n{:?}\n", ctx.types_stack);
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
@@ -416,11 +414,9 @@ fn translate_instruction(
         }
         // Function calls
         Bytecode::CallGeneric(function_instantiation_handle_index) => {
-            println!("1");
             let function_id = &module_data.functions.generic_calls
                 [function_instantiation_handle_index.into_index()];
 
-            println!("2");
             // Obtain the generic function information
             let function_information = {
                 let dependency_data = compilation_ctx
@@ -440,7 +436,6 @@ fn translate_instruction(
                     .unwrap()
             };
 
-            println!("3");
             // If the type instantaitions contains type parameters means we need to instantiate the
             // functions with the information we have in stack.
             // We can encounter this situation with a chain of calls:
@@ -464,7 +459,6 @@ fn translate_instruction(
             // the moment of the function call.
             let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
 
-            println!("4");
             let function_information = if type_instantiations.iter().any(type_contains_generics) {
                 let arguments_start =
                     types_stack.len() - function_information.signature.arguments.len();
@@ -494,18 +488,12 @@ fn translate_instruction(
                 function_information.instantiate(type_instantiations)
             };
 
-            println!("5");
-
             // Shadow the function_id variable because now it contains concrete types
             let function_id = &function_information.function_id;
             let arguments = &function_information.signature.arguments;
 
             let function_module = compilation_ctx
                 .get_module_data_by_id(&function_information.function_id.module_id)?;
-            println!(
-                "6 {arguments:?} {:?} {:?}",
-                function_module.id, module_data.id
-            );
             prepare_function_arguments(
                 module,
                 builder,
@@ -516,7 +504,6 @@ fn translate_instruction(
                 module_data,
             )?;
 
-            println!("7");
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {
                 call_indirect(
@@ -581,7 +568,6 @@ fn translate_instruction(
                 .map(|it| fix_return_type(it, compilation_ctx, module_data))
                 .collect::<Vec<IntermediateType>>();
 
-            println!("AAAAAAAAAA {return_types:?}");
             // Insert in the stack types the types returned by the function (if any)
             types_stack.append(&return_types);
         }
@@ -831,7 +817,6 @@ fn translate_instruction(
             {
                 struct_
             } else {
-                println!("G 2");
                 let generic_stuct = module_data
                     .structs
                     .get_by_field_handle_idx(struct_field_id)?;
@@ -1019,7 +1004,6 @@ fn translate_instruction(
         Bytecode::VecPushBack(signature_index) => {
             let [elem_ty, ref_ty] = types_stack.pop_n_from_stack()?;
 
-            println!("VPB 1");
             types_stack::match_types!(
                 (
                     IntermediateType::IMutRef(mut_inner),
@@ -1029,7 +1013,6 @@ fn translate_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *mut_inner)
             );
 
-            println!("VPB 2");
             let expected_elem_type =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
@@ -1047,7 +1030,6 @@ fn translate_instruction(
                 });
             }
 
-            println!("VPB 3");
             if &elem_ty != expected_elem_type {
                 return Err(TranslationError::TypeMismatch {
                     expected: expected_elem_type.clone(),

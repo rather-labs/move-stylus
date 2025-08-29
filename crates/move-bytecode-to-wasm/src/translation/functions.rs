@@ -16,7 +16,7 @@ use super::{
 use crate::{
     CompilationContext, UserDefinedType,
     compilation_context::{ModuleData, module_data},
-    generics::type_contains_generics,
+    generics::{replace_type_parameters, type_contains_generics},
     translation::{fix_call_type, intermediate_types::ISignature},
 };
 
@@ -86,78 +86,26 @@ impl MappedFunction {
         }
     }
 
-    /// Auxiliary functiion that recursively looks for not instantiated type parameters and
-    /// replaces them
-    fn replace_type_parameters(
-        itype: &IntermediateType,
-        instance_types: &[IntermediateType],
-    ) -> IntermediateType {
-        println!("---> {itype:?} {instance_types:?}");
-        match itype {
-            // Direct type parameter: T -> concrete_type
-            IntermediateType::ITypeParameter(index) => instance_types[*index as usize].clone(),
-            // Reference type parameter: &T -> &concrete_type
-            IntermediateType::IRef(inner) => IntermediateType::IRef(Box::new(
-                Self::replace_type_parameters(&inner, instance_types),
-            )),
-            // Mutable reference type parameter: &mut T -> &mut concrete_type
-            IntermediateType::IMutRef(inner) => IntermediateType::IMutRef(Box::new(
-                Self::replace_type_parameters(&inner, instance_types),
-            )),
-            IntermediateType::IGenericStructInstance {
-                module_id,
-                index,
-                types,
-            } => IntermediateType::IGenericStructInstance {
-                module_id: module_id.clone(),
-                index: *index,
-                types: types
-                    .iter()
-                    .map(|t| Self::replace_type_parameters(t, instance_types))
-                    .collect(),
-            },
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types: Some(generic_types),
-            } => IntermediateType::IExternalUserData {
-                module_id: module_id.clone(),
-                identifier: identifier.clone(),
-                types: Some(
-                    generic_types
-                        .iter()
-                        .map(|t| Self::replace_type_parameters(t, instance_types))
-                        .collect(),
-                ),
-            },
-            IntermediateType::IVector(inner) => IntermediateType::IVector(Box::new(
-                Self::replace_type_parameters(inner, instance_types),
-            )),
-            // Non-generic type: keep as is
-            _ => itype.clone(),
-        }
-    }
-
     /// Replaces all type parameters in the function with the provided types.
     pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
         let arguments = self
             .signature
             .arguments
             .iter()
-            .map(|t| Self::replace_type_parameters(t, types))
+            .map(|t| replace_type_parameters(t, types))
             .collect();
 
         let returns = self
             .signature
             .returns
             .iter()
-            .map(|t| Self::replace_type_parameters(t, types))
+            .map(|t| replace_type_parameters(t, types))
             .collect();
 
         let locals = self
             .locals
             .iter()
-            .map(|t| Self::replace_type_parameters(t, types))
+            .map(|t| replace_type_parameters(t, types))
             .collect();
 
         let signature = ISignature { arguments, returns };
@@ -166,18 +114,14 @@ impl MappedFunction {
         let mut function_id = self.function_id.clone();
         function_id.type_instantiations = Some(types.to_vec());
 
-        let ret = Self {
+        Self {
             function_id,
             signature,
             results,
             locals,
             is_generic: false,
             ..*self
-        };
-
-        println!("{ret:?}");
-
-        ret
+        }
     }
 }
 
