@@ -62,7 +62,7 @@ pub fn mut_borrow_field(
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     types_stack: &mut TypesStack,
-) {
+) -> IntermediateType {
     let Some(field_type) = struct_.fields_types.get(field_id) else {
         panic!(
             "{field_id:?} not found in {}",
@@ -89,7 +89,7 @@ pub fn mut_borrow_field(
         .i32_const(*field_offset as i32)
         .binop(BinaryOp::I32Add);
 
-    types_stack.push(IntermediateType::IMutRef(Box::new(field_type.clone())));
+    field_type.clone()
 }
 
 /// Packs an struct.

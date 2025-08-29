@@ -8,11 +8,16 @@ use walrus::{
     ir::{LoadKind, MemArg, StoreKind},
 };
 
-use super::types_stack::{TypesStack, TypesStackError};
+use super::{
+    fix_return_type,
+    types_stack::{TypesStack, TypesStackError},
+};
 
 use crate::{
-    CompilationContext, UserDefinedType, generics::type_contains_generics,
-    translation::intermediate_types::ISignature,
+    CompilationContext, UserDefinedType,
+    compilation_context::{ModuleData, module_data},
+    generics::type_contains_generics,
+    translation::{fix_call_type, intermediate_types::ISignature},
 };
 
 use super::{intermediate_types::IntermediateType, table::FunctionId};
@@ -99,42 +104,6 @@ impl MappedFunction {
             IntermediateType::IMutRef(inner) => IntermediateType::IMutRef(Box::new(
                 Self::replace_type_parameters(&inner, instance_types),
             )),
-            /*
-            // Reference type parameter: &T -> &concrete_type
-            IntermediateType::IRef(inner) => {
-                if let IntermediateType::ITypeParameter(index) = inner.as_ref() {
-                    let concrete_type = instance_types[*index as usize].clone();
-
-                    // If the concrete type is already a reference, return it as is
-                    // Otherwise, wrap it in a reference
-                    if let IntermediateType::IRef(_) = &concrete_type {
-                        concrete_type
-                    } else {
-                        IntermediateType::IRef(Box::new(concrete_type))
-                    }
-                } else {
-                    itype.clone()
-                }
-            }
-            // Mutable reference type parameter: &mut T -> &mut concrete_type
-            IntermediateType::IMutRef(inner) => {
-                println!("aca?");
-                IntermediateType::IMutRef(Box::new(Self::replace_type_parameters(
-                    &inner,
-                    instance_types,
-                )))
-                if let IntermediateType::ITypeParameter(index) = inner.as_ref() {
-                    let concrete_type = instance_types[*index as usize].clone();
-                    if let IntermediateType::IMutRef(_) = &concrete_type {
-                        concrete_type
-                    } else {
-                        IntermediateType::IMutRef(Box::new(concrete_type))
-                    }
-                } else {
-                    itype.clone()
-                }
-            }
-            */
             IntermediateType::IGenericStructInstance {
                 module_id,
                 index,
@@ -314,12 +283,20 @@ pub fn prepare_function_arguments(
     arguments: &[IntermediateType],
     compilation_ctx: &CompilationContext,
     types_stack: &mut TypesStack,
+    module_data: &ModuleData,
 ) -> Result<(), TypesStackError> {
     // Verify that the types currently on the types stack correspond to the expected argument types.
     // Additionally, determine if any of these arguments are references.
     let mut has_ref = false;
     for arg in arguments.iter().rev() {
-        types_stack.pop_expecting(arg)?;
+        let stack_type = fix_call_type(&types_stack.pop()?, compilation_ctx, module_data);
+
+        println!("BEFORE ARG: {arg:?}");
+        println!("AFTER ARG: {arg:?}");
+        assert_eq!(&stack_type, arg);
+
+        //types_stack.pop_expecting(arg)?;
+
         has_ref = has_ref
             || matches!(
                 arg,

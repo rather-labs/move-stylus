@@ -119,3 +119,55 @@ pub fn extract_type_instances_from_stack(
         _ => None,
     }
 }
+
+/// Auxiliary functiion that recursively looks for not instantiated type parameters and
+/// replaces them
+pub fn replace_type_parameters(
+    itype: &IntermediateType,
+    instance_types: &[IntermediateType],
+) -> IntermediateType {
+    println!("---> {itype:?} {instance_types:?}");
+    match itype {
+        // Direct type parameter: T -> concrete_type
+        IntermediateType::ITypeParameter(index) => instance_types[*index as usize].clone(),
+        // Reference type parameter: &T -> &concrete_type
+        IntermediateType::IRef(inner) => {
+            IntermediateType::IRef(Box::new(replace_type_parameters(&inner, instance_types)))
+        }
+        // Mutable reference type parameter: &mut T -> &mut concrete_type
+        IntermediateType::IMutRef(inner) => {
+            IntermediateType::IMutRef(Box::new(replace_type_parameters(&inner, instance_types)))
+        }
+        IntermediateType::IGenericStructInstance {
+            module_id,
+            index,
+            types,
+        } => IntermediateType::IGenericStructInstance {
+            module_id: module_id.clone(),
+            index: *index,
+            types: types
+                .iter()
+                .map(|t| replace_type_parameters(t, instance_types))
+                .collect(),
+        },
+        IntermediateType::IExternalUserData {
+            module_id,
+            identifier,
+            types: Some(generic_types),
+        } => IntermediateType::IExternalUserData {
+            module_id: module_id.clone(),
+            identifier: identifier.clone(),
+            types: Some(
+                generic_types
+                    .iter()
+                    .map(|t| replace_type_parameters(t, instance_types))
+                    .collect(),
+            ),
+        },
+        IntermediateType::IVector(inner) => {
+            IntermediateType::IVector(Box::new(replace_type_parameters(inner, instance_types)))
+        }
+        // Non-generic type: keep as is
+        _ => itype.clone(),
+    }
+}

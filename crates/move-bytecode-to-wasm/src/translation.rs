@@ -13,9 +13,11 @@ pub mod table;
 
 use crate::{
     CompilationContext,
-    compilation_context::ModuleData,
+    compilation_context::{ExternalModuleData, ModuleData},
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
-    generics::{extract_type_instances_from_stack, type_contains_generics},
+    generics::{
+        extract_type_instances_from_stack, replace_type_parameters, type_contains_generics,
+    },
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
@@ -194,7 +196,7 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
-                    // println!("BEFORE \n{instruction:?}\n{:?}\n", ctx.types_stack);
+                    println!("BEFORE \n{instruction:?}\n{:?}\n", ctx.types_stack);
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -211,7 +213,7 @@ fn translate_flow(
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
                     });
-                    // println!("AFTER \n{instruction:?}\n{:?}\n", ctx.types_stack);
+                    println!("AFTER \n{instruction:?}\n{:?}\n", ctx.types_stack);
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
@@ -414,9 +416,11 @@ fn translate_instruction(
         }
         // Function calls
         Bytecode::CallGeneric(function_instantiation_handle_index) => {
+            println!("1");
             let function_id = &module_data.functions.generic_calls
                 [function_instantiation_handle_index.into_index()];
 
+            println!("2");
             // Obtain the generic function information
             let function_information = {
                 let dependency_data = compilation_ctx
@@ -436,6 +440,7 @@ fn translate_instruction(
                     .unwrap()
             };
 
+            println!("3");
             // If the type instantaitions contains type parameters means we need to instantiate the
             // functions with the information we have in stack.
             // We can encounter this situation with a chain of calls:
@@ -459,8 +464,8 @@ fn translate_instruction(
             // the moment of the function call.
             let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
 
+            println!("4");
             let function_information = if type_instantiations.iter().any(type_contains_generics) {
-                // println!("1 1 {function_id:?} {type_instantiations:?}");
                 let arguments_start =
                     types_stack.len() - function_information.signature.arguments.len();
 
@@ -486,19 +491,28 @@ fn translate_instruction(
 
                 function_information.instantiate(&instantiations)
             } else {
-                // println!("1 2 {type_instantiations:?}");
                 function_information.instantiate(type_instantiations)
             };
-            // println!("2");
+
+            println!("5");
 
             // Shadow the function_id variable because now it contains concrete types
             let function_id = &function_information.function_id;
             let arguments = &function_information.signature.arguments;
 
-            // println!("3 {arguments:?}");
-            prepare_function_arguments(module, builder, arguments, compilation_ctx, types_stack)?;
+            let function_module = compilation_ctx
+                .get_module_data_by_id(&function_information.function_id.module_id)?;
+            println!("6");
+            prepare_function_arguments(
+                module,
+                builder,
+                arguments,
+                compilation_ctx,
+                types_stack,
+                function_module,
+            )?;
 
-            // println!("4");
+            println!("7");
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {
                 call_indirect(
@@ -563,6 +577,7 @@ fn translate_instruction(
                 .map(|it| fix_return_type(it, compilation_ctx, module_data))
                 .collect::<Vec<IntermediateType>>();
 
+            println!("AAAAAAAAAA {return_types:?}");
             // Insert in the stack types the types returned by the function (if any)
             types_stack.append(&return_types);
         }
@@ -571,7 +586,15 @@ fn translate_instruction(
             let function_id = &module_data.functions.calls[function_handle_index.into_index()];
             let arguments = &module_data.functions.arguments[function_handle_index.into_index()];
 
-            prepare_function_arguments(module, builder, arguments, compilation_ctx, types_stack)?;
+            let function_module = compilation_ctx.get_module_data_by_id(&function_id.module_id)?;
+            prepare_function_arguments(
+                module,
+                builder,
+                arguments,
+                compilation_ctx,
+                types_stack,
+                function_module,
+            )?;
 
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {
@@ -767,13 +790,15 @@ fn translate_instruction(
                 },
             )))?;
 
-            bytecodes::structs::mut_borrow_field(
+            let field_type = bytecodes::structs::mut_borrow_field(
                 struct_,
                 field_id,
                 builder,
                 compilation_ctx,
                 types_stack,
             );
+
+            types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
         }
         Bytecode::MutBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = module_data
@@ -782,16 +807,31 @@ fn translate_instruction(
                 .get(field_id)
                 .unwrap();
 
+            let instantiation_types = if instantiation_types.iter().any(type_contains_generics) {
+                if let Some(IntermediateType::IMutRef(inner)) = &types_stack.last() {
+                    match &**inner {
+                        IntermediateType::IGenericStructInstance { types, .. } => types.clone(),
+                        _ => panic!(),
+                    }
+                } else {
+                    panic!()
+                }
+            } else {
+                instantiation_types.clone()
+            };
+
             let struct_ = if let Ok(struct_) = module_data
                 .structs
                 .get_struct_instance_by_field_handle_idx(field_id)
             {
                 struct_
             } else {
+                println!("G 2");
                 let generic_stuct = module_data
                     .structs
                     .get_by_field_handle_idx(struct_field_id)?;
-                generic_stuct.instantiate(instantiation_types)
+
+                generic_stuct.instantiate(&instantiation_types)
             };
 
             // Check if in the types stack we have the correct type
@@ -803,13 +843,17 @@ fn translate_instruction(
                 },
             )))?;
 
-            bytecodes::structs::mut_borrow_field(
+            let field_type = bytecodes::structs::mut_borrow_field(
                 &struct_,
                 struct_field_id,
                 builder,
                 compilation_ctx,
                 types_stack,
             );
+
+            let field_type = replace_type_parameters(&field_type, &instantiation_types);
+
+            types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
         }
         // Vector instructions
         Bytecode::VecImmBorrow(signature_index) => {
@@ -970,6 +1014,7 @@ fn translate_instruction(
         Bytecode::VecPushBack(signature_index) => {
             let [elem_ty, ref_ty] = types_stack.pop_n_from_stack()?;
 
+            println!("VPB 1");
             types_stack::match_types!(
                 (
                     IntermediateType::IMutRef(mut_inner),
@@ -979,19 +1024,28 @@ fn translate_instruction(
                 (IntermediateType::IVector(vec_inner), "vector", *mut_inner)
             );
 
+            println!("VPB 2");
             let expected_elem_type =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
-            if *vec_inner != expected_elem_type {
+            let expected_elem_type = if let IntermediateType::ITypeParameter(_) = expected_elem_type
+            {
+                &*vec_inner
+            } else {
+                &expected_elem_type
+            };
+
+            if *vec_inner != *expected_elem_type {
                 return Err(TranslationError::TypeMismatch {
-                    expected: expected_elem_type,
+                    expected: expected_elem_type.clone(),
                     found: *vec_inner,
                 });
             }
 
-            if elem_ty != expected_elem_type {
+            println!("VPB 3");
+            if &elem_ty != expected_elem_type {
                 return Err(TranslationError::TypeMismatch {
-                    expected: expected_elem_type,
+                    expected: expected_elem_type.clone(),
                     found: elem_ty,
                 });
             }
@@ -2018,6 +2072,64 @@ pub fn fix_return_type(
                 itype.clone()
             }
         }
+        // TODO enum cases
+        _ => itype.clone(),
+    }
+}
+
+pub fn fix_call_type(
+    itype: &IntermediateType,
+    compilation_ctx: &CompilationContext,
+    module_data: &ModuleData,
+) -> IntermediateType {
+    println!("CHEEEE {itype:?}");
+    match itype {
+        IntermediateType::IRef(inner) => {
+            IntermediateType::IRef(Box::new(fix_call_type(inner, compilation_ctx, module_data)))
+        }
+
+        IntermediateType::IMutRef(inner) => {
+            IntermediateType::IMutRef(Box::new(fix_call_type(inner, compilation_ctx, module_data)))
+        }
+        IntermediateType::IVector(inner) => {
+            IntermediateType::IVector(Box::new(fix_call_type(inner, compilation_ctx, module_data)))
+        }
+        IntermediateType::IExternalUserData {
+            module_id,
+            identifier,
+            types: Some(types),
+        } if &module_data.id == module_id => {
+            let external_data = compilation_ctx
+                .get_external_module_data(module_id, identifier, &Some(types.to_vec()))
+                .unwrap();
+
+            match external_data {
+                ExternalModuleData::Struct(struct_) => IntermediateType::IGenericStructInstance {
+                    module_id: module_id.clone(),
+                    index: struct_.index(),
+                    types: types.to_vec(),
+                },
+                ExternalModuleData::Enum(ienum) => todo!(),
+            }
+        }
+        IntermediateType::IExternalUserData {
+            module_id,
+            identifier,
+            types: None,
+        } if &module_data.id == module_id => {
+            let external_data = compilation_ctx
+                .get_external_module_data(module_id, identifier, &None)
+                .unwrap();
+
+            match external_data {
+                ExternalModuleData::Struct(struct_) => IntermediateType::IStruct {
+                    module_id: module_id.clone(),
+                    index: struct_.index(),
+                },
+                ExternalModuleData::Enum(ienum) => todo!(),
+            }
+        }
+
         // TODO enum cases
         _ => itype.clone(),
     }
