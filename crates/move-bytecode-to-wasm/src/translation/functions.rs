@@ -10,7 +10,12 @@ use walrus::{
 
 use super::types_stack::{TypesStack, TypesStackError};
 
-use crate::{CompilationContext, UserDefinedType, translation::intermediate_types::ISignature};
+use crate::{
+    CompilationContext, UserDefinedType,
+    compilation_context::ModuleData,
+    generics::{replace_type_parameters, type_contains_generics},
+    translation::{fix_call_type, intermediate_types::ISignature},
+};
 
 use super::{intermediate_types::IntermediateType, table::FunctionId};
 
@@ -53,27 +58,8 @@ impl MappedFunction {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
-        let is_generic = signature.arguments.iter().any(|a| match a {
-            IntermediateType::IRef(intermediate_type)
-            | IntermediateType::IMutRef(intermediate_type) => {
-                matches!(
-                    intermediate_type.as_ref(),
-                    IntermediateType::ITypeParameter(_)
-                )
-            }
-            IntermediateType::ITypeParameter(_) => true,
-            _ => false,
-        }) || signature.returns.iter().any(|a| match a {
-            IntermediateType::IRef(intermediate_type)
-            | IntermediateType::IMutRef(intermediate_type) => {
-                matches!(
-                    intermediate_type.as_ref(),
-                    IntermediateType::ITypeParameter(_)
-                )
-            }
-            IntermediateType::ITypeParameter(_) => true,
-            _ => false,
-        });
+        let is_generic = signature.arguments.iter().any(type_contains_generics)
+            || signature.returns.iter().any(type_contains_generics);
 
         Self {
             function_id,
@@ -97,98 +83,26 @@ impl MappedFunction {
         }
     }
 
-    /// Auxiliary functiion that recursively looks for not instantiated type parameters and
-    /// replaces them
-    fn replace_type_parameters(
-        itype: &IntermediateType,
-        instance_types: &[IntermediateType],
-    ) -> IntermediateType {
-        match itype {
-            // Direct type parameter: T -> concrete_type
-            IntermediateType::ITypeParameter(index) => instance_types[*index as usize].clone(),
-            // Reference type parameter: &T -> &concrete_type
-            IntermediateType::IRef(inner) => {
-                if let IntermediateType::ITypeParameter(index) = inner.as_ref() {
-                    let concrete_type = instance_types[*index as usize].clone();
-
-                    // If the concrete type is already a reference, return it as is
-                    // Otherwise, wrap it in a reference
-                    if let IntermediateType::IRef(_) = &concrete_type {
-                        concrete_type
-                    } else {
-                        IntermediateType::IRef(Box::new(concrete_type))
-                    }
-                } else {
-                    itype.clone()
-                }
-            }
-            // Mutable reference type parameter: &mut T -> &mut concrete_type
-            IntermediateType::IMutRef(inner) => {
-                if let IntermediateType::ITypeParameter(index) = inner.as_ref() {
-                    let concrete_type = instance_types[*index as usize].clone();
-                    if let IntermediateType::IMutRef(_) = &concrete_type {
-                        concrete_type
-                    } else {
-                        IntermediateType::IMutRef(Box::new(concrete_type))
-                    }
-                } else {
-                    itype.clone()
-                }
-            }
-            IntermediateType::IGenericStructInstance {
-                module_id,
-                index,
-                types,
-            } => IntermediateType::IGenericStructInstance {
-                module_id: module_id.clone(),
-                index: *index,
-                types: types
-                    .iter()
-                    .map(|t| Self::replace_type_parameters(t, instance_types))
-                    .collect(),
-            },
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types: Some(generic_types),
-            } => IntermediateType::IExternalUserData {
-                module_id: module_id.clone(),
-                identifier: identifier.clone(),
-                types: Some(
-                    generic_types
-                        .iter()
-                        .map(|t| Self::replace_type_parameters(t, instance_types))
-                        .collect(),
-                ),
-            },
-            IntermediateType::IVector(inner) => IntermediateType::IVector(Box::new(
-                Self::replace_type_parameters(inner, instance_types),
-            )),
-            // Non-generic type: keep as is
-            _ => itype.clone(),
-        }
-    }
-
     /// Replaces all type parameters in the function with the provided types.
     pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
         let arguments = self
             .signature
             .arguments
             .iter()
-            .map(|t| Self::replace_type_parameters(t, types))
+            .map(|t| replace_type_parameters(t, types))
             .collect();
 
         let returns = self
             .signature
             .returns
             .iter()
-            .map(|t| Self::replace_type_parameters(t, types))
+            .map(|t| replace_type_parameters(t, types))
             .collect();
 
         let locals = self
             .locals
             .iter()
-            .map(|t| Self::replace_type_parameters(t, types))
+            .map(|t| replace_type_parameters(t, types))
             .collect();
 
         let signature = ISignature { arguments, returns };
@@ -300,6 +214,32 @@ pub fn prepare_function_return(
     builder.return_();
 }
 
+/// Looks for an IExtnernalUserData in the IntermediateType tree. If it finds it, returns it,
+/// otherwise retuns None
+fn look_for_external_data(itype: &IntermediateType) -> Option<&IntermediateType> {
+    match itype {
+        IntermediateType::IBool
+        | IntermediateType::IU8
+        | IntermediateType::IU16
+        | IntermediateType::IU32
+        | IntermediateType::IU64
+        | IntermediateType::IU128
+        | IntermediateType::IU256
+        | IntermediateType::IAddress
+        | IntermediateType::ISigner => None,
+        IntermediateType::IVector(inner)
+        | IntermediateType::IRef(inner)
+        | IntermediateType::IMutRef(inner) => look_for_external_data(inner),
+        IntermediateType::ITypeParameter(_) => None,
+        IntermediateType::IStruct { .. } => None,
+        IntermediateType::IGenericStructInstance { types, .. } => {
+            types.iter().find(|t| look_for_external_data(t).is_some())
+        }
+        IntermediateType::IEnum(_) => todo!(),
+        IntermediateType::IExternalUserData { .. } => Some(itype),
+    }
+}
+
 /// This function sets up the arguments for a function call.
 ///
 /// It processes each argument type, checking if it is an immutable (`IRef`) or mutable (`IMutRef`) reference.
@@ -310,12 +250,57 @@ pub fn prepare_function_arguments(
     arguments: &[IntermediateType],
     compilation_ctx: &CompilationContext,
     types_stack: &mut TypesStack,
+    function_module_data: &ModuleData,
+    caller_module: &ModuleData,
 ) -> Result<(), TypesStackError> {
     // Verify that the types currently on the types stack correspond to the expected argument types.
     // Additionally, determine if any of these arguments are references.
     let mut has_ref = false;
     for arg in arguments.iter().rev() {
-        types_stack.pop_expecting(arg)?;
+        // Here we compute the type we expect to be on the stack. The expected type can be represented
+        // by two variants of the `IntermediateType` enum: `IExternalUserData` and one of the variants
+        // corresponding to generic or concrete structs/enums.
+        //
+        // `IExternalUserData` and those variants have a one-to-one correspondence: one is used from the
+        // perspective of a module that did not define the datatype, and the other is used from the
+        // perspective of the module that defined it.
+        //
+        // There are cases where we encounter an `IExternalUserData` but the function expects an
+        // `IGenericStructInstance` (or another struct/enum variant), and vice versa.
+        //
+        // This happens when the caller of the function and the callee are in different modules...
+        let stack_type = if caller_module.id != function_module_data.id {
+            let type_ = types_stack.pop()?;
+
+            match &look_for_external_data(&type_) {
+                // If we find an `IExternalUserData` at the top of the stack (or inside another type) and the
+                // `IExternalUserData`’s module matches the callee’s module, then the callee will expect an
+                // `IntermediateType` defined within its own module (for example, an `IGenericStructInstance`
+                // that corresponds to the encountered `IExternalUserData`).
+                //
+                // In this case, we simply return `arg`, since it already matches what the callee expects.
+                Some(IntermediateType::IExternalUserData { module_id, .. })
+                    if *module_id == function_module_data.id =>
+                {
+                    arg.clone()
+                }
+                // Otherwise, if the data type’s module does not match the callee’s module, we
+                // return it directly.
+                _ => type_,
+            }
+        }
+        // If the caller’s module and the callee’s module do not match, but we encounter an
+        // `IExternalUserData` that belongs to the callee’s module, the callee will expect an
+        // `IntermediateType` defined within its own module (for example, an `IGenericStructInstance`
+        // corresponding to the `IExternalUserData`).
+        //
+        // In this case, the `fix_call_type` function returns the expected `IntermediateType`.
+        else {
+            fix_call_type(&types_stack.pop()?, compilation_ctx, function_module_data)
+        };
+
+        assert_eq!(&stack_type, arg);
+
         has_ref = has_ref
             || matches!(
                 arg,
