@@ -12,8 +12,10 @@ use alloy::{
     primitives::{Address, address},
     providers::ProviderBuilder,
     sol,
+    sol_types::SolValue,
     transports::http::reqwest::Url,
 };
+// use alloy_sol_types::{SolValue, sol};
 use dotenv::dotenv;
 use eyre::eyre;
 use std::str::FromStr;
@@ -33,7 +35,45 @@ sol!(
            ID id;
         }
 
+        #[derive(Debug, PartialEq)]
+        struct TestEvent1 {
+            uint32 n;
+        }
 
+        #[derive(Debug, PartialEq)]
+        struct TestEvent2 {
+            uint32 a;
+            uint8[] b;
+            uint128 c;
+        }
+
+        #[derive(Debug, PartialEq)]
+        struct TestEvent3 {
+            TestEvent1 a;
+            TestEvent2 b;
+        }
+
+        #[derive(Debug, PartialEq)]
+        struct TestGenericEvent1 {
+            uint32 o;
+            bool p;
+            TestEvent1 q;
+        }
+
+        #[derive(Debug, PartialEq)]
+        struct TestGenericEvent2 {
+            uint32 o;
+            bool p;
+            TestEvent1 q;
+            uint32[] r;
+            TestGenericEvent1 s;
+        }
+
+        function emitTestEvent1(uint32 n) public view;
+        function emitTestEvent2(uint32 a, uint8[] b, uint128 c) public view;
+        function emitTestEvent3(TestEvent1 a, TestEvent2 b) public view;
+        function emitTestEventGeneric1(uint32 o, bool p, TestEvent1 q) public view;
+        function emitTestEventGeneric2(uint32 o, bool p, TestEvent1 q, uint32[] r) public view;
         function echoWithGenericFunctionU16(uint16 x) external view returns (uint16);
         function echoWithGenericFunctionVec32(uint32[] x) external view returns (uint32[]);
         function echoWithGenericFunctionU16Vec32(uint16 x, uint32[] y) external view returns (uint16, uint32[]);
@@ -134,6 +174,121 @@ async fn main() -> eyre::Result<()> {
 
     let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
     println!("Counter value: {:?}", storage_value_le);
+
+    // Events
+    // Emit test event 1
+    let pending_tx = example.emitTestEvent1(43).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    let event = Example::TestEvent1 { n: 43 };
+
+    // Decode the event data
+    let logs = receipt.logs();
+    for log in logs {
+        let data = log.data().data.0.clone();
+        let decoded_event = <Example::TestEvent1 as SolValue>::abi_decode(&data)?;
+        assert_eq!(event, decoded_event);
+        println!("Decoded event data = {:?}", decoded_event);
+    }
+
+    // Emit test event 2
+    let pending_tx = example
+        .emitTestEvent2(43, vec![1, 2, 3], 1234)
+        .send()
+        .await?;
+    let receipt = pending_tx.get_receipt().await?;
+    let event = Example::TestEvent2 {
+        a: 43,
+        b: vec![1, 2, 3],
+        c: 1234,
+    };
+
+    // Decode the event data
+    let logs = receipt.logs();
+    for log in logs {
+        let data = log.data().data.0.clone();
+        let decoded_event = <Example::TestEvent2 as SolValue>::abi_decode(&data)?;
+        println!("Decoded event data = {:?}", decoded_event);
+        assert_eq!(event, decoded_event);
+    }
+
+    // Emit test event 3
+    let pending_tx = example
+        .emitTestEvent3(
+            Example::TestEvent1 { n: 43 },
+            Example::TestEvent2 {
+                a: 43,
+                b: vec![1, 2, 3],
+                c: 1234,
+            },
+        )
+        .send()
+        .await?;
+    let receipt = pending_tx.get_receipt().await?;
+    let event = Example::TestEvent3 {
+        a: Example::TestEvent1 { n: 43 },
+        b: Example::TestEvent2 {
+            a: 43,
+            b: vec![1, 2, 3],
+            c: 1234,
+        },
+    };
+
+    // Decode the event data
+    let logs = receipt.logs();
+    for log in logs {
+        let data = log.data().data.0.clone();
+        let decoded_event = <Example::TestEvent3 as SolValue>::abi_decode(&data)?;
+        println!("Decoded event data = {:?}", decoded_event);
+        assert_eq!(event, decoded_event);
+    }
+
+    // Emit test event with generics 1
+    let pending_tx = example
+        .emitTestEventGeneric1(43, true, Example::TestEvent1 { n: 43 })
+        .send()
+        .await?;
+    let receipt = pending_tx.get_receipt().await?;
+    let event = Example::TestGenericEvent1 {
+        o: 43,
+        p: true,
+        q: Example::TestEvent1 { n: 43 },
+    };
+
+    // Decode the event data
+    let logs = receipt.logs();
+    for log in logs {
+        let data = log.data().data.0.clone();
+        let decoded_event = <Example::TestGenericEvent1 as SolValue>::abi_decode(&data)?;
+        println!("Decoded event data = {:?}", decoded_event);
+        assert_eq!(event, decoded_event);
+    }
+
+    // Emit test event with generics 2
+    let pending_tx = example
+        .emitTestEventGeneric2(43, true, Example::TestEvent1 { n: 43 }, vec![1, 2, 3])
+        .send()
+        .await?;
+    let receipt = pending_tx.get_receipt().await?;
+    let event = Example::TestGenericEvent2 {
+        o: 43,
+        p: true,
+        q: Example::TestEvent1 { n: 43 },
+        r: vec![1, 2, 3],
+        s: Example::TestGenericEvent1 {
+            o: 43,
+            p: true,
+            q: Example::TestEvent1 { n: 43 },
+        },
+    };
+
+    // Decode the event data
+    let logs = receipt.logs();
+    for log in logs {
+        let data = log.data().data.0.clone();
+        let decoded_event = <Example::TestGenericEvent2 as SolValue>::abi_decode(&data)?;
+        println!("Decoded event data = {:?}", decoded_event);
+        assert_eq!(event, decoded_event);
+    }
 
     Ok(())
 }
