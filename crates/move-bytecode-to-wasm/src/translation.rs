@@ -554,42 +554,7 @@ fn translate_instruction(
                 .signature
                 .returns
                 .iter()
-                .map(|it| match it {
-                    IntermediateType::IStruct { module_id, .. } => {
-                        if module_id != &module_data.id {
-                            // TODO: Add identifier to IntermediateType::IStruct
-                            let struct_ =
-                                compilation_ctx.get_struct_by_intermediate_type(it).unwrap();
-
-                            IntermediateType::IExternalUserData {
-                                module_id: module_id.clone(),
-                                identifier: struct_.identifier.clone(),
-                                types: None,
-                            }
-                        } else {
-                            it.clone()
-                        }
-                    }
-                    IntermediateType::IGenericStructInstance {
-                        module_id, types, ..
-                    } => {
-                        if module_id != &module_data.id {
-                            // TODO: Add identifier to IntermediateType::IGenericStruct
-                            let struct_ =
-                                compilation_ctx.get_struct_by_intermediate_type(it).unwrap();
-
-                            IntermediateType::IExternalUserData {
-                                module_id: module_id.clone(),
-                                identifier: struct_.identifier.clone(),
-                                types: Some(types.to_vec()),
-                            }
-                        } else {
-                            it.clone()
-                        }
-                    }
-                    // TODO enum cases
-                    _ => it.clone(),
-                })
+                .map(|it| fix_return_type(it, compilation_ctx, module_data))
                 .collect::<Vec<IntermediateType>>();
 
             // Insert in the stack types the types returned by the function (if any)
@@ -1972,5 +1937,76 @@ pub fn box_args(
 
     for (index, pointer) in updates {
         function_locals[index] = pointer;
+    }
+}
+
+// If the called function returns a user defined data (struct or enum), and that
+// datatype is not defined in the current module, we need to change the return type
+// from a IGenericStructInstance or IGenericEnumInstance to a IExternalUserData:
+//
+// - From the caller perspective the called function is returning a foreign data type.
+// - From the callee perspective, the function is just returning a data type defined in
+// its module.
+//
+// Subsequent opcodes that work with the return value of the caller will expect a
+// IExternalUserData in the types stack.
+pub fn fix_return_type(
+    itype: &IntermediateType,
+    compilation_ctx: &CompilationContext,
+    module_data: &ModuleData,
+) -> IntermediateType {
+    match itype {
+        IntermediateType::IRef(inner) => IntermediateType::IRef(Box::new(fix_return_type(
+            inner,
+            compilation_ctx,
+            module_data,
+        ))),
+
+        IntermediateType::IMutRef(inner) => IntermediateType::IMutRef(Box::new(fix_return_type(
+            inner,
+            compilation_ctx,
+            module_data,
+        ))),
+        IntermediateType::IVector(inner) => IntermediateType::IVector(Box::new(fix_return_type(
+            inner,
+            compilation_ctx,
+            module_data,
+        ))),
+        IntermediateType::IStruct { module_id, .. } => {
+            if module_id != &module_data.id {
+                // TODO: Add identifier to IntermediateType::IStruct
+                let struct_ = compilation_ctx
+                    .get_struct_by_intermediate_type(itype)
+                    .unwrap();
+
+                IntermediateType::IExternalUserData {
+                    module_id: module_id.clone(),
+                    identifier: struct_.identifier.clone(),
+                    types: None,
+                }
+            } else {
+                itype.clone()
+            }
+        }
+        IntermediateType::IGenericStructInstance {
+            module_id, types, ..
+        } => {
+            if module_id != &module_data.id {
+                // TODO: Add identifier to IntermediateType::IGenericStruct
+                let struct_ = compilation_ctx
+                    .get_struct_by_intermediate_type(itype)
+                    .unwrap();
+
+                IntermediateType::IExternalUserData {
+                    module_id: module_id.clone(),
+                    identifier: struct_.identifier.clone(),
+                    types: Some(types.to_vec()),
+                }
+            } else {
+                itype.clone()
+            }
+        }
+        // TODO enum cases
+        _ => itype.clone(),
     }
 }
