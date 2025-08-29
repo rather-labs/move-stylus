@@ -502,7 +502,10 @@ fn translate_instruction(
 
             let function_module = compilation_ctx
                 .get_module_data_by_id(&function_information.function_id.module_id)?;
-            println!("6");
+            println!(
+                "6 {arguments:?} {:?} {:?}",
+                function_module.id, module_data.id
+            );
             prepare_function_arguments(
                 module,
                 builder,
@@ -2131,7 +2134,6 @@ pub fn fix_call_type(
                 ExternalModuleData::Enum(ienum) => todo!(),
             }
         }
-
         // TODO enum cases
         _ => itype.clone(),
     }
