@@ -402,11 +402,6 @@ impl IStruct {
                         "cannot know if a unknown type parameter is dynamic, expected a concrete type"
                     );
                 }
-                IntermediateType::IUnknown => {
-                    panic!(
-                        "cannot know if a unknown type parameter is dynamic, expected a concrete type"
-                    );
-                }
                 IntermediateType::IEnum(_) => todo!(),
                 IntermediateType::IExternalUserData {
                     module_id,

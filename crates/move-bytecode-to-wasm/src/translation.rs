@@ -16,7 +16,8 @@ use crate::{
     compilation_context::{ExternalModuleData, ModuleData},
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     generics::{
-        extract_type_instances_from_stack, replace_type_parameters, type_contains_generics,
+        extract_type_instances_from_stack, replace_type_parameters,
+        replace_type_parameters_for_unknown, type_contains_generics,
     },
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
@@ -468,7 +469,6 @@ fn translate_instruction(
                 let types = &types_stack[arguments_start..types_stack.len()];
 
                 if types.len() > 0 {
-                    println!("-----> {types_stack:?}");
                     // These types represent the instantiated types that correspond to the return values
                     // of the parent function. This is crucial because we may encounter an IRef<T> or
                     // IMutRef<T>, and we need to extract the underlying type T.
@@ -488,7 +488,13 @@ fn translate_instruction(
 
                     function_information.instantiate(&instantiations)
                 } else {
-                    function_information.instantiate(type_instantiations)
+                    // If we can't deduce the types from the stack we mark them as unknown
+                    let type_instantiations = type_instantiations
+                        .iter()
+                        .map(replace_type_parameters_for_unknown)
+                        .collect::<Vec<IntermediateType>>();
+
+                    function_information.instantiate(&type_instantiations)
                 }
             } else {
                 function_information.instantiate(type_instantiations)
@@ -663,8 +669,31 @@ fn translate_instruction(
             } else {
                 local_type.box_local_instructions(module, builder, compilation_ctx, local);
             }
-            //types_stack.pop_expecting(local_type)?;
-            types_stack.pop()?;
+
+            //let stack_type = types_stack.pop()?;
+
+            types_stack.pop_expecting_with_unknown(local_type)?;
+            // We can have a type with IntermediateType::IUnknown, the stack_type is different from
+            // local_type, we inject IntermediateType::IUnknown to local_type. If that also fails
+            // means there is a type we did not expect
+            /*
+            if stack_type != **local_type {
+                println!("1");
+                let local_type_with_unknown = replace_type_parameters_for_unknown(&local_type);
+                println!("2 {local_type_with_unknown:?}");
+                if local_type_with_unknown != stack_type {
+                    println!("3");
+                    return Err(TranslationError::TypesStackError(
+                        types_stack::TypesStackError::TypeMismatch {
+                            expected: local_type.clone().clone(),
+                            found: stack_type,
+                        },
+                    ));
+                }
+            }
+            */
+            // types_stack.pop_expecting(local_type)?;
+            //types_stack.pop()?;
         }
         Bytecode::MoveLoc(local_id) => {
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
@@ -946,7 +975,11 @@ fn translate_instruction(
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
             let inner = if let IntermediateType::ITypeParameter(_) = inner {
-                types_stack.0.last().unwrap_or(&inner).clone()
+                types_stack
+                    .0
+                    .last()
+                    .unwrap_or(&IntermediateType::IUnknown)
+                    .clone()
             } else {
                 inner
             };
