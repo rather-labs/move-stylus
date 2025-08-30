@@ -1220,11 +1220,6 @@ impl From<&IntermediateType> for ValType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot convert a type parameter to a wasm type, expected a concrete type");
             }
-            IntermediateType::ITypeParameter(_) => {
-                panic!(
-                    "cannot convert a unknown type parameter to a wasm type, expected a concrete type"
-                );
-            }
             IntermediateType::IUnknown => {
                 panic!(
                     "cannot convert a unknown type parameter to a wasm type, expected a concrete type"

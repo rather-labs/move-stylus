@@ -703,7 +703,6 @@ impl IVector {
         compilation_ctx: &CompilationContext,
         num_elements: i32,
     ) {
-        println!("1 0 {num_elements}");
         // Local declarations
         let ptr_local = module.locals.add(ValType::I32);
         let len_local = module.locals.add(ValType::I32);
@@ -713,11 +712,9 @@ impl IVector {
             inner.stack_data_size() as i32
         };
 
-        println!("1 1");
         // Set length
         builder.i32_const(num_elements).local_set(len_local);
 
-        println!("1 2");
         IVector::allocate_vector_with_header(
             builder,
             compilation_ctx,
@@ -729,7 +726,6 @@ impl IVector {
 
         if num_elements != 0 {
             let temp_local = module.locals.add(inner.into());
-            println!("1 3");
             for i in 0..num_elements {
                 builder.local_get(ptr_local);
                 builder.swap(ptr_local, temp_local);
@@ -749,7 +745,7 @@ impl IVector {
                 );
             }
         }
-        println!("1 4");
+
         builder.local_get(ptr_local);
     }
 

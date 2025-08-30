@@ -197,7 +197,6 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
-                    println!("TRANSLATING {instruction:?}");
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -670,30 +669,16 @@ fn translate_instruction(
                 local_type.box_local_instructions(module, builder, compilation_ctx, local);
             }
 
-            //let stack_type = types_stack.pop()?;
-
+            // It can happen that we encounter a type that contains the IntermediateType::IUnknown
+            // type instead of a concrete type. This can happen in functions such as
+            //
+            // public fun none<Element>(): Option<Element> {
+            //    Option { vec: vector::empty() }
+            // }
+            //
+            // where in the previous instructions, we had no information about what type Element
+            // could be
             types_stack.pop_expecting_with_unknown(local_type)?;
-            // We can have a type with IntermediateType::IUnknown, the stack_type is different from
-            // local_type, we inject IntermediateType::IUnknown to local_type. If that also fails
-            // means there is a type we did not expect
-            /*
-            if stack_type != **local_type {
-                println!("1");
-                let local_type_with_unknown = replace_type_parameters_for_unknown(&local_type);
-                println!("2 {local_type_with_unknown:?}");
-                if local_type_with_unknown != stack_type {
-                    println!("3");
-                    return Err(TranslationError::TypesStackError(
-                        types_stack::TypesStackError::TypeMismatch {
-                            expected: local_type.clone().clone(),
-                            found: stack_type,
-                        },
-                    ));
-                }
-            }
-            */
-            // types_stack.pop_expecting(local_type)?;
-            //types_stack.pop()?;
         }
         Bytecode::MoveLoc(local_id) => {
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
@@ -761,7 +746,6 @@ fn translate_instruction(
                 .unwrap();
 
             let instantiation_types = if instantiation_types.iter().any(type_contains_generics) {
-                println!("{:?}", &types_stack.last());
                 match &types_stack.last().unwrap() {
                     IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
                         match &**inner {
@@ -771,16 +755,6 @@ fn translate_instruction(
                     }
                     _ => panic!(),
                 }
-                /*
-                if let Some(IntermediateType::IRef(inner)) = &types_stack.last() {
-                    match &**inner {
-                        IntermediateType::IGenericStructInstance { types, .. } => types.clone(),
-                        _ => panic!(),
-                    }
-                } else {
-                    panic!()
-                }
-                */
             } else {
                 instantiation_types.clone()
             };
@@ -969,7 +943,6 @@ fn translate_instruction(
             //     create_foo(t)
             // }
             // ```
-            println!("1");
 
             let inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
@@ -984,7 +957,6 @@ fn translate_instruction(
                 inner
             };
 
-            println!("2");
             IVector::vec_pack_instructions(
                 &inner,
                 module,
@@ -993,7 +965,6 @@ fn translate_instruction(
                 *num_elements as i32,
             );
 
-            println!("3");
             // Remove the packing values from types stack and check if the types are correct
             let mut n = *num_elements as usize;
             while n > 0 {
@@ -1001,7 +972,6 @@ fn translate_instruction(
                 n -= 1;
             }
 
-            println!("4");
             types_stack.push(IntermediateType::IVector(Box::new(inner)));
         }
         Bytecode::VecPopBack(signature_index) => {

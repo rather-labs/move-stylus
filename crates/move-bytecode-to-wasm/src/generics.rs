@@ -174,7 +174,7 @@ pub fn replace_type_parameters(
 /// replaces them
 pub fn replace_type_parameters_for_unknown(itype: &IntermediateType) -> IntermediateType {
     match itype {
-        IntermediateType::ITypeParameter(index) => IntermediateType::IUnknown,
+        IntermediateType::ITypeParameter(_) => IntermediateType::IUnknown,
         IntermediateType::IRef(inner) => {
             IntermediateType::IRef(Box::new(replace_type_parameters_for_unknown(inner)))
         }
