@@ -467,7 +467,7 @@ fn translate_instruction(
                 // Get the function's arguments from the types stack
                 let types = &types_stack[arguments_start..types_stack.len()];
 
-                if types.len() > 0 {
+                if types.is_empty() {
                     // These types represent the instantiated types that correspond to the return values
                     // of the parent function. This is crucial because we may encounter an IRef<T> or
                     // IMutRef<T>, and we need to extract the underlying type T.

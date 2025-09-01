@@ -49,13 +49,11 @@ impl TypesStack {
             });
         };
 
-        if ty != *expected_type {
-            if !Self::check_equality_ignoring_unknown(expected_type, &ty) {
-                return Err(TypesStackError::TypeMismatch {
-                    expected: expected_type.clone(),
-                    found: ty,
-                });
-            }
+        if ty != *expected_type && !Self::check_equality_ignoring_unknown(expected_type, &ty) {
+            return Err(TypesStackError::TypeMismatch {
+                expected: expected_type.clone(),
+                found: ty,
+            });
         }
 
         Ok(())
