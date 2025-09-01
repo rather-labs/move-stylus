@@ -166,6 +166,7 @@ impl IntermediateType {
                             index: *index,
                         },
                         UserDefinedType::Enum(i) => IntermediateType::IEnum(*i as u16),
+                        /*
                         UserDefinedType::ExternalData {
                             module: module_id,
                             identifier,
@@ -174,6 +175,7 @@ impl IntermediateType {
                             identifier: identifier.clone(),
                             types: None,
                         },
+                        */
                     })
                 } else {
                     Err(anyhow::anyhow!(
@@ -198,6 +200,7 @@ impl IntermediateType {
                             }
                         }
                         UserDefinedType::Enum(_) => todo!(),
+                        /*
                         UserDefinedType::ExternalData {
                             module: module_id,
                             identifier,
@@ -206,6 +209,7 @@ impl IntermediateType {
                             identifier: identifier.clone(),
                             types: Some(types),
                         },
+                        */
                     })
                 } else {
                     Err(anyhow::anyhow!(

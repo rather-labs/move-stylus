@@ -27,6 +27,10 @@ use move_binary_format::{
     },
     internals::ModuleIndex,
 };
+use move_package::{
+    compilation::compiled_package::CompiledUnitWithSource,
+    source_package::parsed_manifest::PackageName,
+};
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -42,12 +46,13 @@ pub enum UserDefinedType {
 
     /// Enum defined in this module
     Enum(usize),
-
+    /*
     /// Data type defined outside this module
     ExternalData {
         module: ModuleId,
         identifier: String,
     },
+    */
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
@@ -138,9 +143,11 @@ impl ModuleData {
     pub fn build_module_data<'move_package>(
         module_id: ModuleId,
         move_module: &'move_package CompiledModule,
+        move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
         function_definitions: &mut GlobalFunctionTable<'move_package>,
     ) -> Self {
-        let datatype_handles_map = Self::process_datatype_handles(&module_id, move_module);
+        let datatype_handles_map =
+            Self::process_datatype_handles(&module_id, move_module, move_module_dependencies);
 
         // Module's structs
         let (module_structs, fields_to_struct_map) =
@@ -201,6 +208,7 @@ impl ModuleData {
     fn process_datatype_handles(
         module_id: &ModuleId,
         module: &CompiledModule,
+        move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
     ) -> HashMap<DatatypeHandleIndex, UserDefinedType> {
         let mut datatype_handles_map = HashMap::new();
 
@@ -233,14 +241,44 @@ impl ModuleData {
                 };
             } else {
                 let datatype_module = module.module_handle_at(datatype_handle.module);
+                let module_address = module.address_identifier_at(datatype_module.address);
+                let module_name = module.identifier_at(datatype_module.name);
+
                 let module_id = ModuleId {
-                    address: module
-                        .address_identifier_at(datatype_module.address)
-                        .into_bytes()
-                        .into(),
-                    module_name: module.identifier_at(datatype_module.name).to_string(),
+                    address: module_address.into_bytes().into(),
+                    module_name: module_name.to_string(),
                 };
 
+                // Find the module where the external data is defined
+                let external_module_source = move_module_dependencies
+                    .iter()
+                    .find(|(_, m)| {
+                        m.unit.name().as_str() == module_name.as_str()
+                            && m.unit.address == *module_address
+                    })
+                    .expect(&format!("could not find dependency {module_id}"));
+
+                if let Some(position) = module
+                    .struct_defs()
+                    .iter()
+                    .position(|s| s.struct_handle == idx)
+                {
+                    datatype_handles_map.insert(
+                        idx,
+                        UserDefinedType::Struct {
+                            module_id: module_id.clone(), // TODO: clone
+                            index: position as u16,
+                        },
+                    );
+                } else if let Some(position) =
+                    module.enum_defs().iter().position(|e| e.enum_handle == idx)
+                {
+                    datatype_handles_map.insert(idx, UserDefinedType::Enum(position));
+                } else {
+                    panic!("datatype handle index {index} not found");
+                };
+
+                /*
                 datatype_handles_map.insert(
                     idx,
                     UserDefinedType::ExternalData {
@@ -248,6 +286,7 @@ impl ModuleData {
                         identifier: module.identifier_at(datatype_handle.name).to_string(),
                     },
                 );
+                */
             }
         }
 
