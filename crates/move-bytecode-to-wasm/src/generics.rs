@@ -171,7 +171,7 @@ pub fn replace_type_parameters(
 }
 
 /// Auxiliary functiion that recursively looks for not instantiated type parameters and
-/// replaces them
+/// replaces them with `IntermediateType::IUnknown`
 pub fn replace_type_parameters_for_unknown(itype: &IntermediateType) -> IntermediateType {
     match itype {
         IntermediateType::ITypeParameter(_) => IntermediateType::IUnknown,

@@ -11,9 +11,6 @@ pub enum CompilationContextError {
     #[error("struct with index {0} not found in compilation context")]
     StructNotFound(u16),
 
-    #[error("struct with identifier {0} not found in compilation context")]
-    StructWithIdentifierNotFound(String),
-
     #[error("struct with field id {0:?} not found in compilation context")]
     StructWithFieldIdxNotFound(FieldHandleIndex),
 

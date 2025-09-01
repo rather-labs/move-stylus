@@ -117,9 +117,9 @@ pub fn pack_variant(
                         });
                     }
                     IntermediateType::IUnknown => {
-                        // TODO: add enum variant error
-                        return Err(TranslationError::FoundUnknownTypeInsideStruct {
-                            struct_index: enum_.index,
+                        return Err(TranslationError::FoundUnknownTypeInsideEnumVariant {
+                            enum_index: enum_.index,
+                            variant_index,
                         });
                     }
                     IntermediateType::IEnum(_) => todo!(),

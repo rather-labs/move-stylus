@@ -83,6 +83,11 @@ pub enum TranslationError {
     )]
     FoundTypeParameterInsideEnumVariant { enum_index: u16, variant_index: u16 },
 
+    #[error(
+        "found unknown type inside enum variant with index {variant_index} and enum index {enum_index}"
+    )]
+    FoundUnknownTypeInsideEnumVariant { enum_index: u16, variant_index: u16 },
+
     // TODO: identify concrete errors and add its corresponding enum variant
     #[error("unknown error: {0}")]
     Unknown(#[from] anyhow::Error),

@@ -84,7 +84,21 @@ pub enum IntermediateType {
     },
 
     /// This represents a type that is unknown. This is useful when working with generics, there
-    /// are cases where the type cannot be deduced
+    /// are cases where the type cannot be deduced by the types in the stack. `IUnknown` is
+    /// different from a `ITypeParameter` in the sense that we are sure that the type is an
+    /// instantiated one.
+    ///
+    /// This is useful in situations where the type instance is actually not used, for example:
+    ///
+    /// ```move
+    /// public fun none<Element>(): Option<Element> {
+    ///     Option { vec: vector::empty() }
+    /// }
+    /// ```
+    ///
+    /// In this case, there's no instance of the `Element` type parameter, but the `Option` type
+    /// needs a concrete type. Since no value is needed, the `IUnknown` value can be used here,
+    /// since we don't need to know anything about the underlying representation.
     IUnknown,
 }
 
@@ -1120,7 +1134,9 @@ impl IntermediateType {
                         panic!("Cannot compare a type parameter, expected a concrete type");
                     }
                     IntermediateType::IUnknown => {
-                        panic!("Cannot compare an unknown type parameter, expected a concrete type");
+                        panic!(
+                            "Cannot compare an unknown type parameter, expected a concrete type"
+                        );
                     }
                     IntermediateType::IEnum(_) => todo!(),
                 }
