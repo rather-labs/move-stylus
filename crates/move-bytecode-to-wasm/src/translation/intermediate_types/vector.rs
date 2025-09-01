@@ -28,7 +28,7 @@ impl IVector {
         builder.if_else(
             None,
             |then| {
-                then.i32_const(16)
+                then.i32_const(8)
                     .call(compilation_ctx.allocator)
                     .local_set(pointer);
             },
@@ -706,25 +706,34 @@ impl IVector {
         // Local declarations
         let ptr_local = module.locals.add(ValType::I32);
         let len_local = module.locals.add(ValType::I32);
-        let data_size = if num_elements == 0 {
-            0
+
+        if num_elements == 0 {
+            // Set length
+            builder.i32_const(0).local_set(len_local);
+
+            IVector::allocate_vector_with_header(
+                builder,
+                compilation_ctx,
+                ptr_local,
+                len_local,
+                len_local,
+                0,
+            );
         } else {
-            inner.stack_data_size() as i32
-        };
+            let data_size = inner.stack_data_size() as i32;
 
-        // Set length
-        builder.i32_const(num_elements).local_set(len_local);
+            // Set length
+            builder.i32_const(num_elements).local_set(len_local);
 
-        IVector::allocate_vector_with_header(
-            builder,
-            compilation_ctx,
-            ptr_local,
-            len_local,
-            len_local,
-            data_size,
-        );
+            IVector::allocate_vector_with_header(
+                builder,
+                compilation_ctx,
+                ptr_local,
+                len_local,
+                len_local,
+                data_size,
+            );
 
-        if num_elements != 0 {
             let temp_local = module.locals.add(inner.into());
             for i in 0..num_elements {
                 builder.local_get(ptr_local);
