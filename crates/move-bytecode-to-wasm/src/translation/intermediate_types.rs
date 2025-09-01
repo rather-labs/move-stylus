@@ -83,12 +83,12 @@ pub enum IntermediateType {
         types: Option<Vec<IntermediateType>>,
     },
 
-    /// This represents a type that is unknown. This is useful when working with generics, there
-    /// are cases where the type cannot be deduced by the types in the stack. `IUnknown` is
-    /// different from a `ITypeParameter` in the sense that we are sure that the type is an
-    /// instantiated one.
+    /// Represents a type that is unknown. This is particularly useful when working with generics,
+    /// as there are cases where a type cannot be inferred from the types currently on the stack.
+    /// Unlike `ITypeParameter`, `IUnknown` indicates that the type is an instantiated one.
     ///
-    /// This is useful in situations where the type instance is actually not used, for example:
+    /// This is useful in situations where the type parameter is required syntactically but never
+    /// actually used. For example:
     ///
     /// ```move
     /// public fun none<Element>(): Option<Element> {
@@ -96,9 +96,10 @@ pub enum IntermediateType {
     /// }
     /// ```
     ///
-    /// In this case, there's no instance of the `Element` type parameter, but the `Option` type
-    /// needs a concrete type. Since no value is needed, the `IUnknown` value can be used here,
-    /// since we don't need to know anything about the underlying representation.
+    /// In this case, the `Element` type parameter is declared but never instantiated with a value.
+    /// However, `Option` still requires a concrete type. Since no actual value is needed,
+    /// `IUnknown` can be used to represent the placeholder type without needing to know its
+    /// underlying representation.
     IUnknown,
 }
 
