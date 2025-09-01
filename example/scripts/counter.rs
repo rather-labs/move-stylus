@@ -114,8 +114,8 @@ async fn main() -> eyre::Result<()> {
     let pending_tx = provider.send_transaction(tx).await?;
     pending_tx.get_receipt().await?;
 
-    println!("\nSending set value tx");
-    let pending_tx = example_2.setValue(counter_id, 42).send().await?;
+    println!("\nSending set value to 100 tx with the account that is not the owner");
+    let pending_tx = example_2.setValue(counter_id, 100).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
