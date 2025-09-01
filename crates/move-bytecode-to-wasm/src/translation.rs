@@ -1012,7 +1012,6 @@ fn translate_instruction(
                 | IntermediateType::IU256
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
-                | IntermediateType::IExternalUserData { .. }
                 | IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. }
                 | IntermediateType::IVector(_) => {
@@ -2072,38 +2071,12 @@ pub fn fix_return_type(
             module_data,
         ))),
         IntermediateType::IStruct { module_id, .. } => {
-            if module_id != &module_data.id {
-                // TODO: Add identifier to IntermediateType::IStruct
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(itype)
-                    .unwrap();
-
-                IntermediateType::IExternalUserData {
-                    module_id: module_id.clone(),
-                    identifier: struct_.identifier.clone(),
-                    types: None,
-                }
-            } else {
                 itype.clone()
-            }
         }
         IntermediateType::IGenericStructInstance {
             module_id, types, ..
         } => {
-            if module_id != &module_data.id {
-                // TODO: Add identifier to IntermediateType::IGenericStruct
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(itype)
-                    .unwrap();
-
-                IntermediateType::IExternalUserData {
-                    module_id: module_id.clone(),
-                    identifier: struct_.identifier.clone(),
-                    types: Some(types.to_vec()),
-                }
-            } else {
                 itype.clone()
-            }
         }
         // TODO enum cases
         _ => itype.clone(),
@@ -2132,41 +2105,6 @@ pub fn fix_call_type(
         }
         IntermediateType::IVector(inner) => {
             IntermediateType::IVector(Box::new(fix_call_type(inner, compilation_ctx, module_data)))
-        }
-        IntermediateType::IExternalUserData {
-            module_id,
-            identifier,
-            types: Some(types),
-        } if &module_data.id == module_id => {
-            let external_data = compilation_ctx
-                .get_external_module_data(module_id, identifier, &Some(types.to_vec()))
-                .unwrap();
-
-            match external_data {
-                ExternalModuleData::Struct(struct_) => IntermediateType::IGenericStructInstance {
-                    module_id: module_id.clone(),
-                    index: struct_.index(),
-                    types: types.to_vec(),
-                },
-                ExternalModuleData::Enum(_ienum) => todo!(),
-            }
-        }
-        IntermediateType::IExternalUserData {
-            module_id,
-            identifier,
-            types: None,
-        } if &module_data.id == module_id => {
-            let external_data = compilation_ctx
-                .get_external_module_data(module_id, identifier, &None)
-                .unwrap();
-
-            match external_data {
-                ExternalModuleData::Struct(struct_) => IntermediateType::IStruct {
-                    module_id: module_id.clone(),
-                    index: struct_.index(),
-                },
-                ExternalModuleData::Enum(_ienum) => todo!(),
-            }
         }
         // TODO enum cases
         _ => itype.clone(),

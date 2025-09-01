@@ -245,7 +245,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                     written_bytes_in_slot,
                 );
             }
-            IntermediateType::IExternalUserData {
+            IntermediateType::IStruct {
                 module_id,
                 identifier,
                 ..
@@ -289,42 +289,6 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                     .i32_const(32);
 
                 builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-            }
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types,
-            } => {
-                let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier, types)
-                    .unwrap();
-
-                match external_data {
-                    ExternalModuleData::Struct(struct_) => {
-                        // The struct ptr
-                        let tmp = module.locals.add(ValType::I32);
-                        builder.local_set(tmp);
-
-                        written_bytes_in_slot =
-                            add_encode_and_save_into_storage_struct_instructions(
-                                module,
-                                builder,
-                                compilation_ctx,
-                                tmp,
-                                slot_ptr,
-                                &struct_,
-                                written_bytes_in_slot,
-                            );
-                    }
-                    ExternalModuleData::Enum(enum_) => {
-                        if !enum_.is_simple {
-                            panic!(
-                                "cannot abi pack enum, it contains at least one variant with fields"
-                            );
-                        }
-                        todo!();
-                    }
-                }
             }
             e => todo!("{e:?}"),
         };
@@ -612,7 +576,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
 
                 builder.local_get(child_struct_ptr).local_set(field_ptr);
             }
-            IntermediateType::IExternalUserData {
+            IntermediateType::IStruct {
                 module_id,
                 identifier,
                 ..
@@ -678,38 +642,6 @@ pub fn add_read_and_decode_storage_struct_instructions(
                     },
                 );
             }
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types,
-            } => {
-                let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier, types)
-                    .unwrap();
-
-                match external_data {
-                    ExternalModuleData::Struct(child_struct) => {
-                        // Read the child struct
-                        let (child_struct_ptr, read_bytes) =
-                            add_read_and_decode_storage_struct_instructions(
-                                module,
-                                builder,
-                                compilation_ctx,
-                                slot_ptr,
-                                &child_struct,
-                                true,
-                                read_bytes_in_slot,
-                            );
-
-                        read_bytes_in_slot = read_bytes;
-
-                        builder.local_get(child_struct_ptr).local_set(field_ptr);
-                    }
-                    ExternalModuleData::Enum(_) => {
-                        todo!();
-                    }
-                }
-            }
             _ => todo!(),
         };
 
@@ -744,23 +676,12 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
         // fields of the child struct, whether they are dynamic or static. The store function
         // called will take care of this.
         IntermediateType::IGenericStructInstance { .. } | IntermediateType::IStruct { .. } => 0,
-        IntermediateType::IExternalUserData {
+        IntermediateType::IStruct {
             module_id,
             identifier,
             ..
         } if Uid::is_vm_type(module_id, identifier) => 32,
-        IntermediateType::IExternalUserData {
-            module_id,
-            identifier,
-            types,
-        } => match compilation_ctx
-            .get_external_module_data(module_id, identifier, types)
-            .unwrap()
-        {
-            ExternalModuleData::Struct(_) => 0,
-            ExternalModuleData::Enum(_) => 1,
-        },
-
+        
         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
             panic!("found reference inside struct")
         }

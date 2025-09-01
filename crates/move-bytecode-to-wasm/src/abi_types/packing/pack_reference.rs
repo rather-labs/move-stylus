@@ -26,7 +26,6 @@ impl IRef {
             | IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IExternalUserData { .. }
             | IntermediateType::IEnum(_) => {
                 // Load the intermediate pointer and pack
                 builder
@@ -127,8 +126,7 @@ impl IMutRef {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IExternalUserData { .. } => {
+            | IntermediateType::IGenericStructInstance { .. } => {
                 builder
                     .local_get(local)
                     .load(

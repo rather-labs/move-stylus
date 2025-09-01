@@ -89,35 +89,6 @@ impl SolName for IntermediateType {
             IntermediateType::ISigner
             | IntermediateType::IUnknown
             | IntermediateType::ITypeParameter(_) => None,
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types,
-            } => {
-                let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier, types)
-                    .unwrap();
-                match external_data {
-                    // TxContext should not be part of the function signature, since it is injected
-                    // by the VM.
-                    ExternalModuleData::Struct(_)
-                        if TxContext::is_vm_type(module_id, identifier) =>
-                    {
-                        None
-                    }
-                    ExternalModuleData::Struct(istruct) => {
-                        if istruct.saved_in_storage {
-                            Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
-                        } else {
-                            Self::struct_fields_sol_name(&istruct, compilation_ctx)
-                        }
-                    }
-                    // TODO: check if the enum is simple
-                    ExternalModuleData::Enum(_ienum) => {
-                        Some(sol_data::Uint::<8>::SOL_NAME.to_string())
-                    }
-                }
-            }
         }
     }
 }

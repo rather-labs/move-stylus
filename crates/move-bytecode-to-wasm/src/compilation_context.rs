@@ -128,18 +128,6 @@ impl CompilationContext<'_> {
                 let instance = struct_.instantiate(types);
                 Ok(Cow::Owned(instance))
             }
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types,
-            } => {
-                let external_data = self.get_external_module_data(module_id, identifier, types)?;
-
-                match external_data {
-                    ExternalModuleData::Struct(external_struct) => Ok(external_struct),
-                    ExternalModuleData::Enum(_) => Err(CompilationContextError::ExpectedStruct),
-                }
-            }
             _ => Err(CompilationContextError::ExpectedStruct),
         }
     }

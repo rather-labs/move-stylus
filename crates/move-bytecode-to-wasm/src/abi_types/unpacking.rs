@@ -245,55 +245,6 @@ impl Unpackable for IntermediateType {
                     compilation_ctx,
                 )
             }
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types,
-            } => {
-                let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier, types)
-                    .unwrap();
-
-                match external_data {
-                    ExternalModuleData::Struct(istruct) => {
-                        if TxContext::is_vm_type(module_id, identifier) {
-                            TxContext::inject(function_builder, module, compilation_ctx);
-                        } else if istruct.saved_in_storage {
-                            add_unpack_from_storage_instructions(
-                                function_builder,
-                                module,
-                                reader_pointer,
-                                calldata_reader_pointer,
-                                compilation_ctx,
-                                self,
-                                false,
-                            );
-                        } else {
-                            istruct.add_unpack_instructions(
-                                function_builder,
-                                module,
-                                reader_pointer,
-                                calldata_reader_pointer,
-                                compilation_ctx,
-                            )
-                        }
-                    }
-                    ExternalModuleData::Enum(ienum) => {
-                        if !ienum.is_simple {
-                            panic!(
-                                "cannot abi external module's enum {identifier}, it contains at least one variant with fields"
-                            );
-                        }
-                        IEnum::add_unpack_instructions(
-                            ienum,
-                            function_builder,
-                            module,
-                            reader_pointer,
-                            compilation_ctx,
-                        )
-                    }
-                }
-            }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot unpack generic type parameter");
             }
