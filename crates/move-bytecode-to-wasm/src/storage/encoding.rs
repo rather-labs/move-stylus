@@ -341,6 +341,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                     slot_ptr,
                     inner,
                 );
+
+                let written_bytes_in_slot = 32; // Vector header always takes 32 bytes
             }
             e => todo!("{e:?}"),
         };
@@ -918,7 +920,14 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                 written_bytes_in_slot += elem_size;
             }
 
-            loop_.local_get(vector_ptr);
+            loop_.
+                local_get(vector_ptr)
+                .i32_const(8) // Skip header (length and capacity)
+                .binop(BinaryOp::I32Add)
+                .local_get(i)
+                .i32_const(inner.stack_data_size() as i32)
+                .binop(BinaryOp::I32Mul)
+                .binop(BinaryOp::I32Add);
 
             match inner {
                 IntermediateType::IBool
@@ -1157,7 +1166,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                         }
                     }
                 }
-                IntermediateType::IVector(inner) => {
+                IntermediateType::IVector(inner_) => {
                     let tmp = module.locals.add(ValType::I32);
                     loop_.local_set(tmp);
                     add_encode_and_save_into_storage_vector_instructions(
@@ -1166,7 +1175,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                         compilation_ctx,
                         tmp,
                         elem_slot_ptr, // TODO: check if this is correct!
-                        inner,
+                        inner_,
                     );
                 }
                 e => todo!("{e:?}"),
@@ -1189,6 +1198,12 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
         });
     });
 
+    // Save the last element to storage
+    builder
+        .local_get(elem_slot_ptr)
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .call(storage_cache);
+
     // Save the (swapped to BE) length of the vector in the leftmost 4 bytes of the header slot
     builder
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
@@ -1201,8 +1216,11 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                 align: 0,
                 offset: 28,
             },
-        )
-        .local_get(slot_ptr)
-        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-        .call(storage_cache);
+        );
+
+    // TODO: this is done afterwards in add_encode_and_save_into_storage_vector_instructions
+    // builder
+    //     .local_get(slot_ptr)
+    //     .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+    //     .call(storage_cache);
 }
