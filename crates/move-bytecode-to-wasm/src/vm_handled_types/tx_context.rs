@@ -19,6 +19,7 @@ impl VmHandledType for TxContext {
     }
 
     fn is_vm_type(module_id: &ModuleId, identifier: &str) -> bool {
+        /*
         if identifier == Self::IDENTIFIER {
             if module_id.address != STYLUS_FRAMEWORK_ADDRESS
                 || module_id.module_name != "tx_context"
@@ -28,5 +29,7 @@ impl VmHandledType for TxContext {
             return true;
         }
         false
+        */
+        true
     }
 }

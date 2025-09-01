@@ -46,13 +46,6 @@ pub enum UserDefinedType {
 
     /// Enum defined in this module
     Enum(usize),
-    /*
-    /// Data type defined outside this module
-    ExternalData {
-        module: ModuleId,
-        identifier: String,
-    },
-    */
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
@@ -250,28 +243,47 @@ impl ModuleData {
                 };
 
                 // Find the module where the external data is defined
-                let external_module_source = move_module_dependencies
+                let external_module_source = &move_module_dependencies
                     .iter()
                     .find(|(_, m)| {
                         m.unit.name().as_str() == module_name.as_str()
                             && m.unit.address == *module_address
                     })
-                    .expect(&format!("could not find dependency {module_id}"));
+                    .expect(&format!("could not find dependency {module_id}"))
+                    .1
+                    .unit
+                    .module;
 
-                if let Some(position) = module
+                let external_data_name = module.identifier_at(datatype_handle.name);
+
+                println!("{:?}", module.identifier_at(datatype_handle.name));
+                let external_dth_idx = external_module_source
+                    .datatype_handles()
+                    .iter()
+                    .position(|dth| {
+                        external_module_source.identifier_at(dth.name) == external_data_name
+                    })
+                    .unwrap();
+                let external_dth_idx = DatatypeHandleIndex::new(external_dth_idx as u16);
+
+                println!("{external_dth_idx:?}");
+
+                if let Some(position) = external_module_source
                     .struct_defs()
                     .iter()
-                    .position(|s| s.struct_handle == idx)
+                    .position(|s| s.struct_handle == external_dth_idx)
                 {
                     datatype_handles_map.insert(
                         idx,
                         UserDefinedType::Struct {
-                            module_id: module_id.clone(), // TODO: clone
+                            module_id,
                             index: position as u16,
                         },
                     );
-                } else if let Some(position) =
-                    module.enum_defs().iter().position(|e| e.enum_handle == idx)
+                } else if let Some(position) = module
+                    .enum_defs()
+                    .iter()
+                    .position(|e| e.enum_handle == external_dth_idx)
                 {
                     datatype_handles_map.insert(idx, UserDefinedType::Enum(position));
                 } else {
