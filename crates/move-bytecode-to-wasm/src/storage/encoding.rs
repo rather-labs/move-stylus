@@ -11,7 +11,10 @@ use walrus::{
 use crate::{
     CompilationContext,
     compilation_context::ExternalModuleData,
-    data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_STORAGE_OBJECT_OWNER_OFFSET},
+    data::{
+        DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
+        DATA_STORAGE_OBJECT_OWNER_OFFSET,
+    },
     hostio::host_functions::{storage_cache_bytes32, storage_load_bytes32},
     runtime::RuntimeFunction,
     translation::intermediate_types::{
@@ -325,6 +328,19 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                         todo!();
                     }
                 }
+            }
+            IntermediateType::IVector(inner) => {
+                let vector_ptr = module.locals.add(ValType::I32);
+                builder.local_set(vector_ptr);
+
+                add_encode_and_save_into_storage_vector_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    vector_ptr,
+                    slot_ptr,
+                    inner,
+                );
             }
             e => todo!("{e:?}"),
         };
@@ -768,4 +784,425 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
             panic!("cannot know if a type parameter is dynamic, expected a concrete type");
         }
     }
+}
+
+/// Adds the instructions to encode and save a vector (as a field in a struct) into storage.
+pub fn add_encode_and_save_into_storage_vector_instructions(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    vector_ptr: LocalId,
+    slot_ptr: LocalId,
+    inner: &IntermediateType,
+) {
+    let (storage_cache, _) = storage_cache_bytes32(module);
+    let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None);
+    let derive_dyn_array_slot_fn =
+        RuntimeFunction::DeriveDynArraySlot.get(module, Some(compilation_ctx));
+
+    // Locals
+    let val_32 = module.locals.add(ValType::I32);
+    let val_64 = module.locals.add(ValType::I64);
+    let len = module.locals.add(ValType::I32);
+    let elem_slot_ptr = module.locals.add(ValType::I32);
+    let elem_size_ptr = module.locals.add(ValType::I32);
+    let elem_index_ptr = module.locals.add(ValType::I32);
+
+    // Allocate 4 bytes for the element slot
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_set(elem_slot_ptr);
+
+    // Allocate 4 bytes for the element index
+    builder
+        .i32_const(4)
+        .call(compilation_ctx.allocator)
+        .local_set(elem_index_ptr);
+
+    // Allocate 4 bytes for the element size
+    builder
+        .i32_const(4)
+        .call(compilation_ctx.allocator)
+        .local_set(elem_size_ptr);
+
+    // Calculate and store the first element slot
+    builder
+        .local_get(slot_ptr)
+        .local_get(elem_index_ptr) // Initially just 0
+        .local_get(elem_size_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(derive_dyn_array_slot_fn);
+
+    // Element size in storage
+    // TODO: look out for structs, they have field size = 0.
+    let elem_size = field_size(inner, compilation_ctx);
+    builder
+        .local_get(elem_size_ptr)
+        .i32_const(elem_size as i32)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    // Load the length of the vector (first 4 bytes of the vector data)
+    // If the length is 0, it means we are storing an empty vector. we should just return here.
+    builder
+        .local_get(slot_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(len);
+
+    builder.block(None, |block| {
+        let block_id = block.id();
+
+        let mut written_bytes_in_slot = 0;
+
+        let i = module.locals.add(ValType::I32);
+        block.i32_const(0).local_set(i);
+        block.loop_(None, |loop_| {
+            let loop_id = loop_.id();
+
+            // Store the element index at #elem_index_ptr
+            loop_.local_get(elem_index_ptr).local_get(i).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+
+            // For each element, derive the corresponding slot.
+            // Elements smaller than 16 bytes can be packed in the same slot.
+            loop_
+                .local_get(slot_ptr)
+                .local_get(elem_index_ptr)
+                .local_get(elem_size_ptr)
+                .local_get(elem_slot_ptr)
+                .call(derive_dyn_array_slot_fn);
+
+            if written_bytes_in_slot + elem_size > 32 {
+                // Save previous slot to storage
+                loop_
+                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                    .call(storage_cache);
+
+                // Wipe the data so we can fill it with new data
+                loop_
+                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                    .i32_const(0)
+                    .i32_const(32)
+                    .memory_fill(compilation_ctx.memory_id);
+
+                // Set the element slot to data
+                loop_
+                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .local_get(elem_slot_ptr)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+                written_bytes_in_slot = elem_size;
+            } else {
+                written_bytes_in_slot += elem_size;
+            }
+
+            loop_.local_get(vector_ptr);
+
+            match inner {
+                IntermediateType::IBool
+                | IntermediateType::IU8
+                | IntermediateType::IU16
+                | IntermediateType::IU32
+                | IntermediateType::IU64 => {
+                    let (val, load_kind, swap_fn) = if inner.stack_data_size() == 8 {
+                        let swap_fn = RuntimeFunction::SwapI64Bytes.get(module, None);
+                        (val_64, LoadKind::I64 { atomic: false }, swap_fn)
+                    } else {
+                        let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None);
+                        (val_32, LoadKind::I32 { atomic: false }, swap_fn)
+                    };
+
+                    loop_
+                        .load(
+                            compilation_ctx.memory_id,
+                            load_kind,
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_tee(val);
+
+                    // Convert the value to big endian
+                    loop_.call(swap_fn).local_set(val);
+
+                    // We need to shift the swapped bytes to the right because WASM is little endian. If we try
+                    // to write a 16 bits number contained in a 32 bits number, without shifting, it will write
+                    // the zeroed part.
+                    // This only needs to be done for 32 bits (4 bytes) numbers
+                    if inner.stack_data_size() == 4 {
+                        if elem_size == 1 {
+                            loop_
+                                .local_get(val)
+                                .i32_const(24)
+                                .binop(BinaryOp::I32ShrU)
+                                .local_set(val);
+                        } else if elem_size == 2 {
+                            loop_
+                                .local_get(val)
+                                .i32_const(16)
+                                .binop(BinaryOp::I32ShrU)
+                                .local_set(val);
+                        }
+                    }
+
+                    let store_kind = if elem_size == 1 {
+                        StoreKind::I32_8 { atomic: false }
+                    } else if elem_size == 2 {
+                        StoreKind::I32_16 { atomic: false }
+                    } else if elem_size == 4 {
+                        StoreKind::I32 { atomic: false }
+                    } else {
+                        StoreKind::I64 { atomic: false }
+                    };
+
+                    // Save the value in slot data
+                    loop_
+                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                        .local_get(val)
+                        .store(
+                            compilation_ctx.memory_id,
+                            store_kind,
+                            MemArg {
+                                align: 0,
+                                offset: 32 - written_bytes_in_slot,
+                            },
+                        );
+                }
+                IntermediateType::IU128 => {
+                    let swap_fn = RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx));
+
+                    // Slot data plus offset as dest ptr
+                    loop_
+                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                        .i32_const(32 - written_bytes_in_slot as i32)
+                        .binop(BinaryOp::I32Add);
+
+                    // Transform to BE
+                    loop_.call(swap_fn);
+                }
+                IntermediateType::IU256 => {
+                    let swap_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
+
+                    // Slot data plus offset as dest ptr (offset should be zero because data is already
+                    // 32 bytes in size)
+                    loop_.i32_const(DATA_SLOT_DATA_PTR_OFFSET);
+
+                    // Transform to BE
+                    loop_.call(swap_fn);
+                }
+                IntermediateType::IAddress | IntermediateType::ISigner => {
+                    // We need to swap values before copying because memory copy takes dest pointer
+                    // first
+                    let tmp = module.locals.add(ValType::I32);
+                    loop_.local_set(tmp);
+                    // Load the memory address
+
+                    // Slot data plus offset as dest ptr
+                    loop_
+                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                        .i32_const(32 - written_bytes_in_slot as i32)
+                        .binop(BinaryOp::I32Add);
+
+                    // Grab the last 20 bytes of the address
+                    loop_.local_get(tmp).i32_const(12).binop(BinaryOp::I32Add);
+
+                    // Amount of bytes to copy
+                    loop_.i32_const(20);
+                    loop_.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                }
+                IntermediateType::IStruct { module_id, index } => {
+                    let child_struct = compilation_ctx
+                        .get_user_data_type_by_index(module_id, *index)
+                        .unwrap();
+
+                    // The struct ptr
+                    let tmp = module.locals.add(ValType::I32);
+                    loop_.local_set(tmp);
+
+                    written_bytes_in_slot = add_encode_and_save_into_storage_struct_instructions(
+                        module,
+                        loop_,
+                        compilation_ctx,
+                        tmp,
+                        elem_slot_ptr, // TODO: check if this is correct!
+                        child_struct,
+                        written_bytes_in_slot,
+                    );
+                }
+                IntermediateType::IGenericStructInstance {
+                    module_id,
+                    index,
+                    types,
+                } => {
+                    let child_struct = compilation_ctx
+                        .get_user_data_type_by_index(module_id, *index)
+                        .unwrap();
+                    let child_struct = child_struct.instantiate(types);
+
+                    // The struct ptr
+                    let tmp = module.locals.add(ValType::I32);
+                    loop_.local_set(tmp);
+
+                    written_bytes_in_slot = add_encode_and_save_into_storage_struct_instructions(
+                        module,
+                        loop_,
+                        compilation_ctx,
+                        tmp,
+                        elem_slot_ptr, // TODO: check if this is correct!
+                        &child_struct,
+                        written_bytes_in_slot,
+                    );
+                }
+                IntermediateType::IExternalUserData {
+                    module_id,
+                    identifier,
+                    ..
+                } if Uid::is_vm_type(module_id, identifier) => {
+                    let tmp = module.locals.add(ValType::I32);
+
+                    // The UID struct has the following form
+                    //
+                    // UID { id: ID { bytes: <bytes> } }
+                    //
+                    // At this point we have in stack a pointer to field we are processing. The
+                    // field's value is a pointer to the ID struct.
+                    //
+                    // The first load instruction puts in stack the pointer to the ID struct
+                    // The second load instruction loads the ID's bytes field pointer
+                    //
+                    // At the end of the load chain we point to the 32 bytes holding the data
+                    loop_
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_set(tmp);
+
+                    // Load the memory address
+                    loop_
+                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                        .local_get(tmp)
+                        .i32_const(32);
+
+                    loop_.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                }
+                IntermediateType::IExternalUserData {
+                    module_id,
+                    identifier,
+                    types,
+                } => {
+                    let external_data = compilation_ctx
+                        .get_external_module_data(module_id, identifier, types)
+                        .unwrap();
+
+                    match external_data {
+                        ExternalModuleData::Struct(struct_) => {
+                            // The struct ptr
+                            let tmp = module.locals.add(ValType::I32);
+                            loop_.local_set(tmp);
+
+                            written_bytes_in_slot =
+                                add_encode_and_save_into_storage_struct_instructions(
+                                    module,
+                                    loop_,
+                                    compilation_ctx,
+                                    tmp,
+                                    elem_slot_ptr, // TODO: check if this is correct!
+                                    &struct_,
+                                    written_bytes_in_slot,
+                                );
+                        }
+                        ExternalModuleData::Enum(enum_) => {
+                            if !enum_.is_simple {
+                                panic!(
+                                    "cannot abi pack enum, it contains at least one variant with fields"
+                                );
+                            }
+                            todo!();
+                        }
+                    }
+                }
+                IntermediateType::IVector(inner) => {
+                    let tmp = module.locals.add(ValType::I32);
+                    loop_.local_set(tmp);
+                    add_encode_and_save_into_storage_vector_instructions(
+                        module,
+                        loop_,
+                        compilation_ctx,
+                        tmp,
+                        elem_slot_ptr, // TODO: check if this is correct!
+                        inner,
+                    );
+                }
+                e => todo!("{e:?}"),
+            };
+
+            // If we reach the last element, we exit
+            loop_
+                .local_get(i)
+                .local_get(len)
+                .binop(BinaryOp::I32Eq)
+                .br_if(block_id);
+
+            // Else, increment i and continue the loop
+            loop_
+                .local_get(i)
+                .i32_const(1)
+                .binop(BinaryOp::I32Add)
+                .local_set(i)
+                .br(loop_id);
+        });
+    });
+
+    // Save the (swapped to BE) length of the vector in the leftmost 4 bytes of the header slot
+    builder
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .local_get(len)
+        .call(swap_fn)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 28,
+            },
+        )
+        .local_get(slot_ptr)
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .call(storage_cache);
 }

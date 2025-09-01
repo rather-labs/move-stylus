@@ -228,7 +228,7 @@ pub fn write_object_slot(module: &mut Module, compilation_ctx: &CompilationConte
         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
         .call(derive_slot_fn);
 
-    // Derive slot for ther second mapping
+    // Derive slot for the second mapping
     builder
         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
         .local_get(uid_ptr)
