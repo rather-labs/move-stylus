@@ -28,7 +28,7 @@ impl IVector {
         builder.if_else(
             None,
             |then| {
-                then.i32_const(8)
+                then.i32_const(16)
                     .call(compilation_ctx.allocator)
                     .local_set(pointer);
             },

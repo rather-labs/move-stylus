@@ -14,7 +14,7 @@ example-interaction:
 	cargo run -p move-hello-world-example --bin interaction
 
 example-interaction-2:
-	cargo run -p move-hello-world-example --bin features_2
+	cargo run -p move-hello-world-example --bin interaction_2
 
 example-interaction-primitives:
 	cargo run -p move-hello-world-example --bin primitives_and_operations
@@ -38,7 +38,7 @@ deploy-example-2:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/wasm/features_2.wasm
+		--wasm-file=./example/build/wasm/hello_world_2.wasm
 
 deploy-example-primitives:
 	cargo stylus deploy \
