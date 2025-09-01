@@ -103,7 +103,7 @@ impl IRef {
                 panic!("cannot pack generic type parameter");
             }
             IntermediateType::IUnknown => {
-                panic!("cannot pack a unknown type parameter");
+                panic!("cannot pack an unknown type parameter");
             }
         }
     }
@@ -204,7 +204,7 @@ impl IMutRef {
                 panic!("cannot pack generic type parameter");
             }
             IntermediateType::IUnknown => {
-                panic!("cannot pack a unknown type parameter");
+                panic!("cannot pack an unknown type parameter");
             }
         }
     }

@@ -246,7 +246,7 @@ impl IntermediateType {
             }
             IntermediateType::IUnknown => {
                 panic!(
-                    "can't load a unknown type parameter as a constant, expected a concrete type"
+                    "can't load an unknown type parameter as a constant, expected a concrete type"
                 )
             }
             IntermediateType::IEnum(_) => todo!(),
@@ -325,7 +325,7 @@ impl IntermediateType {
                 panic!("cannot move a type parameter, expected a concrete type");
             }
             IntermediateType::IUnknown => {
-                panic!("cannot move a unknown type parameter, expected a concrete type");
+                panic!("cannot move an unknown type parameter, expected a concrete type");
             }
         }
     }
@@ -501,7 +501,7 @@ impl IntermediateType {
                 panic!("cannot copy a type parameter, expected a concrete type");
             }
             IntermediateType::IUnknown => {
-                panic!("cannot copy a unknown type parameter, expected a concrete type");
+                panic!("cannot copy an unknown type parameter, expected a concrete type");
             }
             IntermediateType::IEnum(_) => todo!(),
         }
@@ -564,7 +564,7 @@ impl IntermediateType {
                 panic!("cannot load a type parameter, expected a concrete type");
             }
             IntermediateType::IUnknown => {
-                panic!("cannot load a unknown type parameter, expected a concrete type");
+                panic!("cannot load an unknown type parameter, expected a concrete type");
             }
             IntermediateType::IEnum(_) => todo!(),
         }
@@ -606,7 +606,7 @@ impl IntermediateType {
                 panic!("cannot load a type parameter, expected a concrete type");
             }
             IntermediateType::IUnknown => {
-                panic!("cannot load a unknown type parameter, expected a concrete type");
+                panic!("cannot load an unknown type parameter, expected a concrete type");
             }
         }
     }
@@ -635,7 +635,7 @@ impl IntermediateType {
                 panic!("cannot borrow a type parameter, expected a concrete type");
             }
             IntermediateType::IUnknown => {
-                panic!("cannot borrow a unknown type parameter, expected a concrete type");
+                panic!("cannot borrow an unknown type parameter, expected a concrete type");
             }
             IntermediateType::IEnum(_) => todo!(),
         }
@@ -885,7 +885,7 @@ impl IntermediateType {
                 panic!("cannot write to a type parameter, expected a concrete type");
             }
             IntermediateType::IUnknown => {
-                panic!("cannot write to a unknown type parameter, expected a concrete type");
+                panic!("cannot write to an unknown type parameter, expected a concrete type");
             }
             IntermediateType::IEnum(_) => todo!(),
         }
@@ -993,7 +993,7 @@ impl IntermediateType {
                 panic!("cannot box a type parameter, expected a concrete type");
             }
             IntermediateType::IUnknown => {
-                panic!("cannot box a unknown type parameter, expected a concrete type");
+                panic!("cannot box an unknown type parameter, expected a concrete type");
             }
         }
     }
@@ -1120,7 +1120,7 @@ impl IntermediateType {
                         panic!("Cannot compare a type parameter, expected a concrete type");
                     }
                     IntermediateType::IUnknown => {
-                        panic!("Cannot compare a unknown type parameter, expected a concrete type");
+                        panic!("Cannot compare an unknown type parameter, expected a concrete type");
                     }
                     IntermediateType::IEnum(_) => todo!(),
                 }
@@ -1190,7 +1190,7 @@ impl IntermediateType {
             }
             IntermediateType::IUnknown => {
                 panic!(
-                    "cannot check if a unknown type parameter is a stack type, expected a concrete type"
+                    "cannot check if an unknown type parameter is a stack type, expected a concrete type"
                 );
             }
             IntermediateType::IEnum(_) => todo!(),
@@ -1222,7 +1222,7 @@ impl From<&IntermediateType> for ValType {
             }
             IntermediateType::IUnknown => {
                 panic!(
-                    "cannot convert a unknown type parameter to a wasm type, expected a concrete type"
+                    "cannot convert an unknown type parameter to a wasm type, expected a concrete type"
                 );
             }
         }

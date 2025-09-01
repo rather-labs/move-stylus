@@ -768,7 +768,7 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
             panic!("cannot know if a type parameter is dynamic, expected a concrete type");
         }
         IntermediateType::IUnknown => {
-            panic!("cannot know if a unknown parameter is dynamic, expected a concrete type");
+            panic!("cannot know if an unknown parameter is dynamic, expected a concrete type");
         }
     }
 }
