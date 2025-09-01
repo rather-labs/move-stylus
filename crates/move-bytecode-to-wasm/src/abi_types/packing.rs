@@ -240,6 +240,9 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
             }
+            IntermediateType::IUnknown => {
+                panic!("cannot pack an unknown type parameter");
+            }
         }
     }
 
@@ -380,6 +383,9 @@ impl Packable for IntermediateType {
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
+            }
+            IntermediateType::IUnknown => {
+                panic!("cannot pack an unknown type parameter");
             }
             IntermediateType::IExternalUserData {
                 module_id,
@@ -572,6 +578,9 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("can't know the size of a generic type parameter at compile time");
             }
+            IntermediateType::IUnknown => {
+                panic!("can't know the size of an unknown type parameter at compile time");
+            }
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
@@ -623,6 +632,9 @@ impl Packable for IntermediateType {
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot check if generic type parameter is dynamic at compile time");
+            }
+            IntermediateType::IUnknown => {
+                panic!("cannot check if unknown type parameter is dynamic at compile time");
             }
             IntermediateType::IExternalUserData {
                 module_id,

@@ -69,6 +69,11 @@ sol!(
             TestGenericEvent1 s;
         }
 
+        #[derive(Debug, PartialEq)]
+        struct Stack {
+            uint32[] pos0;
+        }
+
         function emitTestEvent1(uint32 n) public view;
         function emitTestEvent2(uint32 a, uint8[] b, uint128 c) public view;
         function emitTestEvent3(TestEvent1 a, TestEvent2 b) public view;
@@ -81,6 +86,9 @@ sol!(
         function getUniqueIds() external view returns (UID, UID, UID);
         function getUniqueId() external view returns (UID);
         function getFreshObjectAddress() external view returns (address);
+        function testStack1() external view returns (Stack, uint64);
+        function testStack2() external view returns (Stack, uint64);
+        function testStack3() external view returns (Stack, uint64);
     }
 );
 
@@ -289,6 +297,15 @@ async fn main() -> eyre::Result<()> {
         println!("Decoded event data = {:?}", decoded_event);
         assert_eq!(event, decoded_event);
     }
+
+    let s = example.testStack1().call().await?;
+    println!("testStack1\nelements: {:?} len: {}", s._0, s._1);
+
+    let s = example.testStack2().call().await?;
+    println!("testStack2\nelements: {:?} len: {}", s._0, s._1);
+
+    let s = example.testStack3().call().await?;
+    println!("testStack2\nelements: {:?} len: {}", s._0, s._1);
 
     Ok(())
 }

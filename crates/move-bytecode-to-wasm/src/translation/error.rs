@@ -61,6 +61,9 @@ pub enum TranslationError {
         type_parameter_index: u16,
     },
 
+    #[error("found unknown type inside struct with index {struct_index}")]
+    FoundUnknownTypeInsideStruct { struct_index: u16 },
+
     #[error(r#"found external struct "{identifier}" from module "{module_id}" inside struct when unpacking"#)]
     UnpackingStructFoundExternalStruct {
         identifier: String,
@@ -79,6 +82,11 @@ pub enum TranslationError {
         "found type parameter inside enum variant with index {variant_index} and enum index {enum_index}"
     )]
     FoundTypeParameterInsideEnumVariant { enum_index: u16, variant_index: u16 },
+
+    #[error(
+        "found unknown type inside enum variant with index {variant_index} and enum index {enum_index}"
+    )]
+    FoundUnknownTypeInsideEnumVariant { enum_index: u16, variant_index: u16 },
 
     // TODO: identify concrete errors and add its corresponding enum variant
     #[error("unknown error: {0}")]

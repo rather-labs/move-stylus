@@ -3,8 +3,6 @@
 //! Then, it attempts to check the current counter value, increment it via a tx,
 //! and check the value again. The deployed contract is fully written in Rust and compiled to WASM
 //! but with Stylus, it is accessible just as a normal Solidity smart contract is via an ABI.
-use alloy::primitives::utils::parse_ether;
-use alloy::providers::Provider;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
@@ -190,26 +188,6 @@ async fn main() -> eyre::Result<()> {
         .call()
         .await?;
     println!("testValues = ({}, {})", test_values._0, test_values._1);
-
-    // This simple call will inject the "from" field as asigner
-    let ret = example.echoSignerWithInt(42).call().await?;
-    println!("echoSignerWithInt = ({}, {})", ret._0, ret._1);
-
-    // A real tx should write in the logs the signer's address
-    // 0x3f1eae7d46d88f08fc2f8ed27fcb2ab183eb2d0e
-    let tx = example
-        .echoSignerWithInt(43)
-        .into_transaction_request()
-        .to(Address::from_str(&contract_address).unwrap())
-        .value(parse_ether("0.1")?);
-
-    let pending_tx = provider.send_transaction(tx).await?;
-    let receipt = pending_tx.get_receipt().await?;
-
-    println!(
-        "echoSignerWithInt - transaction log data: {:?}",
-        receipt.logs().first().map(|l| l.data())
-    );
 
     Ok(())
 }

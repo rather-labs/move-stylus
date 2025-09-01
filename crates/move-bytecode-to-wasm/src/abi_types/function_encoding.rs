@@ -86,8 +86,9 @@ impl SolName for IntermediateType {
                     Self::struct_fields_sol_name(&struct_instance, compilation_ctx)
                 }
             }
-            IntermediateType::ISigner => None,
-            IntermediateType::ITypeParameter(_) => None,
+            IntermediateType::ISigner
+            | IntermediateType::IUnknown
+            | IntermediateType::ITypeParameter(_) => None,
             IntermediateType::IExternalUserData {
                 module_id,
                 identifier,
