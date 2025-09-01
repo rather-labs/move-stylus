@@ -33,6 +33,21 @@ pub struct CompilationContext<'a> {
 }
 
 impl CompilationContext<'_> {
+    /// Creates a new compilation context
+    pub fn new<'a>(
+        root_module_data: &'a ModuleData,
+        deps_data: &'a HashMap<ModuleId, ModuleData>,
+        memory_id: MemoryId,
+        allocator: FunctionId,
+    ) -> CompilationContext<'a> {
+        CompilationContext::<'a> {
+            root_module_data,
+            deps_data,
+            memory_id,
+            allocator,
+        }
+    }
+
     pub fn get_external_module_data(
         &self,
         module_id: &ModuleId,

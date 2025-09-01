@@ -116,12 +116,8 @@ pub fn translate_package(
             &mut function_definitions,
         );
 
-        let compilation_ctx = CompilationContext {
-            root_module_data: &root_module_data,
-            deps_data: &modules_data,
-            memory_id,
-            allocator: allocator_func,
-        };
+        let compilation_ctx =
+            CompilationContext::new(&root_module_data, &modules_data, memory_id, allocator_func);
 
         let mut public_functions = Vec::new();
         for function_information in root_module_data
