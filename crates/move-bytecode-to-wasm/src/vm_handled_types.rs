@@ -23,5 +23,5 @@ pub trait VmHandledType {
     /// Checks if the type is the reserved one or one declared by the user with the same name.
     ///
     /// Panics if the type is not the vm one
-    fn is_vm_type(module_id: &ModuleId, identifier: &str) -> bool;
+    fn is_vm_type(module_id: &ModuleId, index: u16, compilation_ctx: &CompilationContext) -> bool;
 }

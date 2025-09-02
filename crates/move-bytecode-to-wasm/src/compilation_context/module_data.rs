@@ -4,6 +4,7 @@ mod struct_data;
 
 use crate::{
     GlobalFunctionTable,
+    compilation_context::reserved_modules::STYLUS_FRAMEWORK_ADDRESS,
     translation::{
         functions::MappedFunction,
         intermediate_types::{
@@ -174,6 +175,7 @@ impl ModuleData {
             move_module,
             &datatype_handles_map,
             function_definitions,
+            move_module_dependencies,
         );
 
         let signatures = move_module
@@ -536,6 +538,7 @@ impl ModuleData {
         move_module: &'move_package CompiledModule,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         function_definitions: &mut GlobalFunctionTable<'move_package>,
+        move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
     ) -> FunctionData {
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
@@ -615,6 +618,7 @@ impl ModuleData {
                     function_def,
                     datatype_handles_map,
                     move_module,
+                    move_module_dependencies,
                 );
 
                 if is_init {
@@ -709,6 +713,7 @@ impl ModuleData {
         function_def: &FunctionDefinition,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         module: &CompiledModule,
+        move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
     ) -> bool {
         // Constants
         const INIT_FUNCTION_NAME: &str = "init";
@@ -736,21 +741,58 @@ impl ModuleData {
         assert!((1..=2).contains(&arg_count), "{}", BAD_ARGS_ERROR_MESSAGE);
 
         // Check TxContext in the last argument
-        let is_tx_context_ref = move_function_arguments
-            .0
-            .last()
+        let last_arg = move_function_arguments.0.last().map(|last| {
+            IntermediateType::try_from_signature_token(last, datatype_handles_map).unwrap()
+        });
+
+        let is_tx_context_ref = match last_arg {
+            Some(IntermediateType::IRef(inner)) | Some(IntermediateType::IMutRef(inner)) => {
+                match inner.as_ref() {
+                    IntermediateType::IStruct {
+                        module_id, index, ..
+                    } if module_id.module_name == "tx_context"
+                        && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
+                    {
+                        let external_module_source = &move_module_dependencies
+                            .iter()
+                            .find(|(_, m)| {
+                                m.unit.name().as_str() == "tx_context"
+                                    && Address::from(m.unit.address.into_bytes())
+                                        == STYLUS_FRAMEWORK_ADDRESS
+                            })
+                            .expect("could not find stylus framework as dependency")
+                            .1
+                            .unit
+                            .module;
+
+                        let struct_ = external_module_source
+                            .struct_def_at(StructDefinitionIndex::new(*index));
+                        let handle =
+                            external_module_source.datatype_handle_at(struct_.struct_handle);
+                        let identifier = external_module_source.identifier_at(handle.name);
+                        identifier.as_str() == "TxContext"
+                    }
+
+                    _ => false,
+                }
+            }
+            _ => false,
+        };
+
+        /*
             .map(|last| {
                 matches!(
                     IntermediateType::try_from_signature_token(last, datatype_handles_map).unwrap(),
                     IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner)
                         if matches!(
                             inner.as_ref(),
-                            IntermediateType::IStruct { module_id, identifier, .. }
+                            IntermediateType::IStruct { module_id, index, .. }
                                 if TxContext::is_vm_type(module_id, identifier)
                         )
                 )
             })
             .unwrap_or(false);
+        */
 
         assert!(is_tx_context_ref, "{}", BAD_ARGS_ERROR_MESSAGE);
 

@@ -246,10 +246,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                 );
             }
             IntermediateType::IStruct {
-                module_id,
-                identifier,
-                ..
-            } if Uid::is_vm_type(module_id, identifier) => {
+                module_id, index, ..
+            } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
                 let tmp = module.locals.add(ValType::I32);
 
                 // The UID struct has the following form
@@ -577,10 +575,8 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 builder.local_get(child_struct_ptr).local_set(field_ptr);
             }
             IntermediateType::IStruct {
-                module_id,
-                identifier,
-                ..
-            } if Uid::is_vm_type(module_id, identifier) => {
+                module_id, index, ..
+            } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
                 // Here we need to reconstruct the UID struct. To do that we first allocate 4 bytes
                 // that will contain the pointer to the UID struct data
                 //
@@ -677,11 +673,9 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
         // called will take care of this.
         IntermediateType::IGenericStructInstance { .. } | IntermediateType::IStruct { .. } => 0,
         IntermediateType::IStruct {
-            module_id,
-            identifier,
-            ..
-        } if Uid::is_vm_type(module_id, identifier) => 32,
-        
+            module_id, index, ..
+        } if Uid::is_vm_type(module_id, *index, compilation_ctx) => 32,
+
         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
             panic!("found reference inside struct")
         }
