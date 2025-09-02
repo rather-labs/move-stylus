@@ -275,7 +275,7 @@ mod tests {
 
         let data = SolType::abi_encode_params::<(Vec<u8>,)>(&(vec![],));
         let expected_result_bytes =
-            [0u32.to_le_bytes().as_slice(), 0u32.to_le_bytes().as_slice()].concat();
+            [0u64.to_le_bytes().as_slice(), 0u64.to_le_bytes().as_slice()].concat();
         test_vec_unpacking(&data, int_type, &expected_result_bytes);
     }
 

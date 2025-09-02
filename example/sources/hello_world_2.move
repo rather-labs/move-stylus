@@ -1,4 +1,4 @@
-module hello_world::features_2;
+module hello_world::hello_world_2;
 
 use stylus::tx_context::TxContext;
 use stylus::object as object;

@@ -15,7 +15,6 @@ use alloy::{
     sol_types::SolValue,
     transports::http::reqwest::Url,
 };
-// use alloy_sol_types::{SolValue, sol};
 use dotenv::dotenv;
 use eyre::eyre;
 use std::str::FromStr;
@@ -98,8 +97,8 @@ async fn main() -> eyre::Result<()> {
     let priv_key = std::env::var("PRIV_KEY").map_err(|_| eyre!("No {} env var set", "PRIV_KEY"))?;
     let rpc_url = std::env::var("RPC_URL").map_err(|_| eyre!("No {} env var set", "RPC_URL"))?;
 
-    let contract_address = std::env::var("CONTRACT_ADDRESS_FEATURES_2")
-        .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_FEATURES_2"))?;
+    let contract_address = std::env::var("CONTRACT_ADDRESS_2")
+        .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_2"))?;
 
     let signer = PrivateKeySigner::from_str(&priv_key)?;
 
@@ -294,18 +293,18 @@ async fn main() -> eyre::Result<()> {
     for log in logs {
         let data = log.data().data.0.clone();
         let decoded_event = <Example::TestGenericEvent2 as SolValue>::abi_decode(&data)?;
-        println!("Decoded event data = {:?}", decoded_event);
+        println!("Decoded event data = {:#?}", decoded_event);
         assert_eq!(event, decoded_event);
     }
 
     let s = example.testStack1().call().await?;
-    println!("testStack1\nelements: {:?} len: {}", s._0, s._1);
+    println!("testStack1\nelements: {:?} len: {}", s._0.pos0, s._1);
 
     let s = example.testStack2().call().await?;
-    println!("testStack2\nelements: {:?} len: {}", s._0, s._1);
+    println!("testStack2\nelements: {:?} len: {}", s._0.pos0, s._1);
 
     let s = example.testStack3().call().await?;
-    println!("testStack2\nelements: {:?} len: {}", s._0, s._1);
+    println!("testStack3\nelements: {:?} len: {}", s._0.pos0, s._1);
 
     Ok(())
 }

@@ -1,15 +1,15 @@
 [package]
 name = "move-hello-world-example"
 version = "0.1.11"
-edition = "2021"
+edition = "2024"
 
 [[bin]]
 name = "interaction"
 path = "scripts/interaction.rs"
 
 [[bin]]
-name = "features_2"
-path = "scripts/features_2.rs"
+name = "interaction_2"
+path = "scripts/interaction_2.rs"
 
 [[bin]]
 name = "primitives_and_operations"
