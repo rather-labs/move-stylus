@@ -315,7 +315,7 @@ impl RuntimeSandbox {
                             _ => panic!("failed to find host memory"),
                         };
 
-                        let mut result = [0; 512];
+                        let mut result = [0; 32];
                         memory.read(&caller, ptr as usize, &mut result).unwrap();
                         println!("Data {result:?}");
                         println!("--- --- ---\n");
@@ -398,7 +398,7 @@ impl RuntimeSandbox {
 
     pub fn get_storage_at_slot(&self, slot: [u8; 32]) -> [u8; 32] {
         let storage = self.storage.lock().unwrap();
-        println!("{:?}", storage);
+        println!("Storage: {storage:?}");
         *storage.get(&slot).unwrap()
     }
 }

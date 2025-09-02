@@ -114,3 +114,45 @@ public fun save_static_nested_struct(
 public fun read_static_nested_struct(): StaticNestedStruct {
     read_slot<StaticNestedStruct>(0)
 }
+
+public struct DynamicArrayStruct has key {
+    id: UID,
+    a: u32,
+    b: bool,
+    c: vector<u64>,
+    d: vector<u128>,
+}
+
+public fun save_dynamic_array_struct(
+    id: UID,
+    a: u32,
+    b: bool,
+    c: vector<u64>,
+    d: vector<u128>
+) {
+    let struct_ = DynamicArrayStruct { id, a, b, c, d };
+    save_in_slot(struct_, 0);
+}
+
+public fun read_dynamic_array_struct(): DynamicArrayStruct {
+    read_slot<DynamicArrayStruct>(0)
+}
+
+public struct DynamicArrayStruct2 has key {
+    id: UID,
+    c: vector<u256>,
+    d: vector<address>,
+}
+
+public fun save_dynamic_array_struct_2(
+    id: UID,
+    c: vector<u256>,
+    d: vector<address>
+) {
+    let struct_ = DynamicArrayStruct2 { id, c, d };
+    save_in_slot(struct_, 0);
+}
+
+public fun read_dynamic_array_struct_2(): DynamicArrayStruct2 {
+    read_slot<DynamicArrayStruct2>(0)
+}
