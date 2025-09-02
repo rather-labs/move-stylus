@@ -18,7 +18,12 @@ impl VmHandledType for Uid {
         // UID is not injected, is created with a native function
     }
 
-    fn is_vm_type(module_id: &ModuleId, identifier: &str) -> bool {
+    fn is_vm_type(module_id: &ModuleId, index: u16, compilation_ctx: &CompilationContext) -> bool {
+        let identifier = &compilation_ctx
+            .get_user_data_type_by_index(module_id, index)
+            .unwrap()
+            .identifier;
+
         if identifier == Self::IDENTIFIER {
             if module_id.address != STYLUS_FRAMEWORK_ADDRESS || module_id.module_name != "object" {
                 panic!("invalid UID found, only the one from the stylus framework is valid");

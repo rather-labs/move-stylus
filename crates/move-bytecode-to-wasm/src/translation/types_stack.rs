@@ -110,31 +110,6 @@ impl TypesStack {
                 }
                 true
             }
-            (
-                IntermediateType::IExternalUserData {
-                    module_id: expected_module_id,
-                    identifier: expected_identifier,
-                    types: Some(expected_types),
-                },
-                IntermediateType::IExternalUserData {
-                    module_id: found_module_id,
-                    identifier: found_identifier,
-                    types: Some(found_types),
-                },
-            ) if expected_module_id == found_module_id
-                && expected_identifier == found_identifier
-                && expected_types.len() == found_types.len() =>
-            {
-                for (e_type, f_type) in expected_types.iter().zip(found_types) {
-                    if e_type != f_type
-                        && *f_type != IntermediateType::IUnknown
-                        && *e_type != IntermediateType::IUnknown
-                    {
-                        return false;
-                    }
-                }
-                true
-            }
             (IntermediateType::IVector(inner_expected), IntermediateType::IVector(inner_found)) => {
                 Self::check_equality_ignoring_unknown(inner_expected, inner_found)
             }

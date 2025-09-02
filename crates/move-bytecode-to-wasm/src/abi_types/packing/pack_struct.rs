@@ -90,7 +90,6 @@ use walrus::{
 use crate::{
     CompilationContext,
     abi_types::packing::pack_native_int::pack_i32_type_instructions,
-    compilation_context::ExternalModuleData,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
 
@@ -245,39 +244,6 @@ impl IStruct {
                         inner_data_reference,
                         field,
                     )
-                }
-                IntermediateType::IExternalUserData {
-                    module_id,
-                    identifier,
-                    types,
-                } => {
-                    let external_data = compilation_ctx
-                        .get_external_module_data(module_id, identifier, types)
-                        .unwrap();
-
-                    match external_data {
-                        ExternalModuleData::Struct(child_struct) => pack_child_struct(
-                            &child_struct,
-                            module,
-                            compilation_ctx,
-                            block,
-                            field_local,
-                            data_ptr,
-                            inner_data_reference,
-                            field,
-                        ),
-                        _ => {
-                            field.add_pack_instructions(
-                                block,
-                                module,
-                                field_local,
-                                data_ptr,
-                                inner_data_reference,
-                                compilation_ctx,
-                            );
-                            32
-                        }
-                    }
                 }
                 _ => {
                     field.add_pack_instructions(

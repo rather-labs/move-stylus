@@ -3,7 +3,6 @@ use alloy_sol_types::{SolType, sol_data};
 
 use crate::{
     CompilationContext,
-    compilation_context::ExternalModuleData,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
     utils::snake_to_camel,
     vm_handled_types::{VmHandledType, tx_context::TxContext},
@@ -59,6 +58,11 @@ impl SolName for IntermediateType {
             IntermediateType::IVector(inner) => inner
                 .sol_name(compilation_ctx)
                 .map(|sol_n| format!("{sol_n}[]")),
+            IntermediateType::IStruct { module_id, index }
+                if TxContext::is_vm_type(module_id, *index, compilation_ctx) =>
+            {
+                None
+            }
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
                     .get_user_data_type_by_index(module_id, *index)
@@ -89,35 +93,6 @@ impl SolName for IntermediateType {
             IntermediateType::ISigner
             | IntermediateType::IUnknown
             | IntermediateType::ITypeParameter(_) => None,
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types,
-            } => {
-                let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier, types)
-                    .unwrap();
-                match external_data {
-                    // TxContext should not be part of the function signature, since it is injected
-                    // by the VM.
-                    ExternalModuleData::Struct(_)
-                        if TxContext::is_vm_type(module_id, identifier) =>
-                    {
-                        None
-                    }
-                    ExternalModuleData::Struct(istruct) => {
-                        if istruct.saved_in_storage {
-                            Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
-                        } else {
-                            Self::struct_fields_sol_name(&istruct, compilation_ctx)
-                        }
-                    }
-                    // TODO: check if the enum is simple
-                    ExternalModuleData::Enum(_ienum) => {
-                        Some(sol_data::Uint::<8>::SOL_NAME.to_string())
-                    }
-                }
-            }
         }
     }
 }

@@ -4,6 +4,7 @@ mod struct_data;
 
 use crate::{
     GlobalFunctionTable,
+    compilation_context::reserved_modules::STYLUS_FRAMEWORK_ADDRESS,
     translation::{
         functions::MappedFunction,
         intermediate_types::{
@@ -13,7 +14,6 @@ use crate::{
         },
         table::FunctionId,
     },
-    vm_handled_types::{VmHandledType, tx_context::TxContext},
 };
 use enum_data::{EnumData, VariantData};
 use function_data::FunctionData;
@@ -26,6 +26,10 @@ use move_binary_format::{
         VariantHandleIndex, Visibility,
     },
     internals::ModuleIndex,
+};
+use move_package::{
+    compilation::compiled_package::CompiledUnitWithSource,
+    source_package::parsed_manifest::PackageName,
 };
 use std::{
     collections::HashMap,
@@ -42,12 +46,6 @@ pub enum UserDefinedType {
 
     /// Enum defined in this module
     Enum(usize),
-
-    /// Data type defined outside this module
-    ExternalData {
-        module: ModuleId,
-        identifier: String,
-    },
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
@@ -138,9 +136,16 @@ impl ModuleData {
     pub fn build_module_data<'move_package>(
         module_id: ModuleId,
         move_module: &'move_package CompiledModule,
+        move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
+        root_compiled_units: &'move_package [CompiledUnitWithSource],
         function_definitions: &mut GlobalFunctionTable<'move_package>,
     ) -> Self {
-        let datatype_handles_map = Self::process_datatype_handles(&module_id, move_module);
+        let datatype_handles_map = Self::process_datatype_handles(
+            &module_id,
+            move_module,
+            move_module_dependencies,
+            root_compiled_units,
+        );
 
         // Module's structs
         let (module_structs, fields_to_struct_map) =
@@ -174,6 +179,7 @@ impl ModuleData {
             move_module,
             &datatype_handles_map,
             function_definitions,
+            move_module_dependencies,
         );
 
         let signatures = move_module
@@ -201,6 +207,8 @@ impl ModuleData {
     fn process_datatype_handles(
         module_id: &ModuleId,
         module: &CompiledModule,
+        move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
+        root_compiled_units: &[CompiledUnitWithSource],
     ) -> HashMap<DatatypeHandleIndex, UserDefinedType> {
         let mut datatype_handles_map = HashMap::new();
 
@@ -233,21 +241,64 @@ impl ModuleData {
                 };
             } else {
                 let datatype_module = module.module_handle_at(datatype_handle.module);
+                let module_address = module.address_identifier_at(datatype_module.address);
+                let module_name = module.identifier_at(datatype_module.name);
+
                 let module_id = ModuleId {
-                    address: module
-                        .address_identifier_at(datatype_module.address)
-                        .into_bytes()
-                        .into(),
-                    module_name: module.identifier_at(datatype_module.name).to_string(),
+                    address: module_address.into_bytes().into(),
+                    module_name: module_name.to_string(),
                 };
 
-                datatype_handles_map.insert(
-                    idx,
-                    UserDefinedType::ExternalData {
-                        module: module_id,
-                        identifier: module.identifier_at(datatype_handle.name).to_string(),
-                    },
-                );
+                // Find the module where the external data is defined, we first look for it in the
+                // external packages and if we dont't find it, we look for it in the compile units
+                // that belong to our package
+                let external_module_source = if let Some(external_module) =
+                    &move_module_dependencies.iter().find(|(_, m)| {
+                        m.unit.name().as_str() == module_name.as_str()
+                            && m.unit.address == *module_address
+                    }) {
+                    &external_module.1.unit.module
+                } else if let Some(external_module) = &root_compiled_units.iter().find(|m| {
+                    m.unit.name().as_str() == module_name.as_str()
+                        && m.unit.address == *module_address
+                }) {
+                    &external_module.unit.module
+                } else {
+                    panic!("could not find dependency {module_id}")
+                };
+
+                let external_data_name = module.identifier_at(datatype_handle.name);
+
+                let external_dth_idx = external_module_source
+                    .datatype_handles()
+                    .iter()
+                    .position(|dth| {
+                        external_module_source.identifier_at(dth.name) == external_data_name
+                    })
+                    .unwrap();
+                let external_dth_idx = DatatypeHandleIndex::new(external_dth_idx as u16);
+
+                if let Some(position) = external_module_source
+                    .struct_defs()
+                    .iter()
+                    .position(|s| s.struct_handle == external_dth_idx)
+                {
+                    datatype_handles_map.insert(
+                        idx,
+                        UserDefinedType::Struct {
+                            module_id,
+                            index: position as u16,
+                        },
+                    );
+                } else if let Some(position) = module
+                    .enum_defs()
+                    .iter()
+                    .position(|e| e.enum_handle == external_dth_idx)
+                {
+                    datatype_handles_map.insert(idx, UserDefinedType::Enum(position));
+                } else {
+                    panic!("datatype handle index {index} not found");
+                };
             }
         }
 
@@ -485,6 +536,7 @@ impl ModuleData {
         move_module: &'move_package CompiledModule,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         function_definitions: &mut GlobalFunctionTable<'move_package>,
+        move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
     ) -> FunctionData {
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
@@ -564,6 +616,7 @@ impl ModuleData {
                     function_def,
                     datatype_handles_map,
                     move_module,
+                    move_module_dependencies,
                 );
 
                 if is_init {
@@ -658,6 +711,7 @@ impl ModuleData {
         function_def: &FunctionDefinition,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         module: &CompiledModule,
+        move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
     ) -> bool {
         // Constants
         const INIT_FUNCTION_NAME: &str = "init";
@@ -685,21 +739,47 @@ impl ModuleData {
         assert!((1..=2).contains(&arg_count), "{}", BAD_ARGS_ERROR_MESSAGE);
 
         // Check TxContext in the last argument
-        let is_tx_context_ref = move_function_arguments
-            .0
-            .last()
-            .map(|last| {
-                matches!(
-                    IntermediateType::try_from_signature_token(last, datatype_handles_map).unwrap(),
-                    IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner)
-                        if matches!(
-                            inner.as_ref(),
-                            IntermediateType::IExternalUserData { module_id, identifier, .. }
-                                if TxContext::is_vm_type(module_id, identifier)
-                        )
-                )
-            })
-            .unwrap_or(false);
+        let last_arg = move_function_arguments.0.last().map(|last| {
+            IntermediateType::try_from_signature_token(last, datatype_handles_map).unwrap()
+        });
+
+        // The compilation context is not available yet, so we can't use it to check if the
+        // `TxContext` is the one from the stylus framework. It is done manually
+        let is_tx_context_ref = match last_arg {
+            Some(IntermediateType::IRef(inner)) | Some(IntermediateType::IMutRef(inner)) => {
+                match inner.as_ref() {
+                    IntermediateType::IStruct {
+                        module_id, index, ..
+                    } if module_id.module_name == "tx_context"
+                        && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
+                    {
+                        // TODO: Look for this external module one time and pass it down to this
+                        // function
+                        let external_module_source = &move_module_dependencies
+                            .iter()
+                            .find(|(_, m)| {
+                                m.unit.name().as_str() == "tx_context"
+                                    && Address::from(m.unit.address.into_bytes())
+                                        == STYLUS_FRAMEWORK_ADDRESS
+                            })
+                            .expect("could not find stylus framework as dependency")
+                            .1
+                            .unit
+                            .module;
+
+                        let struct_ = external_module_source
+                            .struct_def_at(StructDefinitionIndex::new(*index));
+                        let handle =
+                            external_module_source.datatype_handle_at(struct_.struct_handle);
+                        let identifier = external_module_source.identifier_at(handle.name);
+                        identifier.as_str() == "TxContext"
+                    }
+
+                    _ => false,
+                }
+            }
+            _ => false,
+        };
 
         assert!(is_tx_context_ref, "{}", BAD_ARGS_ERROR_MESSAGE);
 

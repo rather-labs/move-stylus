@@ -33,6 +33,21 @@ pub struct CompilationContext<'a> {
 }
 
 impl CompilationContext<'_> {
+    /// Creates a new compilation context
+    pub fn new<'a>(
+        root_module_data: &'a ModuleData,
+        deps_data: &'a HashMap<ModuleId, ModuleData>,
+        memory_id: MemoryId,
+        allocator: FunctionId,
+    ) -> CompilationContext<'a> {
+        CompilationContext::<'a> {
+            root_module_data,
+            deps_data,
+            memory_id,
+            allocator,
+        }
+    }
+
     pub fn get_external_module_data(
         &self,
         module_id: &ModuleId,
@@ -112,18 +127,6 @@ impl CompilationContext<'_> {
                 let struct_ = self.get_user_data_type_by_index(module_id, *index)?;
                 let instance = struct_.instantiate(types);
                 Ok(Cow::Owned(instance))
-            }
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types,
-            } => {
-                let external_data = self.get_external_module_data(module_id, identifier, types)?;
-
-                match external_data {
-                    ExternalModuleData::Struct(external_struct) => Ok(external_struct),
-                    ExternalModuleData::Enum(_) => Err(CompilationContextError::ExpectedStruct),
-                }
             }
             _ => Err(CompilationContextError::ExpectedStruct),
         }

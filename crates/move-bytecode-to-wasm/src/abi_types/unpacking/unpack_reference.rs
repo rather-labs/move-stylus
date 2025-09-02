@@ -32,9 +32,7 @@ impl IRef {
                     compilation_ctx,
                 );
             }
-            IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IExternalUserData { .. } => {
+            IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_intermediate_type(inner)
                     .unwrap();
@@ -129,8 +127,7 @@ impl IMutRef {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IExternalUserData { .. } => {
+            | IntermediateType::IGenericStructInstance { .. } => {
                 inner.add_unpack_instructions(
                     builder,
                     module,

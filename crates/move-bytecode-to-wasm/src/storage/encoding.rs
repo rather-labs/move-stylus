@@ -10,7 +10,6 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    compilation_context::ExternalModuleData,
     data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_STORAGE_OBJECT_OWNER_OFFSET},
     hostio::host_functions::{storage_cache_bytes32, storage_load_bytes32},
     runtime::RuntimeFunction,
@@ -202,6 +201,49 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 
                 builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
             }
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+                let tmp = module.locals.add(ValType::I32);
+
+                // The UID struct has the following form
+                //
+                // UID { id: ID { bytes: <bytes> } }
+                //
+                // At this point we have in stack a pointer to field we are processing. The
+                // field's value is a pointer to the ID struct.
+                //
+                // The first load instruction puts in stack the pointer to the ID struct
+                // The second load instruction loads the ID's bytes field pointer
+                //
+                // At the end of the load chain we point to the 32 bytes holding the data
+                builder
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(tmp);
+
+                // Load the memory address
+                builder
+                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                    .local_get(tmp)
+                    .i32_const(32);
+
+                builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+            }
             IntermediateType::IStruct { module_id, index } => {
                 let child_struct = compilation_ctx
                     .get_user_data_type_by_index(module_id, *index)
@@ -245,87 +287,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                     written_bytes_in_slot,
                 );
             }
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                ..
-            } if Uid::is_vm_type(module_id, identifier) => {
-                let tmp = module.locals.add(ValType::I32);
 
-                // The UID struct has the following form
-                //
-                // UID { id: ID { bytes: <bytes> } }
-                //
-                // At this point we have in stack a pointer to field we are processing. The
-                // field's value is a pointer to the ID struct.
-                //
-                // The first load instruction puts in stack the pointer to the ID struct
-                // The second load instruction loads the ID's bytes field pointer
-                //
-                // At the end of the load chain we point to the 32 bytes holding the data
-                builder
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_set(tmp);
-
-                // Load the memory address
-                builder
-                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                    .local_get(tmp)
-                    .i32_const(32);
-
-                builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-            }
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types,
-            } => {
-                let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier, types)
-                    .unwrap();
-
-                match external_data {
-                    ExternalModuleData::Struct(struct_) => {
-                        // The struct ptr
-                        let tmp = module.locals.add(ValType::I32);
-                        builder.local_set(tmp);
-
-                        written_bytes_in_slot =
-                            add_encode_and_save_into_storage_struct_instructions(
-                                module,
-                                builder,
-                                compilation_ctx,
-                                tmp,
-                                slot_ptr,
-                                &struct_,
-                                written_bytes_in_slot,
-                            );
-                    }
-                    ExternalModuleData::Enum(enum_) => {
-                        if !enum_.is_simple {
-                            panic!(
-                                "cannot abi pack enum, it contains at least one variant with fields"
-                            );
-                        }
-                        todo!();
-                    }
-                }
-            }
             e => todo!("{e:?}"),
         };
     }
@@ -565,58 +527,9 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 // Copy the chunk of memory
                 builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
             }
-            IntermediateType::IStruct { module_id, index } => {
-                let child_struct = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
-                    .unwrap();
-
-                // Read the child struct
-                let (child_struct_ptr, read_bytes) =
-                    add_read_and_decode_storage_struct_instructions(
-                        module,
-                        builder,
-                        compilation_ctx,
-                        slot_ptr,
-                        child_struct,
-                        true,
-                        read_bytes_in_slot,
-                    );
-
-                read_bytes_in_slot = read_bytes;
-
-                builder.local_get(child_struct_ptr).local_set(field_ptr);
-            }
-            IntermediateType::IGenericStructInstance {
-                module_id,
-                index,
-                types,
-            } => {
-                let child_struct = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
-                    .unwrap();
-                let child_struct = child_struct.instantiate(types);
-
-                // Read the child struct
-                let (child_struct_ptr, read_bytes) =
-                    add_read_and_decode_storage_struct_instructions(
-                        module,
-                        builder,
-                        compilation_ctx,
-                        slot_ptr,
-                        &child_struct,
-                        true,
-                        read_bytes_in_slot,
-                    );
-
-                read_bytes_in_slot = read_bytes;
-
-                builder.local_get(child_struct_ptr).local_set(field_ptr);
-            }
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                ..
-            } if Uid::is_vm_type(module_id, identifier) => {
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
                 // Here we need to reconstruct the UID struct. To do that we first allocate 4 bytes
                 // that will contain the pointer to the UID struct data
                 //
@@ -678,38 +591,54 @@ pub fn add_read_and_decode_storage_struct_instructions(
                     },
                 );
             }
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types,
-            } => {
-                let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier, types)
+            IntermediateType::IStruct { module_id, index } => {
+                let child_struct = compilation_ctx
+                    .get_user_data_type_by_index(module_id, *index)
                     .unwrap();
 
-                match external_data {
-                    ExternalModuleData::Struct(child_struct) => {
-                        // Read the child struct
-                        let (child_struct_ptr, read_bytes) =
-                            add_read_and_decode_storage_struct_instructions(
-                                module,
-                                builder,
-                                compilation_ctx,
-                                slot_ptr,
-                                &child_struct,
-                                true,
-                                read_bytes_in_slot,
-                            );
+                // Read the child struct
+                let (child_struct_ptr, read_bytes) =
+                    add_read_and_decode_storage_struct_instructions(
+                        module,
+                        builder,
+                        compilation_ctx,
+                        slot_ptr,
+                        child_struct,
+                        true,
+                        read_bytes_in_slot,
+                    );
 
-                        read_bytes_in_slot = read_bytes;
+                read_bytes_in_slot = read_bytes;
 
-                        builder.local_get(child_struct_ptr).local_set(field_ptr);
-                    }
-                    ExternalModuleData::Enum(_) => {
-                        todo!();
-                    }
-                }
+                builder.local_get(child_struct_ptr).local_set(field_ptr);
             }
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+            } => {
+                let child_struct = compilation_ctx
+                    .get_user_data_type_by_index(module_id, *index)
+                    .unwrap();
+                let child_struct = child_struct.instantiate(types);
+
+                // Read the child struct
+                let (child_struct_ptr, read_bytes) =
+                    add_read_and_decode_storage_struct_instructions(
+                        module,
+                        builder,
+                        compilation_ctx,
+                        slot_ptr,
+                        &child_struct,
+                        true,
+                        read_bytes_in_slot,
+                    );
+
+                read_bytes_in_slot = read_bytes;
+
+                builder.local_get(child_struct_ptr).local_set(field_ptr);
+            }
+
             _ => todo!(),
         };
 
@@ -740,27 +669,14 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
         // Dynamic data occupies the whole slot, but the data is saved somewhere else
         IntermediateType::IVector(_) => 32,
 
+        IntermediateType::IStruct {
+            module_id, index, ..
+        } if Uid::is_vm_type(module_id, *index, compilation_ctx) => 32,
+
         // Structs are 0 because we don't know how much they will occupy, this depends on the
         // fields of the child struct, whether they are dynamic or static. The store function
         // called will take care of this.
         IntermediateType::IGenericStructInstance { .. } | IntermediateType::IStruct { .. } => 0,
-        IntermediateType::IExternalUserData {
-            module_id,
-            identifier,
-            ..
-        } if Uid::is_vm_type(module_id, identifier) => 32,
-        IntermediateType::IExternalUserData {
-            module_id,
-            identifier,
-            types,
-        } => match compilation_ctx
-            .get_external_module_data(module_id, identifier, types)
-            .unwrap()
-        {
-            ExternalModuleData::Struct(_) => 0,
-            ExternalModuleData::Enum(_) => 1,
-        },
-
         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
             panic!("found reference inside struct")
         }

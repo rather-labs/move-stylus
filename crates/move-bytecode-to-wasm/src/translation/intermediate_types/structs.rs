@@ -45,11 +45,7 @@
 //! field management across all types.
 use std::collections::HashMap;
 
-use crate::{
-    CompilationContext,
-    abi_types::packing::Packable,
-    compilation_context::{ExternalModuleData, ModuleData},
-};
+use crate::{CompilationContext, abi_types::packing::Packable, compilation_context::ModuleData};
 
 use super::IntermediateType;
 use move_binary_format::{
@@ -284,7 +280,6 @@ impl IStruct {
                 }
                 IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. }
-                | IntermediateType::IExternalUserData { .. }
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
                 | IntermediateType::IU128
@@ -403,25 +398,6 @@ impl IStruct {
                     );
                 }
                 IntermediateType::IEnum(_) => todo!(),
-                IntermediateType::IExternalUserData {
-                    module_id,
-                    identifier,
-                    types,
-                } => {
-                    let external_data = compilation_ctx
-                        .get_external_module_data(module_id, identifier, types)
-                        .unwrap();
-
-                    match external_data {
-                        ExternalModuleData::Struct(istruct)
-                            if istruct.solidity_abi_encode_is_dynamic(compilation_ctx) =>
-                        {
-                            return true;
-                        }
-                        ExternalModuleData::Enum(_ienum) => todo!(),
-                        _ => (),
-                    }
-                }
             }
         }
 
@@ -482,26 +458,6 @@ impl IStruct {
                     panic!("cannot know a type parameter's size, expected a concrete type");
                 }
                 IntermediateType::IEnum(_) => todo!(),
-                IntermediateType::IExternalUserData {
-                    module_id,
-                    identifier,
-                    types,
-                } => {
-                    let external_data = compilation_ctx
-                        .get_external_module_data(module_id, identifier, types)
-                        .unwrap();
-
-                    match external_data {
-                        ExternalModuleData::Struct(external_struct) => {
-                            if external_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                                size += 32;
-                            } else {
-                                size += field.encoded_size(compilation_ctx);
-                            }
-                        }
-                        ExternalModuleData::Enum(_ienum) => todo!(),
-                    }
-                }
             }
         }
 
@@ -527,20 +483,6 @@ impl IStruct {
                     .iter()
                     .map(|t| Self::replace_type_parameters(t, instance_types))
                     .collect(),
-            },
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types: Some(generic_types),
-            } => IntermediateType::IExternalUserData {
-                module_id: module_id.clone(),
-                identifier: identifier.clone(),
-                types: Some(
-                    generic_types
-                        .iter()
-                        .map(|t| Self::replace_type_parameters(t, instance_types))
-                        .collect(),
-                ),
             },
             IntermediateType::IVector(inner) => IntermediateType::IVector(Box::new(
                 Self::replace_type_parameters(inner, instance_types),
