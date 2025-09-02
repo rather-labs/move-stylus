@@ -249,16 +249,16 @@ impl ModuleData {
                     module_name: module_name.to_string(),
                 };
 
-                // Find the module where the external data is defined
+                // Find the module where the external data is defined, we first look for it in the
+                // external packages and if we dont't find it, we look for it in the compile units
+                // that belong to our package
                 let external_module_source = if let Some(external_module) =
                     &move_module_dependencies.iter().find(|(_, m)| {
-                        println!("2 {} {}", m.unit.name().as_str(), m.unit.address);
                         m.unit.name().as_str() == module_name.as_str()
                             && m.unit.address == *module_address
                     }) {
                     &external_module.1.unit.module
                 } else if let Some(external_module) = &root_compiled_units.iter().find(|m| {
-                    println!("3 {} {}", m.unit.name().as_str(), m.unit.address);
                     m.unit.name().as_str() == module_name.as_str()
                         && m.unit.address == *module_address
                 }) {
@@ -269,7 +269,6 @@ impl ModuleData {
 
                 let external_data_name = module.identifier_at(datatype_handle.name);
 
-                println!("{:?}", module.identifier_at(datatype_handle.name));
                 let external_dth_idx = external_module_source
                     .datatype_handles()
                     .iter()
@@ -278,8 +277,6 @@ impl ModuleData {
                     })
                     .unwrap();
                 let external_dth_idx = DatatypeHandleIndex::new(external_dth_idx as u16);
-
-                println!("{external_dth_idx:?}");
 
                 if let Some(position) = external_module_source
                     .struct_defs()
@@ -302,16 +299,6 @@ impl ModuleData {
                 } else {
                     panic!("datatype handle index {index} not found");
                 };
-
-                /*
-                datatype_handles_map.insert(
-                    idx,
-                    UserDefinedType::ExternalData {
-                        module: module_id,
-                        identifier: module.identifier_at(datatype_handle.name).to_string(),
-                    },
-                );
-                */
             }
         }
 
@@ -756,6 +743,8 @@ impl ModuleData {
             IntermediateType::try_from_signature_token(last, datatype_handles_map).unwrap()
         });
 
+        // The compilation context is not available yet, so we can't use it to check if the
+        // `TxContext` is the one from the stylus framework. It is done manually.
         let is_tx_context_ref = match last_arg {
             Some(IntermediateType::IRef(inner)) | Some(IntermediateType::IMutRef(inner)) => {
                 match inner.as_ref() {
@@ -789,21 +778,6 @@ impl ModuleData {
             }
             _ => false,
         };
-
-        /*
-            .map(|last| {
-                matches!(
-                    IntermediateType::try_from_signature_token(last, datatype_handles_map).unwrap(),
-                    IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner)
-                        if matches!(
-                            inner.as_ref(),
-                            IntermediateType::IStruct { module_id, index, .. }
-                                if TxContext::is_vm_type(module_id, identifier)
-                        )
-                )
-            })
-            .unwrap_or(false);
-        */
 
         assert!(is_tx_context_ref, "{}", BAD_ARGS_ERROR_MESSAGE);
 
