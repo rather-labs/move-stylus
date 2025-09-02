@@ -222,7 +222,6 @@ pub fn process_dependency_tree<'move_package>(
         let dependency_module = deps_compiled_units
             .iter()
             .find(|(_, module)| {
-                println!("1 {} {}", module.unit.name().as_str(), module.unit.address);
                 module.unit.name().as_str() == dependency.name().as_str()
                     && module.unit.address.into_bytes() == **dependency.address()
             })

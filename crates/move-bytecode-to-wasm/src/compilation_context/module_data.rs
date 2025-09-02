@@ -744,7 +744,7 @@ impl ModuleData {
         });
 
         // The compilation context is not available yet, so we can't use it to check if the
-        // `TxContext` is the one from the stylus framework. It is done manually.
+        // `TxContext` is the one from the stylus framework. It is done manually
         let is_tx_context_ref = match last_arg {
             Some(IntermediateType::IRef(inner)) | Some(IntermediateType::IMutRef(inner)) => {
                 match inner.as_ref() {
@@ -753,6 +753,8 @@ impl ModuleData {
                     } if module_id.module_name == "tx_context"
                         && module_id.address == STYLUS_FRAMEWORK_ADDRESS =>
                     {
+                        // TODO: Look for this external module one time and pass it down to this
+                        // function
                         let external_module_source = &move_module_dependencies
                             .iter()
                             .find(|(_, m)| {
