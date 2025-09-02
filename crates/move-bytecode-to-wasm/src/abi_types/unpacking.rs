@@ -14,6 +14,7 @@ use crate::{
         simple_integers::{IU8, IU16, IU32, IU64},
         vector::IVector,
     },
+    vm_handled_types::{VmHandledType, tx_context::TxContext},
 };
 
 mod unpack_enum;
@@ -167,6 +168,12 @@ impl Unpackable for IntermediateType {
                 calldata_reader_pointer,
                 compilation_ctx,
             ),
+
+            IntermediateType::IStruct { module_id, index }
+                if TxContext::is_vm_type(module_id, *index, compilation_ctx) =>
+            {
+                TxContext::inject(function_builder, module, compilation_ctx);
+            }
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
                     .get_user_data_type_by_index(module_id, *index)
