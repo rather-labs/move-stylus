@@ -12,9 +12,8 @@ use super::types_stack::{TypesStack, TypesStackError};
 
 use crate::{
     CompilationContext, UserDefinedType,
-    compilation_context::ModuleData,
     generics::{replace_type_parameters, type_contains_generics},
-    translation::{fix_call_type, intermediate_types::ISignature},
+    translation::intermediate_types::ISignature,
 };
 
 use super::{intermediate_types::IntermediateType, table::FunctionId};
@@ -214,32 +213,6 @@ pub fn prepare_function_return(
     builder.return_();
 }
 
-/// Looks for an IExtnernalUserData in the IntermediateType tree. If it finds it, returns it,
-/// otherwise retuns None
-fn look_for_external_data(itype: &IntermediateType) -> Option<&IntermediateType> {
-    match itype {
-        IntermediateType::IBool
-        | IntermediateType::IU8
-        | IntermediateType::IU16
-        | IntermediateType::IU32
-        | IntermediateType::IU64
-        | IntermediateType::IU128
-        | IntermediateType::IU256
-        | IntermediateType::IAddress
-        | IntermediateType::ISigner => None,
-        IntermediateType::IVector(inner)
-        | IntermediateType::IRef(inner)
-        | IntermediateType::IMutRef(inner) => look_for_external_data(inner),
-        IntermediateType::ITypeParameter(_)
-        | IntermediateType::IUnknown
-        | IntermediateType::IStruct { .. } => None,
-        IntermediateType::IGenericStructInstance { types, .. } => {
-            types.iter().find(|t| look_for_external_data(t).is_some())
-        }
-        IntermediateType::IEnum(_) => todo!(),
-    }
-}
-
 /// This function sets up the arguments for a function call.
 ///
 /// It processes each argument type, checking if it is an immutable (`IRef`) or mutable (`IMutRef`) reference.
@@ -250,15 +223,12 @@ pub fn prepare_function_arguments(
     arguments: &[IntermediateType],
     compilation_ctx: &CompilationContext,
     types_stack: &mut TypesStack,
-    function_module_data: &ModuleData,
-    caller_module: &ModuleData,
 ) -> Result<(), TypesStackError> {
     // Verify that the types currently on the types stack correspond to the expected argument types.
     // Additionally, determine if any of these arguments are references.
     let mut has_ref = false;
     for arg in arguments.iter().rev() {
-
-        types_stack.pop_expecting(&arg)?;
+        types_stack.pop_expecting(arg)?;
 
         has_ref = has_ref
             || matches!(

@@ -6,7 +6,6 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    compilation_context::ExternalModuleData,
     translation::{
         TranslationError,
         intermediate_types::{IntermediateType, structs::IStruct},

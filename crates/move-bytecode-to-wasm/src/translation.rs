@@ -13,7 +13,7 @@ pub mod table;
 
 use crate::{
     CompilationContext,
-    compilation_context::{ExternalModuleData, ModuleData},
+    compilation_context::ModuleData,
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     generics::{
         extract_type_instances_from_stack, replace_type_parameters,
@@ -503,17 +503,7 @@ fn translate_instruction(
             let function_id = &function_information.function_id;
             let arguments = &function_information.signature.arguments;
 
-            let function_module = compilation_ctx
-                .get_module_data_by_id(&function_information.function_id.module_id)?;
-            prepare_function_arguments(
-                module,
-                builder,
-                arguments,
-                compilation_ctx,
-                types_stack,
-                function_module,
-                module_data,
-            )?;
+            prepare_function_arguments(module, builder, arguments, compilation_ctx, types_stack)?;
 
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {
@@ -561,42 +551,15 @@ fn translate_instruction(
                 );
             };
 
-            // If the called function returns a user defined data (struct or enum), and that
-            // datatype is not defined in the current module, we need to change the return type
-            // from a IGenericStructInstance or IGenericEnumInstance to a IExternalUserData:
-            //
-            // - From the caller perspective the called function is returning a foreign data type.
-            // - From the callee perspective, the function is just returning a data type defined in
-            // its module.
-            //
-            // Subsequent opcodes that work with the return value of the caller will expect a
-            // IExternalUserData in the types stack.
-
-            let return_types = function_information
-                .signature
-                .returns
-                .iter()
-                .map(|it| fix_return_type(it, compilation_ctx, module_data))
-                .collect::<Vec<IntermediateType>>();
-
             // Insert in the stack types the types returned by the function (if any)
-            types_stack.append(&return_types);
+            types_stack.append(&function_information.signature.returns);
         }
         // Function calls
         Bytecode::Call(function_handle_index) => {
             let function_id = &module_data.functions.calls[function_handle_index.into_index()];
             let arguments = &module_data.functions.arguments[function_handle_index.into_index()];
 
-            let function_module = compilation_ctx.get_module_data_by_id(&function_id.module_id)?;
-            prepare_function_arguments(
-                module,
-                builder,
-                arguments,
-                compilation_ctx,
-                types_stack,
-                function_module,
-                module_data,
-            )?;
+            prepare_function_arguments(module, builder, arguments, compilation_ctx, types_stack)?;
 
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {
@@ -2035,78 +1998,5 @@ pub fn box_args(
 
     for (index, pointer) in updates {
         function_locals[index] = pointer;
-    }
-}
-
-// If the called function returns a user defined data (struct or enum), and that
-// datatype is not defined in the current module, we need to change the return type
-// from a IGenericStructInstance or IGenericEnumInstance to a IExternalUserData:
-//
-// - From the caller perspective the called function is returning a foreign data type.
-// - From the callee perspective, the function is just returning a data type defined in
-// its module.
-//
-// Subsequent opcodes that work with the return value of the caller will expect a
-// IExternalUserData in the types stack.
-pub fn fix_return_type(
-    itype: &IntermediateType,
-    compilation_ctx: &CompilationContext,
-    module_data: &ModuleData,
-) -> IntermediateType {
-    match itype {
-        IntermediateType::IRef(inner) => IntermediateType::IRef(Box::new(fix_return_type(
-            inner,
-            compilation_ctx,
-            module_data,
-        ))),
-
-        IntermediateType::IMutRef(inner) => IntermediateType::IMutRef(Box::new(fix_return_type(
-            inner,
-            compilation_ctx,
-            module_data,
-        ))),
-        IntermediateType::IVector(inner) => IntermediateType::IVector(Box::new(fix_return_type(
-            inner,
-            compilation_ctx,
-            module_data,
-        ))),
-        IntermediateType::IStruct { module_id, .. } => {
-                itype.clone()
-        }
-        IntermediateType::IGenericStructInstance {
-            module_id, types, ..
-        } => {
-                itype.clone()
-        }
-        // TODO enum cases
-        _ => itype.clone(),
-    }
-}
-
-// If the called function receives an `IExternalUserData` as an argument, and the data type is
-// defined in the same module as the function, the function will actually expect the internal
-// variant corresponding to that `IExternalUserData` (for example `IGenericStructInstance`).
-//
-// In other words, the type stack may contain an `IExternalUserData`, but since both the data
-// structure and the function are defined in the same module, the internal representation is
-// required.
-pub fn fix_call_type(
-    itype: &IntermediateType,
-    compilation_ctx: &CompilationContext,
-    module_data: &ModuleData,
-) -> IntermediateType {
-    match itype {
-        IntermediateType::IRef(inner) => {
-            IntermediateType::IRef(Box::new(fix_call_type(inner, compilation_ctx, module_data)))
-        }
-
-        IntermediateType::IMutRef(inner) => {
-            IntermediateType::IMutRef(Box::new(fix_call_type(inner, compilation_ctx, module_data)))
-        }
-        IntermediateType::IVector(inner) => {
-            IntermediateType::IVector(Box::new(fix_call_type(inner, compilation_ctx, module_data)))
-        }
-        // TODO enum cases
-        _ => itype.clone(),
     }
 }

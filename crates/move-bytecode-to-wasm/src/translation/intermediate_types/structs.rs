@@ -45,11 +45,7 @@
 //! field management across all types.
 use std::collections::HashMap;
 
-use crate::{
-    CompilationContext,
-    abi_types::packing::Packable,
-    compilation_context::{ExternalModuleData, ModuleData},
-};
+use crate::{CompilationContext, abi_types::packing::Packable, compilation_context::ModuleData};
 
 use super::IntermediateType;
 use move_binary_format::{

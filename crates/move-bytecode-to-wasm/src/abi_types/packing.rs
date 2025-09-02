@@ -7,7 +7,6 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    compilation_context::ExternalModuleData,
     translation::intermediate_types::{
         IntermediateType,
         address::IAddress,

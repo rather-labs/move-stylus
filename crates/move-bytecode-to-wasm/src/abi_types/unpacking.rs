@@ -2,7 +2,6 @@ use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
     CompilationContext,
-    compilation_context::ExternalModuleData,
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     runtime::RuntimeFunction,
     translation::intermediate_types::{
@@ -15,7 +14,6 @@ use crate::{
         simple_integers::{IU8, IU16, IU32, IU64},
         vector::IVector,
     },
-    vm_handled_types::{VmHandledType, tx_context::TxContext},
 };
 
 mod unpack_enum;

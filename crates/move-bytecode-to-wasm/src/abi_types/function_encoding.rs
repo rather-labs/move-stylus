@@ -3,7 +3,6 @@ use alloy_sol_types::{SolType, sol_data};
 
 use crate::{
     CompilationContext,
-    compilation_context::ExternalModuleData,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
     utils::snake_to_camel,
     vm_handled_types::{VmHandledType, tx_context::TxContext},
@@ -59,6 +58,11 @@ impl SolName for IntermediateType {
             IntermediateType::IVector(inner) => inner
                 .sol_name(compilation_ctx)
                 .map(|sol_n| format!("{sol_n}[]")),
+            IntermediateType::IStruct { module_id, index }
+                if TxContext::is_vm_type(module_id, *index, compilation_ctx) =>
+            {
+                None
+            }
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
                     .get_user_data_type_by_index(module_id, *index)

@@ -14,7 +14,6 @@ use crate::{
         },
         table::FunctionId,
     },
-    vm_handled_types::{VmHandledType, tx_context::TxContext},
 };
 use enum_data::{EnumData, VariantData};
 use function_data::FunctionData;
@@ -251,7 +250,7 @@ impl ModuleData {
                         m.unit.name().as_str() == module_name.as_str()
                             && m.unit.address == *module_address
                     })
-                    .expect(&format!("could not find dependency {module_id}"))
+                    .unwrap_or_else(|| panic!("could not find dependency {module_id}"))
                     .1
                     .unit
                     .module;

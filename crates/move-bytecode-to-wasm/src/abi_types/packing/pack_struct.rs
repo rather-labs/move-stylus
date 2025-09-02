@@ -90,7 +90,6 @@ use walrus::{
 use crate::{
     CompilationContext,
     abi_types::packing::pack_native_int::pack_i32_type_instructions,
-    compilation_context::ExternalModuleData,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
 

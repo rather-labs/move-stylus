@@ -2,7 +2,7 @@ use std::{collections::HashMap, hash::Hash};
 
 use crate::{
     CompilationContext, UserDefinedType,
-    compilation_context::{ExternalModuleData, ModuleData, ModuleId},
+    compilation_context::{ModuleData, ModuleId},
     runtime::RuntimeFunction,
     wasm_builder_extensions::WasmBuilderExtension,
 };

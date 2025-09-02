@@ -5,7 +5,7 @@ use walrus::{
 
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, compilation_context::ModuleData};
-use crate::{compilation_context::ExternalModuleData, runtime::RuntimeFunction};
+use crate::runtime::RuntimeFunction;
 
 use super::IntermediateType;
 
