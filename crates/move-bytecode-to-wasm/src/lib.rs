@@ -106,6 +106,7 @@ pub fn translate_package(
         process_dependency_tree(
             &mut modules_data,
             &package.deps_compiled_units,
+            &root_compiled_units,
             &root_compiled_module.immediate_dependencies(),
             &mut function_definitions,
         );
@@ -114,6 +115,7 @@ pub fn translate_package(
             root_module_id.clone(),
             root_compiled_module,
             &package.deps_compiled_units,
+            &root_compiled_units,
             &mut function_definitions,
         );
 
@@ -198,6 +200,7 @@ pub fn translate_package_cli(package: CompiledPackage, rerooted_path: &Path) {
 pub fn process_dependency_tree<'move_package>(
     dependencies_data: &mut HashMap<ModuleId, ModuleData>,
     deps_compiled_units: &'move_package [(PackageName, CompiledUnitWithSource)],
+    root_compiled_units: &'move_package [CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
     function_definitions: &mut GlobalFunctionTable<'move_package>,
 ) {
@@ -219,6 +222,7 @@ pub fn process_dependency_tree<'move_package>(
         let dependency_module = deps_compiled_units
             .iter()
             .find(|(_, module)| {
+                println!("1 {} {}", module.unit.name().as_str(), module.unit.address);
                 module.unit.name().as_str() == dependency.name().as_str()
                     && module.unit.address.into_bytes() == **dependency.address()
             })
@@ -233,6 +237,7 @@ pub fn process_dependency_tree<'move_package>(
             process_dependency_tree(
                 dependencies_data,
                 deps_compiled_units,
+                &root_compiled_units,
                 immediate_dependencies,
                 function_definitions,
             );
@@ -242,6 +247,7 @@ pub fn process_dependency_tree<'move_package>(
             module_id.clone(),
             dependency_module,
             deps_compiled_units,
+            &root_compiled_units,
             function_definitions,
         );
 

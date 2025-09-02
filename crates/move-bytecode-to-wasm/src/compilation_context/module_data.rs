@@ -137,10 +137,15 @@ impl ModuleData {
         module_id: ModuleId,
         move_module: &'move_package CompiledModule,
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
+        root_compiled_units: &'move_package [CompiledUnitWithSource],
         function_definitions: &mut GlobalFunctionTable<'move_package>,
     ) -> Self {
-        let datatype_handles_map =
-            Self::process_datatype_handles(&module_id, move_module, move_module_dependencies);
+        let datatype_handles_map = Self::process_datatype_handles(
+            &module_id,
+            move_module,
+            move_module_dependencies,
+            root_compiled_units,
+        );
 
         // Module's structs
         let (module_structs, fields_to_struct_map) =
@@ -203,6 +208,7 @@ impl ModuleData {
         module_id: &ModuleId,
         module: &CompiledModule,
         move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
+        root_compiled_units: &[CompiledUnitWithSource],
     ) -> HashMap<DatatypeHandleIndex, UserDefinedType> {
         let mut datatype_handles_map = HashMap::new();
 
@@ -244,16 +250,22 @@ impl ModuleData {
                 };
 
                 // Find the module where the external data is defined
-                let external_module_source = &move_module_dependencies
-                    .iter()
-                    .find(|(_, m)| {
+                let external_module_source = if let Some(external_module) =
+                    &move_module_dependencies.iter().find(|(_, m)| {
+                        println!("2 {} {}", m.unit.name().as_str(), m.unit.address);
                         m.unit.name().as_str() == module_name.as_str()
                             && m.unit.address == *module_address
-                    })
-                    .unwrap_or_else(|| panic!("could not find dependency {module_id}"))
-                    .1
-                    .unit
-                    .module;
+                    }) {
+                    &external_module.1.unit.module
+                } else if let Some(external_module) = &root_compiled_units.iter().find(|m| {
+                    println!("3 {} {}", m.unit.name().as_str(), m.unit.address);
+                    m.unit.name().as_str() == module_name.as_str()
+                        && m.unit.address == *module_address
+                }) {
+                    &external_module.unit.module
+                } else {
+                    panic!("could not find dependency {module_id}")
+                };
 
                 let external_data_name = module.identifier_at(datatype_handle.name);
 
