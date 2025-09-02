@@ -32,8 +32,7 @@ impl IRef {
                     compilation_ctx,
                 );
             }
-            IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. } => {
+            IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_intermediate_type(inner)
                     .unwrap();
