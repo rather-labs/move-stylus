@@ -344,7 +344,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                     inner,
                 );
 
-                let written_bytes_in_slot = 32; // Vector header always takes 32 bytes
+                // TODO: Do we need this?
+                written_bytes_in_slot = 32; // Vector header always takes 32 bytes
             }
             e => todo!("{e:?}"),
         };
@@ -1316,8 +1317,6 @@ pub fn add_read_and_decode_storage_vector_instructions(
         RuntimeFunction::DeriveDynArraySlot.get(module, Some(compilation_ctx));
 
     // Locals
-    let val_32 = module.locals.add(ValType::I32);
-    let val_64 = module.locals.add(ValType::I64);
     let len = module.locals.add(ValType::I32);
     let elem_slot_ptr = module.locals.add(ValType::I32);
     let elem_size_ptr = module.locals.add(ValType::I32);
@@ -1472,18 +1471,16 @@ pub fn add_read_and_decode_storage_vector_instructions(
                 | IntermediateType::IU16
                 | IntermediateType::IU32
                 | IntermediateType::IU64 => {
-                    let (val, store_kind, swap_fn) = if data_size == 8 {
+                    // Determine store kind and swap function
+                    let (store_kind, swap_fn) = if data_size == 8 {
                         let swap_fn = RuntimeFunction::SwapI64Bytes.get(module, None);
-                        (val_64, StoreKind::I64 { atomic: false }, swap_fn)
+                        (StoreKind::I64 { atomic: false }, swap_fn)
                     } else {
                         let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None);
-                        (val_32, StoreKind::I32 { atomic: false }, swap_fn)
+                        (StoreKind::I32 { atomic: false }, swap_fn)
                     };
 
-                    // Determine the element's address, beginning from #data_ptr
-                    loop_.vec_elem_ptr(data_ptr, i, data_size as i32);
-
-                    // Read the value from the slot
+                    // Determine load kind
                     let load_kind = match elem_size {
                         1 => LoadKind::I32_8 {
                             kind: ExtendedLoad::ZeroExtend,
@@ -1496,7 +1493,10 @@ pub fn add_read_and_decode_storage_vector_instructions(
                         _ => panic!("invalid element size {elem_size} for type {inner:?}"),
                     };
 
-                    // Read the value and transform it to LE
+                    // Destination address of the element in memory
+                    loop_.vec_elem_ptr(data_ptr, i, data_size as i32);
+
+                    // Load the (u8, u16, u32, u64) value from slot data (plus offset)
                     loop_
                         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
                         .i32_const(32)
@@ -1511,28 +1511,17 @@ pub fn add_read_and_decode_storage_vector_instructions(
                                 offset: 0,
                             },
                         )
-                        .local_tee(val)
-                        .call(swap_fn)
-                        .local_set(val);
+                        .call(swap_fn);
 
-                    // If the field size are less than 4 or 8 bytes we need to shift them before
-                    // saving
+                    // If the size is less than 8 bytes we need to shift before saving
                     if elem_size == 1 {
-                        loop_
-                            .local_get(val)
-                            .i32_const(24)
-                            .binop(BinaryOp::I32ShrU)
-                            .local_set(val);
+                        loop_.i32_const(24).binop(BinaryOp::I32ShrU);
                     } else if elem_size == 2 {
-                        loop_
-                            .local_get(val)
-                            .i32_const(16)
-                            .binop(BinaryOp::I32ShrU)
-                            .local_set(val);
+                        loop_.i32_const(16).binop(BinaryOp::I32ShrU);
                     }
 
-                    // Save it to the struct
-                    loop_.local_get(val).store(
+                    // Save the value into the data memory
+                    loop_.store(
                         compilation_ctx.memory_id,
                         store_kind,
                         MemArg {
@@ -1542,8 +1531,10 @@ pub fn add_read_and_decode_storage_vector_instructions(
                     );
                 }
                 IntermediateType::IU128 => {
-                    // Allocate 16 bytes for the u128 element
+                    let swap_fn = RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx));
                     let heap_elem_ptr = module.locals.add(ValType::I32);
+
+                    // Allocate 16 bytes for the u128 element
                     loop_
                         .i32_const(IU128::HEAP_SIZE)
                         .call(compilation_ctx.allocator)
@@ -1563,15 +1554,13 @@ pub fn add_read_and_decode_storage_vector_instructions(
                     // Copy the chunk of memory
                     loop_.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-                    let swap_fn = RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx));
-
                     // Transform it to LE
                     loop_
                         .local_get(heap_elem_ptr)
                         .local_get(heap_elem_ptr)
                         .call(swap_fn);
 
-                    // Determine the element's address in memory and copy the element pointer there
+                    // Store the pointer to the copied u128 into the data memory
                     loop_
                         .vec_elem_ptr(data_ptr, i, data_size as i32)
                         .local_get(heap_elem_ptr)
@@ -1585,16 +1574,16 @@ pub fn add_read_and_decode_storage_vector_instructions(
                         );
                 }
                 IntermediateType::IU256 => {
-                    // Allocate 32 bytes for the u256 element
+                    let swap_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
                     let heap_elem_ptr = module.locals.add(ValType::I32);
 
-                    // 
+                    // Allocate 32 bytes for the u256 element
                     loop_
                         .i32_const(IU256::HEAP_SIZE)
                         .call(compilation_ctx.allocator)
                         .local_tee(heap_elem_ptr);
 
-                    // Source address (plus offset)
+                    // Source address
                     loop_.i32_const(DATA_SLOT_DATA_PTR_OFFSET);
 
                     // Number of bytes to copy
@@ -1603,15 +1592,13 @@ pub fn add_read_and_decode_storage_vector_instructions(
                     // Copy the chunk of memory
                     loop_.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-                    let swap_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
-
                     // Transform it to LE
                     loop_
                         .local_get(heap_elem_ptr)
                         .local_get(heap_elem_ptr)
                         .call(swap_fn);
 
-                    // Determine the element's address in memory and copy the element pointer there
+                    // Store the pointer to the copied u256 into the data memory
                     loop_
                         .vec_elem_ptr(data_ptr, i, data_size as i32)
                         .local_get(heap_elem_ptr)
@@ -1625,12 +1612,11 @@ pub fn add_read_and_decode_storage_vector_instructions(
                         );
                 }
                 IntermediateType::IAddress | IntermediateType::ISigner => {
-                    // Allocate 20 bytes for the address element
                     let heap_elem_ptr = module.locals.add(ValType::I32);
                     // Allocate memory for the address
                     // TODO: for this to work we are saving 32 and using only 20. Debug this.
                     loop_
-                        .i32_const(20)
+                        .i32_const(32)
                         .call(compilation_ctx.allocator)
                         .local_tee(heap_elem_ptr)
                         .i32_const(12)
@@ -1649,7 +1635,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
                     // Copy the chunk of memory
                     loop_.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-                    // Store the pointer to the copied address into the data pointer
+                    // Store the pointer to the copied address into the data memory
                     loop_
                         .vec_elem_ptr(data_ptr, i, data_size as i32)
                         .local_get(heap_elem_ptr)
