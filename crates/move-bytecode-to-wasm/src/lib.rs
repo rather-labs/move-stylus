@@ -236,7 +236,7 @@ pub fn process_dependency_tree<'move_package>(
             process_dependency_tree(
                 dependencies_data,
                 deps_compiled_units,
-                &root_compiled_units,
+                root_compiled_units,
                 immediate_dependencies,
                 function_definitions,
             );
@@ -246,7 +246,7 @@ pub fn process_dependency_tree<'move_package>(
             module_id.clone(),
             dependency_module,
             deps_compiled_units,
-            &root_compiled_units,
+            root_compiled_units,
             function_definitions,
         );
 
