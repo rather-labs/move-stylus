@@ -3,9 +3,9 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
+use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, compilation_context::ModuleData};
-use crate::runtime::RuntimeFunction;
 
 use super::IntermediateType;
 
@@ -359,6 +359,33 @@ impl IVector {
                     let struct_ = compilation_ctx
                         .get_user_data_type_by_index(module_id, *index)
                         .unwrap();
+
+                    struct_.copy_local_instructions(
+                        module,
+                        loop_block,
+                        compilation_ctx,
+                        module_data,
+                    );
+                }
+
+                IntermediateType::IGenericStructInstance {
+                    module_id,
+                    index,
+                    types,
+                } => {
+                    loop_block.load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                    let struct_ = compilation_ctx
+                        .get_user_data_type_by_index(module_id, *index)
+                        .unwrap();
+                    let struct_ = struct_.instantiate(types);
 
                     struct_.copy_local_instructions(
                         module,
