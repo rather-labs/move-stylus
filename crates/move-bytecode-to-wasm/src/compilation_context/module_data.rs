@@ -652,12 +652,6 @@ impl ModuleData {
                 .into_bytes()
                 .into();
 
-            println!("\nprocessing {function_name:?}");
-            println!(
-                "instantiatons {:?}\n",
-                move_module.signature_at(function.type_parameters)
-            );
-
             let type_instantiations = move_module
                 .signature_at(function.type_parameters)
                 .0

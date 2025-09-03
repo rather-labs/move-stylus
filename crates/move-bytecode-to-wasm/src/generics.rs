@@ -42,7 +42,7 @@ pub fn extract_type_instances_from_stack(
     instantiated_type: &IntermediateType,
 ) -> Option<IntermediateType> {
     match generic_type {
-        IntermediateType::ITypeParameter(i) => match instantiated_type {
+        IntermediateType::ITypeParameter(_) => match instantiated_type {
             IntermediateType::IRef(instantiated_inner)
             | IntermediateType::IMutRef(instantiated_inner) => {
                 extract_type_instances_from_stack(generic_type, instantiated_inner)

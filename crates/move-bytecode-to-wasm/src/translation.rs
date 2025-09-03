@@ -134,7 +134,6 @@ pub fn translate_function(
     );
 
     let flow = Flow::new(move_bytecode, function_information);
-    println!("{move_bytecode:?}");
 
     let mut branch_targets = BranchTargets::new();
     let mut types_stack = TypesStack::new();
@@ -440,18 +439,10 @@ fn translate_instruction(
             let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
 
             // If the type_instantiations contains generic parameters, those generic parameters
-            // refer to instantiations whithin this context. There are two places where we can
-            // obtain those instantiations
-            // 1. The caller's function type instances (located in
+            // refer to instantiations whithin this context. Instantiatons are obtained using
+            // the caller's function type instances (located in
             // `mapped_function.function_id.type_instantiations`)
-            // 2. The types in the stack befor calling the generic function.
             let function_information = if type_instantiations.iter().any(type_contains_generics) {
-                let arguments_start =
-                    types_stack.len() - function_information.signature.arguments.len();
-
-                // Get the function's arguments from the types stack
-                let types = &types_stack[arguments_start..types_stack.len()];
-
                 // Here we extract the type instances from the caller's type instantiations.
                 // Consider the following example:
                 //
@@ -526,15 +517,6 @@ fn translate_instruction(
                                 f
                             }
                         })
-                        /*
-                        .filter_map(|f| {
-                            if let IntermediateType::ITypeParameter(i) = f {
-                                Some(caller_type_instances[*i as usize].clone())
-                            } else {
-                                None
-                            }
-                        })
-                        */
                         .collect::<Vec<IntermediateType>>();
 
                     function_information.instantiate(&instantiations)
@@ -1824,7 +1806,7 @@ fn translate_instruction(
             // ```
             //  In `create_foo` the compiler does not have any information about what T could be,
             //  so, when called from `create_foo_u32` it will find a TypeParameter instead of a u32.
-            //  The TypeParameter will replaced by the u32 using the types stack information.
+            //  The TypeParameter will replaced by the u32 using the caller's type information.
             let (struct_, types) = if type_instantiations.iter().any(type_contains_generics) {
                 if let Some(caller_type_instances) =
                     &mapped_function.function_id.type_instantiations
@@ -1872,14 +1854,6 @@ fn translate_instruction(
                 .structs
                 .get_generic_struct_idx_by_struct_definition_idx(struct_definition_index);
 
-            println!(
-                "------> {:?}",
-                IntermediateType::IGenericStructInstance {
-                    module_id: module_data.id.clone(),
-                    index: idx,
-                    types: types.clone(),
-                }
-            );
             types_stack.push(IntermediateType::IGenericStructInstance {
                 module_id: module_data.id.clone(),
                 index: idx,

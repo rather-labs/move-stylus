@@ -91,11 +91,6 @@ impl MappedFunction {
             .map(|t| replace_type_parameters(t, types))
             .collect();
 
-        println!(
-            "Replaced arguments {:?} for {:?}",
-            self.signature.arguments, arguments,
-        );
-
         let returns = self
             .signature
             .returns
@@ -103,18 +98,11 @@ impl MappedFunction {
             .map(|t| replace_type_parameters(t, types))
             .collect();
 
-        println!(
-            "Replaced returns {:?} for {:?}",
-            self.signature.returns, returns,
-        );
-
         let locals = self
             .locals
             .iter()
             .map(|t| replace_type_parameters(t, types))
             .collect();
-
-        println!("Replaced locals {:?} for {:?}", self.locals, locals);
 
         let signature = ISignature { arguments, returns };
         let results = signature.get_return_wasm_types();
