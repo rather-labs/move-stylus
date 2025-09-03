@@ -73,6 +73,7 @@ impl Disassemble {
                         source_path,
                     )
                 } else {
+                    println!("ACA?");
                     let d = Disassembler::from_unit(&unit.unit);
                     let (disassemble_string, bcode_map) = d.disassemble_with_source_map()?;
                     if bytecode_map {

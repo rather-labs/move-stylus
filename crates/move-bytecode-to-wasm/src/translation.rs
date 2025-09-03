@@ -135,6 +135,7 @@ pub fn translate_function(
     );
 
     let flow = Flow::new(move_bytecode, function_information);
+    println!("{move_bytecode:?}");
 
     let mut branch_targets = BranchTargets::new();
     let mut types_stack = TypesStack::new();
@@ -197,6 +198,8 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
+                    println!("\n TRANSLATING {instruction:?}");
+                    println!("TS BEFORE {:?}", ctx.types_stack.0);
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -213,6 +216,7 @@ fn translate_flow(
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
                     });
+                    println!("TS AFTER {:?}\n", ctx.types_stack.0);
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
@@ -468,6 +472,7 @@ fn translate_instruction(
                 let types = &types_stack[arguments_start..types_stack.len()];
 
                 if !types.is_empty() {
+                    println!("ACAAA 1");
                     // These types represent the instantiated types that correspond to the return values
                     // of the parent function. This is crucial because we may encounter an IRef<T> or
                     // IMutRef<T>, and we need to extract the underlying type T.
@@ -486,7 +491,58 @@ fn translate_instruction(
                         .collect::<Vec<IntermediateType>>();
 
                     function_information.instantiate(&instantiations)
+                }
+                // If we can't compute the types from the stack, we check the caller's
+                // instantiations
+                else if let Some(caller_type_instances) =
+                    &mapped_function.function_id.type_instantiations
+                {
+                    println!("ACAAA 2");
+                    /*
+                    println!(
+                        "1 \n{:?} \n {:?}  \n {type_instantiations:?}",
+                        function_id.type_instantiations, &caller_type_instances
+                    );
+                    */
+
+                    let mut instantiations = HashSet::new();
+                    for (index, field) in type_instantiations.iter().enumerate() {
+                        if let Some(res) =
+                            extract_type_instances_from_stack(field, &type_instantiations[index])
+                        {
+                            instantiations.insert(res);
+                        }
+                    }
+                    // TODO assert the same index is not repreated twice (meaning there is two or more
+                    // different types for the same type parameter)
+
+                    let instantiations = instantiations
+                        .into_iter()
+                        .map(|(_, t)| t)
+                        .collect::<Vec<IntermediateType>>();
+                    println!("1.3 {instantiations:?}",);
+
+                    let instantiations = instantiations
+                        .iter()
+                        .filter_map(|f| {
+                            println!("\n\n---- {f:?}\n\n");
+                            if let IntermediateType::ITypeParameter(i) = f {
+                                Some(caller_type_instances[*i as usize].clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<IntermediateType>>();
+
+                    println!("1.5 {instantiations:?}",);
+
+                    let res = function_information.instantiate(&instantiations);
+                    println!("2 {res:?} {instantiations:?}",);
+                    res
                 } else {
+                    panic!("llega aca?");
+                    println!("ACAAA 3");
+
                     // If we can't deduce the types from the stack we mark them as unknown
                     let type_instantiations = type_instantiations
                         .iter()
@@ -541,6 +597,10 @@ fn translate_instruction(
                     function_table.add(module, function_id.clone(), &function_information);
                 functions_calls_to_link.push(function_id.clone());
 
+                println!(
+                    "AAA {:#?} {:#?}",
+                    function_information, mapped_function.function_id.type_instantiations
+                );
                 call_indirect(
                     f_entry,
                     &function_information.signature.returns,
@@ -910,11 +970,20 @@ fn translate_instruction(
             let inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
-            let inner = if let IntermediateType::ITypeParameter(_) = inner {
+            let inner = if let IntermediateType::ITypeParameter(i) = inner {
                 types_stack
                     .0
                     .last()
-                    .unwrap_or(&IntermediateType::IUnknown)
+                    .unwrap_or(
+                        if let Some(caller_type_instances) =
+                            &mapped_function.function_id.type_instantiations
+                        {
+                            &caller_type_instances[i as usize]
+                        } else {
+                            panic!("could not compute concrete type")
+                            // &IntermediateType::IUnknown
+                        },
+                    )
                     .clone()
             } else {
                 inner
