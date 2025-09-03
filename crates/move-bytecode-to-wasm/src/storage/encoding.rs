@@ -391,6 +391,12 @@ pub fn add_read_and_decode_storage_struct_instructions(
 ) -> (LocalId, u32) {
     let (storage_load, _) = storage_load_bytes32(module);
 
+    #[cfg(feature = "inject-host-debug-fns")]
+    let (print_i32, print_i64, print_memory_from, print_address, print_separator, print_u128) = {
+        crate::inject_debug_fns(module);
+        crate::declare_host_debug_functions!(module)
+    };
+
     let struct_ptr = module.locals.add(ValType::I32);
 
     // Locals
@@ -745,10 +751,16 @@ pub fn add_read_and_decode_storage_struct_instructions(
                     module,
                     builder,
                     compilation_ctx,
-                    field_ptr,
+                    field_ptr, // this local has not been set yet!
                     slot_ptr,
                     inner,
                 );
+                #[cfg(feature = "inject-host-debug-fns")]
+                {
+                    builder.call(print_separator);
+                    builder.local_get(field_ptr).call(print_memory_from);
+                    builder.call(print_separator);
+                }
             }
             _ => todo!(),
         };
@@ -1350,7 +1362,8 @@ pub fn add_read_and_decode_storage_vector_instructions(
     // Element size in STORAGE
     // TODO: look out for structs, they have field size = 0.
     let elem_size = field_size(inner, compilation_ctx);
-
+    // Element size in memory
+    let data_size = inner.stack_data_size();
     builder
         .local_get(elem_size_ptr)
         .i32_const(elem_size as i32)
@@ -1362,9 +1375,6 @@ pub fn add_read_and_decode_storage_vector_instructions(
                 offset: 0,
             },
         );
-
-    // Element size in memory
-    let data_size = inner.stack_data_size();
 
     // Load vector header slot data
     builder
@@ -1387,6 +1397,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
         .call(swap_fn)
         .local_set(len);
 
+    // Allocate memory for the vector and write the header data
     IVector::allocate_vector_with_header(
         builder,
         compilation_ctx,
@@ -1397,20 +1408,20 @@ pub fn add_read_and_decode_storage_vector_instructions(
     );
 
     // Calculate the slot of the first element
-    // Save it to DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
     builder
         .local_get(slot_ptr)
-        .local_get(elem_index_ptr) // i = 0, memory is not initialized yet
+        .local_get(elem_index_ptr) // i = 0
         .local_get(elem_size_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .local_get(elem_slot_ptr)
         .call(derive_dyn_array_slot_fn);
 
-    // Load the first slot of the vector into DATA_SLOT_DATA_PTR_OFFSET
+    // Load the first slot data
     builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .local_get(elem_slot_ptr)
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .call(storage_load);
 
+    // Read the elements from the vector
     builder.block(None, |block| {
         let block_id = block.id();
 
@@ -1431,46 +1442,38 @@ pub fn add_read_and_decode_storage_vector_instructions(
                 },
             );
 
-            // For each element, derive the corresponding slot.
-            loop_
-                .local_get(slot_ptr)
-                .local_get(elem_index_ptr)
-                .local_get(elem_size_ptr)
-                .local_get(elem_slot_ptr)
-                .call(derive_dyn_array_slot_fn);
-
             loop_
                 .local_get(read_bytes_in_slot)
                 .i32_const(elem_size as i32)
                 .binop(BinaryOp::I32Add)
                 .i32_const(32)
-                .binop(BinaryOp::I32GtS);
+                .binop(BinaryOp::I32GtS)
+                .if_else(
+                    None,
+                    |then| {
+                        // Calculate next slot to read from
+                        then.local_get(slot_ptr)
+                            .local_get(elem_index_ptr)
+                            .local_get(elem_size_ptr)
+                            .local_get(elem_slot_ptr)
+                            .call(derive_dyn_array_slot_fn);
 
-            loop_.if_else(
-                None,
-                |then| {
-                    // Save the current element slot to the object mapping slot
-                    then.i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                        .local_get(elem_slot_ptr)
-                        .i32_const(32)
-                        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                        // Load next slot data
+                        then.local_get(elem_slot_ptr)
+                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                            .call(storage_load);
 
-                    // Load the whole slot into DATA_SLOT_DATA_PTR_OFFSET
-                    then.i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                        .call(storage_load);
-
-                    then.i32_const(elem_size as i32)
-                        .local_set(read_bytes_in_slot);
-                },
-                |else_| {
-                    else_
-                        .local_get(read_bytes_in_slot)
-                        .i32_const(elem_size as i32)
-                        .binop(BinaryOp::I32Add)
-                        .local_set(read_bytes_in_slot);
-                },
-            );
+                        then.i32_const(elem_size as i32)
+                            .local_set(read_bytes_in_slot);
+                    },
+                    |else_| {
+                        else_
+                            .local_get(read_bytes_in_slot)
+                            .i32_const(elem_size as i32)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(read_bytes_in_slot);
+                    },
+                );
 
             match inner {
                 IntermediateType::IBool
@@ -1500,8 +1503,10 @@ pub fn add_read_and_decode_storage_vector_instructions(
                         _ => panic!("invalid element size {elem_size} for type {inner:?}"),
                     };
 
+                    let tmp_data_ptr = module.locals.add(ValType::I32);
                     // Destination address of the element in memory
                     loop_.vec_elem_ptr(data_ptr, i, data_size as i32);
+                    loop_.local_tee(tmp_data_ptr);
 
                     // Load the (u8, u16, u32, u64) value from slot data (plus offset)
                     loop_
@@ -1802,22 +1807,32 @@ pub fn add_read_and_decode_storage_vector_instructions(
                 // }
                 IntermediateType::IVector(inner_) => {
                     let inner_data_ptr = module.locals.add(ValType::I32);
-                    let innet_slot_ptr = module.locals.add(ValType::I32);
+                    let inner_slot_ptr = module.locals.add(ValType::I32);
 
-                    loop_
-                        .vec_elem_ptr(data_ptr, i, data_size as i32)
-                        .local_set(inner_data_ptr);
-
-                    loop_.local_get(elem_slot_ptr).local_set(innet_slot_ptr);
+                    // Duplicate the element to avoid overwriting it
+                    loop_.local_get(elem_slot_ptr).local_set(inner_slot_ptr);
 
                     add_read_and_decode_storage_vector_instructions(
                         module,
                         loop_,
                         compilation_ctx,
                         inner_data_ptr,
-                        innet_slot_ptr,
+                        inner_slot_ptr,
                         inner_,
                     );
+
+                    // Save the inner vector ptr in the parent vector at position i
+                    loop_
+                        .vec_elem_ptr(data_ptr, i, data_size as i32)
+                        .local_get(inner_data_ptr)
+                        .store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
                 }
                 _ => todo!(),
             };
