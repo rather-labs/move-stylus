@@ -40,7 +40,7 @@ pub fn type_contains_generics(itype: &IntermediateType) -> bool {
 pub fn extract_type_instances_from_stack(
     generic_type: &IntermediateType,
     instantiated_type: &IntermediateType,
-) -> Option<(u16, IntermediateType)> {
+) -> Option<IntermediateType> {
     match generic_type {
         IntermediateType::ITypeParameter(i) => match instantiated_type {
             IntermediateType::IRef(instantiated_inner)
@@ -48,7 +48,7 @@ pub fn extract_type_instances_from_stack(
                 extract_type_instances_from_stack(generic_type, instantiated_inner)
             }
 
-            _ => Some((*i, instantiated_type.clone())),
+            _ => Some(instantiated_type.clone()),
         },
         IntermediateType::IVector(inner) => {
             if let IntermediateType::IVector(instantiated_inner) = instantiated_type {
