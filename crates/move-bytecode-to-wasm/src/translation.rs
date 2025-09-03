@@ -16,8 +16,7 @@ use crate::{
     compilation_context::ModuleData,
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     generics::{
-        extract_type_instances_from_stack, replace_type_parameters,
-        replace_type_parameters_for_unknown, type_contains_generics,
+        extract_type_instances_from_stack, replace_type_parameters, type_contains_generics,
     },
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
@@ -441,27 +440,6 @@ fn translate_instruction(
                     .unwrap()
             };
 
-            // If the type instantaitions contains type parameters means we need to instantiate the
-            // functions with the information we have in stack.
-            // We can encounter this situation with a chain of calls:
-            //
-            // public fun echo_u16(x: u16): u16 {
-            //     test(x)
-            // }
-            //
-            // fun test<T>(t: T): T {
-            //     test2(t)
-            // }
-            //
-            // fun test2<T>(t: T): T {
-            //     t
-            // }
-            //
-            // In this example, the type parameter `T` in `test` is instantiated as `u16`.
-            // However, when `test2` is called from within `test`, the concrete type for `T`
-            // is not yet known at module processing time. The type instantiations for
-            // `test2` will remain as `ITypeParameters` and will only be resolved at
-            // the moment of the function call.
             let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
 
             let function_information = if type_instantiations.iter().any(type_contains_generics) {
@@ -470,31 +448,9 @@ fn translate_instruction(
 
                 // Get the function's arguments from the types stack
                 let types = &types_stack[arguments_start..types_stack.len()];
-
-                if !types.is_empty() {
-                    println!("ACAAA 1");
-                    // These types represent the instantiated types that correspond to the return values
-                    // of the parent function. This is crucial because we may encounter an IRef<T> or
-                    // IMutRef<T>, and we need to extract the underlying type T.
-                    let mut instantiations = HashSet::new();
-                    for (index, field) in type_instantiations.iter().enumerate() {
-                        if let Some(res) = extract_type_instances_from_stack(field, &types[index]) {
-                            instantiations.insert(res);
-                        }
-                    }
-                    // TODO assert the same index is not repreated twice (meaning there is two or more
-                    // different types for the same type parameter)
-
-                    let instantiations = instantiations
-                        .into_iter()
-                        .map(|(_, t)| t)
-                        .collect::<Vec<IntermediateType>>();
-
-                    function_information.instantiate(&instantiations)
-                }
                 // If we can't compute the types from the stack, we check the caller's
                 // instantiations
-                else if let Some(caller_type_instances) =
+                if let Some(caller_type_instances) =
                     &mapped_function.function_id.type_instantiations
                 {
                     println!("ACAAA 2");
@@ -539,17 +495,52 @@ fn translate_instruction(
                     let res = function_information.instantiate(&instantiations);
                     println!("2 {res:?} {instantiations:?}",);
                     res
-                } else {
-                    panic!("llega aca?");
-                    println!("ACAAA 3");
+                }
+                // If the type instantaitions contains type parameters means we need to instantiate the
+                // functions with the information we have in stack.
+                // We can encounter this situation with a chain of calls:
+                //
+                // public fun echo_u16(x: u16): u16 {
+                //     test(x)
+                // }
+                //
+                // fun test<T>(t: T): T {
+                //     test2(t)
+                // }
+                //
+                // fun test2<T>(t: T): T {
+                //     t
+                // }
+                //
+                // In this example, the type parameter `T` in `test` is instantiated as `u16`.
+                // However, when `test2` is called from within `test`, the concrete type for `T`
+                // is not yet known at module processing time. The type instantiations for
+                // `test2` will remain as `ITypeParameters` and will only be resolved at
+                // the moment of the function call.
+                else if !types.is_empty() {
+                    println!("ACAAA 1");
+                    // These types represent the instantiated types that correspond to the return values
+                    // of the parent function. This is crucial because we may encounter an IRef<T> or
+                    // IMutRef<T>, and we need to extract the underlying type T.
+                    let mut instantiations = HashSet::new();
+                    for (index, field) in type_instantiations.iter().enumerate() {
+                        if let Some(res) = extract_type_instances_from_stack(field, &types[index]) {
+                            instantiations.insert(res);
+                        }
+                    }
+                    // TODO assert the same index is not repreated twice (meaning there is two or more
+                    // different types for the same type parameter)
 
-                    // If we can't deduce the types from the stack we mark them as unknown
-                    let type_instantiations = type_instantiations
-                        .iter()
-                        .map(replace_type_parameters_for_unknown)
+                    let instantiations = instantiations
+                        .into_iter()
+                        .map(|(_, t)| t)
                         .collect::<Vec<IntermediateType>>();
 
-                    function_information.instantiate(&type_instantiations)
+                    function_information.instantiate(&instantiations)
+                }
+                // This should never happen
+                else {
+                    panic!("could not instantiate generic types");
                 }
             } else {
                 function_information.instantiate(type_instantiations)
@@ -692,16 +683,7 @@ fn translate_instruction(
                 local_type.box_local_instructions(module, builder, compilation_ctx, local);
             }
 
-            // It can happen that we encounter a type that contains the IntermediateType::IUnknown
-            // type instead of a concrete type. This can happen in functions such as
-            //
-            // public fun none<Element>(): Option<Element> {
-            //    Option { vec: vector::empty() }
-            // }
-            //
-            // where in the previous instructions, we had no information about what type Element
-            // could be
-            types_stack.pop_expecting_with_unknown(local_type)?;
+            types_stack.pop_expecting(local_type)?;
         }
         Bytecode::MoveLoc(local_id) => {
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
@@ -981,7 +963,6 @@ fn translate_instruction(
                             &caller_type_instances[i as usize]
                         } else {
                             panic!("could not compute concrete type")
-                            // &IntermediateType::IUnknown
                         },
                     )
                     .clone()
@@ -1057,7 +1038,6 @@ fn translate_instruction(
                     builder.call(pop_back_f);
                 }
                 IntermediateType::ITypeParameter(_)
-                | IntermediateType::IUnknown
                 | IntermediateType::IRef(_)
                 | IntermediateType::IMutRef(_) => {
                     return Err(TranslationError::InvalidOperation {

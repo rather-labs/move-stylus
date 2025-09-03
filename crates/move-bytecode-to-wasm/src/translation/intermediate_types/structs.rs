@@ -310,11 +310,6 @@ impl IStruct {
                         "Trying to copy a type parameter inside a struct, expected a concrete type"
                     );
                 }
-                IntermediateType::IUnknown => {
-                    panic!(
-                        "Trying to copy an unknown type parameter inside a struct, expected a concrete type"
-                    );
-                }
                 IntermediateType::IEnum(_) => todo!(),
             }
 
@@ -392,11 +387,6 @@ impl IStruct {
                 IntermediateType::ITypeParameter(_) => {
                     panic!("cannot know if a type parameter is dynamic, expected a concrete type");
                 }
-                IntermediateType::IUnknown => {
-                    panic!(
-                        "cannot know if an unknown type parameter is dynamic, expected a concrete type"
-                    );
-                }
                 IntermediateType::IEnum(_) => todo!(),
             }
         }
@@ -452,9 +442,6 @@ impl IStruct {
                     panic!("found reference inside struct")
                 }
                 IntermediateType::ITypeParameter(_) => {
-                    panic!("cannot know a type parameter's size, expected a concrete type");
-                }
-                IntermediateType::IUnknown => {
                     panic!("cannot know a type parameter's size, expected a concrete type");
                 }
                 IntermediateType::IEnum(_) => todo!(),

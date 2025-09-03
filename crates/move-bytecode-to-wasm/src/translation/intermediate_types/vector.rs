@@ -648,9 +648,6 @@ impl IVector {
                     IntermediateType::ITypeParameter(_) => {
                         panic!("cannot check the equality of a vector of type parameters, expected a concrete type");
                     }
-                    IntermediateType::IUnknown => {
-                        panic!("cannot check the equality of a vector of unknown type parameters, expected a concrete type");
-                    }
                 }
             },
             |else_| {
@@ -755,9 +752,6 @@ impl IVector {
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot borrow generic type parameters, expected a concrete type");
-            }
-            IntermediateType::IUnknown => {
-                panic!("cannot borrow unknown type parameters, expected a concrete type");
             }
             IntermediateType::IEnum(_) => todo!(),
         }
@@ -1090,9 +1084,6 @@ mod tests {
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pop back a vector of type parameters, expected a concrete type");
-            }
-            IntermediateType::IUnknown => {
-                panic!("cannot pop back a vector of unknown parameters, expected a concrete type");
             }
             IntermediateType::IEnum(_) => todo!(),
         }

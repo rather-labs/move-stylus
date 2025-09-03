@@ -253,9 +253,6 @@ impl Unpackable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot unpack generic type parameter");
             }
-            IntermediateType::IUnknown => {
-                panic!("cannot unpack unknown type parameter");
-            }
         }
     }
 }

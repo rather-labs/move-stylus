@@ -131,34 +131,3 @@ pub fn replace_type_parameters(
         _ => itype.clone(),
     }
 }
-
-/// Auxiliary functiion that recursively looks for not instantiated type parameters and
-/// replaces them with `IntermediateType::IUnknown`
-pub fn replace_type_parameters_for_unknown(itype: &IntermediateType) -> IntermediateType {
-    match itype {
-        IntermediateType::ITypeParameter(_) => IntermediateType::IUnknown,
-        IntermediateType::IRef(inner) => {
-            IntermediateType::IRef(Box::new(replace_type_parameters_for_unknown(inner)))
-        }
-        IntermediateType::IMutRef(inner) => {
-            IntermediateType::IMutRef(Box::new(replace_type_parameters_for_unknown(inner)))
-        }
-        IntermediateType::IGenericStructInstance {
-            module_id,
-            index,
-            types,
-        } => IntermediateType::IGenericStructInstance {
-            module_id: module_id.clone(),
-            index: *index,
-            types: types
-                .iter()
-                .map(replace_type_parameters_for_unknown)
-                .collect(),
-        },
-        IntermediateType::IVector(inner) => {
-            IntermediateType::IVector(Box::new(replace_type_parameters_for_unknown(inner)))
-        }
-        // Non-generic type: keep as is
-        _ => itype.clone(),
-    }
-}
