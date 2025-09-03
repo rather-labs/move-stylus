@@ -50,7 +50,11 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     written_bytes_in_slot: u32,
 ) -> u32 {
     let (storage_cache, _) = storage_cache_bytes32(module);
-
+    #[cfg(feature = "inject-host-debug-fns")]
+    let (print_i32, print_i64, print_memory_from, print_address, print_separator, print_u128) = {
+        crate::inject_debug_fns(module);
+        crate::declare_host_debug_functions!(module)
+    };
     // Locals
     let val_32 = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
@@ -334,6 +338,11 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             IntermediateType::IVector(inner) => {
                 let vector_ptr = module.locals.add(ValType::I32);
                 builder.local_set(vector_ptr);
+
+                #[cfg(feature = "inject-host-debug-fns")]
+                {
+                    builder.local_get(slot_ptr).call(print_memory_from);
+                }
 
                 add_encode_and_save_into_storage_vector_instructions(
                     module,
@@ -806,7 +815,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
-    vector_ptr: LocalId,      // struct_ptr.load()
+    vector_ptr: LocalId,      // struct_ptr.load(offset: i)
     slot_ptr: LocalId,        // pointer to the slot where the vector header will be stored
     inner: &IntermediateType, // vector inner type
 ) {
@@ -879,12 +888,11 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
         .local_set(len);
 
     // Calculate the slot of the first element
-    // Save it to DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
     builder
         .local_get(slot_ptr)
         .local_get(elem_index_ptr) // i = 0, memory is not initialized yet
         .local_get(elem_size_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .local_get(elem_slot_ptr)
         .call(derive_dyn_array_slot_fn);
 
     builder.block(None, |block| {
@@ -907,55 +915,47 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                 },
             );
 
-            // For each element, derive the corresponding slot.
-            // Elements smaller than 16 bytes can be packed in the same slot.
-            loop_
-                .local_get(slot_ptr)
-                .local_get(elem_index_ptr)
-                .local_get(elem_size_ptr)
-                .local_get(elem_slot_ptr)
-                .call(derive_dyn_array_slot_fn);
-
+            // If we have written the whole slot, save to storage and calculate the next slot
             loop_
                 .local_get(written_bytes_in_slot)
                 .i32_const(elem_size as i32)
                 .binop(BinaryOp::I32Add)
                 .i32_const(32)
-                .binop(BinaryOp::I32GtS);
+                .binop(BinaryOp::I32GtS)
+                .if_else(
+                    None,
+                    |then| {
+                        // Save previous slot to storage
+                        then.local_get(elem_slot_ptr)
+                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                            .call(storage_cache);
 
-            loop_.if_else(
-                None,
-                |then| {
-                    // Save previous slot to storage
-                    then.i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                        .call(storage_cache);
+                        // Wipe the data so we can fill it with new data
+                        then.i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                            .i32_const(0)
+                            .i32_const(32)
+                            .memory_fill(compilation_ctx.memory_id);
 
-                    // Wipe the data so we can fill it with new data
-                    then.i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                        .i32_const(0)
-                        .i32_const(32)
-                        .memory_fill(compilation_ctx.memory_id);
+                        // Next slot (not necessarily contiguous)
+                        then.local_get(slot_ptr)
+                            .local_get(elem_index_ptr)
+                            .local_get(elem_size_ptr)
+                            .local_get(elem_slot_ptr)
+                            .call(derive_dyn_array_slot_fn);
 
-                    // Save the current element slot to the object mapping slot
-                    then.i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                        .local_get(elem_slot_ptr)
-                        .i32_const(32)
-                        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                        then.i32_const(elem_size as i32)
+                            .local_set(written_bytes_in_slot);
+                    },
+                    |else_| {
+                        else_
+                            .local_get(written_bytes_in_slot)
+                            .i32_const(elem_size as i32)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(written_bytes_in_slot);
+                    },
+                );
 
-                    then.i32_const(elem_size as i32)
-                        .local_set(written_bytes_in_slot);
-                },
-                |else_| {
-                    else_
-                        .local_get(written_bytes_in_slot)
-                        .i32_const(elem_size as i32)
-                        .binop(BinaryOp::I32Add)
-                        .local_set(written_bytes_in_slot);
-                },
-            );
-
-            // Calculate the address of the element we are processing
+            // ptr to the element in memory
             loop_.vec_elem_ptr(vector_ptr, i, data_size as i32);
 
             match inner {
@@ -972,38 +972,6 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                         (val_32, LoadKind::I32 { atomic: false }, swap_fn)
                     };
 
-                    loop_
-                        .load(
-                            compilation_ctx.memory_id,
-                            load_kind,
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        )
-                        .call(swap_fn)
-                        .local_set(val);
-
-                    // We need to shift the swapped bytes to the right because WASM is little endian. If we try
-                    // to write a 16 bits number contained in a 32 bits number, without shifting, it will write
-                    // the zeroed part.
-                    // This only needs to be done for 32 bits (4 bytes) numbers
-                    if inner.stack_data_size() == 4 {
-                        if elem_size == 1 {
-                            loop_
-                                .local_get(val)
-                                .i32_const(24)
-                                .binop(BinaryOp::I32ShrU)
-                                .local_set(val);
-                        } else if elem_size == 2 {
-                            loop_
-                                .local_get(val)
-                                .i32_const(16)
-                                .binop(BinaryOp::I32ShrU)
-                                .local_set(val);
-                        }
-                    }
-
                     let store_kind = if elem_size == 1 {
                         StoreKind::I32_8 { atomic: false }
                     } else if elem_size == 2 {
@@ -1013,6 +981,31 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                     } else {
                         StoreKind::I64 { atomic: false }
                     };
+
+                    loop_
+                        .load(
+                            compilation_ctx.memory_id,
+                            load_kind,
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .call(swap_fn);
+
+                    // We need to shift the swapped bytes to the right because WASM is little endian. If we try
+                    // to write a 16 bits number contained in a 32 bits number, without shifting, it will write
+                    // the zeroed part.
+                    // This only needs to be done for 32 bits (4 bytes) numbers
+                    if inner.stack_data_size() == 4 {
+                        if elem_size == 1 {
+                            loop_.i32_const(24).binop(BinaryOp::I32ShrU);
+                        } else if elem_size == 2 {
+                            loop_.i32_const(16).binop(BinaryOp::I32ShrU);
+                        }
+                    }
+
+                    loop_.local_set(val);
 
                     // Save the value in slot data
                     // Calculate address: DATA_SLOT_DATA_PTR_OFFSET + (32 - written_bytes_in_slot)
@@ -1234,14 +1227,28 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                 //     }
                 // }
                 IntermediateType::IVector(inner_) => {
-                    let tmp = module.locals.add(ValType::I32);
-                    loop_.local_set(tmp);
+                    let inner_vector_ptr = module.locals.add(ValType::I32);
+                    let innet_slot_ptr = module.locals.add(ValType::I32);
+
+                    loop_
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_set(inner_vector_ptr);
+
+                    loop_.local_get(elem_slot_ptr).local_set(innet_slot_ptr);
+
                     add_encode_and_save_into_storage_vector_instructions(
                         module,
                         loop_,
                         compilation_ctx,
-                        tmp,
-                        elem_slot_ptr, // TODO: check if this is correct!
+                        inner_vector_ptr,
+                        innet_slot_ptr,
                         inner_,
                     );
                 }
@@ -1267,9 +1274,10 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
         });
     });
 
-    // Save the last element to storage
+    // Store the last element.
+    // If the element is a vector, here we will be storing the length of it in it's header slot
     builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .local_get(elem_slot_ptr)
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .call(storage_cache);
 
@@ -1281,7 +1289,6 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
         .memory_fill(compilation_ctx.memory_id);
 
     // Write the length in the slot data
-    // Saved to storage by the caller (add_encode_and_save_into_storage_struct_instructions)
     builder
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .local_get(len)
@@ -1301,8 +1308,8 @@ pub fn add_read_and_decode_storage_vector_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
-    data_ptr: LocalId,        // where to write the decoded data!
-    slot_ptr: LocalId,        // pointer to the slot where the vector header is stored
+    data_ptr: LocalId,        // where to write the decoded data
+    slot_ptr: LocalId,        // pointer to the slot of the vector header
     inner: &IntermediateType, // vector inner type
 ) {
     #[cfg(feature = "inject-host-debug-fns")]
@@ -1793,19 +1800,25 @@ pub fn add_read_and_decode_storage_vector_instructions(
                 //         }
                 //     }
                 // }
-                // IntermediateType::IVector(inner) => {
-                //     // let vector_ptr = module.locals.add(ValType::I32);
-                //     // builder.local_set(vector_ptr);
+                IntermediateType::IVector(inner_) => {
+                    let inner_data_ptr = module.locals.add(ValType::I32);
+                    let innet_slot_ptr = module.locals.add(ValType::I32);
 
-                //     // add_encode_and_save_into_storage_vector_instructions(
-                //     //     module,
-                //     //     builder,
-                //     //     compilation_ctx,
-                //     //     vector_ptr,
-                //     //     slot_ptr,
-                //     //     inner,
-                //     // );
-                // }
+                    loop_
+                        .vec_elem_ptr(data_ptr, i, data_size as i32)
+                        .local_set(inner_data_ptr);
+
+                    loop_.local_get(elem_slot_ptr).local_set(innet_slot_ptr);
+
+                    add_read_and_decode_storage_vector_instructions(
+                        module,
+                        loop_,
+                        compilation_ctx,
+                        inner_data_ptr,
+                        innet_slot_ptr,
+                        inner_,
+                    );
+                }
                 _ => todo!(),
             };
 

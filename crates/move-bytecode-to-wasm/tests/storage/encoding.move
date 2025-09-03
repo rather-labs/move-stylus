@@ -156,3 +156,20 @@ public fun save_dynamic_array_struct_2(
 public fun read_dynamic_array_struct_2(): DynamicArrayStruct2 {
     read_slot<DynamicArrayStruct2>(0)
 }
+
+public struct DynamicArrayStruct3 has key {
+    id: UID,
+    c: vector<vector<u32>>,
+}
+
+public fun save_dynamic_array_struct_3(
+    id: UID,
+    c: vector<vector<u32>>,
+) {
+    let struct_ = DynamicArrayStruct3 { id, c };
+    save_in_slot(struct_, 0);
+}
+
+public fun read_dynamic_array_struct_3(): DynamicArrayStruct3 {
+    read_slot<DynamicArrayStruct3>(0)
+}
