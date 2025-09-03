@@ -197,8 +197,6 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
-                    println!("\n TRANSLATING {instruction:?}");
-                    println!("TS BEFORE {:?}", ctx.types_stack.0);
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -215,7 +213,6 @@ fn translate_flow(
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
                     });
-                    println!("TS AFTER {:?}\n", ctx.types_stack.0);
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
@@ -442,25 +439,73 @@ fn translate_instruction(
 
             let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
 
+            // If the type_instantiations contains generic parameters, those generic parameters
+            // refer to instantiations whithin this context. There are two places where we can
+            // obtain those instantiations
+            // 1. The caller's function type instances (located in
+            // `mapped_function.function_id.type_instantiations`)
+            // 2. The types in the stack befor calling the generic function.
             let function_information = if type_instantiations.iter().any(type_contains_generics) {
                 let arguments_start =
                     types_stack.len() - function_information.signature.arguments.len();
 
                 // Get the function's arguments from the types stack
                 let types = &types_stack[arguments_start..types_stack.len()];
-                // If we can't compute the types from the stack, we check the caller's
-                // instantiations
+
+                // Here we extract the type instances from the caller's type instantiations.
+                // Consider the following example:
+                //
+                // ```move
+                // public fun two_generics<T, U>(): Option<U> {
+                //     option::none()
+                // }
+                //
+                // public fun test(): Option<u16> {
+                //     two_generics<u32, u16>()
+                // }
+                // ```
+                //
+                // where `option::none()` is defined as:
+                //
+                // ```move
+                // public fun none<V>(): Option<V> {
+                //     Option { vec: vector::empty() }
+                // }
+                // ```
+                //
+                // In this case:
+                //
+                // - The call to `two_generics` is instantiated with two types: `u32` mapped to
+                //   `ITypeParameter(0)` and `u16` mapped to `ITypeParameter(1)`.
+                //
+                // - `two_generics<T, U>` returns `U`, which corresponds to `ITypeParameter(1)`.
+                //
+                // - `option::none<V>()` has a single type parameter `V`, represented as
+                //   `ITypeParameter(0)`.
+                //
+                // The substitutions happen as follows:
+                //
+                // - Since `option::none()` provides the return value, its parameter
+                //   `V: ITypeParameter(0)` is instantiated with the caller's parameter
+                //   `U: ITypeParameter(1)`.
+                //
+                // - In `test`, we call `two_generics` with `T = u32` and `U = u16`. Therefore:
+                //   - `ITypeParameter(0)` is replaced with `u32`
+                //   - `ITypeParameter(1)` is replaced with `u16`
+                //
+                // If we follow the call chain:
+                //
+                // - `ITypeParameter(0)` (from `option::none`) is replaced with
+                //   `ITypeParameter(1)` (from `two_generics`).
+                //
+                // - `ITypeParameter(1)` is then replaced with `u16` (from the instantiation
+                //   in `test`).
+                //
+                // By transitivity, we infer that the type of `option::none()` in this context
+                // is `u16`.
                 if let Some(caller_type_instances) =
                     &mapped_function.function_id.type_instantiations
                 {
-                    println!("ACAAA 2");
-                    /*
-                    println!(
-                        "1 \n{:?} \n {:?}  \n {type_instantiations:?}",
-                        function_id.type_instantiations, &caller_type_instances
-                    );
-                    */
-
                     let mut instantiations = HashSet::new();
                     for (index, field) in type_instantiations.iter().enumerate() {
                         if let Some(res) =
@@ -476,12 +521,10 @@ fn translate_instruction(
                         .into_iter()
                         .map(|(_, t)| t)
                         .collect::<Vec<IntermediateType>>();
-                    println!("1.3 {instantiations:?}",);
 
                     let instantiations = instantiations
                         .iter()
                         .filter_map(|f| {
-                            println!("\n\n---- {f:?}\n\n");
                             if let IntermediateType::ITypeParameter(i) = f {
                                 Some(caller_type_instances[*i as usize].clone())
                             } else {
@@ -490,11 +533,7 @@ fn translate_instruction(
                         })
                         .collect::<Vec<IntermediateType>>();
 
-                    println!("1.5 {instantiations:?}",);
-
-                    let res = function_information.instantiate(&instantiations);
-                    println!("2 {res:?} {instantiations:?}",);
-                    res
+                    function_information.instantiate(&instantiations)
                 }
                 // If the type instantaitions contains type parameters means we need to instantiate the
                 // functions with the information we have in stack.
@@ -518,7 +557,6 @@ fn translate_instruction(
                 // `test2` will remain as `ITypeParameters` and will only be resolved at
                 // the moment of the function call.
                 else if !types.is_empty() {
-                    println!("ACAAA 1");
                     // These types represent the instantiated types that correspond to the return values
                     // of the parent function. This is crucial because we may encounter an IRef<T> or
                     // IMutRef<T>, and we need to extract the underlying type T.
