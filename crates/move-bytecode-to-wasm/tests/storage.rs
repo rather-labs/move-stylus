@@ -1183,6 +1183,38 @@ mod storage_encoding {
            d: 42,
         }
     )]
+    #[case(saveDynamicArrayStructCall::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        47,
+        true,
+        vec![],
+        vec![7, 8, 9]
+    )),
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // 0x01
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // 0x02 (first vector header)
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // 0x03 (second vector header)
+        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b", 16).unwrap().to_be_bytes(), // vector elements first slot
+        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85c", 16).unwrap().to_be_bytes(), // vector elements second slot
+    ],
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("000000000000000000000000000000000000000000000000000000010000002f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000800000000000000000000000000000007", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000009", 16).unwrap().to_be_bytes(),
+    ],
+        readDynamicArrayStructCall::new(()),
+        DynamicArrayStruct {
+           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           a: 47,
+           b: true,
+           c: vec![],
+           d: vec![7, 8, 9],
+        }
+    )]
     fn test_dynamic_fields<T: SolCall, U: SolCall, V: SolValue>(
         runtime: RuntimeSandbox,
         #[case] call_data_encode: T,
