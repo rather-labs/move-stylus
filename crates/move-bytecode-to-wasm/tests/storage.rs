@@ -740,7 +740,7 @@ mod storage_encoding {
             address e;
         }
 
-        struct DynamicArrayStruct {
+        struct DynamicStruct {
             UID id;
             uint32 a;
             bool b;
@@ -748,24 +748,24 @@ mod storage_encoding {
             uint128[] d;
         }
 
-        struct DynamicArrayStruct2 {
+        struct DynamicStruct2 {
             UID id;
             uint256[] c;
             address[] d;
         }
 
-        struct DynamicArrayStruct3 {
+        struct DynamicStruct3 {
             UID id;
             uint32[][] c;
         }
 
-        struct DynamicArrayStruct4 {
+        struct DynamicStruct4 {
             UID id;
             uint128[][] c;
             uint32 d;
         }
 
-        struct DynamicArrayStruct5 {
+        struct DynamicStruct5 {
             UID id;
             NestedStruct[] c;
         }
@@ -817,41 +817,41 @@ mod storage_encoding {
         ) public view;
         function readStaticNestedStruct() public view returns (StaticNestedStruct);
 
-        function saveDynamicArrayStruct(
+        function saveDynamicStruct(
             UID id,
             uint32 a,
             bool b,
             uint64[] c,
             uint128[] d
         ) public view;
-        function readDynamicArrayStruct() public view returns (DynamicArrayStruct);
+        function readDynamicStruct() public view returns (DynamicStruct);
 
-        function saveDynamicArrayStruct2(
+        function saveDynamicStruct2(
             UID id,
             uint256[] c,
             address[] d
         ) public view;
-        function readDynamicArrayStruct2() public view returns (DynamicArrayStruct2);
+        function readDynamicStruct2() public view returns (DynamicStruct2);
 
-        function saveDynamicArrayStruct3(
+        function saveDynamicStruct3(
             UID id,
             uint32[][] c,
         ) public view;
-        function readDynamicArrayStruct3() public view returns (DynamicArrayStruct3);
+        function readDynamicStruct3() public view returns (DynamicStruct3);
 
-        function saveDynamicArrayStruct4(
+        function saveDynamicStruct4(
             UID id,
             uint128[][] c,
             uint32 d,
         ) public view;
-        function readDynamicArrayStruct4() public view returns (DynamicArrayStruct4);
+        function readDynamicStruct4() public view returns (DynamicStruct4);
 
-        function saveDynamicArrayStruct5(
+        function saveDynamicStruct5(
             UID id,
             uint64 a,
             uint128 b,
         ) public view;
-        function readDynamicArrayStruct5() public view returns (DynamicArrayStruct5);
+        function readDynamicStruct5() public view returns (DynamicStruct5);
     );
 
     #[rstest]
@@ -1072,7 +1072,7 @@ mod storage_encoding {
     }
 
     #[rstest]
-    #[case(saveDynamicArrayStructCall::new((
+    #[case(saveDynamicStructCall::new((
         UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         47,
         true,
@@ -1099,8 +1099,8 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000800000000000000000000000000000007", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000009", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicArrayStructCall::new(()),
-        DynamicArrayStruct {
+        readDynamicStructCall::new(()),
+        DynamicStruct {
            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
            a: 47,
            b: true,
@@ -1108,7 +1108,7 @@ mod storage_encoding {
            d: vec![7, 8, 9],
         }
     )]
-    #[case(saveDynamicArrayStruct2Call::new((
+    #[case(saveDynamicStruct2Call::new((
         UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         vec![U256::from(2), U256::from(3), U256::from(4)],
         vec![address!("0x1111111111111111111111111111111111111111"), address!("0x2222222222222222222222222222222222222222")]
@@ -1133,14 +1133,14 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000001111111111111111111111111111111111111111", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000002222222222222222222222222222222222222222", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicArrayStruct2Call::new(()),
-        DynamicArrayStruct2 {
+        readDynamicStruct2Call::new(()),
+        DynamicStruct2 {
            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
            c: vec![U256::from(2), U256::from(3), U256::from(4)],
            d: vec![address!("0x1111111111111111111111111111111111111111"), address!("0x2222222222222222222222222222222222222222"),],
         }
     )]
-    #[case(saveDynamicArrayStruct3Call::new((
+    #[case(saveDynamicStruct3Call::new((
         UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         vec![vec![1, 2, 3], vec![4, 5, 6]],
     )),
@@ -1160,13 +1160,13 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // second vector<u32> header
         U256::from_str_radix("0000000000000000000000000000000000000000000000060000000500000004", 16).unwrap().to_be_bytes(), // second vector<u32> elements
     ],
-        readDynamicArrayStruct3Call::new(()),
-        DynamicArrayStruct3 {
+        readDynamicStruct3Call::new(()),
+        DynamicStruct3 {
            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
            c: vec![vec![1, 2, 3], vec![4, 5, 6]],
         }
     )]
-    #[case(saveDynamicArrayStruct4Call::new((
+    #[case(saveDynamicStruct4Call::new((
         UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         vec![vec![1, 2, 3], vec![4, 5, 6]],
         42,
@@ -1193,14 +1193,14 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000006", 16).unwrap().to_be_bytes(), // second vector<u32> elements
         U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002a", 16).unwrap().to_be_bytes(), // u32 value
     ],
-        readDynamicArrayStruct4Call::new(()),
-        DynamicArrayStruct4 {
+        readDynamicStruct4Call::new(()),
+        DynamicStruct4 {
            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
            c: vec![vec![1, 2, 3], vec![4, 5, 6]],
            d: 42,
         }
     )]
-    #[case(saveDynamicArrayStructCall::new((
+    #[case(saveDynamicStructCall::new((
         UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         47,
         true,
@@ -1223,8 +1223,8 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000800000000000000000000000000000007", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000009", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicArrayStructCall::new(()),
-        DynamicArrayStruct {
+        readDynamicStructCall::new(()),
+        DynamicStruct {
            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
            a: 47,
            b: true,
@@ -1232,7 +1232,7 @@ mod storage_encoding {
            d: vec![7, 8, 9],
         }
     )]
-    #[case(saveDynamicArrayStruct5Call::new((
+    #[case(saveDynamicStruct5Call::new((
         UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         47,
         123,
@@ -1251,8 +1251,8 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000002f0000000000000000000000000000007b", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000007b", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicArrayStruct5Call::new(()),
-        DynamicArrayStruct5 {
+        readDynamicStruct5Call::new(()),
+        DynamicStruct5 {
            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
            c: vec![NestedStruct { a: 47, b: 123 }, NestedStruct { a: 47, b: 123 }, NestedStruct { a: 47, b: 123 }],
         }
