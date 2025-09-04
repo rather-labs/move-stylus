@@ -48,34 +48,6 @@ impl CompilationContext<'_> {
         }
     }
 
-    pub fn get_external_module_data(
-        &self,
-        module_id: &ModuleId,
-        identifier: &str,
-        types: &Option<Vec<IntermediateType>>,
-    ) -> Result<ExternalModuleData> {
-        let module = self
-            .deps_data
-            .get(module_id)
-            .ok_or(CompilationContextError::ModuleNotFound(module_id.clone()))?;
-
-        if let Some(struct_) = module
-            .structs
-            .structs
-            .iter()
-            .find(|s| s.identifier == identifier)
-        {
-            if let Some(instantiation_types) = types {
-                let struct_instance = struct_.instantiate(instantiation_types);
-                Ok(ExternalModuleData::Struct(Cow::Owned(struct_instance)))
-            } else {
-                Ok(ExternalModuleData::Struct(Cow::Borrowed(struct_)))
-            }
-        } else {
-            todo!("enum case and empty case")
-        }
-    }
-
     pub fn get_module_data_by_id(&self, module_id: &ModuleId) -> Result<&ModuleData> {
         if let Some(m) = self.deps_data.get(module_id) {
             Ok(m)
@@ -105,7 +77,6 @@ impl CompilationContext<'_> {
     /// - IStruct: a concrete struct defined in the root module or immediate dependency.
     /// - IGenericStructInstance: a generic struct insantiation defined in the root module or immediate
     ///   dependency.
-    /// - ExternalModuleData: can contain either an enum or a struct defined in a dependency.
     ///
     /// The information to reconstruct the `IStruct` object is in different places within the
     /// compilation contect. With this macro we can easily avoid all the boilerplate and obtain
