@@ -150,12 +150,6 @@ pub fn translate_function(
         branch_targets: &mut branch_targets,
     };
 
-    /*
-    println!(
-        "translating {}",
-        function_information.function_id.identifier
-    );
-    */
     translate_flow(
         &mut ctx,
         &mut builder,
@@ -203,7 +197,6 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
-                    // println!("\nTranslating {instruction:?}");
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -220,7 +213,6 @@ fn translate_flow(
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
                     });
-                    // println!("typestack after {:?}\n", ctx.types_stack);
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
@@ -964,25 +956,6 @@ fn translate_instruction(
             let inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
-            /*
-            let inner = if let IntermediateType::ITypeParameter(i) = inner {
-                types_stack
-                    .0
-                    .last()
-                    .unwrap_or(
-                        if let Some(caller_type_instances) =
-                            &mapped_function.function_id.type_instantiations
-                        {
-                            &caller_type_instances[i as usize]
-                        } else {
-                            panic!("could not compute concrete type")
-                        },
-                    )
-                    .clone()
-            } else {
-                inner
-            };
-            */
             let inner = if type_contains_generics(&inner) {
                 if let Some(caller_type_instances) =
                     &mapped_function.function_id.type_instantiations
@@ -1979,7 +1952,7 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IGenericStructInstance {
                 module_id: module_data.id.clone(),
                 index: idx,
-                types: types.clone(),
+                types,
             })?;
 
             bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
