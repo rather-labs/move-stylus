@@ -1072,166 +1072,166 @@ mod storage_encoding {
     }
 
     #[rstest]
-    // #[case(saveDynamicArrayStructCall::new((
-    //     UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
-    //     47,
-    //     true,
-    //     vec![2, 3, 4, 5, 6],
-    //     vec![7, 8, 9]
-    // )),
-    // vec![
-    //     [0x00; 32], // 0x0
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // 0x01
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // 0x02 (vector header)
-    //     U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace", 16).unwrap().to_be_bytes(), // vector elements first slot
-    //     U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5acf", 16).unwrap().to_be_bytes(), // vector elements second slot
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // 0x02 (vector header)
-    //     U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b", 16).unwrap().to_be_bytes(), // vector elements first slot
-    //     U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85c", 16).unwrap().to_be_bytes(), // vector elements second slot
-    // ],
-    // vec![
-    //     [0x00; 32], // 0x0
-    //     U256::from_str_radix("000000000000000000000000000000000000000000000000000000010000002f", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000005", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000005000000000000000400000000000000030000000000000002", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000006", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000000000000000000000800000000000000000000000000000007", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000009", 16).unwrap().to_be_bytes(),
-    // ],
-    //     readDynamicArrayStructCall::new(()),
-    //     DynamicArrayStruct {
-    //        id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
-    //        a: 47,
-    //        b: true,
-    //        c: vec![2, 3, 4, 5, 6],
-    //        d: vec![7, 8, 9],
-    //     }
-    // )]
-    // #[case(saveDynamicArrayStruct2Call::new((
-    //     UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
-    //     vec![U256::from(2), U256::from(3), U256::from(4)],
-    //     vec![address!("0x1111111111111111111111111111111111111111"), address!("0x2222222222222222222222222222222222222222")]
-    // )),
-    // vec![
-    //     [0x00; 32], // 0x0
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // 0x01 (u256 vector header)
-    //     U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6", 16).unwrap().to_be_bytes(), // u256 vec, first slot
-    //     U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf7", 16).unwrap().to_be_bytes(), // u256 vec, second slot
-    //     U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf8", 16).unwrap().to_be_bytes(), // u256 vec, third slot
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // 0x02 (address vector header)
-    //     U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace", 16).unwrap().to_be_bytes(), // address vec, first slot
-    //     U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5acf", 16).unwrap().to_be_bytes(), // address vec, second slot
-    // ],
-    // vec![
-    //     [0x00; 32], // 0x0
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000004", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000000000000001111111111111111111111111111111111111111", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000000000000002222222222222222222222222222222222222222", 16).unwrap().to_be_bytes(),
-    // ],
-    //     readDynamicArrayStruct2Call::new(()),
-    //     DynamicArrayStruct2 {
-    //        id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
-    //        c: vec![U256::from(2), U256::from(3), U256::from(4)],
-    //        d: vec![address!("0x1111111111111111111111111111111111111111"), address!("0x2222222222222222222222222222222222222222"),],
-    //     }
-    // )]
-    // #[case(saveDynamicArrayStruct3Call::new((
-    //     UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
-    //     vec![vec![1, 2, 3], vec![4, 5, 6]],
-    // )),
-    // vec![
-    //     [0x00; 32], // 0x0
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // 0x01 (vector<vector<u32>> header)
-    //     U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6", 16).unwrap().to_be_bytes(), // first vector<u32> header
-    //     U256::from_str_radix("b5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d22", 16).unwrap().to_be_bytes(), // first vector<u32> elements
-    //     U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf7", 16).unwrap().to_be_bytes(), // second vector<u32> header
-    //     U256::from_str_radix("ea7809e925a8989e20c901c4c1da82f0ba29b26797760d445a0ce4cf3c6fbd31", 16).unwrap().to_be_bytes(), // second vector<u32> elements
-    // ],
-    // vec![
-    //     [0x00; 32], // 0x0
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // 0x02 (vector<vector<u32>> header)
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // first vector<u32> header
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000030000000200000001", 16).unwrap().to_be_bytes(), // first vector<u32> elements
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // second vector<u32> header
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000060000000500000004", 16).unwrap().to_be_bytes(), // second vector<u32> elements
-    // ],
-    //     readDynamicArrayStruct3Call::new(()),
-    //     DynamicArrayStruct3 {
-    //        id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
-    //        c: vec![vec![1, 2, 3], vec![4, 5, 6]],
-    //     }
-    // )]
-    // #[case(saveDynamicArrayStruct4Call::new((
-    //     UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
-    //     vec![vec![1, 2, 3], vec![4, 5, 6]],
-    //     42,
-    // )),
-    // vec![
-    //     [0x00; 32], // 0x0
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // 0x01 (vector<vector<u32>> header)
-    //     U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6", 16).unwrap().to_be_bytes(), // first vector<u32> header
-    //     U256::from_str_radix("b5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d22", 16).unwrap().to_be_bytes(), // first vector<u32> elements
-    //     U256::from_str_radix("b5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d23", 16).unwrap().to_be_bytes(), // first vector<u32> elements
-    //     U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf7", 16).unwrap().to_be_bytes(), // second vector<u32> header
-    //     U256::from_str_radix("ea7809e925a8989e20c901c4c1da82f0ba29b26797760d445a0ce4cf3c6fbd31", 16).unwrap().to_be_bytes(), // second vector<u32> elements
-    //     U256::from_str_radix("ea7809e925a8989e20c901c4c1da82f0ba29b26797760d445a0ce4cf3c6fbd32", 16).unwrap().to_be_bytes(), // second vector<u32> elements
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // 0x02 (u32 slot)
-    // ],
-    // vec![
-    //     [0x00; 32], // 0x0
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // 0x02 (vector<vector<u32>> header)
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // first vector<u32> header
-    //     U256::from_str_radix("0000000000000000000000000000000200000000000000000000000000000001", 16).unwrap().to_be_bytes(), // first vector<u32> elements
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // first vector<u32> elements
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // second vector<u32> header
-    //     U256::from_str_radix("0000000000000000000000000000000500000000000000000000000000000004", 16).unwrap().to_be_bytes(), // second vector<u32> elements
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000006", 16).unwrap().to_be_bytes(), // second vector<u32> elements
-    //     U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002a", 16).unwrap().to_be_bytes(), // u32 value
-    // ],
-    //     readDynamicArrayStruct4Call::new(()),
-    //     DynamicArrayStruct4 {
-    //        id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
-    //        c: vec![vec![1, 2, 3], vec![4, 5, 6]],
-    //        d: 42,
-    //     }
-    // )]
-    // #[case(saveDynamicArrayStructCall::new((
-    //     UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
-    //     47,
-    //     true,
-    //     vec![],
-    //     vec![7, 8, 9]
-    // )),
-    // vec![
-    //     [0x00; 32], // 0x0
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // 0x01
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // 0x02 (first vector header)
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // 0x03 (second vector header)
-    //     U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b", 16).unwrap().to_be_bytes(), // vector elements first slot
-    //     U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85c", 16).unwrap().to_be_bytes(), // vector elements second slot
-    // ],
-    // vec![
-    //     [0x00; 32], // 0x0
-    //     U256::from_str_radix("000000000000000000000000000000000000000000000000000000010000002f", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000000000000000000000800000000000000000000000000000007", 16).unwrap().to_be_bytes(),
-    //     U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000009", 16).unwrap().to_be_bytes(),
-    // ],
-    //     readDynamicArrayStructCall::new(()),
-    //     DynamicArrayStruct {
-    //        id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
-    //        a: 47,
-    //        b: true,
-    //        c: vec![],
-    //        d: vec![7, 8, 9],
-    //     }
-    // )]
+    #[case(saveDynamicArrayStructCall::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        47,
+        true,
+        vec![2, 3, 4, 5, 6],
+        vec![7, 8, 9]
+    )),
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // 0x01
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // 0x02 (vector header)
+        U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace", 16).unwrap().to_be_bytes(), // vector elements first slot
+        U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5acf", 16).unwrap().to_be_bytes(), // vector elements second slot
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // 0x02 (vector header)
+        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b", 16).unwrap().to_be_bytes(), // vector elements first slot
+        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85c", 16).unwrap().to_be_bytes(), // vector elements second slot
+    ],
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("000000000000000000000000000000000000000000000000000000010000002f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000005", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000005000000000000000400000000000000030000000000000002", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000006", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000800000000000000000000000000000007", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000009", 16).unwrap().to_be_bytes(),
+    ],
+        readDynamicArrayStructCall::new(()),
+        DynamicArrayStruct {
+           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           a: 47,
+           b: true,
+           c: vec![2, 3, 4, 5, 6],
+           d: vec![7, 8, 9],
+        }
+    )]
+    #[case(saveDynamicArrayStruct2Call::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        vec![U256::from(2), U256::from(3), U256::from(4)],
+        vec![address!("0x1111111111111111111111111111111111111111"), address!("0x2222222222222222222222222222222222222222")]
+    )),
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // 0x01 (u256 vector header)
+        U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6", 16).unwrap().to_be_bytes(), // u256 vec, first slot
+        U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf7", 16).unwrap().to_be_bytes(), // u256 vec, second slot
+        U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf8", 16).unwrap().to_be_bytes(), // u256 vec, third slot
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // 0x02 (address vector header)
+        U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace", 16).unwrap().to_be_bytes(), // address vec, first slot
+        U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5acf", 16).unwrap().to_be_bytes(), // address vec, second slot
+    ],
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000004", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000001111111111111111111111111111111111111111", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000002222222222222222222222222222222222222222", 16).unwrap().to_be_bytes(),
+    ],
+        readDynamicArrayStruct2Call::new(()),
+        DynamicArrayStruct2 {
+           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           c: vec![U256::from(2), U256::from(3), U256::from(4)],
+           d: vec![address!("0x1111111111111111111111111111111111111111"), address!("0x2222222222222222222222222222222222222222"),],
+        }
+    )]
+    #[case(saveDynamicArrayStruct3Call::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        vec![vec![1, 2, 3], vec![4, 5, 6]],
+    )),
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // 0x01 (vector<vector<u32>> header)
+        U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6", 16).unwrap().to_be_bytes(), // first vector<u32> header
+        U256::from_str_radix("b5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d22", 16).unwrap().to_be_bytes(), // first vector<u32> elements
+        U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf7", 16).unwrap().to_be_bytes(), // second vector<u32> header
+        U256::from_str_radix("ea7809e925a8989e20c901c4c1da82f0ba29b26797760d445a0ce4cf3c6fbd31", 16).unwrap().to_be_bytes(), // second vector<u32> elements
+    ],
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // 0x02 (vector<vector<u32>> header)
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // first vector<u32> header
+        U256::from_str_radix("0000000000000000000000000000000000000000000000030000000200000001", 16).unwrap().to_be_bytes(), // first vector<u32> elements
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // second vector<u32> header
+        U256::from_str_radix("0000000000000000000000000000000000000000000000060000000500000004", 16).unwrap().to_be_bytes(), // second vector<u32> elements
+    ],
+        readDynamicArrayStruct3Call::new(()),
+        DynamicArrayStruct3 {
+           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           c: vec![vec![1, 2, 3], vec![4, 5, 6]],
+        }
+    )]
+    #[case(saveDynamicArrayStruct4Call::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        vec![vec![1, 2, 3], vec![4, 5, 6]],
+        42,
+    )),
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // 0x01 (vector<vector<u32>> header)
+        U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6", 16).unwrap().to_be_bytes(), // first vector<u32> header
+        U256::from_str_radix("b5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d22", 16).unwrap().to_be_bytes(), // first vector<u32> elements
+        U256::from_str_radix("b5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d23", 16).unwrap().to_be_bytes(), // first vector<u32> elements
+        U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf7", 16).unwrap().to_be_bytes(), // second vector<u32> header
+        U256::from_str_radix("ea7809e925a8989e20c901c4c1da82f0ba29b26797760d445a0ce4cf3c6fbd31", 16).unwrap().to_be_bytes(), // second vector<u32> elements
+        U256::from_str_radix("ea7809e925a8989e20c901c4c1da82f0ba29b26797760d445a0ce4cf3c6fbd32", 16).unwrap().to_be_bytes(), // second vector<u32> elements
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // 0x02 (u32 slot)
+    ],
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // 0x02 (vector<vector<u32>> header)
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // first vector<u32> header
+        U256::from_str_radix("0000000000000000000000000000000200000000000000000000000000000001", 16).unwrap().to_be_bytes(), // first vector<u32> elements
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // first vector<u32> elements
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // second vector<u32> header
+        U256::from_str_radix("0000000000000000000000000000000500000000000000000000000000000004", 16).unwrap().to_be_bytes(), // second vector<u32> elements
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000006", 16).unwrap().to_be_bytes(), // second vector<u32> elements
+        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002a", 16).unwrap().to_be_bytes(), // u32 value
+    ],
+        readDynamicArrayStruct4Call::new(()),
+        DynamicArrayStruct4 {
+           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           c: vec![vec![1, 2, 3], vec![4, 5, 6]],
+           d: 42,
+        }
+    )]
+    #[case(saveDynamicArrayStructCall::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        47,
+        true,
+        vec![],
+        vec![7, 8, 9]
+    )),
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // 0x01
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // 0x02 (first vector header)
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // 0x03 (second vector header)
+        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b", 16).unwrap().to_be_bytes(), // vector elements first slot
+        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85c", 16).unwrap().to_be_bytes(), // vector elements second slot
+    ],
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("000000000000000000000000000000000000000000000000000000010000002f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000800000000000000000000000000000007", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000009", 16).unwrap().to_be_bytes(),
+    ],
+        readDynamicArrayStructCall::new(()),
+        DynamicArrayStruct {
+           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           a: 47,
+           b: true,
+           c: vec![],
+           d: vec![7, 8, 9],
+        }
+    )]
     #[case(saveDynamicArrayStruct5Call::new((
         UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         47,
