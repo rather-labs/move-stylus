@@ -11,10 +11,7 @@ use walrus::{
 use crate::{
     CompilationContext,
     compilation_context::ExternalModuleData,
-    data::{
-        DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
-        DATA_STORAGE_OBJECT_OWNER_OFFSET,
-    },
+    data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_STORAGE_OBJECT_OWNER_OFFSET},
     hostio::host_functions::{native_keccak256, storage_cache_bytes32, storage_load_bytes32},
     runtime::RuntimeFunction,
     translation::intermediate_types::vector::IVector,
@@ -47,45 +44,60 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     struct_ptr: LocalId,
     slot_ptr: LocalId,
     struct_: &IStruct,
-    written_bytes_in_slot: u32,
-) -> u32 {
+    written_bytes_in_slot: LocalId,
+) {
     let (storage_cache, _) = storage_cache_bytes32(module);
     #[cfg(feature = "inject-host-debug-fns")]
     let (print_i32, print_i64, print_memory_from, print_address, print_separator, print_u128) = {
         crate::inject_debug_fns(module);
         crate::declare_host_debug_functions!(module)
     };
+
+    // Runtime functions
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
+
     // Locals
     let val_32 = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
 
-    let mut written_bytes_in_slot = written_bytes_in_slot;
+    // let mut written_bytes_in_slot = written_bytes_in_slot;
     for (index, field) in struct_.fields.iter().enumerate() {
         let field_size = field_size(field, compilation_ctx);
-        if written_bytes_in_slot + field_size > 32 {
-            // Save previous slot (maybe not needed...)
-            builder
-                .local_get(slot_ptr)
-                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                .call(storage_cache);
+        builder
+            .local_get(written_bytes_in_slot)
+            .i32_const(field_size as i32)
+            .binop(BinaryOp::I32Add)
+            .i32_const(32)
+            .binop(BinaryOp::I32GtS)
+            .if_else(
+                None,
+                |then| {
+                    // Save previous slot (maybe not needed...)
+                    then.local_get(slot_ptr)
+                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                        .call(storage_cache);
 
-            // Wipe the data so we can fill it with new data
-            builder
-                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                .i32_const(0)
-                .i32_const(32)
-                .memory_fill(compilation_ctx.memory_id);
+                    // Wipe the data so we can fill it with new data
+                    then.i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                        .i32_const(0)
+                        .i32_const(32)
+                        .memory_fill(compilation_ctx.memory_id);
 
-            let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
-            builder
-                .local_get(slot_ptr)
-                .call(next_slot_fn)
-                .local_set(slot_ptr);
+                    then.local_get(slot_ptr)
+                        .call(next_slot_fn)
+                        .local_set(slot_ptr);
 
-            written_bytes_in_slot = field_size;
-        } else {
-            written_bytes_in_slot += field_size;
-        }
+                    then.i32_const(field_size as i32)
+                        .local_set(written_bytes_in_slot);
+                },
+                |else_| {
+                    else_
+                        .local_get(written_bytes_in_slot)
+                        .i32_const(field_size as i32)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(written_bytes_in_slot);
+                },
+            );
 
         // Load field's intermediate pointer
         builder.local_get(struct_ptr).load(
@@ -158,13 +170,17 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                 // Save the value in slot data
                 builder
                     .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                    .i32_const(32)
+                    .local_get(written_bytes_in_slot)
+                    .binop(BinaryOp::I32Sub)
+                    .binop(BinaryOp::I32Add)
                     .local_get(val)
                     .store(
                         compilation_ctx.memory_id,
                         store_kind,
                         MemArg {
                             align: 0,
-                            offset: 32 - written_bytes_in_slot,
+                            offset: 0,
                         },
                     );
             }
@@ -174,7 +190,9 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                 // Slot data plus offset as dest ptr
                 builder
                     .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                    .i32_const(32 - written_bytes_in_slot as i32)
+                    .i32_const(32)
+                    .local_get(written_bytes_in_slot)
+                    .binop(BinaryOp::I32Sub)
                     .binop(BinaryOp::I32Add);
 
                 // Transform to BE
@@ -200,7 +218,9 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                 // Slot data plus offset as dest ptr
                 builder
                     .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                    .i32_const(32 - written_bytes_in_slot as i32)
+                    .i32_const(32)
+                    .local_get(written_bytes_in_slot)
+                    .binop(BinaryOp::I32Sub)
                     .binop(BinaryOp::I32Add);
 
                 // Grab the last 20 bytes of the address
@@ -220,7 +240,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                 let tmp = module.locals.add(ValType::I32);
                 builder.local_set(tmp);
 
-                written_bytes_in_slot = add_encode_and_save_into_storage_struct_instructions(
+                add_encode_and_save_into_storage_struct_instructions(
                     module,
                     builder,
                     compilation_ctx,
@@ -244,7 +264,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                 let tmp = module.locals.add(ValType::I32);
                 builder.local_set(tmp);
 
-                written_bytes_in_slot = add_encode_and_save_into_storage_struct_instructions(
+                add_encode_and_save_into_storage_struct_instructions(
                     module,
                     builder,
                     compilation_ctx,
@@ -314,16 +334,15 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                         let tmp = module.locals.add(ValType::I32);
                         builder.local_set(tmp);
 
-                        written_bytes_in_slot =
-                            add_encode_and_save_into_storage_struct_instructions(
-                                module,
-                                builder,
-                                compilation_ctx,
-                                tmp,
-                                slot_ptr,
-                                &struct_,
-                                written_bytes_in_slot,
-                            );
+                        add_encode_and_save_into_storage_struct_instructions(
+                            module,
+                            builder,
+                            compilation_ctx,
+                            tmp,
+                            slot_ptr,
+                            &struct_,
+                            written_bytes_in_slot,
+                        );
                     }
                     ExternalModuleData::Enum(enum_) => {
                         if !enum_.is_simple {
@@ -349,7 +368,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                 );
 
                 // TODO: Do we need this?
-                written_bytes_in_slot = 32; // Vector header always takes 32 bytes
+                builder.i32_const(32).local_set(written_bytes_in_slot); // Vector header always takes 32 bytes
             }
             e => todo!("{e:?}"),
         };
@@ -359,8 +378,6 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
         .local_get(slot_ptr)
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .call(storage_cache);
-
-    written_bytes_in_slot
 }
 
 /// Adds the instructions to read, decode from storage and build in memory a structure.
@@ -382,8 +399,8 @@ pub fn add_read_and_decode_storage_struct_instructions(
     slot_ptr: LocalId,
     struct_: &IStruct,
     reading_nested_struct: bool,
-    read_bytes_in_slot: u32,
-) -> (LocalId, u32) {
+    read_bytes_in_slot: LocalId,
+) -> LocalId {
     let (storage_load, _) = storage_load_bytes32(module);
 
     #[cfg(feature = "inject-host-debug-fns")]
@@ -392,9 +409,10 @@ pub fn add_read_and_decode_storage_struct_instructions(
         crate::declare_host_debug_functions!(module)
     };
 
-    let struct_ptr = module.locals.add(ValType::I32);
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
 
     // Locals
+    let struct_ptr = module.locals.add(ValType::I32);
     let field_ptr = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
     let val_32 = module.locals.add(ValType::I32);
@@ -427,26 +445,37 @@ pub fn add_read_and_decode_storage_struct_instructions(
             .call(storage_load);
     }
 
-    let mut read_bytes_in_slot = read_bytes_in_slot;
+    // let mut read_bytes_in_slot = read_bytes_in_slot;
     for (index, field) in struct_.fields.iter().enumerate() {
-        let field_size = field_size(field, compilation_ctx);
-        if read_bytes_in_slot + field_size > 32 {
-            let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
-            builder
-                .local_get(slot_ptr)
-                .call(next_slot_fn)
-                .local_set(slot_ptr);
+        let field_size = field_size(field, compilation_ctx) as i32;
+        builder
+            .local_get(read_bytes_in_slot)
+            .i32_const(field_size)
+            .binop(BinaryOp::I32Add)
+            .i32_const(32)
+            .binop(BinaryOp::I32GtS)
+            .if_else(
+                None,
+                |then| {
+                    then.local_get(slot_ptr)
+                        .call(next_slot_fn)
+                        .local_set(slot_ptr);
 
-            // Load the slot data
-            builder
-                .local_get(slot_ptr)
-                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                .call(storage_load);
+                    // Load the slot data
+                    then.local_get(slot_ptr)
+                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                        .call(storage_load);
 
-            read_bytes_in_slot = field_size;
-        } else {
-            read_bytes_in_slot += field_size;
-        }
+                    then.i32_const(field_size).local_set(read_bytes_in_slot);
+                },
+                |else_| {
+                    else_
+                        .local_get(read_bytes_in_slot)
+                        .i32_const(field_size)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(read_bytes_in_slot);
+                },
+            );
 
         match field {
             IntermediateType::IBool
@@ -485,12 +514,16 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 // Read the value and transform it to LE
                 builder
                     .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                    .i32_const(32)
+                    .local_get(read_bytes_in_slot)
+                    .binop(BinaryOp::I32Sub)
+                    .binop(BinaryOp::I32Add)
                     .load(
                         compilation_ctx.memory_id,
                         load_kind,
                         MemArg {
                             align: 0,
-                            offset: 32 - read_bytes_in_slot,
+                            offset: 0,
                         },
                     )
                     .local_tee(val)
@@ -533,7 +566,9 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 // Source address (plus offset)
                 builder
                     .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                    .i32_const(32 - read_bytes_in_slot as i32)
+                    .i32_const(32)
+                    .local_get(read_bytes_in_slot)
+                    .binop(BinaryOp::I32Sub)
                     .binop(BinaryOp::I32Add);
 
                 // Number of bytes to copy
@@ -587,7 +622,9 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 // Source address (plus offset)
                 builder
                     .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                    .i32_const(32 - read_bytes_in_slot as i32)
+                    .i32_const(32)
+                    .local_get(read_bytes_in_slot)
+                    .binop(BinaryOp::I32Sub)
                     .binop(BinaryOp::I32Add);
 
                 // Number of bytes to copy
@@ -602,18 +639,15 @@ pub fn add_read_and_decode_storage_struct_instructions(
                     .unwrap();
 
                 // Read the child struct
-                let (child_struct_ptr, read_bytes) =
-                    add_read_and_decode_storage_struct_instructions(
-                        module,
-                        builder,
-                        compilation_ctx,
-                        slot_ptr,
-                        child_struct,
-                        true,
-                        read_bytes_in_slot,
-                    );
-
-                read_bytes_in_slot = read_bytes;
+                let child_struct_ptr = add_read_and_decode_storage_struct_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    slot_ptr,
+                    child_struct,
+                    true,
+                    read_bytes_in_slot,
+                );
 
                 builder.local_get(child_struct_ptr).local_set(field_ptr);
             }
@@ -628,18 +662,15 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 let child_struct = child_struct.instantiate(types);
 
                 // Read the child struct
-                let (child_struct_ptr, read_bytes) =
-                    add_read_and_decode_storage_struct_instructions(
-                        module,
-                        builder,
-                        compilation_ctx,
-                        slot_ptr,
-                        &child_struct,
-                        true,
-                        read_bytes_in_slot,
-                    );
-
-                read_bytes_in_slot = read_bytes;
+                let child_struct_ptr = add_read_and_decode_storage_struct_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    slot_ptr,
+                    &child_struct,
+                    true,
+                    read_bytes_in_slot,
+                );
 
                 builder.local_get(child_struct_ptr).local_set(field_ptr);
             }
@@ -721,18 +752,15 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 match external_data {
                     ExternalModuleData::Struct(child_struct) => {
                         // Read the child struct
-                        let (child_struct_ptr, read_bytes) =
-                            add_read_and_decode_storage_struct_instructions(
-                                module,
-                                builder,
-                                compilation_ctx,
-                                slot_ptr,
-                                &child_struct,
-                                true,
-                                read_bytes_in_slot,
-                            );
-
-                        read_bytes_in_slot = read_bytes;
+                        let child_struct_ptr = add_read_and_decode_storage_struct_instructions(
+                            module,
+                            builder,
+                            compilation_ctx,
+                            slot_ptr,
+                            &child_struct,
+                            true,
+                            read_bytes_in_slot,
+                        );
 
                         builder.local_get(child_struct_ptr).local_set(field_ptr);
                     }
@@ -765,7 +793,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
         );
     }
 
-    (struct_ptr, read_bytes_in_slot)
+    struct_ptr
 }
 
 /// Return the storage-encoded field size in bytes
@@ -1110,16 +1138,15 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                             .local_set(inner_data_ptr);
 
                         // add_encode_and_save_into_storage_struct_instructions will modify the slot pointer so we know where to continue once this function returns.
-                        let written_bytes_in_slot_ =
-                            add_encode_and_save_into_storage_struct_instructions(
-                                module,
-                                loop_,
-                                compilation_ctx,
-                                inner_data_ptr,
-                                elem_slot_ptr,
-                                child_struct,
-                                0,
-                            );
+                        add_encode_and_save_into_storage_struct_instructions(
+                            module,
+                            loop_,
+                            compilation_ctx,
+                            inner_data_ptr,
+                            elem_slot_ptr,
+                            child_struct,
+                            written_bytes_in_slot,
+                        );
                     }
                     // IntermediateType::IGenericStructInstance {
                     //     module_id,
@@ -1635,27 +1662,35 @@ pub fn add_read_and_decode_storage_vector_instructions(
                                     },
                                 );
                         }
-                        // IntermediateType::IStruct { module_id, index } => {
-                        //     let child_struct = compilation_ctx
-                        //         .get_user_data_type_by_index(module_id, *index)
-                        //         .unwrap();
+                        IntermediateType::IStruct { module_id, index } => {
+                            let child_struct = compilation_ctx
+                                .get_user_data_type_by_index(module_id, *index)
+                                .unwrap();
 
-                        //     // Read the child struct
-                        //     let (child_struct_ptr, read_bytes) =
-                        //         add_read_and_decode_storage_struct_instructions(
-                        //             module,
-                        //             builder,
-                        //             compilation_ctx,
-                        //             slot_ptr,
-                        //             child_struct,
-                        //             true,
-                        //             read_bytes_in_slot,
-                        //         );
+                            // Read the child struct
+                            let child_struct_ptr = add_read_and_decode_storage_struct_instructions(
+                                module,
+                                loop_,
+                                compilation_ctx,
+                                elem_slot_ptr,
+                                child_struct,
+                                false,
+                                read_bytes_in_slot,
+                            );
 
-                        //     read_bytes_in_slot = read_bytes;
-
-                        //     builder.local_get(child_struct_ptr).local_set(field_ptr);
-                        // }
+                            // Store the pointer to the child struct into the vector data memory
+                            loop_
+                                .vec_elem_ptr(data_ptr, i, stack_size)
+                                .local_get(child_struct_ptr)
+                                .store(
+                                    compilation_ctx.memory_id,
+                                    StoreKind::I32 { atomic: false },
+                                    MemArg {
+                                        align: 0,
+                                        offset: 0,
+                                    },
+                                );
+                        }
                         // IntermediateType::IGenericStructInstance {
                         //     module_id,
                         //     index,

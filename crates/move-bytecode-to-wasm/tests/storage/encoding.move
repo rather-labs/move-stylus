@@ -192,3 +192,27 @@ public fun save_dynamic_array_struct_4(
 public fun read_dynamic_array_struct_4(): DynamicArrayStruct4 {
     read_slot<DynamicArrayStruct4>(0)
 }
+
+public struct NestedStruct has store {
+    a: u64,
+    b: u128
+}
+
+public struct DynamicArrayStruct5 has key {
+    id: UID,
+    c: vector<NestedStruct>,
+}
+
+public fun save_dynamic_array_struct_5(
+    id: UID,
+    a: u64,
+    b: u128
+) {
+    let c = vector[NestedStruct { a, b }, NestedStruct { a, b }, NestedStruct { a, b }];
+    let struct_ = DynamicArrayStruct5 { id, c};
+    save_in_slot(struct_, 0);
+}
+
+public fun read_dynamic_array_struct_5(): DynamicArrayStruct5 {
+    read_slot<DynamicArrayStruct5>(0)
+} 

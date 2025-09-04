@@ -623,6 +623,8 @@ pub fn add_save_struct_into_storage_fn(
 
     let struct_ptr = module.locals.add(ValType::I32);
     let slot_ptr = module.locals.add(ValType::I32);
+    let written_bytes_in_slot = module.locals.add(ValType::I32);
+    builder.i32_const(0).local_set(written_bytes_in_slot);
 
     add_encode_and_save_into_storage_struct_instructions(
         module,
@@ -631,7 +633,7 @@ pub fn add_save_struct_into_storage_fn(
         struct_ptr,
         slot_ptr,
         &struct_,
-        0,
+        written_bytes_in_slot,
     );
 
     function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs)
@@ -668,15 +670,17 @@ pub fn add_read_struct_from_storage_fn(
     let mut builder = function.name(name).func_body();
 
     let slot_ptr = module.locals.add(ValType::I32);
+    let read_bytes_in_slot = module.locals.add(ValType::I32);
+    builder.i32_const(0).local_set(read_bytes_in_slot);
 
-    let (struct_ptr, _) = add_read_and_decode_storage_struct_instructions(
+    let struct_ptr = add_read_and_decode_storage_struct_instructions(
         module,
         &mut builder,
         compilation_ctx,
         slot_ptr,
         &struct_,
         false,
-        0,
+        read_bytes_in_slot,
     );
 
     builder.local_get(struct_ptr);
