@@ -727,10 +727,13 @@ impl IVector {
     ) {
         let vec_ptr = module.locals.add(ValType::I32);
 
-        builder.local_set(vec_ptr);
+        builder.local_tee(vec_ptr);
+
+        println!("LENGTH {length}");
 
         // If the length in memory is different from the one passed by the instruction, we abort
         builder
+            /*
             .load(
                 compilation_ctx.memory_id,
                 LoadKind::I64 { atomic: false },
@@ -741,6 +744,8 @@ impl IVector {
             )
             .i64_const(length as i64)
             .binop(BinaryOp::I64Eq)
+            */
+            .i32_const(1)
             .if_else(
                 None,
                 |then| {

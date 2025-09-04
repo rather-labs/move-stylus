@@ -1403,6 +1403,7 @@ mod vec_32 {
         function vecSwap(uint32[] x, uint64 id1, uint64 id2) external returns (uint32[]);
         function vecPushBack(uint32[] x, uint32 y) external returns (uint32[]);
         function vecPushAndPopBack(uint32[] x, uint32 y) external returns (uint32[]);
+        function vecUnpack(uint32[] x) external returns (uint32[]);
     );
 
     #[rstest]
@@ -1424,6 +1425,7 @@ mod vec_32 {
     #[case(vecSwapCall::new((vec![1u32, 2u32, 3u32], 0u64, 2u64)), vec![3, 2, 1])]
     #[case(vecPushBackCall::new((vec![1u32, 2u32, 3u32], 4u32)), vec![1, 2, 3, 4])]
     #[case(vecPushAndPopBackCall::new((vec![1u32, 2u32, 3u32], 4u32)), vec![1, 2, 3])]
+    #[case(vecUnpackCall::new((vec![1u32, 2u32, 3u32],)), vec![1, 2, 3])]
     fn test_vec_32<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

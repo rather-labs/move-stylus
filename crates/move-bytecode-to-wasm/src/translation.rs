@@ -150,10 +150,12 @@ pub fn translate_function(
         branch_targets: &mut branch_targets,
     };
 
+    /*
     println!(
         "translating {}",
         function_information.function_id.identifier
     );
+    */
     translate_flow(
         &mut ctx,
         &mut builder,
@@ -201,7 +203,7 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
-                    println!("\nTranslating {instruction:?}");
+                    // println!("\nTranslating {instruction:?}");
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -218,7 +220,7 @@ fn translate_flow(
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
                     });
-                    println!("typestack after {:?}\n", ctx.types_stack);
+                    // println!("typestack after {:?}\n", ctx.types_stack);
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
@@ -876,6 +878,8 @@ fn translate_instruction(
             } else {
                 inner
             };
+
+            println!("INNERRRR {inner:?}");
 
             types_stack.pop_expecting(&IntermediateType::IVector(Box::new(inner.clone())))?;
 
@@ -1944,10 +1948,8 @@ fn translate_instruction(
                 if let Some(caller_type_instances) =
                     &mapped_function.function_id.type_instantiations
                 {
-                    println!("AAAAAA");
                     let mut instantiations = Vec::new();
                     for (index, field) in types.iter().enumerate() {
-                        println!("AAAAAA {:?} {:?}", field, &types[index]);
                         if let Some(res) = extract_type_instances_from_stack(field, &types[index]) {
                             instantiations.push(res);
                         } else {
@@ -1966,7 +1968,6 @@ fn translate_instruction(
                         })
                         .collect::<Vec<IntermediateType>>();
 
-                    println!("AAAAAA {:?}", instantiations);
                     (struct_.instantiate(&instantiations), instantiations)
                 }
                 // This should never happen
