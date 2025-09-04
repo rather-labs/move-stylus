@@ -79,9 +79,9 @@ public fun vec_push_and_pop_back(x: vector<u32>, y: u32): vector<u32> {
   z
 }
 
-public fun vec_unpack(_x: vector<u32>): vector<u32> {
-    let mut z = vector[1, 2];
-    let mut x = vector[1, 2, 3];
+// This generates a VecUnpack instruction
+public fun vec_unpack(x: vector<u32>): vector<u32> {
+    let mut z = vector[3, 1, 4];
     x.do!(|e| z.push_back(e));
     z
 }

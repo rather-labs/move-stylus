@@ -35,8 +35,8 @@ public fun vec_from_vec_and_int(x: vector<u64>, y: u64): vector<vector<u64>> {
 // Forces the compiler to store literals on locals
 public fun get_copied_local(): vector<u64> {
   let x: vector<u64> = vector[1u64, 2u64, 3u64];
-  let y = x; 
-  let _z = x; 
+  let y = x;
+  let _z = x;
   y
 }
 
@@ -78,4 +78,11 @@ public fun vec_push_and_pop_back(x: vector<u64>, y: u64): vector<u64> {
   z.push_back(y);
   z.pop_back();
   z
+}
+
+// This generates a VecUnpack instruction
+public fun vec_unpack(x: vector<u64>): vector<u64> {
+    let mut z = vector[3, 1, 4];
+    x.do!(|e| z.push_back(e));
+    z
 }

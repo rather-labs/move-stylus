@@ -879,8 +879,6 @@ fn translate_instruction(
                 inner
             };
 
-            println!("INNERRRR {inner:?}");
-
             types_stack.pop_expecting(&IntermediateType::IVector(Box::new(inner.clone())))?;
 
             IVector::vec_unpack_instructions(&inner, module, builder, compilation_ctx, *length);

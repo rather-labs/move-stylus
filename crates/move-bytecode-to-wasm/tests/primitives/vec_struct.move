@@ -191,3 +191,10 @@ public fun vec_borrow(x: &vector<Foo>): &Foo {
 public fun vec_mut_borrow(x: &mut vector<Foo>): &mut Foo {
     &mut x[0]
 }
+
+// This generates a VecUnpack instruction
+public fun vec_unpack(x: vector<Foo>): vector<Foo> {
+    let mut z = get_literal();
+    x.do!(|e| z.push_back(e));
+    z
+}
