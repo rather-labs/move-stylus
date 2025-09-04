@@ -65,7 +65,7 @@ impl SolName for IntermediateType {
             }
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
 
                 if struct_.saved_in_storage {
@@ -80,7 +80,7 @@ impl SolName for IntermediateType {
                 types,
             } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
 
@@ -90,9 +90,7 @@ impl SolName for IntermediateType {
                     Self::struct_fields_sol_name(&struct_instance, compilation_ctx)
                 }
             }
-            IntermediateType::ISigner
-            | IntermediateType::IUnknown
-            | IntermediateType::ITypeParameter(_) => None,
+            IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => None,
         }
     }
 }

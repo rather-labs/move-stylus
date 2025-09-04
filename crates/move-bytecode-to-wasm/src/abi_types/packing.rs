@@ -238,9 +238,6 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
             }
-            IntermediateType::IUnknown => {
-                panic!("cannot pack an unknown type parameter");
-            }
         }
     }
 
@@ -328,7 +325,7 @@ impl Packable for IntermediateType {
             ),
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
 
                 struct_.add_pack_instructions(
@@ -347,7 +344,7 @@ impl Packable for IntermediateType {
                 types,
             } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.add_pack_instructions(
@@ -381,9 +378,6 @@ impl Packable for IntermediateType {
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
-            }
-            IntermediateType::IUnknown => {
-                panic!("cannot pack an unknown type parameter");
             }
         }
     }
@@ -424,7 +418,7 @@ impl Packable for IntermediateType {
             }
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
 
                 struct_.add_pack_instructions(
@@ -443,7 +437,7 @@ impl Packable for IntermediateType {
                 types,
             } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.add_pack_instructions(
@@ -491,23 +485,20 @@ impl Packable for IntermediateType {
                 types,
             } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.solidity_abi_encode_size(compilation_ctx)
             }
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
 
                 struct_.solidity_abi_encode_size(compilation_ctx)
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("can't know the size of a generic type parameter at compile time");
-            }
-            IntermediateType::IUnknown => {
-                panic!("can't know the size of an unknown type parameter at compile time");
             }
         }
     }
@@ -527,7 +518,7 @@ impl Packable for IntermediateType {
             IntermediateType::IVector(_) => true,
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 struct_.solidity_abi_encode_is_dynamic(compilation_ctx)
             }
@@ -537,16 +528,13 @@ impl Packable for IntermediateType {
                 types,
             } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.solidity_abi_encode_is_dynamic(compilation_ctx)
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot check if generic type parameter is dynamic at compile time");
-            }
-            IntermediateType::IUnknown => {
-                panic!("cannot check if unknown type parameter is dynamic at compile time");
             }
             // References are dynamic if the inner type is dynamic!
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {

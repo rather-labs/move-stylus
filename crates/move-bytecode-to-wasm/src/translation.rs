@@ -16,8 +16,7 @@ use crate::{
     compilation_context::ModuleData,
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     generics::{
-        extract_type_instances_from_stack, replace_type_parameters,
-        replace_type_parameters_for_unknown, type_contains_generics,
+        extract_type_instances_from_stack, replace_type_parameters, type_contains_generics,
     },
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
@@ -437,63 +436,94 @@ fn translate_instruction(
                     .unwrap()
             };
 
-            // If the type instantaitions contains type parameters means we need to instantiate the
-            // functions with the information we have in stack.
-            // We can encounter this situation with a chain of calls:
-            //
-            // public fun echo_u16(x: u16): u16 {
-            //     test(x)
-            // }
-            //
-            // fun test<T>(t: T): T {
-            //     test2(t)
-            // }
-            //
-            // fun test2<T>(t: T): T {
-            //     t
-            // }
-            //
-            // In this example, the type parameter `T` in `test` is instantiated as `u16`.
-            // However, when `test2` is called from within `test`, the concrete type for `T`
-            // is not yet known at module processing time. The type instantiations for
-            // `test2` will remain as `ITypeParameters` and will only be resolved at
-            // the moment of the function call.
             let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
 
+            // If the type_instantiations contains generic parameters, those generic parameters
+            // refer to instantiations whithin this context. Instantiatons are obtained using
+            // the caller's function type instances (located in
+            // `mapped_function.function_id.type_instantiations`)
             let function_information = if type_instantiations.iter().any(type_contains_generics) {
-                let arguments_start =
-                    types_stack.len() - function_information.signature.arguments.len();
-
-                // Get the function's arguments from the types stack
-                let types = &types_stack[arguments_start..types_stack.len()];
-
-                if !types.is_empty() {
-                    // These types represent the instantiated types that correspond to the return values
-                    // of the parent function. This is crucial because we may encounter an IRef<T> or
-                    // IMutRef<T>, and we need to extract the underlying type T.
-                    let mut instantiations = HashSet::new();
+                // Here we extract the type instances from the caller's type instantiations.
+                // Consider the following example:
+                //
+                // ```move
+                // public fun two_generics<T, U>(): Option<U> {
+                //     option::none()
+                // }
+                //
+                // public fun test(): Option<u16> {
+                //     two_generics<u32, u16>()
+                // }
+                // ```
+                //
+                // where `option::none()` is defined as:
+                //
+                // ```move
+                // public fun none<V>(): Option<V> {
+                //     Option { vec: vector::empty() }
+                // }
+                // ```
+                //
+                // In this case:
+                //
+                // - The call to `two_generics` is instantiated with two types: `u32` mapped to
+                //   `ITypeParameter(0)` and `u16` mapped to `ITypeParameter(1)`.
+                //
+                // - `two_generics<T, U>` returns `U`, which corresponds to `ITypeParameter(1)`.
+                //
+                // - `option::none<V>()` has a single type parameter `V`, represented as
+                //   `ITypeParameter(0)`.
+                //
+                // The substitutions happen as follows:
+                //
+                // - Since `option::none()` provides the return value, its parameter
+                //   `V: ITypeParameter(0)` is instantiated with the caller's parameter
+                //   `U: ITypeParameter(1)`.
+                //
+                // - In `test`, we call `two_generics` with `T = u32` and `U = u16`. Therefore:
+                //   - `ITypeParameter(0)` is replaced with `u32`
+                //   - `ITypeParameter(1)` is replaced with `u16`
+                //
+                // If we follow the call chain:
+                //
+                // - `ITypeParameter(0)` (from `option::none`) is replaced with
+                //   `ITypeParameter(1)` (from `two_generics`).
+                //
+                // - `ITypeParameter(1)` is then replaced with `u16` (from the instantiation
+                //   in `test`).
+                //
+                // By transitivity, we infer that the type of `option::none()` in this context
+                // is `u16`.
+                if let Some(caller_type_instances) =
+                    &mapped_function.function_id.type_instantiations
+                {
+                    let mut instantiations = Vec::new();
                     for (index, field) in type_instantiations.iter().enumerate() {
-                        if let Some(res) = extract_type_instances_from_stack(field, &types[index]) {
-                            instantiations.insert(res);
+                        if let Some(res) =
+                            extract_type_instances_from_stack(field, &type_instantiations[index])
+                        {
+                            instantiations.push(res);
+                        } else {
+                            instantiations.push(field.clone());
                         }
                     }
-                    // TODO assert the same index is not repreated twice (meaning there is two or more
-                    // different types for the same type parameter)
 
                     let instantiations = instantiations
                         .into_iter()
-                        .map(|(_, t)| t)
+                        .map(|f| {
+                            if let IntermediateType::ITypeParameter(i) = f {
+                                caller_type_instances[i as usize].clone()
+                            } else {
+                                f
+                            }
+                        })
                         .collect::<Vec<IntermediateType>>();
 
                     function_information.instantiate(&instantiations)
-                } else {
-                    // If we can't deduce the types from the stack we mark them as unknown
-                    let type_instantiations = type_instantiations
-                        .iter()
-                        .map(replace_type_parameters_for_unknown)
-                        .collect::<Vec<IntermediateType>>();
-
-                    function_information.instantiate(&type_instantiations)
+                }
+                // This should never happen
+                else {
+                    panic!("could not instantiate generic types");
                 }
             } else {
                 function_information.instantiate(type_instantiations)
@@ -632,16 +662,7 @@ fn translate_instruction(
                 local_type.box_local_instructions(module, builder, compilation_ctx, local);
             }
 
-            // It can happen that we encounter a type that contains the IntermediateType::IUnknown
-            // type instead of a concrete type. This can happen in functions such as
-            //
-            // public fun none<Element>(): Option<Element> {
-            //    Option { vec: vector::empty() }
-            // }
-            //
-            // where in the previous instructions, we had no information about what type Element
-            // could be
-            types_stack.pop_expecting_with_unknown(local_type)?;
+            types_stack.pop_expecting(local_type)?;
         }
         Bytecode::MoveLoc(local_id) => {
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
@@ -910,11 +931,19 @@ fn translate_instruction(
             let inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
-            let inner = if let IntermediateType::ITypeParameter(_) = inner {
+            let inner = if let IntermediateType::ITypeParameter(i) = inner {
                 types_stack
                     .0
                     .last()
-                    .unwrap_or(&IntermediateType::IUnknown)
+                    .unwrap_or(
+                        if let Some(caller_type_instances) =
+                            &mapped_function.function_id.type_instantiations
+                        {
+                            &caller_type_instances[i as usize]
+                        } else {
+                            panic!("could not compute concrete type")
+                        },
+                    )
                     .clone()
             } else {
                 inner
@@ -988,7 +1017,6 @@ fn translate_instruction(
                     builder.call(pop_back_f);
                 }
                 IntermediateType::ITypeParameter(_)
-                | IntermediateType::IUnknown
                 | IntermediateType::IRef(_)
                 | IntermediateType::IMutRef(_) => {
                     return Err(TranslationError::InvalidOperation {
@@ -1756,6 +1784,11 @@ fn translate_instruction(
                 .structs
                 .get_struct_instance_by_struct_definition_idx(struct_definition_index)?;
 
+            let type_instantiations = module_data
+                .structs
+                .get_generic_struct_types_instances(struct_definition_index)?
+                .to_vec();
+
             // In some situations a struct instantiation in the Move module that contains a generic type
             // parameter. For example:
             // ```
@@ -1773,29 +1806,39 @@ fn translate_instruction(
             // ```
             //  In `create_foo` the compiler does not have any information about what T could be,
             //  so, when called from `create_foo_u32` it will find a TypeParameter instead of a u32.
-            //  The TypeParameter will replaced by the u32 using the types stack information.
-            let (struct_, types) = if struct_.fields.iter().any(type_contains_generics) {
-                let types_start = types_stack.len() - struct_.fields.len();
-
-                // Get the function's arguments from the types stack
-                let types = &types_stack[types_start..types_stack.len()];
-
-                let mut instantiations = HashSet::new();
-                for (index, field) in struct_.fields.iter().enumerate() {
-                    if let Some(res) = extract_type_instances_from_stack(field, &types[index]) {
-                        instantiations.insert(res);
+            //  The TypeParameter will replaced by the u32 using the caller's type information.
+            let (struct_, types) = if type_instantiations.iter().any(type_contains_generics) {
+                if let Some(caller_type_instances) =
+                    &mapped_function.function_id.type_instantiations
+                {
+                    let mut instantiations = Vec::new();
+                    for (index, field) in type_instantiations.iter().enumerate() {
+                        if let Some(res) =
+                            extract_type_instances_from_stack(field, &type_instantiations[index])
+                        {
+                            instantiations.push(res);
+                        } else {
+                            instantiations.push(field.clone());
+                        }
                     }
+
+                    let instantiations = instantiations
+                        .into_iter()
+                        .map(|f| {
+                            if let IntermediateType::ITypeParameter(i) = f {
+                                caller_type_instances[i as usize].clone()
+                            } else {
+                                f
+                            }
+                        })
+                        .collect::<Vec<IntermediateType>>();
+
+                    (struct_.instantiate(&instantiations), instantiations)
                 }
-
-                let instantiations = instantiations
-                    .into_iter()
-                    .map(|(_, t)| t)
-                    .collect::<Vec<IntermediateType>>();
-
-                // TODO assert the same index is not repreated twice (meaning there is two or more
-                // different types for the same type parameter)
-
-                (struct_.instantiate(&instantiations), instantiations)
+                // This should never happen
+                else {
+                    panic!("could not instantiate generic types");
+                }
             } else {
                 let types = module_data
                     .structs

@@ -116,12 +116,6 @@ pub fn pack_variant(
                             variant_index,
                         });
                     }
-                    IntermediateType::IUnknown => {
-                        return Err(TranslationError::FoundUnknownTypeInsideEnumVariant {
-                            enum_index: enum_.index,
-                            variant_index,
-                        });
-                    }
                     IntermediateType::IEnum(_) => todo!(),
                 };
             }

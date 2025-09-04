@@ -310,11 +310,6 @@ impl IStruct {
                         "Trying to copy a type parameter inside a struct, expected a concrete type"
                     );
                 }
-                IntermediateType::IUnknown => {
-                    panic!(
-                        "Trying to copy an unknown type parameter inside a struct, expected a concrete type"
-                    );
-                }
                 IntermediateType::IEnum(_) => todo!(),
             }
 
@@ -364,7 +359,7 @@ impl IStruct {
                 IntermediateType::IVector(_) => return true,
                 IntermediateType::IStruct { module_id, index } => {
                     let child_struct = compilation_ctx
-                        .get_user_data_type_by_index(module_id, *index)
+                        .get_struct_by_index(module_id, *index)
                         .unwrap();
 
                     if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
@@ -377,7 +372,7 @@ impl IStruct {
                     types,
                 } => {
                     let child_struct = compilation_ctx
-                        .get_user_data_type_by_index(module_id, *index)
+                        .get_struct_by_index(module_id, *index)
                         .unwrap();
                     let child_struct_instance = child_struct.instantiate(types);
 
@@ -391,11 +386,6 @@ impl IStruct {
                 }
                 IntermediateType::ITypeParameter(_) => {
                     panic!("cannot know if a type parameter is dynamic, expected a concrete type");
-                }
-                IntermediateType::IUnknown => {
-                    panic!(
-                        "cannot know if an unknown type parameter is dynamic, expected a concrete type"
-                    );
                 }
                 IntermediateType::IEnum(_) => todo!(),
             }
@@ -426,7 +416,7 @@ impl IStruct {
                     types,
                 } => {
                     let child_struct = compilation_ctx
-                        .get_user_data_type_by_index(module_id, *index)
+                        .get_struct_by_index(module_id, *index)
                         .unwrap();
                     let child_struct_instance = child_struct.instantiate(types);
 
@@ -438,7 +428,7 @@ impl IStruct {
                 }
                 IntermediateType::IStruct { module_id, index } => {
                     let child_struct = compilation_ctx
-                        .get_user_data_type_by_index(module_id, *index)
+                        .get_struct_by_index(module_id, *index)
                         .unwrap();
 
                     if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
@@ -452,9 +442,6 @@ impl IStruct {
                     panic!("found reference inside struct")
                 }
                 IntermediateType::ITypeParameter(_) => {
-                    panic!("cannot know a type parameter's size, expected a concrete type");
-                }
-                IntermediateType::IUnknown => {
                     panic!("cannot know a type parameter's size, expected a concrete type");
                 }
                 IntermediateType::IEnum(_) => todo!(),

@@ -40,15 +40,15 @@ pub fn type_contains_generics(itype: &IntermediateType) -> bool {
 pub fn extract_type_instances_from_stack(
     generic_type: &IntermediateType,
     instantiated_type: &IntermediateType,
-) -> Option<(u16, IntermediateType)> {
+) -> Option<IntermediateType> {
     match generic_type {
-        IntermediateType::ITypeParameter(i) => match instantiated_type {
+        IntermediateType::ITypeParameter(_) => match instantiated_type {
             IntermediateType::IRef(instantiated_inner)
             | IntermediateType::IMutRef(instantiated_inner) => {
                 extract_type_instances_from_stack(generic_type, instantiated_inner)
             }
 
-            _ => Some((*i, instantiated_type.clone())),
+            _ => Some(instantiated_type.clone()),
         },
         IntermediateType::IVector(inner) => {
             if let IntermediateType::IVector(instantiated_inner) = instantiated_type {
@@ -126,37 +126,6 @@ pub fn replace_type_parameters(
         },
         IntermediateType::IVector(inner) => {
             IntermediateType::IVector(Box::new(replace_type_parameters(inner, instance_types)))
-        }
-        // Non-generic type: keep as is
-        _ => itype.clone(),
-    }
-}
-
-/// Auxiliary functiion that recursively looks for not instantiated type parameters and
-/// replaces them with `IntermediateType::IUnknown`
-pub fn replace_type_parameters_for_unknown(itype: &IntermediateType) -> IntermediateType {
-    match itype {
-        IntermediateType::ITypeParameter(_) => IntermediateType::IUnknown,
-        IntermediateType::IRef(inner) => {
-            IntermediateType::IRef(Box::new(replace_type_parameters_for_unknown(inner)))
-        }
-        IntermediateType::IMutRef(inner) => {
-            IntermediateType::IMutRef(Box::new(replace_type_parameters_for_unknown(inner)))
-        }
-        IntermediateType::IGenericStructInstance {
-            module_id,
-            index,
-            types,
-        } => IntermediateType::IGenericStructInstance {
-            module_id: module_id.clone(),
-            index: *index,
-            types: types
-                .iter()
-                .map(replace_type_parameters_for_unknown)
-                .collect(),
-        },
-        IntermediateType::IVector(inner) => {
-            IntermediateType::IVector(Box::new(replace_type_parameters_for_unknown(inner)))
         }
         // Non-generic type: keep as is
         _ => itype.clone(),
