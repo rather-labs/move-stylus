@@ -2,18 +2,13 @@ mod error;
 pub mod module_data;
 pub mod reserved_modules;
 
-use crate::translation::intermediate_types::{IntermediateType, enums::IEnum, structs::IStruct};
+use crate::translation::intermediate_types::{IntermediateType, structs::IStruct};
 pub use error::CompilationContextError;
 pub use module_data::{ModuleData, ModuleId, UserDefinedType};
 use std::{borrow::Cow, collections::HashMap};
 use walrus::{FunctionId, MemoryId};
 
 type Result<T> = std::result::Result<T, CompilationContextError>;
-
-pub enum ExternalModuleData<'a> {
-    Struct(Cow<'a, IStruct>),
-    Enum(&'a IEnum),
-}
 
 /// Compilation context
 ///
@@ -58,11 +53,8 @@ impl CompilationContext<'_> {
         }
     }
 
-    pub fn get_user_data_type_by_index(
-        &self,
-        module_id: &ModuleId,
-        index: u16,
-    ) -> Result<&IStruct> {
+    /// Looks for a struct with index `index` within the module with id `module_id`
+    pub fn get_struct_by_index(&self, module_id: &ModuleId, index: u16) -> Result<&IStruct> {
         let module = self
             .deps_data
             .get(module_id)
@@ -87,7 +79,7 @@ impl CompilationContext<'_> {
     ) -> Result<Cow<IStruct>> {
         match itype {
             IntermediateType::IStruct { module_id, index } => {
-                let struct_ = self.get_user_data_type_by_index(module_id, *index)?;
+                let struct_ = self.get_struct_by_index(module_id, *index)?;
                 Ok(Cow::Borrowed(struct_))
             }
             IntermediateType::IGenericStructInstance {
@@ -95,7 +87,7 @@ impl CompilationContext<'_> {
                 index,
                 types,
             } => {
-                let struct_ = self.get_user_data_type_by_index(module_id, *index)?;
+                let struct_ = self.get_struct_by_index(module_id, *index)?;
                 let instance = struct_.instantiate(types);
                 Ok(Cow::Owned(instance))
             }

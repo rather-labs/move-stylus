@@ -20,7 +20,7 @@ impl VmHandledType for TxContext {
 
     fn is_vm_type(module_id: &ModuleId, index: u16, compilation_ctx: &CompilationContext) -> bool {
         let identifier = &compilation_ctx
-            .get_user_data_type_by_index(module_id, index)
+            .get_struct_by_index(module_id, index)
             .unwrap()
             .identifier;
 

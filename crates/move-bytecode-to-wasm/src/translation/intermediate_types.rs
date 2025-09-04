@@ -375,7 +375,7 @@ impl IntermediateType {
             }
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 builder.load(
                     compilation_ctx.memory_id,
@@ -393,7 +393,7 @@ impl IntermediateType {
                 types,
             } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 builder.load(
@@ -605,7 +605,7 @@ impl IntermediateType {
             }
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 IStruct::copy_local_instructions(
                     struct_,
@@ -621,7 +621,7 @@ impl IntermediateType {
                 types,
             } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.copy_local_instructions(
@@ -902,7 +902,7 @@ impl IntermediateType {
             Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner),
             Self::IStruct { index, module_id } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 struct_.equality(builder, module, compilation_ctx, module_data)
             }
@@ -912,7 +912,7 @@ impl IntermediateType {
                 types,
             } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 struct_
                     .instantiate(types)

@@ -210,7 +210,7 @@ impl IStruct {
             let advancement = match field {
                 IntermediateType::IStruct { module_id, index } => {
                     let child_struct = compilation_ctx
-                        .get_user_data_type_by_index(module_id, *index)
+                        .get_struct_by_index(module_id, *index)
                         .unwrap();
 
                     pack_child_struct(
@@ -230,7 +230,7 @@ impl IStruct {
                     types,
                 } => {
                     let child_struct = compilation_ctx
-                        .get_user_data_type_by_index(module_id, *index)
+                        .get_struct_by_index(module_id, *index)
                         .unwrap();
                     let child_struct_instance = child_struct.instantiate(types);
 

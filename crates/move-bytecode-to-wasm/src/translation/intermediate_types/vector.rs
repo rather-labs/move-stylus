@@ -357,7 +357,7 @@ impl IVector {
                     );
 
                     let struct_ = compilation_ctx
-                        .get_user_data_type_by_index(module_id, *index)
+                        .get_struct_by_index(module_id, *index)
                         .unwrap();
 
                     struct_.copy_local_instructions(
@@ -383,7 +383,7 @@ impl IVector {
                     );
 
                     let struct_ = compilation_ctx
-                        .get_user_data_type_by_index(module_id, *index)
+                        .get_struct_by_index(module_id, *index)
                         .unwrap();
                     let struct_ = struct_.instantiate(types);
 
@@ -504,7 +504,7 @@ impl IVector {
                             .get_module_data_by_id(module_id)
                             .unwrap();
                         let struct_ = compilation_ctx
-                            .get_user_data_type_by_index(module_id, *index)
+                            .get_struct_by_index(module_id, *index)
                             .unwrap();
 
                         then.local_get(v1_ptr)
@@ -532,7 +532,7 @@ impl IVector {
                         let module_data = compilation_ctx
                             .get_module_data_by_id(module_id)
                             .unwrap();
-                        let struct_ = compilation_ctx.get_user_data_type_by_index(module_id, *index).unwrap();
+                        let struct_ = compilation_ctx.get_struct_by_index(module_id, *index).unwrap();
                         let struct_instance = struct_.instantiate(types);
 
                         then.local_get(v1_ptr)

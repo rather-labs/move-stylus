@@ -246,7 +246,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             }
             IntermediateType::IStruct { module_id, index } => {
                 let child_struct = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
 
                 // The struct ptr
@@ -269,7 +269,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                 types,
             } => {
                 let child_struct = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 let child_struct = child_struct.instantiate(types);
 
@@ -593,7 +593,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
             }
             IntermediateType::IStruct { module_id, index } => {
                 let child_struct = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
 
                 // Read the child struct
@@ -618,7 +618,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 types,
             } => {
                 let child_struct = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 let child_struct = child_struct.instantiate(types);
 
