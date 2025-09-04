@@ -775,6 +775,12 @@ mod storage_encoding {
             uint128 b;
         }
 
+        struct DynamicStruct6 {
+            UID id;
+            NestedStruct[][] c;
+            uint64[] d;
+        }
+
         function saveStaticFields(
             UID id,
             uint256 a,
@@ -852,6 +858,13 @@ mod storage_encoding {
             uint128 b,
         ) public view;
         function readDynamicStruct5() public view returns (DynamicStruct5);
+
+        function saveDynamicStruct6(
+            UID id,
+            uint64 a,
+            uint128 b,
+        ) public view;
+        function readDynamicStruct6() public view returns (DynamicStruct6);
     );
 
     #[rstest]
@@ -1255,6 +1268,42 @@ mod storage_encoding {
         DynamicStruct5 {
            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
            c: vec![NestedStruct { a: 47, b: 123 }, NestedStruct { a: 47, b: 123 }, NestedStruct { a: 47, b: 123 }],
+        }
+    )]
+    #[case(saveDynamicStruct6Call::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        47,
+        123,
+    )),
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // vector<vector<NestedStruct>> header
+        U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6", 16).unwrap().to_be_bytes(), // first vector<NestedStruct> header
+        U256::from_str_radix("b5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d22", 16).unwrap().to_be_bytes(), // first vector<NestedStruct> element slot
+        U256::from_str_radix("b5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d23", 16).unwrap().to_be_bytes(), // second vector<NestedStruct> element slot
+        U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf7", 16).unwrap().to_be_bytes(), // second vector<NestedStruct> header
+        U256::from_str_radix("ea7809e925a8989e20c901c4c1da82f0ba29b26797760d445a0ce4cf3c6fbd31", 16).unwrap().to_be_bytes(), // first vector<NestedStruct> element slot
+        U256::from_str_radix("ea7809e925a8989e20c901c4c1da82f0ba29b26797760d445a0ce4cf3c6fbd32", 16).unwrap().to_be_bytes(), // second vector<NestedStruct> element slot
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // vector<uint64> header
+        U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace", 16).unwrap().to_be_bytes(), // vector<uint64> elements slot
+    ],
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000002f0000000000000000000000000000007b000000000000002f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000007b", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000002f0000000000000000000000000000007b000000000000002f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000007b", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000310000000000000030000000000000002f", 16).unwrap().to_be_bytes(),
+    ],
+        readDynamicStruct6Call::new(()),
+        DynamicStruct6 {
+           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           c: vec![vec![NestedStruct { a: 47, b: 123 }, NestedStruct { a: 47, b: 123 }], vec![NestedStruct { a: 47, b: 123 }, NestedStruct { a: 47, b: 123 }]],
+           d: vec![47, 48, 49],
         }
     )]
     fn test_dynamic_fields<T: SolCall, U: SolCall, V: SolValue>(
