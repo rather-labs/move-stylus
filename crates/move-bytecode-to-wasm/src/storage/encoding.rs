@@ -15,7 +15,7 @@ use crate::{
         DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
         DATA_STORAGE_OBJECT_OWNER_OFFSET,
     },
-    hostio::host_functions::{storage_cache_bytes32, storage_load_bytes32},
+    hostio::host_functions::{native_keccak256, storage_cache_bytes32, storage_load_bytes32},
     runtime::RuntimeFunction,
     translation::intermediate_types::vector::IVector,
     translation::intermediate_types::{
@@ -826,16 +826,16 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
         crate::declare_host_debug_functions!(module)
     };
 
-    // Runtime functions
+    // Host functions
     let (storage_cache, _) = storage_cache_bytes32(module);
+    let (native_keccak, _) = native_keccak256(module);
+
+    // Runtime functions
     let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None);
-    let derive_dyn_array_slot_fn =
-        RuntimeFunction::DeriveDynArraySlot.get(module, Some(compilation_ctx));
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
 
     // Locals
     let elem_slot_ptr = module.locals.add(ValType::I32);
-    let elem_size_ptr = module.locals.add(ValType::I32);
-    let elem_index_ptr = module.locals.add(ValType::I32);
     let len = module.locals.add(ValType::I32);
     let val_32 = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
@@ -847,20 +847,11 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
         .i32_const(32)
         .memory_fill(compilation_ctx.memory_id);
 
-    // Memory allocation
+    // Allocate 32 bytes for the element slot
     builder
-        // allocate 32 bytes for the element slot
         .i32_const(32)
         .call(compilation_ctx.allocator)
-        .local_set(elem_slot_ptr)
-        // allocate 4 bytes for the element index
-        .i32_const(4)
-        .call(compilation_ctx.allocator)
-        .local_set(elem_index_ptr)
-        // allocate 4 bytes for the element size
-        .i32_const(4)
-        .call(compilation_ctx.allocator)
-        .local_set(elem_size_ptr);
+        .local_set(elem_slot_ptr);
 
     // Load vector length from its header
     builder
@@ -893,25 +884,12 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
         // TODO: look out for structs, they have field size = 0.
         let elem_size = field_size(inner, compilation_ctx);
 
-        outer_block
-            .local_get(elem_size_ptr)
-            .i32_const(elem_size as i32)
-            .store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-
         // Calculate the slot of the first element
         outer_block
             .local_get(slot_ptr)
-            .local_get(elem_index_ptr) // i = 0, memory is not initialized yet
-            .local_get(elem_size_ptr)
+            .i32_const(32)
             .local_get(elem_slot_ptr)
-            .call(derive_dyn_array_slot_fn);
+            .call(native_keccak);
 
         outer_block.block(None, |inner_block| {
             let inner_block_id = inner_block.id();
@@ -925,16 +903,6 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
 
             inner_block.loop_(None, |loop_| {
                 let loop_id = loop_.id();
-
-                // Store the element index at #elem_index_ptr
-                loop_.local_get(elem_index_ptr).local_get(i).store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
 
                 // If we have written the whole slot, save to storage and calculate the next slot
                 loop_
@@ -957,12 +925,10 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                                 .i32_const(32)
                                 .memory_fill(compilation_ctx.memory_id);
 
-                            // Next slot (not necessarily contiguous)
-                            then.local_get(slot_ptr)
-                                .local_get(elem_index_ptr)
-                                .local_get(elem_size_ptr)
-                                .local_get(elem_slot_ptr)
-                                .call(derive_dyn_array_slot_fn);
+                            // Next slot
+                            then.local_get(elem_slot_ptr)
+                                .call(next_slot_fn)
+                                .local_set(elem_slot_ptr);
 
                             then.i32_const(elem_size as i32)
                                 .local_set(written_bytes_in_slot);
@@ -1124,39 +1090,37 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                         loop_.i32_const(20);
                         loop_.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
                     }
-                    // IntermediateType::IStruct { module_id, index } => {
-                    //     let inner_slot_ptr = module.locals.add(ValType::I32);
-                    //     let inner_data_ptr = module.locals.add(ValType::I32);
+                    IntermediateType::IStruct { module_id, index } => {
+                        let inner_data_ptr = module.locals.add(ValType::I32);
 
-                    //     let child_struct = compilation_ctx
-                    //         .get_user_data_type_by_index(module_id, *index)
-                    //         .unwrap();
+                        let child_struct = compilation_ctx
+                            .get_user_data_type_by_index(module_id, *index)
+                            .unwrap();
 
-                    //     // Load the struct pointer
-                    //     loop_
-                    //         .load(
-                    //             compilation_ctx.memory_id,
-                    //             LoadKind::I32 { atomic: false },
-                    //             MemArg {
-                    //                 align: 0,
-                    //                 offset: 0,
-                    //             },
-                    //         )
-                    //         .local_set(inner_data_ptr);
+                        // Load the struct pointer
+                        loop_
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            )
+                            .local_set(inner_data_ptr);
 
-                    //     // Duplicate the slot pointer to avoid overwriting it
-                    //     loop_.local_get(elem_slot_ptr).local_set(inner_slot_ptr);
-
-                    //     written_bytes_in_slot = add_encode_and_save_into_storage_struct_instructions(
-                    //         module,
-                    //         loop_,
-                    //         compilation_ctx,
-                    //         inner_data_ptr,
-                    //         inner_slot_ptr,
-                    //         child_struct,
-                    //         written_bytes_in_slot,
-                    //     );
-                    // }
+                        // add_encode_and_save_into_storage_struct_instructions will modify the slot pointer so we know where to continue once this function returns.
+                        let written_bytes_in_slot_ =
+                            add_encode_and_save_into_storage_struct_instructions(
+                                module,
+                                loop_,
+                                compilation_ctx,
+                                inner_data_ptr,
+                                elem_slot_ptr,
+                                child_struct,
+                                0,
+                            );
+                    }
                     // IntermediateType::IGenericStructInstance {
                     //     module_id,
                     //     index,
@@ -1355,17 +1319,17 @@ pub fn add_read_and_decode_storage_vector_instructions(
         crate::declare_host_debug_functions!(module)
     };
 
-    // Runtime functions
+    // Host functions
     let (storage_load, _) = storage_load_bytes32(module);
+    let (native_keccak, _) = native_keccak256(module);
+
+    // Runtime functions
     let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None);
-    let derive_dyn_array_slot_fn =
-        RuntimeFunction::DeriveDynArraySlot.get(module, Some(compilation_ctx));
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
 
     // Locals
     let len = module.locals.add(ValType::I32);
     let elem_slot_ptr = module.locals.add(ValType::I32);
-    let elem_size_ptr = module.locals.add(ValType::I32);
-    let elem_index_ptr = module.locals.add(ValType::I32);
 
     // Wipe the data so we write on it safely
     builder
@@ -1374,20 +1338,11 @@ pub fn add_read_and_decode_storage_vector_instructions(
         .i32_const(32)
         .memory_fill(compilation_ctx.memory_id);
 
-    // Memory allocation
+    // Allocate 32 bytes for the element slot
     builder
-        // allocate 32 bytes for the element slot
         .i32_const(32)
         .call(compilation_ctx.allocator)
-        .local_set(elem_slot_ptr)
-        // allocate 4 bytes for the element index
-        .i32_const(4)
-        .call(compilation_ctx.allocator)
-        .local_set(elem_index_ptr)
-        // allocate 4 bytes for the element size
-        .i32_const(4)
-        .call(compilation_ctx.allocator)
-        .local_set(elem_size_ptr);
+        .local_set(elem_slot_ptr);
 
     // Load vector header slot data
     builder
@@ -1428,18 +1383,6 @@ pub fn add_read_and_decode_storage_vector_instructions(
             // TODO: look out for structs, they have field size = 0.
             let elem_size = field_size(inner, compilation_ctx);
 
-            else_
-                .local_get(elem_size_ptr)
-                .i32_const(elem_size as i32)
-                .store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-
             // Allocate memory for the vector and write the header data
             IVector::allocate_vector_with_header(
                 else_,
@@ -1453,10 +1396,9 @@ pub fn add_read_and_decode_storage_vector_instructions(
             // Calculate the slot of the first element
             else_
                 .local_get(slot_ptr)
-                .local_get(elem_index_ptr) // i = 0
-                .local_get(elem_size_ptr)
+                .i32_const(32)
                 .local_get(elem_slot_ptr)
-                .call(derive_dyn_array_slot_fn);
+                .call(native_keccak);
 
             // Load the first slot data
             else_
@@ -1477,16 +1419,6 @@ pub fn add_read_and_decode_storage_vector_instructions(
                 block.loop_(None, |loop_| {
                     let loop_id = loop_.id();
 
-                    // Store the element index at #elem_index_ptr
-                    loop_.local_get(elem_index_ptr).local_get(i).store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-
                     loop_
                         .local_get(read_bytes_in_slot)
                         .i32_const(elem_size as i32)
@@ -1497,16 +1429,12 @@ pub fn add_read_and_decode_storage_vector_instructions(
                             None,
                             |then| {
                                 // Calculate next slot to read from
-                                then.local_get(slot_ptr)
-                                    .local_get(elem_index_ptr)
-                                    .local_get(elem_size_ptr)
-                                    .local_get(elem_slot_ptr)
-                                    .call(derive_dyn_array_slot_fn);
+                                then.local_get(elem_slot_ptr)
+                                    .call(next_slot_fn)
+                                    .local_tee(elem_slot_ptr);
 
                                 // Load next slot data
-                                then.local_get(elem_slot_ptr)
-                                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                                    .call(storage_load);
+                                then.i32_const(DATA_SLOT_DATA_PTR_OFFSET).call(storage_load);
 
                                 then.i32_const(elem_size as i32)
                                     .local_set(read_bytes_in_slot);
