@@ -90,7 +90,6 @@ use walrus::{
 use crate::{
     CompilationContext,
     abi_types::packing::pack_native_int::pack_i32_type_instructions,
-    compilation_context::ExternalModuleData,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
 
@@ -211,7 +210,7 @@ impl IStruct {
             let advancement = match field {
                 IntermediateType::IStruct { module_id, index } => {
                     let child_struct = compilation_ctx
-                        .get_user_data_type_by_index(module_id, *index)
+                        .get_struct_by_index(module_id, *index)
                         .unwrap();
 
                     pack_child_struct(
@@ -231,7 +230,7 @@ impl IStruct {
                     types,
                 } => {
                     let child_struct = compilation_ctx
-                        .get_user_data_type_by_index(module_id, *index)
+                        .get_struct_by_index(module_id, *index)
                         .unwrap();
                     let child_struct_instance = child_struct.instantiate(types);
 
@@ -245,39 +244,6 @@ impl IStruct {
                         inner_data_reference,
                         field,
                     )
-                }
-                IntermediateType::IExternalUserData {
-                    module_id,
-                    identifier,
-                    types,
-                } => {
-                    let external_data = compilation_ctx
-                        .get_external_module_data(module_id, identifier, types)
-                        .unwrap();
-
-                    match external_data {
-                        ExternalModuleData::Struct(child_struct) => pack_child_struct(
-                            &child_struct,
-                            module,
-                            compilation_ctx,
-                            block,
-                            field_local,
-                            data_ptr,
-                            inner_data_reference,
-                            field,
-                        ),
-                        _ => {
-                            field.add_pack_instructions(
-                                block,
-                                module,
-                                field_local,
-                                data_ptr,
-                                inner_data_reference,
-                                compilation_ctx,
-                            );
-                            32
-                        }
-                    }
                 }
                 _ => {
                     field.add_pack_instructions(

@@ -7,7 +7,6 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    compilation_context::ExternalModuleData,
     translation::intermediate_types::{
         IntermediateType,
         address::IAddress,
@@ -226,7 +225,6 @@ impl Packable for IntermediateType {
             | IntermediateType::IMutRef(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IExternalUserData { .. }
             | IntermediateType::IEnum(_) => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
@@ -327,7 +325,7 @@ impl Packable for IntermediateType {
             ),
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
 
                 struct_.add_pack_instructions(
@@ -346,7 +344,7 @@ impl Packable for IntermediateType {
                 types,
             } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.add_pack_instructions(
@@ -380,41 +378,6 @@ impl Packable for IntermediateType {
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
-            }
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types,
-            } => {
-                let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier, types)
-                    .unwrap();
-
-                match external_data {
-                    ExternalModuleData::Struct(struct_) => struct_.add_pack_instructions(
-                        builder,
-                        module,
-                        local,
-                        writer_pointer,
-                        calldata_reference_pointer,
-                        compilation_ctx,
-                        None,
-                    ),
-                    ExternalModuleData::Enum(enum_) => {
-                        if !enum_.is_simple {
-                            panic!(
-                                "cannot abi pack enum, it contains at least one variant with fields"
-                            );
-                        }
-                        IEnum::add_pack_instructions(
-                            builder,
-                            module,
-                            local,
-                            writer_pointer,
-                            compilation_ctx,
-                        )
-                    }
-                }
             }
         }
     }
@@ -455,7 +418,7 @@ impl Packable for IntermediateType {
             }
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
 
                 struct_.add_pack_instructions(
@@ -474,7 +437,7 @@ impl Packable for IntermediateType {
                 types,
             } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.add_pack_instructions(
@@ -488,41 +451,6 @@ impl Packable for IntermediateType {
                 );
             }
 
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types,
-            } => {
-                let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier, types)
-                    .unwrap();
-
-                match external_data {
-                    ExternalModuleData::Struct(struct_) => struct_.add_pack_instructions(
-                        builder,
-                        module,
-                        local,
-                        writer_pointer,
-                        calldata_reference_pointer,
-                        compilation_ctx,
-                        Some(calldata_reference_pointer),
-                    ),
-                    ExternalModuleData::Enum(enum_) => {
-                        if !enum_.is_simple {
-                            panic!(
-                                "cannot abi pack enum with it contains at least one variant with fields"
-                            );
-                        }
-                        IEnum::add_pack_instructions(
-                            builder,
-                            module,
-                            local,
-                            writer_pointer,
-                            compilation_ctx,
-                        )
-                    }
-                }
-            }
             _ => self.add_pack_instructions(
                 builder,
                 module,
@@ -557,36 +485,20 @@ impl Packable for IntermediateType {
                 types,
             } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.solidity_abi_encode_size(compilation_ctx)
             }
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
 
                 struct_.solidity_abi_encode_size(compilation_ctx)
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("can't know the size of a generic type parameter at compile time");
-            }
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types,
-            } => {
-                let external_data = compilation_ctx
-                    .get_external_module_data(module_id, identifier, types)
-                    .unwrap();
-
-                match external_data {
-                    ExternalModuleData::Struct(external_struct) => {
-                        external_struct.solidity_abi_encode_size(compilation_ctx)
-                    }
-                    ExternalModuleData::Enum(_) => sol_data::Uint::<8>::ENCODED_SIZE.unwrap(),
-                }
             }
         }
     }
@@ -606,7 +518,7 @@ impl Packable for IntermediateType {
             IntermediateType::IVector(_) => true,
             IntermediateType::IStruct { module_id, index } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 struct_.solidity_abi_encode_is_dynamic(compilation_ctx)
             }
@@ -616,29 +528,13 @@ impl Packable for IntermediateType {
                 types,
             } => {
                 let struct_ = compilation_ctx
-                    .get_user_data_type_by_index(module_id, *index)
+                    .get_struct_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.solidity_abi_encode_is_dynamic(compilation_ctx)
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot check if generic type parameter is dynamic at compile time");
-            }
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types,
-            } => {
-                let datatype = compilation_ctx
-                    .get_external_module_data(module_id, identifier, types)
-                    .unwrap();
-
-                match datatype {
-                    ExternalModuleData::Struct(istruct) => {
-                        istruct.solidity_abi_encode_is_dynamic(compilation_ctx)
-                    }
-                    ExternalModuleData::Enum(_) => false,
-                }
             }
             // References are dynamic if the inner type is dynamic!
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {

@@ -47,7 +47,11 @@ impl VmHandledType for Signer {
         }
     }
 
-    fn is_vm_type(_module_id: &ModuleId, _identifier: &str) -> bool {
+    fn is_vm_type(
+        _module_id: &ModuleId,
+        _index: u16,
+        _compilation_ctx: &CompilationContext,
+    ) -> bool {
         true
     }
 }

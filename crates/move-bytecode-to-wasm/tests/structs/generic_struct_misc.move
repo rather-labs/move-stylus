@@ -1,6 +1,6 @@
 module 0x00::generic_struct_misc;
 
-public struct Foo<T: copy> has drop, copy {
+public struct Foo<T: copy, phantom U> has drop, copy {
     g: T,
     q: address,
     r: vector<u32>,
@@ -30,11 +30,7 @@ public struct Baz<T: copy> has drop, copy {
     b: vector<u256>,
 }
 
-// This will create an struct instantiation in the Move module that contains a generic type parameter.
-// That is because we don't have any information about what T could be, so, when called from
-// `create_foo_u32` the compiler will find a TypeParameter instead of a u32. The TypeParameter will
-// replaced by the u32 using the types stack information.
-public fun create_foo<T: copy>(g: T): Foo<T> {
+public fun create_foo<T: copy>(g: T): Foo<T, u64> {
     Foo {
         g,
         q: @0xcafe000000000000000000000000000000007357,
@@ -52,11 +48,11 @@ public fun create_foo<T: copy>(g: T): Foo<T> {
     }
 }
 
-public fun create_foo_u32(g: u32): Foo<u32> {
+public fun create_foo_u32(g: u32): Foo<u32, u64> {
     create_foo(g)
 }
 
-public fun create_foo_vec_u32(g: vector<u32>): Foo<vector<u32>> {
+public fun create_foo_vec_u32(g: vector<u32>): Foo<vector<u32>, u64> {
     create_foo(g)
 }
 

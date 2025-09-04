@@ -13,7 +13,7 @@ pub mod table;
 
 use crate::{
     CompilationContext,
-    compilation_context::{ExternalModuleData, ModuleData},
+    compilation_context::ModuleData,
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     generics::{
         extract_type_instances_from_stack, replace_type_parameters, type_contains_generics,
@@ -436,54 +436,95 @@ fn translate_instruction(
                     .unwrap()
             };
 
-            // If the type instantaitions contains type parameters means we need to instantiate the
-            // functions with the information we have in stack.
-            // We can encounter this situation with a chain of calls:
-            //
-            // public fun echo_u16(x: u16): u16 {
-            //     test(x)
-            // }
-            //
-            // fun test<T>(t: T): T {
-            //     test2(t)
-            // }
-            //
-            // fun test2<T>(t: T): T {
-            //     t
-            // }
-            //
-            // In this example, the type parameter `T` in `test` is instantiated as `u16`.
-            // However, when `test2` is called from within `test`, the concrete type for `T`
-            // is not yet known at module processing time. The type instantiations for
-            // `test2` will remain as `ITypeParameters` and will only be resolved at
-            // the moment of the function call.
             let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
 
+            // If the type_instantiations contains generic parameters, those generic parameters
+            // refer to instantiations whithin this context. Instantiatons are obtained using
+            // the caller's function type instances (located in
+            // `mapped_function.function_id.type_instantiations`)
             let function_information = if type_instantiations.iter().any(type_contains_generics) {
-                let arguments_start =
-                    types_stack.len() - function_information.signature.arguments.len();
-
-                // Get the function's arguments from the types stack
-                let types = &types_stack[arguments_start..types_stack.len()];
-
-                // These types represent the instantiated types that correspond to the return values
-                // of the parent function. This is crucial because we may encounter an IRef<T> or
-                // IMutRef<T>, and we need to extract the underlying type T.
-                let mut instantiations = HashSet::new();
-                for (index, field) in type_instantiations.iter().enumerate() {
-                    if let Some(res) = extract_type_instances_from_stack(field, &types[index]) {
-                        instantiations.insert(res);
+                // Here we extract the type instances from the caller's type instantiations.
+                // Consider the following example:
+                //
+                // ```move
+                // public fun two_generics<T, U>(): Option<U> {
+                //     option::none()
+                // }
+                //
+                // public fun test(): Option<u16> {
+                //     two_generics<u32, u16>()
+                // }
+                // ```
+                //
+                // where `option::none()` is defined as:
+                //
+                // ```move
+                // public fun none<V>(): Option<V> {
+                //     Option { vec: vector::empty() }
+                // }
+                // ```
+                //
+                // In this case:
+                //
+                // - The call to `two_generics` is instantiated with two types: `u32` mapped to
+                //   `ITypeParameter(0)` and `u16` mapped to `ITypeParameter(1)`.
+                //
+                // - `two_generics<T, U>` returns `U`, which corresponds to `ITypeParameter(1)`.
+                //
+                // - `option::none<V>()` has a single type parameter `V`, represented as
+                //   `ITypeParameter(0)`.
+                //
+                // The substitutions happen as follows:
+                //
+                // - Since `option::none()` provides the return value, its parameter
+                //   `V: ITypeParameter(0)` is instantiated with the caller's parameter
+                //   `U: ITypeParameter(1)`.
+                //
+                // - In `test`, we call `two_generics` with `T = u32` and `U = u16`. Therefore:
+                //   - `ITypeParameter(0)` is replaced with `u32`
+                //   - `ITypeParameter(1)` is replaced with `u16`
+                //
+                // If we follow the call chain:
+                //
+                // - `ITypeParameter(0)` (from `option::none`) is replaced with
+                //   `ITypeParameter(1)` (from `two_generics`).
+                //
+                // - `ITypeParameter(1)` is then replaced with `u16` (from the instantiation
+                //   in `test`).
+                //
+                // By transitivity, we infer that the type of `option::none()` in this context
+                // is `u16`.
+                if let Some(caller_type_instances) =
+                    &mapped_function.function_id.type_instantiations
+                {
+                    let mut instantiations = Vec::new();
+                    for (index, field) in type_instantiations.iter().enumerate() {
+                        if let Some(res) =
+                            extract_type_instances_from_stack(field, &type_instantiations[index])
+                        {
+                            instantiations.push(res);
+                        } else {
+                            instantiations.push(field.clone());
+                        }
                     }
+
+                    let instantiations = instantiations
+                        .into_iter()
+                        .map(|f| {
+                            if let IntermediateType::ITypeParameter(i) = f {
+                                caller_type_instances[i as usize].clone()
+                            } else {
+                                f
+                            }
+                        })
+                        .collect::<Vec<IntermediateType>>();
+
+                    function_information.instantiate(&instantiations)
                 }
-                // TODO assert the same index is not repreated twice (meaning there is two or more
-                // different types for the same type parameter)
-
-                let instantiations = instantiations
-                    .into_iter()
-                    .map(|(_, t)| t)
-                    .collect::<Vec<IntermediateType>>();
-
-                function_information.instantiate(&instantiations)
+                // This should never happen
+                else {
+                    panic!("could not instantiate generic types");
+                }
             } else {
                 function_information.instantiate(type_instantiations)
             };
@@ -492,17 +533,7 @@ fn translate_instruction(
             let function_id = &function_information.function_id;
             let arguments = &function_information.signature.arguments;
 
-            let function_module = compilation_ctx
-                .get_module_data_by_id(&function_information.function_id.module_id)?;
-            prepare_function_arguments(
-                module,
-                builder,
-                arguments,
-                compilation_ctx,
-                types_stack,
-                function_module,
-                module_data,
-            )?;
+            prepare_function_arguments(module, builder, arguments, compilation_ctx, types_stack)?;
 
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {
@@ -550,42 +581,15 @@ fn translate_instruction(
                 );
             };
 
-            // If the called function returns a user defined data (struct or enum), and that
-            // datatype is not defined in the current module, we need to change the return type
-            // from a IGenericStructInstance or IGenericEnumInstance to a IExternalUserData:
-            //
-            // - From the caller perspective the called function is returning a foreign data type.
-            // - From the callee perspective, the function is just returning a data type defined in
-            // its module.
-            //
-            // Subsequent opcodes that work with the return value of the caller will expect a
-            // IExternalUserData in the types stack.
-
-            let return_types = function_information
-                .signature
-                .returns
-                .iter()
-                .map(|it| fix_return_type(it, compilation_ctx, module_data))
-                .collect::<Vec<IntermediateType>>();
-
             // Insert in the stack types the types returned by the function (if any)
-            types_stack.append(&return_types);
+            types_stack.append(&function_information.signature.returns);
         }
         // Function calls
         Bytecode::Call(function_handle_index) => {
             let function_id = &module_data.functions.calls[function_handle_index.into_index()];
             let arguments = &module_data.functions.arguments[function_handle_index.into_index()];
 
-            let function_module = compilation_ctx.get_module_data_by_id(&function_id.module_id)?;
-            prepare_function_arguments(
-                module,
-                builder,
-                arguments,
-                compilation_ctx,
-                types_stack,
-                function_module,
-                module_data,
-            )?;
+            prepare_function_arguments(module, builder, arguments, compilation_ctx, types_stack)?;
 
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {
@@ -657,6 +661,7 @@ fn translate_instruction(
             } else {
                 local_type.box_local_instructions(module, builder, compilation_ctx, local);
             }
+
             types_stack.pop_expecting(local_type)?;
         }
         Bytecode::MoveLoc(local_id) => {
@@ -713,13 +718,9 @@ fn translate_instruction(
             assert_eq!(module_id, &module_data.id);
             assert_eq!(struct_.index(), index);
 
-            bytecodes::structs::borrow_field(
-                struct_,
-                field_id,
-                builder,
-                compilation_ctx,
-                types_stack,
-            );
+            let field_type =
+                bytecodes::structs::borrow_field(struct_, field_id, builder, compilation_ctx);
+            types_stack.push(IntermediateType::IRef(Box::new(field_type)));
         }
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
             let (struct_field_id, instantiation_types) = module_data
@@ -727,6 +728,20 @@ fn translate_instruction(
                 .instantiated_fields_to_generic_fields
                 .get(field_id)
                 .unwrap();
+
+            let instantiation_types = if instantiation_types.iter().any(type_contains_generics) {
+                match &types_stack.last().unwrap() {
+                    IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+                        match &**inner {
+                            IntermediateType::IGenericStructInstance { types, .. } => types.clone(),
+                            _ => panic!(),
+                        }
+                    }
+                    _ => panic!(),
+                }
+            } else {
+                instantiation_types.clone()
+            };
 
             let struct_ = if let Ok(struct_) = module_data
                 .structs
@@ -738,7 +753,7 @@ fn translate_instruction(
                     .structs
                     .get_by_field_handle_idx(struct_field_id)?;
 
-                generic_stuct.instantiate(instantiation_types)
+                generic_stuct.instantiate(&instantiation_types)
             };
 
             // Check if in the types stack we have the correct type
@@ -760,15 +775,16 @@ fn translate_instruction(
             );
             assert_eq!(module_id, &module_data.id);
             assert_eq!(struct_.index(), index);
-            assert_eq!(types, instantiation_types);
+            assert_eq!(types, &instantiation_types);
 
-            bytecodes::structs::borrow_field(
+            let field_type = bytecodes::structs::borrow_field(
                 &struct_,
                 struct_field_id,
                 builder,
                 compilation_ctx,
-                types_stack,
             );
+            let field_type = replace_type_parameters(&field_type, &instantiation_types);
+            types_stack.push(IntermediateType::IRef(Box::new(field_type)));
         }
         Bytecode::MutBorrowField(field_id) => {
             let struct_ = module_data.structs.get_by_field_handle_idx(field_id)?;
@@ -783,7 +799,6 @@ fn translate_instruction(
 
             let field_type =
                 bytecodes::structs::mut_borrow_field(struct_, field_id, builder, compilation_ctx);
-
             types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
         }
         Bytecode::MutBorrowFieldGeneric(field_id) => {
@@ -912,11 +927,24 @@ fn translate_instruction(
             //     create_foo(t)
             // }
             // ```
+
             let inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
-            let inner = if let IntermediateType::ITypeParameter(_) = inner {
-                types_stack.0.last().unwrap().clone()
+            let inner = if let IntermediateType::ITypeParameter(i) = inner {
+                types_stack
+                    .0
+                    .last()
+                    .unwrap_or(
+                        if let Some(caller_type_instances) =
+                            &mapped_function.function_id.type_instantiations
+                        {
+                            &caller_type_instances[i as usize]
+                        } else {
+                            panic!("could not compute concrete type")
+                        },
+                    )
+                    .clone()
             } else {
                 inner
             };
@@ -953,9 +981,16 @@ fn translate_instruction(
             let expected_vec_inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
-            if *vec_inner != expected_vec_inner {
+            let expected_vec_inner = if let IntermediateType::ITypeParameter(_) = expected_vec_inner
+            {
+                &*vec_inner
+            } else {
+                &expected_vec_inner
+            };
+
+            if *vec_inner != *expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
-                    expected: expected_vec_inner,
+                    expected: expected_vec_inner.clone(),
                     found: *vec_inner,
                 });
             }
@@ -969,7 +1004,6 @@ fn translate_instruction(
                 | IntermediateType::IU256
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
-                | IntermediateType::IExternalUserData { .. }
                 | IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. }
                 | IntermediateType::IVector(_) => {
@@ -1078,9 +1112,17 @@ fn translate_instruction(
             let elem_ir_type =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
-            types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
-                IntermediateType::IVector(Box::new(elem_ir_type)),
-            )))?;
+            if let IntermediateType::ITypeParameter(_) = elem_ir_type {
+                let ref_ty = types_stack.pop()?;
+                types_stack::match_types!(
+                    (IntermediateType::IRef(inner), "vector reference", ref_ty),
+                    (IntermediateType::IVector(_vec_inner), "vector", *inner)
+                );
+            } else {
+                types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
+                    IntermediateType::IVector(Box::new(elem_ir_type)),
+                )))?;
+            };
 
             builder
                 .load(
@@ -1742,6 +1784,11 @@ fn translate_instruction(
                 .structs
                 .get_struct_instance_by_struct_definition_idx(struct_definition_index)?;
 
+            let type_instantiations = module_data
+                .structs
+                .get_generic_struct_types_instances(struct_definition_index)?
+                .to_vec();
+
             // In some situations a struct instantiation in the Move module that contains a generic type
             // parameter. For example:
             // ```
@@ -1759,29 +1806,39 @@ fn translate_instruction(
             // ```
             //  In `create_foo` the compiler does not have any information about what T could be,
             //  so, when called from `create_foo_u32` it will find a TypeParameter instead of a u32.
-            //  The TypeParameter will replaced by the u32 using the types stack information.
-            let (struct_, types) = if struct_.fields.iter().any(type_contains_generics) {
-                let types_start = types_stack.len() - struct_.fields.len();
-
-                // Get the function's arguments from the types stack
-                let types = &types_stack[types_start..types_stack.len()];
-
-                let mut instantiations = HashSet::new();
-                for (index, field) in struct_.fields.iter().enumerate() {
-                    if let Some(res) = extract_type_instances_from_stack(field, &types[index]) {
-                        instantiations.insert(res);
+            //  The TypeParameter will replaced by the u32 using the caller's type information.
+            let (struct_, types) = if type_instantiations.iter().any(type_contains_generics) {
+                if let Some(caller_type_instances) =
+                    &mapped_function.function_id.type_instantiations
+                {
+                    let mut instantiations = Vec::new();
+                    for (index, field) in type_instantiations.iter().enumerate() {
+                        if let Some(res) =
+                            extract_type_instances_from_stack(field, &type_instantiations[index])
+                        {
+                            instantiations.push(res);
+                        } else {
+                            instantiations.push(field.clone());
+                        }
                     }
+
+                    let instantiations = instantiations
+                        .into_iter()
+                        .map(|f| {
+                            if let IntermediateType::ITypeParameter(i) = f {
+                                caller_type_instances[i as usize].clone()
+                            } else {
+                                f
+                            }
+                        })
+                        .collect::<Vec<IntermediateType>>();
+
+                    (struct_.instantiate(&instantiations), instantiations)
                 }
-
-                let instantiations = instantiations
-                    .into_iter()
-                    .map(|(_, t)| t)
-                    .collect::<Vec<IntermediateType>>();
-
-                // TODO assert the same index is not repreated twice (meaning there is two or more
-                // different types for the same type parameter)
-
-                (struct_.instantiate(&instantiations), instantiations)
+                // This should never happen
+                else {
+                    panic!("could not instantiate generic types");
+                }
             } else {
                 let types = module_data
                     .structs
@@ -1984,139 +2041,5 @@ pub fn box_args(
 
     for (index, pointer) in updates {
         function_locals[index] = pointer;
-    }
-}
-
-// If the called function returns a user defined data (struct or enum), and that
-// datatype is not defined in the current module, we need to change the return type
-// from a IGenericStructInstance or IGenericEnumInstance to a IExternalUserData:
-//
-// - From the caller perspective the called function is returning a foreign data type.
-// - From the callee perspective, the function is just returning a data type defined in
-// its module.
-//
-// Subsequent opcodes that work with the return value of the caller will expect a
-// IExternalUserData in the types stack.
-pub fn fix_return_type(
-    itype: &IntermediateType,
-    compilation_ctx: &CompilationContext,
-    module_data: &ModuleData,
-) -> IntermediateType {
-    match itype {
-        IntermediateType::IRef(inner) => IntermediateType::IRef(Box::new(fix_return_type(
-            inner,
-            compilation_ctx,
-            module_data,
-        ))),
-
-        IntermediateType::IMutRef(inner) => IntermediateType::IMutRef(Box::new(fix_return_type(
-            inner,
-            compilation_ctx,
-            module_data,
-        ))),
-        IntermediateType::IVector(inner) => IntermediateType::IVector(Box::new(fix_return_type(
-            inner,
-            compilation_ctx,
-            module_data,
-        ))),
-        IntermediateType::IStruct { module_id, .. } => {
-            if module_id != &module_data.id {
-                // TODO: Add identifier to IntermediateType::IStruct
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(itype)
-                    .unwrap();
-
-                IntermediateType::IExternalUserData {
-                    module_id: module_id.clone(),
-                    identifier: struct_.identifier.clone(),
-                    types: None,
-                }
-            } else {
-                itype.clone()
-            }
-        }
-        IntermediateType::IGenericStructInstance {
-            module_id, types, ..
-        } => {
-            if module_id != &module_data.id {
-                // TODO: Add identifier to IntermediateType::IGenericStruct
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(itype)
-                    .unwrap();
-
-                IntermediateType::IExternalUserData {
-                    module_id: module_id.clone(),
-                    identifier: struct_.identifier.clone(),
-                    types: Some(types.to_vec()),
-                }
-            } else {
-                itype.clone()
-            }
-        }
-        // TODO enum cases
-        _ => itype.clone(),
-    }
-}
-
-// If the called function receives an `IExternalUserData` as an argument, and the data type is
-// defined in the same module as the function, the function will actually expect the internal
-// variant corresponding to that `IExternalUserData` (for example `IGenericStructInstance`).
-//
-// In other words, the type stack may contain an `IExternalUserData`, but since both the data
-// structure and the function are defined in the same module, the internal representation is
-// required.
-pub fn fix_call_type(
-    itype: &IntermediateType,
-    compilation_ctx: &CompilationContext,
-    module_data: &ModuleData,
-) -> IntermediateType {
-    match itype {
-        IntermediateType::IRef(inner) => {
-            IntermediateType::IRef(Box::new(fix_call_type(inner, compilation_ctx, module_data)))
-        }
-
-        IntermediateType::IMutRef(inner) => {
-            IntermediateType::IMutRef(Box::new(fix_call_type(inner, compilation_ctx, module_data)))
-        }
-        IntermediateType::IVector(inner) => {
-            IntermediateType::IVector(Box::new(fix_call_type(inner, compilation_ctx, module_data)))
-        }
-        IntermediateType::IExternalUserData {
-            module_id,
-            identifier,
-            types: Some(types),
-        } if &module_data.id == module_id => {
-            let external_data = compilation_ctx
-                .get_external_module_data(module_id, identifier, &Some(types.to_vec()))
-                .unwrap();
-
-            match external_data {
-                ExternalModuleData::Struct(struct_) => IntermediateType::IGenericStructInstance {
-                    module_id: module_id.clone(),
-                    index: struct_.index(),
-                    types: types.to_vec(),
-                },
-                ExternalModuleData::Enum(_ienum) => todo!(),
-            }
-        }
-        IntermediateType::IExternalUserData {
-            module_id,
-            identifier,
-            types: None,
-        } if &module_data.id == module_id => {
-            let external_data = compilation_ctx
-                .get_external_module_data(module_id, identifier, &None)
-                .unwrap();
-
-            match external_data {
-                ExternalModuleData::Struct(struct_) => IntermediateType::IStruct {
-                    module_id: module_id.clone(),
-                    index: struct_.index(),
-                },
-                ExternalModuleData::Enum(_ienum) => todo!(),
-            }
-        }
-        // TODO enum cases
-        _ => itype.clone(),
     }
 }

@@ -117,7 +117,6 @@ pub fn pack_variant(
                         });
                     }
                     IntermediateType::IEnum(_) => todo!(),
-                    IntermediateType::IExternalUserData { .. } => todo!(),
                 };
             }
             t => Err(TranslationError::TypeMismatch {

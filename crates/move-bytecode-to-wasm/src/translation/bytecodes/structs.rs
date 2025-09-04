@@ -6,7 +6,6 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    compilation_context::ExternalModuleData,
     translation::{
         TranslationError,
         intermediate_types::{IntermediateType, structs::IStruct},
@@ -22,8 +21,7 @@ pub fn borrow_field(
     field_id: &FieldHandleIndex,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
-    types_stack: &mut TypesStack,
-) {
+) -> IntermediateType {
     let Some(field_type) = struct_.fields_types.get(field_id) else {
         panic!(
             "{field_id} not found in {}",
@@ -50,7 +48,7 @@ pub fn borrow_field(
         .i32_const(*field_offset as i32)
         .binop(BinaryOp::I32Add);
 
-    types_stack.push(IntermediateType::IRef(Box::new(field_type.clone())));
+    field_type.clone()
 }
 
 /// Mutably borrows a field of a struct.
@@ -168,8 +166,7 @@ pub fn pack(
                     | IntermediateType::ISigner
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
-                    | IntermediateType::IGenericStructInstance { .. }
-                    | IntermediateType::IExternalUserData { .. } => {
+                    | IntermediateType::IGenericStructInstance { .. } => {
                         builder.local_set(ptr_to_data);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -270,23 +267,6 @@ pub fn unpack(
                 });
             }
             IntermediateType::IEnum(_) => todo!(),
-            IntermediateType::IExternalUserData {
-                module_id,
-                identifier,
-                types,
-            } => {
-                let external_data =
-                    compilation_ctx.get_external_module_data(module_id, identifier, types)?;
-                match external_data {
-                    ExternalModuleData::Struct(_) => {
-                        return Err(TranslationError::UnpackingStructFoundExternalStruct {
-                            identifier: identifier.to_owned(),
-                            module_id: module_id.clone(),
-                        });
-                    }
-                    ExternalModuleData::Enum(_) => todo!(),
-                }
-            }
         }
 
         types_stack.push(field.clone());

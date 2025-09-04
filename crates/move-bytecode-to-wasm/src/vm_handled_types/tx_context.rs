@@ -18,7 +18,12 @@ impl VmHandledType for TxContext {
         block.i32_const(4).call(compilation_ctx.allocator);
     }
 
-    fn is_vm_type(module_id: &ModuleId, identifier: &str) -> bool {
+    fn is_vm_type(module_id: &ModuleId, index: u16, compilation_ctx: &CompilationContext) -> bool {
+        let identifier = &compilation_ctx
+            .get_struct_by_index(module_id, index)
+            .unwrap()
+            .identifier;
+
         if identifier == Self::IDENTIFIER {
             if module_id.address != STYLUS_FRAMEWORK_ADDRESS
                 || module_id.module_name != "tx_context"

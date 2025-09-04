@@ -6,21 +6,23 @@ public struct ID has copy, drop, store {
     bytes: address,
 }
 
+/// Globally unique IDs that define an object's ID in storage. Any Sui Object, that is a struct
+/// with the `key` ability, must have `id: UID` as its first field.
 public struct UID has store {
     id: ID,
 }
 
-/// Create a new object. Returns the `UID` that must be stored in a Sui object.
+/// Creates a new `UID`, which must be stored in an object's `id` field.
 /// This is the only way to create `UID`s.
+///
+/// Each time a new `UID` is created, an event is emitted on topic 0.
+/// This allows the transaction caller to capture and persist it for later
+/// reference to the object associated with that `UID`
 public fun new(ctx: &mut TxContext): UID {
     UID {
         id: ID { bytes: ctx.fresh_object_address() },
     }
 }
 
-/// Delete the object and its `UID`. This is the only way to eliminate a `UID`.
-/// This exists to inform Sui of object deletions. When an object
-/// gets unpacked, the programmer will have to do something with its
-/// `UID`. The implementation of this function emits a deleted
-/// system event so Sui knows to process the object deletion
+/// Deletes the object from the storage.
 public native fun delete<T: key>(obj: T);

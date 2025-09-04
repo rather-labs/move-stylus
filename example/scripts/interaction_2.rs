@@ -15,7 +15,6 @@ use alloy::{
     sol_types::SolValue,
     transports::http::reqwest::Url,
 };
-// use alloy_sol_types::{SolValue, sol};
 use dotenv::dotenv;
 use eyre::eyre;
 use std::str::FromStr;
@@ -69,6 +68,11 @@ sol!(
             TestGenericEvent1 s;
         }
 
+        #[derive(Debug, PartialEq)]
+        struct Stack {
+            uint32[] pos0;
+        }
+
         function emitTestEvent1(uint32 n) public view;
         function emitTestEvent2(uint32 a, uint8[] b, uint128 c) public view;
         function emitTestEvent3(TestEvent1 a, TestEvent2 b) public view;
@@ -81,6 +85,9 @@ sol!(
         function getUniqueIds() external view returns (UID, UID, UID);
         function getUniqueId() external view returns (UID);
         function getFreshObjectAddress() external view returns (address);
+        function testStack1() external view returns (Stack, uint64);
+        function testStack2() external view returns (Stack, uint64);
+        function testStack3() external view returns (Stack, uint64);
     }
 );
 
@@ -90,8 +97,8 @@ async fn main() -> eyre::Result<()> {
     let priv_key = std::env::var("PRIV_KEY").map_err(|_| eyre!("No {} env var set", "PRIV_KEY"))?;
     let rpc_url = std::env::var("RPC_URL").map_err(|_| eyre!("No {} env var set", "RPC_URL"))?;
 
-    let contract_address = std::env::var("CONTRACT_ADDRESS_FEATURES_2")
-        .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_FEATURES_2"))?;
+    let contract_address = std::env::var("CONTRACT_ADDRESS_2")
+        .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_2"))?;
 
     let signer = PrivateKeySigner::from_str(&priv_key)?;
 
@@ -286,9 +293,18 @@ async fn main() -> eyre::Result<()> {
     for log in logs {
         let data = log.data().data.0.clone();
         let decoded_event = <Example::TestGenericEvent2 as SolValue>::abi_decode(&data)?;
-        println!("Decoded event data = {:?}", decoded_event);
+        println!("Decoded event data = {:#?}", decoded_event);
         assert_eq!(event, decoded_event);
     }
+
+    let s = example.testStack1().call().await?;
+    println!("testStack1\nelements: {:?} len: {}", s._0.pos0, s._1);
+
+    let s = example.testStack2().call().await?;
+    println!("testStack2\nelements: {:?} len: {}", s._0.pos0, s._1);
+
+    let s = example.testStack3().call().await?;
+    println!("testStack3\nelements: {:?} len: {}", s._0.pos0, s._1);
 
     Ok(())
 }

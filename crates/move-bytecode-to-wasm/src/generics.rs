@@ -12,10 +12,6 @@ pub fn type_contains_generics(itype: &IntermediateType) -> bool {
         IntermediateType::IGenericStructInstance { types, .. } => {
             types.iter().any(type_contains_generics)
         }
-        IntermediateType::IExternalUserData {
-            types: Some(gtypes),
-            ..
-        } => gtypes.iter().any(type_contains_generics),
         IntermediateType::IVector(inner) => type_contains_generics(inner),
         _ => false,
     }
@@ -44,15 +40,15 @@ pub fn type_contains_generics(itype: &IntermediateType) -> bool {
 pub fn extract_type_instances_from_stack(
     generic_type: &IntermediateType,
     instantiated_type: &IntermediateType,
-) -> Option<(u16, IntermediateType)> {
+) -> Option<IntermediateType> {
     match generic_type {
-        IntermediateType::ITypeParameter(i) => match instantiated_type {
+        IntermediateType::ITypeParameter(_) => match instantiated_type {
             IntermediateType::IRef(instantiated_inner)
             | IntermediateType::IMutRef(instantiated_inner) => {
                 extract_type_instances_from_stack(generic_type, instantiated_inner)
             }
 
-            _ => Some((*i, instantiated_type.clone())),
+            _ => Some(instantiated_type.clone()),
         },
         IntermediateType::IVector(inner) => {
             if let IntermediateType::IVector(instantiated_inner) = instantiated_type {
@@ -81,26 +77,6 @@ pub fn extract_type_instances_from_stack(
         } => {
             if let IntermediateType::IGenericStructInstance {
                 types: instantaited_types,
-                ..
-            } = instantiated_type
-            {
-                for (gt, it) in generic_types.iter().zip(instantaited_types) {
-                    let res = extract_type_instances_from_stack(gt, it);
-                    if res.is_some() {
-                        return res;
-                    }
-                }
-                None
-            } else {
-                None
-            }
-        }
-        IntermediateType::IExternalUserData {
-            types: Some(generic_types),
-            ..
-        } => {
-            if let IntermediateType::IExternalUserData {
-                types: Some(instantaited_types),
                 ..
             } = instantiated_type
             {
@@ -147,20 +123,6 @@ pub fn replace_type_parameters(
                 .iter()
                 .map(|t| replace_type_parameters(t, instance_types))
                 .collect(),
-        },
-        IntermediateType::IExternalUserData {
-            module_id,
-            identifier,
-            types: Some(generic_types),
-        } => IntermediateType::IExternalUserData {
-            module_id: module_id.clone(),
-            identifier: identifier.clone(),
-            types: Some(
-                generic_types
-                    .iter()
-                    .map(|t| replace_type_parameters(t, instance_types))
-                    .collect(),
-            ),
         },
         IntermediateType::IVector(inner) => {
             IntermediateType::IVector(Box::new(replace_type_parameters(inner, instance_types)))

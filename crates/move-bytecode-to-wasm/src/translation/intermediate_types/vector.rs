@@ -3,9 +3,9 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
+use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, compilation_context::ModuleData};
-use crate::{compilation_context::ExternalModuleData, runtime::RuntimeFunction};
 
 use super::IntermediateType;
 
@@ -23,46 +23,58 @@ impl IVector {
         capacity: LocalId,
         data_size: i32,
     ) {
-        // This is a failsafe to prevent UB if static checks failed
-        builder
-            .local_get(len)
-            .local_get(capacity)
-            .binop(BinaryOp::I32GtU)
-            .if_else(
-                None,
-                |then_| {
-                    then_.unreachable(); // Trap if len > capacity
-                },
-                |_| {},
-            );
-
-        // Allocate memory: capacity * element size + 8 bytes for header
-        builder
-            .local_get(capacity)
-            .i32_const(data_size)
-            .binop(BinaryOp::I32Mul)
-            .i32_const(8)
-            .binop(BinaryOp::I32Add)
-            .call(compilation_ctx.allocator)
-            .local_set(pointer);
-
-        // Write length at offset 0
-        builder.local_get(pointer).local_get(len).store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
+        // If the len is 0 we just allocate 16 bytes representing 0 length and 0 capacity
+        builder.local_get(len).i32_const(0).binop(BinaryOp::I32Eq);
+        builder.if_else(
+            None,
+            |then| {
+                then.i32_const(16)
+                    .call(compilation_ctx.allocator)
+                    .local_set(pointer);
             },
-        );
+            |else_| {
+                // This is a failsafe to prevent UB if static checks failed
+                else_
+                    .local_get(len)
+                    .local_get(capacity)
+                    .binop(BinaryOp::I32GtU)
+                    .if_else(
+                        None,
+                        |then_| {
+                            then_.unreachable(); // Trap if len > capacity
+                        },
+                        |_| {},
+                    );
 
-        // Write capacity at offset 4
-        builder.local_get(pointer).local_get(capacity).store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 4,
+                // Allocate memory: capacity * element size + 8 bytes for header
+                else_
+                    .local_get(capacity)
+                    .i32_const(data_size)
+                    .binop(BinaryOp::I32Mul)
+                    .i32_const(8)
+                    .binop(BinaryOp::I32Add)
+                    .call(compilation_ctx.allocator)
+                    .local_set(pointer);
+
+                // Write length at offset 0
+                else_.local_get(pointer).local_get(len).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                // Write capacity at offset 4
+                else_.local_get(pointer).local_get(capacity).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 4,
+                    },
+                );
             },
         );
     }
@@ -345,7 +357,7 @@ impl IVector {
                     );
 
                     let struct_ = compilation_ctx
-                        .get_user_data_type_by_index(module_id, *index)
+                        .get_struct_by_index(module_id, *index)
                         .unwrap();
 
                     struct_.copy_local_instructions(
@@ -356,36 +368,33 @@ impl IVector {
                     );
                 }
 
-                IntermediateType::IExternalUserData {
+                IntermediateType::IGenericStructInstance {
                     module_id,
-                    identifier,
+                    index,
                     types,
                 } => {
-                    let external_data = compilation_ctx
-                        .get_external_module_data(module_id, identifier, types)
+                    loop_block.load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+
+                    let struct_ = compilation_ctx
+                        .get_struct_by_index(module_id, *index)
                         .unwrap();
+                    let struct_ = struct_.instantiate(types);
 
-                    match external_data {
-                        ExternalModuleData::Struct(struct_) => {
-                            loop_block.load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            );
-
-                            struct_.copy_local_instructions(
-                                module,
-                                loop_block,
-                                compilation_ctx,
-                                module_data,
-                            );
-                        }
-                        ExternalModuleData::Enum(_) => todo!(),
-                    }
+                    struct_.copy_local_instructions(
+                        module,
+                        loop_block,
+                        compilation_ctx,
+                        module_data,
+                    );
                 }
+
                 t => panic!("unsupported vector type {t:?}"),
             }
 
@@ -495,7 +504,7 @@ impl IVector {
                             .get_module_data_by_id(module_id)
                             .unwrap();
                         let struct_ = compilation_ctx
-                            .get_user_data_type_by_index(module_id, *index)
+                            .get_struct_by_index(module_id, *index)
                             .unwrap();
 
                         then.local_get(v1_ptr)
@@ -523,7 +532,7 @@ impl IVector {
                         let module_data = compilation_ctx
                             .get_module_data_by_id(module_id)
                             .unwrap();
-                        let struct_ = compilation_ctx.get_user_data_type_by_index(module_id, *index).unwrap();
+                        let struct_ = compilation_ctx.get_struct_by_index(module_id, *index).unwrap();
                         let struct_instance = struct_.instantiate(types);
 
                         then.local_get(v1_ptr)
@@ -546,40 +555,6 @@ impl IVector {
                             );
 
                         struct_instance.equality(then, module, compilation_ctx, module_data);
-                    }
-                    IntermediateType::IExternalUserData { module_id, identifier, types } => {
-                        let module_data = compilation_ctx
-                            .get_module_data_by_id(module_id)
-                            .unwrap();
-                        let external_data = compilation_ctx
-                            .get_external_module_data(module_id, identifier, types)
-                            .unwrap();
-
-                        match external_data {
-                            ExternalModuleData::Struct(struct_) => {
-                                then.local_get(v1_ptr)
-                                    .load(
-                                        compilation_ctx.memory_id,
-                                        LoadKind::I32 { atomic: false },
-                                        MemArg {
-                                            align: 0,
-                                            offset: 0,
-                                        },
-                                    )
-                                    .local_get(v2_ptr)
-                                    .load(
-                                        compilation_ctx.memory_id,
-                                        LoadKind::I32 { atomic: false },
-                                        MemArg {
-                                            align: 0,
-                                            offset: 0,
-                                        },
-                                    );
-
-                                struct_.equality(then, module, compilation_ctx, module_data);
-                            },
-                            ExternalModuleData::Enum(_) => todo!(),
-                        }
                     }
                     IntermediateType::IVector(inner_v) => {
                         let res = module.locals.add(ValType::I32);
@@ -691,38 +666,53 @@ impl IVector {
         // Local declarations
         let ptr_local = module.locals.add(ValType::I32);
         let len_local = module.locals.add(ValType::I32);
-        let temp_local = module.locals.add(inner.into());
-        let data_size = inner.stack_data_size() as i32;
 
-        // Set length
-        builder.i32_const(num_elements).local_set(len_local);
+        if num_elements == 0 {
+            // Set length
+            builder.i32_const(0).local_set(len_local);
 
-        IVector::allocate_vector_with_header(
-            builder,
-            compilation_ctx,
-            ptr_local,
-            len_local,
-            len_local,
-            data_size,
-        );
-
-        for i in 0..num_elements {
-            builder.local_get(ptr_local);
-            builder.swap(ptr_local, temp_local);
-
-            // Store at computed address
-            builder.store(
-                compilation_ctx.memory_id,
-                match inner.into() {
-                    ValType::I64 => StoreKind::I64 { atomic: false },
-                    ValType::I32 => StoreKind::I32 { atomic: false },
-                    _ => panic!("Unsupported ValType"),
-                },
-                MemArg {
-                    align: 0,
-                    offset: (8 + (num_elements - 1 - i) * data_size) as u32,
-                },
+            IVector::allocate_vector_with_header(
+                builder,
+                compilation_ctx,
+                ptr_local,
+                len_local,
+                len_local,
+                0,
             );
+        } else {
+            let data_size = inner.stack_data_size() as i32;
+
+            // Set length
+            builder.i32_const(num_elements).local_set(len_local);
+
+            IVector::allocate_vector_with_header(
+                builder,
+                compilation_ctx,
+                ptr_local,
+                len_local,
+                len_local,
+                data_size,
+            );
+
+            let temp_local = module.locals.add(inner.into());
+            for i in 0..num_elements {
+                builder.local_get(ptr_local);
+                builder.swap(ptr_local, temp_local);
+
+                // Store at computed address
+                builder.store(
+                    compilation_ctx.memory_id,
+                    match inner.into() {
+                        ValType::I64 => StoreKind::I64 { atomic: false },
+                        ValType::I32 => StoreKind::I32 { atomic: false },
+                        _ => panic!("Unsupported ValType"),
+                    },
+                    MemArg {
+                        align: 0,
+                        offset: (8 + (num_elements - 1 - i) * data_size) as u32,
+                    },
+                );
+            }
         }
 
         builder.local_get(ptr_local);
@@ -756,8 +746,7 @@ impl IVector {
             | IntermediateType::ISigner
             | IntermediateType::IAddress
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IExternalUserData { .. } => {
+            | IntermediateType::IGenericStructInstance { .. } => {
                 builder.call(downcast_f);
                 builder.i32_const(1);
             }
@@ -1080,8 +1069,7 @@ mod tests {
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IStruct { .. }
-            | IntermediateType::IExternalUserData { .. } => {
+            | IntermediateType::IStruct { .. } => {
                 let swap_f =
                     RuntimeFunction::VecPopBack32.get(&mut raw_module, Some(&compilation_ctx));
                 builder.call(swap_f);

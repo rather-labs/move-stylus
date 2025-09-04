@@ -106,6 +106,7 @@ pub fn translate_package(
         process_dependency_tree(
             &mut modules_data,
             &package.deps_compiled_units,
+            &root_compiled_units,
             &root_compiled_module.immediate_dependencies(),
             &mut function_definitions,
         );
@@ -113,15 +114,13 @@ pub fn translate_package(
         let root_module_data = ModuleData::build_module_data(
             root_module_id.clone(),
             root_compiled_module,
+            &package.deps_compiled_units,
+            &root_compiled_units,
             &mut function_definitions,
         );
 
-        let compilation_ctx = CompilationContext {
-            root_module_data: &root_module_data,
-            deps_data: &modules_data,
-            memory_id,
-            allocator: allocator_func,
-        };
+        let compilation_ctx =
+            CompilationContext::new(&root_module_data, &modules_data, memory_id, allocator_func);
 
         let mut public_functions = Vec::new();
         for function_information in root_module_data
@@ -201,6 +200,7 @@ pub fn translate_package_cli(package: CompiledPackage, rerooted_path: &Path) {
 pub fn process_dependency_tree<'move_package>(
     dependencies_data: &mut HashMap<ModuleId, ModuleData>,
     deps_compiled_units: &'move_package [(PackageName, CompiledUnitWithSource)],
+    root_compiled_units: &'move_package [CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
     function_definitions: &mut GlobalFunctionTable<'move_package>,
 ) {
@@ -230,12 +230,14 @@ pub fn process_dependency_tree<'move_package>(
 
         let dependency_module = &dependency_module.unit.module;
 
+        let immediate_dependencies = &dependency_module.immediate_dependencies();
         // If the the dependency has dependency, we process them first
-        if !dependency_module.immediate_dependencies().is_empty() {
+        if !immediate_dependencies.is_empty() {
             process_dependency_tree(
                 dependencies_data,
                 deps_compiled_units,
-                &dependency_module.immediate_dependencies(),
+                root_compiled_units,
+                immediate_dependencies,
                 function_definitions,
             );
         }
@@ -243,6 +245,8 @@ pub fn process_dependency_tree<'move_package>(
         let dependency_module_data = ModuleData::build_module_data(
             module_id.clone(),
             dependency_module,
+            deps_compiled_units,
+            root_compiled_units,
             function_definitions,
         );
 
