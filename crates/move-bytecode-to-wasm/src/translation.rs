@@ -201,6 +201,7 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
+                    println!("\nTranslating {instruction:?}");
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -217,6 +218,7 @@ fn translate_flow(
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
                     });
+                    println!("typestack after {:?}\n", ctx.types_stack);
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
@@ -960,6 +962,7 @@ fn translate_instruction(
             let inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
+            /*
             let inner = if let IntermediateType::ITypeParameter(i) = inner {
                 types_stack
                     .0
@@ -974,6 +977,18 @@ fn translate_instruction(
                         },
                     )
                     .clone()
+            } else {
+                inner
+            };
+            */
+            let inner = if type_contains_generics(&inner) {
+                if let Some(caller_type_instances) =
+                    &mapped_function.function_id.type_instantiations
+                {
+                    instantiate_vec_type_parameters(&inner, caller_type_instances)
+                } else {
+                    panic!("could not compute concrete type")
+                }
             } else {
                 inner
             };
@@ -1921,15 +1936,52 @@ fn translate_instruction(
                 .structs
                 .get_generic_struct_types_instances(struct_definition_index)?;
 
-            types_stack.pop_expecting(&IntermediateType::IGenericStructInstance {
-                module_id: module_data.id.clone(),
-                index: idx,
-                types: types.to_vec(),
-            })?;
-
             let struct_ = module_data
                 .structs
                 .get_struct_instance_by_struct_definition_idx(struct_definition_index)?;
+
+            let (struct_, types) = if types.iter().any(type_contains_generics) {
+                if let Some(caller_type_instances) =
+                    &mapped_function.function_id.type_instantiations
+                {
+                    println!("AAAAAA");
+                    let mut instantiations = Vec::new();
+                    for (index, field) in types.iter().enumerate() {
+                        println!("AAAAAA {:?} {:?}", field, &types[index]);
+                        if let Some(res) = extract_type_instances_from_stack(field, &types[index]) {
+                            instantiations.push(res);
+                        } else {
+                            instantiations.push(field.clone());
+                        }
+                    }
+
+                    let instantiations = instantiations
+                        .into_iter()
+                        .map(|f| {
+                            if let IntermediateType::ITypeParameter(i) = f {
+                                caller_type_instances[i as usize].clone()
+                            } else {
+                                f
+                            }
+                        })
+                        .collect::<Vec<IntermediateType>>();
+
+                    println!("AAAAAA {:?}", instantiations);
+                    (struct_.instantiate(&instantiations), instantiations)
+                }
+                // This should never happen
+                else {
+                    panic!("could not instantiate generic types");
+                }
+            } else {
+                (struct_, types.to_vec())
+            };
+
+            types_stack.pop_expecting(&IntermediateType::IGenericStructInstance {
+                module_id: module_data.id.clone(),
+                index: idx,
+                types: types.clone(),
+            })?;
 
             bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
         }
