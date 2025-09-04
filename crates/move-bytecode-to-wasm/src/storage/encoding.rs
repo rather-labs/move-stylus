@@ -915,6 +915,7 @@ pub fn add_encode_intermediate_type_instructions(
                 inner,
             );
 
+            // TODO: is this needed?
             builder.i32_const(32).local_set(written_bytes_in_slot);
         }
 
@@ -922,6 +923,16 @@ pub fn add_encode_intermediate_type_instructions(
     };
 }
 
+/// Adds the instructions to decode and read an intermediate type from the storage slot.
+///
+/// # Arguments
+/// `module` - walrus module
+/// `builder` - insturctions sequence builder
+/// `compilation_ctx` - compilation context
+/// `data_ptr` - pointer to where data is written
+/// `slot_ptr` - storage's slot where the data is read
+/// `itype` - intermediate type to be decoded
+/// `read_bytes_in_slot` - number of bytes already read in the slot.
 pub fn add_decode_intermediate_type_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
@@ -941,10 +952,10 @@ pub fn add_decode_intermediate_type_instructions(
         | IntermediateType::IU16
         | IntermediateType::IU32
         | IntermediateType::IU64 => {
-            let swap_fn = if stack_size == 8 {
-                RuntimeFunction::SwapI64Bytes.get(module, None)
+            let (store_kind, swap_fn) = if stack_size == 8 {
+                (StoreKind::I64 { atomic: false }, RuntimeFunction::SwapI64Bytes.get(module, None))
             } else {
-                RuntimeFunction::SwapI32Bytes.get(module, None)
+                (StoreKind::I32 { atomic: false }, RuntimeFunction::SwapI32Bytes.get(module, None))
             };
 
             let load_kind = match storage_size {
@@ -959,12 +970,13 @@ pub fn add_decode_intermediate_type_instructions(
                 _ => panic!("invalid element size {storage_size} for type {itype:?}"),
             };
 
+            // Allocate memory to write the decoded value
             builder
                 .i32_const(stack_size)
                 .call(compilation_ctx.allocator)
                 .local_tee(data_ptr);
 
-            // Load the (u8, u16, u32, u64) value from slot data (plus offset)
+            // Load and swap the value
             builder
                 .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
                 .i32_const(32)
@@ -988,14 +1000,10 @@ pub fn add_decode_intermediate_type_instructions(
                 builder.i32_const(16).binop(BinaryOp::I32ShrU);
             }
 
-            // Save it
+            // Write the swapped value
             builder.store(
                 compilation_ctx.memory_id,
-                if stack_size == 8 {
-                    StoreKind::I64 { atomic: false }
-                } else {
-                    StoreKind::I32 { atomic: false }
-                },
+                store_kind,
                 MemArg {
                     align: 0,
                     offset: 0,
@@ -1064,13 +1072,6 @@ pub fn add_decode_intermediate_type_instructions(
 
             // Add 12 to the offset to write the last 20 bytes of the address
             builder.i32_const(12).binop(BinaryOp::I32Add);
-
-            // Source address
-            // // The offset is fixed because only one element address fits in a slot.
-            // builder
-            //     .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-            //     .i32_const(12)
-            //     .binop(BinaryOp::I32Add);
 
             builder
                 .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
@@ -1191,11 +1192,6 @@ pub fn add_decode_intermediate_type_instructions(
             builder.local_get(child_struct_ptr).local_set(data_ptr);
         }
         IntermediateType::IVector(inner_) => {
-            // let inner_slot_ptr = module.locals.add(ValType::I32);
-
-            // Duplicate the element to avoid overwriting it
-            // builder.local_get(slot_ptr).local_set(inner_slot_ptr);
-
             add_read_and_decode_storage_vector_instructions(
                 module,
                 builder,
