@@ -718,6 +718,102 @@ impl IVector {
         builder.local_get(ptr_local);
     }
 
+    pub fn vec_unpack_instructions(
+        inner: &IntermediateType,
+        module: &mut Module,
+        builder: &mut InstrSeqBuilder,
+        compilation_ctx: &CompilationContext,
+        length: u64,
+    ) {
+        let vec_ptr = module.locals.add(ValType::I32);
+
+        builder
+            .local_set(vec_ptr)
+            .skip_vec_header(vec_ptr)
+            .local_set(vec_ptr);
+
+        let i = module.locals.add(ValType::I32);
+        builder.i32_const(0).local_set(i);
+
+        builder.block(None, |block| {
+            let exit_loop_id = block.id();
+
+            block.loop_(None, |loop_| {
+                let loop_id = loop_.id();
+
+                loop_
+                    .local_get(i)
+                    .i32_const(length as i32)
+                    .binop(BinaryOp::I32GeU)
+                    .br_if(exit_loop_id);
+
+                match inner {
+                    IntermediateType::IBool
+                    | IntermediateType::IU8
+                    | IntermediateType::IU16
+                    | IntermediateType::IU32
+                    | IntermediateType::IU128
+                    | IntermediateType::IU256
+                    | IntermediateType::IAddress
+                    | IntermediateType::IVector(_)
+                    | IntermediateType::IStruct { .. }
+                    | IntermediateType::IGenericStructInstance { .. } => {
+                        loop_
+                            .local_get(vec_ptr)
+                            .local_get(i)
+                            .i32_const(4)
+                            .binop(BinaryOp::I32Mul)
+                            .binop(BinaryOp::I32Add)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+                    }
+                    IntermediateType::IU64 => {
+                        loop_
+                            .local_get(vec_ptr)
+                            .local_get(i)
+                            .i32_const(8)
+                            .binop(BinaryOp::I32Mul)
+                            .binop(BinaryOp::I32Add)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I64 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+                    }
+                    IntermediateType::IEnum(_) => todo!(),
+                    IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                        panic!("vector of rereferences found")
+                    }
+                    IntermediateType::ISigner => {
+                        panic!("should not be possible to have a vector of signers")
+                    }
+                    IntermediateType::ITypeParameter(_) => {
+                        panic!(
+                            "cannot unpack a vector of type parameters, expected a concrete type"
+                        );
+                    }
+                }
+
+                loop_
+                    .local_get(i)
+                    .i32_const(1)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(i);
+
+                loop_.br(loop_id);
+            });
+        });
+    }
+
     pub fn vec_borrow_instructions(
         inner: &IntermediateType,
         module: &mut Module,

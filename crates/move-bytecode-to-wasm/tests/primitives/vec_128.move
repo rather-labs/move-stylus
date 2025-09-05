@@ -73,3 +73,10 @@ public fun vec_push_and_pop_back(x: vector<u128>, y: u128): vector<u128> {
 public fun vec_len(x: vector<u128>): u64 {
   x.length()
 }
+
+// This generates a VecUnpack instruction
+public fun vec_unpack(x: vector<u128>): vector<u128> {
+    let mut z = vector[3, 1, 4];
+    x.do!(|e| z.push_back(e));
+    z
+}

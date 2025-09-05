@@ -1403,6 +1403,7 @@ mod vec_32 {
         function vecSwap(uint32[] x, uint64 id1, uint64 id2) external returns (uint32[]);
         function vecPushBack(uint32[] x, uint32 y) external returns (uint32[]);
         function vecPushAndPopBack(uint32[] x, uint32 y) external returns (uint32[]);
+        function vecUnpack(uint32[] x) external returns (uint32[]);
     );
 
     #[rstest]
@@ -1424,6 +1425,7 @@ mod vec_32 {
     #[case(vecSwapCall::new((vec![1u32, 2u32, 3u32], 0u64, 2u64)), vec![3, 2, 1])]
     #[case(vecPushBackCall::new((vec![1u32, 2u32, 3u32], 4u32)), vec![1, 2, 3, 4])]
     #[case(vecPushAndPopBackCall::new((vec![1u32, 2u32, 3u32], 4u32)), vec![1, 2, 3])]
+    #[case(vecUnpackCall::new((vec![1u32, 5u32, 9u32],)), vec![3, 1, 4, 1, 5, 9])]
     fn test_vec_32<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -1468,6 +1470,7 @@ mod vec_64 {
           function vecSwap(uint64[] x, uint64 id1, uint64 id2) external returns (uint64[]);
           function vecPushBack(uint64[] x, uint64 y) external returns (uint64[]);
           function vecPushAndPopBack(uint64[] x, uint64 y) external returns (uint64[]);
+          function vecUnpack(uint64[] x) external returns (uint64[]);
     );
 
     #[rstest]
@@ -1489,6 +1492,7 @@ mod vec_64 {
     #[case(vecSwapCall::new((vec![1u64, 2u64, 3u64], 0u64, 2u64)), vec![3u64, 2u64, 1u64])]
     #[case(vecPushBackCall::new((vec![1u64, 2u64, 3u64], 4u64)), vec![1u64, 2u64, 3u64, 4u64, 4u64])]
     #[case(vecPushAndPopBackCall::new((vec![1u64, 2u64, 3u64], 4u64)), vec![1u64, 2u64, 3u64])]
+    #[case(vecUnpackCall::new((vec![1u64, 5u64, 9u64],)), vec![3, 1, 4, 1, 5, 9])]
     fn test_vec_64<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -1533,6 +1537,7 @@ mod vec_128 {
         function vecSwap(uint128[] x, uint64 id1, uint64 id2) external returns (uint128[]);
         function vecPushBack(uint128[] x, uint128 y) external returns (uint128[]);
         function vecPushAndPopBack(uint128[] x, uint128 y) external returns (uint128[]);
+        function vecUnpack(uint128[] x) external returns (uint128[]);
     );
 
     #[rstest]
@@ -1554,6 +1559,7 @@ mod vec_128 {
     #[case(vecSwapCall::new((vec![1u128, 2u128, 3u128], 0u64, 2u64)), vec![3u128, 2u128, 1u128])]
     #[case(vecPushBackCall::new((vec![1u128, 2u128, 3u128], 4u128)), vec![1u128, 2u128, 3u128, 4u128, 4u128])]
     #[case(vecPushAndPopBackCall::new((vec![1u128, 2u128, 3u128], 4u128)), vec![1u128, 2u128, 3u128])]
+    #[case(vecUnpackCall::new((vec![1u128, 5u128, 9u128],)), vec![3, 1, 4, 1, 5, 9])]
     fn test_vec_128<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -1597,6 +1603,7 @@ mod vec_vec_32 {
         function vecPushBackToElement(uint32[][] x, uint32 y) external returns (uint32[][]);
         function vecPushAndPopBack(uint32[][] x, uint32[] y) external returns (uint32[][]);
         function misc0(uint32[][] x, uint32 y) external returns (uint32[][]);
+        function vecUnpack(uint32[][] x) external returns (uint32[][]);
     );
 
     #[rstest]
@@ -1616,6 +1623,7 @@ mod vec_vec_32 {
     #[case(vecPushBackCall::new((vec![vec![1u32, 2u32], vec![3u32, 4u32]], vec![5u32, 6u32])), vec![vec![1u32, 2u32], vec![3u32, 4u32], vec![5u32, 6u32], vec![5u32, 6u32]])]
     #[case(vecPushAndPopBackCall::new((vec![vec![1u32, 2u32], vec![3u32, 4u32]], vec![5u32, 6u32])), vec![vec![1u32, 2u32], vec![3u32, 4u32]])]
     #[case(misc0Call::new((vec![vec![1u32, 2u32], vec![3u32, 4u32]], 99u32)), vec![vec![1u32, 2u32, 99u32], vec![4u32, 99u32]])]
+    #[case(vecUnpackCall::new((vec![vec![1u32], vec![5u32], vec![9u32]],)), vec![vec![3], vec![1], vec![4], vec![1], vec![5], vec![9]])]
     fn test_vec_vec_32<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -1659,6 +1667,7 @@ mod vec_vec_128 {
         function vecPushBackToElement(uint128[][] x, uint128 y) external returns (uint128[][]);
         function vecPushAndPopBack(uint128[][] x, uint128[] y) external returns (uint128[][]);
         function misc0(uint128[][] x, uint128 y) external returns (uint128[][]);
+        function vecUnpack(uint128[][] x) external returns (uint128[][]);
     );
 
     #[rstest]
@@ -1678,6 +1687,7 @@ mod vec_vec_128 {
     #[case(vecPushBackCall::new((vec![vec![1u128, 2u128], vec![3u128, 4u128]], vec![5u128, 6u128])), vec![vec![1u128, 2u128], vec![3u128, 4u128], vec![5u128, 6u128], vec![5u128, 6u128]])]
     #[case(vecPushAndPopBackCall::new((vec![vec![1u128, 2u128], vec![3u128, 4u128]], vec![5u128, 6u128])), vec![vec![1u128, 2u128], vec![3u128, 4u128]])]
     #[case(misc0Call::new((vec![vec![1u128, 2u128], vec![3u128, 4u128]], 99u128)), vec![vec![1u128, 2u128, 99u128], vec![4u128, 99u128]])]
+    #[case(vecUnpackCall::new((vec![vec![1u128], vec![5u128], vec![9u128]],)), vec![vec![3], vec![1], vec![4], vec![1], vec![5], vec![9]])]
     fn test_vec_vec_128<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -1750,6 +1760,7 @@ mod vec_struct {
         function vecNeq(Foo[] x, Foo[] y) external returns (bool);
         function vecBorrow(Foo[] x) external returns (Foo);
         function vecMutBorrow(Foo[] x) external returns (Foo);
+        function vecUnpack(Foo[] x) external returns (Foo[]);
     );
 
     fn get_foo_vector() -> Vec<Foo> {
@@ -2201,6 +2212,7 @@ mod vec_struct {
     )]
     #[case(vecBorrowCall::new((get_foo_vector(),)), get_foo_vector()[0].clone())]
     #[case(vecMutBorrowCall::new((get_foo_vector(),)), get_foo_vector()[0].clone())]
+    #[case(vecUnpackCall::new((get_foo_vector(),)), [get_foo_vector(), get_foo_vector()].concat())]
     fn test_vec_struct<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
