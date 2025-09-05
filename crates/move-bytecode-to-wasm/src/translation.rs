@@ -16,7 +16,8 @@ use crate::{
     compilation_context::ModuleData,
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     generics::{
-        extract_type_instances_from_stack, replace_type_parameters, type_contains_generics,
+        extract_type_instances_from_stack, instantiate_vec_type_parameters,
+        replace_type_parameters, type_contains_generics,
     },
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
@@ -854,6 +855,30 @@ fn translate_instruction(
 
             types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
         }
+        Bytecode::VecUnpack(signature_index, length) => {
+            let inner =
+                bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
+
+            let inner = if type_contains_generics(&inner) {
+                if let Some(caller_type_instances) =
+                    &mapped_function.function_id.type_instantiations
+                {
+                    instantiate_vec_type_parameters(&inner, caller_type_instances)
+                } else {
+                    panic!("could not compute concrete type")
+                }
+            } else {
+                inner
+            };
+
+            types_stack.pop_expecting(&IntermediateType::IVector(Box::new(inner.clone())))?;
+
+            IVector::vec_unpack_instructions(&inner, module, builder, compilation_ctx, *length);
+
+            for _ in 0..*length {
+                types_stack.push(inner.clone());
+            }
+        }
         // Vector instructions
         Bytecode::VecImmBorrow(signature_index) => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
@@ -931,20 +956,14 @@ fn translate_instruction(
             let inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
 
-            let inner = if let IntermediateType::ITypeParameter(i) = inner {
-                types_stack
-                    .0
-                    .last()
-                    .unwrap_or(
-                        if let Some(caller_type_instances) =
-                            &mapped_function.function_id.type_instantiations
-                        {
-                            &caller_type_instances[i as usize]
-                        } else {
-                            panic!("could not compute concrete type")
-                        },
-                    )
-                    .clone()
+            let inner = if type_contains_generics(&inner) {
+                if let Some(caller_type_instances) =
+                    &mapped_function.function_id.type_instantiations
+                {
+                    instantiate_vec_type_parameters(&inner, caller_type_instances)
+                } else {
+                    panic!("could not compute concrete type")
+                }
             } else {
                 inner
             };
@@ -1089,6 +1108,18 @@ fn translate_instruction(
 
             let expected_vec_inner =
                 bytecodes::vectors::get_inner_type_from_signature(signature_index, module_data)?;
+
+            let expected_vec_inner = if type_contains_generics(&expected_vec_inner) {
+                if let Some(caller_type_instances) =
+                    &mapped_function.function_id.type_instantiations
+                {
+                    instantiate_vec_type_parameters(&expected_vec_inner, caller_type_instances)
+                } else {
+                    panic!("could not compute concrete type")
+                }
+            } else {
+                expected_vec_inner
+            };
 
             if *vec_inner != expected_vec_inner {
                 return Err(TranslationError::TypeMismatch {
@@ -1880,15 +1911,49 @@ fn translate_instruction(
                 .structs
                 .get_generic_struct_types_instances(struct_definition_index)?;
 
-            types_stack.pop_expecting(&IntermediateType::IGenericStructInstance {
-                module_id: module_data.id.clone(),
-                index: idx,
-                types: types.to_vec(),
-            })?;
-
             let struct_ = module_data
                 .structs
                 .get_struct_instance_by_struct_definition_idx(struct_definition_index)?;
+
+            let (struct_, types) = if types.iter().any(type_contains_generics) {
+                if let Some(caller_type_instances) =
+                    &mapped_function.function_id.type_instantiations
+                {
+                    let mut instantiations = Vec::new();
+                    for (index, field) in types.iter().enumerate() {
+                        if let Some(res) = extract_type_instances_from_stack(field, &types[index]) {
+                            instantiations.push(res);
+                        } else {
+                            instantiations.push(field.clone());
+                        }
+                    }
+
+                    let instantiations = instantiations
+                        .into_iter()
+                        .map(|f| {
+                            if let IntermediateType::ITypeParameter(i) = f {
+                                caller_type_instances[i as usize].clone()
+                            } else {
+                                f
+                            }
+                        })
+                        .collect::<Vec<IntermediateType>>();
+
+                    (struct_.instantiate(&instantiations), instantiations)
+                }
+                // This should never happen
+                else {
+                    panic!("could not instantiate generic types");
+                }
+            } else {
+                (struct_, types.to_vec())
+            };
+
+            types_stack.pop_expecting(&IntermediateType::IGenericStructInstance {
+                module_id: module_data.id.clone(),
+                index: idx,
+                types,
+            })?;
 
             bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
         }

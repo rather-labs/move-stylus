@@ -19,8 +19,8 @@ public fun get_literal(): vector<vector<u32>> {
 // Forces the compiler to store literals on locals
 public fun get_copied_local(): vector<vector<u32>> {
   let x: vector<vector<u32>> = vector[vector[1u32, 2u32, 3u32], vector[4u32, 5u32, 6u32], vector[7u32, 8u32, 9u32]];
-  let y = x; 
-  let _z = x; 
+  let y = x;
+  let _z = x;
   y
 }
 
@@ -58,14 +58,14 @@ public fun vec_push_and_pop_back(x: vector<vector<u32>>, y: vector<u32>): vector
   z.pop_back();
   z
 }
-  
+
 public fun vec_push_back_to_element(x: vector<vector<u32>>, y: u32): vector<vector<u32>> {
   let mut w = x;
   w[0].push_back(y);
   w[0].push_back(y);
   w
 }
-  
+
 public fun misc_0(x: vector<vector<u32>>, y: u32): vector<vector<u32>> {
   let mut w = x;
   w[0].push_back(y);
@@ -75,4 +75,11 @@ public fun misc_0(x: vector<vector<u32>>, y: u32): vector<vector<u32>> {
   a.push_back(y);
   let z = vector[w[0], a];
   z
+}
+
+// This generates a VecUnpack instruction
+public fun vec_unpack(x: vector<vector<u32>>): vector<vector<u32>> {
+    let mut z = vector[vector[3], vector[1], vector[4]];
+    x.do!(|e| z.push_back(e));
+    z
 }

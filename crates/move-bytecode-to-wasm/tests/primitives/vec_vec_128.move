@@ -19,8 +19,8 @@ public fun get_literal(): vector<vector<u128>> {
 // Forces the compiler to store literals on locals
 public fun get_copied_local(): vector<vector<u128>> {
   let x: vector<vector<u128>> = vector[vector[1u128, 2u128, 3u128], vector[4u128, 5u128, 6u128], vector[7u128, 8u128, 9u128]];
-  let y = x; 
-  let _z = x; 
+  let y = x;
+  let _z = x;
   y
 }
 
@@ -65,8 +65,8 @@ public fun vec_push_and_pop_back(x: vector<vector<u128>>, y: vector<u128>): vect
   z.pop_back();
   z
 }
-  
-  
+
+
 public fun misc_0(x: vector<vector<u128>>, y: u128): vector<vector<u128>> {
   let mut w = x;
   w[0].push_back(y);
@@ -76,4 +76,11 @@ public fun misc_0(x: vector<vector<u128>>, y: u128): vector<vector<u128>> {
   a.push_back(y);
   let z = vector[w[0], a];
   z
+}
+
+// This generates a VecUnpack instruction
+public fun vec_unpack(x: vector<vector<u128>>): vector<vector<u128>> {
+    let mut z = vector[vector[3], vector[1], vector[4]];
+    x.do!(|e| z.push_back(e));
+    z
 }
