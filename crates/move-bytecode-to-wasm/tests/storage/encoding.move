@@ -159,11 +159,15 @@ public struct DynamicStruct4 has key {
     b: vector<StaticNestedStructChild>,
 }
 
-// public struct DynamicStruct6 has key {
-//     id: UID,
-//     c: vector<vector<StaticNestedStructChild>>,
-//     d: vector<u64>,
-// }
+public struct NestedStructChildWrapper has store {
+    a: vector<DynamicNestedStructChild>,
+    b: vector<StaticNestedStructChild>
+}
+
+public struct DynamicStruct5 has key {
+    id: UID,
+    a: vector<NestedStructChildWrapper>,
+}
 
 public fun save_dynamic_struct(
     id: UID,
@@ -234,17 +238,23 @@ public fun read_dynamic_struct_4(): DynamicStruct4 {
     read_slot<DynamicStruct4>(0)
 }
 
-// public fun save_dynamic_struct_6(
-//     id: UID,
-//     a: u64,
-//     b: u128
-// ) {
-//     let c = vector[vector[StaticNestedStructChild { a, b }, StaticNestedStructChild { a, b }], vector[StaticNestedStructChild { a, b }, StaticNestedStructChild { a, b }]];
-//     let d = vector[a, a + 1, a + 2];
-//     let struct_ = DynamicStruct6 { id, c, d};
-//     save_in_slot(struct_, 0);
-// }
+public fun save_dynamic_struct_5(
+    id: UID,
+    x: u32,
+    y: u64,
+    z: u128,
+    w: address
+) {
+    let v = vector[x, x + 1, x + 2];
+    let a1 = vector[DynamicNestedStructChild { a: v, b: z }, DynamicNestedStructChild { a: v, b: z + 1 }];
+    let a2 = vector[DynamicNestedStructChild { a: v, b: z + 2 }, DynamicNestedStructChild { a: v, b: z + 3 }, DynamicNestedStructChild { a: v, b: z + 4 }];
+    let b1 = vector[StaticNestedStructChild { d: y, e: w }, StaticNestedStructChild { d: y + 1 , e: w }, StaticNestedStructChild { d: y + 2, e: w }];
+    let b2 = vector[StaticNestedStructChild { d: y + 3, e: w }, StaticNestedStructChild { d: y + 4 , e: w }];
+    let a = vector[NestedStructChildWrapper { a: a1, b: b1 }, NestedStructChildWrapper { a: a2, b: b2 }];
+    let struct_ = DynamicStruct5 { id, a};
+    save_in_slot(struct_, 0);
+}
 
-// public fun read_dynamic_struct_6(): DynamicStruct6 {
-//     read_slot<DynamicStruct6>(0)
-// }
+public fun read_dynamic_struct_5(): DynamicStruct5 {
+    read_slot<DynamicStruct5>(0)
+}
