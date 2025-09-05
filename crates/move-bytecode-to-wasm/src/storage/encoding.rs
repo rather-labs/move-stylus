@@ -43,13 +43,6 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     written_bytes_in_slot: LocalId,
 ) {
     let (storage_cache, _) = storage_cache_bytes32(module);
-    #[cfg(feature = "inject-host-debug-fns")]
-    let (print_i32, print_i64, print_memory_from, print_address, print_separator, print_u128) = {
-        crate::inject_debug_fns(module);
-        crate::declare_host_debug_functions!(module)
-    };
-
-    // Runtime functions
     let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
 
     // let mut written_bytes_in_slot = written_bytes_in_slot;
@@ -142,13 +135,6 @@ pub fn add_read_and_decode_storage_struct_instructions(
     read_bytes_in_slot: LocalId,
 ) -> LocalId {
     let (storage_load, _) = storage_load_bytes32(module);
-
-    #[cfg(feature = "inject-host-debug-fns")]
-    let (print_i32, print_i64, print_memory_from, print_address, print_separator, print_u128) = {
-        crate::inject_debug_fns(module);
-        crate::declare_host_debug_functions!(module)
-    };
-
     let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
 
     // Locals
@@ -256,12 +242,6 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     slot_ptr: LocalId,
     inner: &IntermediateType,
 ) {
-    #[cfg(feature = "inject-host-debug-fns")]
-    let (print_i32, print_i64, print_memory_from, print_address, print_separator, print_u128) = {
-        crate::inject_debug_fns(module);
-        crate::declare_host_debug_functions!(module)
-    };
-
     // Host functions
     let (storage_cache, _) = storage_cache_bytes32(module);
     let (native_keccak, _) = native_keccak256(module);
@@ -467,12 +447,6 @@ pub fn add_read_and_decode_storage_vector_instructions(
     slot_ptr: LocalId,
     inner: &IntermediateType,
 ) {
-    #[cfg(feature = "inject-host-debug-fns")]
-    let (print_i32, print_i64, print_memory_from, print_address, print_separator, print_u128) = {
-        crate::inject_debug_fns(module);
-        crate::declare_host_debug_functions!(module)
-    };
-
     // Host functions
     let (storage_load, _) = storage_load_bytes32(module);
     let (native_keccak, _) = native_keccak256(module);

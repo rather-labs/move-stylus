@@ -835,6 +835,11 @@ mod storage_encoding {
             NestedStructChildWrapper[] a;
         }
 
+        struct GenericStruct32 {
+            UID id;
+            uint32[] a;
+            uint32 b;
+        }
         function saveDynamicStruct(
             UID id,
             uint32 a,
@@ -886,6 +891,12 @@ mod storage_encoding {
             address w,
         ) public view;
         function readDynamicStruct5() public view returns (DynamicStruct5);
+
+        function saveGenericStruct32(
+            UID id,
+            uint32 x,
+        ) public view;
+        function readGenericStruct32() public view returns (GenericStruct32);
     );
 
     #[rstest]
@@ -1433,6 +1444,29 @@ mod storage_encoding {
            ],
         }
     )]
+    #[case(saveGenericStruct32Call::new((
+        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        1,
+    )),
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // uint32[] header slot
+        U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6", 16).unwrap().to_be_bytes(), // uint32[] elements slot
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // uint32 b
+    ],
+    vec![
+        [0x00; 32], // 0x0
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // Header slot
+        U256::from_str_radix("0000000000000000000000000000000000000000000000030000000200000001", 16).unwrap().to_be_bytes(), // First element
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // Second element
+    ],
+        readGenericStruct32Call::new(()),
+        GenericStruct32 {
+            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+            a: vec![1, 2, 3],
+            b: 1,
+        }
+    )]
     fn test_dynamic_fields<T: SolCall, U: SolCall, V: SolValue>(
         runtime: RuntimeSandbox,
         #[case] call_data_encode: T,
@@ -1448,9 +1482,7 @@ mod storage_encoding {
 
         // Check if it is encoded correctly in storage
         for (i, slot) in expected_slots.iter().enumerate() {
-            // println!("Slot: {slot:?}");
             let storage = runtime.get_storage_at_slot(*slot);
-            // println!("-- Data: {storage:?}");
             assert_eq!(expected_encode[i], storage, "Mismatch at slot {}", i);
         }
 

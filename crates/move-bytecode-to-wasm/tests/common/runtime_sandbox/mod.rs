@@ -398,7 +398,6 @@ impl RuntimeSandbox {
 
     pub fn get_storage_at_slot(&self, slot: [u8; 32]) -> [u8; 32] {
         let storage = self.storage.lock().unwrap();
-        // println!("Storage contents:");
         for (slot_key, data) in storage.iter() {
             println!("  slot: 0x{}", hex::encode(slot_key));
             println!("  data: 0x{}", hex::encode(data));

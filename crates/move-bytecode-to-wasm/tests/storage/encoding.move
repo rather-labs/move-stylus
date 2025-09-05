@@ -169,6 +169,12 @@ public struct DynamicStruct5 has key {
     a: vector<NestedStructChildWrapper>,
 }
 
+public struct GenericStruct<T> has key {
+    id: UID,
+    a: vector<T>,
+    b: T,
+}
+
 public fun save_dynamic_struct(
     id: UID,
     a: u32,
@@ -257,4 +263,17 @@ public fun save_dynamic_struct_5(
 
 public fun read_dynamic_struct_5(): DynamicStruct5 {
     read_slot<DynamicStruct5>(0)
+}
+
+public fun save_generic_struct_32(
+    id: UID,
+    x: u32
+) {
+    let a = vector[x, x + 1, x + 2];
+    let struct_ = GenericStruct<u32> { id, a, b: x };
+    save_in_slot(struct_, 0);
+}
+
+public fun read_generic_struct_32(): GenericStruct<u32> {
+    read_slot<GenericStruct<u32>>(0)
 }
