@@ -1399,36 +1399,32 @@ mod storage_encoding {
     vec![
         [0x00; 32], // 0x0
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // Header slot
-        // U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6", 16).unwrap().to_be_bytes(), // First element
-        // U256::from_str_radix("b5d9d894133a730aa651ef62d26b0ffa846233c74177a591a4a896adfda97d22", 16).unwrap().to_be_bytes(), // Second element
     ],
     vec![
         [0x00; 32], // 0x0
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
-        // U256::from_str_radix("0000000000000000000000000000000000000000000000030000000200000001", 16).unwrap().to_be_bytes(),
-        // U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000007b", 16).unwrap().to_be_bytes(),
     ],
         readDynamicStruct5Call::new(()),
         DynamicStruct5 {
            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
            a: vec![
-               NestedStructChildWrapper { 
+               NestedStructChildWrapper {
                    a: vec![
-                       DynamicNestedStructChild { a: vec![1, 2, 3], b: 123 }, 
+                       DynamicNestedStructChild { a: vec![1, 2, 3], b: 123 },
                        DynamicNestedStructChild { a: vec![1, 2, 3], b: 124 }
-                   ], 
+                   ],
                    b: vec![
                        StaticNestedStructChild { d: 42, e: address!("0x1111111111111111111111111111111111111111") }, 
                        StaticNestedStructChild { d: 43, e: address!("0x1111111111111111111111111111111111111111") }, 
                        StaticNestedStructChild { d: 44, e: address!("0x1111111111111111111111111111111111111111") }
                    ]
                },
-               NestedStructChildWrapper { 
+               NestedStructChildWrapper {
                    a: vec![
-                       DynamicNestedStructChild { a: vec![1, 2, 3], b: 125 }, 
+                       DynamicNestedStructChild { a: vec![1, 2, 3], b: 125 },
                        DynamicNestedStructChild { a: vec![1, 2, 3], b: 126 },
                        DynamicNestedStructChild { a: vec![1, 2, 3], b: 127 }
-                   ], 
+                   ],
                    b: vec![
                        StaticNestedStructChild { d: 45, e: address!("0x1111111111111111111111111111111111111111") }, 
                        StaticNestedStructChild { d: 46, e: address!("0x1111111111111111111111111111111111111111") }, 
