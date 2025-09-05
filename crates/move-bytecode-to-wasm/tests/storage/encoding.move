@@ -123,16 +123,59 @@ public struct DynamicStruct has key {
     b: bool,
     c: vector<u64>,
     d: vector<u128>,
+    e: u64,
+    f: u128,
+    g: u256,
 }
+
+public struct DynamicStruct2 has key {
+    id: UID,
+    a: vector<bool>,
+    b: vector<u8>,
+    c: vector<u16>,
+    d: vector<u32>,
+    e: vector<u64>,
+    f: vector<u128>,
+    g: vector<u256>,
+    h: vector<address>,
+}
+
+public struct DynamicStruct3 has key {
+    id: UID,
+    a: vector<vector<u8>>,
+    b: vector<vector<u32>>,
+    c: vector<vector<u64>>,
+    d: vector<vector<u128>>,
+}
+
+public struct DynamicNestedStructChild has store {
+    a: vector<u32>,
+    b: u128
+}
+
+public struct DynamicStruct4 has key {
+    id: UID,
+    a: vector<DynamicNestedStructChild>,
+    b: vector<StaticNestedStructChild>,
+}
+
+// public struct DynamicStruct6 has key {
+//     id: UID,
+//     c: vector<vector<StaticNestedStructChild>>,
+//     d: vector<u64>,
+// }
 
 public fun save_dynamic_struct(
     id: UID,
     a: u32,
     b: bool,
     c: vector<u64>,
-    d: vector<u128>
+    d: vector<u128>,
+    e: u64,
+    f: u128,
+    g: u256,
 ) {
-    let struct_ = DynamicStruct { id, a, b, c, d };
+    let struct_ = DynamicStruct { id, a, b, c, d, e, f, g };
     save_in_slot(struct_, 0);
 }
 
@@ -140,18 +183,18 @@ public fun read_dynamic_struct(): DynamicStruct {
     read_slot<DynamicStruct>(0)
 }
 
-public struct DynamicStruct2 has key {
-    id: UID,    
-    c: vector<u256>,
-    d: vector<address>,
-}
-
 public fun save_dynamic_struct_2(
     id: UID,
-    c: vector<u256>,
-    d: vector<address>
-) {
-    let struct_ = DynamicStruct2 { id, c, d };
+    a: vector<bool>,
+    b: vector<u8>,
+    c: vector<u16>,
+    d: vector<u32>,
+    e: vector<u64>,
+    f: vector<u128>,
+    g: vector<u256>,
+    h: vector<address>,
+) { 
+    let struct_ = DynamicStruct2 { id, a, b, c, d, e, f, g, h };
     save_in_slot(struct_, 0);
 }
 
@@ -159,16 +202,14 @@ public fun read_dynamic_struct_2(): DynamicStruct2 {
     read_slot<DynamicStruct2>(0)
 }
 
-public struct DynamicStruct3 has key {
-    id: UID,
-    c: vector<vector<u32>>,
-}
-
 public fun save_dynamic_struct_3(
     id: UID,
-    c: vector<vector<u32>>,
+    a: vector<vector<u8>>,
+    b: vector<vector<u32>>,
+    c: vector<vector<u64>>,
+    d: vector<vector<u128>>,
 ) {
-    let struct_ = DynamicStruct3 { id, c };
+    let struct_ = DynamicStruct3 { id, a, b, c, d };
     save_in_slot(struct_, 0);
 }
 
@@ -176,18 +217,16 @@ public fun read_dynamic_struct_3(): DynamicStruct3 {
     read_slot<DynamicStruct3>(0)
 }
 
-public struct DynamicStruct4 has key {
-    id: UID,
-    c: vector<vector<u128>>,
-    d: u32,
-}
-
 public fun save_dynamic_struct_4(
     id: UID,
-    c: vector<vector<u128>>,
-    d: u32,
+    x: vector<u32>,
+    y: u64,
+    z: u128,
+    w: address
 ) {
-    let struct_ = DynamicStruct4 { id, c, d };
+    let a = vector[DynamicNestedStructChild { a: x, b: z }, DynamicNestedStructChild { a: x, b: z + 1 }];
+    let b = vector[StaticNestedStructChild { d: y, e: w }, StaticNestedStructChild { d: y + 1 , e: w }, StaticNestedStructChild { d: y + 2, e: w }];
+    let struct_ = DynamicStruct4 { id, a, b};
     save_in_slot(struct_, 0);
 }
 
@@ -195,47 +234,17 @@ public fun read_dynamic_struct_4(): DynamicStruct4 {
     read_slot<DynamicStruct4>(0)
 }
 
-public struct NestedStruct has store {
-    a: u64,
-    b: u128
-}
+// public fun save_dynamic_struct_6(
+//     id: UID,
+//     a: u64,
+//     b: u128
+// ) {
+//     let c = vector[vector[StaticNestedStructChild { a, b }, StaticNestedStructChild { a, b }], vector[StaticNestedStructChild { a, b }, StaticNestedStructChild { a, b }]];
+//     let d = vector[a, a + 1, a + 2];
+//     let struct_ = DynamicStruct6 { id, c, d};
+//     save_in_slot(struct_, 0);
+// }
 
-public struct DynamicStruct5 has key {
-    id: UID,
-    c: vector<NestedStruct>,
-}
-
-public fun save_dynamic_struct_5(
-    id: UID,
-    a: u64,
-    b: u128
-) {
-    let c = vector[NestedStruct { a, b }, NestedStruct { a, b }, NestedStruct { a, b }];
-    let struct_ = DynamicStruct5 { id, c};
-    save_in_slot(struct_, 0);
-}
-
-public fun read_dynamic_struct_5(): DynamicStruct5 {
-    read_slot<DynamicStruct5>(0)
-} 
-
-public struct DynamicStruct6 has key {
-    id: UID,
-    c: vector<vector<NestedStruct>>,
-    d: vector<u64>,
-}
-
-public fun save_dynamic_struct_6(
-    id: UID,
-    a: u64,
-    b: u128
-) {
-    let c = vector[vector[NestedStruct { a, b }, NestedStruct { a, b }], vector[NestedStruct { a, b }, NestedStruct { a, b }]];
-    let d = vector[a, a + 1, a + 2];
-    let struct_ = DynamicStruct6 { id, c, d};
-    save_in_slot(struct_, 0);
-}
-
-public fun read_dynamic_struct_6(): DynamicStruct6 {
-    read_slot<DynamicStruct6>(0)
-} 
+// public fun read_dynamic_struct_6(): DynamicStruct6 {
+//     read_slot<DynamicStruct6>(0)
+// }

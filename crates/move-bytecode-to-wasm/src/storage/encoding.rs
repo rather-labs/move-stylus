@@ -601,6 +601,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
                             },
                         );
 
+                    // Decode the element and store it at elem_data_ptr
                     add_decode_intermediate_type_instructions(
                         module,
                         loop_,
@@ -614,9 +615,10 @@ pub fn add_read_and_decode_storage_vector_instructions(
                     // Destination address of the element in memory
                     loop_.vec_elem_ptr(data_ptr, i, stack_size);
 
-                    // Write the decoded element in the vector data memory
+                    // Get the decoded element
                     loop_.local_get(elem_data_ptr);
 
+                    // If the element is not heap, load the value from the intermediate pointer
                     if matches!(
                         inner,
                         IntermediateType::IU64
@@ -639,6 +641,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
                         );
                     };
 
+                    // Store the decoded element at data_ptr + i * stack_size
                     loop_.store(
                         compilation_ctx.memory_id,
                         if stack_size == 8 {
@@ -716,7 +719,7 @@ pub fn add_encode_intermediate_type_instructions(
             };
 
             // If we are processing a field from a struct, a second load is needed.
-            // This is because structs just store pointers to the data.
+            // This is because structs store pointers to their fields, even for non-heap types.
             if is_field {
                 builder.load(
                     compilation_ctx.memory_id,
@@ -953,9 +956,15 @@ pub fn add_decode_intermediate_type_instructions(
         | IntermediateType::IU32
         | IntermediateType::IU64 => {
             let (store_kind, swap_fn) = if stack_size == 8 {
-                (StoreKind::I64 { atomic: false }, RuntimeFunction::SwapI64Bytes.get(module, None))
+                (
+                    StoreKind::I64 { atomic: false },
+                    RuntimeFunction::SwapI64Bytes.get(module, None),
+                )
             } else {
-                (StoreKind::I32 { atomic: false }, RuntimeFunction::SwapI32Bytes.get(module, None))
+                (
+                    StoreKind::I32 { atomic: false },
+                    RuntimeFunction::SwapI32Bytes.get(module, None),
+                )
             };
 
             let load_kind = match storage_size {
@@ -1000,7 +1009,7 @@ pub fn add_decode_intermediate_type_instructions(
                 builder.i32_const(16).binop(BinaryOp::I32ShrU);
             }
 
-            // Write the swapped value
+            // Store the swapped value at #data_ptr
             builder.store(
                 compilation_ctx.memory_id,
                 store_kind,
