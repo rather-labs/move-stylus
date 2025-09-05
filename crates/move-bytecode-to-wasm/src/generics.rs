@@ -170,5 +170,5 @@ pub fn instantiate_vec_type_parameters(
         })
         .collect::<Vec<IntermediateType>>();
 
-    replace_type_parameters(&inner, &concrete_types)
+    replace_type_parameters(inner, &concrete_types)
 }
