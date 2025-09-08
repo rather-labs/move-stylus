@@ -497,10 +497,10 @@ pub fn add_read_and_decode_storage_vector_instructions(
     builder.i32_const(0).binop(BinaryOp::I32Eq).if_else(
         None,
         |then| {
-            // If the vector is empty (len == 0) we allocate 32 bytes of empty data and skip the rest of the instructions.
+            // If the vector is empty (len == 0) we reserve 8 bytes of empty data and skip the rest of the instructions.
             // This is neeeded because the caller (add_read_and_decode_storage_struct_instructions) is going to save the field pointer in the struct data.
             // If we dont reserve this memory, we can end up reading garbage data and messing up the decoding.
-            then.i32_const(32)
+            then.i32_const(8)
                 .call(compilation_ctx.allocator)
                 .local_set(data_ptr);
         },
@@ -593,14 +593,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
                     loop_.local_get(elem_data_ptr);
 
                     // If the element is not heap, load the value from the intermediate pointer
-                    if matches!(
-                        inner,
-                        IntermediateType::IU64
-                            | IntermediateType::IU32
-                            | IntermediateType::IU16
-                            | IntermediateType::IU8
-                            | IntermediateType::IBool
-                    ) {
+                    if inner.is_stack_type() {
                         loop_.load(
                             compilation_ctx.memory_id,
                             if stack_size == 8 {

@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex, mpsc},
 };
 
-use alloy_primitives::{hex, keccak256};
+use alloy_primitives::keccak256;
 use anyhow::Result;
 use constants::{
     BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, CHAIN_ID, GAS_PRICE,
@@ -14,9 +14,6 @@ use constants::{
 };
 use walrus::Module;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
-
-#[cfg(feature = "inject-host-debug-fns")]
-use walrus::ValType;
 
 struct ModuleData {
     pub data: Vec<u8>,
@@ -398,11 +395,6 @@ impl RuntimeSandbox {
 
     pub fn get_storage_at_slot(&self, slot: [u8; 32]) -> [u8; 32] {
         let storage = self.storage.lock().unwrap();
-        for (slot_key, data) in storage.iter() {
-            println!("  slot: 0x{}", hex::encode(slot_key));
-            println!("  data: 0x{}", hex::encode(data));
-            println!();
-        }
         *storage.get(&slot).unwrap()
     }
 }
