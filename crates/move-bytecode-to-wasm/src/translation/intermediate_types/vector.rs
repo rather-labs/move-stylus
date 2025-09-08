@@ -7,7 +7,7 @@ use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, compilation_context::ModuleData};
 
-use super::IntermediateType;
+use super::{IntermediateType, heap_integers::IU128};
 
 #[derive(Clone)]
 pub struct IVector;
@@ -23,12 +23,15 @@ impl IVector {
         capacity: LocalId,
         data_size: i32,
     ) {
-        // If the len is 0 we just allocate 16 bytes representing 0 length and 0 capacity
-        builder.local_get(len).i32_const(0).binop(BinaryOp::I32Eq);
+        // If the len is 0 we just allocate 8 bytes representing 0 length and 0 capacity
+        builder
+            .local_get(capacity)
+            .i32_const(0)
+            .binop(BinaryOp::I32Eq);
         builder.if_else(
             None,
             |then| {
-                then.i32_const(16)
+                then.i32_const(8)
                     .call(compilation_ctx.allocator)
                     .local_set(pointer);
             },
@@ -190,13 +193,26 @@ impl IVector {
                     offset: 0,
                 },
             )
-            .local_tee(len);
+            .local_set(len);
 
         // Calculate the capacity
         builder
-            .local_get(multiplier)
-            .binop(BinaryOp::I32Mul)
-            .local_set(capacity);
+            .local_get(len)
+            .i32_const(0)
+            .binop(BinaryOp::I32Eq)
+            .if_else(
+                None,
+                |then| {
+                    then.i32_const(1).local_set(capacity);
+                },
+                |else_| {
+                    else_
+                        .local_get(len)
+                        .local_get(multiplier)
+                        .binop(BinaryOp::I32Mul)
+                        .local_set(capacity);
+                },
+            );
 
         // Allocate memory and write length and capacity at the beginning
         IVector::allocate_vector_with_header(
@@ -245,86 +261,55 @@ impl IVector {
                     );
                 }
                 IntermediateType::IU128 => {
-                    loop_block.load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-                    loop_block.local_set(src_elem_ptr);
-
-                    loop_block.i32_const(16);
-                    loop_block.call(compilation_ctx.allocator);
-                    loop_block.local_set(dst_elem_ptr);
-
-                    for i in 0..2 {
-                        loop_block
-                            .local_get(dst_elem_ptr)
-                            .local_get(src_elem_ptr)
-                            .load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I64 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: i * 8,
-                                },
-                            );
-                    }
-
-                    for i in 0..2 {
-                        loop_block.store(
+                    // Set src
+                    loop_block
+                        .load(
                             compilation_ctx.memory_id,
-                            StoreKind::I64 { atomic: false },
+                            LoadKind::I32 { atomic: false },
                             MemArg {
                                 align: 0,
-                                offset: 8 - i * 8,
+                                offset: 0,
                             },
-                        );
-                    }
+                        )
+                        .local_set(src_elem_ptr);
+
+                    // Allocate memory for dest
+                    loop_block
+                        .i32_const(16)
+                        .call(compilation_ctx.allocator)
+                        .local_tee(dst_elem_ptr);
+
+                    // Put dest (tee above), src and size to perform memory copy
+                    loop_block
+                        .local_get(src_elem_ptr)
+                        .i32_const(IU128::HEAP_SIZE);
+
+                    loop_block.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
                     loop_block.local_get(dst_elem_ptr);
                 }
                 IntermediateType::IU256 | IntermediateType::IAddress => {
-                    loop_block.load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-                    loop_block.local_set(src_elem_ptr);
-
-                    loop_block.i32_const(32);
-                    loop_block.call(compilation_ctx.allocator);
-                    loop_block.local_set(dst_elem_ptr);
-
-                    for i in 0..4 {
-                        loop_block
-                            .local_get(dst_elem_ptr)
-                            .local_get(src_elem_ptr)
-                            .load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I64 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: i * 8,
-                                },
-                            );
-                    }
-
-                    for i in 0..4 {
-                        loop_block.store(
+                    loop_block
+                        .load(
                             compilation_ctx.memory_id,
-                            StoreKind::I64 { atomic: false },
+                            LoadKind::I32 { atomic: false },
                             MemArg {
                                 align: 0,
-                                offset: 24 - i * 8,
+                                offset: 0,
                             },
-                        );
-                    }
+                        )
+                        .local_set(src_elem_ptr);
+
+                    loop_block
+                        .i32_const(32)
+                        .call(compilation_ctx.allocator)
+                        .local_tee(dst_elem_ptr);
+
+                    // Put dest (tee above), src and size to perform memory copy
+                    loop_block.local_get(src_elem_ptr).i32_const(32);
+
+                    loop_block.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
                     loop_block.local_get(dst_elem_ptr);
                 }
                 IntermediateType::IVector(inner_) => {
@@ -666,6 +651,7 @@ impl IVector {
         // Local declarations
         let ptr_local = module.locals.add(ValType::I32);
         let len_local = module.locals.add(ValType::I32);
+        let data_size = inner.stack_data_size() as i32;
 
         if num_elements == 0 {
             // Set length
@@ -677,11 +663,9 @@ impl IVector {
                 ptr_local,
                 len_local,
                 len_local,
-                0,
+                data_size,
             );
         } else {
-            let data_size = inner.stack_data_size() as i32;
-
             // Set length
             builder.i32_const(num_elements).local_set(len_local);
 
