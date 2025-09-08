@@ -9,7 +9,7 @@ use crate::{
 impl IVector {
     pub fn add_pack_instructions(
         inner: &IntermediateType,
-        block: &mut InstrSeqBuilder,
+        builder: &mut InstrSeqBuilder,
         module: &mut Module,
         local: LocalId,
         writer_pointer: LocalId,
@@ -19,9 +19,9 @@ impl IVector {
         let data_pointer = module.locals.add(ValType::I32);
         let inner_data_reference = module.locals.add(ValType::I32);
 
-        let length = IntermediateType::IU32.add_load_memory_to_local_instructions(
+        let len = IntermediateType::IU32.add_load_memory_to_local_instructions(
             module,
-            block,
+            builder,
             local,
             compilation_ctx.memory_id,
         );
@@ -33,35 +33,36 @@ impl IVector {
         };
 
         // Allocate memory for the packed value, this will be allocate at the end of calldata
-        block.local_get(length);
-        block.i32_const(inner_encoded_size); // The size of each element
-        block.binop(BinaryOp::I32Mul);
-        block.i32_const(32); // The size of the length value itself
-        block.binop(BinaryOp::I32Add);
+        builder.local_get(len);
+        builder.i32_const(inner_encoded_size); // The size of each element
+        builder.binop(BinaryOp::I32Mul);
+        builder.i32_const(32); // The size of the length value itself
+        builder.binop(BinaryOp::I32Add);
 
-        block.call(compilation_ctx.allocator);
-        block.local_tee(data_pointer);
+        builder.call(compilation_ctx.allocator);
+        builder.local_tee(data_pointer);
 
         // The value stored at this param position should be the distance from the start of this
         // calldata portion to the pointer
         let reference_value = module.locals.add(ValType::I32);
 
-        block.local_get(calldata_reference_pointer);
-        block.binop(BinaryOp::I32Sub);
-        block.local_set(reference_value);
+        builder.local_get(calldata_reference_pointer);
+        builder.binop(BinaryOp::I32Sub);
+        builder.local_set(reference_value);
         pack_i32_type_instructions(
-            block,
+            builder,
             module,
             compilation_ctx.memory_id,
             reference_value,
             writer_pointer,
         );
 
-        // increment the local to point to first value
-        block.local_get(local);
-        block.i32_const(8); // 8 bytes to skip the length and capacity as well
-        block.binop(BinaryOp::I32Add);
-        block.local_set(local);
+        // Set the local to point to the first element
+        builder
+            .local_get(local)
+            .i32_const(8)
+            .binop(BinaryOp::I32Add)
+            .local_set(local);
 
         /*
          *  Store the values at allocated memory at the end of calldata
@@ -69,75 +70,91 @@ impl IVector {
 
         // Length
         pack_i32_type_instructions(
-            block,
+            builder,
             module,
             compilation_ctx.memory_id,
-            length,
+            len,
             data_pointer,
         );
 
         // increment the data pointer
-        block.local_get(data_pointer);
-        block.i32_const(32);
-        block.binop(BinaryOp::I32Add);
-        block.local_tee(data_pointer);
-        block.local_set(inner_data_reference); // This will be the reference for next allocated calldata
+        builder
+            .local_get(data_pointer)
+            .i32_const(32)
+            .binop(BinaryOp::I32Add)
+            .local_tee(data_pointer)
+            .local_set(inner_data_reference); // This will be the reference for next allocated calldata
 
-        // Loop through the vector values
-        let i = module.locals.add(ValType::I32);
-        block.i32_const(0);
-        block.local_set(i);
-        block.loop_(None, |loop_block| {
-            let loop_block_id = loop_block.id();
+        // Outer block: if the vector length is 0, we skip to the end
+        builder.block(None, |outer_block| {
+            let outer_block_id = outer_block.id();
 
-            let inner_local = inner.add_load_memory_to_local_instructions(
-                module,
-                loop_block,
-                local,
-                compilation_ctx.memory_id,
-            );
+            // Check if length == 0
+            outer_block
+                .local_get(len)
+                .i32_const(0)
+                .binop(BinaryOp::I32Eq)
+                .br_if(outer_block_id);
 
-            if inner.is_dynamic(compilation_ctx) {
-                inner.add_pack_instructions_dynamic(
-                    loop_block,
+            // Loop through the vector values
+            let i = module.locals.add(ValType::I32);
+            outer_block.i32_const(0).local_set(i);
+            outer_block.loop_(None, |loop_block| {
+                let loop_block_id = loop_block.id();
+
+                let inner_local = inner.add_load_memory_to_local_instructions(
                     module,
-                    inner_local,
-                    data_pointer,
-                    inner_data_reference,
-                    compilation_ctx,
-                );
-            } else {
-                inner.add_pack_instructions(
                     loop_block,
-                    module,
-                    inner_local,
-                    data_pointer,
-                    inner_data_reference,
-                    compilation_ctx,
+                    local,
+                    compilation_ctx.memory_id,
                 );
-            }
 
-            // increment the local to point to next first value
-            loop_block.local_get(local);
-            loop_block.i32_const(inner.stack_data_size() as i32);
-            loop_block.binop(BinaryOp::I32Add);
-            loop_block.local_set(local);
+                if inner.is_dynamic(compilation_ctx) {
+                    inner.add_pack_instructions_dynamic(
+                        loop_block,
+                        module,
+                        inner_local,
+                        data_pointer,
+                        inner_data_reference,
+                        compilation_ctx,
+                    );
+                } else {
+                    inner.add_pack_instructions(
+                        loop_block,
+                        module,
+                        inner_local,
+                        data_pointer,
+                        inner_data_reference,
+                        compilation_ctx,
+                    );
+                }
 
-            // increment data pointer
-            loop_block.local_get(data_pointer);
-            loop_block.i32_const(inner_encoded_size);
-            loop_block.binop(BinaryOp::I32Add);
-            loop_block.local_set(data_pointer);
+                // increment the local to point to next first value
+                loop_block
+                    .local_get(local)
+                    .i32_const(inner.stack_data_size() as i32)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(local);
 
-            // increment i
-            loop_block.local_get(i);
-            loop_block.i32_const(1);
-            loop_block.binop(BinaryOp::I32Add);
-            loop_block.local_tee(i);
+                // increment data pointer
+                loop_block
+                    .local_get(data_pointer)
+                    .i32_const(inner_encoded_size)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(data_pointer);
 
-            loop_block.local_get(length);
-            loop_block.binop(BinaryOp::I32LtU);
-            loop_block.br_if(loop_block_id);
+                // increment i
+                loop_block
+                    .local_get(i)
+                    .i32_const(1)
+                    .binop(BinaryOp::I32Add)
+                    .local_tee(i);
+
+                loop_block
+                    .local_get(len)
+                    .binop(BinaryOp::I32LtU)
+                    .br_if(loop_block_id);
+            });
         });
     }
 }
