@@ -231,7 +231,7 @@ pub fn sub_u64(module: &mut Module) -> FunctionId {
         &[ValType::I64],
     );
     let mut builder = function
-        .name(RuntimeFunction::SubU32.name().to_owned())
+        .name(RuntimeFunction::SubU64.name().to_owned())
         .func_body();
 
     let n1 = module.locals.add(ValType::I64);
