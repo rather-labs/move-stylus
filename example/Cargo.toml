@@ -27,6 +27,10 @@ path = "scripts/counter_with_init.rs"
 name = "dog_walker"
 path = "scripts/dog_walker.rs"
 
+[[bin]]
+name = "todo_list"
+path = "scripts/todo_list.rs"
+
 [dependencies]
 dotenv = "0.15.0"
 eyre = "0.6.8"

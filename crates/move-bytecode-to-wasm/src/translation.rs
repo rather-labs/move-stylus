@@ -47,7 +47,7 @@ use types_stack::TypesStack;
 use walrus::TableId;
 use walrus::{
     FunctionBuilder, FunctionId as WasmFunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, UnaryOp},
+    ir::{BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 /// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs.
@@ -1730,8 +1730,25 @@ fn translate_instruction(
             types_stack.push(t2);
         }
         Bytecode::Abort => {
+            let error_code = module.locals.add(ValType::I64);
+            let error_ptr = module.locals.add(ValType::I32);
+
             types_stack.pop_expecting(&IntermediateType::IU64)?;
-            builder.return_();
+            builder.local_set(error_code);
+            builder
+                .i32_const(8)
+                .call(compilation_ctx.allocator)
+                .local_tee(error_ptr)
+                .local_get(error_code)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            builder.local_get(error_ptr).return_();
         }
         Bytecode::Xor => {
             let [t1, t2] = types_stack.pop_n_from_stack()?;
