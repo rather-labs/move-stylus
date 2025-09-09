@@ -1,7 +1,5 @@
 use alloy::hex;
-use alloy::primitives::{FixedBytes, U256};
-use alloy::providers::Provider;
-use alloy::rpc::types::TransactionRequest;
+use alloy::primitives::FixedBytes;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
@@ -14,7 +12,7 @@ sol!(
     #[allow(missing_docs)]
 
     contract Example {
-        
+
         #[derive(Debug)]
         struct String {
             uint8[] bytes;
@@ -68,7 +66,15 @@ async fn main() -> eyre::Result<()> {
     let len = example.length(list_id).call().await?;
     assert_eq!(len, 0);
 
-    let pending_tx = example.add(list_id, Example::String { bytes: "Buy groceries".as_bytes().to_vec() }).send().await?;
+    let pending_tx = example
+        .add(
+            list_id,
+            Example::String {
+                bytes: "Buy groceries".as_bytes().to_vec(),
+            },
+        )
+        .send()
+        .await?;
     let _ = pending_tx.get_receipt().await?;
     println!("Added item to todo list");
 
@@ -81,7 +87,15 @@ async fn main() -> eyre::Result<()> {
     let len = example.length(list_id).call().await?;
     assert_eq!(len, 1);
 
-    let pending_tx = example.add(list_id, Example::String { bytes: "Go to the gym".as_bytes().to_vec() }).send().await?;
+    let pending_tx = example
+        .add(
+            list_id,
+            Example::String {
+                bytes: "Go to the gym".as_bytes().to_vec(),
+            },
+        )
+        .send()
+        .await?;
     let _ = pending_tx.get_receipt().await?;
 
     println!("Added item to todo list");
