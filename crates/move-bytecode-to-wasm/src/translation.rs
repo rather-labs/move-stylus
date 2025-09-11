@@ -14,9 +14,8 @@ pub mod table;
 use crate::{
     CompilationContext,
     compilation_context::ModuleData,
-    data::{
-        DATA_ABORT_FLAG_OFFSET, DATA_ERROR_CODE_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
-    },
+    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET},
+    error_handling::build_abort_error_message,
     generics::{
         extract_type_instances_from_stack, instantiate_vec_type_parameters,
         replace_type_parameters, type_contains_generics,
@@ -1732,16 +1731,16 @@ fn translate_instruction(
             types_stack.push(t2);
         }
         Bytecode::Abort => {
-            let error_code = module.locals.add(walrus::ValType::I64);
-
             // Expect a u64 on the Wasm stack and stash it
             types_stack.pop_expecting(&IntermediateType::IU64)?;
-            builder.local_set(error_code);
 
-            // Set the error flag
+            // Returns a ptr to the encoded error message
+            let ptr = build_abort_error_message(builder, module, compilation_ctx);
+
+            // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
             builder
-                .i32_const(DATA_ABORT_FLAG_OFFSET)
-                .i32_const(1)
+                .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
+                .local_get(ptr)
                 .store(
                     compilation_ctx.memory_id,
                     StoreKind::I32 { atomic: false },
@@ -1751,19 +1750,7 @@ fn translate_instruction(
                     },
                 );
 
-            // Save the error code
-            builder
-                .i32_const(DATA_ERROR_CODE_OFFSET)
-                .local_get(error_code)
-                .store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I64 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-
+            builder.i32_const(1);
             builder.return_();
         }
         Bytecode::Xor => {
