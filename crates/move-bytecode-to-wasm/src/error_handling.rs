@@ -189,8 +189,8 @@ fn build_error_blob_header(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-    msg_len: LocalId, 
-    ptr: LocalId,           
+    msg_len: LocalId,
+    ptr: LocalId,
 ) {
     const MSG_START: i32 = 4 + 32 + 32; // selector + head + len
     const HEAD_OFFSET: u32 = 35; // last byte of 32B head word
