@@ -43,17 +43,17 @@ pub fn build_abort_error_message(
     compilation_ctx: &CompilationContext,
 ) -> LocalId {
     let ptr = module.locals.add(ValType::I32);
-    let data_ptr = module.locals.add(ValType::I32);
+    // let data_ptr = module.locals.add(ValType::I32);
 
     // Convert error code to decimal string
     let u64_to_dec_ascii = RuntimeFunction::U64ToAsciiBase10.get(module, Some(compilation_ctx));
     let error_ptr = module.locals.add(ValType::I32);
     let error_len = module.locals.add(ValType::I32);
 
-    // Convert error code to decimal string
+    // Convert u64 error code to decimal ASCII string
     builder.call(u64_to_dec_ascii).local_tee(error_ptr);
 
-    // Load the length of the decimal string
+    // Load the length of the decimal string from memory
     builder
         .load(
             compilation_ctx.memory_id,
@@ -65,103 +65,28 @@ pub fn build_abort_error_message(
         )
         .local_set(error_len);
 
-    // Load the pointer to the decimal string
+    // Skip length header to get pointer to actual string data
     builder
         .local_get(error_ptr)
         .i32_const(4)
         .binop(BinaryOp::I32Add)
         .local_set(error_ptr);
 
-    // Calculate message length and total allocation size
+    // Calculate total message length: prefix + decimal string
     let msg_raw_len = module.locals.add(ValType::I32);
-    let msg_total_len = module.locals.add(ValType::I32);
-    const HEAD_OFFSET: u32 = 35; // Position of head word (0x20)
-    const LENGTH_OFFSET: u32 = 64; // Position of length word
-    const MSG_START: u32 = 4 + 32 + 32; // selector(4) + head(32) + len(32)
-
-    // msg_raw_len = ABORT_INSTRUCTION_REACHED_MSG.len() + decimal_len
     builder
         .i32_const(ABORT_INSTRUCTION_REACHED_MSG.len() as i32)
         .local_get(error_len)
         .binop(BinaryOp::I32Add)
         .local_set(msg_raw_len);
 
-    // total_len = selector(4) + head(32) + len(32) + padded_msg_len
-    builder
-        .local_get(msg_raw_len)
-        .i32_const(31)
-        .binop(BinaryOp::I32Add)
-        .i32_const(!31)
-        .binop(BinaryOp::I32And)
-        .i32_const(MSG_START as i32)
-        .binop(BinaryOp::I32Add)
-        .local_set(msg_total_len);
+    // Build error blob header with ABI formatting
+    build_error_blob_header(builder, module, compilation_ctx, msg_raw_len, ptr);
 
-    // Allocate memory: 4 bytes (for the length) + msg_total_len bytes (for the message)
-    builder
-        .local_get(msg_total_len)
-        .i32_const(4)
-        .binop(BinaryOp::I32Add)
-        .call(compilation_ctx.allocator)
-        .local_tee(ptr);
-
-    // Store data length in the first 4 bytes of the allocated memory
-    builder.local_get(msg_total_len).store(
-        compilation_ctx.memory_id,
-        StoreKind::I32 { atomic: false },
-        MemArg {
-            align: 0,
-            offset: 0,
-        },
-    );
-
-    // Skip header and set data_ptr
-    builder
-        .local_get(ptr)
-        .i32_const(4)
-        .binop(BinaryOp::I32Add)
-        .local_set(data_ptr);
-
-    // Write error selector (first 4 bytes)
-    for (i, b) in ERROR_SELECTOR.iter().enumerate() {
-        builder.local_get(data_ptr).i32_const(*b as i32).store(
-            compilation_ctx.memory_id,
-            StoreKind::I32_8 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: i as u32,
-            },
-        );
-    }
-
-    // Write head word (offset to data = 0x20) in the last byte of the 32-byte word
-    builder.local_get(data_ptr).i32_const(32).store(
-        compilation_ctx.memory_id,
-        StoreKind::I32_8 { atomic: false },
-        MemArg {
-            align: 0,
-            offset: HEAD_OFFSET,
-        },
-    );
-
-    // Write length word (big-endian, in the LAST 4 bytes of the 32-byte word)
-    let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None);
-    builder
-        .local_get(data_ptr)
-        .local_get(msg_raw_len)
-        .call(swap_i32)
-        .store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: LENGTH_OFFSET,
-            },
-        );
-
-    // Write prefix
+    // Write error message prefix (bytes 72+)
+    const MSG_START: u32 = 4 + 4 + 32 + 32; // total_len(4) + selector(4) + head(32) + length(32)
     for (i, &b) in ABORT_INSTRUCTION_REACHED_MSG.iter().enumerate() {
-        builder.local_get(data_ptr).i32_const(b as i32).store(
+        builder.local_get(ptr).i32_const(b as i32).store(
             compilation_ctx.memory_id,
             StoreKind::I32_8 { atomic: false },
             MemArg {
@@ -171,9 +96,9 @@ pub fn build_abort_error_message(
         );
     }
 
-    // Append decimal digits after the prefix
+    // Append decimal error code after the prefix
     builder
-        .local_get(data_ptr)
+        .local_get(ptr)
         .i32_const(MSG_START as i32 + ABORT_INSTRUCTION_REACHED_MSG.len() as i32)
         .binop(BinaryOp::I32Add)
         .local_get(error_ptr)
@@ -210,23 +135,96 @@ pub fn build_no_function_match_error_message(
     compilation_ctx: &CompilationContext,
 ) -> LocalId {
     let ptr = module.locals.add(ValType::I32);
-    let data_ptr = module.locals.add(ValType::I32);
+    let msg_len = module.locals.add(ValType::I32);
 
-    let msg_len = ERROR_NO_FUNCTION_MATCH_MSG.len() as i32;
-    let padded_len = ((msg_len + 31) / 32) * 32;
-    let data_start = 4 + 32 + 32;
-    let total_len = data_start + padded_len;
-
-    // Allocate error buffer and set the pointer
+    // Set message length to the size of the error message string
     builder
-        .i32_const(total_len)
+        .i32_const(ERROR_NO_FUNCTION_MATCH_MSG.len() as i32)
+        .local_set(msg_len);
+
+    // Build error blob header with ABI formatting
+    build_error_blob_header(builder, module, compilation_ctx, msg_len, ptr);
+
+    // Write error message text (bytes 72+)
+    const MSG_START: u32 = 4 + 4 + 32 + 32; // total_len + selector + head + length
+    for (i, &byte) in ERROR_NO_FUNCTION_MATCH_MSG.iter().enumerate() {
+        builder.local_get(ptr).i32_const(byte as i32).store(
+            compilation_ctx.memory_id,
+            StoreKind::I32_8 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: MSG_START + i as u32,
+            },
+        );
+    }
+
+    ptr
+}
+
+/// Allocates and initializes the ABI error blob header.
+///
+/// This function creates a structured error message header in the format:
+/// [length: u32 LE][selector: 4 bytes][head: 32 bytes][length: 32 bytes]
+/// where the message data will be written after this header.
+///
+/// Note: Two different lengths are stored:
+/// - First 4 bytes: Total allocated length (for memory management)
+/// - Length word (bytes 40-71): Raw message length (for ABI decoding)
+///
+/// # Arguments
+/// - `builder`: WASM instruction sequence builder
+/// - `module`: WASM module being built
+/// - `compilation_ctx`: Compilation context with memory and allocator info
+/// - `msg_len`: LocalId containing the raw message length (i32)
+/// - `ptr`: LocalId where the allocated memory pointer will be stored (i32 OUT)
+///
+/// # Memory Layout
+/// The allocated blob has the following structure:
+/// - Bytes 0-3: Total message length (little-endian u32)
+/// - Bytes 4-7: Error selector (4 bytes)
+/// - Bytes 8-39: Head word (32 bytes, with 0x20 at offset 39)
+/// - Bytes 40-71: Length word (32 bytes, big-endian message length at offset 68)
+/// - Bytes 72+: Message data (to be written by caller)
+fn build_error_blob_header(
+    builder: &mut InstrSeqBuilder,
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    msg_len: LocalId, 
+    ptr: LocalId,           
+) {
+    const MSG_START: i32 = 4 + 32 + 32; // selector + head + len
+    const HEAD_OFFSET: u32 = 35; // last byte of 32B head word
+    const LENGTH_OFFSET: u32 = 64; // last 4 bytes of 32B len word
+
+    let padded_len = module.locals.add(ValType::I32);
+    let total_len = module.locals.add(ValType::I32);
+
+    // Round up message length to 32-byte boundary for ABI alignment
+    builder
+        .local_get(msg_len)
+        .i32_const(31)
+        .binop(BinaryOp::I32Add)
+        .i32_const(!31)
+        .binop(BinaryOp::I32And)
+        .local_set(padded_len);
+
+    // Calculate total allocation size: header + padded message
+    builder
+        .i32_const(MSG_START)
+        .local_get(padded_len)
+        .binop(BinaryOp::I32Add)
+        .local_set(total_len);
+
+    // Allocate memory and store pointer
+    builder
+        .local_get(total_len)
         .i32_const(4)
         .binop(BinaryOp::I32Add)
         .call(compilation_ctx.allocator)
         .local_tee(ptr);
 
-    // Store the total length in the first 4 bytes of the allocated memory
-    builder.i32_const(total_len).store(
+    // Store total length in first 4 bytes (for memory management)
+    builder.local_get(total_len).store(
         compilation_ctx.memory_id,
         StoreKind::I32 { atomic: false },
         MemArg {
@@ -235,61 +233,40 @@ pub fn build_no_function_match_error_message(
         },
     );
 
-    // Skip header and set data_ptr
-    builder
-        .local_get(ptr)
-        .i32_const(4)
-        .binop(BinaryOp::I32Add)
-        .local_set(data_ptr);
-
-    // Write error selector (4 bytes)
-    for (i, &byte) in ERROR_SELECTOR.iter().enumerate() {
-        builder.local_get(data_ptr).i32_const(byte as i32).store(
+    // Write error selector (bytes 4-7)
+    for (i, b) in ERROR_SELECTOR.iter().enumerate() {
+        builder.local_get(ptr).i32_const(*b as i32).store(
             compilation_ctx.memory_id,
             StoreKind::I32_8 { atomic: false },
             MemArg {
                 align: 0,
-                offset: i as u32,
+                offset: 4 + i as u32,
             },
         );
     }
 
-    // Write offset (32) -> dynamic encoding
-    builder.local_get(data_ptr).i32_const(32).store(
+    // Write head word with 0x20 offset (byte 39)
+    builder.local_get(ptr).i32_const(32).store(
         compilation_ctx.memory_id,
         StoreKind::I32_8 { atomic: false },
         MemArg {
             align: 0,
-            offset: data_start as u32 - 32 - 1,
+            offset: 4 + HEAD_OFFSET,
         },
     );
 
-    // Write error message length (big-endian)
-    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
+    // Write message length in big-endian format (bytes 68-71)
+    let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None);
     builder
-        .local_get(data_ptr)
-        .i32_const(msg_len)
-        .call(swap_i32_bytes_function)
+        .local_get(ptr)
+        .local_get(msg_len)
+        .call(swap_i32)
         .store(
             compilation_ctx.memory_id,
             StoreKind::I32 { atomic: false },
             MemArg {
                 align: 0,
-                offset: data_start as u32 - 4,
+                offset: 4 + LENGTH_OFFSET,
             },
         );
-
-    // Write message data
-    for (i, &byte) in ERROR_NO_FUNCTION_MATCH_MSG.iter().enumerate() {
-        builder.local_get(data_ptr).i32_const(byte as i32).store(
-            compilation_ctx.memory_id,
-            StoreKind::I32_8 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: data_start as u32 + i as u32,
-            },
-        );
-    }
-
-    ptr
 }
