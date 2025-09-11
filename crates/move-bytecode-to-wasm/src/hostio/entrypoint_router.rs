@@ -1,11 +1,13 @@
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use crate::{
-    CompilationContext, abi_types::public_function::PublicFunction,
-    runtime_error_codes::ERROR_NO_FUNCTION_MATCH,
+    CompilationContext,
+    abi_types::public_function::PublicFunction,
+    runtime::RuntimeFunction,
+    runtime_error_codes::{ERROR_NO_FUNCTION_MATCH, ERROR_NO_FUNCTION_MATCH_MSG, ERROR_SELECTOR},
 };
 
 use super::host_functions;
@@ -76,8 +78,81 @@ pub fn build_entrypoint_router(
 
     // When no match is found, return error code
     // TODO: allow fallback function definition
-    router_builder.i32_const(ERROR_NO_FUNCTION_MATCH);
-    router_builder.return_();
+
+    let msg_len = ERROR_NO_FUNCTION_MATCH_MSG.len() as i32;
+    let padded_len = ((msg_len + 31) / 32) * 32;
+    let data_start = 4 + 32 + 32;
+    let total_len = data_start + padded_len;
+
+    // Allocate error buffer and set the pointer
+    let ptr = module.locals.add(ValType::I32);
+    router_builder
+        .i32_const(total_len)
+        .call(compilation_ctx.allocator)
+        .local_set(ptr);
+
+    // Write error selector (4 bytes)
+    for (i, &byte) in ERROR_SELECTOR.iter().enumerate() {
+        router_builder.local_get(ptr).i32_const(byte as i32).store(
+            compilation_ctx.memory_id,
+            StoreKind::I32_8 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: i as u32,
+            },
+        );
+    }
+
+    // Write offset (32) -> dynamic encoding
+    router_builder.local_get(ptr).i32_const(32).store(
+        compilation_ctx.memory_id,
+        StoreKind::I32_8 { atomic: false },
+        MemArg {
+            align: 0,
+            offset: data_start as u32 - 32 - 1,
+        },
+    );
+
+    // Write error message length (big-endian)
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
+    router_builder
+        .local_get(ptr)
+        .i32_const(msg_len)
+        .call(swap_i32_bytes_function)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: data_start as u32 - 4,
+            },
+        );
+
+    // Write message data
+    for (i, &byte) in ERROR_NO_FUNCTION_MATCH_MSG.iter().enumerate() {
+        router_builder.local_get(ptr).i32_const(byte as i32).store(
+            compilation_ctx.memory_id,
+            StoreKind::I32_8 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: data_start as u32 + i as u32,
+            },
+        );
+    }
+
+    // Write error data to memory
+    router_builder
+        .local_get(ptr)
+        .i32_const(total_len)
+        .call(write_return_data_function);
+
+    // Flush cache
+    router_builder
+        .i32_const(0)
+        .call(storage_flush_cache_function);
+
+    // Push the error code and return
+    router_builder.i32_const(ERROR_NO_FUNCTION_MATCH).return_();
 
     let router = router.finish(vec![args_len], &mut module.funcs);
     add_entrypoint(module, router);

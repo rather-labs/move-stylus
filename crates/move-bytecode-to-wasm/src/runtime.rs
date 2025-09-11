@@ -66,6 +66,8 @@ pub enum RuntimeFunction {
     EncodeAndSaveInStorage,
     DecodeAndReadFromStorage,
     DeleteFromStorage,
+    // ASCII conversion
+    U64ToAsciiBase10,
 }
 
 impl RuntimeFunction {
@@ -121,6 +123,7 @@ impl RuntimeFunction {
             Self::EncodeAndSaveInStorage => "encode_and_save_in_storage",
             Self::DecodeAndReadFromStorage => "decode_and_read_from_storage",
             Self::DeleteFromStorage => "delete_from_storage",
+            Self::U64ToAsciiBase10 => "u64_to_ascii_base_10",
         }
     }
 
@@ -227,6 +230,10 @@ impl RuntimeFunction {
                 (Self::LocateStorageData, Some(ctx)) => storage::locate_storage_data(module, ctx),
                 (Self::LocateStructSlot, Some(ctx)) => storage::locate_struct_slot(module, ctx),
                 (Self::GetIdBytesPtr, Some(ctx)) => storage::get_id_bytes_ptr(module, ctx),
+                // ASCII conversion
+                (Self::U64ToAsciiBase10, Some(ctx)) => {
+                    integers::ascii::u64_to_ascii_base_10(module, ctx)
+                }
                 // Error
                 _ => panic!(
                     r#"there was an error linking "{}" runtime function, missing compilation context?"#,

@@ -1,7 +1,13 @@
-use walrus::{FunctionId, InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
+use walrus::{
+    FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+};
 
 use crate::{
     CompilationContext,
+    data::{DATA_ABORT_FLAG_OFFSET, DATA_ERROR_CODE_OFFSET},
+    runtime::RuntimeFunction,
+    runtime_error_codes::ERROR_SELECTOR,
     translation::{
         functions::add_unpack_function_return_values_instructions,
         intermediate_types::{ISignature, IntermediateType},
@@ -141,7 +147,29 @@ impl<'a> PublicFunction<'a> {
         args_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) {
-        let memory_id = module.get_memory_id().expect("memory not found");
+        let data_ptr = module.locals.add(ValType::I32);
+        let data_len = module.locals.add(ValType::I32);
+        let status = module.locals.add(ValType::I32);
+
+        // Clear abort flag data
+        block.i32_const(DATA_ABORT_FLAG_OFFSET).i32_const(0).store(
+            compilation_ctx.memory_id,
+            StoreKind::I32_8 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+        // Clear error code data
+        block.i32_const(DATA_ERROR_CODE_OFFSET).i64_const(0).store(
+            compilation_ctx.memory_id,
+            StoreKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
 
         build_unpack_instructions(
             block,
@@ -150,27 +178,88 @@ impl<'a> PublicFunction<'a> {
             args_pointer,
             compilation_ctx,
         );
+
         block.call(self.function_id);
+
+        // Unpack function return values
         add_unpack_function_return_values_instructions(
             block,
             module,
             &self.signature.returns,
-            memory_id,
+            compilation_ctx.memory_id,
         );
 
+        // Success path
         if self.signature.returns.is_empty() {
-            block.i32_const(0).i32_const(0).i32_const(0);
-            return;
+            // Set data_ptr and data_len to 0
+            block.i32_const(0).local_set(data_ptr);
+            block.i32_const(0).local_set(data_len);
+        } else {
+            // Set data_ptr and data_len to the result of packing the return values
+            let (data_ptr_, data_len_) =
+                build_pack_instructions(block, &self.signature.returns, module, compilation_ctx);
+
+            block.local_get(data_ptr_).local_set(data_ptr);
+            block.local_get(data_len_).local_set(data_len);
         }
 
-        // If we pack a unique value we proceed as always
-        let (data_start, data_end) =
-            build_pack_instructions(block, &self.signature.returns, module, compilation_ctx);
+        // Check if the abort flag is set
+        block
+            .i32_const(DATA_ABORT_FLAG_OFFSET)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .i32_const(0)
+            .binop(BinaryOp::I32Ne);
 
-        block.local_get(data_start).local_get(data_end);
-        // TODO: Define error handling strategy, for now it will always result in traps
-        // So it will only reach this point in the case of success
-        block.i32_const(0);
+        block.if_else(
+            None,
+            |then_| {
+                // Abort path
+                then_.i32_const(1).local_set(status);
+
+                // Load the u64 abort code from memory
+                let error_code = module.locals.add(ValType::I64);
+                then_
+                    .i32_const(DATA_ERROR_CODE_OFFSET)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(error_code);
+
+                // Build error message
+                Self::build_abort_error_message(
+                    then_,
+                    module,
+                    compilation_ctx,
+                    error_code,
+                    data_ptr,
+                    data_len,
+                );
+            },
+            |else_| {
+                // Success path
+
+                // Set status to 0 to flag success
+                else_.i32_const(0).local_set(status);
+            },
+        );
+
+        // [data_ptr][data_len][status]
+        block
+            .local_get(data_ptr)
+            .local_get(data_len)
+            .local_get(status);
     }
 
     /// This function checks if the arguments of a public functions is valid. A signature is not
@@ -220,6 +309,139 @@ impl<'a> PublicFunction<'a> {
             }
             _ => false,
         }
+    }
+
+    /// Builds an error message for abort instructions with the error code converted to decimal.
+    fn build_abort_error_message(
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        error_code: LocalId,
+        data_ptr: LocalId,
+        data_len: LocalId,
+    ) {
+        // Message prefix
+        const PREFIX: &[u8] = b"Abort instruction reached: error code ";
+
+        // Convert error code to decimal string
+        let u64_to_dec_ascii = RuntimeFunction::U64ToAsciiBase10.get(module, Some(compilation_ctx));
+        let error_ptr = module.locals.add(ValType::I32);
+        let error_len = module.locals.add(ValType::I32);
+
+        // Convert error code to decimal string
+        builder
+            .local_get(error_code)
+            .call(u64_to_dec_ascii)
+            .local_tee(error_ptr);
+
+        // Load the length of the decimal string
+        builder
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_set(error_len);
+
+        // Load the pointer to the decimal string
+        builder
+            .local_get(error_ptr)
+            .i32_const(4)
+            .binop(BinaryOp::I32Add)
+            .local_set(error_ptr);
+
+        // Calculate message length and total allocation size
+        let msg_raw_len = module.locals.add(ValType::I32);
+        let msg_total_len = module.locals.add(ValType::I32);
+        const HEAD_OFFSET: u32 = 35; // Position of head word (0x20)
+        const LENGTH_OFFSET: u32 = 64; // Position of length word
+        const MSG_START: u32 = 4 + 32 + 32; // selector(4) + head(32) + len(32)
+
+        // msg_raw_len = PREFIX.len() + decimal_len
+        builder
+            .i32_const(PREFIX.len() as i32)
+            .local_get(error_len)
+            .binop(BinaryOp::I32Add)
+            .local_set(msg_raw_len);
+
+        // total_len = selector(4) + head(32) + len(32) + padded_msg_len
+        builder
+            .local_get(msg_raw_len)
+            .i32_const(31)
+            .binop(BinaryOp::I32Add)
+            .i32_const(!31)
+            .binop(BinaryOp::I32And)
+            .i32_const(MSG_START as i32)
+            .binop(BinaryOp::I32Add)
+            .local_set(msg_total_len);
+
+        // Allocate memory
+        builder
+            .local_get(msg_total_len)
+            .local_tee(data_len)
+            .call(compilation_ctx.allocator)
+            .local_set(data_ptr);
+
+        // Write error selector (first 4 bytes)
+        for (i, b) in ERROR_SELECTOR.iter().enumerate() {
+            builder.local_get(data_ptr).i32_const(*b as i32).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32_8 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: i as u32,
+                },
+            );
+        }
+
+        // Write head word (offset to data = 0x20) in the last byte of the 32-byte word
+        builder.local_get(data_ptr).i32_const(32).store(
+            compilation_ctx.memory_id,
+            StoreKind::I32_8 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: HEAD_OFFSET,
+            },
+        );
+
+        // Write length word (big-endian, in the LAST 4 bytes of the 32-byte word)
+        let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None);
+        builder
+            .local_get(data_ptr)
+            .local_get(msg_raw_len)
+            .call(swap_i32)
+            .store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: LENGTH_OFFSET,
+                },
+            );
+
+        // Write prefix
+        for (i, &b) in PREFIX.iter().enumerate() {
+            builder.local_get(data_ptr).i32_const(b as i32).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32_8 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: MSG_START + i as u32,
+                },
+            );
+        }
+
+        // Append decimal digits after the prefix
+        builder
+            .local_get(data_ptr)
+            .i32_const(MSG_START as i32 + PREFIX.len() as i32)
+            .binop(BinaryOp::I32Add)
+            .local_get(error_ptr)
+            .local_get(error_len)
+            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
     }
 }
 

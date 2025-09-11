@@ -14,7 +14,9 @@ pub mod table;
 use crate::{
     CompilationContext,
     compilation_context::ModuleData,
-    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    data::{
+        DATA_ABORT_FLAG_OFFSET, DATA_ERROR_CODE_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    },
     generics::{
         extract_type_instances_from_stack, instantiate_vec_type_parameters,
         replace_type_parameters, type_contains_generics,
@@ -47,7 +49,7 @@ use types_stack::TypesStack;
 use walrus::TableId;
 use walrus::{
     FunctionBuilder, FunctionId as WasmFunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, UnaryOp},
+    ir::{BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 /// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs.
@@ -1730,7 +1732,38 @@ fn translate_instruction(
             types_stack.push(t2);
         }
         Bytecode::Abort => {
+            let error_code = module.locals.add(walrus::ValType::I64);
+
+            // Expect a u64 on the Wasm stack and stash it
             types_stack.pop_expecting(&IntermediateType::IU64)?;
+            builder.local_set(error_code);
+
+            // Set the error flag
+            builder
+                .i32_const(DATA_ABORT_FLAG_OFFSET)
+                .i32_const(1)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+            // Save the error code
+            builder
+                .i32_const(DATA_ERROR_CODE_OFFSET)
+                .local_get(error_code)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
             builder.return_();
         }
         Bytecode::Xor => {
