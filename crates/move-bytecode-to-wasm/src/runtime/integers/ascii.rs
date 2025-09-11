@@ -13,7 +13,6 @@ use super::RuntimeFunction;
 ///
 /// # Arguments
 /// - `val`: The value to convert. Passed as WASM `i64` but must be ≥ 0; traps if negative.
-///          (Conceptually a `u64`.)
 ///
 /// # Returns
 /// - `ptr`: Pointer to the allocated blob `[len: u32 LE][ASCII bytes...]`.
