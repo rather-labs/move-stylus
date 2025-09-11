@@ -5,7 +5,7 @@ use walrus::{
 
 use crate::{
     CompilationContext, abi_types::public_function::PublicFunction,
-    error_handling::build_no_function_match_error_message,
+    error_encoding::build_no_function_match_error_message,
     runtime_error_codes::ERROR_NO_FUNCTION_MATCH,
 };
 

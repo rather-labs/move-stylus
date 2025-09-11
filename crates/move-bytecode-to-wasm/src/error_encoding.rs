@@ -43,7 +43,6 @@ pub fn build_abort_error_message(
     compilation_ctx: &CompilationContext,
 ) -> LocalId {
     let ptr = module.locals.add(ValType::I32);
-    // let data_ptr = module.locals.add(ValType::I32);
 
     // Convert error code to decimal string
     let u64_to_dec_ascii = RuntimeFunction::U64ToAsciiBase10.get(module, Some(compilation_ctx));

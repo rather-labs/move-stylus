@@ -15,7 +15,7 @@ use crate::{
     CompilationContext,
     compilation_context::ModuleData,
     data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET},
-    error_handling::build_abort_error_message,
+    error_encoding::build_abort_error_message,
     generics::{
         extract_type_instances_from_stack, instantiate_vec_type_parameters,
         replace_type_parameters, type_contains_generics,
