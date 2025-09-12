@@ -1,7 +1,4 @@
-use walrus::{
-    FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, MemArg, StoreKind, UnaryOp},
-};
+use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
 use crate::CompilationContext;
 
@@ -32,150 +29,233 @@ pub fn u64_to_ascii_base_10(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
 ) -> FunctionId {
+    use walrus::ir::{BinaryOp, MemArg, StoreKind, UnaryOp};
+
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I64], &[ValType::I32]);
 
-    // Function arguments and local variables
-    let val = module.locals.add(ValType::I64); // input value (must be >= 0)
-    let n = module.locals.add(ValType::I64); // working copy for digit extraction
-    let len = module.locals.add(ValType::I32); // length of the resulting string
-    let data_ptr = module.locals.add(ValType::I32); // pointer to the allocated blob
+    // locals
+    let n = module.locals.add(ValType::I64); // input (>= 0)
+    let len = module.locals.add(ValType::I32); // digit count
+    let ptr = module.locals.add(ValType::I32); // [len|bytes..]
+    let scale = module.locals.add(ValType::I64); // current power of 10
 
     let mut builder = function
         .name(RuntimeFunction::U64ToAsciiBase10.name().to_owned())
         .func_body();
 
-    // Safety check: trap if the input value is negative
-    // This should never happen for Move abort codes, but we check for safety
+    // trap if negative (shouldn't happen for u64-ish inputs)
     builder
-        .local_get(val)
+        .local_get(n)
         .i64_const(0)
         .binop(BinaryOp::I64LtS)
         .if_else(
             None,
             |t| {
-                t.unreachable(); // Trap on negative input
+                t.unreachable();
             },
             |_| {},
         );
 
-    // Step 1: Count the number of decimal digits needed
-    // Algorithm: len = 1; n = val; while (n >= 10) { n /= 10; len++; }
-    // This ensures we allocate exactly the right amount of memory
-    builder.local_get(val).local_set(n); // n = val (working copy)
-    builder.i32_const(1).local_set(len); // len = 1 (minimum for single digit)
-
-    builder.block(None, |block| {
-        let block_id = block.id();
-        block.loop_(None, |lp| {
-            let lp_id = lp.id();
-
-            // Check if we've processed all digits: if (n < 10) break;
-            lp.local_get(n)
-                .i64_const(10)
-                .binop(BinaryOp::I64LtU)
-                .br_if(block_id);
-
-            // Process next digit: n /= 10; len++;
-            lp.local_get(n)
-                .i64_const(10)
-                .binop(BinaryOp::I64DivU)
-                .local_set(n);
-
-            // Increment digit counter
-            lp.local_get(len)
-                .i32_const(1)
-                .binop(BinaryOp::I32Add)
-                .local_set(len);
-
-            lp.br(lp_id); // Continue loop
-        });
-    });
-
-    // Step 2: Allocate memory for the result blob
-    // Memory layout: [4 bytes for length][len bytes for ASCII digits]
+    // Handle n = 0 case
     builder
-        .i32_const(4)
-        .local_get(len)
-        .binop(BinaryOp::I32Add)
-        .call(compilation_ctx.allocator)
-        .local_set(data_ptr);
+        .local_get(n)
+        .i64_const(0)
+        .binop(BinaryOp::I64Eq)
+        .if_else(
+            None,
+            |z| {
+                z.i32_const(1)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(ptr)
+                    .i32_const(1)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32_8 { atomic: false },
+                        // StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
 
-    // Step 3: Store the length in the first 4 bytes (little-endian)
-    builder.local_get(data_ptr).local_get(len).store(
-        compilation_ctx.memory_id,
-        StoreKind::I32 { atomic: false },
-        MemArg {
-            align: 0,
-            offset: 0,
-        },
-    );
+                // store the '0'digit
+                z.i32_const(1)
+                    .call(compilation_ctx.allocator)
+                    .i32_const(0x30)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32_8 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            },
+            |nz| {
+                // scale = 10^18;
+                nz.i64_const(1_000_000_000_000_000_000i64).local_set(scale);
 
-    // Step 4: Set up write pointer for digit storage
-    // We'll write digits backwards, so start at the end of the string
-    let write_ptr = module.locals.add(ValType::I32);
-    builder
-        .local_get(data_ptr)
-        .i32_const(4)
-        .binop(BinaryOp::I32Add)
-        .local_get(len)
-        .binop(BinaryOp::I32Add)
-        .local_set(write_ptr);
+                // len = 19
+                nz.i32_const(19).local_set(len);
 
-    // Step 5: Extract and write digits in reverse order
-    // Algorithm: n = val; while (n != 0) { *--write_ptr = '0' + (n % 10); n /= 10; };
-    // This writes digits from right to left, then we'll have the correct order
-    let char_ = module.locals.add(ValType::I32);
-    builder.local_get(val).local_set(n);
+                // allocate memory for the length
+                nz.i32_const(1)
+                    .call(compilation_ctx.allocator)
+                    .local_set(ptr);
 
-    builder.block(None, |block| {
-        let block_id = block.id();
-        block.loop_(None, |lp| {
-            let lp_id = lp.id();
+                // while (scale > n) { scale /= 10; len--; }
+                nz.block(None, |block| {
+                    let block_id = block.id();
+                    block.loop_(None, |lp| {
+                        let lp_id = lp.id();
+                        lp.local_get(scale)
+                            .local_get(n)
+                            .binop(BinaryOp::I64LeU)
+                            .br_if(block_id);
 
-            // Extract the rightmost digit and convert to ASCII
-            // char_ = '0' + (n % 10)
-            lp.local_get(n)
-                .i64_const(10)
-                .binop(BinaryOp::I64RemU) // n % 10 (get rightmost digit)
-                .i64_const(0x30) // ASCII '0' = 0x30
-                .binop(BinaryOp::I64Add) // '0' + digit
-                .unop(UnaryOp::I32WrapI64) // Convert i64 to i32
-                .local_set(char_);
+                        lp.local_get(scale)
+                            .i64_const(10)
+                            .binop(BinaryOp::I64DivU)
+                            .local_set(scale);
 
-            // Write the character to memory (moving backwards)
-            // *--write_ptr = char_
-            lp.local_get(write_ptr)
-                .i32_const(1)
-                .binop(BinaryOp::I32Sub) // --write_ptr
-                .local_tee(write_ptr) // Update write_ptr
-                .local_get(char_) // Get the ASCII character
-                .store(
+                        lp.local_get(len)
+                            .i32_const(1)
+                            .binop(BinaryOp::I32Sub)
+                            .local_set(len);
+                        lp.br(lp_id);
+                    });
+                });
+
+                // Store the length
+                nz.local_get(ptr).local_get(len).store(
                     compilation_ctx.memory_id,
                     StoreKind::I32_8 { atomic: false },
+                    // StoreKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
                         offset: 0,
                     },
                 );
 
-            // Remove the processed digit and check if we're done
-            // n /= 10; if (n == 0) break;
-            lp.local_get(n)
-                .i64_const(10)
-                .binop(BinaryOp::I64DivU) // n /= 10
-                .local_set(n);
-            lp.local_get(n)
-                .i64_const(0)
-                .binop(BinaryOp::I64Eq) // if (n == 0)
-                .br_if(block_id); // break;
+                // while (true) {
+                //   digit = n / scale; *write_ptr++ = '0' + digit; n -= digit * scale;
+                //   if (scale == 1) break; scale /= 10;
+                // }
+                nz.block(None, |block| {
+                    let block_id = block.id();
+                    let write_ptr = module.locals.add(ValType::I32);
+                    block.loop_(None, |lp| {
+                        let lp_id = lp.id();
 
-            lp.br(lp_id); // Continue loop
-        });
-    });
+                        // Allocate 1 byte for the digit
+                        lp.i32_const(1)
+                            .call(compilation_ctx.allocator)
+                            .local_tee(write_ptr);
 
-    // Step 6: Return the pointer to the complete blob
-    // The blob contains [length][ASCII digits] and is ready to use
-    builder.local_get(data_ptr);
+                        // digit = (n / scale) + '0'
+                        lp.local_get(n)
+                            .local_get(scale)
+                            .binop(BinaryOp::I64DivU)
+                            .i64_const(0x30)
+                            .binop(BinaryOp::I64Add)
+                            .unop(UnaryOp::I32WrapI64);
 
-    function.finish(vec![val], &mut module.funcs)
+                        // store the digit
+                        lp.store(
+                            compilation_ctx.memory_id,
+                            StoreKind::I32_8 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
+
+                        // n -= digit * scale
+                        lp.local_get(n)
+                            .local_get(scale)
+                            .binop(BinaryOp::I64RemU)
+                            .local_set(n);
+
+                        // if (scale == 1) break;
+                        lp.local_get(scale)
+                            .i64_const(1)
+                            .binop(BinaryOp::I64Eq)
+                            .br_if(block_id);
+
+                        // scale /= 10; continue
+                        lp.local_get(scale)
+                            .i64_const(10)
+                            .binop(BinaryOp::I64DivU)
+                            .local_set(scale);
+
+                        lp.br(lp_id);
+                    });
+                });
+            },
+        );
+
+    // return
+    builder.local_get(ptr);
+
+    function.finish(vec![n], &mut module.funcs)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test_compilation_context;
+    use crate::test_tools::{build_module, setup_wasmtime_module};
+    use rstest::rstest;
+    use walrus::FunctionBuilder;
+
+    use super::*;
+
+    #[rstest]
+    #[case(0u64, "0")]
+    #[case(1u64, "1")]
+    #[case(123u64, "123")]
+    #[case(999u64, "999")]
+    #[case(1000u64, "1000")]
+    #[case(999999u64, "999999")]
+    #[case(1000000u64, "1000000")]
+    #[case(123456789u64, "123456789")]
+    #[case(9876543210u64, "9876543210")]
+    #[should_panic]
+    #[case(u64::MAX, "18446744073709551615")]
+    fn test_u64_to_ascii_base_10(#[case] error_code: u64, #[case] expected: &str) {
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+
+        // Add the u64_to_ascii_base_10 function to the module
+        let ascii_func = u64_to_ascii_base_10(&mut raw_module, &compilation_ctx);
+
+        // Create a test function that calls u64_to_ascii_base_10 and writes to memory
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I64], &[]);
+        let n = raw_module.locals.add(ValType::I64);
+
+        let mut func_body = function_builder.func_body();
+        func_body.i64_const(error_code as i64);
+        func_body.call(ascii_func);
+        func_body.drop();
+
+        let function = function_builder.finish(vec![n], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i64, ()>(&mut raw_module, vec![], "test_function", None);
+
+        entrypoint.call(&mut store, 0).unwrap();
+
+        // Read the result from memory at offset 0
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let memory_data = memory.data(&mut store);
+
+        let len = memory_data[0] as u32;
+
+        // Read the ASCII string
+        let ascii_data = &memory_data[1..1 + len as usize];
+        let result_str = String::from_utf8(ascii_data.to_vec()).unwrap();
+
+        assert_eq!(result_str, expected, "Failed for input {}", error_code);
+    }
 }

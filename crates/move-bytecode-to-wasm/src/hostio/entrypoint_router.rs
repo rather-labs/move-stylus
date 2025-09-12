@@ -1,12 +1,11 @@
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg},
+    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg},
 };
 
 use crate::{
     CompilationContext, abi_types::public_function::PublicFunction,
-    error_encoding::build_no_function_match_error_message,
-    runtime_error_codes::ERROR_NO_FUNCTION_MATCH,
+    error_encoding::build_error_message, runtime_error_codes::ERROR_NO_FUNCTION_MATCH,
 };
 
 use super::host_functions;
@@ -76,19 +75,22 @@ pub fn build_entrypoint_router(
     }
 
     // Build no function match error message
-    let ptr = build_no_function_match_error_message(&mut router_builder, module, compilation_ctx);
+    router_builder.i64_const(ERROR_NO_FUNCTION_MATCH);
+    let ptr = build_error_message(&mut router_builder, module, compilation_ctx);
 
     // Write error data to memory
     router_builder
         // Skip header
         .local_get(ptr)
-        .i32_const(4)
+        .i32_const(1)
         .binop(BinaryOp::I32Add)
         // Load msg length
         .local_get(ptr)
         .load(
             compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
+            LoadKind::I32_8 {
+                kind: ExtendedLoad::ZeroExtend,
+            },
             MemArg {
                 align: 0,
                 offset: 0,
@@ -103,7 +105,7 @@ pub fn build_entrypoint_router(
         .call(storage_flush_cache_function);
 
     // Push the error code and return
-    router_builder.i32_const(ERROR_NO_FUNCTION_MATCH).return_();
+    router_builder.i32_const(1).return_();
 
     let router = router.finish(vec![args_len], &mut module.funcs);
     add_entrypoint(module, router);
@@ -338,6 +340,6 @@ mod tests {
         let (_, mut store, entrypoint) = setup_wasmtime_module(&mut raw_module, data);
 
         let result = entrypoint.call(&mut store, data_len).unwrap();
-        assert_eq!(result, ERROR_NO_FUNCTION_MATCH);
+        assert_eq!(result, 1);
     }
 }

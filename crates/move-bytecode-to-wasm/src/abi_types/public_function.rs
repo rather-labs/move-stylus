@@ -1,6 +1,6 @@
 use walrus::{
     FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg},
 };
 
 use crate::{
@@ -149,23 +149,6 @@ impl<'a> PublicFunction<'a> {
         let data_ptr = module.locals.add(ValType::I32);
         let data_len = module.locals.add(ValType::I32);
 
-        // Set status to 0 by default (no abort)
-        block.i32_const(0).local_set(status);
-
-        // Wipe DATA_ABORT_MESSAGE_PTR_OFFSET
-        // In case an Abort instruction is encountered, this will hold the pointer to the encoded error message
-        block
-            .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
-            .i32_const(0)
-            .store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-
         build_unpack_instructions(
             block,
             module,
@@ -226,7 +209,9 @@ impl<'a> PublicFunction<'a> {
                 .local_get(ptr)
                 .load(
                     compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
+                    LoadKind::I32_8 {
+                        kind: ExtendedLoad::ZeroExtend,
+                    },
                     MemArg {
                         align: 0,
                         offset: 0,
@@ -237,7 +222,7 @@ impl<'a> PublicFunction<'a> {
             // Load the abort message pointer and set data_ptr
             abort_block
                 .local_get(ptr)
-                .i32_const(4)
+                .i32_const(1)
                 .binop(BinaryOp::I32Add)
                 .local_set(data_ptr);
 
