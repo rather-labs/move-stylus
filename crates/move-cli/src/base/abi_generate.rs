@@ -13,9 +13,6 @@ pub struct AbiGenerate;
 impl AbiGenerate {
     pub fn execute(self, path: Option<&Path>, config: BuildConfig) -> anyhow::Result<()> {
         generate_abi(path);
-
-        println!("{path:?}");
-
         Ok(())
     }
 }
