@@ -15,13 +15,13 @@ use super::RuntimeFunction;
 /// - `ptr`: Pointer to the allocated blob `[len: u32 LE][ASCII bytes...]`.
 ///
 /// # Memory Layout
-/// - Bytes 0..4 : Little-endian `u32` length of the ASCII string
-/// - Bytes 4..  : ASCII digits (e.g., "123" for value 123)
+/// - Byte 0: Little-endian `u8` length of the ASCII string
+/// - Bytes 1..  : ASCII digits (e.g., "123" for value 123)
 ///
 /// # Examples
-/// - Input: 0          → `[1, 0, 0, 0, '0']`                      // len=1, data="0"
-/// - Input: 123        → `[3, 0, 0, 0, '1','2','3']`               // len=3, data="123"
-/// - Input: 999_999    → `[6, 0, 0, 0, '9','9','9','9','9','9']`   // len=6, data="999999"
+/// - Input: 0          → `[1, '0']`                       // len=1, data="0"
+/// - Input: 123        → `[3, '1','2','3']`               // len=3, data="123"
+/// - Input: 999_999    → `[6, '9','9','9','9','9','9']`   // len=6, data="999999"
 ///
 /// Notes:
 /// - Each decimal digit `d` (0..9) is encoded as the ASCII byte `'0' + d` (0x30..0x39).
@@ -43,7 +43,7 @@ pub fn u64_to_ascii_base_10(
         .name(RuntimeFunction::U64ToAsciiBase10.name().to_owned())
         .func_body();
 
-    // trap if negative (shouldn't happen for u64-ish inputs)
+    // trap if negative, or n > 10ˆ18
     builder
         .local_get(n)
         .i64_const(0)
@@ -71,14 +71,13 @@ pub fn u64_to_ascii_base_10(
                     .store(
                         compilation_ctx.memory_id,
                         StoreKind::I32_8 { atomic: false },
-                        // StoreKind::I32 { atomic: false },
                         MemArg {
                             align: 0,
                             offset: 0,
                         },
                     );
 
-                // store the '0'digit
+                // store the '0' digit
                 z.i32_const(1)
                     .call(compilation_ctx.allocator)
                     .i32_const(0x30)
@@ -106,6 +105,7 @@ pub fn u64_to_ascii_base_10(
                 // while (scale > n) { scale /= 10; len--; }
                 nz.block(None, |block| {
                     let block_id = block.id();
+
                     block.loop_(None, |lp| {
                         let lp_id = lp.id();
                         lp.local_get(scale)
@@ -125,17 +125,6 @@ pub fn u64_to_ascii_base_10(
                         lp.br(lp_id);
                     });
                 });
-
-                // Store the length
-                nz.local_get(ptr).local_get(len).store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32_8 { atomic: false },
-                    // StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
 
                 // while (true) {
                 //   digit = n / scale; *write_ptr++ = '0' + digit; n -= digit * scale;
@@ -191,10 +180,19 @@ pub fn u64_to_ascii_base_10(
                         lp.br(lp_id);
                     });
                 });
+
+                // Store the length
+                nz.local_get(ptr).local_get(len).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32_8 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
             },
         );
 
-    // return
     builder.local_get(ptr);
 
     function.finish(vec![n], &mut module.funcs)
