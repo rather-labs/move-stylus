@@ -28,12 +28,16 @@ pub const DATA_FROZEN_OBJECTS_KEY_OFFSET: i32 = 160;
 /// key 2 for frozen).
 pub const DATA_STORAGE_OBJECT_OWNER_OFFSET: i32 = 192;
 
+/// Used to store the pointer to the abort message when translating an Abort instruction.
+/// The memory layout is structured as: [length, data], where the first 4 bytes represent the length of the message.
+pub const DATA_ABORT_MESSAGE_PTR_OFFSET: i32 = 224;
+
 /// Amount of memory reserved starting from offset 0.
 ///
 /// # WARNING
 /// This value must be kept in sync to correctly initialize the memory allocator
 /// at the proper offset.
-pub const TOTAL_RESERVED_MEMORY: i32 = 256;
+pub const TOTAL_RESERVED_MEMORY: i32 = 228;
 
 /// Initializes the module's data segment.
 pub fn setup_data_segment(module: &mut Module, memory_id: MemoryId) {

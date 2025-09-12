@@ -14,7 +14,8 @@ pub mod table;
 use crate::{
     CompilationContext,
     compilation_context::ModuleData,
-    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET},
+    error_encoding::build_error_message,
     generics::{
         extract_type_instances_from_stack, instantiate_vec_type_parameters,
         replace_type_parameters, type_contains_generics,
@@ -47,7 +48,7 @@ use types_stack::TypesStack;
 use walrus::TableId;
 use walrus::{
     FunctionBuilder, FunctionId as WasmFunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, UnaryOp},
+    ir::{BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 /// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs.
@@ -1730,7 +1731,26 @@ fn translate_instruction(
             types_stack.push(t2);
         }
         Bytecode::Abort => {
+            // Expect a u64 on the Wasm stack and stash it
             types_stack.pop_expecting(&IntermediateType::IU64)?;
+
+            // Returns a ptr to the encoded error message
+            let ptr = build_error_message(builder, module, compilation_ctx);
+
+            // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
+            builder
+                .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
+                .local_get(ptr)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+            builder.i32_const(1);
             builder.return_();
         }
         Bytecode::Xor => {

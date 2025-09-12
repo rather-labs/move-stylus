@@ -1,1 +1,1 @@
-pub const ERROR_NO_FUNCTION_MATCH: i32 = -100;
+pub const ERROR_NO_FUNCTION_MATCH: i64 = 100;
