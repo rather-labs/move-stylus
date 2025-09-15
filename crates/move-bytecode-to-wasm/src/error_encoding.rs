@@ -158,3 +158,88 @@ pub fn build_error_message(
 
     ptr
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_compilation_context;
+    use crate::test_tools::{build_module, setup_wasmtime_module};
+    use rstest::rstest;
+    use walrus::FunctionBuilder;
+
+    use super::*;
+
+    #[rstest]
+    #[case(0u64, "0")]
+    #[case(1u64, "1")]
+    #[case(123u64, "123")]
+    #[case(999u64, "999")]
+    #[case(1000u64, "1000")]
+    #[case(999999u64, "999999")]
+    #[case(1000000u64, "1000000")]
+    #[case(123456789u64, "123456789")]
+    #[case(9876543210u64, "9876543210")]
+    #[should_panic]
+    #[case(u64::MAX, "18446744073709551615")]
+    fn test_build_error_message(#[case] error_code: u64, #[case] expected: &str) {
+        let (mut raw_module, allocator_func, memory_id) = build_module(None);
+        let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+
+        // Create a test function that calls build_error_message
+        let mut function_builder =
+            FunctionBuilder::new(&mut raw_module.types, &[ValType::I64], &[ValType::I32]);
+        let n = raw_module.locals.add(ValType::I64);
+
+        let mut func_body = function_builder.func_body();
+        func_body.i64_const(error_code as i64);
+        let error_ptr = build_error_message(&mut func_body, &mut raw_module, &compilation_ctx);
+        func_body.local_get(error_ptr);
+        let function = function_builder.finish(vec![n], &mut raw_module.funcs);
+        raw_module.exports.add("test_function", function);
+
+        let (_, instance, mut store, entrypoint) =
+            setup_wasmtime_module::<i64, i32>(&mut raw_module, vec![], "test_function", None);
+
+        let ptr = entrypoint.call(&mut store, 0).unwrap();
+
+        // Read the error blob from the returned pointer
+        let memory = instance.get_memory(&mut store, "memory").unwrap();
+        let memory_data = memory.data(&mut store);
+
+        // Read the total length (1 byte)
+        let total_len = memory_data[ptr as usize] as u32;
+
+        // Read the error selector (4 bytes at offset 1)
+        let error_selector = memory_data[ptr as usize + 1..ptr as usize + 5].to_vec();
+        assert_eq!(error_selector, ERROR_SELECTOR, "Error selector mismatch");
+
+        // Read the head word (32 bytes at offset 5)
+        let head_word = memory_data[ptr as usize + 5..ptr as usize + 37].to_vec();
+        let mut expected_head_word = vec![0; 32];
+        expected_head_word[31] = 0x20;
+        assert_eq!(head_word, expected_head_word, "Head word mismatch");
+
+        // Read the error message length from the ABI header (4 bytes big-endian at offset 65 = 1 + 4 + 32 + 32 - 4)
+        let msg_len = u32::from_be_bytes([
+            memory_data[ptr as usize + 65],
+            memory_data[ptr as usize + 66],
+            memory_data[ptr as usize + 67],
+            memory_data[ptr as usize + 68],
+        ]) as usize;
+
+        // round up the msg_len to 32 bytes
+        let padded_msg_len = (msg_len + 31) & !31;
+
+        // Assert that the total length is the sum of the padded message length and the ABI header length
+        assert_eq!(
+            total_len,
+            padded_msg_len as u32 + 68,
+            "Error message length mismatch"
+        );
+
+        // Read the error message
+        let error_start = ptr as usize + 69; // 1 + 4 + 32 + 32 = 69
+        let error_message_data = &memory_data[error_start..error_start + msg_len];
+        let result_str = String::from_utf8(error_message_data.to_vec()).unwrap();
+        assert_eq!(result_str, expected, "Failed for input {}", error_code);
+    }
+}
