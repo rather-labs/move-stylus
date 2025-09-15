@@ -3,6 +3,8 @@ use std::ops::Deref;
 use crate::translation::intermediate_types::IntermediateType;
 use move_binary_format::file_format::Bytecode;
 
+use super::intermediate_types::VmHandledStruct;
+
 #[derive(Debug, Clone)]
 pub struct TypesStack(pub Vec<IntermediateType>);
 
@@ -32,14 +34,30 @@ impl TypesStack {
             });
         };
 
-        if ty != *expected_type {
-            return Err(TypesStackError::TypeMismatch {
+        // If we find an struct, we don't need to check here if it is a vm handled type or not.
+        // That information is useful for the instruction that will use the struct found in the
+        // types stack.
+        match (&ty, expected_type) {
+            (
+                IntermediateType::IStruct {
+                    module_id: ty_module_id,
+                    index: ty_index,
+                    ..
+                },
+                IntermediateType::IStruct {
+                    module_id: ety_module_id,
+                    index: ety_index,
+                    ..
+                },
+            ) if ty_module_id == ety_module_id && ty_index == ety_index => Ok(()),
+
+            _ if ty != *expected_type => Err(TypesStackError::TypeMismatch {
                 expected: expected_type.clone(),
                 found: ty,
-            });
-        }
+            }),
 
-        Ok(())
+            _ => Ok(()),
+        }
     }
 
     pub fn pop_n_from_stack<const N: usize>(&mut self) -> Result<[IntermediateType; N]> {
