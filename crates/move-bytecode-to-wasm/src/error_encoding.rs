@@ -159,7 +159,6 @@ pub fn build_error_message(
     ptr
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::test_compilation_context;
@@ -208,7 +207,7 @@ mod tests {
 
         // Read the total length (1 byte)
         let total_len = memory_data[ptr as usize] as u32;
-        
+
         // Read the error selector (4 bytes at offset 1)
         let error_selector = memory_data[ptr as usize + 1..ptr as usize + 5].to_vec();
         assert_eq!(error_selector, ERROR_SELECTOR, "Error selector mismatch");
@@ -218,7 +217,7 @@ mod tests {
         let mut expected_head_word = vec![0; 32];
         expected_head_word[31] = 0x20;
         assert_eq!(head_word, expected_head_word, "Head word mismatch");
-        
+
         // Read the error message length from the ABI header (4 bytes big-endian at offset 65 = 1 + 4 + 32 + 32 - 4)
         let msg_len = u32::from_be_bytes([
             memory_data[ptr as usize + 65],
@@ -231,7 +230,11 @@ mod tests {
         let padded_msg_len = (msg_len + 31) & !31;
 
         // Assert that the total length is the sum of the padded message length and the ABI header length
-        assert_eq!(total_len, padded_msg_len as u32 + 68, "Error message length mismatch");
+        assert_eq!(
+            total_len,
+            padded_msg_len as u32 + 68,
+            "Error message length mismatch"
+        );
 
         // Read the error message
         let error_start = ptr as usize + 69; // 1 + 4 + 32 + 32 = 69
