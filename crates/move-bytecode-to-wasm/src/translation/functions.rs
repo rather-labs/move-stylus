@@ -50,6 +50,7 @@ impl MappedFunction {
 
         assert!(results.len() <= 1, "Multiple return values not supported");
 
+        println!("MOVE LOCALS: {move_locals:?}");
         // Declared locals
         let locals = move_locals
             .iter()

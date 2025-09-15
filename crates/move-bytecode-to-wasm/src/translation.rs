@@ -13,7 +13,7 @@ pub mod table;
 
 use crate::{
     CompilationContext,
-    compilation_context::ModuleData,
+    compilation_context::{ModuleData, ModuleId},
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     generics::{
         extract_type_instances_from_stack, instantiate_vec_type_parameters,
@@ -22,7 +22,7 @@ use crate::{
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
-    vm_handled_types::uid::Uid,
+    vm_handled_types::{VmHandledType, uid::Uid},
     wasm_builder_extensions::WasmBuilderExtension,
 };
 use anyhow::Result;
@@ -86,6 +86,11 @@ impl BranchTargets {
     }
 }
 
+struct UidParentInformation {
+    module_id: ModuleId,
+    index: u16,
+}
+
 /// This is used to pass around the context of the translation process. Also clippy complains about too many arguments in translate_instruction.
 struct TranslateFlowContext<'a> {
     compilation_ctx: &'a CompilationContext<'a>,
@@ -94,6 +99,7 @@ struct TranslateFlowContext<'a> {
     function_information: &'a MappedFunction,
     function_table: &'a mut FunctionTable,
     function_locals: &'a Vec<LocalId>,
+    uid_locals: &'a mut HashMap<u16, UidParentInformation>,
     branch_targets: &'a mut BranchTargets,
 }
 
@@ -140,6 +146,7 @@ pub fn translate_function(
     let mut branch_targets = BranchTargets::new();
     let mut types_stack = TypesStack::new();
     let mut functions_to_link = HashSet::new();
+    let mut uid_locals: HashMap<u16, UidParentInformation> = HashMap::new();
 
     let mut ctx = TranslateFlowContext {
         compilation_ctx,
@@ -147,6 +154,7 @@ pub fn translate_function(
         function_table,
         function_information,
         function_locals: &function_locals,
+        uid_locals: &mut uid_locals,
         types_stack: &mut types_stack,
         branch_targets: &mut branch_targets,
     };
@@ -198,6 +206,8 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
+                    println!("\nTranslating {instruction:?}");
+                    println!("TS Before {:?}", &ctx.types_stack);
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -208,12 +218,14 @@ fn translate_flow(
                         ctx.function_table,
                         ctx.types_stack,
                         ctx.function_locals,
+                        ctx.uid_locals,
                         branches,
                         ctx.branch_targets,
                     )
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
                     });
+                    println!("TS After {:?}\n", &ctx.types_stack);
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
@@ -346,6 +358,7 @@ fn translate_instruction(
     function_table: &mut FunctionTable,
     types_stack: &mut TypesStack,
     function_locals: &[LocalId],
+    uid_locals: &mut HashMap<u16, UidParentInformation>,
     branches: &HashMap<u16, BranchMode>,
     branch_targets: &BranchTargets,
 ) -> Result<Vec<FunctionId>, TranslationError> {
@@ -703,13 +716,21 @@ fn translate_instruction(
                 local_type.box_local_instructions(module, builder, compilation_ctx, local);
             }
 
-            types_stack.pop_expecting(local_type)?;
+            match local_type {
+                IntermediateType::IStruct {
+                    module_id, index, ..
+                } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {}
+                _ => types_stack.pop_expecting(local_type)?,
+            }
+
+            // types_stack.pop_expecting(local_type)?;
         }
         Bytecode::MoveLoc(local_id) => {
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             local_type.move_local_instructions(builder, compilation_ctx, local);
+
             types_stack.push(local_type);
         }
         Bytecode::CopyLoc(local_id) => {
