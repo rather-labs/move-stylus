@@ -22,6 +22,7 @@ use crate::{
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
+    vm_handled_types::uid::Uid,
     wasm_builder_extensions::WasmBuilderExtension,
 };
 use anyhow::Result;
@@ -590,65 +591,102 @@ fn translate_instruction(
             let function_id = &module_data.functions.calls[function_handle_index.into_index()];
             let arguments = &module_data.functions.arguments[function_handle_index.into_index()];
 
-            println!("1");
-            prepare_function_arguments(module, builder, arguments, compilation_ctx, types_stack)?;
+            let function_information = if let Some(fi) = module_data
+                .functions
+                .information
+                .get(function_handle_index.into_index())
+            {
+                fi
+            } else {
+                let dependency_data = compilation_ctx
+                    .deps_data
+                    .get(&function_id.module_id)
+                    .unwrap();
 
-            println!("2");
-            // If the function is in the table we call it directly
-            if let Some(f) = function_table.get_by_function_id(function_id) {
-                call_indirect(
-                    f,
-                    &module_data.functions.returns[function_handle_index.into_index()],
-                    function_table.get_table_id(),
-                    builder,
-                    module,
-                    compilation_ctx,
-                );
-            }
-            // Otherwise
-            // If the function is not native, we add it to the table and declare it for translating
-            // and linking
-            // If the function IS native, we link it and call it directly
-            else {
-                let function_information = if let Some(fi) = module_data
+                dependency_data
                     .functions
                     .information
-                    .get(function_handle_index.into_index())
-                {
-                    fi
-                } else {
-                    let dependency_data = compilation_ctx
-                        .deps_data
-                        .get(&function_id.module_id)
-                        .unwrap();
+                    .iter()
+                    .find(|f| &f.function_id == function_id)
+                    .unwrap()
+            };
 
-                    dependency_data
-                        .functions
-                        .information
-                        .iter()
-                        .find(|f| &f.function_id == function_id)
-                        .unwrap()
-                };
-                if function_information.is_native {
-                    let native_function_id =
-                        NativeFunction::get(&function_id.identifier, module, compilation_ctx);
-                    builder.call(native_function_id);
-                } else {
-                    let table_id = function_table.get_table_id();
-                    let f_entry =
-                        function_table.add(module, function_id.clone(), function_information);
-                    functions_calls_to_link.push(function_id.clone());
+            // There are some functions that need to be specially handled, if we find one of those
+            // functions, we introduce custom code, otherwise proceed with a normal function call
+            if Uid::is_delete_function(
+                &function_information.function_id.module_id,
+                &function_information.function_id.identifier,
+            ) {
+                types_stack::match_types!((
+                    IntermediateType::IStruct {
+                        module_id: _,
+                        index: _,
+                        vm_handled_struct: VmHandledStruct::Uid {
+                            parent_module_id,
+                            parent_index
+                        }
+                    },
+                    "struct",
+                    types_stack.pop()?
+                ));
 
+                let delete_fn = RuntimeFunction::DeleteFromStorage.get_generic(
+                    module,
+                    compilation_ctx,
+                    &[&IntermediateType::IStruct {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                        vm_handled_struct: VmHandledStruct::None,
+                    }],
+                );
+
+                builder.call(delete_fn);
+            } else {
+                prepare_function_arguments(
+                    module,
+                    builder,
+                    arguments,
+                    compilation_ctx,
+                    types_stack,
+                )?;
+
+                // If the function is in the table we call it directly
+                if let Some(f) = function_table.get_by_function_id(function_id) {
                     call_indirect(
-                        f_entry,
+                        f,
                         &module_data.functions.returns[function_handle_index.into_index()],
-                        table_id,
+                        function_table.get_table_id(),
                         builder,
                         module,
                         compilation_ctx,
                     );
                 }
-            };
+                // Otherwise
+                // If the function is not native, we add it to the table and declare it for translating
+                // and linking
+                // If the function IS native, we link it and call it directly
+                else {
+                    if function_information.is_native {
+                        let native_function_id =
+                            NativeFunction::get(&function_id.identifier, module, compilation_ctx);
+                        builder.call(native_function_id);
+                    } else {
+                        let table_id = function_table.get_table_id();
+                        let f_entry =
+                            function_table.add(module, function_id.clone(), function_information);
+                        functions_calls_to_link.push(function_id.clone());
+
+                        call_indirect(
+                            f_entry,
+                            &module_data.functions.returns[function_handle_index.into_index()],
+                            table_id,
+                            builder,
+                            module,
+                            compilation_ctx,
+                        );
+                    }
+                };
+            }
 
             // Insert in the stack types the types returned by the function (if any)
             let return_types = &module_data.functions.returns[function_handle_index.0 as usize];

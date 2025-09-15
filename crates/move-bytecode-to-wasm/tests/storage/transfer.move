@@ -51,10 +51,11 @@ public fun increment_value(foo: &mut Foo) {
 
 // Wrappers to manipulate storage directly: delete, transfer, freeze and share object.
 public fun delete_obj(foo: Foo) {
-    object::delete(foo);
+    let Foo { id, value } = foo;
+    id.delete();
 }
 
-public fun freeze_obj(foo: Foo) { 
+public fun freeze_obj(foo: Foo) {
   transfer::freeze_object(foo);
 }
 
@@ -62,7 +63,7 @@ public fun share_obj(foo: Foo) {
   transfer::share_object(foo);
 }
 
-public fun transfer_obj(foo: Foo, recipient: address) { 
+public fun transfer_obj(foo: Foo, recipient: address) {
   transfer::transfer(foo, recipient);
 }
 
