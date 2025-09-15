@@ -31,7 +31,7 @@ use functions::{
     prepare_function_return,
 };
 use intermediate_types::{
-    IntermediateType,
+    IntermediateType, VmHandledStruct,
     heap_integers::{IU128, IU256},
     simple_integers::{IU8, IU16, IU32, IU64},
     vector::IVector,
@@ -711,7 +711,7 @@ fn translate_instruction(
                     t
                 ),
                 (
-                    IntermediateType::IStruct { ref module_id, index },
+                    IntermediateType::IStruct { ref module_id, index, .. },
                     "struct",
                     *ref_inner
                 )
@@ -795,6 +795,7 @@ fn translate_instruction(
                 IntermediateType::IStruct {
                     module_id: module_data.id.clone(),
                     index: struct_.index(),
+                    vm_handled_struct: VmHandledStruct::None,
                 },
             )))?;
 
@@ -1808,6 +1809,7 @@ fn translate_instruction(
             types_stack.push(IntermediateType::IStruct {
                 module_id: module_data.id.clone(),
                 index: struct_definition_index.0,
+                vm_handled_struct: VmHandledStruct::None,
             });
         }
         Bytecode::PackGeneric(struct_definition_index) => {
@@ -1895,13 +1897,21 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IStruct {
                 module_id: module_data.id.clone(),
                 index: struct_definition_index.0,
+                vm_handled_struct: VmHandledStruct::None,
             })?;
 
             let struct_ = module_data
                 .structs
                 .get_by_struct_definition_idx(struct_definition_index)?;
 
-            bytecodes::structs::unpack(struct_, module, builder, compilation_ctx, types_stack)?;
+            bytecodes::structs::unpack(
+                struct_,
+                &module_data.id,
+                module,
+                builder,
+                compilation_ctx,
+                types_stack,
+            )?;
         }
         Bytecode::UnpackGeneric(struct_definition_index) => {
             let idx = module_data
@@ -1955,7 +1965,14 @@ fn translate_instruction(
                 types,
             })?;
 
-            bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
+            bytecodes::structs::unpack(
+                &struct_,
+                &module_data.id,
+                module,
+                builder,
+                compilation_ctx,
+                types_stack,
+            )?;
         }
         Bytecode::BrTrue(code_offset) => {
             if let Some(branch_mode) = branches.get(code_offset) {

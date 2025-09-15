@@ -832,7 +832,7 @@ pub fn add_encode_intermediate_type_instructions(
 
             builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         }
-        IntermediateType::IStruct { module_id, index } => {
+        IntermediateType::IStruct { module_id, index, .. } => {
             let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)
                 .unwrap();
@@ -1126,7 +1126,7 @@ pub fn add_decode_intermediate_type_instructions(
                 },
             );
         }
-        IntermediateType::IStruct { module_id, index } => {
+        IntermediateType::IStruct { module_id, index, .. } => {
             let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)
                 .unwrap();

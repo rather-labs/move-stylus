@@ -78,7 +78,7 @@ impl CompilationContext<'_> {
         itype: &IntermediateType,
     ) -> Result<Cow<IStruct>> {
         match itype {
-            IntermediateType::IStruct { module_id, index } => {
+            IntermediateType::IStruct { module_id, index, .. } => {
                 let struct_ = self.get_struct_by_index(module_id, *index)?;
                 Ok(Cow::Borrowed(struct_))
             }

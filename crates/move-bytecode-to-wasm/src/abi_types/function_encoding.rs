@@ -58,12 +58,12 @@ impl SolName for IntermediateType {
             IntermediateType::IVector(inner) => inner
                 .sol_name(compilation_ctx)
                 .map(|sol_n| format!("{sol_n}[]")),
-            IntermediateType::IStruct { module_id, index }
-                if TxContext::is_vm_type(module_id, *index, compilation_ctx) =>
-            {
-                None
-            }
-            IntermediateType::IStruct { module_id, index } => {
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } if TxContext::is_vm_type(module_id, *index, compilation_ctx) => None,
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
                     .unwrap();
@@ -121,7 +121,7 @@ mod tests {
         compilation_context::{ModuleData, ModuleId},
         test_compilation_context,
         test_tools::build_module,
-        translation::intermediate_types::structs::IStruct,
+        translation::intermediate_types::{VmHandledStruct, structs::IStruct},
     };
 
     use super::*;
@@ -199,6 +199,7 @@ mod tests {
                     IntermediateType::IStruct {
                         module_id: ModuleId::default(),
                         index: 1,
+                        vm_handled_struct: VmHandledStruct::None,
                     },
                 ),
             ],
@@ -228,10 +229,12 @@ mod tests {
             IntermediateType::IStruct {
                 module_id: ModuleId::default(),
                 index: 0,
+                vm_handled_struct: VmHandledStruct::None,
             },
             IntermediateType::IVector(Box::new(IntermediateType::IStruct {
                 module_id: ModuleId::default(),
                 index: 1,
+                vm_handled_struct: VmHandledStruct::None,
             })),
         ];
 

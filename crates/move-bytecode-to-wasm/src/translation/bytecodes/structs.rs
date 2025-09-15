@@ -6,11 +6,13 @@ use walrus::{
 
 use crate::{
     CompilationContext,
+    compilation_context::ModuleId,
     translation::{
         TranslationError,
-        intermediate_types::{IntermediateType, structs::IStruct},
+        intermediate_types::{IntermediateType, VmHandledStruct, structs::IStruct},
         types_stack::TypesStack,
     },
+    vm_handled_types::{VmHandledType, uid::Uid},
 };
 
 /// Borrows a field of a struct.
@@ -206,6 +208,7 @@ pub fn pack(
 /// This function is used with Unpack and UnpackGeneric bytecodes
 pub fn unpack(
     struct_: &IStruct,
+    struct_module_id: &ModuleId,
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
@@ -269,7 +272,22 @@ pub fn unpack(
             IntermediateType::IEnum(_) => todo!(),
         }
 
-        types_stack.push(field.clone());
+        match field {
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+                types_stack.push(IntermediateType::IStruct {
+                    module_id: module_id.clone(),
+                    index: *index,
+                    vm_handled_struct: VmHandledStruct::Uid {
+                        parent_module_id: struct_module_id.clone(),
+                        parent_index: struct_.index(),
+                    },
+                })
+            }
+            _ => types_stack.push(field.clone()),
+        }
+
         offset += 4;
     }
 
