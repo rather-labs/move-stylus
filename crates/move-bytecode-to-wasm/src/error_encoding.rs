@@ -230,9 +230,10 @@ mod tests {
         // round up the msg_len to 32 bytes
         let padded_msg_len = (msg_len + 31) & !31;
 
+        // Assert that the total length is the sum of the padded message length and the ABI header length
         assert_eq!(total_len, padded_msg_len as u32 + 68, "Error message length mismatch");
 
-        // Read the ASCII error message
+        // Read the error message
         let error_start = ptr as usize + 69; // 1 + 4 + 32 + 32 = 69
         let error_message_data = &memory_data[error_start..error_start + msg_len];
         let result_str = String::from_utf8(error_message_data.to_vec()).unwrap();
