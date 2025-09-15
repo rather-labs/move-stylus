@@ -1,4 +1,5 @@
 pub mod add;
+pub mod ascii;
 pub mod bitwise;
 pub mod div;
 pub mod mul;

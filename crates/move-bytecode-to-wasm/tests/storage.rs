@@ -93,7 +93,7 @@ mod counter {
         // Set value to 111 with a sender that is not the owner
         let call_data = setValueCall::new((object_id, 111)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
+        assert_eq!(1, result);
 
         // Assert that the value did not change
         let call_data = readCall::new((object_id,)).abi_encode();

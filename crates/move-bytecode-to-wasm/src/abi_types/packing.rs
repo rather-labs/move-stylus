@@ -134,7 +134,7 @@ pub fn build_pack_instructions<T: Packable>(
     locals.reverse();
 
     let pointer = module.locals.add(ValType::I32);
-    let pointer_end = module.locals.add(ValType::I32);
+    let len = module.locals.add(ValType::I32);
     let writer_pointer = module.locals.add(ValType::I32);
     let calldata_reference_pointer = module.locals.add(ValType::I32);
 
@@ -198,11 +198,9 @@ pub fn build_pack_instructions<T: Packable>(
         .call(compilation_ctx.allocator)
         .local_get(pointer)
         .binop(BinaryOp::I32Sub)
-        .local_set(pointer_end);
+        .local_set(len);
 
-    (pointer, pointer_end)
-
-    // The pointer_end remaining in the stack is the length of the encoded data
+    (pointer, len)
 }
 
 impl Packable for IntermediateType {
