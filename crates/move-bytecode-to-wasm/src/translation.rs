@@ -86,6 +86,7 @@ impl BranchTargets {
     }
 }
 
+#[derive(Debug)]
 struct UidParentInformation {
     module_id: ModuleId,
     index: u16,
@@ -99,7 +100,7 @@ struct TranslateFlowContext<'a> {
     function_information: &'a MappedFunction,
     function_table: &'a mut FunctionTable,
     function_locals: &'a Vec<LocalId>,
-    uid_locals: &'a mut HashMap<u16, UidParentInformation>,
+    uid_locals: &'a mut HashMap<u8, UidParentInformation>,
     branch_targets: &'a mut BranchTargets,
 }
 
@@ -146,7 +147,7 @@ pub fn translate_function(
     let mut branch_targets = BranchTargets::new();
     let mut types_stack = TypesStack::new();
     let mut functions_to_link = HashSet::new();
-    let mut uid_locals: HashMap<u16, UidParentInformation> = HashMap::new();
+    let mut uid_locals: HashMap<u8, UidParentInformation> = HashMap::new();
 
     let mut ctx = TranslateFlowContext {
         compilation_ctx,
@@ -358,7 +359,7 @@ fn translate_instruction(
     function_table: &mut FunctionTable,
     types_stack: &mut TypesStack,
     function_locals: &[LocalId],
-    uid_locals: &mut HashMap<u16, UidParentInformation>,
+    uid_locals: &mut HashMap<u8, UidParentInformation>,
     branches: &HashMap<u16, BranchMode>,
     branch_targets: &BranchTargets,
 ) -> Result<Vec<FunctionId>, TranslationError> {
@@ -716,14 +717,34 @@ fn translate_instruction(
                 local_type.box_local_instructions(module, builder, compilation_ctx, local);
             }
 
+            // TODO: explain this
             match local_type {
                 IntermediateType::IStruct {
                     module_id, index, ..
-                } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {}
-                _ => types_stack.pop_expecting(local_type)?,
+                } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+                    if let Some(IntermediateType::IStruct {
+                        module_id,
+                        index,
+                        vm_handled_struct:
+                            VmHandledStruct::Uid {
+                                parent_module_id,
+                                parent_index,
+                            },
+                    }) = &types_stack.iter().last()
+                    {
+                        uid_locals.insert(
+                            *local_id,
+                            UidParentInformation {
+                                module_id: parent_module_id.clone(),
+                                index: *parent_index,
+                            },
+                        );
+                    }
+                }
+                _ => (),
             }
 
-            // types_stack.pop_expecting(local_type)?;
+            types_stack.pop_expecting(local_type)?;
         }
         Bytecode::MoveLoc(local_id) => {
             // TODO: Find a way to ensure they will not be used again, the Move compiler should do the work for now
@@ -731,7 +752,30 @@ fn translate_instruction(
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             local_type.move_local_instructions(builder, compilation_ctx, local);
 
-            types_stack.push(local_type);
+            // TODO: explain this
+            match local_type {
+                IntermediateType::IStruct {
+                    module_id,
+                    index,
+                    vm_handled_struct: VmHandledStruct::None,
+                } if Uid::is_vm_type(&module_id, index, compilation_ctx) => {
+                    if let Some(UidParentInformation {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                    }) = uid_locals.get(local_id)
+                    {
+                        types_stack.push(IntermediateType::IStruct {
+                            module_id,
+                            index,
+                            vm_handled_struct: VmHandledStruct::Uid {
+                                parent_module_id: parent_module_id.clone(),
+                                parent_index: *parent_index,
+                            },
+                        });
+                    }
+                }
+                _ => types_stack.push(local_type),
+            };
         }
         Bytecode::CopyLoc(local_id) => {
             let local = function_locals[*local_id as usize];
