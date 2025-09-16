@@ -413,6 +413,11 @@ mod storage_transfer {
         let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
         assert_eq!(111, return_data);
         assert_eq!(0, result);
+
+        // Delete object
+        let call_data = deleteObjCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
     }
 
     // Tests the share of an object in both owned and shared cases.
@@ -1384,9 +1389,9 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000030000000200000001", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000007b", 16).unwrap().to_be_bytes(),
         // Second element
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), 
-        U256::from_str_radix("0000000000000000000000000000000000000000000000030000000200000001", 16).unwrap().to_be_bytes(), 
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000007c", 16).unwrap().to_be_bytes(), 
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000030000000200000001", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000007c", 16).unwrap().to_be_bytes(),
         // Field b: StaticNestedStructChild[]
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000001111111111111111111111111111111111111111000000000000002f", 16).unwrap().to_be_bytes(),
@@ -1425,8 +1430,8 @@ mod storage_encoding {
                        DynamicNestedStructChild { a: vec![1, 2, 3], b: 124 }
                    ],
                    b: vec![
-                       StaticNestedStructChild { d: 42, e: address!("0x1111111111111111111111111111111111111111") }, 
-                       StaticNestedStructChild { d: 43, e: address!("0x1111111111111111111111111111111111111111") }, 
+                       StaticNestedStructChild { d: 42, e: address!("0x1111111111111111111111111111111111111111") },
+                       StaticNestedStructChild { d: 43, e: address!("0x1111111111111111111111111111111111111111") },
                        StaticNestedStructChild { d: 44, e: address!("0x1111111111111111111111111111111111111111") }
                    ]
                },
@@ -1437,8 +1442,8 @@ mod storage_encoding {
                        DynamicNestedStructChild { a: vec![1, 2, 3], b: 127 }
                    ],
                    b: vec![
-                       StaticNestedStructChild { d: 45, e: address!("0x1111111111111111111111111111111111111111") }, 
-                       StaticNestedStructChild { d: 46, e: address!("0x1111111111111111111111111111111111111111") }, 
+                       StaticNestedStructChild { d: 45, e: address!("0x1111111111111111111111111111111111111111") },
+                       StaticNestedStructChild { d: 46, e: address!("0x1111111111111111111111111111111111111111") },
                    ]
                }
            ],

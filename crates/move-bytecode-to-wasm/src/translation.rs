@@ -207,8 +207,6 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
-                    println!("\nTranslating {instruction:?}");
-                    println!("TS Before {:?}", &ctx.types_stack);
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -226,7 +224,6 @@ fn translate_flow(
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
                     });
-                    println!("TS After {:?}\n", &ctx.types_stack);
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }

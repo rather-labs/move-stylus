@@ -55,6 +55,13 @@ public fun delete_obj(foo: Foo) {
     id.delete();
 }
 
+public fun delete_obj_2(foo: Foo, foo2: Foo) {
+    let Foo { id: id1 , value } = foo;
+    let Foo { id: id2 , value } = foo2;
+    id1.delete();
+    id2.delete();
+}
+
 public fun freeze_obj(foo: Foo) {
   transfer::freeze_object(foo);
 }
