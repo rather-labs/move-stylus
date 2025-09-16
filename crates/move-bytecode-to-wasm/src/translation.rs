@@ -652,6 +652,18 @@ fn translate_instruction(
                     }],
                 );
 
+                // At this point, in the stack que have the pointer to the Uid struct, but what we
+                // really need is the pointer to the struct that holds that UId. The struct ptr can
+                // be found 4 bytes before the Uid ptr
+                builder.i32_const(4).binop(BinaryOp::I32Sub).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
                 builder.call(delete_fn);
             } else {
                 prepare_function_arguments(
@@ -1945,6 +1957,16 @@ fn translate_instruction(
             let struct_ = module_data
                 .structs
                 .get_by_struct_definition_idx(struct_definition_index)?;
+
+            // Allocate four bytes to be filled later in the pack function that will point to the struct
+            // wrapping this id.
+            // This information will be used by other operations (such as delete) to locate the struct
+            println!("1");
+            if Uid::is_vm_type(&module_data.id, struct_definition_index.0, compilation_ctx) {
+                println!("2");
+                builder.i32_const(4).call(compilation_ctx.allocator).drop();
+            }
+            println!("3");
 
             bytecodes::structs::pack(struct_, module, builder, compilation_ctx, types_stack)?;
 

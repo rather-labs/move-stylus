@@ -160,6 +160,33 @@ pub fn pack(
                             },
                         );
                     }
+
+                    // If we find an UID struct, in the 4 bytes before its pointer, we write the
+                    // address of the struct holding it
+                    IntermediateType::IStruct {
+                        module_id, index, ..
+                    } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+                        builder
+                            .local_get(ptr_to_data)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            )
+                            .i32_const(4)
+                            .binop(BinaryOp::I32Sub)
+                            .local_get(pointer)
+                            .store(
+                                compilation_ctx.memory_id,
+                                StoreKind::I32 { atomic: false },
+                                MemArg { align: 0, offset },
+                            );
+
+                        builder.local_set(ptr_to_data);
+                    }
                     // Heap types: The stack data is a pointer to the value, store directly
                     // that pointer in the struct
                     IntermediateType::IU128
