@@ -25,6 +25,7 @@ pub(crate) mod abi_types;
 mod compilation_context;
 mod constructor;
 mod data;
+mod error_encoding;
 mod generics;
 mod hostio;
 mod memory;

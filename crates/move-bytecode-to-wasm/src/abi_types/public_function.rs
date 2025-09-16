@@ -1,7 +1,11 @@
-use walrus::{FunctionId, InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
+use walrus::{
+    FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
+    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg},
+};
 
 use crate::{
     CompilationContext,
+    data::DATA_ABORT_MESSAGE_PTR_OFFSET,
     translation::{
         functions::add_unpack_function_return_values_instructions,
         intermediate_types::{ISignature, IntermediateType},
@@ -141,7 +145,9 @@ impl<'a> PublicFunction<'a> {
         args_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) {
-        let memory_id = module.get_memory_id().expect("memory not found");
+        let status = module.locals.add(ValType::I32);
+        let data_ptr = module.locals.add(ValType::I32);
+        let data_len = module.locals.add(ValType::I32);
 
         build_unpack_instructions(
             block,
@@ -150,27 +156,85 @@ impl<'a> PublicFunction<'a> {
             args_pointer,
             compilation_ctx,
         );
+
         block.call(self.function_id);
+
+        // Unpack function return values
         add_unpack_function_return_values_instructions(
             block,
             module,
             &self.signature.returns,
-            memory_id,
+            compilation_ctx.memory_id,
         );
 
         if self.signature.returns.is_empty() {
-            block.i32_const(0).i32_const(0).i32_const(0);
-            return;
+            // Set data_ptr and data_len to 0
+            block.i32_const(0).local_set(data_ptr);
+            block.i32_const(0).local_set(data_len);
+        } else {
+            // Set data_ptr and data_len to the result of packing the return values
+            let (data_ptr_, data_len_) =
+                build_pack_instructions(block, &self.signature.returns, module, compilation_ctx);
+            block.local_get(data_ptr_).local_set(data_ptr);
+            block.local_get(data_len_).local_set(data_len);
         }
 
-        // If we pack a unique value we proceed as always
-        let (data_start, data_end) =
-            build_pack_instructions(block, &self.signature.returns, module, compilation_ctx);
+        // Load the abort message pointer from DATA_ABORT_MESSAGE_PTR_OFFSET
+        // If not null, an abort occurred and we need to return the error message
+        block.block(None, |abort_block| {
+            let abort_block_id = abort_block.id();
 
-        block.local_get(data_start).local_get(data_end);
-        // TODO: Define error handling strategy, for now it will always result in traps
-        // So it will only reach this point in the case of success
-        block.i32_const(0);
+            // Load the ptr
+            let ptr = module.locals.add(ValType::I32);
+            abort_block
+                .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .local_tee(ptr);
+
+            // Check if the ptr is null
+            abort_block.i32_const(0).binop(BinaryOp::I32Eq);
+
+            // If the ptr is null, jump to the end of the block, skipping the error message loading
+            abort_block.br_if(abort_block_id);
+
+            // Load the abort message length from the ptr and set data_len
+            abort_block
+                .local_get(ptr)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32_8 {
+                        kind: ExtendedLoad::ZeroExtend,
+                    },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .local_set(data_len);
+
+            // Load the abort message pointer and set data_ptr
+            abort_block
+                .local_get(ptr)
+                .i32_const(1)
+                .binop(BinaryOp::I32Add)
+                .local_set(data_ptr);
+
+            // Set status to 1
+            abort_block.i32_const(1).local_set(status);
+        });
+
+        // [data_ptr][data_len][status]
+        block
+            .local_get(data_ptr)
+            .local_get(data_len)
+            .local_get(status);
     }
 
     /// This function checks if the arguments of a public functions is valid. A signature is not
