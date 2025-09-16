@@ -243,6 +243,25 @@ mod storage_transfer {
         keccak256(buf)
     }
 
+    // Test create frozen object
+    #[rstest]
+    fn test_frozen_object(runtime: RuntimeSandbox) {
+        let call_data = createFrozenCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the object id emmited from the contract's events
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        // Read value before delete
+        let call_data = readValueCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+    }
+
     // Tests operations on a shared object: reading, updating values, etc.
     #[rstest]
     fn test_shared_object(runtime: RuntimeSandbox) {
@@ -636,6 +655,91 @@ mod storage_transfer {
             let call_data = transferObjCall::new((object_id, SIGNER_ADDRESS.into())).abi_encode();
             runtime.call_entrypoint(call_data).unwrap();
         }
+    }
+
+    #[rstest]
+    #[should_panic(expected = "unreachable")]
+    fn test_delete_frozen_object(runtime: RuntimeSandbox) {
+        let call_data = createFrozenCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        // Read value before delete
+        let call_data = readValueCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // Try to delete the object
+        let call_data = deleteObjCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+    }
+
+    // Test delete owned object
+    #[rstest]
+    fn test_delete_owned_object(runtime: RuntimeSandbox) {
+        let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_slot = derive_object_slot(&SIGNER_ADDRESS, &object_id.0);
+
+        // Read value before delete
+        let call_data = readValueCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // Delete the object
+        let call_data = deleteObjCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the storage on the original slot after the delete
+        let value_after_delete = runtime.get_storage_at_slot(object_slot.0);
+        assert_eq!(
+            [0u8; 32], value_after_delete,
+            "Expected storage value to be 32 zeros"
+        );
+    }
+
+    // Test delete owned object
+    #[rstest]
+    fn test_delete_shared_object(runtime: RuntimeSandbox) {
+        let call_data = createSharedCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_slot = derive_object_slot(&SHARED, &object_id.0);
+
+        // Read value before delete
+        let call_data = readValueCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // Delete the object
+        let call_data = deleteObjCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the storage on the original slot after the delete
+        let value_after_delete = runtime.get_storage_at_slot(object_slot.0);
+        assert_eq!(
+            [0u8; 32], value_after_delete,
+            "Expected storage value to be 32 zeros"
+        );
     }
 
     #[rstest]
