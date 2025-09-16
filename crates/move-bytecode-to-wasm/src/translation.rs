@@ -1236,6 +1236,9 @@ fn translate_instruction(
 
                     if let Ok(struct_) = struct_ {
                         if struct_.saved_in_storage {
+                            let get_struct_owner_fn =
+                                RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
+
                             let locate_struct_fn = RuntimeFunction::LocateStructSlot
                                 .get(module, Some(compilation_ctx));
 
@@ -1255,15 +1258,32 @@ fn translate_instruction(
                             // Compute the slot where the struct will be saved
                             builder.call(locate_struct_fn);
 
-                            let save_in_slot_fn = RuntimeFunction::EncodeAndSaveInStorage
-                                .get_generic(module, compilation_ctx, &[itype]);
-
-                            // Load the struct memory representation to pass it to the save
-                            // function
+                            // Check if the object owner is zero
+                            let is_zero_fn =
+                                RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
                             builder
                                 .local_get(struct_ptr)
-                                .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                                .call(save_in_slot_fn);
+                                .call(get_struct_owner_fn)
+                                .i32_const(32)
+                                .call(is_zero_fn);
+
+                            builder.if_else(
+                                None,
+                                |_| {
+                                    // If the object owner is zero, it means the object was deleted and we don't need to save it
+                                },
+                                |else_| {
+                                    let save_in_slot_fn = RuntimeFunction::EncodeAndSaveInStorage
+                                        .get_generic(module, compilation_ctx, &[itype]);
+
+                                    // Load the struct memory representation to pass it to the save
+                                    // function
+                                    else_
+                                        .local_get(struct_ptr)
+                                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                                        .call(save_in_slot_fn);
+                                },
+                            );
 
                             let (storage_flush_cache, _) = storage_flush_cache(module);
                             builder.i32_const(1).call(storage_flush_cache);

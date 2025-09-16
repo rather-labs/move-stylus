@@ -191,13 +191,12 @@ pub fn locate_struct_slot(module: &mut Module, compilation_ctx: &CompilationCont
 
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
+
     let struct_ptr = module.locals.add(ValType::I32);
 
     // Obtain this object's owner
-    builder
-        .local_get(struct_ptr)
-        .i32_const(32)
-        .binop(BinaryOp::I32Sub);
+    builder.local_get(struct_ptr).call(get_struct_owner_fn);
 
     // Get the pointer to the 32 bytes holding the data of the id
     builder.local_get(struct_ptr).call(get_id_bytes_ptr_fn);
@@ -715,6 +714,7 @@ pub fn add_delete_struct_from_storage_fn(
     let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
     let locate_struct_slot_fn =
         RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx));
+    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
 
     let (storage_cache, _) = storage_cache_bytes32(module);
@@ -728,8 +728,7 @@ pub fn add_delete_struct_from_storage_fn(
     // Verify if the object is frozen; if not, continue.
     builder
         .local_get(struct_ptr)
-        .i32_const(32)
-        .binop(BinaryOp::I32Sub)
+        .call(get_struct_owner_fn)
         .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
         .i32_const(32)
         .call(equality_fn);
@@ -780,6 +779,34 @@ pub fn add_delete_struct_from_storage_fn(
             }
         },
     );
+
+    // Wipe out the owner
+    builder
+        .local_get(struct_ptr)
+        .call(get_struct_owner_fn)
+        .i32_const(0)
+        .i32_const(32)
+        .memory_fill(compilation_ctx.memory_id);
+
+    function.finish(vec![struct_ptr], &mut module.funcs)
+}
+
+/// This function returns a pointer to the struct owner, given a struct pointer as input
+pub fn get_struct_owner_fn(
+    module: &mut Module,
+    _compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut builder = function
+        .name(RuntimeFunction::GetStructOwner.name().to_owned())
+        .func_body();
+
+    let struct_ptr = module.locals.add(ValType::I32);
+
+    builder
+        .local_get(struct_ptr)
+        .i32_const(32)
+        .binop(BinaryOp::I32Sub);
 
     function.finish(vec![struct_ptr], &mut module.funcs)
 }

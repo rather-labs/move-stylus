@@ -164,7 +164,7 @@ mod capability {
 }
 
 mod storage_transfer {
-    use alloy_primitives::{FixedBytes, address, keccak256};
+    use alloy_primitives::{FixedBytes, U256, address, keccak256};
     use alloy_sol_types::{SolCall, SolValue, sol};
 
     use super::*;
@@ -241,6 +241,30 @@ mod storage_transfer {
         buf[..32].copy_from_slice(&id_padded);
         buf[32..].copy_from_slice(parent.as_slice());
         keccak256(buf)
+    }
+
+    pub fn get_next_slot(slot: &[u8; 32]) -> [u8; 32] {
+        let slot_value = U256::from_be_bytes(*slot);
+        (slot_value + U256::from(1)).to_be_bytes()
+    }
+
+    // Test create frozen object
+    #[rstest]
+    fn test_frozen_object(runtime: RuntimeSandbox) {
+        let call_data = createFrozenCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the object id emmited from the contract's events
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        // Read value
+        let call_data = readValueCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
     }
 
     // Tests operations on a shared object: reading, updating values, etc.
@@ -636,6 +660,110 @@ mod storage_transfer {
             let call_data = transferObjCall::new((object_id, SIGNER_ADDRESS.into())).abi_encode();
             runtime.call_entrypoint(call_data).unwrap();
         }
+    }
+
+    #[rstest]
+    #[should_panic(expected = "unreachable")]
+    fn test_delete_frozen_object(runtime: RuntimeSandbox) {
+        let call_data = createFrozenCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        // Read value before delete
+        let call_data = readValueCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // Try to delete the object
+        let call_data = deleteObjCall::new((object_id,)).abi_encode();
+        runtime.call_entrypoint(call_data).unwrap();
+    }
+
+    // Test delete owned object
+    #[rstest]
+    fn test_delete_owned_object(runtime: RuntimeSandbox) {
+        let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_slot = derive_object_slot(&SIGNER_ADDRESS, &object_id.0);
+
+        // Read value before delete
+        let call_data = readValueCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // Delete the object
+        let call_data = deleteObjCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the storage from the original slots and check that they are empty
+        // Foo takes 2 slots
+
+        // First slot
+        assert_eq!(
+            [0u8; 32],
+            runtime.get_storage_at_slot(object_slot.0),
+            "Expected storage value to be 32 zeros"
+        );
+
+        // Second slot
+        assert_eq!(
+            [0u8; 32],
+            runtime.get_storage_at_slot(get_next_slot(&object_slot.0)),
+            "Expected storage value to be 32 zeros at next slot"
+        );
+    }
+
+    // Test delete owned object
+    #[rstest]
+    fn test_delete_shared_object(runtime: RuntimeSandbox) {
+        let call_data = createSharedCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_slot = derive_object_slot(&SHARED, &object_id.0);
+
+        // Read value before delete
+        let call_data = readValueCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // Delete the object
+        let call_data = deleteObjCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the storage from the original slots and check that they are empty
+        // Foo takes 2 slots
+
+        // First slot
+        assert_eq!(
+            [0u8; 32],
+            runtime.get_storage_at_slot(object_slot.0),
+            "Expected storage value to be 32 zeros"
+        );
+
+        // Second slot
+        assert_eq!(
+            [0u8; 32],
+            runtime.get_storage_at_slot(get_next_slot(&object_slot.0)),
+            "Expected storage value to be 32 zeros at next slot"
+        );
     }
 
     #[rstest]

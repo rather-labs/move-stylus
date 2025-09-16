@@ -397,4 +397,11 @@ impl RuntimeSandbox {
         let storage = self.storage.lock().unwrap();
         *storage.get(&slot).unwrap()
     }
+
+    pub fn print_storage(&self) {
+        let storage = self.storage.lock().unwrap();
+        for (key, value) in storage.iter() {
+            println!("key: {:?} \n\t value: {:?}", key, value);
+        }
+    }
 }
