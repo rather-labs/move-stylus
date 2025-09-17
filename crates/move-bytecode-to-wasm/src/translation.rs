@@ -763,25 +763,27 @@ fn translate_instruction(
             local_type.move_local_instructions(builder, compilation_ctx, local);
 
             // TODO: explain this
-            match local_type {
+            match &local_type {
                 IntermediateType::IStruct {
                     module_id,
                     index,
                     vm_handled_struct: VmHandledStruct::None,
-                } if Uid::is_vm_type(&module_id, index, compilation_ctx) => {
+                } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
                     if let Some(UidParentInformation {
                         module_id: parent_module_id,
                         index: parent_index,
                     }) = uid_locals.get(local_id)
                     {
                         types_stack.push(IntermediateType::IStruct {
-                            module_id,
-                            index,
+                            module_id: module_id.clone(),
+                            index: *index,
                             vm_handled_struct: VmHandledStruct::Uid {
                                 parent_module_id: parent_module_id.clone(),
                                 parent_index: *parent_index,
                             },
                         });
+                    } else {
+                        types_stack.push(local_type)
                     }
                 }
                 _ => types_stack.push(local_type),
