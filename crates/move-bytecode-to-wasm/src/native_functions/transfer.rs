@@ -184,7 +184,6 @@ pub fn add_share_object_fn(
             },
             |else_| {
                 // Delete the object from owner mapping on the storage
-                // else_.local_get(struct_ptr).call(delete_object_fn);
                 else_.block(None, |block| {
                     let block_id = block.id();
 
@@ -291,7 +290,6 @@ pub fn add_freeze_object_fn(
             },
             |else_| {
                 // Delete the object from the owner mapping on the storage
-                // else_.local_get(struct_ptr).call(delete_object_fn);
                 else_.block(None, |block| {
                     let block_id = block.id();
 
