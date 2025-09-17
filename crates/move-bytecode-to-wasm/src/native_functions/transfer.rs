@@ -142,6 +142,7 @@ pub fn add_share_object_fn(
         RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
     let delete_object_fn =
         RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype]);
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
@@ -183,7 +184,17 @@ pub fn add_share_object_fn(
             },
             |else_| {
                 // Delete the object from owner mapping on the storage
-                else_.local_get(struct_ptr).call(delete_object_fn);
+                // else_.local_get(struct_ptr).call(delete_object_fn);
+                else_.block(None, |block| {
+                    let block_id = block.id();
+
+                    // Check if the owner is zero (means there's no owner, so we don't need to delete anything)
+                    block.local_get(owner_ptr).i32_const(32).call(is_zero_fn);
+
+                    block.br_if(block_id);
+
+                    block.local_get(struct_ptr).call(delete_object_fn);
+                });
 
                 // Update the object ownership in memory to the shared objects key
                 else_
@@ -230,6 +241,7 @@ pub fn add_freeze_object_fn(
         RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
     let delete_object_fn =
         RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype]);
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
@@ -279,7 +291,17 @@ pub fn add_freeze_object_fn(
             },
             |else_| {
                 // Delete the object from the owner mapping on the storage
-                else_.local_get(struct_ptr).call(delete_object_fn);
+                // else_.local_get(struct_ptr).call(delete_object_fn);
+                else_.block(None, |block| {
+                    let block_id = block.id();
+
+                    // Check if the owner is zero (means there's no owner, so we don't need to delete anything)
+                    block.local_get(owner_ptr).i32_const(32).call(is_zero_fn);
+
+                    block.br_if(block_id);
+
+                    block.local_get(struct_ptr).call(delete_object_fn);
+                });
 
                 // Update the object ownership in memory to the frozen objects key
                 else_
