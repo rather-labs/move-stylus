@@ -198,6 +198,46 @@ mod storage_transfer {
             uint64 value;
         }
 
+        struct Bar {
+            UID id;
+            uint64 a;
+            uint64[] c;
+        }
+
+        struct Qux {
+            uint64 a;
+            uint128 b;
+            uint128 c;
+        }
+
+        struct Baz {
+            UID id;
+            uint64 a;
+            Qux c;
+        }
+
+        struct Bez {
+            UID id;
+            uint64 a;
+            Qux[] c;
+            uint128[][] d;
+            uint8 e;
+        }
+
+        struct Quz {
+            uint64 a;
+            uint128 b;
+            uint128 c;
+        }
+
+        struct Biz {
+            UID id;
+            uint64 a;
+            Quz b;
+            Quz[] c;
+        }
+
+
         #[allow(missing_docs)]
         function createShared() public view;
         function createOwned(address recipient) public view;
@@ -210,10 +250,26 @@ mod storage_transfer {
         function shareObj(bytes32 id) public view;
         function transferObj(bytes32 id, address recipient) public view;
         function getFoo(bytes32 id) public view returns (Foo);
+        function createBar() public view;
+        function getBar(bytes32 id) public view returns (Bar);
+        function deleteBar(bytes32 id) public view;
+        function createBaz(address recipient, bool share) public view;
+        function getBaz(bytes32 id) public view returns (Baz);
+        function deleteBaz(bytes32 id) public view;
+        function createBez() public view;
+        function getBez(bytes32 id) public view returns (Bez);
+        function deleteBez(bytes32 id) public view;
+        function createBiz() public view;
+        function getBiz(bytes32 id) public view returns (Biz);
+        function deleteBiz(bytes32 id) public view;
     );
 
     const SHARED: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
     const FROZEN: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2];
+    const COUNTER_KEY: [u8; 32] = [
+        88, 181, 235, 71, 20, 200, 162, 193, 179, 99, 195, 177, 236, 158, 218, 42, 168, 26, 11, 70,
+        66, 173, 6, 207, 222, 175, 248, 56, 236, 49, 87, 253,
+    ];
 
     /// Right-align `data` into a 32-byte word (EVM storage encoding for value types).
     #[inline]
@@ -788,6 +844,241 @@ mod storage_transfer {
         });
         assert_eq!(0, result);
         assert_eq!(result_data, expected_result);
+    }
+
+    #[rstest]
+    fn test_delete_bar(runtime: RuntimeSandbox) {
+        let call_data = createBarCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        let call_data = getBarCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Bar::abi_encode(&Bar {
+            id: UID {
+                id: ID { bytes: object_id },
+            },
+            a: 101,
+            c: vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+
+        let call_data = deleteBarCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        for (key, value) in storage_after_delete.iter() {
+            if *key != COUNTER_KEY {
+                assert!(
+                    storage_before_delete.contains_key(key),
+                    "Key {:?} should exist in storage_before_delete",
+                    key
+                );
+
+                assert_eq!(
+                    *value, [0u8; 32],
+                    "Unexpected non-zero value at key: {:?}",
+                    key
+                );
+            }
+        }
+    }
+
+    #[rstest]
+    #[case(false)]
+    #[case(true)]
+    fn test_delete_baz(runtime: RuntimeSandbox, #[case] share: bool) {
+        let call_data = createBazCall::new((SIGNER_ADDRESS.into(), share)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        let call_data = getBazCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Baz::abi_encode(&Baz {
+            id: UID {
+                id: ID { bytes: object_id },
+            },
+            a: 101,
+            c: Qux {
+                a: 42,
+                b: 55,
+                c: 66,
+            },
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+
+        let call_data = deleteBazCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        for (key, value) in storage_after_delete.iter() {
+            if *key != COUNTER_KEY {
+                assert!(
+                    storage_before_delete.contains_key(key),
+                    "Key {:?} should exist in storage_before_delete",
+                    key
+                );
+
+                assert_eq!(
+                    *value, [0u8; 32],
+                    "Unexpected non-zero value at key: {:?}",
+                    key
+                );
+            }
+        }
+    }
+
+    #[rstest]
+    fn test_delete_bez(runtime: RuntimeSandbox) {
+        let call_data = createBezCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        let call_data = getBezCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Bez::abi_encode(&Bez {
+            id: UID {
+                id: ID { bytes: object_id },
+            },
+            a: 101,
+            c: vec![
+                Qux {
+                    a: 42,
+                    b: 55,
+                    c: 66,
+                },
+                Qux {
+                    a: 43,
+                    b: 56,
+                    c: 67,
+                },
+                Qux {
+                    a: 44,
+                    b: 57,
+                    c: 68,
+                },
+            ],
+            d: vec![vec![1, 2, 3], vec![4], vec![], vec![5, 6]],
+            e: 17,
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+
+        let call_data = deleteBezCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        for (key, value) in storage_after_delete.iter() {
+            if *key != COUNTER_KEY {
+                // Assert that the key existed in storage before deletion
+                assert!(
+                    storage_before_delete.contains_key(key),
+                    "Key {:?} should exist in storage_before_delete",
+                    key
+                );
+
+                assert_eq!(
+                    *value, [0u8; 32],
+                    "Unexpected non-zero value at key: {:?}",
+                    key
+                );
+            }
+        }
+    }
+
+    #[rstest]
+    fn test_delete_biz(runtime: RuntimeSandbox) {
+        let call_data = createBizCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        let call_data = getBizCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Biz::abi_encode(&Biz {
+            id: UID {
+                id: ID { bytes: object_id },
+            },
+            a: 101,
+            b: Quz {
+                a: 42,
+                b: 55,
+                c: 66,
+            },
+            c: vec![
+                Quz {
+                    a: 42,
+                    b: 55,
+                    c: 66,
+                },
+                Quz {
+                    a: 43,
+                    b: 56,
+                    c: 67,
+                },
+                Quz {
+                    a: 44,
+                    b: 57,
+                    c: 68,
+                },
+            ],
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+
+        let call_data = deleteBizCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        for (key, value) in storage_after_delete.iter() {
+            if *key != COUNTER_KEY {
+                // Assert that the key existed in storage before deletion
+                assert!(
+                    storage_before_delete.contains_key(key),
+                    "Key {:?} should exist in storage_before_delete",
+                    key
+                );
+
+                assert_eq!(
+                    *value, [0u8; 32],
+                    "Unexpected non-zero value at key: {:?}",
+                    key
+                );
+            }
+        }
     }
 }
 

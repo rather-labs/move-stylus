@@ -3,7 +3,7 @@
 //! Native functions in Move are functions directly implemented inside the Move VM. To emulate that
 //! mechanism, we direcly implement them in WASM and limk them into the file.
 mod event;
-mod object;
+pub mod object;
 mod transaction;
 mod transfer;
 mod types;

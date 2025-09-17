@@ -169,7 +169,6 @@ pub fn add_read_and_decode_storage_struct_instructions(
             .call(storage_load);
     }
 
-    // let mut read_bytes_in_slot = read_bytes_in_slot;
     for (index, field) in struct_.fields.iter().enumerate() {
         let field_size = field_size(field, compilation_ctx) as i32;
         builder

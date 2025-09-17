@@ -4,7 +4,9 @@ use crate::data::{
     DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
     DATA_STORAGE_OBJECT_OWNER_OFFSET,
 };
-use crate::hostio::host_functions::{self, storage_cache_bytes32, storage_load_bytes32, tx_origin};
+use crate::get_generic_function_name;
+use crate::hostio::host_functions::{self, storage_load_bytes32, tx_origin};
+use crate::native_functions::object::add_delete_storage_struct_instructions;
 use crate::storage::encoding::{
     add_encode_and_save_into_storage_struct_instructions,
     add_read_and_decode_storage_struct_instructions,
@@ -13,7 +15,6 @@ use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::heap_integers::IU256;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, data::DATA_U256_ONE_OFFSET};
-use crate::{get_generic_function_name, storage};
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
@@ -711,18 +712,14 @@ pub fn add_delete_struct_from_storage_fn(
         .get_struct_by_intermediate_type(itype)
         .unwrap();
 
-    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
     let locate_struct_slot_fn =
         RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx));
     let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
 
-    let (storage_cache, _) = storage_cache_bytes32(module);
-
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
 
-    let slot_ptr = module.locals.add(ValType::I32);
     let struct_ptr = module.locals.add(ValType::I32);
 
     // Verify if the object is frozen; if not, continue.
@@ -740,13 +737,6 @@ pub fn add_delete_struct_from_storage_fn(
             then.unreachable();
         },
         |else_| {
-            // Calculate the object slot in the storage (saved in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-            else_
-                .local_get(struct_ptr)
-                .call(locate_struct_slot_fn)
-                .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                .local_set(slot_ptr);
-
             // Wipe the slot data placeholder. We will use it to erase the slots in the storage
             else_
                 .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
@@ -754,29 +744,29 @@ pub fn add_delete_struct_from_storage_fn(
                 .i32_const(32)
                 .memory_fill(compilation_ctx.memory_id);
 
-            // Wipe out the first slot
+            // Locals
+            let slot_ptr = module.locals.add(ValType::I32);
+
+            // Calculate the object slot in storage
             else_
-                .local_get(slot_ptr)
-                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                .call(storage_cache);
+                .local_get(struct_ptr)
+                .call(locate_struct_slot_fn)
+                .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                .local_set(slot_ptr);
 
-            // Loop through each field in the struct and clear the corresponding storage slots.
-            let mut slot_used_bytes = 0;
-            for field in struct_.fields.iter() {
-                let field_size = storage::encoding::field_size(field, compilation_ctx);
-                if slot_used_bytes + field_size > 32 {
-                    else_
-                        .local_get(slot_ptr)
-                        .call(next_slot_fn)
-                        .local_tee(slot_ptr)
-                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                        .call(storage_cache);
+            // Initialize the number of bytes used in the slot to zero
+            let used_bytes_in_slot = module.locals.add(ValType::I32);
+            else_.i32_const(0).local_set(used_bytes_in_slot);
 
-                    slot_used_bytes = field_size;
-                } else {
-                    slot_used_bytes += field_size;
-                }
-            }
+            // Delete the struct from storage
+            add_delete_storage_struct_instructions(
+                module,
+                else_,
+                compilation_ctx,
+                slot_ptr,
+                &struct_,
+                used_bytes_in_slot,
+            );
         },
     );
 
