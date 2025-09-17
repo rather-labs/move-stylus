@@ -731,7 +731,7 @@ fn translate_instruction(
 
             // At the moment of calculating the local types for the function, we can't know if the
             // type the local is holding has some special property.
-            // If we find a UID, we need to know from where struct it is from. That information is
+            // If we find a UID, we need to know which struct it belongs to. That information is
             // inside the types stack (filled by the `bytecodes::struct::unpack` function).
             //
             // So, if the local type is a UID, and in the types stack we have a UID holding the
