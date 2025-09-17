@@ -321,7 +321,9 @@ impl Packable for IntermediateType {
                 calldata_reference_pointer,
                 compilation_ctx,
             ),
-            IntermediateType::IStruct { module_id, index, .. } => {
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
                     .unwrap();
@@ -414,7 +416,9 @@ impl Packable for IntermediateType {
                     compilation_ctx,
                 );
             }
-            IntermediateType::IStruct { module_id, index, .. } => {
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
                     .unwrap();
@@ -488,7 +492,9 @@ impl Packable for IntermediateType {
                 let struct_instance = struct_.instantiate(types);
                 struct_instance.solidity_abi_encode_size(compilation_ctx)
             }
-            IntermediateType::IStruct { module_id, index, .. } => {
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
                     .unwrap();
@@ -514,7 +520,9 @@ impl Packable for IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IEnum(_) => false,
             IntermediateType::IVector(_) => true,
-            IntermediateType::IStruct { module_id, index, .. } => {
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
                     .unwrap();

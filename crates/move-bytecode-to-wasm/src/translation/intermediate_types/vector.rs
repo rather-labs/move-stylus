@@ -344,7 +344,9 @@ impl IVector {
                             module_data,
                         );
                     }
-                    IntermediateType::IStruct { module_id, index, .. } => {
+                    IntermediateType::IStruct {
+                        module_id, index, ..
+                    } => {
                         loop_block.load(
                             compilation_ctx.memory_id,
                             LoadKind::I32 { atomic: false },

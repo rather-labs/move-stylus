@@ -357,7 +357,9 @@ impl IStruct {
                 | IntermediateType::IU256
                 | IntermediateType::IAddress => continue,
                 IntermediateType::IVector(_) => return true,
-                IntermediateType::IStruct { module_id, index, .. } => {
+                IntermediateType::IStruct {
+                    module_id, index, ..
+                } => {
                     let child_struct = compilation_ctx
                         .get_struct_by_index(module_id, *index)
                         .unwrap();
@@ -426,7 +428,9 @@ impl IStruct {
                         size += field.encoded_size(compilation_ctx);
                     }
                 }
-                IntermediateType::IStruct { module_id, index, .. } => {
+                IntermediateType::IStruct {
+                    module_id, index, ..
+                } => {
                     let child_struct = compilation_ctx
                         .get_struct_by_index(module_id, *index)
                         .unwrap();
