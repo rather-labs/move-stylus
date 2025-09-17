@@ -154,7 +154,7 @@ public fun create_bez(ctx: &mut TxContext) {
     id: object::new(ctx),
     a: 101,
     c: vector[Qux { a: 42, b: 55, c: 66 }, Qux { a: 43, b: 56, c: 67 }, Qux { a: 44, b: 57, c: 68 }],
-    d: vector[vector[1,2,3], vector[4], vector[5,6]],
+    d: vector[vector[1,2,3], vector[4], vector[], vector[5,6]],
     e: 17,
   };
 

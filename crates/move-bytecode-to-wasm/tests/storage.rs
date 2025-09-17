@@ -981,7 +981,7 @@ mod storage_transfer {
                     c: 68,
                 },
             ],
-            d: vec![vec![1, 2, 3], vec![4], vec![5, 6]],
+            d: vec![vec![1, 2, 3], vec![4], vec![], vec![5, 6]],
             e: 17,
         });
         assert_eq!(0, result);
