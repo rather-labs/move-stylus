@@ -166,8 +166,11 @@ pub fn pack(
                     IntermediateType::IStruct {
                         module_id, index, ..
                     } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+                        builder.local_set(ptr_to_data);
+
                         builder
                             .local_get(ptr_to_data)
+                            /*
                             .load(
                                 compilation_ctx.memory_id,
                                 LoadKind::I32 { atomic: false },
@@ -176,16 +179,18 @@ pub fn pack(
                                     offset: 0,
                                 },
                             )
+                            */
                             .i32_const(4)
                             .binop(BinaryOp::I32Sub)
                             .local_get(pointer)
                             .store(
                                 compilation_ctx.memory_id,
                                 StoreKind::I32 { atomic: false },
-                                MemArg { align: 0, offset },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
                             );
-
-                        builder.local_set(ptr_to_data);
                     }
                     // Heap types: The stack data is a pointer to the value, store directly
                     // that pointer in the struct

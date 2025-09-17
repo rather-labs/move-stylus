@@ -36,30 +36,39 @@ pub fn add_native_fresh_id_fn(
         .name(NativeFunction::NATIVE_FRESH_ID.to_owned())
         .func_body();
 
+    // use crate::declare_host_debug_functions;
+    // let (print_i32, _, _, _, _, _) = declare_host_debug_functions!(module);
+
+    // builder.i32_const(1).call(print_i32);
+
     // Counter key
     builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
         .local_set(counter_key_ptr);
 
+    // builder.i32_const(2).call(print_i32);
     // Counter value
     builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
         .local_set(counter_value_ptr);
 
+    // builder.i32_const(3).call(print_i32);
     // ID
     builder
         .i32_const(IAddress::HEAP_SIZE)
         .call(compilation_ctx.allocator)
         .local_set(id_ptr);
 
+    // builder.i32_const(4).call(print_i32);
     // Data to hash: block timestamp (8 bytes) + block number (8 bytes) + counter (4 bytes)
     builder
         .i32_const(20)
         .call(compilation_ctx.allocator)
         .local_set(data_to_hash_ptr);
 
+    // builder.i32_const(5).call(print_i32);
     // Store the keccak256 hash of the counter key into linear memory at #counter_key_ptr
     keccak_string_to_memory(
         &mut builder,
@@ -68,12 +77,14 @@ pub fn add_native_fresh_id_fn(
         counter_key_ptr,
     );
 
+    // builder.i32_const(6).call(print_i32);
     // Load the counter from storage
     builder
         .local_get(counter_key_ptr)
         .local_get(counter_value_ptr)
         .call(storage_load_fn);
 
+    // builder.i32_const(7).call(print_i32);
     // Increment the counter and store it in the local variable
     builder
         .local_get(counter_value_ptr)
@@ -108,6 +119,7 @@ pub fn add_native_fresh_id_fn(
             },
         );
 
+    // builder.i32_const(8).call(print_i32);
     builder.store(
         compilation_ctx.memory_id,
         StoreKind::I32 { atomic: false },
@@ -117,6 +129,7 @@ pub fn add_native_fresh_id_fn(
         },
     );
 
+    // builder.i32_const(9).call(print_i32);
     // - Store the block timestamp in the first 8 bytes at #data_to_hash
     // - Store the block number in the next 8 bytes
     // - Store the counter in the final 32 bytes
@@ -160,6 +173,7 @@ pub fn add_native_fresh_id_fn(
             },
         );
 
+    // builder.i32_const(10).call(print_i32);
     // Hash the data to generate the ID
     builder
         .local_get(data_to_hash_ptr)
@@ -167,6 +181,7 @@ pub fn add_native_fresh_id_fn(
         .local_get(id_ptr)
         .call(native_keccak);
 
+    // builder.i32_const(11).call(print_i32);
     // Update storage, flushing the cache
     builder
         .local_get(counter_key_ptr)
@@ -175,6 +190,7 @@ pub fn add_native_fresh_id_fn(
         .i32_const(1)
         .call(storage_flush_cache_fn);
 
+    // builder.i32_const(12).call(print_i32);
     // Emit log with the ID
     builder
         .local_get(id_ptr)
@@ -182,6 +198,7 @@ pub fn add_native_fresh_id_fn(
         .i32_const(0)
         .call(emit_log_fn);
 
+    // builder.i32_const(13).call(print_i32);
     // Return the ID ptr
     builder.local_get(id_ptr);
 

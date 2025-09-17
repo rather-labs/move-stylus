@@ -126,6 +126,10 @@ pub fn translate_function(
     let params = function_information.signature.get_argument_wasm_types();
     let results = function_information.signature.get_return_wasm_types();
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
+
+    #[cfg(debug_assertions)]
+    function.name(function_information.function_id.identifier.clone());
+
     let mut builder = function.func_body();
 
     let (arguments, locals) = process_fn_local_variables(function_information, module);

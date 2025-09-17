@@ -45,7 +45,6 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     let (storage_cache, _) = storage_cache_bytes32(module);
     let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
 
-    // let mut written_bytes_in_slot = written_bytes_in_slot;
     for (index, field) in struct_.fields.iter().enumerate() {
         let field_size = field_size(field, compilation_ctx);
         builder
