@@ -96,6 +96,19 @@ public struct Bez has key {
     e: u8
 }
 
+public struct Quz<T> has store {
+    a: T,
+    b: u128,
+    c: u128
+}
+
+public struct Biz<T: copy> has key {
+    id: UID,
+    a: T,
+    b: Quz<T>,
+    c: vector<Quz<T>>,
+}
+
 public fun create_bar(ctx: &mut TxContext) {
   let bar = Bar {
     id: object::new(ctx),
@@ -154,4 +167,23 @@ public fun get_bez(bez: &Bez): &Bez {
 
 public fun delete_bez(bez: Bez) {
   object::delete(bez);
+}
+
+public fun create_biz(ctx: &mut TxContext) {
+  let biz = Biz<u64> {
+    id: object::new(ctx),
+    a: 101,
+    b: Quz<u64> { a: 42, b: 55, c: 66 },
+    c: vector[Quz<u64> { a: 42, b: 55, c: 66 }, Quz<u64> { a: 43, b: 56, c: 67 }, Quz<u64> { a: 44, b: 57, c: 68 }],
+  };
+
+  transfer::share_object(biz);
+}
+
+public fun get_biz(biz: &Biz<u64>): &Biz<u64> {
+    biz
+}
+
+public fun delete_biz(biz: Biz<u64>) {
+  object::delete(biz);
 }

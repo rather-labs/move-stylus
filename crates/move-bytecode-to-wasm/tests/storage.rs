@@ -224,6 +224,20 @@ mod storage_transfer {
             uint8 e;
         }
 
+        struct Quz {
+            uint64 a;
+            uint128 b;
+            uint128 c;
+        }
+
+        struct Biz {
+            UID id;
+            uint64 a;
+            Quz b;
+            Quz[] c;
+        }
+
+
         #[allow(missing_docs)]
         function createShared() public view;
         function createOwned(address recipient) public view;
@@ -245,6 +259,9 @@ mod storage_transfer {
         function createBez() public view;
         function getBez(bytes32 id) public view returns (Bez);
         function deleteBez(bytes32 id) public view;
+        function createBiz() public view;
+        function getBiz(bytes32 id) public view returns (Biz);
+        function deleteBiz(bytes32 id) public view;
     );
 
     const SHARED: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
@@ -971,6 +988,75 @@ mod storage_transfer {
         assert_eq!(result_data, expected_result);
 
         let call_data = deleteBezCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        for (key, value) in storage_after_delete.iter() {
+            if *key != COUNTER_KEY {
+                // Assert that the key existed in storage before deletion
+                assert!(
+                    storage_before_delete.contains_key(key),
+                    "Key {:?} should exist in storage_before_delete",
+                    key
+                );
+
+                assert_eq!(
+                    *value, [0u8; 32],
+                    "Unexpected non-zero value at key: {:?}",
+                    key
+                );
+            }
+        }
+    }
+
+    #[rstest]
+    fn test_delete_biz(runtime: RuntimeSandbox) {
+        let call_data = createBizCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        let call_data = getBizCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Biz::abi_encode(&Biz {
+            id: UID {
+                id: ID { bytes: object_id },
+            },
+            a: 101,
+            b: Quz {
+                a: 42,
+                b: 55,
+                c: 66,
+            },
+            c: vec![
+                Quz {
+                    a: 42,
+                    b: 55,
+                    c: 66,
+                },
+                Quz {
+                    a: 43,
+                    b: 56,
+                    c: 67,
+                },
+                Quz {
+                    a: 44,
+                    b: 57,
+                    c: 68,
+                },
+            ],
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+
+        let call_data = deleteBizCall::new((object_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 

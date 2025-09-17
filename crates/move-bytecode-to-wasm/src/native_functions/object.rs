@@ -277,6 +277,25 @@ pub fn add_delete_storage_struct_instructions(
                     );
                 }
             }
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+            } => {
+                let child_struct = compilation_ctx
+                    .get_struct_by_index(module_id, *index)
+                    .unwrap();
+                let child_struct = child_struct.instantiate(types);
+
+                add_delete_storage_struct_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    slot_ptr,
+                    &child_struct,
+                    used_bytes_in_slot,
+                );
+            }
             IntermediateType::IVector(inner) => {
                 // If the field is a vector, add the corresponding instructions to delete it
                 add_delete_storage_vector_instructions(
@@ -460,6 +479,25 @@ pub fn add_delete_storage_vector_instructions(
                             used_bytes_in_slot,
                         );
                     }
+                }
+                IntermediateType::IGenericStructInstance {
+                    module_id,
+                    index,
+                    types,
+                } => {
+                    let child_struct = compilation_ctx
+                        .get_struct_by_index(module_id, *index)
+                        .unwrap();
+                    let child_struct = child_struct.instantiate(types);
+
+                    add_delete_storage_struct_instructions(
+                        module,
+                        loop_,
+                        compilation_ctx,
+                        elem_slot_ptr,
+                        &child_struct,
+                        used_bytes_in_slot,
+                    );
                 }
                 IntermediateType::IVector(inner_) => {
                     // Delete the vector recursively
