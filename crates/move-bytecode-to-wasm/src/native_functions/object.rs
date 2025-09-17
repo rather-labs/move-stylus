@@ -397,7 +397,7 @@ fn add_delete_slot_instructions(
         .i32_const(size)
         .binop(BinaryOp::I32Add)
         .i32_const(32)
-        .binop(BinaryOp::I32GtS)
+        .binop(BinaryOp::I32GtU)
         .if_else(
             None,
             // If used_bytes_in_slot + elem_size > 32, wipe the slot and advance the elem_slot_ptr
