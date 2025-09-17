@@ -170,16 +170,6 @@ pub fn pack(
 
                         builder
                             .local_get(ptr_to_data)
-                            /*
-                            .load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            )
-                            */
                             .i32_const(4)
                             .binop(BinaryOp::I32Sub)
                             .local_get(pointer)
@@ -304,6 +294,10 @@ pub fn unpack(
             IntermediateType::IEnum(_) => todo!(),
         }
 
+        // When unpacking an struct, at the moment of unpacking its UID (if some found) we also
+        // push to the types stack the wrapping strung information.
+        //
+        // The wrapping struct information is needed for some UID operations such as delete.
         match field {
             IntermediateType::IStruct {
                 module_id, index, ..

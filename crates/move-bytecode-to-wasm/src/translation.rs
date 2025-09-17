@@ -693,26 +693,24 @@ fn translate_instruction(
                 // If the function is not native, we add it to the table and declare it for translating
                 // and linking
                 // If the function IS native, we link it and call it directly
-                else {
-                    if function_information.is_native {
-                        let native_function_id =
-                            NativeFunction::get(&function_id.identifier, module, compilation_ctx);
-                        builder.call(native_function_id);
-                    } else {
-                        let table_id = function_table.get_table_id();
-                        let f_entry =
-                            function_table.add(module, function_id.clone(), function_information);
-                        functions_calls_to_link.push(function_id.clone());
+                else if function_information.is_native {
+                    let native_function_id =
+                        NativeFunction::get(&function_id.identifier, module, compilation_ctx);
+                    builder.call(native_function_id);
+                } else {
+                    let table_id = function_table.get_table_id();
+                    let f_entry =
+                        function_table.add(module, function_id.clone(), function_information);
+                    functions_calls_to_link.push(function_id.clone());
 
-                        call_indirect(
-                            f_entry,
-                            &module_data.functions.returns[function_handle_index.into_index()],
-                            table_id,
-                            builder,
-                            module,
-                            compilation_ctx,
-                        );
-                    }
+                    call_indirect(
+                        f_entry,
+                        &module_data.functions.returns[function_handle_index.into_index()],
+                        table_id,
+                        builder,
+                        module,
+                        compilation_ctx,
+                    );
                 };
             }
 
@@ -731,14 +729,22 @@ fn translate_instruction(
                 local_type.box_local_instructions(module, builder, compilation_ctx, local);
             }
 
-            // TODO: explain this
+            // At the moment of calculating the local types for the function, we can't know if the
+            // type the local is holding has some special property.
+            // If we find a UID, we need to know from where struct it is from. That information is
+            // inside the types stack (filled by the `bytecodes::struct::unpack` function).
+            //
+            // So, if the local type is a UID, and in the types stack we have a UID holding the
+            // parent struct information, we set the `uid_locals` variable with the parent
+            // information.
+            // That information will be used later when processing the `MoveLoc` bytecode.
             match local_type {
                 IntermediateType::IStruct {
                     module_id, index, ..
                 } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
                     if let Some(IntermediateType::IStruct {
-                        module_id,
-                        index,
+                        module_id: _,
+                        index: _,
                         vm_handled_struct:
                             VmHandledStruct::Uid {
                                 parent_module_id,
@@ -766,7 +772,12 @@ fn translate_instruction(
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             local_type.move_local_instructions(builder, compilation_ctx, local);
 
-            // TODO: explain this
+            // If we find that the local type we are moving is the UID struct, we need to push it
+            // in the stacks type with the parent struct information (needed for example, by the
+            // UID's delete method).
+            //
+            // This information can be found inside the `uid_locals` variable, filled by the
+            // `StLoc` bytecode
             match &local_type {
                 IntermediateType::IStruct {
                     module_id,
@@ -1964,15 +1975,12 @@ fn translate_instruction(
                 .structs
                 .get_by_struct_definition_idx(struct_definition_index)?;
 
-            // Allocate four bytes to be filled later in the pack function that will point to the struct
-            // wrapping this id.
+            // Allocate four bytes that will point to the struct wrapping this UID. It will be
+            // filled later in the `bytecodes::structs::pack` function.
             // This information will be used by other operations (such as delete) to locate the struct
-            println!("1");
             if Uid::is_vm_type(&module_data.id, struct_definition_index.0, compilation_ctx) {
-                println!("2");
                 builder.i32_const(4).call(compilation_ctx.allocator).drop();
             }
-            println!("3");
 
             bytecodes::structs::pack(struct_, module, builder, compilation_ctx, types_stack)?;
 

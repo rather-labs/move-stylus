@@ -3,8 +3,6 @@ use std::ops::Deref;
 use crate::translation::intermediate_types::IntermediateType;
 use move_binary_format::file_format::Bytecode;
 
-use super::intermediate_types::VmHandledStruct;
-
 #[derive(Debug, Clone)]
 pub struct TypesStack(pub Vec<IntermediateType>);
 

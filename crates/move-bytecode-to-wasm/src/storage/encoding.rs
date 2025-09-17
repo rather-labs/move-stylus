@@ -1083,8 +1083,8 @@ pub fn add_decode_intermediate_type_instructions(
         IntermediateType::IStruct {
             module_id, index, ..
         } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
-            // Reserve 4 bytes to fill it with the address of the struct that wraps this id. This
-            // will be filled outside this function where the struct pointer is available
+            // Reserve 4 bytes to fill with the mem address of the struct that wraps this id.
+            // This will be filled outside this function where the struct pointer is available
             builder.i32_const(4).call(compilation_ctx.allocator).drop();
 
             // Here we need to reconstruct the UID struct. To do that we first allocate 4 bytes
@@ -1092,7 +1092,6 @@ pub fn add_decode_intermediate_type_instructions(
             //
             // After that we need to create the ID struct. So we allocate 4 bytes for the first
             // field's pointer, and 32 bytes that will hold the actual data.
-
             let id_struct_ptr = module.locals.add(ValType::I32);
             let id_field_ptr = module.locals.add(ValType::I32);
 

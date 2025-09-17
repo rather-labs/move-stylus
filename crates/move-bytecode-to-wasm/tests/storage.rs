@@ -440,7 +440,7 @@ mod storage_transfer {
 
         // Delete object
         let call_data = deleteObjCall::new((object_id,)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
     }
 

@@ -203,7 +203,7 @@ public fun save_dynamic_struct_2(
     f: vector<u128>,
     g: vector<u256>,
     h: vector<address>,
-) { 
+) {
     let struct_ = DynamicStruct2 { id, a, b, c, d, e, f, g, h };
     save_in_slot(struct_, 0);
 }
@@ -277,3 +277,4 @@ public fun save_generic_struct_32(
 public fun read_generic_struct_32(): GenericStruct<u32> {
     read_slot<GenericStruct<u32>>(0)
 }
+
