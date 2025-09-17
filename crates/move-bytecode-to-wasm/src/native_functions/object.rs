@@ -1,19 +1,19 @@
 use super::NativeFunction;
 use crate::{
     CompilationContext,
+    data::DATA_SLOT_DATA_PTR_OFFSET,
     hostio::host_functions::{
         block_number, block_timestamp, emit_log, native_keccak256, storage_cache_bytes32,
         storage_flush_cache, storage_load_bytes32,
     },
-    translation::intermediate_types::{address::IAddress, IntermediateType, structs::IStruct},
+    runtime::RuntimeFunction,
+    storage::encoding::field_size,
+    translation::intermediate_types::{IntermediateType, address::IAddress, structs::IStruct},
     utils::keccak_string_to_memory,
     vm_handled_types::{VmHandledType, uid::Uid},
-    storage::encoding::field_size,
-    data::DATA_SLOT_DATA_PTR_OFFSET,
-    runtime::RuntimeFunction,
 };
 use walrus::{
-    FunctionBuilder, FunctionId, Module, ValType, InstrSeqBuilder, LocalId,
+    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 

@@ -6,11 +6,11 @@ use crate::data::{
 };
 use crate::get_generic_function_name;
 use crate::hostio::host_functions::{self, storage_load_bytes32, tx_origin};
+use crate::native_functions::object::add_delete_storage_struct_instructions;
 use crate::storage::encoding::{
     add_encode_and_save_into_storage_struct_instructions,
     add_read_and_decode_storage_struct_instructions,
 };
-use crate::native_functions::object::add_delete_storage_struct_instructions;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::heap_integers::IU256;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
@@ -736,7 +736,7 @@ pub fn add_delete_struct_from_storage_fn(
             // Emit an unreachable if the object is frozen
             then.unreachable();
         },
-        |mut else_| {
+        |else_| {
             // Wipe the slot data placeholder. We will use it to erase the slots in the storage
             else_
                 .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
@@ -761,7 +761,7 @@ pub fn add_delete_struct_from_storage_fn(
             // Delete the struct from storage
             add_delete_storage_struct_instructions(
                 module,
-                &mut else_,
+                else_,
                 compilation_ctx,
                 slot_ptr,
                 &struct_,
