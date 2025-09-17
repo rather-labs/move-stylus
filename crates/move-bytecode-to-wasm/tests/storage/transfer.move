@@ -69,3 +69,89 @@ public fun transfer_obj(foo: Foo, recipient: address) {
 public fun get_foo(foo: &Foo): &Foo {
     foo
 }
+
+public struct Bar has key {
+    id: UID,
+    a: u64,
+    c: vector<u64>
+}
+
+public struct Qux has store {
+    a: u64,
+    b: u128,
+    c: u128
+}
+
+public struct Baz has key {
+    id: UID,
+    a: u64,
+    c: Qux
+}
+
+public struct Bez has key {
+    id: UID,
+    a: u64,
+    c: vector<Qux>,
+    d: vector<vector<u128>>,
+    e: u8
+}
+
+public fun create_bar(ctx: &mut TxContext) {
+  let bar = Bar {
+    id: object::new(ctx),
+    a: 101,
+    c: vector[1, 2, 3, 4, 5, 6, 7, 8, 9],
+  };
+
+  transfer::share_object(bar);
+}
+
+public fun get_bar(bar: &Bar): &Bar {
+    bar
+}
+
+public fun delete_bar(bar: Bar) {
+  object::delete(bar);
+}
+
+public fun create_baz(recipient: address, share: bool, ctx: &mut TxContext) {
+  let baz = Baz {
+    id: object::new(ctx),
+    a: 101,
+    c: Qux { a: 42, b: 55, c: 66 },
+  };
+
+  if (share) {
+    transfer::share_object(baz);
+  } else {
+    transfer::transfer(baz, recipient);
+  }
+}
+
+public fun get_baz(baz: &Baz): &Baz {
+    baz
+}
+
+public fun delete_baz(baz: Baz) {
+  object::delete(baz);
+}
+
+public fun create_bez(ctx: &mut TxContext) {
+  let bez = Bez {
+    id: object::new(ctx),
+    a: 101,
+    c: vector[Qux { a: 42, b: 55, c: 66 }, Qux { a: 43, b: 56, c: 67 }, Qux { a: 44, b: 57, c: 68 }],
+    d: vector[vector[1,2,3], vector[4], vector[5,6]],
+    e: 17,
+  };
+
+  transfer::share_object(bez);
+}
+
+public fun get_bez(bez: &Bez): &Bez {
+    bez
+}
+
+public fun delete_bez(bez: Bez) {
+  object::delete(bez);
+}
