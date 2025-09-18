@@ -262,6 +262,8 @@ mod storage_transfer {
         function createBiz() public view;
         function getBiz(bytes32 id) public view returns (Biz);
         function deleteBiz(bytes32 id) public view;
+
+        function deleteObj2(bytes32 id1, bytes32 id2) public view;
     );
 
     const SHARED: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
@@ -1062,6 +1064,49 @@ mod storage_transfer {
         assert_eq!(result_data, expected_result);
 
         let call_data = deleteBizCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        for (key, value) in storage_after_delete.iter() {
+            if *key != COUNTER_KEY {
+                // Assert that the key existed in storage before deletion
+                assert!(
+                    storage_before_delete.contains_key(key),
+                    "Key {:?} should exist in storage_before_delete",
+                    key
+                );
+
+                assert_eq!(
+                    *value, [0u8; 32],
+                    "Unexpected non-zero value at key: {:?}",
+                    key
+                );
+            }
+        }
+    }
+
+    #[rstest]
+    fn test_delete_many(runtime: RuntimeSandbox) {
+        let call_data = createSharedCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_1_id = FixedBytes::<32>::from_slice(&object_1_id);
+
+        let call_data = createSharedCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_2_id = FixedBytes::<32>::from_slice(&object_2_id);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let call_data = deleteObj2Call::new((object_1_id, object_2_id)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
