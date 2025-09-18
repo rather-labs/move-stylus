@@ -5,36 +5,87 @@ use stylus::object as object;
 use stylus::object::UID;
 use stylus::transfer as transfer;
 
+// ============================================================================
+// STRUCT DEFINITIONS
+// ============================================================================
+
+/// Simple struct with a single value field
 public struct Foo has key {
     id: UID,
     value: u64
 }
 
-public fun create_shared(ctx: &mut TxContext) {
-  let foo = Foo {
-    id: object::new(ctx),
-    value: 101,
-  };
+/// Struct with a vector field
+public struct Bar has key {
+    id: UID,
+    a: u64,
+    c: vector<u64>
+}
 
-  transfer::share_object(foo);
+/// Simple value struct (no key)
+public struct Qux has store, drop {
+    a: u64,
+    b: u128,
+    c: u128
+}
+
+/// Struct with nested field struct
+public struct Baz has key {
+    id: UID,
+    a: u64,
+    c: Qux
+}
+
+/// Complex struct with nested vectors
+public struct Bez has key {
+    id: UID,
+    a: u64,
+    c: vector<Qux>,
+    d: vector<vector<u128>>,
+    e: u8
+}
+
+/// Generic value struct
+public struct Quz<T> has store, drop {
+    a: T,
+    b: u128,
+    c: u128
+}
+
+/// Generic struct with key and nested field struct
+public struct Biz<T: copy> has key {
+    id: UID,
+    a: T,
+    b: Quz<T>,
+    c: vector<Quz<T>>,
+}
+
+// ============================================================================
+// FOO FUNCTIONS
+// ============================================================================
+
+public fun create_shared(ctx: &mut TxContext) {
+    let foo = Foo {
+        id: object::new(ctx),
+        value: 101,
+    };
+    transfer::share_object(foo);
 }
 
 public fun create_owned(recipient: address, ctx: &mut TxContext) {
-  let foo = Foo {
-    id: object::new(ctx),
-    value: 101,
-  };
-
-  transfer::transfer(foo, recipient);
+    let foo = Foo {
+        id: object::new(ctx),
+        value: 101,
+    };
+    transfer::transfer(foo, recipient);
 }
 
 public fun create_frozen(ctx: &mut TxContext) {
-  let foo = Foo {
-    id: object::new(ctx),
-    value: 101,
-  };
-
-  transfer::freeze_object(foo);
+    let foo = Foo {
+        id: object::new(ctx),
+        value: 101,
+    };
+    transfer::freeze_object(foo);
 }
 
 public fun read_value(foo: &Foo): u64 {
@@ -49,7 +100,10 @@ public fun increment_value(foo: &mut Foo) {
     foo.value = foo.value + 1;
 }
 
-// Wrappers to manipulate storage directly: delete, transfer, freeze and share object.
+public fun get_foo(foo: &Foo): &Foo {
+    foo
+}
+
 public fun delete_obj(foo: Foo) {
     let Foo { id, value: _ } = foo;
     id.delete();
@@ -63,69 +117,28 @@ public fun delete_obj_2(foo: Foo, foo2: Foo) {
 }
 
 public fun freeze_obj(foo: Foo) {
-  transfer::freeze_object(foo);
+    transfer::freeze_object(foo);
 }
 
 public fun share_obj(foo: Foo) {
-  transfer::share_object(foo);
+    transfer::share_object(foo);
 }
 
 public fun transfer_obj(foo: Foo, recipient: address) {
-  transfer::transfer(foo, recipient);
+    transfer::transfer(foo, recipient);
 }
 
-public fun get_foo(foo: &Foo): &Foo {
-    foo
-}
-
-public struct Bar has key {
-    id: UID,
-    a: u64,
-    c: vector<u64>
-}
-
-public struct Qux has store, drop {
-    a: u64,
-    b: u128,
-    c: u128
-}
-
-public struct Baz has key {
-    id: UID,
-    a: u64,
-    c: Qux
-}
-
-public struct Bez has key {
-    id: UID,
-    a: u64,
-    c: vector<Qux>,
-    d: vector<vector<u128>>,
-    e: u8
-}
-
-public struct Quz<T> has store, drop {
-    a: T,
-    b: u128,
-    c: u128
-}
-
-
-public struct Biz<T: copy> has key {
-    id: UID,
-    a: T,
-    b: Quz<T>,
-    c: vector<Quz<T>>,
-}
+// ============================================================================
+// BAR FUNCTIONS
+// ============================================================================
 
 public fun create_bar(ctx: &mut TxContext) {
-  let bar = Bar {
-    id: object::new(ctx),
-    a: 101,
-    c: vector[1, 2, 3, 4, 5, 6, 7, 8, 9],
-  };
-
-  transfer::share_object(bar);
+    let bar = Bar {
+        id: object::new(ctx),
+        a: 101,
+        c: vector[1, 2, 3, 4, 5, 6, 7, 8, 9],
+    };
+    transfer::share_object(bar);
 }
 
 public fun get_bar(bar: &Bar): &Bar {
@@ -137,18 +150,22 @@ public fun delete_bar(bar: Bar) {
     id.delete();
 }
 
-public fun create_baz(recipient: address, share: bool, ctx: &mut TxContext) {
-  let baz = Baz {
-    id: object::new(ctx),
-    a: 101,
-    c: Qux { a: 42, b: 55, c: 66 },
-  };
+// ============================================================================
+// BAZ FUNCTIONS
+// ============================================================================
 
-  if (share) {
-    transfer::share_object(baz);
-  } else {
-    transfer::transfer(baz, recipient);
-  }
+public fun create_baz(recipient: address, share: bool, ctx: &mut TxContext) {
+    let baz = Baz {
+        id: object::new(ctx),
+        a: 101,
+        c: Qux { a: 42, b: 55, c: 66 },
+    };
+
+    if (share) {
+        transfer::share_object(baz);
+    } else {
+        transfer::transfer(baz, recipient);
+    }
 }
 
 public fun get_baz(baz: &Baz): &Baz {
@@ -160,25 +177,28 @@ public fun delete_baz(baz: Baz) {
     id.delete();
 }
 
-public fun create_bez(ctx: &mut TxContext) {
-  let bez = Bez {
-    id: object::new(ctx),
-    a: 101,
-    c: vector[
-        Qux { a: 42, b: 55, c: 66 },
-        Qux { a: 43, b: 56, c: 67 },
-        Qux { a: 44, b: 57, c: 68 }
-    ],
-    d: vector[
-        vector[1, 2, 3],
-        vector[4],
-        vector[],
-        vector[5, 6]
-    ],
-    e: 17,
-  };
+// ============================================================================
+// BEZ FUNCTIONS
+// ============================================================================
 
-  transfer::share_object(bez);
+public fun create_bez(ctx: &mut TxContext) {
+    let bez = Bez {
+        id: object::new(ctx),
+        a: 101,
+        c: vector[
+            Qux { a: 42, b: 55, c: 66 },
+            Qux { a: 43, b: 56, c: 67 },
+            Qux { a: 44, b: 57, c: 68 }
+        ],
+        d: vector[
+            vector[1, 2, 3],
+            vector[4],
+            vector[],
+            vector[5, 6]
+        ],
+        e: 17,
+    };
+    transfer::share_object(bez);
 }
 
 public fun get_bez(bez: &Bez): &Bez {
@@ -190,19 +210,22 @@ public fun delete_bez(bez: Bez) {
     id.delete();
 }
 
-public fun create_biz(ctx: &mut TxContext) {
-  let biz = Biz<u64> {
-    id: object::new(ctx),
-    a: 101,
-    b: Quz<u64> { a: 42, b: 55, c: 66 },
-    c: vector[
-        Quz<u64>{ a: 42, b: 55, c: 66 },
-        Quz<u64>{ a: 43, b: 56, c: 67 },
-        Quz<u64>{ a: 44, b: 57, c: 68 },
-    ],
-  };
+// ============================================================================
+// BIZ FUNCTIONS
+// ============================================================================
 
-  transfer::share_object(biz);
+public fun create_biz(ctx: &mut TxContext) {
+    let biz = Biz<u64> {
+        id: object::new(ctx),
+        a: 101,
+        b: Quz<u64> { a: 42, b: 55, c: 66 },
+        c: vector[
+            Quz<u64>{ a: 42, b: 55, c: 66 },
+            Quz<u64>{ a: 43, b: 56, c: 67 },
+            Quz<u64>{ a: 44, b: 57, c: 68 },
+        ],
+    };
+    transfer::share_object(biz);
 }
 
 public fun get_biz(biz: &Biz<u64>): &Biz<u64> {
