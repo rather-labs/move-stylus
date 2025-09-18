@@ -8,9 +8,10 @@ use crate::{
     CompilationContext,
     translation::{
         TranslationError,
-        intermediate_types::{IntermediateType, structs::IStruct},
+        intermediate_types::{IntermediateType, VmHandledStruct, structs::IStruct},
         types_stack::TypesStack,
     },
+    vm_handled_types::{VmHandledType, uid::Uid},
 };
 
 /// Borrows a field of a struct.
@@ -158,6 +159,28 @@ pub fn pack(
                             },
                         );
                     }
+
+                    // If we find an UID struct, in the 4 bytes before its pointer, we write the
+                    // address of the struct holding it
+                    IntermediateType::IStruct {
+                        module_id, index, ..
+                    } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+                        builder.local_set(ptr_to_data);
+
+                        builder
+                            .local_get(ptr_to_data)
+                            .i32_const(4)
+                            .binop(BinaryOp::I32Sub)
+                            .local_get(pointer)
+                            .store(
+                                compilation_ctx.memory_id,
+                                StoreKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+                    }
                     // Heap types: The stack data is a pointer to the value, store directly
                     // that pointer in the struct
                     IntermediateType::IU128
@@ -206,6 +229,7 @@ pub fn pack(
 /// This function is used with Unpack and UnpackGeneric bytecodes
 pub fn unpack(
     struct_: &IStruct,
+    itype: &IntermediateType,
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
@@ -269,7 +293,42 @@ pub fn unpack(
             IntermediateType::IEnum(_) => todo!(),
         }
 
-        types_stack.push(field.clone());
+        // When unpacking an struct, at the moment of unpacking its UID (if some found) we also
+        // push to the types stack the wrapping struct information.
+        //
+        // The wrapping struct information is needed for some UID operations such as delete.
+        match field {
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+                let (instance_types, parent_module_id, parent_index) = match itype {
+                    IntermediateType::IStruct {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                        ..
+                    } => (None, parent_module_id.clone(), *parent_index),
+                    IntermediateType::IGenericStructInstance {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                        types,
+                    } => (Some(types.clone()), parent_module_id.clone(), *parent_index),
+                    // TODO: Change to translation error
+                    _ => panic!("invalid intermediate type {itype:?} found in unpack function"),
+                };
+
+                types_stack.push(IntermediateType::IStruct {
+                    module_id: module_id.clone(),
+                    index: *index,
+                    vm_handled_struct: VmHandledStruct::Uid {
+                        parent_module_id,
+                        parent_index,
+                        instance_types,
+                    },
+                })
+            }
+            _ => types_stack.push(field.clone()),
+        }
+
         offset += 4;
     }
 

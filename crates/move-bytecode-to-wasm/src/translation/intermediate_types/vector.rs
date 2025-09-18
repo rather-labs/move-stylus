@@ -344,7 +344,9 @@ impl IVector {
                             module_data,
                         );
                     }
-                    IntermediateType::IStruct { module_id, index } => {
+                    IntermediateType::IStruct {
+                        module_id, index, ..
+                    } => {
                         loop_block.load(
                             compilation_ctx.memory_id,
                             LoadKind::I32 { atomic: false },
@@ -498,7 +500,7 @@ impl IVector {
                             })
                             .call(vec_equality_heap_type_f_id);
                     }
-                    IntermediateType::IStruct { module_id, index } => {
+                    IntermediateType::IStruct { module_id, index, .. } => {
                         let module_data = compilation_ctx
                             .get_module_data_by_id(module_id)
                             .unwrap();

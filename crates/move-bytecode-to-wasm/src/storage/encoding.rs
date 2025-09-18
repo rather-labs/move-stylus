@@ -45,7 +45,6 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     let (storage_cache, _) = storage_cache_bytes32(module);
     let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
 
-    // let mut written_bytes_in_slot = written_bytes_in_slot;
     for (index, field) in struct_.fields.iter().enumerate() {
         let field_size = field_size(field, compilation_ctx);
         builder
@@ -169,7 +168,6 @@ pub fn add_read_and_decode_storage_struct_instructions(
             .call(storage_load);
     }
 
-    // let mut read_bytes_in_slot = read_bytes_in_slot;
     for (index, field) in struct_.fields.iter().enumerate() {
         let field_size = field_size(field, compilation_ctx) as i32;
         builder
@@ -210,6 +208,24 @@ pub fn add_read_and_decode_storage_struct_instructions(
             field,
             read_bytes_in_slot,
         );
+
+        if matches!(field, IntermediateType::IStruct { module_id, index, ..} if Uid::is_vm_type(module_id, *index, compilation_ctx))
+        {
+            // Save the struct pointer in the reserved space of the UID
+            builder
+                .local_get(field_ptr)
+                .i32_const(4)
+                .binop(BinaryOp::I32Sub)
+                .local_get(struct_ptr)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+        }
 
         // Save the ptr value to the struct
         builder.local_get(struct_ptr).local_get(field_ptr).store(
@@ -832,7 +848,9 @@ pub fn add_encode_intermediate_type_instructions(
 
             builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         }
-        IntermediateType::IStruct { module_id, index } => {
+        IntermediateType::IStruct {
+            module_id, index, ..
+        } => {
             let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)
                 .unwrap();
@@ -1065,12 +1083,15 @@ pub fn add_decode_intermediate_type_instructions(
         IntermediateType::IStruct {
             module_id, index, ..
         } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+            // Reserve 4 bytes to fill with the mem address of the struct that wraps this id.
+            // This will be filled outside this function where the struct pointer is available
+            builder.i32_const(4).call(compilation_ctx.allocator).drop();
+
             // Here we need to reconstruct the UID struct. To do that we first allocate 4 bytes
             // that will contain the pointer to the UID struct data
             //
             // After that we need to create the ID struct. So we allocate 4 bytes for the first
             // field's pointer, and 32 bytes that will hold the actual data.
-
             let id_struct_ptr = module.locals.add(ValType::I32);
             let id_field_ptr = module.locals.add(ValType::I32);
 
@@ -1126,7 +1147,9 @@ pub fn add_decode_intermediate_type_instructions(
                 },
             );
         }
-        IntermediateType::IStruct { module_id, index } => {
+        IntermediateType::IStruct {
+            module_id, index, ..
+        } => {
             let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)
                 .unwrap();

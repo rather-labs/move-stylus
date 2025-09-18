@@ -25,21 +25,37 @@ impl TypesStack {
         self.0.extend_from_slice(items);
     }
 
-    pub fn pop_expecting(&mut self, expected_type: &IntermediateType) -> Result<()> {
+    pub fn pop_expecting(&mut self, expected_type: &IntermediateType) -> Result<IntermediateType> {
         let Ok(ty) = self.pop() else {
             return Err(TypesStackError::EmptyStackExpecting {
                 expected: expected_type.clone(),
             });
         };
 
-        if ty != *expected_type {
-            return Err(TypesStackError::TypeMismatch {
+        // If we find an struct, we don't need to check here if it is a vm handled type or not.
+        // That information is useful for the instruction that will use the struct found in the
+        // types stack.
+        match (&ty, expected_type) {
+            (
+                IntermediateType::IStruct {
+                    module_id: ty_module_id,
+                    index: ty_index,
+                    ..
+                },
+                IntermediateType::IStruct {
+                    module_id: ety_module_id,
+                    index: ety_index,
+                    ..
+                },
+            ) if ty_module_id == ety_module_id && ty_index == ety_index => Ok(ty),
+
+            _ if ty != *expected_type => Err(TypesStackError::TypeMismatch {
                 expected: expected_type.clone(),
                 found: ty,
-            });
-        }
+            }),
 
-        Ok(())
+            _ => Ok(ty),
+        }
     }
 
     pub fn pop_n_from_stack<const N: usize>(&mut self) -> Result<[IntermediateType; N]> {

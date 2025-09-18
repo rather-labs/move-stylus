@@ -397,4 +397,15 @@ impl RuntimeSandbox {
         let storage = self.storage.lock().unwrap();
         *storage.get(&slot).unwrap()
     }
+
+    pub fn get_storage(&self) -> HashMap<[u8; 32], [u8; 32]> {
+        self.storage.lock().unwrap().clone()
+    }
+
+    pub fn print_storage(&self) {
+        let storage = self.storage.lock().unwrap();
+        for (key, value) in storage.iter() {
+            println!("key: {:?} \n\t value: {:?}", key, value);
+        }
+    }
 }

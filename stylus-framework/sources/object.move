@@ -25,4 +25,4 @@ public fun new(ctx: &mut TxContext): UID {
 }
 
 /// Deletes the object from the storage.
-public native fun delete<T: key>(obj: T);
+public native fun delete(id: UID);
