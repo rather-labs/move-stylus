@@ -230,7 +230,7 @@ pub fn pack(
 /// This function is used with Unpack and UnpackGeneric bytecodes
 pub fn unpack(
     struct_: &IStruct,
-    struct_module_id: &ModuleId,
+    itype: &IntermediateType,
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
@@ -295,19 +295,39 @@ pub fn unpack(
         }
 
         // When unpacking an struct, at the moment of unpacking its UID (if some found) we also
-        // push to the types stack the wrapping strung information.
+        // push to the types stack the wrapping struct information.
         //
         // The wrapping struct information is needed for some UID operations such as delete.
         match field {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+                let (instance_types, parent_module_id, parent_index) = match itype {
+                    IntermediateType::IStruct {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                        ..
+                    } => (None, parent_module_id.clone(), parent_index.clone()),
+                    IntermediateType::IGenericStructInstance {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                        types,
+                    } => (
+                        Some(types.clone()),
+                        parent_module_id.clone(),
+                        parent_index.clone(),
+                    ),
+                    // TODO: Change to translation error
+                    _ => panic!("invalid intermediate type {itype:?} found in unpack function"),
+                };
+
                 types_stack.push(IntermediateType::IStruct {
                     module_id: module_id.clone(),
                     index: *index,
                     vm_handled_struct: VmHandledStruct::Uid {
-                        parent_module_id: struct_module_id.clone(),
-                        parent_index: struct_.index(),
+                        parent_module_id,
+                        parent_index,
+                        instance_types,
                     },
                 })
             }

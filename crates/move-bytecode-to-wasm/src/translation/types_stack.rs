@@ -25,7 +25,7 @@ impl TypesStack {
         self.0.extend_from_slice(items);
     }
 
-    pub fn pop_expecting(&mut self, expected_type: &IntermediateType) -> Result<()> {
+    pub fn pop_expecting(&mut self, expected_type: &IntermediateType) -> Result<IntermediateType> {
         let Ok(ty) = self.pop() else {
             return Err(TypesStackError::EmptyStackExpecting {
                 expected: expected_type.clone(),
@@ -47,14 +47,14 @@ impl TypesStack {
                     index: ety_index,
                     ..
                 },
-            ) if ty_module_id == ety_module_id && ty_index == ety_index => Ok(()),
+            ) if ty_module_id == ety_module_id && ty_index == ety_index => Ok(ty),
 
             _ if ty != *expected_type => Err(TypesStackError::TypeMismatch {
                 expected: expected_type.clone(),
                 found: ty,
             }),
 
-            _ => Ok(()),
+            _ => Ok(ty),
         }
     }
 

@@ -31,8 +31,13 @@ pub mod vector;
 #[derive(Clone, PartialEq, Debug, Eq, Hash)]
 pub enum VmHandledStruct {
     Uid {
+        /// Wrapping struct's module id
         parent_module_id: ModuleId,
+        /// Wrapping struct's index
         parent_index: u16,
+        /// If the wrapping struct is concrete this field will be None
+        /// Otherwise it will contain the list of the type instantiatons
+        instance_types: Option<Vec<IntermediateType>>,
     },
     None,
 }

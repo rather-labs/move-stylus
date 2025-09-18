@@ -91,6 +91,7 @@ impl BranchTargets {
 struct UidParentInformation {
     module_id: ModuleId,
     index: u16,
+    instance_types: Option<Vec<IntermediateType>>,
 }
 
 /// This is used to pass around the context of the translation process. Also clippy complains about too many arguments in translate_instruction.
@@ -639,21 +640,32 @@ fn translate_instruction(
                         index: _,
                         vm_handled_struct: VmHandledStruct::Uid {
                             parent_module_id,
-                            parent_index
+                            parent_index,
+                            instance_types,
                         }
                     },
                     "struct",
                     types_stack.pop()?
                 ));
 
-                let delete_fn = RuntimeFunction::DeleteFromStorage.get_generic(
-                    module,
-                    compilation_ctx,
-                    &[&IntermediateType::IStruct {
+                let parent_struct = if let Some(instance_types) = instance_types {
+                    IntermediateType::IGenericStructInstance {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                        types: instance_types,
+                    }
+                } else {
+                    IntermediateType::IStruct {
                         module_id: parent_module_id,
                         index: parent_index,
                         vm_handled_struct: VmHandledStruct::None,
-                    }],
+                    }
+                };
+
+                let delete_fn = RuntimeFunction::DeleteFromStorage.get_generic(
+                    module,
+                    compilation_ctx,
+                    &[&parent_struct],
                 );
 
                 // At this point, in the stack que have the pointer to the Uid struct, but what we
@@ -749,6 +761,7 @@ fn translate_instruction(
                             VmHandledStruct::Uid {
                                 parent_module_id,
                                 parent_index,
+                                instance_types,
                             },
                     }) = &types_stack.iter().last()
                     {
@@ -757,6 +770,7 @@ fn translate_instruction(
                             UidParentInformation {
                                 module_id: parent_module_id.clone(),
                                 index: *parent_index,
+                                instance_types: instance_types.clone(),
                             },
                         );
                     }
@@ -787,6 +801,7 @@ fn translate_instruction(
                     if let Some(UidParentInformation {
                         module_id: parent_module_id,
                         index: parent_index,
+                        instance_types,
                     }) = uid_locals.get(local_id)
                     {
                         types_stack.push(IntermediateType::IStruct {
@@ -795,6 +810,7 @@ fn translate_instruction(
                             vm_handled_struct: VmHandledStruct::Uid {
                                 parent_module_id: parent_module_id.clone(),
                                 parent_index: *parent_index,
+                                instance_types: instance_types.clone(),
                             },
                         });
                     } else {
@@ -2072,7 +2088,7 @@ fn translate_instruction(
             });
         }
         Bytecode::Unpack(struct_definition_index) => {
-            types_stack.pop_expecting(&IntermediateType::IStruct {
+            let itype = types_stack.pop_expecting(&IntermediateType::IStruct {
                 module_id: module_data.id.clone(),
                 index: struct_definition_index.0,
                 vm_handled_struct: VmHandledStruct::None,
@@ -2084,7 +2100,7 @@ fn translate_instruction(
 
             bytecodes::structs::unpack(
                 struct_,
-                &module_data.id,
+                &itype,
                 module,
                 builder,
                 compilation_ctx,
@@ -2137,7 +2153,7 @@ fn translate_instruction(
                 (struct_, types.to_vec())
             };
 
-            types_stack.pop_expecting(&IntermediateType::IGenericStructInstance {
+            let itype = types_stack.pop_expecting(&IntermediateType::IGenericStructInstance {
                 module_id: module_data.id.clone(),
                 index: idx,
                 types,
@@ -2145,7 +2161,7 @@ fn translate_instruction(
 
             bytecodes::structs::unpack(
                 &struct_,
-                &module_data.id,
+                &itype,
                 module,
                 builder,
                 compilation_ctx,

@@ -104,7 +104,6 @@ public struct Bez has key {
     e: u8
 }
 
-/*
 public struct Quz<T> has store, drop {
     a: T,
     b: u128,
@@ -118,7 +117,6 @@ public struct Biz<T: copy> has key {
     b: Quz<T>,
     c: vector<Quz<T>>,
 }
-*/
 
 public fun create_bar(ctx: &mut TxContext) {
   let bar = Bar {
@@ -192,8 +190,6 @@ public fun delete_bez(bez: Bez) {
     id.delete();
 }
 
-/*
-
 public fun create_biz(ctx: &mut TxContext) {
   let biz = Biz<u64> {
     id: object::new(ctx),
@@ -202,7 +198,7 @@ public fun create_biz(ctx: &mut TxContext) {
     c: vector[
         Quz<u64>{ a: 42, b: 55, c: 66 },
         Quz<u64>{ a: 43, b: 56, c: 67 },
-        Quz<u64>{ a: 44, b: 57, c: 68 }
+        Quz<u64>{ a: 44, b: 57, c: 68 },
     ],
   };
 
@@ -217,4 +213,3 @@ public fun delete_biz(biz: Biz<u64>) {
     let Biz { id, a: _, b: _, c: _ } = biz;
     id.delete();
 }
-*/

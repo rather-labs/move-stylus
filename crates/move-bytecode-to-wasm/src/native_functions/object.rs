@@ -212,6 +212,8 @@ pub fn add_delete_storage_struct_instructions(
 ) {
     let (storage_cache, _) = storage_cache_bytes32(module);
 
+    println!("====> {struct_:#?}");
+
     // Iterate over the fields of the struct and delete them
     for field in struct_.fields.iter() {
         let field_size = field_size(field, compilation_ctx) as i32;
