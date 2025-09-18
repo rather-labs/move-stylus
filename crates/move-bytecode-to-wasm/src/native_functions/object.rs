@@ -427,9 +427,9 @@ fn add_delete_slot_instructions(
         );
 
     match itype {
-        IntermediateType::IStruct { module_id, index }
-            if !Uid::is_vm_type(module_id, *index, compilation_ctx) =>
-        {
+        IntermediateType::IStruct {
+            module_id, index, ..
+        } if !Uid::is_vm_type(module_id, *index, compilation_ctx) => {
             let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)
                 .unwrap();

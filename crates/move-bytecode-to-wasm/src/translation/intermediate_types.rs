@@ -29,6 +29,20 @@ pub mod structs;
 pub mod vector;
 
 #[derive(Clone, PartialEq, Debug, Eq, Hash)]
+pub enum VmHandledStruct {
+    Uid {
+        /// Wrapping struct's module id
+        parent_module_id: ModuleId,
+        /// Wrapping struct's index
+        parent_index: u16,
+        /// If the wrapping struct is concrete this field will be None
+        /// Otherwise it will contain the list of the type instantiatons
+        instance_types: Option<Vec<IntermediateType>>,
+    },
+    None,
+}
+
+#[derive(Clone, PartialEq, Debug, Eq, Hash)]
 pub enum IntermediateType {
     IBool,
     IU8,
@@ -53,6 +67,7 @@ pub enum IntermediateType {
     IStruct {
         module_id: ModuleId,
         index: u16,
+        vm_handled_struct: VmHandledStruct,
     },
 
     /// The usize is the index of the generic struct.
@@ -127,6 +142,7 @@ impl IntermediateType {
                         UserDefinedType::Struct { module_id, index } => IntermediateType::IStruct {
                             module_id: module_id.clone(),
                             index: *index,
+                            vm_handled_struct: VmHandledStruct::None,
                         },
                         UserDefinedType::Enum(i) => IntermediateType::IEnum(*i as u16),
                     })
@@ -373,7 +389,9 @@ impl IntermediateType {
                     module_data,
                 );
             }
-            IntermediateType::IStruct { module_id, index } => {
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
                     .unwrap();
@@ -603,7 +621,9 @@ impl IntermediateType {
                     module_data,
                 );
             }
-            IntermediateType::IStruct { module_id, index } => {
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
                     .unwrap();
@@ -900,7 +920,9 @@ impl IntermediateType {
                 builder.i32_const(1);
             }
             Self::IVector(inner) => IVector::equality(builder, module, compilation_ctx, inner),
-            Self::IStruct { index, module_id } => {
+            Self::IStruct {
+                index, module_id, ..
+            } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
                     .unwrap();

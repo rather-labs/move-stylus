@@ -51,10 +51,18 @@ public fun increment_value(foo: &mut Foo) {
 
 // Wrappers to manipulate storage directly: delete, transfer, freeze and share object.
 public fun delete_obj(foo: Foo) {
-    object::delete(foo);
+    let Foo { id, value: _ } = foo;
+    id.delete();
 }
 
-public fun freeze_obj(foo: Foo) { 
+public fun delete_obj_2(foo: Foo, foo2: Foo) {
+    let Foo { id: id1, value: _ } = foo;
+    let Foo { id: id2, value: _ } = foo2;
+    id1.delete();
+    id2.delete();
+}
+
+public fun freeze_obj(foo: Foo) {
   transfer::freeze_object(foo);
 }
 
@@ -62,7 +70,7 @@ public fun share_obj(foo: Foo) {
   transfer::share_object(foo);
 }
 
-public fun transfer_obj(foo: Foo, recipient: address) { 
+public fun transfer_obj(foo: Foo, recipient: address) {
   transfer::transfer(foo, recipient);
 }
 
@@ -76,7 +84,7 @@ public struct Bar has key {
     c: vector<u64>
 }
 
-public struct Qux has store {
+public struct Qux has store, drop {
     a: u64,
     b: u128,
     c: u128
@@ -96,11 +104,12 @@ public struct Bez has key {
     e: u8
 }
 
-public struct Quz<T> has store {
+public struct Quz<T> has store, drop {
     a: T,
     b: u128,
     c: u128
 }
+
 
 public struct Biz<T: copy> has key {
     id: UID,
@@ -124,7 +133,8 @@ public fun get_bar(bar: &Bar): &Bar {
 }
 
 public fun delete_bar(bar: Bar) {
-  object::delete(bar);
+    let Bar { id, a: _, c: _ } = bar;
+    id.delete();
 }
 
 public fun create_baz(recipient: address, share: bool, ctx: &mut TxContext) {
@@ -146,15 +156,25 @@ public fun get_baz(baz: &Baz): &Baz {
 }
 
 public fun delete_baz(baz: Baz) {
-  object::delete(baz);
+    let Baz { id, a: _, c: _ } = baz;
+    id.delete();
 }
 
 public fun create_bez(ctx: &mut TxContext) {
   let bez = Bez {
     id: object::new(ctx),
     a: 101,
-    c: vector[Qux { a: 42, b: 55, c: 66 }, Qux { a: 43, b: 56, c: 67 }, Qux { a: 44, b: 57, c: 68 }],
-    d: vector[vector[1,2,3], vector[4], vector[], vector[5,6]],
+    c: vector[
+        Qux { a: 42, b: 55, c: 66 },
+        Qux { a: 43, b: 56, c: 67 },
+        Qux { a: 44, b: 57, c: 68 }
+    ],
+    d: vector[
+        vector[1, 2, 3],
+        vector[4],
+        vector[],
+        vector[5, 6]
+    ],
     e: 17,
   };
 
@@ -166,7 +186,8 @@ public fun get_bez(bez: &Bez): &Bez {
 }
 
 public fun delete_bez(bez: Bez) {
-  object::delete(bez);
+    let Bez { id, a: _, c: _, d: _, e: _ } = bez;
+    id.delete();
 }
 
 public fun create_biz(ctx: &mut TxContext) {
@@ -174,7 +195,11 @@ public fun create_biz(ctx: &mut TxContext) {
     id: object::new(ctx),
     a: 101,
     b: Quz<u64> { a: 42, b: 55, c: 66 },
-    c: vector[Quz<u64> { a: 42, b: 55, c: 66 }, Quz<u64> { a: 43, b: 56, c: 67 }, Quz<u64> { a: 44, b: 57, c: 68 }],
+    c: vector[
+        Quz<u64>{ a: 42, b: 55, c: 66 },
+        Quz<u64>{ a: 43, b: 56, c: 67 },
+        Quz<u64>{ a: 44, b: 57, c: 68 },
+    ],
   };
 
   transfer::share_object(biz);
@@ -185,5 +210,6 @@ public fun get_biz(biz: &Biz<u64>): &Biz<u64> {
 }
 
 public fun delete_biz(biz: Biz<u64>) {
-  object::delete(biz);
+    let Biz { id, a: _, b: _, c: _ } = biz;
+    id.delete();
 }

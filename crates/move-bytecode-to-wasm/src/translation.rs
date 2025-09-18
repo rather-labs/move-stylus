@@ -13,7 +13,7 @@ pub mod table;
 
 use crate::{
     CompilationContext,
-    compilation_context::ModuleData,
+    compilation_context::{ModuleData, ModuleId},
     data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET},
     error_encoding::build_error_message,
     generics::{
@@ -23,6 +23,7 @@ use crate::{
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
+    vm_handled_types::{VmHandledType, uid::Uid},
     wasm_builder_extensions::WasmBuilderExtension,
 };
 use anyhow::Result;
@@ -32,7 +33,7 @@ use functions::{
     prepare_function_return,
 };
 use intermediate_types::{
-    IntermediateType,
+    IntermediateType, VmHandledStruct,
     heap_integers::{IU128, IU256},
     simple_integers::{IU8, IU16, IU32, IU64},
     vector::IVector,
@@ -86,6 +87,13 @@ impl BranchTargets {
     }
 }
 
+#[derive(Debug)]
+struct UidParentInformation {
+    module_id: ModuleId,
+    index: u16,
+    instance_types: Option<Vec<IntermediateType>>,
+}
+
 /// This is used to pass around the context of the translation process. Also clippy complains about too many arguments in translate_instruction.
 struct TranslateFlowContext<'a> {
     compilation_ctx: &'a CompilationContext<'a>,
@@ -94,6 +102,7 @@ struct TranslateFlowContext<'a> {
     function_information: &'a MappedFunction,
     function_table: &'a mut FunctionTable,
     function_locals: &'a Vec<LocalId>,
+    uid_locals: &'a mut HashMap<u8, UidParentInformation>,
     branch_targets: &'a mut BranchTargets,
 }
 
@@ -118,6 +127,10 @@ pub fn translate_function(
     let params = function_information.signature.get_argument_wasm_types();
     let results = function_information.signature.get_return_wasm_types();
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
+
+    #[cfg(debug_assertions)]
+    function.name(function_information.function_id.identifier.clone());
+
     let mut builder = function.func_body();
 
     let (arguments, locals) = process_fn_local_variables(function_information, module);
@@ -140,6 +153,7 @@ pub fn translate_function(
     let mut branch_targets = BranchTargets::new();
     let mut types_stack = TypesStack::new();
     let mut functions_to_link = HashSet::new();
+    let mut uid_locals: HashMap<u8, UidParentInformation> = HashMap::new();
 
     let mut ctx = TranslateFlowContext {
         compilation_ctx,
@@ -147,6 +161,7 @@ pub fn translate_function(
         function_table,
         function_information,
         function_locals: &function_locals,
+        uid_locals: &mut uid_locals,
         types_stack: &mut types_stack,
         branch_targets: &mut branch_targets,
     };
@@ -208,6 +223,7 @@ fn translate_flow(
                         ctx.function_table,
                         ctx.types_stack,
                         ctx.function_locals,
+                        ctx.uid_locals,
                         branches,
                         ctx.branch_targets,
                     )
@@ -346,6 +362,7 @@ fn translate_instruction(
     function_table: &mut FunctionTable,
     types_stack: &mut TypesStack,
     function_locals: &[LocalId],
+    uid_locals: &mut HashMap<u8, UidParentInformation>,
     branches: &HashMap<u16, BranchMode>,
     branch_targets: &BranchTargets,
 ) -> Result<Vec<FunctionId>, TranslationError> {
@@ -591,44 +608,104 @@ fn translate_instruction(
             let function_id = &module_data.functions.calls[function_handle_index.into_index()];
             let arguments = &module_data.functions.arguments[function_handle_index.into_index()];
 
-            prepare_function_arguments(module, builder, arguments, compilation_ctx, types_stack)?;
+            let function_information = if let Some(fi) = module_data
+                .functions
+                .information
+                .get(function_handle_index.into_index())
+            {
+                fi
+            } else {
+                let dependency_data = compilation_ctx
+                    .deps_data
+                    .get(&function_id.module_id)
+                    .unwrap();
 
-            // If the function is in the table we call it directly
-            if let Some(f) = function_table.get_by_function_id(function_id) {
-                call_indirect(
-                    f,
-                    &module_data.functions.returns[function_handle_index.into_index()],
-                    function_table.get_table_id(),
-                    builder,
-                    module,
-                    compilation_ctx,
-                );
-            }
-            // Otherwise
-            // If the function is not native, we add it to the table and declare it for translating
-            // and linking
-            // If the function IS native, we link it and call it directly
-            else {
-                let function_information = if let Some(fi) = module_data
+                dependency_data
                     .functions
                     .information
-                    .get(function_handle_index.into_index())
-                {
-                    fi
-                } else {
-                    let dependency_data = compilation_ctx
-                        .deps_data
-                        .get(&function_id.module_id)
-                        .unwrap();
+                    .iter()
+                    .find(|f| &f.function_id == function_id)
+                    .unwrap()
+            };
 
-                    dependency_data
-                        .functions
-                        .information
-                        .iter()
-                        .find(|f| &f.function_id == function_id)
-                        .unwrap()
+            // There are some functions that need to be specially handled, if we find one of those
+            // functions, we introduce custom code, otherwise proceed with a normal function call
+            if Uid::is_delete_function(
+                &function_information.function_id.module_id,
+                &function_information.function_id.identifier,
+            ) {
+                types_stack::match_types!((
+                    IntermediateType::IStruct {
+                        module_id: _,
+                        index: _,
+                        vm_handled_struct: VmHandledStruct::Uid {
+                            parent_module_id,
+                            parent_index,
+                            instance_types,
+                        }
+                    },
+                    "struct",
+                    types_stack.pop()?
+                ));
+
+                let parent_struct = if let Some(instance_types) = instance_types {
+                    IntermediateType::IGenericStructInstance {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                        types: instance_types,
+                    }
+                } else {
+                    IntermediateType::IStruct {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                        vm_handled_struct: VmHandledStruct::None,
+                    }
                 };
-                if function_information.is_native {
+
+                let delete_fn = RuntimeFunction::DeleteFromStorage.get_generic(
+                    module,
+                    compilation_ctx,
+                    &[&parent_struct],
+                );
+
+                // At this point, in the stack que have the pointer to the Uid struct, but what we
+                // really need is the pointer to the struct that holds that UId. The struct ptr can
+                // be found 4 bytes before the Uid ptr
+                builder.i32_const(4).binop(BinaryOp::I32Sub).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                builder.call(delete_fn);
+            } else {
+                prepare_function_arguments(
+                    module,
+                    builder,
+                    arguments,
+                    compilation_ctx,
+                    types_stack,
+                )?;
+
+                // If the function is in the table we call it directly
+                if let Some(f) = function_table.get_by_function_id(function_id) {
+                    call_indirect(
+                        f,
+                        &module_data.functions.returns[function_handle_index.into_index()],
+                        function_table.get_table_id(),
+                        builder,
+                        module,
+                        compilation_ctx,
+                    );
+                }
+                // Otherwise
+                // If the function is not native, we add it to the table and declare it for translating
+                // and linking
+                // If the function IS native, we link it and call it directly
+                else if function_information.is_native {
                     let native_function_id =
                         NativeFunction::get(&function_id.identifier, module, compilation_ctx);
                     builder.call(native_function_id);
@@ -646,8 +723,8 @@ fn translate_instruction(
                         module,
                         compilation_ctx,
                     );
-                }
-            };
+                };
+            }
 
             // Insert in the stack types the types returned by the function (if any)
             let return_types = &module_data.functions.returns[function_handle_index.0 as usize];
@@ -664,6 +741,43 @@ fn translate_instruction(
                 local_type.box_local_instructions(module, builder, compilation_ctx, local);
             }
 
+            // At the moment of calculating the local types for the function, we can't know if the
+            // type the local is holding has some special property.
+            // If we find a UID, we need to know which struct it belongs to. That information is
+            // inside the types stack (filled by the `bytecodes::struct::unpack` function).
+            //
+            // So, if the local type is a UID, and in the types stack we have a UID holding the
+            // parent struct information, we set the `uid_locals` variable with the parent
+            // information.
+            // That information will be used later when processing the `MoveLoc` bytecode.
+            match local_type {
+                IntermediateType::IStruct {
+                    module_id, index, ..
+                } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+                    if let Some(IntermediateType::IStruct {
+                        module_id: _,
+                        index: _,
+                        vm_handled_struct:
+                            VmHandledStruct::Uid {
+                                parent_module_id,
+                                parent_index,
+                                instance_types,
+                            },
+                    }) = &types_stack.iter().last()
+                    {
+                        uid_locals.insert(
+                            *local_id,
+                            UidParentInformation {
+                                module_id: parent_module_id.clone(),
+                                index: *parent_index,
+                                instance_types: instance_types.clone(),
+                            },
+                        );
+                    }
+                }
+                _ => (),
+            }
+
             types_stack.pop_expecting(local_type)?;
         }
         Bytecode::MoveLoc(local_id) => {
@@ -671,7 +785,40 @@ fn translate_instruction(
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             local_type.move_local_instructions(builder, compilation_ctx, local);
-            types_stack.push(local_type);
+
+            // If we find that the local type we are moving is the UID struct, we need to push it
+            // in the stacks type with the parent struct information (needed for example, by the
+            // UID's delete method).
+            //
+            // This information can be found inside the `uid_locals` variable, filled by the
+            // `StLoc` bytecode
+            match &local_type {
+                IntermediateType::IStruct {
+                    module_id,
+                    index,
+                    vm_handled_struct: VmHandledStruct::None,
+                } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+                    if let Some(UidParentInformation {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                        instance_types,
+                    }) = uid_locals.get(local_id)
+                    {
+                        types_stack.push(IntermediateType::IStruct {
+                            module_id: module_id.clone(),
+                            index: *index,
+                            vm_handled_struct: VmHandledStruct::Uid {
+                                parent_module_id: parent_module_id.clone(),
+                                parent_index: *parent_index,
+                                instance_types: instance_types.clone(),
+                            },
+                        });
+                    } else {
+                        types_stack.push(local_type)
+                    }
+                }
+                _ => types_stack.push(local_type),
+            };
         }
         Bytecode::CopyLoc(local_id) => {
             let local = function_locals[*local_id as usize];
@@ -712,7 +859,7 @@ fn translate_instruction(
                     t
                 ),
                 (
-                    IntermediateType::IStruct { ref module_id, index },
+                    IntermediateType::IStruct { ref module_id, index, .. },
                     "struct",
                     *ref_inner
                 )
@@ -796,6 +943,7 @@ fn translate_instruction(
                 IntermediateType::IStruct {
                     module_id: module_data.id.clone(),
                     index: struct_.index(),
+                    vm_handled_struct: VmHandledStruct::None,
                 },
             )))?;
 
@@ -1843,11 +1991,19 @@ fn translate_instruction(
                 .structs
                 .get_by_struct_definition_idx(struct_definition_index)?;
 
+            // Allocate four bytes that will point to the struct wrapping this UID. It will be
+            // filled later in the `bytecodes::structs::pack` function.
+            // This information will be used by other operations (such as delete) to locate the struct
+            if Uid::is_vm_type(&module_data.id, struct_definition_index.0, compilation_ctx) {
+                builder.i32_const(4).call(compilation_ctx.allocator).drop();
+            }
+
             bytecodes::structs::pack(struct_, module, builder, compilation_ctx, types_stack)?;
 
             types_stack.push(IntermediateType::IStruct {
                 module_id: module_data.id.clone(),
                 index: struct_definition_index.0,
+                vm_handled_struct: VmHandledStruct::None,
             });
         }
         Bytecode::PackGeneric(struct_definition_index) => {
@@ -1932,16 +2088,24 @@ fn translate_instruction(
             });
         }
         Bytecode::Unpack(struct_definition_index) => {
-            types_stack.pop_expecting(&IntermediateType::IStruct {
+            let itype = types_stack.pop_expecting(&IntermediateType::IStruct {
                 module_id: module_data.id.clone(),
                 index: struct_definition_index.0,
+                vm_handled_struct: VmHandledStruct::None,
             })?;
 
             let struct_ = module_data
                 .structs
                 .get_by_struct_definition_idx(struct_definition_index)?;
 
-            bytecodes::structs::unpack(struct_, module, builder, compilation_ctx, types_stack)?;
+            bytecodes::structs::unpack(
+                struct_,
+                &itype,
+                module,
+                builder,
+                compilation_ctx,
+                types_stack,
+            )?;
         }
         Bytecode::UnpackGeneric(struct_definition_index) => {
             let idx = module_data
@@ -1989,13 +2153,20 @@ fn translate_instruction(
                 (struct_, types.to_vec())
             };
 
-            types_stack.pop_expecting(&IntermediateType::IGenericStructInstance {
+            let itype = types_stack.pop_expecting(&IntermediateType::IGenericStructInstance {
                 module_id: module_data.id.clone(),
                 index: idx,
                 types,
             })?;
 
-            bytecodes::structs::unpack(&struct_, module, builder, compilation_ctx, types_stack)?;
+            bytecodes::structs::unpack(
+                &struct_,
+                &itype,
+                module,
+                builder,
+                compilation_ctx,
+                types_stack,
+            )?;
         }
         Bytecode::BrTrue(code_offset) => {
             if let Some(branch_mode) = branches.get(code_offset) {
