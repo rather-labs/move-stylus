@@ -9,34 +9,34 @@ use stylus::transfer as transfer;
 // STRUCT DEFINITIONS
 // ============================================================================
 
-/// Simple struct with a single value field
+// Simple struct with a single value field
 public struct Foo has key {
     id: UID,
     value: u64
 }
 
-/// Struct with a vector field
+// Struct with a vector field
 public struct Bar has key {
     id: UID,
     a: u64,
     c: vector<u64>
 }
 
-/// Simple value struct (no key)
+// Simple value struct (no key)
 public struct Qux has store, drop {
     a: u64,
     b: u128,
     c: u128
 }
 
-/// Struct with nested field struct
+// Struct with nested field struct
 public struct Baz has key {
     id: UID,
     a: u64,
     c: Qux
 }
 
-/// Complex struct with nested vectors
+// Complex struct with nested vectors
 public struct Bez has key {
     id: UID,
     a: u64,
@@ -45,14 +45,14 @@ public struct Bez has key {
     e: u8
 }
 
-/// Generic value struct
+// Generic value struct
 public struct Quz<T> has store, drop {
     a: T,
     b: u128,
     c: u128
 }
 
-/// Generic struct with key and nested field struct
+// Generic struct with key and nested field struct
 public struct Biz<T: copy> has key {
     id: UID,
     a: T,
