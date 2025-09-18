@@ -2,6 +2,7 @@ use super::NativeFunction;
 use crate::{
     CompilationContext,
     data::DATA_SLOT_DATA_PTR_OFFSET,
+    get_generic_function_name,
     hostio::host_functions::{
         block_number, block_timestamp, emit_log, native_keccak256, storage_cache_bytes32,
         storage_flush_cache, storage_load_bytes32,
@@ -16,6 +17,51 @@ use walrus::{
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
+
+pub fn add_compute_named_id_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) -> FunctionId {
+    let name = get_generic_function_name(NativeFunction::NATIVE_COMPUTE_NAMED_ID, &[itype]);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    };
+
+    if let IntermediateType::IStruct {
+        module_id, index, ..
+    } = itype
+    {
+        let mut function = FunctionBuilder::new(&mut module.types, &[], &[ValType::I32]);
+
+        let id_ptr = module.locals.add(ValType::I32);
+
+        let mut builder = function.name(name).func_body();
+
+        // ID
+        builder
+            .i32_const(IAddress::HEAP_SIZE)
+            .call(compilation_ctx.allocator)
+            .local_set(id_ptr);
+
+        let struct_ = compilation_ctx
+            .get_struct_by_index(&module_id, *index)
+            .unwrap();
+
+        // Store the keccak256 hash of the counter key into linear memory at #counter_key_ptr
+        keccak_string_to_memory(&mut builder, compilation_ctx, &struct_.identifier, id_ptr);
+
+        // Return the ID ptr
+        builder.local_get(id_ptr);
+
+        function.finish(vec![], &mut module.funcs)
+    } else {
+        panic!(
+            r#"there was an error linking "{}" function, expected IStruct, found {itype:?}"#,
+            NativeFunction::NATIVE_COMPUTE_NAMED_ID
+        );
+    }
+}
 
 pub fn add_native_fresh_id_fn(
     module: &mut Module,
