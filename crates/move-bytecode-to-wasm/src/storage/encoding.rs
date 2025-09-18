@@ -858,6 +858,8 @@ pub fn add_encode_intermediate_type_instructions(
             // The struct ptr
             builder.local_set(val_32);
 
+            // Get the IStruct data and check if it has the key ability (has_key = true)
+
             add_encode_and_save_into_storage_struct_instructions(
                 module,
                 builder,

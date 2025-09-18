@@ -84,7 +84,7 @@ pub struct IStruct {
     /// many elements the vector has), just the pointers to them.
     pub heap_size: u32,
 
-    pub saved_in_storage: bool,
+    pub has_key: bool,
 
     pub is_one_time_witness: bool,
 }
@@ -95,7 +95,7 @@ impl IStruct {
         identifier: String,
         fields: Vec<(Option<FieldHandleIndex>, IntermediateType)>,
         fields_types: HashMap<FieldHandleIndex, IntermediateType>,
-        saved_in_storage: bool,
+        has_key: bool,
         is_one_time_witness: bool,
     ) -> Self {
         let mut heap_size = 0;
@@ -116,7 +116,7 @@ impl IStruct {
             field_offsets,
             fields_types,
             fields: ir_fields,
-            saved_in_storage,
+            has_key,
             is_one_time_witness,
         }
     }

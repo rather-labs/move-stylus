@@ -68,7 +68,7 @@ impl SolName for IntermediateType {
                     .get_struct_by_index(module_id, *index)
                     .unwrap();
 
-                if struct_.saved_in_storage {
+                if struct_.has_key {
                     Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
                 } else {
                     Self::struct_fields_sol_name(struct_, compilation_ctx)
@@ -84,7 +84,7 @@ impl SolName for IntermediateType {
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
 
-                if struct_instance.saved_in_storage {
+                if struct_instance.has_key {
                     Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
                 } else {
                     Self::struct_fields_sol_name(&struct_instance, compilation_ctx)

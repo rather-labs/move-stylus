@@ -181,7 +181,7 @@ impl Unpackable for IntermediateType {
                     .get_struct_by_index(module_id, *index)
                     .unwrap();
 
-                if struct_.saved_in_storage {
+                if struct_.has_key {
                     add_unpack_from_storage_instructions(
                         function_builder,
                         module,
@@ -213,7 +213,7 @@ impl Unpackable for IntermediateType {
                     .get_struct_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
-                if struct_instance.saved_in_storage {
+                if struct_instance.has_key {
                     add_unpack_from_storage_instructions(
                         function_builder,
                         module,

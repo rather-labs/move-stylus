@@ -1383,7 +1383,7 @@ fn translate_instruction(
                     };
 
                     if let Ok(struct_) = struct_ {
-                        if struct_.saved_in_storage {
+                        if struct_.has_key {
                             let get_struct_owner_fn =
                                 RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
 
