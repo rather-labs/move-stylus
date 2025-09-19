@@ -77,6 +77,7 @@ pub enum IntermediateType {
         module_id: ModuleId,
         index: u16,
         types: Vec<IntermediateType>,
+        vm_handled_struct: VmHandledStruct,
     },
 
     /// Intermediate enum representation
@@ -166,6 +167,7 @@ impl IntermediateType {
                                 module_id: module_id.clone(),
                                 index: *index,
                                 types,
+                                vm_handled_struct: VmHandledStruct::None,
                             }
                         }
                         UserDefinedType::Enum(_) => todo!(),
@@ -409,6 +411,7 @@ impl IntermediateType {
                 module_id,
                 index,
                 types,
+                ..
             } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
@@ -639,6 +642,7 @@ impl IntermediateType {
                 module_id,
                 index,
                 types,
+                ..
             } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
@@ -932,6 +936,7 @@ impl IntermediateType {
                 index,
                 module_id,
                 types,
+                ..
             } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)

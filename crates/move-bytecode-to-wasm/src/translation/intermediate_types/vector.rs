@@ -372,6 +372,7 @@ impl IVector {
                         module_id,
                         index,
                         types,
+                        ..
                     } => {
                         loop_block.load(
                             compilation_ctx.memory_id,
@@ -529,7 +530,7 @@ impl IVector {
 
                         struct_.equality(then, module, compilation_ctx, module_data);
                     }
-                    IntermediateType::IGenericStructInstance { module_id, index, types } => {
+                    IntermediateType::IGenericStructInstance { module_id, index, types, .. } => {
                         let module_data = compilation_ctx
                             .get_module_data_by_id(module_id)
                             .unwrap();

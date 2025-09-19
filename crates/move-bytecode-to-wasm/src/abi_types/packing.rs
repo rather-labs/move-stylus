@@ -338,10 +338,11 @@ impl Packable for IntermediateType {
                     None,
                 )
             }
-            IntermediateType::IGenericStructInstance {
+IntermediateType::IGenericStructInstance {
                 module_id,
                 index,
                 types,
+                ..
             } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
@@ -433,10 +434,11 @@ impl Packable for IntermediateType {
                     Some(calldata_reference_pointer),
                 );
             }
-            IntermediateType::IGenericStructInstance {
+IntermediateType::IGenericStructInstance {
                 module_id,
                 index,
                 types,
+                ..
             } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
@@ -481,10 +483,11 @@ impl Packable for IntermediateType {
             IntermediateType::IVector(_) => 32,
             IntermediateType::IRef(inner) => inner.encoded_size(compilation_ctx),
             IntermediateType::IMutRef(inner) => inner.encoded_size(compilation_ctx),
-            IntermediateType::IGenericStructInstance {
+IntermediateType::IGenericStructInstance {
                 module_id,
                 index,
                 types,
+                ..
             } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
@@ -528,10 +531,11 @@ impl Packable for IntermediateType {
                     .unwrap();
                 struct_.solidity_abi_encode_is_dynamic(compilation_ctx)
             }
-            IntermediateType::IGenericStructInstance {
+IntermediateType::IGenericStructInstance {
                 module_id,
                 index,
                 types,
+                ..
             } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)

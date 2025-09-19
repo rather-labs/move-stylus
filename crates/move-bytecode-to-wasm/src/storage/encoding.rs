@@ -210,10 +210,10 @@ pub fn add_read_and_decode_storage_struct_instructions(
         );
 
         if matches!(
-            field, 
-            IntermediateType::IStruct { module_id, index, ..} 
-                | IntermediateType::IGenericStructInstance { module_id, index, ..} 
-                    if Uid::is_vm_type(module_id, *index, compilation_ctx) 
+            field,
+            IntermediateType::IStruct { module_id, index, ..}
+                | IntermediateType::IGenericStructInstance { module_id, index, ..}
+                    if Uid::is_vm_type(module_id, *index, compilation_ctx)
                         || NamedId::is_vm_type(module_id, *index, compilation_ctx))
         {
             // Save the struct pointer in the reserved space of the UID
@@ -882,6 +882,7 @@ pub fn add_encode_intermediate_type_instructions(
             module_id,
             index,
             types,
+            ..
         } => {
             let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)
@@ -1186,6 +1187,7 @@ pub fn add_decode_intermediate_type_instructions(
             module_id,
             index,
             types,
+            ..
         } => {
             let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)

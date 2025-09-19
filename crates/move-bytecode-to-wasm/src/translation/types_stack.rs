@@ -49,6 +49,26 @@ impl TypesStack {
                 },
             ) if ty_module_id == ety_module_id && ty_index == ety_index => Ok(ty),
 
+            (
+                IntermediateType::IGenericStructInstance {
+                    module_id: ty_module_id,
+                    index: ty_index,
+                    types: ty_types,
+                    ..
+                },
+                IntermediateType::IGenericStructInstance {
+                    module_id: ety_module_id,
+                    index: ety_index,
+                    types: ety_types,
+                    ..
+                },
+            ) if ty_module_id == ety_module_id
+                && ty_index == ety_index
+                && ty_types == ety_types =>
+            {
+                Ok(ty)
+            }
+
             _ if ty != *expected_type => Err(TypesStackError::TypeMismatch {
                 expected: expected_type.clone(),
                 found: ty,

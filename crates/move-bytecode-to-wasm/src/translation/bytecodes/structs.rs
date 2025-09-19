@@ -321,11 +321,13 @@ pub fn unpack(
                         module_id: parent_module_id,
                         index: parent_index,
                         types,
+                        ..
                     } => (Some(types.clone()), parent_module_id.clone(), *parent_index),
                     // TODO: Change to translation error
                     _ => panic!("invalid intermediate type {itype:?} found in unpack function"),
                 };
 
+                // TODO The nammedId is a IGenericStructInstance
                 types_stack.push(IntermediateType::IStruct {
                     module_id: module_id.clone(),
                     index: *index,

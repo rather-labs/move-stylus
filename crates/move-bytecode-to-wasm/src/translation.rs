@@ -653,6 +653,7 @@ fn translate_instruction(
                         module_id: parent_module_id,
                         index: parent_index,
                         types: instance_types,
+                        vm_handled_struct: VmHandledStruct::None,
                     }
                 } else {
                     IntermediateType::IStruct {
@@ -917,7 +918,7 @@ fn translate_instruction(
                     t
                 ),
                 (
-                    IntermediateType::IGenericStructInstance { ref module_id, index, ref types },
+                    IntermediateType::IGenericStructInstance { ref module_id, index, ref types, .. },
                     "generic struct",
                     *ref_inner
                 )
@@ -990,6 +991,7 @@ fn translate_instruction(
                     module_id: module_data.id.clone(),
                     index: struct_.index(),
                     types: instantiation_types.to_vec(),
+                    vm_handled_struct: VmHandledStruct::None,
                 },
             )))?;
 
@@ -2087,6 +2089,7 @@ fn translate_instruction(
                 module_id: module_data.id.clone(),
                 index: idx,
                 types,
+                vm_handled_struct: VmHandledStruct::None,
             });
         }
         Bytecode::Unpack(struct_definition_index) => {
@@ -2159,6 +2162,7 @@ fn translate_instruction(
                 module_id: module_data.id.clone(),
                 index: idx,
                 types,
+                vm_handled_struct: VmHandledStruct::None,
             })?;
 
             bytecodes::structs::unpack(

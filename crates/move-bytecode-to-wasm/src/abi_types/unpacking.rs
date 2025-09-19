@@ -217,6 +217,7 @@ impl Unpackable for IntermediateType {
                 module_id,
                 index,
                 types,
+                ..
             } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
@@ -307,6 +308,7 @@ fn load_struct_storage_id(
             module_id,
             index,
             types,
+            ..
         }) if NamedId::is_vm_type(&module_id, *index, compilation_ctx) => {
             // We use the native function that computes the ID to leave it in the stack so it can
             // be used by `add_unpack_from_storage_instructions`

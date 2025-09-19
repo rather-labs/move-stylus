@@ -512,6 +512,7 @@ fn add_delete_slot_instructions(
             module_id,
             index,
             types,
+            ..
         } => {
             let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)
