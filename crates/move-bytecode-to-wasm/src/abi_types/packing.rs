@@ -338,7 +338,7 @@ impl Packable for IntermediateType {
                     None,
                 )
             }
-IntermediateType::IGenericStructInstance {
+            IntermediateType::IGenericStructInstance {
                 module_id,
                 index,
                 types,
@@ -434,7 +434,7 @@ IntermediateType::IGenericStructInstance {
                     Some(calldata_reference_pointer),
                 );
             }
-IntermediateType::IGenericStructInstance {
+            IntermediateType::IGenericStructInstance {
                 module_id,
                 index,
                 types,
@@ -483,7 +483,7 @@ IntermediateType::IGenericStructInstance {
             IntermediateType::IVector(_) => 32,
             IntermediateType::IRef(inner) => inner.encoded_size(compilation_ctx),
             IntermediateType::IMutRef(inner) => inner.encoded_size(compilation_ctx),
-IntermediateType::IGenericStructInstance {
+            IntermediateType::IGenericStructInstance {
                 module_id,
                 index,
                 types,
@@ -531,7 +531,7 @@ IntermediateType::IGenericStructInstance {
                     .unwrap();
                 struct_.solidity_abi_encode_is_dynamic(compilation_ctx)
             }
-IntermediateType::IGenericStructInstance {
+            IntermediateType::IGenericStructInstance {
                 module_id,
                 index,
                 types,

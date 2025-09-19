@@ -822,7 +822,7 @@ pub fn add_encode_intermediate_type_instructions(
         {
             // The UID and NamedId structs has the following form
             //
-            // UID { id: ID { bytes: <bytes> } }
+            // [UID | NamedId] { id: ID { bytes: <bytes> } }
             //
             // At this point we have in stack a pointer to field we are processing. The
             // field's value is a pointer to the ID struct.

@@ -87,7 +87,7 @@ impl CompilationContext<'_> {
             IntermediateType::IGenericStructInstance {
                 module_id,
                 index,
-                types, 
+                types,
                 ..
             } => {
                 let struct_ = self.get_struct_by_index(module_id, *index)?;

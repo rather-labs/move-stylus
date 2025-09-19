@@ -74,7 +74,7 @@ impl SolName for IntermediateType {
                     Self::struct_fields_sol_name(struct_, compilation_ctx)
                 }
             }
-IntermediateType::IGenericStructInstance {
+            IntermediateType::IGenericStructInstance {
                 module_id,
                 index,
                 types,

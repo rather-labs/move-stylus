@@ -744,8 +744,9 @@ fn translate_instruction(
 
             // At the moment of calculating the local types for the function, we can't know if the
             // type the local is holding has some special property.
-            // If we find a UID, we need to know which struct it belongs to. That information is
-            // inside the types stack (filled by the `bytecodes::struct::unpack` function).
+            // If we find a UID or NamedId, we need to know which struct it belongs to. That
+            // information is inside the types stack (filled by the `bytecodes::struct::unpack`
+            // function).
             //
             // So, if the local type is a UID, and in the types stack we have a UID holding the
             // parent struct information, we set the `uid_locals` variable with the parent
@@ -776,6 +777,32 @@ fn translate_instruction(
                         );
                     }
                 }
+
+                IntermediateType::IGenericStructInstance {
+                    module_id, index, ..
+                } if NamedId::is_vm_type(module_id, *index, compilation_ctx) => {
+                    if let Some(IntermediateType::IGenericStructInstance {
+                        module_id: _,
+                        index: _,
+                        types: _,
+                        vm_handled_struct:
+                            VmHandledStruct::Uid {
+                                parent_module_id,
+                                parent_index,
+                                instance_types,
+                            },
+                    }) = &types_stack.iter().last()
+                    {
+                        uid_locals.insert(
+                            *local_id,
+                            UidParentInformation {
+                                module_id: parent_module_id.clone(),
+                                index: *parent_index,
+                                instance_types: instance_types.clone(),
+                            },
+                        );
+                    }
+                }
                 _ => (),
             }
 
@@ -787,9 +814,9 @@ fn translate_instruction(
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             local_type.move_local_instructions(builder, compilation_ctx, local);
 
-            // If we find that the local type we are moving is the UID struct, we need to push it
-            // in the stacks type with the parent struct information (needed for example, by the
-            // UID's delete method).
+            // If we find that the local type we are moving is the UID or NamedId struct, we need
+            // to push it in the stacks type with the parent struct information (needed for example,
+            // by the UID's delete method).
             //
             // This information can be found inside the `uid_locals` variable, filled by the
             // `StLoc` bytecode
@@ -808,6 +835,32 @@ fn translate_instruction(
                         types_stack.push(IntermediateType::IStruct {
                             module_id: module_id.clone(),
                             index: *index,
+                            vm_handled_struct: VmHandledStruct::Uid {
+                                parent_module_id: parent_module_id.clone(),
+                                parent_index: *parent_index,
+                                instance_types: instance_types.clone(),
+                            },
+                        });
+                    } else {
+                        types_stack.push(local_type)
+                    }
+                }
+                IntermediateType::IGenericStructInstance {
+                    module_id,
+                    index,
+                    types,
+                    vm_handled_struct: VmHandledStruct::None,
+                } if NamedId::is_vm_type(module_id, *index, compilation_ctx) => {
+                    if let Some(UidParentInformation {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                        instance_types,
+                    }) = uid_locals.get(local_id)
+                    {
+                        types_stack.push(IntermediateType::IGenericStructInstance {
+                            module_id: module_id.clone(),
+                            index: *index,
+                            types: types.clone(),
                             vm_handled_struct: VmHandledStruct::Uid {
                                 parent_module_id: parent_module_id.clone(),
                                 parent_index: *parent_index,
