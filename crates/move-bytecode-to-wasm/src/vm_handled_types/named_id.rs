@@ -24,7 +24,6 @@ impl VmHandledType for NamedId {
             .unwrap()
             .identifier;
 
-        println!("===> 2 {module_id:?} {index} {identifier}");
         if identifier == Self::IDENTIFIER {
             if module_id.address != STYLUS_FRAMEWORK_ADDRESS || module_id.module_name != "object" {
                 panic!("invalid NamedId found, only the one from the stylus framework is valid");

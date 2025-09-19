@@ -51,13 +51,6 @@ pub fn add_compute_named_id_fn(
         // Store the keccak256 hash of the counter key into linear memory at #counter_key_ptr
         keccak_string_to_memory(&mut builder, compilation_ctx, &struct_.identifier, id_ptr);
 
-        /*
-        let (print_i32, _, print_m, _, _, print_address) =
-            crate::declare_host_debug_functions!(module);
-
-        builder.local_get(id_ptr).call(print_address);
-        */
-
         // Return the ID ptr
         builder.local_get(id_ptr);
 

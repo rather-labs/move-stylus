@@ -93,15 +93,6 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             },
         );
 
-        /*
-        let (print_i32, _, print_m, _, print_s, print_address) =
-            crate::declare_host_debug_functions!(module);
-
-        builder.call(print_s);
-        builder.call(print_s);
-        builder.local_get(struct_ptr).call(print_m);
-        */
-
         // Encode the field and write it to DATA_SLOT_DATA_PTR_OFFSET
         add_encode_intermediate_type_instructions(
             module,
@@ -829,7 +820,6 @@ pub fn add_encode_intermediate_type_instructions(
         } if Uid::is_vm_type(module_id, *index, compilation_ctx)
             || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
         {
-            println!("ACA?");
             // The UID and NamedId structs has the following form
             //
             // [UID | NamedId] { id: ID { bytes: <bytes> } }
@@ -864,16 +854,6 @@ pub fn add_encode_intermediate_type_instructions(
                     },
                 )
                 .local_set(val_32);
-
-            /*
-            let (_, _, print_m, _, print_s, _) = crate::declare_host_debug_functions!(module);
-
-            builder.call(print_s);
-            builder.local_get(tmp2).call(print_m);
-            builder.local_get(tmp).call(print_m);
-            builder.local_get(val_32).call(print_m);
-            builder.call(print_s);
-            */
 
             // Load the memory address
             builder

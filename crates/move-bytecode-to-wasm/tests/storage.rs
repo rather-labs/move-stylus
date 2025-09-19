@@ -135,16 +135,10 @@ mod counter_named_id {
 
     #[rstest]
     fn test_storage_counter_named_id(runtime: RuntimeSandbox) {
-        println!("1");
-        runtime.print_storage();
-
         // Create a new counter
         let call_data = createCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-
-        println!("2");
-        runtime.print_storage();
 
         // Read initial value (should be 25)
         let call_data = readCall::new(()).abi_encode();
@@ -153,7 +147,6 @@ mod counter_named_id {
         assert_eq!(25, return_data);
         assert_eq!(0, result);
 
-        runtime.print_storage();
         // Increment
         let call_data = incrementCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();

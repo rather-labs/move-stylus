@@ -23,7 +23,6 @@ impl VmHandledType for Uid {
             .get_struct_by_index(module_id, index)
             .unwrap()
             .identifier;
-        println!("===> {module_id:?} {index} {identifier}");
 
         if identifier == Self::IDENTIFIER {
             if module_id.address != STYLUS_FRAMEWORK_ADDRESS || module_id.module_name != "object" {
