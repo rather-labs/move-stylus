@@ -1,5 +1,5 @@
 use alloy::hex;
-use alloy::primitives::{FixedBytes, U256};
+use alloy::primitives::U256;
 use alloy::providers::Provider;
 use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
@@ -107,12 +107,8 @@ async fn main() -> eyre::Result<()> {
     pending_tx.get_receipt().await?;
 
     println!("\nSending set value to 100 tx with the account that is not the owner");
-    let pending_tx = example_2.setValue(100).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("set value logs 0: 0x{}", hex::encode(raw));
-    }
+    let pending_tx = example_2.setValue(100).send().await.err();
+    println!("\nNot owner's tx error: {pending_tx:?}");
 
     // Value did not change as the sender is not the owner
     println!("\nReading value after set value");
