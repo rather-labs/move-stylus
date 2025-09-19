@@ -11,7 +11,7 @@ use crate::{
     storage::encoding::field_size,
     translation::intermediate_types::{IntermediateType, address::IAddress, structs::IStruct},
     utils::keccak_string_to_memory,
-    vm_handled_types::{VmHandledType, uid::Uid},
+    vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
 };
 use walrus::{
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
@@ -475,7 +475,9 @@ fn add_delete_slot_instructions(
     match itype {
         IntermediateType::IStruct {
             module_id, index, ..
-        } if !Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+        } if !Uid::is_vm_type(module_id, *index, compilation_ctx)
+            && !NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
+        {
             let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)
                 .unwrap();

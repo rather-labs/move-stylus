@@ -5,13 +5,9 @@ use walrus::{
 };
 
 use crate::{
-    CompilationContext,
     translation::{
-        TranslationError,
-        intermediate_types::{IntermediateType, VmHandledStruct, structs::IStruct},
-        types_stack::TypesStack,
-    },
-    vm_handled_types::{VmHandledType, uid::Uid},
+        intermediate_types::{structs::IStruct, IntermediateType, VmHandledStruct}, types_stack::TypesStack, TranslationError
+    }, vm_handled_types::{named_id::NamedId, uid::Uid, VmHandledType}, CompilationContext
 };
 
 /// Borrows a field of a struct.
@@ -164,7 +160,9 @@ pub fn pack(
                     // address of the struct holding it
                     IntermediateType::IStruct {
                         module_id, index, ..
-                    } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+                    } if Uid::is_vm_type(module_id, *index, compilation_ctx)
+                        || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
+                    {
                         builder.local_set(ptr_to_data);
 
                         builder
@@ -300,7 +298,9 @@ pub fn unpack(
         match field {
             IntermediateType::IStruct {
                 module_id, index, ..
-            } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+            } if Uid::is_vm_type(module_id, *index, compilation_ctx)
+                || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
+            {
                 let (instance_types, parent_module_id, parent_index) = match itype {
                     IntermediateType::IStruct {
                         module_id: parent_module_id,

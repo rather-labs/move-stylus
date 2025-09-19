@@ -13,13 +13,13 @@ use crate::{
     data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_STORAGE_OBJECT_OWNER_OFFSET},
     hostio::host_functions::{native_keccak256, storage_cache_bytes32, storage_load_bytes32},
     runtime::RuntimeFunction,
-    translation::intermediate_types::vector::IVector,
     translation::intermediate_types::{
         IntermediateType,
         heap_integers::{IU128, IU256},
         structs::IStruct,
+        vector::IVector,
     },
-    vm_handled_types::{VmHandledType, uid::Uid},
+    vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
@@ -209,7 +209,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
             read_bytes_in_slot,
         );
 
-        if matches!(field, IntermediateType::IStruct { module_id, index, ..} if Uid::is_vm_type(module_id, *index, compilation_ctx))
+        if matches!(field, IntermediateType::IStruct { module_id, index, ..} if Uid::is_vm_type(module_id, *index, compilation_ctx) || NamedId::is_vm_type(module_id, *index, compilation_ctx))
         {
             // Save the struct pointer in the reserved space of the UID
             builder
@@ -809,8 +809,10 @@ pub fn add_encode_intermediate_type_instructions(
         }
         IntermediateType::IStruct {
             module_id, index, ..
-        } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
-            // The UID struct has the following form
+        } if Uid::is_vm_type(module_id, *index, compilation_ctx)
+            || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
+        {
+            // The UID and NamedId structs has the following form
             //
             // UID { id: ID { bytes: <bytes> } }
             //
@@ -1082,7 +1084,9 @@ pub fn add_decode_intermediate_type_instructions(
         }
         IntermediateType::IStruct {
             module_id, index, ..
-        } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+        } if Uid::is_vm_type(module_id, *index, compilation_ctx)
+            || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
+        {
             // Reserve 4 bytes to fill with the mem address of the struct that wraps this id.
             // This will be filled outside this function where the struct pointer is available
             builder.i32_const(4).call(compilation_ctx.allocator).drop();
@@ -1219,7 +1223,11 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
 
         IntermediateType::IStruct {
             module_id, index, ..
-        } if Uid::is_vm_type(module_id, *index, compilation_ctx) => 32,
+        } if Uid::is_vm_type(module_id, *index, compilation_ctx)
+            || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
+        {
+            32
+        }
 
         // Structs are 0 because we don't know how much they will occupy, this depends on the
         // fields of the child struct, whether they are dynamic or static. The store function
