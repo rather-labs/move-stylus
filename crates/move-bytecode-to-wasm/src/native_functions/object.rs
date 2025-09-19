@@ -475,12 +475,7 @@ fn add_delete_slot_instructions(
     match itype {
         IntermediateType::IStruct {
             module_id, index, ..
-        }
-        | IntermediateType::IGenericStructInstance {
-            module_id, index, ..
-        } if !Uid::is_vm_type(module_id, *index, compilation_ctx)
-            && !NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
-        {
+        } if !Uid::is_vm_type(module_id, *index, compilation_ctx) => {
             let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)
                 .unwrap();
@@ -514,24 +509,26 @@ fn add_delete_slot_instructions(
             types,
             ..
         } => {
-            let child_struct = compilation_ctx
-                .get_struct_by_index(module_id, *index)
-                .unwrap();
-            let child_struct = child_struct.instantiate(types);
+            if !NamedId::is_vm_type(module_id, *index, compilation_ctx) {
+                let child_struct = compilation_ctx
+                    .get_struct_by_index(module_id, *index)
+                    .unwrap();
+                let child_struct = child_struct.instantiate(types);
 
-            let has_key = false;
-            if has_key {
-                // TODO: Implement this
-            } else {
-                // If the struct does not have key, then we can delete it directly
-                add_delete_storage_struct_instructions(
-                    module,
-                    builder,
-                    compilation_ctx,
-                    slot_ptr,
-                    &child_struct,
-                    used_bytes_in_slot,
-                );
+                let has_key = false;
+                if has_key {
+                    // TODO: Implement this
+                } else {
+                    // If the struct does not have key, then we can delete it directly
+                    add_delete_storage_struct_instructions(
+                        module,
+                        builder,
+                        compilation_ctx,
+                        slot_ptr,
+                        &child_struct,
+                        used_bytes_in_slot,
+                    );
+                }
             }
         }
         IntermediateType::IVector(inner_) => {

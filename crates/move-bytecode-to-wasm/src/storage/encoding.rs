@@ -1241,14 +1241,11 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
 
         IntermediateType::IStruct {
             module_id, index, ..
-        }
-        | IntermediateType::IGenericStructInstance {
+        } if Uid::is_vm_type(module_id, *index, compilation_ctx) => 32,
+
+        IntermediateType::IGenericStructInstance {
             module_id, index, ..
-        } if Uid::is_vm_type(module_id, *index, compilation_ctx)
-            || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
-        {
-            32
-        }
+        } if NamedId::is_vm_type(module_id, *index, compilation_ctx) => 32,
 
         // Structs are 0 because we don't know how much they will occupy, this depends on the
         // fields of the child struct, whether they are dynamic or static. The store function
@@ -1258,7 +1255,7 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
             panic!("found reference inside struct")
         }
         IntermediateType::ITypeParameter(_) => {
-            panic!("cannot know if a type parameter is dynamic, expected a concrete type");
+            panic!("cannot know the field size of a type parameter");
         }
     }
 }
