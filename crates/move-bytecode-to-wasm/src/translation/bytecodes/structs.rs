@@ -5,9 +5,13 @@ use walrus::{
 };
 
 use crate::{
+    CompilationContext,
     translation::{
-        intermediate_types::{structs::IStruct, IntermediateType, VmHandledStruct}, types_stack::TypesStack, TranslationError
-    }, vm_handled_types::{named_id::NamedId, uid::Uid, VmHandledType}, CompilationContext
+        TranslationError,
+        intermediate_types::{IntermediateType, VmHandledStruct, structs::IStruct},
+        types_stack::TypesStack,
+    },
+    vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
 };
 
 /// Borrows a field of a struct.
@@ -160,6 +164,9 @@ pub fn pack(
                     // address of the struct holding it
                     IntermediateType::IStruct {
                         module_id, index, ..
+                    }
+                    | IntermediateType::IGenericStructInstance {
+                        module_id, index, ..
                     } if Uid::is_vm_type(module_id, *index, compilation_ctx)
                         || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
                     {
@@ -297,6 +304,9 @@ pub fn unpack(
         // The wrapping struct information is needed for some UID operations such as delete.
         match field {
             IntermediateType::IStruct {
+                module_id, index, ..
+            }
+            | IntermediateType::IGenericStructInstance {
                 module_id, index, ..
             } if Uid::is_vm_type(module_id, *index, compilation_ctx)
                 || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>

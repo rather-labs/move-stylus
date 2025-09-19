@@ -23,7 +23,7 @@ use crate::{
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
-    vm_handled_types::{VmHandledType, uid::Uid},
+    vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
     wasm_builder_extensions::WasmBuilderExtension,
 };
 use anyhow::Result;
@@ -1994,7 +1994,9 @@ fn translate_instruction(
             // Allocate four bytes that will point to the struct wrapping this UID. It will be
             // filled later in the `bytecodes::structs::pack` function.
             // This information will be used by other operations (such as delete) to locate the struct
-            if Uid::is_vm_type(&module_data.id, struct_definition_index.0, compilation_ctx) {
+            if Uid::is_vm_type(&module_data.id, struct_definition_index.0, compilation_ctx)
+                || NamedId::is_vm_type(&module_data.id, struct_definition_index.0, compilation_ctx)
+            {
                 builder.i32_const(4).call(compilation_ctx.allocator).drop();
             }
 

@@ -209,7 +209,12 @@ pub fn add_read_and_decode_storage_struct_instructions(
             read_bytes_in_slot,
         );
 
-        if matches!(field, IntermediateType::IStruct { module_id, index, ..} if Uid::is_vm_type(module_id, *index, compilation_ctx) || NamedId::is_vm_type(module_id, *index, compilation_ctx))
+        if matches!(
+            field, 
+            IntermediateType::IStruct { module_id, index, ..} 
+                | IntermediateType::IGenericStructInstance { module_id, index, ..} 
+                    if Uid::is_vm_type(module_id, *index, compilation_ctx) 
+                        || NamedId::is_vm_type(module_id, *index, compilation_ctx))
         {
             // Save the struct pointer in the reserved space of the UID
             builder
@@ -809,6 +814,9 @@ pub fn add_encode_intermediate_type_instructions(
         }
         IntermediateType::IStruct {
             module_id, index, ..
+        }
+        | IntermediateType::IGenericStructInstance {
+            module_id, index, ..
         } if Uid::is_vm_type(module_id, *index, compilation_ctx)
             || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
         {
@@ -1084,6 +1092,9 @@ pub fn add_decode_intermediate_type_instructions(
         }
         IntermediateType::IStruct {
             module_id, index, ..
+        }
+        | IntermediateType::IGenericStructInstance {
+            module_id, index, ..
         } if Uid::is_vm_type(module_id, *index, compilation_ctx)
             || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
         {
@@ -1222,6 +1233,9 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
         IntermediateType::IVector(_) => 32,
 
         IntermediateType::IStruct {
+            module_id, index, ..
+        }
+        | IntermediateType::IGenericStructInstance {
             module_id, index, ..
         } if Uid::is_vm_type(module_id, *index, compilation_ctx)
             || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>

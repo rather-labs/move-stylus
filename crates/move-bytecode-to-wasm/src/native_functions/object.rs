@@ -475,6 +475,9 @@ fn add_delete_slot_instructions(
     match itype {
         IntermediateType::IStruct {
             module_id, index, ..
+        }
+        | IntermediateType::IGenericStructInstance {
+            module_id, index, ..
         } if !Uid::is_vm_type(module_id, *index, compilation_ctx)
             && !NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
         {
