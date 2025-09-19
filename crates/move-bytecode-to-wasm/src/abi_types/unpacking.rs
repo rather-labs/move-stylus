@@ -196,8 +196,6 @@ impl Unpackable for IntermediateType {
                     add_unpack_from_storage_instructions(
                         function_builder,
                         module,
-                        reader_pointer,
-                        calldata_reader_pointer,
                         compilation_ctx,
                         self,
                         false,
@@ -237,8 +235,6 @@ impl Unpackable for IntermediateType {
                     add_unpack_from_storage_instructions(
                         function_builder,
                         module,
-                        reader_pointer,
-                        calldata_reader_pointer,
                         compilation_ctx,
                         self,
                         false,
@@ -335,8 +331,6 @@ fn load_struct_storage_id(
 fn add_unpack_from_storage_instructions(
     function_builder: &mut InstrSeqBuilder,
     module: &mut Module,
-    reader_pointer: LocalId,
-    calldata_reader_pointer: LocalId,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
     unpack_frozen: bool,

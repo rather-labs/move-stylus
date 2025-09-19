@@ -1,4 +1,4 @@
-use super::Unpackable;
+use super::{Unpackable, load_struct_storage_id};
 use crate::CompilationContext;
 use crate::abi_types::unpacking::add_unpack_from_storage_instructions;
 use crate::translation::intermediate_types::IntermediateType;
@@ -41,11 +41,18 @@ impl IRef {
                 // This is because we only want to unpack frozen objects from the storage
                 // if the object is passed as an immutable reference to the function arguments.
                 if struct_.saved_in_storage {
-                    add_unpack_from_storage_instructions(
+                    load_struct_storage_id(
                         builder,
                         module,
                         reader_pointer,
                         calldata_reader_pointer,
+                        compilation_ctx,
+                        &struct_,
+                    );
+
+                    add_unpack_from_storage_instructions(
+                        builder,
+                        module,
                         compilation_ctx,
                         inner,
                         true,
