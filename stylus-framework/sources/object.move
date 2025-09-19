@@ -20,9 +20,7 @@ public struct UID has store {
 /// This allows the transaction caller to capture and persist it for later
 /// reference to the object associated with that `UID`
 public fun new(ctx: &mut TxContext): UID {
-    UID {
-        id: ID { bytes: ctx.fresh_object_address() },
-    }
+    UID { id: ID { bytes: ctx.fresh_object_address() } }
 }
 
 /// Deletes the object from the storage.
@@ -52,7 +50,5 @@ public struct NamedId<phantom T: key> has store {
 native fun compute_named_id<T: key>(): address;
 
 public fun new_named_id<T: key>(): NamedId<T> {
-    NamedId {
-        id: ID { bytes: compute_named_id<T>() },
-    }
+    NamedId { id: ID { bytes: compute_named_id<T>() } }
 }
