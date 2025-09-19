@@ -88,7 +88,7 @@ impl BranchTargets {
 }
 
 #[derive(Debug)]
-struct UidParentInformation {
+struct StorageIdParentInformation {
     module_id: ModuleId,
     index: u16,
     instance_types: Option<Vec<IntermediateType>>,
@@ -102,7 +102,7 @@ struct TranslateFlowContext<'a> {
     function_information: &'a MappedFunction,
     function_table: &'a mut FunctionTable,
     function_locals: &'a Vec<LocalId>,
-    uid_locals: &'a mut HashMap<u8, UidParentInformation>,
+    uid_locals: &'a mut HashMap<u8, StorageIdParentInformation>,
     branch_targets: &'a mut BranchTargets,
 }
 
@@ -153,7 +153,7 @@ pub fn translate_function(
     let mut branch_targets = BranchTargets::new();
     let mut types_stack = TypesStack::new();
     let mut functions_to_link = HashSet::new();
-    let mut uid_locals: HashMap<u8, UidParentInformation> = HashMap::new();
+    let mut uid_locals: HashMap<u8, StorageIdParentInformation> = HashMap::new();
 
     let mut ctx = TranslateFlowContext {
         compilation_ctx,
@@ -362,7 +362,7 @@ fn translate_instruction(
     function_table: &mut FunctionTable,
     types_stack: &mut TypesStack,
     function_locals: &[LocalId],
-    uid_locals: &mut HashMap<u8, UidParentInformation>,
+    uid_locals: &mut HashMap<u8, StorageIdParentInformation>,
     branches: &HashMap<u16, BranchMode>,
     branch_targets: &BranchTargets,
 ) -> Result<Vec<FunctionId>, TranslationError> {
@@ -638,7 +638,7 @@ fn translate_instruction(
                     IntermediateType::IStruct {
                         module_id: _,
                         index: _,
-                        vm_handled_struct: VmHandledStruct::Uid {
+                        vm_handled_struct: VmHandledStruct::StorageId {
                             parent_module_id,
                             parent_index,
                             instance_types,
@@ -760,7 +760,7 @@ fn translate_instruction(
                         module_id: _,
                         index: _,
                         vm_handled_struct:
-                            VmHandledStruct::Uid {
+                            VmHandledStruct::StorageId {
                                 parent_module_id,
                                 parent_index,
                                 instance_types,
@@ -769,7 +769,7 @@ fn translate_instruction(
                     {
                         uid_locals.insert(
                             *local_id,
-                            UidParentInformation {
+                            StorageIdParentInformation {
                                 module_id: parent_module_id.clone(),
                                 index: *parent_index,
                                 instance_types: instance_types.clone(),
@@ -786,7 +786,7 @@ fn translate_instruction(
                         index: _,
                         types: _,
                         vm_handled_struct:
-                            VmHandledStruct::Uid {
+                            VmHandledStruct::StorageId {
                                 parent_module_id,
                                 parent_index,
                                 instance_types,
@@ -795,7 +795,7 @@ fn translate_instruction(
                     {
                         uid_locals.insert(
                             *local_id,
-                            UidParentInformation {
+                            StorageIdParentInformation {
                                 module_id: parent_module_id.clone(),
                                 index: *parent_index,
                                 instance_types: instance_types.clone(),
@@ -826,7 +826,7 @@ fn translate_instruction(
                     index,
                     vm_handled_struct: VmHandledStruct::None,
                 } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
-                    if let Some(UidParentInformation {
+                    if let Some(StorageIdParentInformation {
                         module_id: parent_module_id,
                         index: parent_index,
                         instance_types,
@@ -835,7 +835,7 @@ fn translate_instruction(
                         types_stack.push(IntermediateType::IStruct {
                             module_id: module_id.clone(),
                             index: *index,
-                            vm_handled_struct: VmHandledStruct::Uid {
+                            vm_handled_struct: VmHandledStruct::StorageId {
                                 parent_module_id: parent_module_id.clone(),
                                 parent_index: *parent_index,
                                 instance_types: instance_types.clone(),
@@ -851,7 +851,7 @@ fn translate_instruction(
                     types,
                     vm_handled_struct: VmHandledStruct::None,
                 } if NamedId::is_vm_type(module_id, *index, compilation_ctx) => {
-                    if let Some(UidParentInformation {
+                    if let Some(StorageIdParentInformation {
                         module_id: parent_module_id,
                         index: parent_index,
                         instance_types,
@@ -861,7 +861,7 @@ fn translate_instruction(
                             module_id: module_id.clone(),
                             index: *index,
                             types: types.clone(),
-                            vm_handled_struct: VmHandledStruct::Uid {
+                            vm_handled_struct: VmHandledStruct::StorageId {
                                 parent_module_id: parent_module_id.clone(),
                                 parent_index: *parent_index,
                                 instance_types: instance_types.clone(),

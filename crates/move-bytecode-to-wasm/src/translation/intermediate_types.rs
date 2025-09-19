@@ -30,7 +30,8 @@ pub mod vector;
 
 #[derive(Clone, PartialEq, Debug, Eq, Hash)]
 pub enum VmHandledStruct {
-    Uid {
+    // Can be either a UID or NamedId
+    StorageId {
         /// Wrapping struct's module id
         parent_module_id: ModuleId,
         /// Wrapping struct's index

@@ -325,7 +325,7 @@ pub fn unpack(
                 types_stack.push(IntermediateType::IStruct {
                     module_id: module_id.clone(),
                     index: *index,
-                    vm_handled_struct: VmHandledStruct::Uid {
+                    vm_handled_struct: VmHandledStruct::StorageId {
                         parent_module_id,
                         parent_index,
                         instance_types,
@@ -359,7 +359,7 @@ pub fn unpack(
                     module_id: module_id.clone(),
                     index: *index,
                     types: types.clone(),
-                    vm_handled_struct: VmHandledStruct::Uid {
+                    vm_handled_struct: VmHandledStruct::StorageId {
                         parent_module_id,
                         parent_index,
                         instance_types,
