@@ -2049,9 +2049,9 @@ fn translate_instruction(
             // Allocate four bytes that will point to the struct wrapping this UID. It will be
             // filled later in the `bytecodes::structs::pack` function.
             // This information will be used by other operations (such as delete) to locate the struct
-            if Uid::is_vm_type(&module_data.id, struct_definition_index.0, compilation_ctx)
-                || NamedId::is_vm_type(&module_data.id, struct_definition_index.0, compilation_ctx)
-            {
+            println!("1 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+            if Uid::is_vm_type(&module_data.id, struct_definition_index.0, compilation_ctx) {
+                println!("2 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
                 builder.i32_const(4).call(compilation_ctx.allocator).drop();
             }
 
@@ -2131,6 +2131,19 @@ fn translate_instruction(
 
                 (struct_, types)
             };
+
+            // Allocate four bytes that will point to the struct wrapping this UID. It will be
+            // filled later in the `bytecodes::structs::pack` function.
+            // This information will be used by other operations (such as delete) to locate the struct
+            println!(
+                "1 AAAAAAAAAAAAAAAAAAAAAA {:?} {}",
+                &module_data.id,
+                struct_.index()
+            );
+            if NamedId::is_vm_type(&module_data.id, struct_.index(), compilation_ctx) {
+                println!("2 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+                builder.i32_const(4).call(compilation_ctx.allocator).drop();
+            }
 
             bytecodes::structs::pack(&struct_, module, builder, compilation_ctx, types_stack)?;
 

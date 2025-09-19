@@ -93,6 +93,15 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             },
         );
 
+        /*
+        let (print_i32, _, print_m, _, print_s, print_address) =
+            crate::declare_host_debug_functions!(module);
+
+        builder.call(print_s);
+        builder.call(print_s);
+        builder.local_get(struct_ptr).call(print_m);
+        */
+
         // Encode the field and write it to DATA_SLOT_DATA_PTR_OFFSET
         add_encode_intermediate_type_instructions(
             module,
@@ -820,17 +829,22 @@ pub fn add_encode_intermediate_type_instructions(
         } if Uid::is_vm_type(module_id, *index, compilation_ctx)
             || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
         {
+            println!("ACA?");
             // The UID and NamedId structs has the following form
             //
             // [UID | NamedId] { id: ID { bytes: <bytes> } }
             //
-            // At this point we have in stack a pointer to field we are processing. The
+            // At this point we have in stack a pointer to the field we are processing. The
             // field's value is a pointer to the ID struct.
             //
             // The first load instruction puts in stack the pointer to the ID struct
             // The second load instruction loads the ID's bytes field pointer
             //
             // At the end of the load chain we point to the 32 bytes holding the data
+
+            let tmp = module.locals.add(ValType::I32);
+            let tmp2 = module.locals.add(ValType::I32);
+            builder.local_tee(tmp2);
             builder
                 .load(
                     compilation_ctx.memory_id,
@@ -840,6 +854,7 @@ pub fn add_encode_intermediate_type_instructions(
                         offset: 0,
                     },
                 )
+                .local_tee(tmp)
                 .load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -849,6 +864,16 @@ pub fn add_encode_intermediate_type_instructions(
                     },
                 )
                 .local_set(val_32);
+
+            /*
+            let (_, _, print_m, _, print_s, _) = crate::declare_host_debug_functions!(module);
+
+            builder.call(print_s);
+            builder.local_get(tmp2).call(print_m);
+            builder.local_get(tmp).call(print_m);
+            builder.local_get(val_32).call(print_m);
+            builder.call(print_s);
+            */
 
             // Load the memory address
             builder

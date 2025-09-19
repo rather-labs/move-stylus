@@ -626,6 +626,16 @@ pub fn add_save_struct_into_storage_fn(
     let written_bytes_in_slot = module.locals.add(ValType::I32);
     builder.i32_const(0).local_set(written_bytes_in_slot);
 
+    /*
+    let (print_i32, _, print_m, _, print_s, print_address) =
+        crate::declare_host_debug_functions!(module);
+
+    builder.call(print_s);
+    builder.call(print_s);
+    builder.call(print_s);
+    builder.local_get(struct_ptr).call(print_m);
+    */
+
     add_encode_and_save_into_storage_struct_instructions(
         module,
         &mut builder,

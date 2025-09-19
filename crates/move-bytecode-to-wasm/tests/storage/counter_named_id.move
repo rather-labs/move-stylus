@@ -1,11 +1,11 @@
-module test::named_ids;
+module test::counter_named_id;
 
 use stylus::tx_context::TxContext;
 use stylus::object as object;
 use stylus::object::NamedId;
 use stylus::transfer as transfer;
 
-public struct COUNTER_ has key {};
+public struct COUNTER_ has key {}
 
 public struct Counter has key {
     id: NamedId<COUNTER_>,
@@ -15,7 +15,7 @@ public struct Counter has key {
 
 public fun create(ctx: &mut TxContext) {
   transfer::share_object(Counter {
-    id: NamedId<COUNTER_> {},
+    id: object::new_named_id<COUNTER_>(),
     owner: ctx.sender(),
     value: 25
   });
@@ -37,4 +37,3 @@ public fun set_value(counter: &mut Counter, value: u64, ctx: &TxContext) {
     assert!(counter.owner == ctx.sender(), 0);
     counter.value = value;
 }
-
