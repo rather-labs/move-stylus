@@ -114,7 +114,7 @@ public fun delete_obj(foo: Foo) {
     id.remove();
 }
 
-fun freeze_obj(foo: Foo) {
+public fun freeze_obj(foo: Foo) {
     transfer::freeze_object(foo);
 }
 

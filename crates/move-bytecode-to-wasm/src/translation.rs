@@ -697,7 +697,6 @@ fn translate_instruction(
                 &function_information.function_id.module_id,
                 &function_information.function_id.identifier,
             ) {
-                println!("WOLOLOOOO");
                 types_stack::match_types!((
                     IntermediateType::IStruct {
                         module_id: _,
