@@ -1,8 +1,42 @@
 mod common;
 
+use alloy_primitives::{FixedBytes, U256, keccak256};
 use common::runtime_sandbox::constants::SIGNER_ADDRESS;
 use common::{runtime_sandbox::RuntimeSandbox, translate_test_package_with_framework};
 use rstest::{fixture, rstest};
+
+/// Right-align `data` into a 32-byte word (EVM storage encoding for value types).
+#[inline]
+fn pad32_right(data: &[u8]) -> [u8; 32] {
+    let mut out = [0u8; 32];
+    let n = data.len().min(32);
+    out[32 - n..].copy_from_slice(&data[..n]); // <-- right-align
+    out
+}
+
+/// mapping(address => mapping(bytes32 => V)) at base slot 0
+/// slot(owner, id) = keccak256( pad32(id) || keccak256( pad32(owner) || pad32(0) ) )
+pub fn derive_object_slot(owner: &[u8], object_id: &[u8]) -> FixedBytes<32> {
+    // parent = keccak256( pad32(owner) || pad32(0) )
+    let owner_padded = pad32_right(owner);
+    let zero_slot = [0u8; 32];
+
+    let mut buf = [0u8; 64];
+    buf[..32].copy_from_slice(&owner_padded);
+    buf[32..].copy_from_slice(&zero_slot);
+    let parent = keccak256(buf);
+
+    // slot = keccak256( pad32(id) || pad32(parent) )
+    let id_padded = pad32_right(object_id); // object_id is already 32B, this is a no-op
+    buf[..32].copy_from_slice(&id_padded);
+    buf[32..].copy_from_slice(parent.as_slice());
+    keccak256(buf)
+}
+
+pub fn get_next_slot(slot: &[u8; 32]) -> [u8; 32] {
+    let slot_value = U256::from_be_bytes(*slot);
+    (slot_value + U256::from(1)).to_be_bytes()
+}
 
 mod counter {
     use alloy_primitives::{FixedBytes, address};
@@ -164,7 +198,7 @@ mod capability {
 }
 
 mod storage_transfer {
-    use alloy_primitives::{FixedBytes, U256, address, keccak256};
+    use alloy_primitives::{FixedBytes, address};
     use alloy_sol_types::{SolCall, SolValue, sol};
 
     use super::*;
@@ -272,39 +306,6 @@ mod storage_transfer {
         88, 181, 235, 71, 20, 200, 162, 193, 179, 99, 195, 177, 236, 158, 218, 42, 168, 26, 11, 70,
         66, 173, 6, 207, 222, 175, 248, 56, 236, 49, 87, 253,
     ];
-
-    /// Right-align `data` into a 32-byte word (EVM storage encoding for value types).
-    #[inline]
-    fn pad32_right(data: &[u8]) -> [u8; 32] {
-        let mut out = [0u8; 32];
-        let n = data.len().min(32);
-        out[32 - n..].copy_from_slice(&data[..n]); // <-- right-align
-        out
-    }
-
-    /// mapping(address => mapping(bytes32 => V)) at base slot 0
-    /// slot(owner, id) = keccak256( pad32(id) || keccak256( pad32(owner) || pad32(0) ) )
-    pub fn derive_object_slot(owner: &[u8], object_id: &[u8]) -> FixedBytes<32> {
-        // parent = keccak256( pad32(owner) || pad32(0) )
-        let owner_padded = pad32_right(owner);
-        let zero_slot = [0u8; 32];
-
-        let mut buf = [0u8; 64];
-        buf[..32].copy_from_slice(&owner_padded);
-        buf[32..].copy_from_slice(&zero_slot);
-        let parent = keccak256(buf);
-
-        // slot = keccak256( pad32(id) || pad32(parent) )
-        let id_padded = pad32_right(object_id); // object_id is already 32B, this is a no-op
-        buf[..32].copy_from_slice(&id_padded);
-        buf[32..].copy_from_slice(parent.as_slice());
-        keccak256(buf)
-    }
-
-    pub fn get_next_slot(slot: &[u8; 32]) -> [u8; 32] {
-        let slot_value = U256::from_be_bytes(*slot);
-        (slot_value + U256::from(1)).to_be_bytes()
-    }
 
     // Test create frozen object
     #[rstest]
@@ -1159,7 +1160,7 @@ mod storage_encoding {
 
         #[derive(Debug)]
         struct ID {
-           address bytes;
+           bytes32 bytes;
         }
 
         #[derive(Debug)]
@@ -1210,7 +1211,6 @@ mod storage_encoding {
         }
 
         function saveStaticFields(
-            UID id,
             uint256 a,
             uint128 b,
             uint64 c,
@@ -1222,7 +1222,6 @@ mod storage_encoding {
         function readStaticFields() public view returns (StaticFields);
 
         function saveStaticFields2(
-            UID id,
             uint8 a,
             address b,
             uint64 c,
@@ -1232,7 +1231,6 @@ mod storage_encoding {
         function readStaticFields2() public view returns (StaticFields2);
 
         function saveStaticFields3(
-            UID id,
             uint8 a,
             address b,
             uint64 c,
@@ -1241,7 +1239,6 @@ mod storage_encoding {
         function readStaticFields3() public view returns (StaticFields3);
 
         function saveStaticNestedStruct(
-            UID id,
             uint64 a,
             bool b,
             uint64 d,
@@ -1310,7 +1307,6 @@ mod storage_encoding {
             uint32 b;
         }
         function saveDynamicStruct(
-            UID id,
             uint32 a,
             bool b,
             uint64[] c,
@@ -1322,7 +1318,6 @@ mod storage_encoding {
         function readDynamicStruct() public view returns (DynamicStruct);
 
         function saveDynamicStruct2(
-            UID id,
             bool[] a,
             uint8[] b,
             uint16[] c,
@@ -1335,7 +1330,6 @@ mod storage_encoding {
         function readDynamicStruct2() public view returns (DynamicStruct2);
 
         function saveDynamicStruct3(
-            UID id,
             uint8[][] a,
             uint32[][] b,
             uint64[][] c,
@@ -1344,7 +1338,6 @@ mod storage_encoding {
         function readDynamicStruct3() public view returns (DynamicStruct3);
 
         function saveDynamicStruct4(
-            UID id,
             uint32[] x,
             uint64 y,
             uint128 z,
@@ -1353,7 +1346,6 @@ mod storage_encoding {
         function readDynamicStruct4() public view returns (DynamicStruct4);
 
         function saveDynamicStruct5(
-            UID id,
             uint32 x,
             uint64 y,
             uint128 z,
@@ -1362,15 +1354,36 @@ mod storage_encoding {
         function readDynamicStruct5() public view returns (DynamicStruct5);
 
         function saveGenericStruct32(
-            UID id,
             uint32 x,
         ) public view;
         function readGenericStruct32() public view returns (GenericStruct32);
+
+        struct Foo {
+            UID id;
+            uint64 a;
+            Bar b;
+            uint32 c;
+        }
+
+        struct Bar {
+            UID id;
+            uint64 a;
+        }
+        function saveFoo () public view;
+        function readFoo() public view returns (Foo);
+
+        struct MegaFoo {
+            UID id;
+            uint64 a;
+            Foo b;
+            uint32 c;
+        }
+        function saveMegaFoo() public view;
+        function readMegaFoo() public view returns (MegaFoo);
     );
 
     #[rstest]
     #[case(saveStaticFieldsCall::new((
-        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         U256::from_str_radix("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 16).unwrap(),
         0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
         0xcccccccccccccccc,
@@ -1379,14 +1392,14 @@ mod storage_encoding {
         0xff,
         address!("0xcafecafecafecafecafecafecafecafecafecafe"),
     )), vec![
-        [0x00; 32],
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         [0xaa; 32],
         U256::from_str_radix("ffeeeeddddddddccccccccccccccccbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
     ],
         readStaticFieldsCall::new(()),
         StaticFields {
-            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: U256::from_str_radix("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 16).unwrap(),
             b: 0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
             c: 0xcccccccccccccccc,
@@ -1397,7 +1410,6 @@ mod storage_encoding {
         }
     )]
     #[case(saveStaticFieldsCall::new((
-        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         U256::from(1),
         2,
         3,
@@ -1406,14 +1418,14 @@ mod storage_encoding {
         6,
         address!("0xcafecafecafecafecafecafecafecafecafecafe"),
     )), vec![
-        [0x00; 32],
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from(1).to_be_bytes(),
         U256::from_str_radix("06000500000004000000000000000300000000000000000000000000000002", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
     ],
         readStaticFieldsCall::new(()),
         StaticFields {
-            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: U256::from(1),
             b: 2,
             c: 3,
@@ -1424,19 +1436,18 @@ mod storage_encoding {
         }
     )]
     #[case(saveStaticFields2Call::new((
-        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         0xff,
         address!("0xcafecafecafecafecafecafecafecafecafecafe"),
         0xcccccccccccccccc,
         0xeeee,
         0xff,
     )), vec![
-        [0x00; 32],
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("ffeeeecccccccccccccccccafecafecafecafecafecafecafecafecafecafeff", 16).unwrap().to_be_bytes(),
     ],
         readStaticFields2Call::new(()),
         StaticFields2 {
-            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: 0xff,
             b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
             c: 0xcccccccccccccccc,
@@ -1445,19 +1456,18 @@ mod storage_encoding {
         }
     )]
     #[case(saveStaticFields2Call::new((
-        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         1,
         address!("0xcafecafecafecafecafecafecafecafecafecafe"),
         2,
         3,
         4,
     )), vec![
-        [0x00; 32],
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0400030000000000000002cafecafecafecafecafecafecafecafecafecafe01", 16).unwrap().to_be_bytes(),
     ],
         readStaticFields2Call::new(()),
         StaticFields2 {
-            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: 1,
             b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
             c: 2,
@@ -1466,19 +1476,18 @@ mod storage_encoding {
         }
     )]
     #[case(saveStaticFields3Call::new((
-        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         1,
         address!("0xcafecafecafecafecafecafecafecafecafecafe"),
         2,
         address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
     )), vec![
-        [0x00; 32],
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000002cafecafecafecafecafecafecafecafecafecafe01", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeef", 16).unwrap().to_be_bytes(),
     ],
         readStaticFields3Call::new(()),
         StaticFields3 {
-           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: 1,
            b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
            c: 2,
@@ -1486,19 +1495,18 @@ mod storage_encoding {
         }
     )]
     #[case(saveStaticFields3Call::new((
-        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         0xff,
         address!("0xcafecafecafecafecafecafecafecafecafecafe"),
         0xcccccccccccccccc,
         address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
     )), vec![
-        [0x00; 32],
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000cccccccccccccccccafecafecafecafecafecafecafecafecafecafeff", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeef", 16).unwrap().to_be_bytes(),
     ],
         readStaticFields3Call::new(()),
         StaticFields3 {
-            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: 0xff,
             b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
             c: 0xcccccccccccccccc,
@@ -1506,7 +1514,6 @@ mod storage_encoding {
         }
     )]
     #[case(saveStaticNestedStructCall::new((
-        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         1,
         true,
         2,
@@ -1514,14 +1521,14 @@ mod storage_encoding {
         3,
         4
     )), vec![
-        [0x00; 32],
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000002010000000000000001", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000400000000000000000000000000000003", 16).unwrap().to_be_bytes(),
     ],
         readStaticNestedStructCall::new(()),
         StaticNestedStruct {
-           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: 1,
            b: true,
            c: StaticNestedStructChild {
@@ -1533,7 +1540,6 @@ mod storage_encoding {
         }
     )]
     #[case(saveStaticNestedStructCall::new((
-        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         0xaaaaaaaaaaaaaaaa,
         true,
         0xbbbbbbbbbbbbbbbb,
@@ -1541,14 +1547,14 @@ mod storage_encoding {
         0xcccccccccccccccccccccccccccccccc,
         0xdddddddd,
     )), vec![
-        [0x00; 32],
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000bbbbbbbbbbbbbbbb01aaaaaaaaaaaaaaaa", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000ddddddddcccccccccccccccccccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
         readStaticNestedStructCall::new(()),
         StaticNestedStruct {
-           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: 0xaaaaaaaaaaaaaaaa,
            b: true,
            c: StaticNestedStructChild {
@@ -1587,7 +1593,6 @@ mod storage_encoding {
 
     #[rstest]
     #[case(saveDynamicStructCall::new((
-        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         46,
         true,
         vec![2, 3, 4, 5, 6],
@@ -1610,7 +1615,7 @@ mod storage_encoding {
 
     ],
     vec![
-        [0x00; 32], // 0x0
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000000000000000000000000000010000002e", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000005", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000005000000000000000400000000000000030000000000000002", 16).unwrap().to_be_bytes(),
@@ -1623,7 +1628,7 @@ mod storage_encoding {
     ],
         readDynamicStructCall::new(()),
         DynamicStruct {
-           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: 46,
            b: true,
            c: vec![2, 3, 4, 5, 6],
@@ -1634,7 +1639,6 @@ mod storage_encoding {
         }
     )]
     #[case(saveDynamicStructCall::new((
-        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         u32::MAX,
         true,
         vec![],
@@ -1654,7 +1658,7 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000005", 16).unwrap().to_be_bytes(), // u256 slot
     ],
     vec![
-        [0x00; 32], // 0x0
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("00000000000000000000000000000000000000000000000000000001ffffffff", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
@@ -1665,7 +1669,7 @@ mod storage_encoding {
     ],
         readDynamicStructCall::new(()),
         DynamicStruct {
-           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: u32::MAX,
            b: true,
            c: vec![],
@@ -1676,7 +1680,6 @@ mod storage_encoding {
         }
     )]
     #[case(saveDynamicStruct2Call::new((
-        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         vec![true, false, true],
         vec![1, 2, 3, 4, 5], // u8
         vec![6, 7, 8, 9], // u16
@@ -1710,7 +1713,7 @@ mod storage_encoding {
         U256::from_str_radix("f3f7a9fe364faab93b216da50a3214154f22a0a2b415b23a84c8169e8b636ee4", 16).unwrap().to_be_bytes(), // address vec, elem slot #2
     ],
     vec![
-        [0x00; 32], // 0x0
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000010001", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000005", 16).unwrap().to_be_bytes(),
@@ -1734,7 +1737,7 @@ mod storage_encoding {
     ],
         readDynamicStruct2Call::new(()),
         DynamicStruct2 {
-           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: vec![true, false, true],
            b: vec![1, 2, 3, 4, 5],
            c: vec![6, 7, 8, 9],
@@ -1746,7 +1749,6 @@ mod storage_encoding {
         }
     )]
     #[case(saveDynamicStruct3Call::new((
-        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         vec![vec![1, 2, 3], vec![4, 5]],
         vec![vec![6, 7], vec![8], vec![9, 10]],
         vec![vec![11, 12, 13, 14], vec![], vec![15, 16]],
@@ -1781,7 +1783,7 @@ mod storage_encoding {
         U256::from_str_radix("c167b0e3c82238f4f2d1a50a8b3a44f96311d77b148c30dc0ef863e1a060dcb7", 16).unwrap().to_be_bytes(), // u128[] elements slot #2
     ],
     vec![
-        [0x00; 32], // 0x0
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // u32[][] len
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // first u8[] len
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000030201", 16).unwrap().to_be_bytes(), // first u8[] elements
@@ -1810,7 +1812,7 @@ mod storage_encoding {
     ],
         readDynamicStruct3Call::new(()),
         DynamicStruct3 {
-           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+           id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: vec![vec![1, 2, 3], vec![4, 5]],
            b: vec![vec![6, 7], vec![8], vec![9, 10]],
            c: vec![vec![11, 12, 13, 14], vec![], vec![15, 16]],
@@ -1818,11 +1820,10 @@ mod storage_encoding {
         }
     )]
     #[case(saveDynamicStruct4Call::new((
-        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         vec![1, 2, 3],
         47,
         123,
-        address!("0x1111111111111111111111111111111111111111"),
+        address!("1111111111111111111111111111111111111111"),
     )),
     vec![
         // Field uid
@@ -1845,7 +1846,7 @@ mod storage_encoding {
         U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ad0", 16).unwrap().to_be_bytes(), // Third element
     ],
     vec![
-        [0x00; 32], // 0x0
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         // Field a: DynamicNestedStructChild[]
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
         // First element
@@ -1864,13 +1865,12 @@ mod storage_encoding {
     ],
         readDynamicStruct4Call::new(()),
         DynamicStruct4 {
-           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: vec![DynamicNestedStructChild { a: vec![1, 2, 3], b: 123 }, DynamicNestedStructChild { a: vec![1, 2, 3], b: 124 }],
            b: vec![StaticNestedStructChild { d: 47, e: address!("0x1111111111111111111111111111111111111111") }, StaticNestedStructChild { d: 48, e: address!("0x1111111111111111111111111111111111111111") }, StaticNestedStructChild { d: 49, e: address!("0x1111111111111111111111111111111111111111") }],
         }
     )]
     #[case(saveDynamicStruct5Call::new((
-        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         1,
         42,
         123,
@@ -1881,12 +1881,12 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // Header slot
     ],
     vec![
-        [0x00; 32], // 0x0
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
     ],
         readDynamicStruct5Call::new(()),
         DynamicStruct5 {
-           id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+        id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: vec![
                NestedStructChildWrapper {
                    a: vec![
@@ -1914,7 +1914,6 @@ mod storage_encoding {
         }
     )]
     #[case(saveGenericStruct32Call::new((
-        UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
         1,
     )),
     vec![
@@ -1924,14 +1923,14 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // uint32 b
     ],
     vec![
-        [0x00; 32], // 0x0
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // Header slot
         U256::from_str_radix("0000000000000000000000000000000000000000000000030000000200000001", 16).unwrap().to_be_bytes(), // First element
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // Second element
     ],
         readGenericStruct32Call::new(()),
         GenericStruct32 {
-            id: UID { id: ID { bytes: address!("0x0000000000000000000000000000000000000000") } },
+            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: vec![1, 2, 3],
             b: 1,
         }
@@ -1948,6 +1947,129 @@ mod storage_encoding {
             .call_entrypoint(call_data_encode.abi_encode())
             .unwrap();
         assert_eq!(0, result);
+
+        // Check if it is encoded correctly in storage
+        for (i, slot) in expected_slots.iter().enumerate() {
+            let storage = runtime.get_storage_at_slot(*slot);
+            assert_eq!(expected_encode[i], storage, "Mismatch at slot {}", i);
+        }
+
+        // Use the read function to check if it decodes correctly
+        let (result, result_data) = runtime
+            .call_entrypoint(call_data_decode.abi_encode())
+            .unwrap();
+        assert_eq!(0, result);
+        assert_eq!(expected_decode.abi_encode(), result_data);
+    }
+
+    #[rstest]
+    #[case(saveFooCall::new(()),
+    vec![
+        [0x00; 32],
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("b3f87769e0f4505eb27364fe9b31c117ff789e8aa785586680a6c1cb0f592652", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("b3f87769e0f4505eb27364fe9b31c117ff789e8aa785586680a6c1cb0f592653", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+    ],
+    vec![
+        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000065", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002a", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
+    ],
+        readFooCall::new(()),
+        Foo {
+            id: UID { id: ID { bytes: U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().into()  } },
+            a: 101,
+            b: Bar {
+                id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into()  } },
+                a: 42,
+            },
+            c: 102,
+        }
+    )]
+    #[case(saveMegaFooCall::new(()),
+    vec![
+        [0x00; 32],
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+        // [53, 96, 25, 94, 67, 93, 31, 98, 158, 100, 186, 33, 178, 4, 211, 25, 12, 23, 181, 207, 56, 209, 225, 0, 228, 147, 157, 255, 142, 152, 99, 141] 
+        U256::from_str_radix("3560195e435d1f629e64ba21b204d3190c17b5cf38d1e100e4939dff8e98638d", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("3560195e435d1f629e64ba21b204d3190c17b5cf38d1e100e4939dff8e98638e", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("3560195e435d1f629e64ba21b204d3190c17b5cf38d1e100e4939dff8e98638f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("3560195e435d1f629e64ba21b204d3190c17b5cf38d1e100e4939dff8e986390", 16).unwrap().to_be_bytes(),
+        // [179, 248, 119, 105, 224, 244, 80, 94, 178, 115, 100, 254, 155, 49, 193, 23, 255, 120, 158, 138, 167, 133, 88, 102, 128, 166, 193, 203, 15, 89, 38, 83] 
+        U256::from_str_radix("b3f87769e0f4505eb27364fe9b31c117ff789e8aa785586680a6c1cb0f592652", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("b3f87769e0f4505eb27364fe9b31c117ff789e8aa785586680a6c1cb0f592653", 16).unwrap().to_be_bytes(),
+    ],
+    vec![
+        // MegaFoo
+        U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000004d", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000058", 16).unwrap().to_be_bytes(),
+        // Foo
+        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000065", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
+        // Bar
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002a", 16).unwrap().to_be_bytes(),
+
+    ],
+        readMegaFooCall::new(()),
+        MegaFoo {
+            id: UID { id: ID { bytes: U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().into()  } },
+            a: 77,
+            b: Foo {
+                id: UID { id: ID { bytes: U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().into()  } },
+                a: 101,
+                b: Bar {
+                    id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into()  } },
+                    a: 42,
+                },
+                c: 102,
+            },
+            c: 88,
+        }
+    )]
+    fn test_structs_with_wrapped<T: SolCall, U: SolCall, V: SolValue>(
+        runtime: RuntimeSandbox,
+        #[case] call_data_encode: T,
+        #[case] expected_slots: Vec<[u8; 32]>,
+        #[case] expected_encode: Vec<[u8; 32]>,
+        #[case] call_data_decode: U,
+        #[case] expected_decode: V,
+    ) {
+        let (result, _) = runtime
+            .call_entrypoint(call_data_encode.abi_encode())
+            .unwrap();
+        assert_eq!(0, result);
+
+        runtime.print_storage();
+
+        // Helper: calculate object slot
+        let object_id = U256::from_str_radix(
+            "bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989",
+            16,
+        )
+        .unwrap()
+        .to_be_bytes::<32>();
+
+        let child_object_id = U256::from_str_radix(
+            "7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de",
+            16,
+        )
+        .unwrap()
+        .to_be_bytes::<32>();
+
+        let child_object_slot = derive_object_slot(&object_id, &child_object_id);
+        println!("child_object_slot: {:?}", child_object_slot);
 
         // Check if it is encoded correctly in storage
         for (i, slot) in expected_slots.iter().enumerate() {

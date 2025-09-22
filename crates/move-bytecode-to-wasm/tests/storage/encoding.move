@@ -1,6 +1,8 @@
 module test::storage_encoding;
 
 use stylus::object::UID;
+use stylus::tx_context::TxContext;
+use stylus::object;
 
 // This function will facilitate the reading from the test.
 native fun save_in_slot<T: key>(value: T, slot: u256);
@@ -18,16 +20,16 @@ public struct StaticFields has key {
 }
 
 public fun save_static_fields(
-    id: UID,
     a: u256,
     b: u128,
     c: u64,
     d: u32,
     e: u16,
     f: u8,
-    g: address
+    g: address,
+    ctx: &mut TxContext
 ) {
-    let struct_ = StaticFields { id, a, b, c, d, e, f, g };
+    let struct_ = StaticFields { id: object::new(ctx), a, b, c, d, e, f, g };
     save_in_slot(struct_, 0);
 }
 
@@ -45,14 +47,14 @@ public struct StaticFields2 has key {
 }
 
 public fun save_static_fields_2(
-    id: UID,
     a: u8,
     b: address,
     c: u64,
     d: u16,
-    e: u8
+    e: u8,
+    ctx: &mut TxContext
 ) {
-    let struct_ = StaticFields2 { id, a, b, c, d, e };
+    let struct_ = StaticFields2 { id: object::new(ctx), a, b, c, d, e };
     save_in_slot(struct_, 0);
 }
 
@@ -69,13 +71,13 @@ public struct StaticFields3 has key {
 }
 
 public fun save_static_fields_3(
-    id: UID,
     a: u8,
     b: address,
     c: u64,
-    d: address
+    d: address,
+    ctx: &mut TxContext
 ) {
-    let struct_ = StaticFields3 { id, a, b, c, d };
+    let struct_ = StaticFields3 { id: object::new(ctx), a, b, c, d };
     save_in_slot(struct_, 0);
 }
 
@@ -98,16 +100,16 @@ public struct StaticNestedStructChild has store {
 }
 
 public fun save_static_nested_struct(
-    id: UID,
     a: u64,
     b: bool,
     d: u64,
     e: address,
     f: u128,
-    g: u32
+    g: u32, 
+    ctx: &mut TxContext
 ) {
     let child = StaticNestedStructChild { d, e };
-    let struct_ = StaticNestedStruct { id, a, b, c: child, f, g };
+    let struct_ = StaticNestedStruct { id: object::new(ctx), a, b, c: child, f, g };
     save_in_slot(struct_, 0);
 }
 
@@ -176,7 +178,6 @@ public struct GenericStruct<T> has key {
 }
 
 public fun save_dynamic_struct(
-    id: UID,
     a: u32,
     b: bool,
     c: vector<u64>,
@@ -184,8 +185,9 @@ public fun save_dynamic_struct(
     e: u64,
     f: u128,
     g: u256,
+    ctx: &mut TxContext
 ) {
-    let struct_ = DynamicStruct { id, a, b, c, d, e, f, g };
+    let struct_ = DynamicStruct { id: object::new(ctx), a, b, c, d, e, f, g };
     save_in_slot(struct_, 0);
 }
 
@@ -194,7 +196,6 @@ public fun read_dynamic_struct(): DynamicStruct {
 }
 
 public fun save_dynamic_struct_2(
-    id: UID,
     a: vector<bool>,
     b: vector<u8>,
     c: vector<u16>,
@@ -203,8 +204,9 @@ public fun save_dynamic_struct_2(
     f: vector<u128>,
     g: vector<u256>,
     h: vector<address>,
+    ctx: &mut TxContext
 ) {
-    let struct_ = DynamicStruct2 { id, a, b, c, d, e, f, g, h };
+    let struct_ = DynamicStruct2 { id: object::new(ctx), a, b, c, d, e, f, g, h };
     save_in_slot(struct_, 0);
 }
 
@@ -213,13 +215,13 @@ public fun read_dynamic_struct_2(): DynamicStruct2 {
 }
 
 public fun save_dynamic_struct_3(
-    id: UID,
     a: vector<vector<u8>>,
     b: vector<vector<u32>>,
     c: vector<vector<u64>>,
     d: vector<vector<u128>>,
+    ctx: &mut TxContext
 ) {
-    let struct_ = DynamicStruct3 { id, a, b, c, d };
+    let struct_ = DynamicStruct3 { id: object::new(ctx), a, b, c, d };
     save_in_slot(struct_, 0);
 }
 
@@ -228,15 +230,15 @@ public fun read_dynamic_struct_3(): DynamicStruct3 {
 }
 
 public fun save_dynamic_struct_4(
-    id: UID,
     x: vector<u32>,
     y: u64,
     z: u128,
-    w: address
+    w: address,
+    ctx: &mut TxContext
 ) {
     let a = vector[DynamicNestedStructChild { a: x, b: z }, DynamicNestedStructChild { a: x, b: z + 1 }];
     let b = vector[StaticNestedStructChild { d: y, e: w }, StaticNestedStructChild { d: y + 1 , e: w }, StaticNestedStructChild { d: y + 2, e: w }];
-    let struct_ = DynamicStruct4 { id, a, b};
+    let struct_ = DynamicStruct4 { id: object::new(ctx), a, b};
     save_in_slot(struct_, 0);
 }
 
@@ -245,11 +247,11 @@ public fun read_dynamic_struct_4(): DynamicStruct4 {
 }
 
 public fun save_dynamic_struct_5(
-    id: UID,
     x: u32,
     y: u64,
     z: u128,
-    w: address
+    w: address,
+    ctx: &mut TxContext
 ) {
     let v = vector[x, x + 1, x + 2];
     let a1 = vector[DynamicNestedStructChild { a: v, b: z }, DynamicNestedStructChild { a: v, b: z + 1 }];
@@ -257,7 +259,7 @@ public fun save_dynamic_struct_5(
     let b1 = vector[StaticNestedStructChild { d: y, e: w }, StaticNestedStructChild { d: y + 1 , e: w }, StaticNestedStructChild { d: y + 2, e: w }];
     let b2 = vector[StaticNestedStructChild { d: y + 3, e: w }, StaticNestedStructChild { d: y + 4 , e: w }];
     let a = vector[NestedStructChildWrapper { a: a1, b: b1 }, NestedStructChildWrapper { a: a2, b: b2 }];
-    let struct_ = DynamicStruct5 { id, a};
+    let struct_ = DynamicStruct5 { id: object::new(ctx), a};
     save_in_slot(struct_, 0);
 }
 
@@ -266,11 +268,11 @@ public fun read_dynamic_struct_5(): DynamicStruct5 {
 }
 
 public fun save_generic_struct_32(
-    id: UID,
-    x: u32
+    x: u32,
+    ctx: &mut TxContext
 ) {
     let a = vector[x, x + 1, x + 2];
-    let struct_ = GenericStruct<u32> { id, a, b: x };
+    let struct_ = GenericStruct<u32> { id: object::new(ctx), a, b: x };
     save_in_slot(struct_, 0);
 }
 
@@ -278,3 +280,72 @@ public fun read_generic_struct_32(): GenericStruct<u32> {
     read_slot<GenericStruct<u32>>(0)
 }
 
+/// Structs with wrapped objects fields
+
+// Simple value struct with key
+public struct Bar has key, store {
+    id: UID,
+    a: u64,
+}
+
+// Struct with nested field struct with key
+public struct Foo has key, store {
+    id: UID,
+    a: u64,
+    b: Bar,
+    c: u32
+}
+
+public fun save_foo(ctx: &mut TxContext) {
+    let bar = Bar {
+        id: object::new(ctx),
+        a: 42,
+    };
+
+    let foo = Foo {
+        id: object::new(ctx),
+        a: 101,
+        b: bar,
+        c: 102,
+    };
+
+    save_in_slot(foo, 0);
+}
+
+public fun read_foo(): Foo {
+    read_slot<Foo>(0)
+}
+
+public struct MegaFoo has key {
+    id: UID,
+    a: u64,
+    b: Foo,
+    c: u32
+}
+
+public fun save_mega_foo(ctx: &mut TxContext) {
+    let bar = Bar {
+        id: object::new(ctx),
+        a: 42,
+    };
+
+    let foo = Foo {
+        id: object::new(ctx),
+        a: 101,
+        b: bar,
+        c: 102,
+    };
+
+    let mega_foo = MegaFoo {
+        id: object::new(ctx),
+        a: 77,
+        b: foo,
+        c: 88,
+    };
+
+    save_in_slot(mega_foo, 0);
+}
+
+public fun read_mega_foo(): MegaFoo {
+    read_slot<MegaFoo>(0)
+}
