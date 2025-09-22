@@ -11,7 +11,7 @@ use crate::{
         intermediate_types::{IntermediateType, VmHandledStruct, structs::IStruct},
         types_stack::TypesStack,
     },
-    vm_handled_types::{VmHandledType, uid::Uid},
+    vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
 };
 
 /// Borrows a field of a struct.
@@ -160,11 +160,16 @@ pub fn pack(
                         );
                     }
 
-                    // If we find an UID struct, in the 4 bytes before its pointer, we write the
-                    // address of the struct holding it
+                    // If we find an UID or NamedId struct, in the 4 bytes before its pointer, we
+                    // write the address of the struct holding it
                     IntermediateType::IStruct {
                         module_id, index, ..
-                    } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+                    }
+                    | IntermediateType::IGenericStructInstance {
+                        module_id, index, ..
+                    } if Uid::is_vm_type(module_id, *index, compilation_ctx)
+                        || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
+                    {
                         builder.local_set(ptr_to_data);
 
                         builder
@@ -293,8 +298,8 @@ pub fn unpack(
             IntermediateType::IEnum(_) => todo!(),
         }
 
-        // When unpacking an struct, at the moment of unpacking its UID (if some found) we also
-        // push to the types stack the wrapping struct information.
+        // When unpacking an struct, at the moment of unpacking its UID or NamedId (if some found)
+        // we also push to the types stack the wrapping struct information.
         //
         // The wrapping struct information is needed for some UID operations such as delete.
         match field {
@@ -311,6 +316,7 @@ pub fn unpack(
                         module_id: parent_module_id,
                         index: parent_index,
                         types,
+                        ..
                     } => (Some(types.clone()), parent_module_id.clone(), *parent_index),
                     // TODO: Change to translation error
                     _ => panic!("invalid intermediate type {itype:?} found in unpack function"),
@@ -319,7 +325,41 @@ pub fn unpack(
                 types_stack.push(IntermediateType::IStruct {
                     module_id: module_id.clone(),
                     index: *index,
-                    vm_handled_struct: VmHandledStruct::Uid {
+                    vm_handled_struct: VmHandledStruct::StorageId {
+                        parent_module_id,
+                        parent_index,
+                        instance_types,
+                    },
+                })
+            }
+
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+                ..
+            } if NamedId::is_vm_type(module_id, *index, compilation_ctx) => {
+                let (instance_types, parent_module_id, parent_index) = match itype {
+                    IntermediateType::IStruct {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                        ..
+                    } => (None, parent_module_id.clone(), *parent_index),
+                    IntermediateType::IGenericStructInstance {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                        types,
+                        ..
+                    } => (Some(types.clone()), parent_module_id.clone(), *parent_index),
+                    // TODO: Change to translation error
+                    _ => panic!("invalid intermediate type {itype:?} found in unpack function"),
+                };
+
+                types_stack.push(IntermediateType::IGenericStructInstance {
+                    module_id: module_id.clone(),
+                    index: *index,
+                    types: types.clone(),
+                    vm_handled_struct: VmHandledStruct::StorageId {
                         parent_module_id,
                         parent_index,
                         instance_types,

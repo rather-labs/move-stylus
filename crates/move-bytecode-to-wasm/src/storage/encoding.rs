@@ -16,13 +16,13 @@ use crate::{
     },
     hostio::host_functions::{native_keccak256, storage_cache_bytes32, storage_load_bytes32},
     runtime::RuntimeFunction,
-    translation::intermediate_types::vector::IVector,
     translation::intermediate_types::{
         IntermediateType,
         heap_integers::{IU128, IU256},
         structs::IStruct,
+        vector::IVector,
     },
-    vm_handled_types::{VmHandledType, uid::Uid},
+    vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
@@ -214,7 +214,12 @@ pub fn add_read_and_decode_storage_struct_instructions(
             read_bytes_in_slot,
         );
 
-        if matches!(field, IntermediateType::IStruct { module_id, index, ..} if Uid::is_vm_type(module_id, *index, compilation_ctx))
+        if matches!(
+            field,
+            IntermediateType::IStruct { module_id, index, ..}
+                | IntermediateType::IGenericStructInstance { module_id, index, ..}
+                    if Uid::is_vm_type(module_id, *index, compilation_ctx)
+                        || NamedId::is_vm_type(module_id, *index, compilation_ctx))
         {
             // Save the struct pointer in the reserved space of the UID
             builder
@@ -830,18 +835,27 @@ pub fn add_encode_intermediate_type_instructions(
         }
         IntermediateType::IStruct {
             module_id, index, ..
-        } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
-            // The UID struct has the following form
+        }
+        | IntermediateType::IGenericStructInstance {
+            module_id, index, ..
+        } if Uid::is_vm_type(module_id, *index, compilation_ctx)
+            || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
+        {
+            // The UID and NamedId structs has the following form
             //
-            // UID { id: ID { bytes: <bytes> } }
+            // [UID | NamedId] { id: ID { bytes: <bytes> } }
             //
-            // At this point we have in stack a pointer to field we are processing. The
+            // At this point we have in stack a pointer to the field we are processing. The
             // field's value is a pointer to the ID struct.
             //
             // The first load instruction puts in stack the pointer to the ID struct
             // The second load instruction loads the ID's bytes field pointer
             //
             // At the end of the load chain we point to the 32 bytes holding the data
+
+            let tmp = module.locals.add(ValType::I32);
+            let tmp2 = module.locals.add(ValType::I32);
+            builder.local_tee(tmp2);
             builder
                 .load(
                     compilation_ctx.memory_id,
@@ -851,6 +865,7 @@ pub fn add_encode_intermediate_type_instructions(
                         offset: 0,
                     },
                 )
+                .local_tee(tmp)
                 .load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -981,6 +996,7 @@ pub fn add_encode_intermediate_type_instructions(
             module_id,
             index,
             types,
+            ..
         } => {
             let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)
@@ -1202,7 +1218,12 @@ pub fn add_decode_intermediate_type_instructions(
         }
         IntermediateType::IStruct {
             module_id, index, ..
-        } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+        }
+        | IntermediateType::IGenericStructInstance {
+            module_id, index, ..
+        } if Uid::is_vm_type(module_id, *index, compilation_ctx)
+            || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
+        {
             // Reserve 4 bytes to fill with the mem address of the struct that wraps this id.
             // This will be filled outside this function where the struct pointer is available
             builder.i32_const(4).call(compilation_ctx.allocator).drop();
@@ -1370,6 +1391,7 @@ pub fn add_decode_intermediate_type_instructions(
             module_id,
             index,
             types,
+            ..
         } => {
             let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)
@@ -1421,6 +1443,10 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
             module_id, index, ..
         } if Uid::is_vm_type(module_id, *index, compilation_ctx) => 32,
 
+        IntermediateType::IGenericStructInstance {
+            module_id, index, ..
+        } if NamedId::is_vm_type(module_id, *index, compilation_ctx) => 32,
+
         // Structs are 0 because we don't know how much they will occupy, this depends on the
         // fields of the child struct, whether they are dynamic or static. The store function
         // called will take care of this.
@@ -1429,7 +1455,7 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
             panic!("found reference inside struct")
         }
         IntermediateType::ITypeParameter(_) => {
-            panic!("cannot know if a type parameter is dynamic, expected a concrete type");
+            panic!("cannot know the field size of a type parameter");
         }
     }
 }

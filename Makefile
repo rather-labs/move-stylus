@@ -22,6 +22,9 @@ example-interaction-primitives:
 example-counter:
 	cargo run -p move-hello-world-example --bin counter
 
+example-counter-named-id:
+	cargo run -p move-hello-world-example --bin counter_named_id
+
 example-counter-with-init:
 	cargo run -p move-hello-world-example --bin counter_with_init
 
@@ -52,6 +55,12 @@ deploy-counter:
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/wasm/counter.wasm
+
+deploy-counter-named-id:
+	cargo stylus deploy \
+		--endpoint='http://localhost:8547' \
+		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
+		--wasm-file=./example/build/wasm/counter_named_id.wasm
 
 deploy-counter-with-init:
 	cargo stylus deploy \

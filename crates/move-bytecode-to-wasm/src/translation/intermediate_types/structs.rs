@@ -372,6 +372,7 @@ impl IStruct {
                     module_id,
                     index,
                     types,
+                    ..
                 } => {
                     let child_struct = compilation_ctx
                         .get_struct_by_index(module_id, *index)
@@ -416,6 +417,7 @@ impl IStruct {
                     module_id,
                     index,
                     types,
+                    ..
                 } => {
                     let child_struct = compilation_ctx
                         .get_struct_by_index(module_id, *index)
@@ -467,6 +469,7 @@ impl IStruct {
                 module_id,
                 index,
                 types,
+                vm_handled_struct,
             } => IntermediateType::IGenericStructInstance {
                 module_id: module_id.clone(),
                 index: *index,
@@ -474,6 +477,7 @@ impl IStruct {
                     .iter()
                     .map(|t| Self::replace_type_parameters(t, instance_types))
                     .collect(),
+                vm_handled_struct: vm_handled_struct.clone(),
             },
             IntermediateType::IVector(inner) => IntermediateType::IVector(Box::new(
                 Self::replace_type_parameters(inner, instance_types),

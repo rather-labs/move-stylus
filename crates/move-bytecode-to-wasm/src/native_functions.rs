@@ -47,6 +47,7 @@ impl NativeFunction {
 
     // Object functions
     pub const NATIVE_DELETE_OBJECT: &str = "delete";
+    pub const NATIVE_COMPUTE_NAMED_ID: &str = "compute_named_id";
 
     // Host functions
     const HOST_BLOCK_NUMBER: &str = "block_number";
@@ -57,7 +58,7 @@ impl NativeFunction {
     /// Links the function into the module and returns its id. If the function is already present
     /// it just returns the id.
     ///
-    /// This funciton is idempotent.
+    /// This function is idempotent.
     pub fn get(name: &str, module: &mut Module, compilaton_ctx: &CompilationContext) -> FunctionId {
         // Some functions are implemented by host functions directly. For those, we just import and
         // use them without wrapping them.
@@ -225,6 +226,16 @@ impl NativeFunction {
                 );
 
                 types::add_is_one_time_witness_fn(module, compilation_ctx, &generics[0])
+            }
+            Self::NATIVE_COMPUTE_NAMED_ID => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {name} expected 1 type parameter, found {}",
+                    generics.len(),
+                );
+
+                object::add_compute_named_id_fn(module, compilation_ctx, &generics[0])
             }
             _ => panic!("generic native function {name} not supported yet"),
         }
