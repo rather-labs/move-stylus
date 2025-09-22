@@ -342,6 +342,7 @@ impl Packable for IntermediateType {
                 module_id,
                 index,
                 types,
+                ..
             } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
@@ -437,6 +438,7 @@ impl Packable for IntermediateType {
                 module_id,
                 index,
                 types,
+                ..
             } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
@@ -485,6 +487,7 @@ impl Packable for IntermediateType {
                 module_id,
                 index,
                 types,
+                ..
             } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
@@ -532,6 +535,7 @@ impl Packable for IntermediateType {
                 module_id,
                 index,
                 types,
+                ..
             } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)

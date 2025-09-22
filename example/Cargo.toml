@@ -20,6 +20,10 @@ name = "counter"
 path = "scripts/counter.rs"
 
 [[bin]]
+name = "counter_named_id"
+path = "scripts/counter_named_id.rs"
+
+[[bin]]
 name = "counter_with_init"
 path = "scripts/counter_with_init.rs"
 

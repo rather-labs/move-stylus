@@ -5,7 +5,7 @@ use crate::{
     CompilationContext,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
     utils::snake_to_camel,
-    vm_handled_types::{VmHandledType, tx_context::TxContext},
+    vm_handled_types::{VmHandledType, named_id::NamedId, tx_context::TxContext, uid::Uid},
 };
 
 pub type AbiFunctionSelector = [u8; 4];
@@ -69,7 +69,7 @@ impl SolName for IntermediateType {
                     .unwrap();
 
                 if struct_.saved_in_storage {
-                    Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
+                    sol_name_storage_ids(struct_, compilation_ctx)
                 } else {
                     Self::struct_fields_sol_name(struct_, compilation_ctx)
                 }
@@ -78,6 +78,7 @@ impl SolName for IntermediateType {
                 module_id,
                 index,
                 types,
+                ..
             } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
@@ -85,13 +86,31 @@ impl SolName for IntermediateType {
                 let struct_instance = struct_.instantiate(types);
 
                 if struct_instance.saved_in_storage {
-                    Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
+                    sol_name_storage_ids(struct_, compilation_ctx)
                 } else {
                     Self::struct_fields_sol_name(&struct_instance, compilation_ctx)
                 }
             }
             IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => None,
         }
+    }
+}
+
+fn sol_name_storage_ids(struct_: &IStruct, compilation_ctx: &CompilationContext) -> Option<String> {
+    match struct_.fields.first() {
+        Some(IntermediateType::IStruct {
+            module_id, index, ..
+        }) if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+            Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
+        }
+        Some(IntermediateType::IGenericStructInstance {
+            module_id, index, ..
+        }) if NamedId::is_vm_type(module_id, *index, compilation_ctx) => None,
+
+        _ => panic!(
+            "expected stylus::object::UID or stylus::object::NamedId as first field in {} struct (it has key ability)",
+            struct_.identifier
+        ),
     }
 }
 

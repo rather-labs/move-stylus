@@ -136,6 +136,7 @@ pub fn replace_type_parameters(
             module_id,
             index,
             types,
+            vm_handled_struct,
         } => IntermediateType::IGenericStructInstance {
             module_id: module_id.clone(),
             index: *index,
@@ -143,6 +144,7 @@ pub fn replace_type_parameters(
                 .iter()
                 .map(|t| replace_type_parameters(t, instance_types))
                 .collect(),
+            vm_handled_struct: vm_handled_struct.clone(),
         },
         IntermediateType::IVector(inner) => {
             IntermediateType::IVector(Box::new(replace_type_parameters(inner, instance_types)))
