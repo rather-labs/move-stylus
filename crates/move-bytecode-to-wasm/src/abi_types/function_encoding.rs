@@ -69,7 +69,7 @@ impl SolName for IntermediateType {
                     .unwrap();
 
                 if struct_.saved_in_storage {
-                    sol_name_storage_ids(&struct_, compilation_ctx)
+                    sol_name_storage_ids(struct_, compilation_ctx)
                 } else {
                     Self::struct_fields_sol_name(struct_, compilation_ctx)
                 }
@@ -86,7 +86,7 @@ impl SolName for IntermediateType {
                 let struct_instance = struct_.instantiate(types);
 
                 if struct_instance.saved_in_storage {
-                    sol_name_storage_ids(&struct_, compilation_ctx)
+                    sol_name_storage_ids(struct_, compilation_ctx)
                 } else {
                     Self::struct_fields_sol_name(&struct_instance, compilation_ctx)
                 }
@@ -100,12 +100,12 @@ fn sol_name_storage_ids(struct_: &IStruct, compilation_ctx: &CompilationContext)
     match struct_.fields.first() {
         Some(IntermediateType::IStruct {
             module_id, index, ..
-        }) if Uid::is_vm_type(&module_id, *index, compilation_ctx) => {
+        }) if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
             Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
         }
         Some(IntermediateType::IGenericStructInstance {
             module_id, index, ..
-        }) if NamedId::is_vm_type(&module_id, *index, compilation_ctx) => None,
+        }) if NamedId::is_vm_type(module_id, *index, compilation_ctx) => None,
 
         _ => panic!(
             "expected stylus::object::UID or stylus::object::NamedId as first field in {} struct (it has key ability)",

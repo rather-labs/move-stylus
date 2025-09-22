@@ -293,7 +293,7 @@ fn load_struct_storage_id(
     match struct_.fields.first() {
         Some(IntermediateType::IStruct {
             module_id, index, ..
-        }) if Uid::is_vm_type(&module_id, *index, compilation_ctx) => {
+        }) if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
             // First we add the instructions to unpack the UID. We use address to unpack it because ids are
             // 32 bytes static, same as an address
             IAddress::add_unpack_instructions(
@@ -309,7 +309,7 @@ fn load_struct_storage_id(
             index,
             types,
             ..
-        }) if NamedId::is_vm_type(&module_id, *index, compilation_ctx) => {
+        }) if NamedId::is_vm_type(module_id, *index, compilation_ctx) => {
             // We use the native function that computes the ID to leave it in the stack so it can
             // be used by `add_unpack_from_storage_instructions`
             let compute_named_id_fn = NativeFunction::get_generic(
