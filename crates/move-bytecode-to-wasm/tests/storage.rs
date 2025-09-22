@@ -259,6 +259,901 @@ mod capability {
     }
 }
 
+mod storage_transfer_named_id {
+    use alloy_primitives::{FixedBytes, U256, address, keccak256};
+    use alloy_sol_types::{SolCall, SolValue, sol};
+
+    use super::*;
+
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "transfer_named_id";
+        const SOURCE_PATH: &str = "tests/storage/transfer_named_id.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+
+        #[derive(Debug)]
+        struct ID {
+           bytes32 bytes;
+        }
+
+        #[derive(Debug)]
+        struct NamedId {
+           ID id;
+        }
+
+        struct Foo {
+            NamedId id;
+            uint64 value;
+        }
+
+        struct Bar {
+            NamedId id;
+            uint64 a;
+            uint64[] c;
+        }
+
+        struct Qux {
+            uint64 a;
+            uint128 b;
+            uint128 c;
+        }
+
+        struct Baz {
+            NamedId id;
+            uint64 a;
+            Qux c;
+        }
+
+        struct Bez {
+            NamedId id;
+            uint64 a;
+            Qux[] c;
+            uint128[][] d;
+            uint8 e;
+        }
+
+        struct Quz {
+            uint64 a;
+            uint128 b;
+            uint128 c;
+        }
+
+        struct Biz {
+            NamedId id;
+            uint64 a;
+            Quz b;
+            Quz[] c;
+        }
+
+
+        #[allow(missing_docs)]
+        function createShared() public view;
+        function createOwned(address recipient) public view;
+        function createFrozen() public view;
+        function readValue() public view returns (uint64);
+        function setValue(uint64 value) public view;
+        function incrementValue() public view;
+        function deleteObj() public view;
+        function freezeObj() public view;
+        function shareObj() public view;
+        function transferObj(address recipient) public view;
+        function getFoo() public view returns (Foo);
+        function createBar() public view;
+        function getBar() public view returns (Bar);
+        function deleteBar() public view;
+        function createBaz(address recipient, bool share) public view;
+        function getBaz() public view returns (Baz);
+        function deleteBaz() public view;
+        function createBez() public view;
+        function getBez() public view returns (Bez);
+        function deleteBez() public view;
+        function createBiz() public view;
+        function getBiz() public view returns (Biz);
+        function deleteBiz() public view;
+    );
+
+    const SHARED: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+    const FROZEN: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2];
+    const COUNTER_KEY: [u8; 32] = [
+        88, 181, 235, 71, 20, 200, 162, 193, 179, 99, 195, 177, 236, 158, 218, 42, 168, 26, 11, 70,
+        66, 173, 6, 207, 222, 175, 248, 56, 236, 49, 87, 253,
+    ];
+    const FOO_ID: [u8; 32] = [
+        88, 181, 235, 71, 20, 200, 162, 193, 179, 99, 195, 177, 236, 158, 218, 42, 168, 26, 11, 70,
+        66, 173, 6, 207, 222, 175, 248, 56, 236, 49, 87, 253,
+    ];
+    const BAR_ID: [u8; 32] = [
+        88, 181, 235, 71, 20, 200, 162, 193, 179, 99, 195, 177, 236, 158, 218, 42, 168, 26, 11, 70,
+        66, 173, 6, 207, 222, 175, 248, 56, 236, 49, 87, 253,
+    ];
+    const BAZ_ID: [u8; 32] = [
+        88, 181, 235, 71, 20, 200, 162, 193, 179, 99, 195, 177, 236, 158, 218, 42, 168, 26, 11, 70,
+        66, 173, 6, 207, 222, 175, 248, 56, 236, 49, 87, 253,
+    ];
+    const BEZ_ID: [u8; 32] = [
+        88, 181, 235, 71, 20, 200, 162, 193, 179, 99, 195, 177, 236, 158, 218, 42, 168, 26, 11, 70,
+        66, 173, 6, 207, 222, 175, 248, 56, 236, 49, 87, 253,
+    ];
+    const BIZ_ID: [u8; 32] = [
+        88, 181, 235, 71, 20, 200, 162, 193, 179, 99, 195, 177, 236, 158, 218, 42, 168, 26, 11, 70,
+        66, 173, 6, 207, 222, 175, 248, 56, 236, 49, 87, 253,
+    ];
+
+    /// Right-align `data` into a 32-byte word (EVM storage encoding for value types).
+    #[inline]
+    fn pad32_right(data: &[u8]) -> [u8; 32] {
+        let mut out = [0u8; 32];
+        let n = data.len().min(32);
+        out[32 - n..].copy_from_slice(&data[..n]); // <-- right-align
+        out
+    }
+
+    /// mapping(address => mapping(bytes32 => V)) at base slot 0
+    /// slot(owner, id) = keccak256( pad32(id) || keccak256( pad32(owner) || pad32(0) ) )
+    pub fn derive_object_slot(owner: &[u8], object_id: &[u8]) -> FixedBytes<32> {
+        // parent = keccak256( pad32(owner) || pad32(0) )
+        let owner_padded = pad32_right(owner);
+        let zero_slot = [0u8; 32];
+
+        let mut buf = [0u8; 64];
+        buf[..32].copy_from_slice(&owner_padded);
+        buf[32..].copy_from_slice(&zero_slot);
+        let parent = keccak256(buf);
+
+        // slot = keccak256( pad32(id) || pad32(parent) )
+        let id_padded = pad32_right(object_id); // object_id is already 32B, this is a no-op
+        buf[..32].copy_from_slice(&id_padded);
+        buf[32..].copy_from_slice(parent.as_slice());
+        keccak256(buf)
+    }
+
+    pub fn get_next_slot(slot: &[u8; 32]) -> [u8; 32] {
+        let slot_value = U256::from_be_bytes(*slot);
+        (slot_value + U256::from(1)).to_be_bytes()
+    }
+
+    // Test create frozen object
+    #[rstest]
+    fn test_frozen_object(runtime: RuntimeSandbox) {
+        let call_data = createFrozenCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read value
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+    }
+
+    // Tests operations on a shared object: reading, updating values, etc.
+    #[rstest]
+    fn test_shared_object(runtime: RuntimeSandbox) {
+        // Create a new counter
+        let call_data = createSharedCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read initial value (should be 101)
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // Increment
+        let call_data = incrementValueCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read value
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(102, return_data);
+        assert_eq!(0, result);
+
+        // Set value to 42
+        let call_data = setValueCall::new((42,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read value
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(42, return_data);
+        assert_eq!(0, result);
+
+        // Increment
+        let call_data = incrementValueCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read value
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(43, return_data);
+        assert_eq!(0, result);
+
+        // Change the signer
+        runtime.set_tx_origin(address!("0x00000000000000000000000000000000abababab").0.0);
+
+        // Set value to 111
+        let call_data = setValueCall::new((111,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Assert that the value is set
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(111, return_data);
+        assert_eq!(0, result);
+
+        // Change the signer
+        runtime.set_tx_origin(address!("0x00000000000000000000000000000000acacacac").0.0);
+
+        // Increment
+        let call_data = incrementValueCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Assert that the value did not change
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(112, return_data);
+        assert_eq!(0, result);
+
+        // Change the msg sender
+        runtime.set_msg_sender(address!("0x00000000000000000000000000000000abababab").0.0);
+
+        // Set value to 1111 with a sender that is not the owner
+        let call_data = setValueCall::new((1111,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(1111, return_data);
+        assert_eq!(0, result);
+    }
+
+    // Tests operations on an owned object: reading, updating values, etc.
+    #[rstest]
+    fn test_owned_object(runtime: RuntimeSandbox) {
+        // Create a new counter
+        let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read initial value (should be 101)
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // Increment
+        let call_data = incrementValueCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read value
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(102, return_data);
+        assert_eq!(0, result);
+
+        // Set value to 42
+        let call_data = setValueCall::new((42,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read value
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(42, return_data);
+        assert_eq!(0, result);
+
+        // Increment
+        let call_data = incrementValueCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read value
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(43, return_data);
+        assert_eq!(0, result);
+
+        // Change the msg sender
+        // Should still work since the signer is the owner
+        runtime.set_msg_sender(address!("0x00000000000000000000000000000000abababab").0.0);
+
+        // Set value to 111 with a sender that is not the owner
+        let call_data = setValueCall::new((111,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Assert that the value was changes correctly
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(111, return_data);
+        assert_eq!(0, result);
+
+        // Delete object
+        let call_data = deleteObjCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+    }
+
+    // Tests the share of an object in both owned and shared cases.
+    #[rstest]
+    fn test_share_owned_object(runtime: RuntimeSandbox) {
+        // Create a new object
+        let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Compute the object slot using the owner and the object id
+        let owner = runtime.get_tx_origin();
+        let object_slot = derive_object_slot(&owner, &FOO_ID);
+
+        // Read the storage on the original slot before the freeze
+        let value_before_share = runtime.get_storage_at_slot(object_slot.0);
+
+        // Share the object. Only possible if the object is owned by the signer!
+        let call_data = shareObjCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the storage on the original slot after the share
+        // Should be zeroes since the object moved from the owner space to the shared space
+        let value_after_share = runtime.get_storage_at_slot(object_slot.0);
+        assert_eq!(
+            [0u8; 32], value_after_share,
+            "Expected storage value to be 32 zeros"
+        );
+
+        // Get the slot number for the shared object
+        let shared_slot = derive_object_slot(&SHARED, &FOO_ID);
+
+        // Read the storage on the shared slot after the share
+        // Should be the same as the original slot before the share
+        let shared_value = runtime.get_storage_at_slot(shared_slot.0);
+        assert_eq!(
+            value_before_share, shared_value,
+            "Expected storage value to be the same"
+        );
+
+        // Read value
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // Change the signer and read again
+        // Should still work since the object is shared
+        runtime.set_tx_origin(address!("0x00000000000000000000000000000000abababab").0.0);
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+    }
+
+    // Tests the freeze of an object in both owned case.
+    #[rstest]
+    fn test_freeze_owned_object(runtime: RuntimeSandbox) {
+        // Create a new object
+        let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Compute the object slot using the owner and the object id
+        let owner = runtime.get_tx_origin();
+        let object_slot = derive_object_slot(&owner, &FOO_ID);
+
+        // Read the storage on the original slot before the freeze
+        let value_before_freeze = runtime.get_storage_at_slot(object_slot.0);
+
+        // Freeze the object. Only possible if the object is owned by the signer!
+        let call_data = freezeObjCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the storage on the original slot after the freeze
+        // Should be zeroes since the object moved from the owner space to the frozen space
+        let value_after_freeze = runtime.get_storage_at_slot(object_slot.0);
+        assert_eq!(
+            [0u8; 32], value_after_freeze,
+            "Expected storage value to be 32 zeros"
+        );
+
+        // Compute the object slot using the FROZEN address and the object id
+        let frozen_slot = derive_object_slot(&FROZEN, &FOO_ID);
+
+        // Read the storage on the frozen slot after the freeze
+        let frozen_value = runtime.get_storage_at_slot(frozen_slot.0);
+        assert_eq!(
+            value_before_freeze, frozen_value,
+            "Expected storage value to be the same"
+        );
+
+        // Read value
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // Change the signer and read again
+        // Should still work since the object is frozen
+        runtime.set_tx_origin(address!("0x00000000000000000000000000000000abababab").0.0);
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // Change the msg sender and read again
+        // Should still work since the object is frozen
+        runtime.set_msg_sender(address!("0x00000000000000000000000000000000abababab").0.0);
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+    }
+
+    // Tests trying to read an owned object with a signer that is not the owner.
+    #[rstest]
+    #[should_panic(expected = "unreachable")]
+    fn test_signer_owner_mismatch(runtime: RuntimeSandbox) {
+        let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read initial value (should be 101)
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // change the signer
+        runtime.set_tx_origin(address!("0x00000000000000000000000000000000abababab").0.0);
+
+        // This should hit an unreachable due to the signer differing from the owner!
+        let call_data = readValueCall::new(()).abi_encode();
+        runtime.call_entrypoint(call_data).unwrap();
+    }
+
+    // Tests the freeze of an object that is not owned by the signer.
+    #[rstest]
+    #[should_panic(expected = "unreachable")]
+    fn test_freeze_not_owned_object(runtime: RuntimeSandbox) {
+        let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        runtime.set_tx_origin(address!("0x00000000000000000000000000000000abababab").0.0);
+
+        // Freeze the object. Only possible if the object is owned by the signer!
+        let call_data = freezeObjCall::new(()).abi_encode();
+        runtime.call_entrypoint(call_data).unwrap();
+    }
+
+    // Tests the freeze of a shared object.
+    #[rstest]
+    #[should_panic(expected = "unreachable")]
+    fn test_freeze_shared_object(runtime: RuntimeSandbox) {
+        // Create a new object
+        let call_data = createSharedCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Freeze the object. Only possible if the object is owned by the signer!
+        let call_data = freezeObjCall::new(()).abi_encode();
+        runtime.call_entrypoint(call_data).unwrap();
+    }
+
+    // Freeze and then try to share or transfer the object.
+    #[rstest]
+    #[should_panic(expected = "unreachable")]
+    #[case(false)]
+    #[should_panic(expected = "unreachable")]
+    #[case(true)]
+    fn test_share_or_transfer_frozen(runtime: RuntimeSandbox, #[case] share: bool) {
+        let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Freeze the object. Only possible if the object is owned by the signer!
+        let call_data = freezeObjCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        if share {
+            // Try to share the object.
+            let call_data = shareObjCall::new(()).abi_encode();
+            runtime.call_entrypoint(call_data).unwrap();
+        } else {
+            // Try to transfer the object.
+            let call_data = transferObjCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+            runtime.call_entrypoint(call_data).unwrap();
+        }
+    }
+
+    #[rstest]
+    #[should_panic(expected = "unreachable")]
+    fn test_delete_frozen_object(runtime: RuntimeSandbox) {
+        let call_data = createFrozenCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read value before delete
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // Try to delete the object
+        let call_data = deleteObjCall::new(()).abi_encode();
+        runtime.call_entrypoint(call_data).unwrap();
+    }
+
+    // Test delete owned object
+    #[rstest]
+    fn test_delete_owned_object(runtime: RuntimeSandbox) {
+        let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_slot = derive_object_slot(&SIGNER_ADDRESS, &FOO_ID);
+
+        // Read value before delete
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // Delete the object
+        let call_data = deleteObjCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the storage from the original slots and check that they are empty
+        // Foo takes 2 slots
+
+        // First slot
+        assert_eq!(
+            [0u8; 32],
+            runtime.get_storage_at_slot(object_slot.0),
+            "Expected storage value to be 32 zeros"
+        );
+
+        // Second slot
+        assert_eq!(
+            [0u8; 32],
+            runtime.get_storage_at_slot(get_next_slot(&object_slot.0)),
+            "Expected storage value to be 32 zeros at next slot"
+        );
+    }
+
+    // Test delete owned object
+    #[rstest]
+    fn test_delete_shared_object(runtime: RuntimeSandbox) {
+        let call_data = createSharedCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_slot = derive_object_slot(&SHARED, &FOO_ID);
+
+        // Read value before delete
+        let call_data = readValueCall::new(()).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readValueCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(101, return_data);
+        assert_eq!(0, result);
+
+        // Delete the object
+        let call_data = deleteObjCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the storage from the original slots and check that they are empty
+        // Foo takes 2 slots
+
+        // First slot
+        assert_eq!(
+            [0u8; 32],
+            runtime.get_storage_at_slot(object_slot.0),
+            "Expected storage value to be 32 zeros"
+        );
+
+        // Second slot
+        assert_eq!(
+            [0u8; 32],
+            runtime.get_storage_at_slot(get_next_slot(&object_slot.0)),
+            "Expected storage value to be 32 zeros at next slot"
+        );
+    }
+
+    #[rstest]
+    fn test_get_foo(runtime: RuntimeSandbox) {
+        // Create a new counter
+        let call_data = createOwnedCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Set value to 111 with a sender that is not the owner
+        let call_data = getFooCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Foo::abi_encode(&Foo {
+            id: NamedId {
+                id: ID {
+                    bytes: alloy_primitives::FixedBytes(FOO_ID),
+                },
+            },
+            value: 101,
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+    }
+
+    #[rstest]
+    fn test_delete_bar(runtime: RuntimeSandbox) {
+        let call_data = createBarCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let call_data = getBarCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Bar::abi_encode(&Bar {
+            id: NamedId {
+                id: ID {
+                    bytes: alloy_primitives::FixedBytes(BAR_ID),
+                },
+            },
+            a: 101,
+            c: vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+
+        let call_data = deleteBarCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        for (key, value) in storage_after_delete.iter() {
+            if *key != COUNTER_KEY {
+                assert!(
+                    storage_before_delete.contains_key(key),
+                    "Key {:?} should exist in storage_before_delete",
+                    key
+                );
+
+                assert_eq!(
+                    *value, [0u8; 32],
+                    "Unexpected non-zero value at key: {:?}",
+                    key
+                );
+            }
+        }
+    }
+
+    #[rstest]
+    #[case(false)]
+    #[case(true)]
+    fn test_delete_baz(runtime: RuntimeSandbox, #[case] share: bool) {
+        let call_data = createBazCall::new((SIGNER_ADDRESS.into(), share)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let call_data = getBazCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Baz::abi_encode(&Baz {
+            id: NamedId {
+                id: ID {
+                    bytes: alloy_primitives::FixedBytes(BAZ_ID),
+                },
+            },
+            a: 101,
+            c: Qux {
+                a: 42,
+                b: 55,
+                c: 66,
+            },
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+
+        let call_data = deleteBazCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        for (key, value) in storage_after_delete.iter() {
+            if *key != COUNTER_KEY {
+                assert!(
+                    storage_before_delete.contains_key(key),
+                    "Key {:?} should exist in storage_before_delete",
+                    key
+                );
+
+                assert_eq!(
+                    *value, [0u8; 32],
+                    "Unexpected non-zero value at key: {:?}",
+                    key
+                );
+            }
+        }
+    }
+
+    #[rstest]
+    fn test_delete_bez(runtime: RuntimeSandbox) {
+        let call_data = createBezCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let call_data = getBezCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Bez::abi_encode(&Bez {
+            id: NamedId {
+                id: ID {
+                    bytes: alloy_primitives::FixedBytes(BEZ_ID),
+                },
+            },
+            a: 101,
+            c: vec![
+                Qux {
+                    a: 42,
+                    b: 55,
+                    c: 66,
+                },
+                Qux {
+                    a: 43,
+                    b: 56,
+                    c: 67,
+                },
+                Qux {
+                    a: 44,
+                    b: 57,
+                    c: 68,
+                },
+            ],
+            d: vec![vec![1, 2, 3], vec![4], vec![], vec![5, 6]],
+            e: 17,
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+
+        let call_data = deleteBezCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        for (key, value) in storage_after_delete.iter() {
+            if *key != COUNTER_KEY {
+                // Assert that the key existed in storage before deletion
+                assert!(
+                    storage_before_delete.contains_key(key),
+                    "Key {:?} should exist in storage_before_delete",
+                    key
+                );
+
+                assert_eq!(
+                    *value, [0u8; 32],
+                    "Unexpected non-zero value at key: {:?}",
+                    key
+                );
+            }
+        }
+    }
+
+    #[rstest]
+    fn test_delete_biz(runtime: RuntimeSandbox) {
+        let call_data = createBizCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let call_data = getBizCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Biz::abi_encode(&Biz {
+            id: NamedId {
+                id: ID {
+                    bytes: alloy_primitives::FixedBytes(BIZ_ID),
+                },
+            },
+            a: 101,
+            b: Quz {
+                a: 42,
+                b: 55,
+                c: 66,
+            },
+            c: vec![
+                Quz {
+                    a: 42,
+                    b: 55,
+                    c: 66,
+                },
+                Quz {
+                    a: 43,
+                    b: 56,
+                    c: 67,
+                },
+                Quz {
+                    a: 44,
+                    b: 57,
+                    c: 68,
+                },
+            ],
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+
+        let call_data = deleteBizCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        for (key, value) in storage_after_delete.iter() {
+            if *key != COUNTER_KEY {
+                // Assert that the key existed in storage before deletion
+                assert!(
+                    storage_before_delete.contains_key(key),
+                    "Key {:?} should exist in storage_before_delete",
+                    key
+                );
+
+                assert_eq!(
+                    *value, [0u8; 32],
+                    "Unexpected non-zero value at key: {:?}",
+                    key
+                );
+            }
+        }
+    }
+}
+
 mod storage_transfer {
     use alloy_primitives::{FixedBytes, U256, address, keccak256};
     use alloy_sol_types::{SolCall, SolValue, sol};
