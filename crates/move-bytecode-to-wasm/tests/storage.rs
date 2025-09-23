@@ -1486,6 +1486,15 @@ mod storage_encoding {
         }
         function saveVar() public view;
         function readVar() public view returns (Var);
+
+        struct GenericWrapper32 {
+            UID id;
+            uint32 a;
+            GenericStruct32 b;
+            uint32 c;
+        }
+        function saveGenericWrapper32() public view;
+        function readGenericWrapper32() public view returns (GenericWrapper32);
     );
 
     #[rstest]
@@ -2240,6 +2249,40 @@ mod storage_encoding {
                     a: 45,
                 }
             ],
+        }
+    )]
+    #[case(saveGenericWrapper32Call::new(()),
+    vec![
+        [0x00; 32],
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+
+        U256::from_str_radix("398fdf7528e5068055009aa3b7c48e06f0127b5d8c57be483a07b5cd9100322e", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("398fdf7528e5068055009aa3b7c48e06f0127b5d8c57be483a07b5cd9100322f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("580978fee9799ff96dcfcd540232ed2f7cd5bade678a1ccae6650e39d39559dd", 16).unwrap().to_be_bytes(),
+
+    ],
+    vec![
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000065", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
+
+        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000000000000063000000580000004d", 16).unwrap().to_be_bytes(),
+    ],
+        readGenericWrapper32Call::new(()),
+        GenericWrapper32 {
+            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into()  } },
+            a: 101,
+            b: GenericStruct32 {
+                id: UID { id: ID { bytes: U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().into()  } },
+                a: vec![77, 88, 99],
+                b: 1234,
+            },
+            c: 102,
         }
     )]
     fn test_wrapped_objects<T: SolCall, U: SolCall, V: SolValue>(

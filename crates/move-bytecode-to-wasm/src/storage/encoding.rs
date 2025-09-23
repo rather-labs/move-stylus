@@ -886,6 +886,9 @@ pub fn add_encode_intermediate_type_instructions(
         }
         IntermediateType::IStruct {
             module_id, index, ..
+        }
+        | IntermediateType::IGenericStructInstance {
+            module_id, index, ..
         } => {
             // This section handles encoding of nested structs within parent structs.
             // The behavior differs based on whether the child struct has the 'key' ability:
@@ -895,9 +898,18 @@ pub fn add_encode_intermediate_type_instructions(
             let child_struct_ptr = module.locals.add(ValType::I32);
             builder.local_set(child_struct_ptr);
 
-            let child_struct = compilation_ctx
+            // Get base definition by (module_id, index)
+            let base_def = compilation_ctx
                 .get_struct_by_index(module_id, *index)
-                .unwrap();
+                .expect("struct not found");
+
+            // If it's a generic instance, instantiate; otherwise use as-is
+            let child_struct = if let IntermediateType::IGenericStructInstance { types, .. } = itype
+            {
+                base_def.instantiate(types)
+            } else {
+                base_def.clone()
+            };
 
             if child_struct.has_key {
                 // ====================================================================
@@ -986,7 +998,7 @@ pub fn add_encode_intermediate_type_instructions(
                     compilation_ctx,
                     child_struct_ptr,
                     child_struct_slot_ptr,
-                    child_struct,
+                    &child_struct,
                     written_bytes_in_slot,
                 );
 
@@ -1004,7 +1016,6 @@ pub fn add_encode_intermediate_type_instructions(
                     .local_get(child_struct_id_ptr)
                     .i32_const(32)
                     .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
             } else {
                 // ====================================================================
                 // CHILD STRUCT WITHOUT KEY - Flatten into Parent
@@ -1020,34 +1031,10 @@ pub fn add_encode_intermediate_type_instructions(
                     compilation_ctx,
                     child_struct_ptr,
                     slot_ptr,
-                    child_struct,
+                    &child_struct,
                     written_bytes_in_slot,
                 );
             }
-        }
-        IntermediateType::IGenericStructInstance {
-            module_id,
-            index,
-            types,
-            ..
-        } => {
-            let child_struct = compilation_ctx
-                .get_struct_by_index(module_id, *index)
-                .unwrap();
-            let child_struct = child_struct.instantiate(types);
-
-            // The struct ptr
-            builder.local_set(val_32);
-
-            add_encode_and_save_into_storage_struct_instructions(
-                module,
-                builder,
-                compilation_ctx,
-                val_32,
-                slot_ptr,
-                &child_struct,
-                written_bytes_in_slot,
-            );
         }
         IntermediateType::IVector(inner) => {
             builder.local_set(val_32);
@@ -1323,6 +1310,9 @@ pub fn add_decode_intermediate_type_instructions(
         }
         IntermediateType::IStruct {
             module_id, index, ..
+        }
+        | IntermediateType::IGenericStructInstance {
+            module_id, index, ..
         } => {
             // ========================================================================
             // Handle Nested Struct Decoding
@@ -1332,9 +1322,18 @@ pub fn add_decode_intermediate_type_instructions(
             // - If child has 'key': read UID from parent, calculate child slot, decode child
             // - If child has no 'key': decode child directly from current slot (flattened)
 
-            let child_struct = compilation_ctx
+            // Get base definition by (module_id, index)
+            let base_def = compilation_ctx
                 .get_struct_by_index(module_id, *index)
-                .unwrap();
+                .expect("struct not found");
+
+            // If it's a generic instance, instantiate; otherwise use as-is
+            let child_struct = if let IntermediateType::IGenericStructInstance { types, .. } = itype
+            {
+                base_def.instantiate(types)
+            } else {
+                base_def.clone()
+            };
 
             if child_struct.has_key {
                 // ====================================================================
@@ -1389,13 +1388,13 @@ pub fn add_decode_intermediate_type_instructions(
                     .local_get(child_struct_id_ptr)
                     .call(storage_load);
 
-                // Calculate the child struct's storage slot     
+                // Calculate the child struct's storage slot
                 // child_struct_slot = keccak256(child_struct_id || keccak256(parent_struct_id || 0))
                 builder
                     .local_get(parent_struct_id_ptr)
                     .local_get(child_struct_id_ptr)
                     .call(write_object_slot_fn);
-        
+
                 // Allocate memory for the child struct slot and copy the calculated
                 // slot data to avoid overwriting during recursive decoding.
 
@@ -1424,7 +1423,7 @@ pub fn add_decode_intermediate_type_instructions(
                     builder,
                     compilation_ctx,
                     child_struct_slot_ptr,
-                    child_struct,
+                    &child_struct,
                     false,
                     read_bytes_in_slot,
                 );
@@ -1434,7 +1433,6 @@ pub fn add_decode_intermediate_type_instructions(
 
                 // Set the decoded child struct as the result
                 builder.local_get(child_struct_ptr).local_set(data_ptr);
-
             } else {
                 // ====================================================================
                 // CHILD STRUCT WITHOUT KEY - Decode from Flattened Data
@@ -1450,7 +1448,7 @@ pub fn add_decode_intermediate_type_instructions(
                     builder,
                     compilation_ctx,
                     slot_ptr,
-                    child_struct,
+                    &child_struct,
                     true,
                     read_bytes_in_slot,
                 );
@@ -1458,30 +1456,6 @@ pub fn add_decode_intermediate_type_instructions(
                 // Set the decoded child struct as the result
                 builder.local_get(child_struct_ptr).local_set(data_ptr);
             }
-        }
-        IntermediateType::IGenericStructInstance {
-            module_id,
-            index,
-            types,
-            ..
-        } => {
-            let child_struct = compilation_ctx
-                .get_struct_by_index(module_id, *index)
-                .unwrap();
-            let child_struct = child_struct.instantiate(types);
-
-            // Read the child struct
-            let child_struct_ptr = add_read_and_decode_storage_struct_instructions(
-                module,
-                builder,
-                compilation_ctx,
-                slot_ptr,
-                &child_struct,
-                true,
-                read_bytes_in_slot,
-            );
-
-            builder.local_get(child_struct_ptr).local_set(data_ptr);
         }
         IntermediateType::IVector(inner_) => {
             add_read_and_decode_storage_vector_instructions(

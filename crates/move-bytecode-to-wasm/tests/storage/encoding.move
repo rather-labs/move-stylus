@@ -122,7 +122,7 @@ public struct DynamicStruct5 has key {
 }
 
 /// Generic test structure
-public struct GenericStruct<T> has key {
+public struct GenericStruct<T> has key, store {
     id: UID,
     a: vector<T>,
     b: T,
@@ -172,6 +172,13 @@ public struct Var has key {
     a: Bar,
     b: Foo,
     c: vector<Bar>,
+}
+
+public struct GenericWrapper<T> has key {
+    id: UID,
+    a: T,
+    b: GenericStruct<T>,
+    c: T
 }
 
 // ============================================================================
@@ -528,4 +535,18 @@ public fun save_var(ctx: &mut TxContext) {
 /// Read a Var structure from storage
 public fun read_var(): Var {
     read_slot<Var>(0)
+}
+
+public fun save_generic_wrapper_32(ctx: &mut TxContext) {
+    let wrapper = GenericWrapper<u32> {
+        id: object::new(ctx),
+        a: 101,
+        b: GenericStruct<u32> { id: object::new(ctx), a: vector[77, 88, 99], b: 1234 },
+        c: 102,
+    };
+    save_in_slot(wrapper, 0);
+}
+
+public fun read_generic_wrapper_32(): GenericWrapper<u32> {
+    read_slot<GenericWrapper<u32>>(0)
 }
