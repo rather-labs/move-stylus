@@ -10,7 +10,10 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_STORAGE_OBJECT_OWNER_OFFSET},
+    data::{
+        DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
+        DATA_STORAGE_OBJECT_OWNER_OFFSET,
+    },
     hostio::host_functions::{native_keccak256, storage_cache_bytes32, storage_load_bytes32},
     runtime::RuntimeFunction,
     translation::intermediate_types::{
@@ -99,6 +102,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             builder,
             compilation_ctx,
             slot_ptr,
+            struct_ptr,
             field,
             written_bytes_in_slot,
             true,
@@ -205,6 +209,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
             compilation_ctx,
             field_ptr,
             slot_ptr,
+            struct_ptr,
             field,
             read_bytes_in_slot,
         );
@@ -261,6 +266,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     compilation_ctx: &CompilationContext,
     vector_ptr: LocalId,
     slot_ptr: LocalId,
+    parent_struct_ptr: LocalId,
     inner: &IntermediateType,
 ) {
     // Host functions
@@ -397,6 +403,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                     loop_,
                     compilation_ctx,
                     elem_slot_ptr,
+                    parent_struct_ptr,
                     inner,
                     written_bytes_in_slot,
                     false,
@@ -466,6 +473,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
     compilation_ctx: &CompilationContext,
     data_ptr: LocalId,
     slot_ptr: LocalId,
+    parent_struct_ptr: LocalId,
     inner: &IntermediateType,
 ) {
     // Host functions
@@ -603,6 +611,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
                         compilation_ctx,
                         elem_data_ptr,
                         elem_slot_ptr,
+                        parent_struct_ptr,
                         inner,
                         read_bytes_in_slot,
                     );
@@ -675,11 +684,15 @@ pub fn add_read_and_decode_storage_vector_instructions(
 /// `itype` - intermediate type to be encoded
 /// `written_bytes_in_slot` - number of bytes already written in the slot.
 /// `is_field` - whether the type is a field from a struct or not.
+///
+/// Expects a pointer to the element in memory in stack
+#[allow(clippy::too_many_arguments)]
 pub fn add_encode_intermediate_type_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     slot_ptr: LocalId,
+    parent_struct_ptr: LocalId,
     itype: &IntermediateType,
     written_bytes_in_slot: LocalId,
     is_field: bool,
@@ -691,6 +704,10 @@ pub fn add_encode_intermediate_type_instructions(
     // Stack and storage size of the type
     let stack_size = itype.stack_data_size() as i32;
     let storage_size = field_size(itype, compilation_ctx) as i32;
+
+    // Runtime functions
+    let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
 
     match itype {
         IntermediateType::IBool
@@ -865,47 +882,129 @@ pub fn add_encode_intermediate_type_instructions(
         }
         IntermediateType::IStruct {
             module_id, index, ..
-        } => {
-            let child_struct = compilation_ctx
-                .get_struct_by_index(module_id, *index)
-                .unwrap();
-
-            // The struct ptr
-            builder.local_set(val_32);
-
-            add_encode_and_save_into_storage_struct_instructions(
-                module,
-                builder,
-                compilation_ctx,
-                val_32,
-                slot_ptr,
-                child_struct,
-                written_bytes_in_slot,
-            );
         }
-        IntermediateType::IGenericStructInstance {
-            module_id,
-            index,
-            types,
-            ..
+        | IntermediateType::IGenericStructInstance {
+            module_id, index, ..
         } => {
-            let child_struct = compilation_ctx
+            // This section handles encoding of nested structs within parent structs.
+            // The behavior differs based on whether the child struct has the 'key' ability:
+            // - If child has 'key': stored as separate object under the parent key
+            // - If child has no 'key': flattened into parent struct's data
+
+            let child_struct_ptr = module.locals.add(ValType::I32);
+            builder.local_set(child_struct_ptr);
+
+            // Get base definition by (module_id, index)
+            let base_def = compilation_ctx
                 .get_struct_by_index(module_id, *index)
-                .unwrap();
-            let child_struct = child_struct.instantiate(types);
+                .expect("struct not found");
 
-            // The struct ptr
-            builder.local_set(val_32);
+            // If it's a generic instance, instantiate; otherwise use as-is
+            let child_struct = if let IntermediateType::IGenericStructInstance { types, .. } = itype
+            {
+                base_def.instantiate(types)
+            } else {
+                base_def.clone()
+            };
 
-            add_encode_and_save_into_storage_struct_instructions(
-                module,
-                builder,
-                compilation_ctx,
-                val_32,
-                slot_ptr,
-                &child_struct,
-                written_bytes_in_slot,
-            );
+            if child_struct.has_key {
+                // ====================================================================
+                // CHILD STRUCT WITH KEY - Store as Separate Object
+                // ====================================================================
+                // When a child struct has the 'key' ability, it becomes a separate
+                // object in storage rather than being flattened into the parent.
+                // This requires:
+                // 1. Calculating the slot for the child struct
+                // 2. Recursively encoding the child struct in its own slot
+                // 3. Storing the child struct UID in the parent's data
+
+                // Calculate the slot for the child struct according to Solidity storage layout:
+                // child_struct_slot = keccak256(child_struct_id || keccak256(parent_struct_id || 0))
+
+                // Extract parent struct ID for slot calculation
+                let parent_struct_id_ptr = module.locals.add(ValType::I32);
+                builder
+                    .local_get(parent_struct_ptr)
+                    .call(get_struct_id_fn)
+                    .local_set(parent_struct_id_ptr);
+
+                // Extract child struct ID for slot calculation
+                let child_struct_id_ptr = module.locals.add(ValType::I32);
+                builder
+                    .local_get(child_struct_ptr)
+                    .call(get_struct_id_fn)
+                    .local_set(child_struct_id_ptr);
+
+                // Calculate the unique slot for the child struct
+                builder
+                    .local_get(parent_struct_id_ptr)
+                    .local_get(child_struct_id_ptr)
+                    .call(write_object_slot_fn);
+
+                // Allocate memory for the child struct slot and copy the calculated
+                // slot data to avoid overwriting during recursive encoding.
+
+                // Allocate memory for child struct slot (32 bytes for slot data)
+                let child_struct_slot_ptr = module.locals.add(ValType::I32);
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_set(child_struct_slot_ptr);
+
+                // Copy the calculated slot data to the allocated memory
+                builder
+                    .local_get(child_struct_slot_ptr)
+                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+                // Reset written bytes counter for the child struct encoding
+                builder.i32_const(0).local_set(written_bytes_in_slot);
+
+                // Recursively encode and store the child struct
+                add_encode_and_save_into_storage_struct_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    child_struct_ptr,
+                    child_struct_slot_ptr,
+                    &child_struct,
+                    written_bytes_in_slot,
+                );
+
+                // After encoding the child struct, we need to store its UID in the
+                // parent struct's data so the parent can reference the child.
+                // The UID takes exactly 32 bytes (one full slot).
+
+                // Update written bytes counter to reflect the 32-byte UID
+                builder.i32_const(32).local_set(written_bytes_in_slot);
+
+                // Copy the child struct UID to the parent's data section
+                // This creates the reference from parent to child struct
+                builder
+                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                    .local_get(child_struct_id_ptr)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+            } else {
+                // ====================================================================
+                // CHILD STRUCT WITHOUT KEY - Flatten into Parent
+                // ====================================================================
+                // When a child struct doesn't have the 'key' ability, it gets
+                // flattened directly into the parent struct's data. This means
+                // all fields of the child struct are stored inline within the
+                // parent struct's storage slot.
+
+                add_encode_and_save_into_storage_struct_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    child_struct_ptr,
+                    slot_ptr,
+                    &child_struct,
+                    written_bytes_in_slot,
+                );
+            }
         }
         IntermediateType::IVector(inner) => {
             builder.local_set(val_32);
@@ -916,6 +1015,7 @@ pub fn add_encode_intermediate_type_instructions(
                 compilation_ctx,
                 val_32,
                 slot_ptr,
+                parent_struct_ptr,
                 inner,
             );
 
@@ -937,18 +1037,27 @@ pub fn add_encode_intermediate_type_instructions(
 /// `slot_ptr` - storage's slot where the data is read
 /// `itype` - intermediate type to be decoded
 /// `read_bytes_in_slot` - number of bytes already read in the slot.
+#[allow(clippy::too_many_arguments)]
 pub fn add_decode_intermediate_type_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     data_ptr: LocalId,
     slot_ptr: LocalId,
+    parent_struct_ptr: LocalId,
     itype: &IntermediateType,
     read_bytes_in_slot: LocalId,
 ) {
     // Stack and storage size of the type
     let stack_size = itype.stack_data_size() as i32;
     let storage_size = field_size(itype, compilation_ctx) as i32;
+
+    // Host functions
+    let (storage_load, _) = storage_load_bytes32(module);
+
+    // Runtime functions
+    let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
 
     match itype {
         IntermediateType::IBool
@@ -1170,47 +1279,133 @@ pub fn add_decode_intermediate_type_instructions(
         }
         IntermediateType::IStruct {
             module_id, index, ..
-        } => {
-            let child_struct = compilation_ctx
-                .get_struct_by_index(module_id, *index)
-                .unwrap();
-
-            // Read the child struct
-            let child_struct_ptr = add_read_and_decode_storage_struct_instructions(
-                module,
-                builder,
-                compilation_ctx,
-                slot_ptr,
-                child_struct,
-                false,
-                read_bytes_in_slot,
-            );
-
-            builder.local_get(child_struct_ptr).local_set(data_ptr);
         }
-        IntermediateType::IGenericStructInstance {
-            module_id,
-            index,
-            types,
-            ..
+        | IntermediateType::IGenericStructInstance {
+            module_id, index, ..
         } => {
-            let child_struct = compilation_ctx
+            // ========================================================================
+            // Handle Nested Struct Decoding
+            // ========================================================================
+            // This section handles decoding of nested structs from storage.
+            // The behavior differs based on whether the child struct has the 'key' ability:
+            // - If child has 'key': read UID from parent, calculate child slot, decode child
+            // - If child has no 'key': decode child directly from current slot (flattened)
+
+            // Get base definition by (module_id, index)
+            let base_def = compilation_ctx
                 .get_struct_by_index(module_id, *index)
-                .unwrap();
-            let child_struct = child_struct.instantiate(types);
+                .expect("struct not found");
 
-            // Read the child struct
-            let child_struct_ptr = add_read_and_decode_storage_struct_instructions(
-                module,
-                builder,
-                compilation_ctx,
-                slot_ptr,
-                &child_struct,
-                true,
-                read_bytes_in_slot,
-            );
+            // If it's a generic instance, instantiate; otherwise use as-is
+            let child_struct = if let IntermediateType::IGenericStructInstance { types, .. } = itype
+            {
+                base_def.instantiate(types)
+            } else {
+                base_def.clone()
+            };
 
-            builder.local_get(child_struct_ptr).local_set(data_ptr);
+            if child_struct.has_key {
+                // ====================================================================
+                // CHILD STRUCT WITH KEY - Decode from Separate Object
+                // ====================================================================
+                // When a child struct has the 'key' ability, it is stored as a separate
+                // object in storage. To decode it, we need to:
+                // 1. Read the child struct UID from the parent's data
+                // 2. Calculate the child struct's storage slot
+                // 3. Decode the child struct from its dedicated slot
+                // 4. Return the decoded child struct
+
+                // Get parent struct ID
+                let parent_struct_id_ptr = module.locals.add(ValType::I32);
+                builder
+                    .local_get(parent_struct_ptr)
+                    .call(get_struct_id_fn)
+                    .local_set(parent_struct_id_ptr);
+
+                // Retrieve the 32-byte UID of the child struct from the current slot.
+                // This UID, saved during the encoding process in the parent struct, links the child struct to its parent.
+
+                // Allocate memory for the child struct UID (32 bytes)
+                let child_struct_id_ptr = module.locals.add(ValType::I32);
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_set(child_struct_id_ptr);
+
+                // Load the child struct UID from storage
+                builder
+                    .local_get(slot_ptr)
+                    .local_get(child_struct_id_ptr)
+                    .call(storage_load);
+
+                // Calculate the child struct's storage slot
+                // child_struct_slot = keccak256(child_struct_id || keccak256(parent_struct_id || 0))
+                builder
+                    .local_get(parent_struct_id_ptr)
+                    .local_get(child_struct_id_ptr)
+                    .call(write_object_slot_fn);
+
+                // Allocate memory for the child struct slot and copy the calculated
+                // slot data to avoid overwriting during recursive decoding.
+
+                // Allocate memory for child struct slot (32 bytes for slot data)
+                let child_struct_slot_ptr = module.locals.add(ValType::I32);
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_set(child_struct_slot_ptr);
+
+                // Copy the calculated slot data to the allocated memory
+                builder
+                    .local_get(child_struct_slot_ptr)
+                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+                // Reset read bytes counter for the child struct decoding
+                builder.i32_const(0).local_set(read_bytes_in_slot);
+
+                // Recursively decode the child struct from its dedicated slot
+                // This will handle all fields of the child struct and reconstruct
+                // the complete child struct object.
+                let child_struct_ptr = add_read_and_decode_storage_struct_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    child_struct_slot_ptr,
+                    &child_struct,
+                    false,
+                    read_bytes_in_slot,
+                );
+
+                // Update read bytes counter to reflect the 32-byte UID we consumed
+                builder.i32_const(32).local_set(read_bytes_in_slot);
+
+                // Set the decoded child struct as the result
+                builder.local_get(child_struct_ptr).local_set(data_ptr);
+            } else {
+                // ====================================================================
+                // CHILD STRUCT WITHOUT KEY - Decode from Flattened Data
+                // ====================================================================
+                // When a child struct doesn't have the 'key' ability, it was stored
+                // flattened within the parent struct's data. We can decode it directly
+                // from the current slot without needing to calculate separate storage.
+
+                // Decode the child struct directly from the current slot
+                // The child struct's fields are stored inline within the parent's data
+                let child_struct_ptr = add_read_and_decode_storage_struct_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    slot_ptr,
+                    &child_struct,
+                    true,
+                    read_bytes_in_slot,
+                );
+
+                // Set the decoded child struct as the result
+                builder.local_get(child_struct_ptr).local_set(data_ptr);
+            }
         }
         IntermediateType::IVector(inner_) => {
             add_read_and_decode_storage_vector_instructions(
@@ -1219,6 +1414,7 @@ pub fn add_decode_intermediate_type_instructions(
                 compilation_ctx,
                 data_ptr,
                 slot_ptr,
+                parent_struct_ptr,
                 inner_,
             );
         }
@@ -1250,7 +1446,18 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
         // Structs are 0 because we don't know how much they will occupy, this depends on the
         // fields of the child struct, whether they are dynamic or static. The store function
         // called will take care of this.
-        IntermediateType::IGenericStructInstance { .. } | IntermediateType::IStruct { .. } => 0,
+        IntermediateType::IGenericStructInstance {
+            module_id, index, ..
+        }
+        | IntermediateType::IStruct {
+            module_id, index, ..
+        } => {
+            let s = compilation_ctx
+                .get_struct_by_index(module_id, *index)
+                .expect("struct not found");
+
+            if s.has_key { 32 } else { 0 }
+        }
         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
             panic!("found reference inside struct")
         }

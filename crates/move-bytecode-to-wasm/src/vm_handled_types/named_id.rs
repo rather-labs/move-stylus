@@ -34,14 +34,12 @@ impl VmHandledType for NamedId {
     }
 }
 
-/*
 impl NamedId {
-    const DELETE_FN_IDENTIFIER: &str = "delete";
+    const REMOVE_FN_IDENTIFIER: &str = "remove";
 
-    pub fn is_delete_function(module_id: &ModuleId, identifier: &str) -> bool {
-        identifier == Self::DELETE_FN_IDENTIFIER
+    pub fn is_remove_function(module_id: &ModuleId, identifier: &str) -> bool {
+        identifier == Self::REMOVE_FN_IDENTIFIER
             && module_id.address == STYLUS_FRAMEWORK_ADDRESS
             && module_id.module_name == "object"
     }
 }
-*/

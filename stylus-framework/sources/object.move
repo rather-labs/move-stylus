@@ -65,3 +65,6 @@ native fun compute_named_id<T: key>(): address;
 public fun new_named_id<T: key>(): NamedId<T> {
     NamedId { id: ID { bytes: compute_named_id<T>() } }
 }
+
+/// Deletes the object with a `NamedId` from the storage.
+public native fun remove<T: key>(id: NamedId<T>);

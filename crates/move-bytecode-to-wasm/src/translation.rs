@@ -210,8 +210,6 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
-                    println!("\nTranslating instruction: {instruction:?}");
-                    println!("Current stack: {:?}", ctx.types_stack);
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -229,7 +227,6 @@ fn translate_flow(
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
                     });
-                    println!("Stack after instruction: {:?}\n", ctx.types_stack);
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
@@ -436,8 +433,6 @@ fn translate_instruction(
             let function_id = &module_data.functions.generic_calls
                 [function_instantiation_handle_index.into_index()];
 
-            println!("1");
-
             // Obtain the generic function information
             let function_information = {
                 let dependency_data = compilation_ctx
@@ -457,141 +452,199 @@ fn translate_instruction(
                     .unwrap()
             };
 
-            println!("2");
+            if NamedId::is_remove_function(
+                &function_information.function_id.module_id,
+                &function_information.function_id.identifier,
+            ) {
+                types_stack::match_types!((
+                    IntermediateType::IGenericStructInstance {
+                        module_id: _,
+                        index: _,
+                        types: _,
+                        vm_handled_struct: VmHandledStruct::StorageId {
+                            parent_module_id,
+                            parent_index,
+                            instance_types,
+                        }
+                    },
+                    "struct",
+                    types_stack.pop()?
+                ));
 
-            let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
-
-            println!("3 type instantiations {type_instantiations:?}");
-            // If the type_instantiations contains generic parameters, those generic parameters
-            // refer to instantiations whithin this context. Instantiatons are obtained using
-            // the caller's function type instances (located in
-            // `mapped_function.function_id.type_instantiations`)
-            let function_information = if type_instantiations.iter().any(type_contains_generics) {
-                // Here we extract the type instances from the caller's type instantiations.
-                // Consider the following example:
-                //
-                // ```move
-                // public fun two_generics<T, U>(): Option<U> {
-                //     option::none()
-                // }
-                //
-                // public fun test(): Option<u16> {
-                //     two_generics<u32, u16>()
-                // }
-                // ```
-                //
-                // where `option::none()` is defined as:
-                //
-                // ```move
-                // public fun none<V>(): Option<V> {
-                //     Option { vec: vector::empty() }
-                // }
-                // ```
-                //
-                // In this case:
-                //
-                // - The call to `two_generics` is instantiated with two types: `u32` mapped to
-                //   `ITypeParameter(0)` and `u16` mapped to `ITypeParameter(1)`.
-                //
-                // - `two_generics<T, U>` returns `U`, which corresponds to `ITypeParameter(1)`.
-                //
-                // - `option::none<V>()` has a single type parameter `V`, represented as
-                //   `ITypeParameter(0)`.
-                //
-                // The substitutions happen as follows:
-                //
-                // - Since `option::none()` provides the return value, its parameter
-                //   `V: ITypeParameter(0)` is instantiated with the caller's parameter
-                //   `U: ITypeParameter(1)`.
-                //
-                // - In `test`, we call `two_generics` with `T = u32` and `U = u16`. Therefore:
-                //   - `ITypeParameter(0)` is replaced with `u32`
-                //   - `ITypeParameter(1)` is replaced with `u16`
-                //
-                // If we follow the call chain:
-                //
-                // - `ITypeParameter(0)` (from `option::none`) is replaced with
-                //   `ITypeParameter(1)` (from `two_generics`).
-                //
-                // - `ITypeParameter(1)` is then replaced with `u16` (from the instantiation
-                //   in `test`).
-                //
-                // By transitivity, we infer that the type of `option::none()` in this context
-                // is `u16`.
-                if let Some(caller_type_instances) =
-                    &mapped_function.function_id.type_instantiations
-                {
-                    let mut instantiations = Vec::new();
-                    for field in type_instantiations {
-                        instantiations.push(replace_type_parameters(field, caller_type_instances));
+                let parent_struct = if let Some(instance_types) = instance_types {
+                    IntermediateType::IGenericStructInstance {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                        types: instance_types,
+                        vm_handled_struct: VmHandledStruct::None,
                     }
+                } else {
+                    IntermediateType::IStruct {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                        vm_handled_struct: VmHandledStruct::None,
+                    }
+                };
 
-                    function_information.instantiate(&instantiations)
-                }
-                // This should never happen
-                else {
-                    panic!("could not instantiate generic types");
-                }
-            } else {
-                function_information.instantiate(type_instantiations)
-            };
-
-            // Shadow the function_id variable because now it contains concrete types
-            let function_id = &function_information.function_id;
-            let arguments = &function_information.signature.arguments;
-
-            println!("6 {function_id:?}");
-            prepare_function_arguments(module, builder, arguments, compilation_ctx, types_stack)?;
-
-            println!("7");
-            // If the function is in the table we call it directly
-            if let Some(f) = function_table.get_by_function_id(function_id) {
-                call_indirect(
-                    f,
-                    &function_information.signature.returns,
-                    function_table.get_table_id(),
-                    builder,
+                let delete_fn = RuntimeFunction::DeleteFromStorage.get_generic(
                     module,
                     compilation_ctx,
+                    &[&parent_struct],
                 );
+
+                // At this point, in the stack que have the pointer to the Uid struct, but what we
+                // really need is the pointer to the struct that holds that UId. The struct ptr can
+                // be found 4 bytes before the Uid ptr
+                builder.i32_const(4).binop(BinaryOp::I32Sub).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                builder.call(delete_fn);
+            } else {
+                let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
+
+                // If the type_instantiations contains generic parameters, those generic parameters
+                // refer to instantiations whithin this context. Instantiatons are obtained using
+                // the caller's function type instances (located in
+                // `mapped_function.function_id.type_instantiations`)
+                let function_information = if type_instantiations.iter().any(type_contains_generics)
+                {
+                    // Here we extract the type instances from the caller's type instantiations.
+                    // Consider the following example:
+                    //
+                    // ```move
+                    // public fun two_generics<T, U>(): Option<U> {
+                    //     option::none()
+                    // }
+                    //
+                    // public fun test(): Option<u16> {
+                    //     two_generics<u32, u16>()
+                    // }
+                    // ```
+                    //
+                    // where `option::none()` is defined as:
+                    //
+                    // ```move
+                    // public fun none<V>(): Option<V> {
+                    //     Option { vec: vector::empty() }
+                    // }
+                    // ```
+                    //
+                    // In this case:
+                    //
+                    // - The call to `two_generics` is instantiated with two types: `u32` mapped to
+                    //   `ITypeParameter(0)` and `u16` mapped to `ITypeParameter(1)`.
+                    //
+                    // - `two_generics<T, U>` returns `U`, which corresponds to `ITypeParameter(1)`.
+                    //
+                    // - `option::none<V>()` has a single type parameter `V`, represented as
+                    //   `ITypeParameter(0)`.
+                    //
+                    // The substitutions happen as follows:
+                    //
+                    // - Since `option::none()` provides the return value, its parameter
+                    //   `V: ITypeParameter(0)` is instantiated with the caller's parameter
+                    //   `U: ITypeParameter(1)`.
+                    //
+                    // - In `test`, we call `two_generics` with `T = u32` and `U = u16`. Therefore:
+                    //   - `ITypeParameter(0)` is replaced with `u32`
+                    //   - `ITypeParameter(1)` is replaced with `u16`
+                    //
+                    // If we follow the call chain:
+                    //
+                    // - `ITypeParameter(0)` (from `option::none`) is replaced with
+                    //   `ITypeParameter(1)` (from `two_generics`).
+                    //
+                    // - `ITypeParameter(1)` is then replaced with `u16` (from the instantiation
+                    //   in `test`).
+                    //
+                    // By transitivity, we infer that the type of `option::none()` in this context
+                    // is `u16`.
+                    if let Some(caller_type_instances) =
+                        &mapped_function.function_id.type_instantiations
+                    {
+                        let mut instantiations = Vec::new();
+                        for field in type_instantiations {
+                            instantiations
+                                .push(replace_type_parameters(field, caller_type_instances));
+                        }
+
+                        function_information.instantiate(&instantiations)
+                    }
+                    // This should never happen
+                    else {
+                        panic!("could not instantiate generic types");
+                    }
+                } else {
+                    function_information.instantiate(type_instantiations)
+                };
+
+                // Shadow the function_id variable because now it contains concrete types
+                let function_id = &function_information.function_id;
+                let arguments = &function_information.signature.arguments;
+
+                prepare_function_arguments(
+                    module,
+                    builder,
+                    arguments,
+                    compilation_ctx,
+                    types_stack,
+                )?;
+
+                // If the function is in the table we call it directly
+                if let Some(f) = function_table.get_by_function_id(function_id) {
+                    call_indirect(
+                        f,
+                        &function_information.signature.returns,
+                        function_table.get_table_id(),
+                        builder,
+                        module,
+                        compilation_ctx,
+                    );
+                }
+                // Otherwise
+                // If the function is not native, we add it to the table and declare it for translating
+                // and linking
+                // If the function IS native, we link it and call it directly
+                else if function_information.is_native {
+                    let type_instantiations = function_information
+                        .function_id
+                        .type_instantiations
+                        .as_ref()
+                        .unwrap();
+
+                    let native_function_id = NativeFunction::get_generic(
+                        &function_id.identifier,
+                        module,
+                        compilation_ctx,
+                        type_instantiations,
+                    );
+
+                    builder.call(native_function_id);
+                } else {
+                    let table_id = function_table.get_table_id();
+                    let f_entry =
+                        function_table.add(module, function_id.clone(), &function_information);
+                    functions_calls_to_link.push(function_id.clone());
+
+                    call_indirect(
+                        f_entry,
+                        &function_information.signature.returns,
+                        table_id,
+                        builder,
+                        module,
+                        compilation_ctx,
+                    );
+                };
+
+                // Insert in the stack types the types returned by the function (if any)
+                types_stack.append(&function_information.signature.returns);
             }
-            // Otherwise
-            // If the function is not native, we add it to the table and declare it for translating
-            // and linking
-            // If the function IS native, we link it and call it directly
-            else if function_information.is_native {
-                let type_instantiations = function_information
-                    .function_id
-                    .type_instantiations
-                    .as_ref()
-                    .unwrap();
-
-                let native_function_id = NativeFunction::get_generic(
-                    &function_id.identifier,
-                    module,
-                    compilation_ctx,
-                    type_instantiations,
-                );
-
-                builder.call(native_function_id);
-            } else {
-                let table_id = function_table.get_table_id();
-                let f_entry =
-                    function_table.add(module, function_id.clone(), &function_information);
-                functions_calls_to_link.push(function_id.clone());
-
-                call_indirect(
-                    f_entry,
-                    &function_information.signature.returns,
-                    table_id,
-                    builder,
-                    module,
-                    compilation_ctx,
-                );
-            };
-
-            // Insert in the stack types the types returned by the function (if any)
-            types_stack.append(&function_information.signature.returns);
         }
         // Function calls
         Bytecode::Call(function_handle_index) => {
@@ -1428,7 +1481,7 @@ fn translate_instruction(
                     };
 
                     if let Ok(struct_) = struct_ {
-                        if struct_.saved_in_storage {
+                        if struct_.has_key {
                             let get_struct_owner_fn =
                                 RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
 

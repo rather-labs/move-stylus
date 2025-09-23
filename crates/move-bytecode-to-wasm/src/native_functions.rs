@@ -46,7 +46,10 @@ impl NativeFunction {
     const NATIVE_EMIT: &str = "emit";
 
     // Object functions
+    // This is for objects with UID as id.
     pub const NATIVE_DELETE_OBJECT: &str = "delete";
+    // This is for objects with NamedId as id.
+    pub const NATIVE_REMOVE_OBJECT: &str = "remove";
     pub const NATIVE_COMPUTE_NAMED_ID: &str = "compute_named_id";
     const NATIVE_HASH_TYPE_AND_KEY: &str = "hash_type_and_key";
 
@@ -153,7 +156,7 @@ impl NativeFunction {
 
                 transfer::add_freeze_object_fn(module, compilation_ctx, &generics[0])
             }
-            Self::NATIVE_DELETE_OBJECT => {
+            Self::NATIVE_DELETE_OBJECT | Self::NATIVE_REMOVE_OBJECT => {
                 assert_eq!(
                     1,
                     generics.len(),

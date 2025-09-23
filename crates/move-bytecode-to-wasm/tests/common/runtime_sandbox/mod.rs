@@ -404,7 +404,10 @@ impl RuntimeSandbox {
 
     pub fn print_storage(&self) {
         let storage = self.storage.lock().unwrap();
-        for (key, value) in storage.iter() {
+        let mut entries: Vec<_> = storage.iter().collect();
+        entries.sort_by_key(|(key, _)| *key);
+
+        for (key, value) in entries {
             println!("key: {:?} \n\t value: {:?}", key, value);
         }
     }
