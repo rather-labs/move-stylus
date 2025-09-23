@@ -16,14 +16,11 @@ use crate::{
     compilation_context::{ModuleData, ModuleId},
     data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET},
     error_encoding::build_error_message,
-    generics::{
-        extract_type_instances_from_stack, instantiate_vec_type_parameters,
-        replace_type_parameters, type_contains_generics,
-    },
+    generics::{instantiate_vec_type_parameters, replace_type_parameters, type_contains_generics},
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
-    vm_handled_types::{VmHandledType, uid::Uid},
+    vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
     wasm_builder_extensions::WasmBuilderExtension,
 };
 use anyhow::Result;
@@ -88,7 +85,7 @@ impl BranchTargets {
 }
 
 #[derive(Debug)]
-struct UidParentInformation {
+struct StorageIdParentInformation {
     module_id: ModuleId,
     index: u16,
     instance_types: Option<Vec<IntermediateType>>,
@@ -102,7 +99,7 @@ struct TranslateFlowContext<'a> {
     function_information: &'a MappedFunction,
     function_table: &'a mut FunctionTable,
     function_locals: &'a Vec<LocalId>,
-    uid_locals: &'a mut HashMap<u8, UidParentInformation>,
+    uid_locals: &'a mut HashMap<u8, StorageIdParentInformation>,
     branch_targets: &'a mut BranchTargets,
 }
 
@@ -153,7 +150,7 @@ pub fn translate_function(
     let mut branch_targets = BranchTargets::new();
     let mut types_stack = TypesStack::new();
     let mut functions_to_link = HashSet::new();
-    let mut uid_locals: HashMap<u8, UidParentInformation> = HashMap::new();
+    let mut uid_locals: HashMap<u8, StorageIdParentInformation> = HashMap::new();
 
     let mut ctx = TranslateFlowContext {
         compilation_ctx,
@@ -362,7 +359,7 @@ fn translate_instruction(
     function_table: &mut FunctionTable,
     types_stack: &mut TypesStack,
     function_locals: &[LocalId],
-    uid_locals: &mut HashMap<u8, UidParentInformation>,
+    uid_locals: &mut HashMap<u8, StorageIdParentInformation>,
     branches: &HashMap<u16, BranchMode>,
     branch_targets: &BranchTargets,
 ) -> Result<Vec<FunctionId>, TranslationError> {
@@ -517,26 +514,9 @@ fn translate_instruction(
                     &mapped_function.function_id.type_instantiations
                 {
                     let mut instantiations = Vec::new();
-                    for (index, field) in type_instantiations.iter().enumerate() {
-                        if let Some(res) =
-                            extract_type_instances_from_stack(field, &type_instantiations[index])
-                        {
-                            instantiations.push(res);
-                        } else {
-                            instantiations.push(field.clone());
-                        }
+                    for field in type_instantiations {
+                        instantiations.push(replace_type_parameters(field, caller_type_instances));
                     }
-
-                    let instantiations = instantiations
-                        .into_iter()
-                        .map(|f| {
-                            if let IntermediateType::ITypeParameter(i) = f {
-                                caller_type_instances[i as usize].clone()
-                            } else {
-                                f
-                            }
-                        })
-                        .collect::<Vec<IntermediateType>>();
 
                     function_information.instantiate(&instantiations)
                 }
@@ -638,7 +618,7 @@ fn translate_instruction(
                     IntermediateType::IStruct {
                         module_id: _,
                         index: _,
-                        vm_handled_struct: VmHandledStruct::Uid {
+                        vm_handled_struct: VmHandledStruct::StorageId {
                             parent_module_id,
                             parent_index,
                             instance_types,
@@ -653,6 +633,7 @@ fn translate_instruction(
                         module_id: parent_module_id,
                         index: parent_index,
                         types: instance_types,
+                        vm_handled_struct: VmHandledStruct::None,
                     }
                 } else {
                     IntermediateType::IStruct {
@@ -743,8 +724,9 @@ fn translate_instruction(
 
             // At the moment of calculating the local types for the function, we can't know if the
             // type the local is holding has some special property.
-            // If we find a UID, we need to know which struct it belongs to. That information is
-            // inside the types stack (filled by the `bytecodes::struct::unpack` function).
+            // If we find a UID or NamedId, we need to know which struct it belongs to. That
+            // information is inside the types stack (filled by the `bytecodes::struct::unpack`
+            // function).
             //
             // So, if the local type is a UID, and in the types stack we have a UID holding the
             // parent struct information, we set the `uid_locals` variable with the parent
@@ -758,7 +740,7 @@ fn translate_instruction(
                         module_id: _,
                         index: _,
                         vm_handled_struct:
-                            VmHandledStruct::Uid {
+                            VmHandledStruct::StorageId {
                                 parent_module_id,
                                 parent_index,
                                 instance_types,
@@ -767,7 +749,33 @@ fn translate_instruction(
                     {
                         uid_locals.insert(
                             *local_id,
-                            UidParentInformation {
+                            StorageIdParentInformation {
+                                module_id: parent_module_id.clone(),
+                                index: *parent_index,
+                                instance_types: instance_types.clone(),
+                            },
+                        );
+                    }
+                }
+
+                IntermediateType::IGenericStructInstance {
+                    module_id, index, ..
+                } if NamedId::is_vm_type(module_id, *index, compilation_ctx) => {
+                    if let Some(IntermediateType::IGenericStructInstance {
+                        module_id: _,
+                        index: _,
+                        types: _,
+                        vm_handled_struct:
+                            VmHandledStruct::StorageId {
+                                parent_module_id,
+                                parent_index,
+                                instance_types,
+                            },
+                    }) = &types_stack.iter().last()
+                    {
+                        uid_locals.insert(
+                            *local_id,
+                            StorageIdParentInformation {
                                 module_id: parent_module_id.clone(),
                                 index: *parent_index,
                                 instance_types: instance_types.clone(),
@@ -786,9 +794,9 @@ fn translate_instruction(
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
             local_type.move_local_instructions(builder, compilation_ctx, local);
 
-            // If we find that the local type we are moving is the UID struct, we need to push it
-            // in the stacks type with the parent struct information (needed for example, by the
-            // UID's delete method).
+            // If we find that the local type we are moving is the UID or NamedId struct, we need
+            // to push it in the stacks type with the parent struct information (needed for example,
+            // by the UID's delete method).
             //
             // This information can be found inside the `uid_locals` variable, filled by the
             // `StLoc` bytecode
@@ -798,7 +806,7 @@ fn translate_instruction(
                     index,
                     vm_handled_struct: VmHandledStruct::None,
                 } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
-                    if let Some(UidParentInformation {
+                    if let Some(StorageIdParentInformation {
                         module_id: parent_module_id,
                         index: parent_index,
                         instance_types,
@@ -807,7 +815,33 @@ fn translate_instruction(
                         types_stack.push(IntermediateType::IStruct {
                             module_id: module_id.clone(),
                             index: *index,
-                            vm_handled_struct: VmHandledStruct::Uid {
+                            vm_handled_struct: VmHandledStruct::StorageId {
+                                parent_module_id: parent_module_id.clone(),
+                                parent_index: *parent_index,
+                                instance_types: instance_types.clone(),
+                            },
+                        });
+                    } else {
+                        types_stack.push(local_type)
+                    }
+                }
+                IntermediateType::IGenericStructInstance {
+                    module_id,
+                    index,
+                    types,
+                    vm_handled_struct: VmHandledStruct::None,
+                } if NamedId::is_vm_type(module_id, *index, compilation_ctx) => {
+                    if let Some(StorageIdParentInformation {
+                        module_id: parent_module_id,
+                        index: parent_index,
+                        instance_types,
+                    }) = uid_locals.get(local_id)
+                    {
+                        types_stack.push(IntermediateType::IGenericStructInstance {
+                            module_id: module_id.clone(),
+                            index: *index,
+                            types: types.clone(),
+                            vm_handled_struct: VmHandledStruct::StorageId {
                                 parent_module_id: parent_module_id.clone(),
                                 parent_index: *parent_index,
                                 instance_types: instance_types.clone(),
@@ -917,7 +951,7 @@ fn translate_instruction(
                     t
                 ),
                 (
-                    IntermediateType::IGenericStructInstance { ref module_id, index, ref types },
+                    IntermediateType::IGenericStructInstance { ref module_id, index, ref types, .. },
                     "generic struct",
                     *ref_inner
                 )
@@ -990,6 +1024,7 @@ fn translate_instruction(
                     module_id: module_data.id.clone(),
                     index: struct_.index(),
                     types: instantiation_types.to_vec(),
+                    vm_handled_struct: VmHandledStruct::None,
                 },
             )))?;
 
@@ -2039,26 +2074,9 @@ fn translate_instruction(
                     &mapped_function.function_id.type_instantiations
                 {
                     let mut instantiations = Vec::new();
-                    for (index, field) in type_instantiations.iter().enumerate() {
-                        if let Some(res) =
-                            extract_type_instances_from_stack(field, &type_instantiations[index])
-                        {
-                            instantiations.push(res);
-                        } else {
-                            instantiations.push(field.clone());
-                        }
+                    for field in &type_instantiations {
+                        instantiations.push(replace_type_parameters(field, caller_type_instances));
                     }
-
-                    let instantiations = instantiations
-                        .into_iter()
-                        .map(|f| {
-                            if let IntermediateType::ITypeParameter(i) = f {
-                                caller_type_instances[i as usize].clone()
-                            } else {
-                                f
-                            }
-                        })
-                        .collect::<Vec<IntermediateType>>();
 
                     (struct_.instantiate(&instantiations), instantiations)
                 }
@@ -2075,6 +2093,13 @@ fn translate_instruction(
                 (struct_, types)
             };
 
+            // Allocate four bytes that will point to the struct wrapping this UID. It will be
+            // filled later in the `bytecodes::structs::pack` function.
+            // This information will be used by other operations (such as delete) to locate the struct
+            if NamedId::is_vm_type(&module_data.id, struct_.index(), compilation_ctx) {
+                builder.i32_const(4).call(compilation_ctx.allocator).drop();
+            }
+
             bytecodes::structs::pack(&struct_, module, builder, compilation_ctx, types_stack)?;
 
             let idx = module_data
@@ -2085,6 +2110,7 @@ fn translate_instruction(
                 module_id: module_data.id.clone(),
                 index: idx,
                 types,
+                vm_handled_struct: VmHandledStruct::None,
             });
         }
         Bytecode::Unpack(struct_definition_index) => {
@@ -2124,24 +2150,9 @@ fn translate_instruction(
                     &mapped_function.function_id.type_instantiations
                 {
                     let mut instantiations = Vec::new();
-                    for (index, field) in types.iter().enumerate() {
-                        if let Some(res) = extract_type_instances_from_stack(field, &types[index]) {
-                            instantiations.push(res);
-                        } else {
-                            instantiations.push(field.clone());
-                        }
+                    for field in types {
+                        instantiations.push(replace_type_parameters(field, caller_type_instances));
                     }
-
-                    let instantiations = instantiations
-                        .into_iter()
-                        .map(|f| {
-                            if let IntermediateType::ITypeParameter(i) = f {
-                                caller_type_instances[i as usize].clone()
-                            } else {
-                                f
-                            }
-                        })
-                        .collect::<Vec<IntermediateType>>();
 
                     (struct_.instantiate(&instantiations), instantiations)
                 }
@@ -2157,6 +2168,7 @@ fn translate_instruction(
                 module_id: module_data.id.clone(),
                 index: idx,
                 types,
+                vm_handled_struct: VmHandledStruct::None,
             })?;
 
             bytecodes::structs::unpack(

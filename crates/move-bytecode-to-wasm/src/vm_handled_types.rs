@@ -2,6 +2,7 @@
 //! automatically injected by the VM, such as the primitive type Signer or the TxContext struct
 //! from the stylus framework.
 
+pub mod named_id;
 pub mod signer;
 pub mod tx_context;
 pub mod uid;

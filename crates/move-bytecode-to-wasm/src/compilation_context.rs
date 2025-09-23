@@ -88,6 +88,7 @@ impl CompilationContext<'_> {
                 module_id,
                 index,
                 types,
+                ..
             } => {
                 let struct_ = self.get_struct_by_index(module_id, *index)?;
                 let instance = struct_.instantiate(types);

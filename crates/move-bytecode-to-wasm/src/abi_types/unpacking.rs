@@ -3,6 +3,7 @@ use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 use crate::{
     CompilationContext,
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    native_functions::NativeFunction,
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         IntermediateType,
@@ -12,9 +13,10 @@ use crate::{
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         simple_integers::{IU8, IU16, IU32, IU64},
+        structs::IStruct,
         vector::IVector,
     },
-    vm_handled_types::{VmHandledType, tx_context::TxContext},
+    vm_handled_types::{VmHandledType, named_id::NamedId, tx_context::TxContext, uid::Uid},
 };
 
 mod unpack_enum;
@@ -182,11 +184,18 @@ impl Unpackable for IntermediateType {
                     .unwrap();
 
                 if struct_.saved_in_storage {
-                    add_unpack_from_storage_instructions(
+                    load_struct_storage_id(
                         function_builder,
                         module,
                         reader_pointer,
                         calldata_reader_pointer,
+                        compilation_ctx,
+                        struct_,
+                    );
+
+                    add_unpack_from_storage_instructions(
+                        function_builder,
+                        module,
                         compilation_ctx,
                         self,
                         false,
@@ -208,17 +217,25 @@ impl Unpackable for IntermediateType {
                 module_id,
                 index,
                 types,
+                ..
             } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
                     .unwrap();
                 let struct_instance = struct_.instantiate(types);
                 if struct_instance.saved_in_storage {
-                    add_unpack_from_storage_instructions(
+                    load_struct_storage_id(
                         function_builder,
                         module,
                         reader_pointer,
                         calldata_reader_pointer,
+                        compilation_ctx,
+                        &struct_instance,
+                    );
+
+                    add_unpack_from_storage_instructions(
+                        function_builder,
+                        module,
                         compilation_ctx,
                         self,
                         false,
@@ -259,27 +276,67 @@ impl Unpackable for IntermediateType {
     }
 }
 
-/// This function searches in the storage for the structure that belongs to the object UID passed
-/// as argument.
-fn add_unpack_from_storage_instructions(
+/// This function leaves in the stack a pointer containing the ID for the storage struct about to be
+/// unpacked.
+///
+/// If the first field is a `UID`, we just unpack a IAddress.
+/// If the first field is a `NamedId` we compute the named id.
+/// If none of the above is the first field, we found a compiler error and abort
+fn load_struct_storage_id(
     function_builder: &mut InstrSeqBuilder,
     module: &mut Module,
     reader_pointer: LocalId,
     calldata_reader_pointer: LocalId,
     compilation_ctx: &CompilationContext,
+    struct_: &IStruct,
+) {
+    match struct_.fields.first() {
+        Some(IntermediateType::IStruct {
+            module_id, index, ..
+        }) if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+            // First we add the instructions to unpack the UID. We use address to unpack it because ids are
+            // 32 bytes static, same as an address
+            IAddress::add_unpack_instructions(
+                function_builder,
+                module,
+                reader_pointer,
+                calldata_reader_pointer,
+                compilation_ctx,
+            );
+        }
+        Some(IntermediateType::IGenericStructInstance {
+            module_id,
+            index,
+            types,
+            ..
+        }) if NamedId::is_vm_type(module_id, *index, compilation_ctx) => {
+            // We use the native function that computes the ID to leave it in the stack so it can
+            // be used by `add_unpack_from_storage_instructions`
+            let compute_named_id_fn = NativeFunction::get_generic(
+                NativeFunction::NATIVE_COMPUTE_NAMED_ID,
+                module,
+                compilation_ctx,
+                types,
+            );
+
+            function_builder.call(compute_named_id_fn);
+        }
+        _ => panic!(
+            "expected stylus::object::UID or stylus::object::NamedId as first field in {} struct (it has key ability)",
+            struct_.identifier
+        ),
+    }
+}
+
+/// This function searches in the storage for the structure that belongs to the object UID passed
+/// as argument.
+fn add_unpack_from_storage_instructions(
+    function_builder: &mut InstrSeqBuilder,
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
     unpack_frozen: bool,
 ) {
-    // First we add the instructions to unpack the UID. We use address to unpack it because ids are
-    // 32 bytes static, same as an address
-    IAddress::add_unpack_instructions(
-        function_builder,
-        module,
-        reader_pointer,
-        calldata_reader_pointer,
-        compilation_ctx,
-    );
-
     // Search for the object in the objects mappings
     let locate_storage_data_fn =
         RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
