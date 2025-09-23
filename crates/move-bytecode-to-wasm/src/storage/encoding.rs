@@ -708,10 +708,6 @@ pub fn add_encode_intermediate_type_instructions(
     // Runtime functions
     let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
-
-    // Host functions
-    let (storage_cache, _) = storage_cache_bytes32(module);
 
     match itype {
         IntermediateType::IBool
@@ -918,35 +914,9 @@ pub fn add_encode_intermediate_type_instructions(
                 // When a child struct has the 'key' ability, it becomes a separate
                 // object in storage rather than being flattened into the parent.
                 // This requires:
-                // 1. Calculating a unique slot for the child struct
+                // 1. Calculating the slot for the child struct
                 // 2. Recursively encoding the child struct in its own slot
                 // 3. Storing the child struct UID in the parent's data
-
-                // Check if current slot has space for the 32-byte child struct UID.
-                // If not, cache existing data and move to next slot.
-                builder.block(None, |block| {
-                    let block_id = block.id();
-
-                    // Check if we're at the beginning of a new slot (written_bytes_in_slot == 0)
-                    block
-                        .local_get(written_bytes_in_slot)
-                        .i32_const(0)
-                        .binop(BinaryOp::I32Eq)
-                        .br_if(block_id);
-
-                    // Cache existing data to current slot before moving to next slot
-                    // This ensures no data is lost during the slot transition
-                    block
-                        .local_get(slot_ptr)
-                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                        .call(storage_cache);
-
-                    // Move to the next slot where we'll write the child struct UID
-                    block
-                        .local_get(slot_ptr)
-                        .call(next_slot_fn)
-                        .local_set(slot_ptr);
-                });
 
                 // Calculate the slot for the child struct according to Solidity storage layout:
                 // child_struct_slot = keccak256(child_struct_id || keccak256(parent_struct_id || 0))
@@ -1088,7 +1058,6 @@ pub fn add_decode_intermediate_type_instructions(
     // Runtime functions
     let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
 
     match itype {
         IntermediateType::IBool
@@ -1346,25 +1315,6 @@ pub fn add_decode_intermediate_type_instructions(
                 // 3. Decode the child struct from its dedicated slot
                 // 4. Return the decoded child struct
 
-                // Check if we need to move to the next slot to read the child struct UID.
-                // The UID is stored in the parent's data and takes exactly 32 bytes.
-                builder.block(None, |block| {
-                    let block_id = block.id();
-
-                    // Check if we're at the beginning of a new slot (read_bytes_in_slot == 0)
-                    block
-                        .local_get(read_bytes_in_slot)
-                        .i32_const(0)
-                        .binop(BinaryOp::I32Eq)
-                        .br_if(block_id);
-
-                    // Move to the next slot where the child struct UID is stored
-                    block
-                        .local_get(slot_ptr)
-                        .call(next_slot_fn)
-                        .local_set(slot_ptr);
-                });
-
                 // Get parent struct ID
                 let parent_struct_id_ptr = module.locals.add(ValType::I32);
                 builder
@@ -1496,7 +1446,18 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
         // Structs are 0 because we don't know how much they will occupy, this depends on the
         // fields of the child struct, whether they are dynamic or static. The store function
         // called will take care of this.
-        IntermediateType::IGenericStructInstance { .. } | IntermediateType::IStruct { .. } => 0,
+        IntermediateType::IGenericStructInstance {
+            module_id, index, ..
+        }
+        | IntermediateType::IStruct {
+            module_id, index, ..
+        } => {
+            let s = compilation_ctx
+                .get_struct_by_index(module_id, *index)
+                .expect("struct not found");
+
+            if s.has_key { 32 } else { 0 }
+        }
         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
             panic!("found reference inside struct")
         }
