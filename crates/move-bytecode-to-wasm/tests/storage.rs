@@ -1454,6 +1454,7 @@ mod storage_encoding {
         ) public view;
         function readGenericStruct32() public view returns (GenericStruct32);
 
+        //// Wrapped objects ////
         struct Foo {
             UID id;
             uint64 a;
@@ -1476,6 +1477,15 @@ mod storage_encoding {
         }
         function saveMegaFoo() public view;
         function readMegaFoo() public view returns (MegaFoo);
+
+        struct Var {
+            UID id;
+            Bar a;
+            Foo b;
+            Bar[] c;
+        }
+        function saveVar() public view;
+        function readVar() public view returns (Var);
     );
 
     #[rstest]
@@ -2089,16 +2099,17 @@ mod storage_encoding {
     )]
     #[case(saveMegaFooCall::new(()),
     vec![
+        // MegaFoo
         [0x00; 32],
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
-        // [53, 96, 25, 94, 67, 93, 31, 98, 158, 100, 186, 33, 178, 4, 211, 25, 12, 23, 181, 207, 56, 209, 225, 0, 228, 147, 157, 255, 142, 152, 99, 141] 
+        // Foo
         U256::from_str_radix("3560195e435d1f629e64ba21b204d3190c17b5cf38d1e100e4939dff8e98638d", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("3560195e435d1f629e64ba21b204d3190c17b5cf38d1e100e4939dff8e98638e", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("3560195e435d1f629e64ba21b204d3190c17b5cf38d1e100e4939dff8e98638f", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("3560195e435d1f629e64ba21b204d3190c17b5cf38d1e100e4939dff8e986390", 16).unwrap().to_be_bytes(),
-        // [179, 248, 119, 105, 224, 244, 80, 94, 178, 115, 100, 254, 155, 49, 193, 23, 255, 120, 158, 138, 167, 133, 88, 102, 128, 166, 193, 203, 15, 89, 38, 83] 
+        //Bar
         U256::from_str_radix("b3f87769e0f4505eb27364fe9b31c117ff789e8aa785586680a6c1cb0f592652", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("b3f87769e0f4505eb27364fe9b31c117ff789e8aa785586680a6c1cb0f592653", 16).unwrap().to_be_bytes(),
     ],
@@ -2134,7 +2145,104 @@ mod storage_encoding {
             c: 88,
         }
     )]
-    fn test_structs_with_wrapped<T: SolCall, U: SolCall, V: SolValue>(
+    #[case(saveVarCall::new(()),
+    vec![
+        // Var
+        [0x00; 32],
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+        //Bar
+        U256::from_str_radix("918d490f3f5a5af006896b3a37d65a9b496b1db689b87334200c90ab4023c178", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("918d490f3f5a5af006896b3a37d65a9b496b1db689b87334200c90ab4023c179", 16).unwrap().to_be_bytes(),
+        // Foo
+        U256::from_str_radix("322a33ca5945c1c34a8261d3e947c675478f7d28fef6f722a010b01be97bd034", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("322a33ca5945c1c34a8261d3e947c675478f7d28fef6f722a010b01be97bd035", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("322a33ca5945c1c34a8261d3e947c675478f7d28fef6f722a010b01be97bd036", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("322a33ca5945c1c34a8261d3e947c675478f7d28fef6f722a010b01be97bd037", 16).unwrap().to_be_bytes(),
+        //Bar in Foo
+        U256::from_str_radix("751256a7a9ce5df532239c40b31940a9a4fe03b965b20192b8f02653745a9369", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("751256a7a9ce5df532239c40b31940a9a4fe03b965b20192b8f02653745a936a", 16).unwrap().to_be_bytes(),
+        // Bar vector
+        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85c", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85d", 16).unwrap().to_be_bytes(),
+
+        U256::from_str_radix("ae7e0571fa79d756545e084ec0d0c624cdbe4a05e898a1cf0e32a0821c5a6911", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("ae7e0571fa79d756545e084ec0d0c624cdbe4a05e898a1cf0e32a0821c5a6912", 16).unwrap().to_be_bytes(),
+
+        U256::from_str_radix("26a28b6df88122dd5c0e1993dcda278372d63dbd74d0b08e3d76c6012a7da7f8", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("26a28b6df88122dd5c0e1993dcda278372d63dbd74d0b08e3d76c6012a7da7f9", 16).unwrap().to_be_bytes(),
+
+        U256::from_str_radix("e41226abe04fb72908c78250de568834065f6d35bc75081a3368d6a693296f5a", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("e41226abe04fb72908c78250de568834065f6d35bc75081a3368d6a693296f5b", 16).unwrap().to_be_bytes(),
+    ],
+    vec![
+        // Var
+        U256::from_str_radix("d51bb5edad7d1535fb0a47b2d03d08c0fe02560a3de80e55815fedb1ce1be09b", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("d929b3310243fae82a39e83032462fceb274b042b98732db8c6e9fbeab70c3c9", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+        // Bar
+        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002a", 16).unwrap().to_be_bytes(),
+        // Foo
+        U256::from_str_radix("d929b3310243fae82a39e83032462fceb274b042b98732db8c6e9fbeab70c3c9", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000065", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
+        // Bar in Foo
+        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000029", 16).unwrap().to_be_bytes(),
+        // Bar vector
+        U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("60b770a33dfbcb5aaea4306257d155502df85b76449b216c476fcfcd437c152e", 16).unwrap().to_be_bytes(),
+
+        U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002b", 16).unwrap().to_be_bytes(),
+
+        U256::from_str_radix("1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002c", 16).unwrap().to_be_bytes(),
+
+        U256::from_str_radix("60b770a33dfbcb5aaea4306257d155502df85b76449b216c476fcfcd437c152e", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002d", 16).unwrap().to_be_bytes(),
+
+
+    ],
+        readVarCall::new(()),
+        Var {
+            id: UID { id: ID { bytes: U256::from_str_radix("d51bb5edad7d1535fb0a47b2d03d08c0fe02560a3de80e55815fedb1ce1be09b", 16).unwrap().into()  } },
+            a: Bar {
+                id: UID { id: ID { bytes: U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().into()  } },
+                a: 42,
+            },
+            b: Foo {
+                id: UID { id: ID { bytes: U256::from_str_radix("d929b3310243fae82a39e83032462fceb274b042b98732db8c6e9fbeab70c3c9", 16).unwrap().into()  } },
+                a: 101,
+                b: Bar {
+                    id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into()  } },
+                    a: 41,
+                },
+                c: 102,
+            },
+            c: vec![
+                Bar {
+                    id: UID { id: ID { bytes: U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().into()  } },
+                    a: 43,
+                },
+                Bar {
+                    id: UID { id: ID { bytes: U256::from_str_radix("1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741", 16).unwrap().into()  } },
+                    a: 44,
+                },
+                Bar {
+                    id: UID { id: ID { bytes: U256::from_str_radix("60b770a33dfbcb5aaea4306257d155502df85b76449b216c476fcfcd437c152e", 16).unwrap().into()  } },
+                    a: 45,
+                }
+            ],
+        }
+    )]
+    fn test_wrapped_objects<T: SolCall, U: SolCall, V: SolValue>(
         runtime: RuntimeSandbox,
         #[case] call_data_encode: T,
         #[case] expected_slots: Vec<[u8; 32]>,
@@ -2148,24 +2256,6 @@ mod storage_encoding {
         assert_eq!(0, result);
 
         runtime.print_storage();
-
-        // Helper: calculate object slot
-        let object_id = U256::from_str_radix(
-            "bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989",
-            16,
-        )
-        .unwrap()
-        .to_be_bytes::<32>();
-
-        let child_object_id = U256::from_str_radix(
-            "7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de",
-            16,
-        )
-        .unwrap()
-        .to_be_bytes::<32>();
-
-        let child_object_slot = derive_object_slot(&object_id, &child_object_id);
-        println!("child_object_slot: {:?}", child_object_slot);
 
         // Check if it is encoded correctly in storage
         for (i, slot) in expected_slots.iter().enumerate() {

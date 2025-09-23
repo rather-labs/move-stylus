@@ -282,13 +282,13 @@ public fun read_generic_struct_32(): GenericStruct<u32> {
 
 /// Structs with wrapped objects fields
 
-// Simple value struct with key
+// Simple wrapped object
 public struct Bar has key, store {
     id: UID,
     a: u64,
 }
 
-// Struct with nested field struct with key
+// Struct with wrapped object
 public struct Foo has key, store {
     id: UID,
     a: u64,
@@ -348,4 +348,58 @@ public fun save_mega_foo(ctx: &mut TxContext) {
 
 public fun read_mega_foo(): MegaFoo {
     read_slot<MegaFoo>(0)
+}
+
+public struct Var has key {
+    id: UID,
+    a: Bar,
+    b: Foo,
+    c: vector<Bar>
+}
+
+public fun save_var(ctx: &mut TxContext) {
+    let bar_1 = Bar {
+            id: object::new(ctx),
+            a: 41
+        };
+
+    let bar_2 = Bar {
+        id: object::new(ctx),
+        a: 42,
+    };
+    
+    let bar_3 = Bar {
+        id: object::new(ctx),
+        a: 43,
+    };
+
+    let bar_4 = Bar {
+        id: object::new(ctx),
+        a: 44,
+    };
+
+    let bar_5 = Bar {
+        id: object::new(ctx),
+        a: 45,
+    };
+    
+    let foo = Foo {
+        id: object::new(ctx),
+        a: 101,
+        b: bar_1,
+        c: 102,
+    };
+    
+    let var = Var {
+        id: object::new(ctx),
+        a: bar_2,
+        b: foo,
+        c: vector[bar_3, bar_4, bar_5],
+    };
+    
+    save_in_slot(var, 0);
+}
+
+public fun read_var(): Var {
+    read_slot<Var>(0)
 }

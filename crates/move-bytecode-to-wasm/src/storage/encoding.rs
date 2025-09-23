@@ -888,20 +888,36 @@ pub fn add_encode_intermediate_type_instructions(
             module_id, index, ..
         } => {
             let child_struct_ptr = module.locals.add(ValType::I32);
+            builder.local_set(child_struct_ptr);
 
             let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)
                 .unwrap();
 
-            builder.local_set(child_struct_ptr);
-
-            // Save the child struct under the parent struct key if it possesses the key ability
+            // Save the child struct under the parent struct key if it has the key ability
             if child_struct.has_key {
-                // Cache the data written in the slot
-                builder
-                    .local_get(slot_ptr)
-                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                    .call(storage_cache);
+                builder.block(None, |block| {
+                    let block_id = block.id();
+
+                    // Check if the child struct uid fits in the current slot (it takes 32 bytes, a full slot)
+                    block
+                        .local_get(written_bytes_in_slot)
+                        .i32_const(0)
+                        .binop(BinaryOp::I32Eq)
+                        .br_if(block_id);
+
+                    // Cache the existing data to the slot
+                    block
+                        .local_get(slot_ptr)
+                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                        .call(storage_cache);
+
+                    // Move to the next slot. Here we will write the child struct id
+                    block
+                        .local_get(slot_ptr)
+                        .call(next_slot_fn)
+                        .local_set(slot_ptr);
+                });
 
                 // Get the parent struct id
                 let parent_struct_id_ptr = module.locals.add(ValType::I32);
@@ -923,7 +939,7 @@ pub fn add_encode_intermediate_type_instructions(
                     .local_get(child_struct_id_ptr)
                     .call(write_object_slot_fn);
 
-                // Copy the calculated slot to avoid overwriting it when calling the function recursively
+                // Copy the calculated slot to a new local to avoid overwriting it when calling the function recursively
                 let child_struct_slot_ptr = module.locals.add(ValType::I32);
                 builder
                     .i32_const(32)
@@ -951,25 +967,8 @@ pub fn add_encode_intermediate_type_instructions(
                     written_bytes_in_slot,
                 );
 
-                // Set written bytes in slot to 32 after the recursive call, to account for the 32 bytes of the child struct uid
+                // Set written bytes in slot to 32 after encoding the child struct, to account for the 32 bytes of the child struct uid
                 builder.i32_const(32).local_set(written_bytes_in_slot);
-
-                builder.block(None, |block| {
-                    let block_id = block.id();
-
-                    // Check if the child struct uid fits in the current slot (it takes 32 bytes, a full slot)
-                    block
-                        .local_get(written_bytes_in_slot)
-                        .i32_const(0)
-                        .binop(BinaryOp::I32Eq)
-                        .br_if(block_id);
-
-                    // Move to the next slot. Here we will write the child struct id
-                    block
-                        .local_get(slot_ptr)
-                        .call(next_slot_fn)
-                        .local_set(slot_ptr);
-                });
 
                 // Copy the child struct id to the data
                 // When we exit this function, the caller (the parent struct) will save this data at the slot we just moved to
