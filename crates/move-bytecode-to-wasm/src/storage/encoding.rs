@@ -887,6 +887,11 @@ pub fn add_encode_intermediate_type_instructions(
         IntermediateType::IStruct {
             module_id, index, ..
         } => {
+            // This section handles encoding of nested structs within parent structs.
+            // The behavior differs based on whether the child struct has the 'key' ability:
+            // - If child has 'key': stored as separate object under the parent key
+            // - If child has no 'key': flattened into parent struct's data
+
             let child_struct_ptr = module.locals.add(ValType::I32);
             builder.local_set(child_struct_ptr);
 
@@ -894,69 +899,87 @@ pub fn add_encode_intermediate_type_instructions(
                 .get_struct_by_index(module_id, *index)
                 .unwrap();
 
-            // Save the child struct under the parent struct key if it has the key ability
             if child_struct.has_key {
+                // ====================================================================
+                // CHILD STRUCT WITH KEY - Store as Separate Object
+                // ====================================================================
+                // When a child struct has the 'key' ability, it becomes a separate
+                // object in storage rather than being flattened into the parent.
+                // This requires:
+                // 1. Calculating a unique slot for the child struct
+                // 2. Recursively encoding the child struct in its own slot
+                // 3. Storing the child struct UID in the parent's data
+
+                // Check if current slot has space for the 32-byte child struct UID.
+                // If not, cache existing data and move to next slot.
                 builder.block(None, |block| {
                     let block_id = block.id();
 
-                    // Check if the child struct uid fits in the current slot (it takes 32 bytes, a full slot)
+                    // Check if we're at the beginning of a new slot (written_bytes_in_slot == 0)
                     block
                         .local_get(written_bytes_in_slot)
                         .i32_const(0)
                         .binop(BinaryOp::I32Eq)
                         .br_if(block_id);
 
-                    // Cache the existing data to the slot
+                    // Cache existing data to current slot before moving to next slot
+                    // This ensures no data is lost during the slot transition
                     block
                         .local_get(slot_ptr)
                         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
                         .call(storage_cache);
 
-                    // Move to the next slot. Here we will write the child struct id
+                    // Move to the next slot where we'll write the child struct UID
                     block
                         .local_get(slot_ptr)
                         .call(next_slot_fn)
                         .local_set(slot_ptr);
                 });
 
-                // Get the parent struct id
+                // Calculate the slot for the child struct according to Solidity storage layout:
+                // child_struct_slot = keccak256(child_struct_id || keccak256(parent_struct_id || 0))
+
+                // Extract parent struct ID for slot calculation
                 let parent_struct_id_ptr = module.locals.add(ValType::I32);
                 builder
                     .local_get(parent_struct_ptr)
                     .call(get_struct_id_fn)
                     .local_set(parent_struct_id_ptr);
 
-                // Get the child struct id
+                // Extract child struct ID for slot calculation
                 let child_struct_id_ptr = module.locals.add(ValType::I32);
                 builder
                     .local_get(child_struct_ptr)
                     .call(get_struct_id_fn)
                     .local_set(child_struct_id_ptr);
 
-                // Calculate the child struct slot
+                // Calculate the unique slot for the child struct
                 builder
                     .local_get(parent_struct_id_ptr)
                     .local_get(child_struct_id_ptr)
                     .call(write_object_slot_fn);
 
-                // Copy the calculated slot to a new local to avoid overwriting it when calling the function recursively
+                // Allocate memory for the child struct slot and copy the calculated
+                // slot data to avoid overwriting during recursive encoding.
+
+                // Allocate memory for child struct slot (32 bytes for slot data)
                 let child_struct_slot_ptr = module.locals.add(ValType::I32);
                 builder
                     .i32_const(32)
                     .call(compilation_ctx.allocator)
                     .local_set(child_struct_slot_ptr);
 
+                // Copy the calculated slot data to the allocated memory
                 builder
                     .local_get(child_struct_slot_ptr)
                     .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                     .i32_const(32)
                     .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-                // Set written bytes in slot to zero before the recursive call
+                // Reset written bytes counter for the child struct encoding
                 builder.i32_const(0).local_set(written_bytes_in_slot);
 
-                // Now call the struct encoding function with the calculate child slot pointer
-                // This will encode and write the child struct under the parent struct mapping
+                // Recursively encode and store the child struct
                 add_encode_and_save_into_storage_struct_instructions(
                     module,
                     builder,
@@ -967,19 +990,30 @@ pub fn add_encode_intermediate_type_instructions(
                     written_bytes_in_slot,
                 );
 
-                // Set written bytes in slot to 32 after encoding the child struct, to account for the 32 bytes of the child struct uid
+                // After encoding the child struct, we need to store its UID in the
+                // parent struct's data so the parent can reference the child.
+                // The UID takes exactly 32 bytes (one full slot).
+
+                // Update written bytes counter to reflect the 32-byte UID
                 builder.i32_const(32).local_set(written_bytes_in_slot);
 
-                // Copy the child struct id to the data
-                // When we exit this function, the caller (the parent struct) will save this data at the slot we just moved to
-                // The child struct uid gets copied twice, once in the parent struct (to make reference to the child struct)
-                // and once in the child struct (because it has key, so the first field is the uid)
+                // Copy the child struct UID to the parent's data section
+                // This creates the reference from parent to child struct
                 builder
                     .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
                     .local_get(child_struct_id_ptr)
                     .i32_const(32)
                     .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
             } else {
+                // ====================================================================
+                // CHILD STRUCT WITHOUT KEY - Flatten into Parent
+                // ====================================================================
+                // When a child struct doesn't have the 'key' ability, it gets
+                // flattened directly into the parent struct's data. This means
+                // all fields of the child struct are stored inline within the
+                // parent struct's storage slot.
+
                 add_encode_and_save_into_storage_struct_instructions(
                     module,
                     builder,
@@ -1290,73 +1324,101 @@ pub fn add_decode_intermediate_type_instructions(
         IntermediateType::IStruct {
             module_id, index, ..
         } => {
+            // ========================================================================
+            // Handle Nested Struct Decoding
+            // ========================================================================
+            // This section handles decoding of nested structs from storage.
+            // The behavior differs based on whether the child struct has the 'key' ability:
+            // - If child has 'key': read UID from parent, calculate child slot, decode child
+            // - If child has no 'key': decode child directly from current slot (flattened)
+
             let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)
                 .unwrap();
 
             if child_struct.has_key {
-                // If we are decoding a wrapped object, i.e. a struct with key stored as a field in the parent struct
-                // Then the current slot contains the id of the child struct
+                // ====================================================================
+                // CHILD STRUCT WITH KEY - Decode from Separate Object
+                // ====================================================================
+                // When a child struct has the 'key' ability, it is stored as a separate
+                // object in storage. To decode it, we need to:
+                // 1. Read the child struct UID from the parent's data
+                // 2. Calculate the child struct's storage slot
+                // 3. Decode the child struct from its dedicated slot
+                // 4. Return the decoded child struct
 
+                // Check if we need to move to the next slot to read the child struct UID.
+                // The UID is stored in the parent's data and takes exactly 32 bytes.
                 builder.block(None, |block| {
                     let block_id = block.id();
 
+                    // Check if we're at the beginning of a new slot (read_bytes_in_slot == 0)
                     block
                         .local_get(read_bytes_in_slot)
                         .i32_const(0)
                         .binop(BinaryOp::I32Eq)
                         .br_if(block_id);
 
-                    // Move to the next slot
+                    // Move to the next slot where the child struct UID is stored
                     block
                         .local_get(slot_ptr)
                         .call(next_slot_fn)
                         .local_set(slot_ptr);
                 });
 
-                // Load the child struct id from the slot
-                let child_struct_id_ptr = module.locals.add(ValType::I32);
-
-                builder
-                    .i32_const(32)
-                    .call(compilation_ctx.allocator)
-                    .local_set(child_struct_id_ptr);
-
-                builder
-                    .local_get(slot_ptr)
-                    .local_get(child_struct_id_ptr)
-                    .call(storage_load);
-
-                // Get the parent struct id
+                // Get parent struct ID
                 let parent_struct_id_ptr = module.locals.add(ValType::I32);
                 builder
                     .local_get(parent_struct_ptr)
                     .call(get_struct_id_fn)
                     .local_set(parent_struct_id_ptr);
 
-                // Calculate the child struct slot
+                // Retrieve the 32-byte UID of the child struct from the current slot.
+                // This UID, saved during the encoding process in the parent struct, links the child struct to its parent.
+
+                // Allocate memory for the child struct UID (32 bytes)
+                let child_struct_id_ptr = module.locals.add(ValType::I32);
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_set(child_struct_id_ptr);
+
+                // Load the child struct UID from storage
+                builder
+                    .local_get(slot_ptr)
+                    .local_get(child_struct_id_ptr)
+                    .call(storage_load);
+
+                // Calculate the child struct's storage slot     
+                // child_struct_slot = keccak256(child_struct_id || keccak256(parent_struct_id || 0))
                 builder
                     .local_get(parent_struct_id_ptr)
                     .local_get(child_struct_id_ptr)
                     .call(write_object_slot_fn);
+        
+                // Allocate memory for the child struct slot and copy the calculated
+                // slot data to avoid overwriting during recursive decoding.
 
-                // Copy the calculated slot to avoid overwriting it when calling the function recursively
+                // Allocate memory for child struct slot (32 bytes for slot data)
                 let child_struct_slot_ptr = module.locals.add(ValType::I32);
                 builder
                     .i32_const(32)
                     .call(compilation_ctx.allocator)
                     .local_set(child_struct_slot_ptr);
 
+                // Copy the calculated slot data to the allocated memory
                 builder
                     .local_get(child_struct_slot_ptr)
                     .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                     .i32_const(32)
                     .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-                // Set read bytes in slot to zero before the recursive call
+                // Reset read bytes counter for the child struct decoding
                 builder.i32_const(0).local_set(read_bytes_in_slot);
 
-                // Read and decode the child struct at the calculated slot!
+                // Recursively decode the child struct from its dedicated slot
+                // This will handle all fields of the child struct and reconstruct
+                // the complete child struct object.
                 let child_struct_ptr = add_read_and_decode_storage_struct_instructions(
                     module,
                     builder,
@@ -1367,12 +1429,22 @@ pub fn add_decode_intermediate_type_instructions(
                     read_bytes_in_slot,
                 );
 
-                // The whole slot is taken by the uid, so we set the read bytes to 32
+                // Update read bytes counter to reflect the 32-byte UID we consumed
                 builder.i32_const(32).local_set(read_bytes_in_slot);
 
+                // Set the decoded child struct as the result
                 builder.local_get(child_struct_ptr).local_set(data_ptr);
+
             } else {
-                // Read the child struct
+                // ====================================================================
+                // CHILD STRUCT WITHOUT KEY - Decode from Flattened Data
+                // ====================================================================
+                // When a child struct doesn't have the 'key' ability, it was stored
+                // flattened within the parent struct's data. We can decode it directly
+                // from the current slot without needing to calculate separate storage.
+
+                // Decode the child struct directly from the current slot
+                // The child struct's fields are stored inline within the parent's data
                 let child_struct_ptr = add_read_and_decode_storage_struct_instructions(
                     module,
                     builder,
@@ -1383,6 +1455,7 @@ pub fn add_decode_intermediate_type_instructions(
                     read_bytes_in_slot,
                 );
 
+                // Set the decoded child struct as the result
                 builder.local_get(child_struct_ptr).local_set(data_ptr);
             }
         }
