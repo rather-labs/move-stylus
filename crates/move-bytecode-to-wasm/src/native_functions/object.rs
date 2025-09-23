@@ -573,6 +573,8 @@ pub fn add_hash_type_and_key_fn(
         return function;
     };
 
+    let (native_keccak, _) = native_keccak256(module);
+
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
@@ -584,9 +586,10 @@ pub fn add_hash_type_and_key_fn(
     // Arguments
     let parent_address = module.locals.add(ValType::I32);
     let key_ptr = module.locals.add(ValType::I32);
-    let type_name = itype.get_name(compilation_ctx);
 
+    // Locals
     let data_start = module.locals.add(ValType::I32);
+    let result_ptr = module.locals.add(ValType::I32);
 
     // Fist we allocate space for the address
     builder
@@ -688,6 +691,22 @@ pub fn add_hash_type_and_key_fn(
                 },
             );
     }
+
+    // First slot = keccak(header_slot)
+    builder.local_get(data_start);
+
+    // Call allocator to get the end of the data to Hash and substract the start to get the length
+    builder
+        .local_get(data_start)
+        .i32_const(0)
+        .call(compilation_ctx.allocator)
+        .binop(BinaryOp::I32Sub);
+
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_tee(result_ptr);
+    builder.call(native_keccak);
 
     function.finish(vec![parent_address, key_ptr], &mut module.funcs)
 }
