@@ -17,6 +17,7 @@ use crate::{
     },
     utils::keccak_string_to_memory,
     vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
+    wasm_builder_extensions::WasmBuilderExtension,
 };
 use walrus::{
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
@@ -604,95 +605,23 @@ pub fn add_hash_type_and_key_fn(
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     // Copy the data after the parent addresss
-    match itype {
-        IntermediateType::IAddress => {
-            builder
-                .i32_const(IAddress::HEAP_SIZE)
-                .call(compilation_ctx.allocator);
-
-            builder
-                .local_get(parent_address)
-                .i32_const(IAddress::HEAP_SIZE)
-                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-        }
-        // 4 bytes numbers should be in the stack
-        IntermediateType::IBool
-        | IntermediateType::IU8
-        | IntermediateType::IU16
-        | IntermediateType::IU32 => {
-            builder
-                .i32_const(itype.stack_data_size() as i32)
-                .call(compilation_ctx.allocator);
-
-            builder.local_get(key_ptr).store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-        }
-        IntermediateType::IU64 => {
-            builder
-                .i32_const(itype.stack_data_size() as i32)
-                .call(compilation_ctx.allocator);
-
-            builder.local_get(key_ptr).store(
-                compilation_ctx.memory_id,
-                StoreKind::I64 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-        }
-        IntermediateType::IU128 => {
-            builder
-                .i32_const(IU128::HEAP_SIZE)
-                .call(compilation_ctx.allocator);
-
-            builder
-                .local_get(parent_address)
-                .i32_const(IU128::HEAP_SIZE)
-                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-        }
-        IntermediateType::IU256 => {
-            builder
-                .i32_const(IU256::HEAP_SIZE)
-                .call(compilation_ctx.allocator);
-
-            builder
-                .local_get(parent_address)
-                .i32_const(IU256::HEAP_SIZE)
-                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-        }
-        _ => {
-            panic!(
-                r#"there was an error linking "{}" function, unsupported key type {itype:?}"#,
-                NativeFunction::NATIVE_HASH_TYPE_AND_KEY
-            );
-        }
-    }
+    copy_data_to_memory(&mut builder, compilation_ctx, module, itype, key_ptr);
 
     let type_name = itype.get_name(compilation_ctx);
 
-    for chunk in type_name.as_bytes().chunks(4) {
-        builder.i32_const(4).call(compilation_ctx.allocator);
+    for chunk in type_name.as_bytes() {
+        builder.i32_const(1).call(compilation_ctx.allocator);
 
-        builder
-            .i32_const(i32::from_be_bytes(chunk.try_into().unwrap()))
-            .store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
+        builder.i32_const(*chunk as i32).store(
+            compilation_ctx.memory_id,
+            StoreKind::I32_8 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
     }
 
-    // First slot = keccak(header_slot)
     builder.local_get(data_start);
 
     // Call allocator to get the end of the data to Hash and substract the start to get the length
@@ -709,4 +638,183 @@ pub fn add_hash_type_and_key_fn(
     builder.call(native_keccak);
 
     function.finish(vec![parent_address, key_ptr], &mut module.funcs)
+}
+
+fn copy_data_to_memory(
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    module: &mut Module,
+    itype: &IntermediateType,
+    data: LocalId,
+) {
+    // Copy the data after the parent addresss
+    match itype {
+        IntermediateType::IAddress => {
+            builder
+                .i32_const(IAddress::HEAP_SIZE)
+                .call(compilation_ctx.allocator);
+
+            builder
+                .local_get(data)
+                .i32_const(IAddress::HEAP_SIZE)
+                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+        }
+        // 4 bytes numbers should be in the stack
+        IntermediateType::IBool
+        | IntermediateType::IU8
+        | IntermediateType::IU16
+        | IntermediateType::IU32 => {
+            builder
+                .i32_const(itype.stack_data_size() as i32)
+                .call(compilation_ctx.allocator);
+
+            builder.local_get(data).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+        }
+        IntermediateType::IU64 => {
+            builder
+                .i32_const(itype.stack_data_size() as i32)
+                .call(compilation_ctx.allocator);
+
+            builder.local_get(data).store(
+                compilation_ctx.memory_id,
+                StoreKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+        }
+        IntermediateType::IU128 => {
+            builder
+                .i32_const(IU128::HEAP_SIZE)
+                .call(compilation_ctx.allocator);
+
+            builder
+                .local_get(data)
+                .i32_const(IU128::HEAP_SIZE)
+                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+        }
+        IntermediateType::IU256 => {
+            builder
+                .i32_const(IU256::HEAP_SIZE)
+                .call(compilation_ctx.allocator);
+
+            builder
+                .local_get(data)
+                .i32_const(IU256::HEAP_SIZE)
+                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+        }
+        IntermediateType::IStruct {
+            module_id, index, ..
+        } => {
+            let struct_ = compilation_ctx
+                .get_struct_by_index(module_id, *index)
+                .unwrap();
+
+            let field_data = module.locals.add(ValType::I32);
+
+            for (index, field) in struct_.fields.iter().enumerate() {
+                builder
+                    .local_get(data)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: index as u32 * 4,
+                        },
+                    )
+                    .local_set(field_data);
+
+                copy_data_to_memory(builder, compilation_ctx, module, field, field_data);
+            }
+        }
+        IntermediateType::IVector(inner) => {
+            let len = module.locals.add(ValType::I32);
+            let i = module.locals.add(ValType::I32);
+            builder
+                .local_tee(data)
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .local_set(len);
+
+            let (field_data, load_kind, element_multiplier) = if **inner == IntermediateType::IU64 {
+                (
+                    module.locals.add(ValType::I64),
+                    LoadKind::I64 { atomic: false },
+                    8,
+                )
+            } else {
+                (
+                    module.locals.add(ValType::I32),
+                    LoadKind::I32 { atomic: false },
+                    4,
+                )
+            };
+
+            builder.i32_const(1).local_set(i);
+            builder.skip_vec_header(data).local_set(data);
+
+            builder.block(None, |block| {
+                let block_id = block.id();
+                block.loop_(None, |loop_| {
+                    let loop_id = loop_.id();
+
+                    // Load the element pointer from the vector data
+                    loop_
+                        .local_get(data)
+                        .i32_const(element_multiplier)
+                        .local_get(i)
+                        .binop(BinaryOp::I32Mul)
+                        .binop(BinaryOp::I32Add)
+                        .load(
+                            compilation_ctx.memory_id,
+                            load_kind,
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_set(field_data);
+
+                    copy_data_to_memory(loop_, compilation_ctx, module, inner, field_data);
+
+                    // If we reach the last element, we exit
+                    loop_
+                        .local_get(i)
+                        .local_get(len)
+                        .binop(BinaryOp::I32Eq)
+                        .br_if(block_id);
+
+                    // Else, increment i and continue the loop
+                    loop_
+                        .local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(i)
+                        .br(loop_id);
+                });
+            });
+        }
+
+        _ => {
+            panic!(
+                r#"there was an error linking "{}" function, unsupported key type {itype:?}"#,
+                NativeFunction::NATIVE_HASH_TYPE_AND_KEY
+            );
+        }
+    }
 }
