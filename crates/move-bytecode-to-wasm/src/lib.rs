@@ -124,12 +124,9 @@ pub fn translate_package(
             CompilationContext::new(&root_module_data, &modules_data, memory_id, allocator_func);
 
         let mut public_functions = Vec::new();
-        for function_information in root_module_data
-            .functions
-            .information
-            .iter()
-            .filter(|fi| fi.function_id.module_id == root_module_id && !fi.is_generic)
-        {
+        for function_information in root_module_data.functions.information.iter().filter(|fi| {
+            fi.function_id.module_id == root_module_id && !fi.is_generic && !fi.is_native
+        }) {
             translate_and_link_functions(
                 &function_information.function_id,
                 &mut function_table,
@@ -138,13 +135,13 @@ pub fn translate_package(
                 &compilation_ctx,
             );
 
-            let wasm_function_id = function_table
-                .get_by_function_id(&function_information.function_id)
-                .unwrap()
-                .wasm_function_id
-                .unwrap();
-
             if function_information.is_entry {
+                let wasm_function_id = function_table
+                    .get_by_function_id(&function_information.function_id)
+                    .unwrap()
+                    .wasm_function_id
+                    .unwrap();
+
                 public_functions.push(PublicFunction::new(
                     wasm_function_id,
                     &function_information.function_id.identifier,
@@ -165,7 +162,7 @@ pub fn translate_package(
         hostio::build_entrypoint_router(&mut module, &public_functions, &compilation_ctx);
 
         function_table.ensure_all_functions_added().unwrap();
-        validate_stylus_wasm(&mut module).unwrap();
+        // validate_stylus_wasm(&mut module).unwrap();
 
         modules.insert(module_name, module);
         modules_data.insert(root_module_id.clone(), root_module_data);

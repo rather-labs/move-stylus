@@ -553,6 +553,30 @@ fn add_delete_slot_instructions(
     }
 }
 
+#[cfg(debug_assertions)]
+pub fn add_get_last_memory_position_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    if let Some(function) = module
+        .funcs
+        .by_name(NativeFunction::NATIVE_GET_LAST_MEMORY_POSITION)
+    {
+        return function;
+    };
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[], &[ValType::I32]);
+
+    let mut builder = function
+        .name(NativeFunction::NATIVE_GET_LAST_MEMORY_POSITION.to_owned())
+        .func_body();
+
+    // Call allocator with size 0 to get the current memory position
+    builder.i32_const(0).call(compilation_ctx.allocator);
+
+    function.finish(vec![], &mut module.funcs)
+}
+
 /// Computes a keccak256 hash from:
 /// - parent address (32 bytes)
 /// - key (variable size)
@@ -635,7 +659,8 @@ pub fn add_hash_type_and_key_fn(
         .i32_const(32)
         .call(compilation_ctx.allocator)
         .local_tee(result_ptr);
-    builder.call(native_keccak);
+
+    builder.call(native_keccak).local_get(result_ptr);
 
     function.finish(vec![parent_address, key_ptr], &mut module.funcs)
 }

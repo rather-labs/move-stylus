@@ -51,6 +51,10 @@ impl NativeFunction {
     // This is for objects with NamedId as id.
     pub const NATIVE_REMOVE_OBJECT: &str = "remove";
     pub const NATIVE_COMPUTE_NAMED_ID: &str = "compute_named_id";
+
+    // Dynamic fields
+    #[cfg(debug_assertions)]
+    pub const NATIVE_GET_LAST_MEMORY_POSITION: &str = "get_last_memory_position";
     const NATIVE_HASH_TYPE_AND_KEY: &str = "hash_type_and_key";
 
     // Host functions
@@ -63,7 +67,11 @@ impl NativeFunction {
     /// it just returns the id.
     ///
     /// This function is idempotent.
-    pub fn get(name: &str, module: &mut Module, compilaton_ctx: &CompilationContext) -> FunctionId {
+    pub fn get(
+        name: &str,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+    ) -> FunctionId {
         // Some functions are implemented by host functions directly. For those, we just import and
         // use them without wrapping them.
         if let Some(host_fn_name) = Self::host_fn_name(name) {
@@ -87,6 +95,7 @@ impl NativeFunction {
                         let (function_id, _) = hostio::host_functions::chain_id(module);
                         return function_id;
                     }
+
                     _ => {
                         panic!("host function {host_fn_name} not supported yet");
                     }
@@ -98,17 +107,21 @@ impl NativeFunction {
             function
         } else {
             match name {
-                Self::NATIVE_SENDER => transaction::add_native_sender_fn(module, compilaton_ctx),
+                Self::NATIVE_SENDER => transaction::add_native_sender_fn(module, compilation_ctx),
                 Self::NATIVE_MSG_VALUE => {
-                    transaction::add_native_msg_value_fn(module, compilaton_ctx)
+                    transaction::add_native_msg_value_fn(module, compilation_ctx)
                 }
                 Self::NATIVE_BLOCK_BASEFEE => {
-                    transaction::add_native_block_basefee_fn(module, compilaton_ctx)
+                    transaction::add_native_block_basefee_fn(module, compilation_ctx)
                 }
                 Self::NATIVE_GAS_PRICE => {
-                    transaction::add_native_tx_gas_price_fn(module, compilaton_ctx)
+                    transaction::add_native_tx_gas_price_fn(module, compilation_ctx)
                 }
-                Self::NATIVE_FRESH_ID => object::add_native_fresh_id_fn(module, compilaton_ctx),
+                Self::NATIVE_FRESH_ID => object::add_native_fresh_id_fn(module, compilation_ctx),
+                #[cfg(debug_assertions)]
+                Self::NATIVE_GET_LAST_MEMORY_POSITION => {
+                    object::add_get_last_memory_position_fn(module, compilation_ctx)
+                }
                 _ => panic!("native function {name} not supported yet"),
             }
         }
@@ -251,6 +264,7 @@ impl NativeFunction {
 
                 object::add_hash_type_and_key_fn(module, compilation_ctx, &generics[0])
             }
+
             _ => panic!("generic native function {name} not supported yet"),
         }
     }
