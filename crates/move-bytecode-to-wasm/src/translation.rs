@@ -16,10 +16,7 @@ use crate::{
     compilation_context::{ModuleData, ModuleId},
     data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET},
     error_encoding::build_error_message,
-    generics::{
-        extract_type_instances_from_stack, instantiate_vec_type_parameters,
-        replace_type_parameters, type_contains_generics,
-    },
+    generics::{instantiate_vec_type_parameters, replace_type_parameters, type_contains_generics},
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
@@ -572,27 +569,10 @@ fn translate_instruction(
                         &mapped_function.function_id.type_instantiations
                     {
                         let mut instantiations = Vec::new();
-                        for (index, field) in type_instantiations.iter().enumerate() {
-                            if let Some(res) = extract_type_instances_from_stack(
-                                field,
-                                &type_instantiations[index],
-                            ) {
-                                instantiations.push(res);
-                            } else {
-                                instantiations.push(field.clone());
-                            }
+                        for field in type_instantiations {
+                            instantiations
+                                .push(replace_type_parameters(field, caller_type_instances));
                         }
-
-                        let instantiations = instantiations
-                            .into_iter()
-                            .map(|f| {
-                                if let IntermediateType::ITypeParameter(i) = f {
-                                    caller_type_instances[i as usize].clone()
-                                } else {
-                                    f
-                                }
-                            })
-                            .collect::<Vec<IntermediateType>>();
 
                         function_information.instantiate(&instantiations)
                     }
@@ -2157,26 +2137,9 @@ fn translate_instruction(
                     &mapped_function.function_id.type_instantiations
                 {
                     let mut instantiations = Vec::new();
-                    for (index, field) in type_instantiations.iter().enumerate() {
-                        if let Some(res) =
-                            extract_type_instances_from_stack(field, &type_instantiations[index])
-                        {
-                            instantiations.push(res);
-                        } else {
-                            instantiations.push(field.clone());
-                        }
+                    for field in &type_instantiations {
+                        instantiations.push(replace_type_parameters(field, caller_type_instances));
                     }
-
-                    let instantiations = instantiations
-                        .into_iter()
-                        .map(|f| {
-                            if let IntermediateType::ITypeParameter(i) = f {
-                                caller_type_instances[i as usize].clone()
-                            } else {
-                                f
-                            }
-                        })
-                        .collect::<Vec<IntermediateType>>();
 
                     (struct_.instantiate(&instantiations), instantiations)
                 }
@@ -2250,24 +2213,9 @@ fn translate_instruction(
                     &mapped_function.function_id.type_instantiations
                 {
                     let mut instantiations = Vec::new();
-                    for (index, field) in types.iter().enumerate() {
-                        if let Some(res) = extract_type_instances_from_stack(field, &types[index]) {
-                            instantiations.push(res);
-                        } else {
-                            instantiations.push(field.clone());
-                        }
+                    for field in types {
+                        instantiations.push(replace_type_parameters(field, caller_type_instances));
                     }
-
-                    let instantiations = instantiations
-                        .into_iter()
-                        .map(|f| {
-                            if let IntermediateType::ITypeParameter(i) = f {
-                                caller_type_instances[i as usize].clone()
-                            } else {
-                                f
-                            }
-                        })
-                        .collect::<Vec<IntermediateType>>();
 
                     (struct_.instantiate(&instantiations), instantiations)
                 }
