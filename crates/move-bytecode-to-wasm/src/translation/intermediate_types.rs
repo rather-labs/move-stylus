@@ -1073,6 +1073,41 @@ impl IntermediateType {
             IntermediateType::IEnum(_) => todo!(),
         }
     }
+
+    pub fn get_name(&self, compilation_ctx: &CompilationContext) -> String {
+        match self {
+            IntermediateType::IBool => "bool".to_string(),
+            IntermediateType::IU8 => "u8".to_string(),
+            IntermediateType::IU16 => "u16".to_string(),
+            IntermediateType::IU32 => "u32".to_string(),
+            IntermediateType::IU64 => "u64".to_string(),
+            IntermediateType::IU128 => "u128".to_string(),
+            IntermediateType::IU256 => "u256".to_string(),
+            IntermediateType::IAddress => "address".to_string(),
+            IntermediateType::ISigner => "signer".to_string(),
+            IntermediateType::IVector(inner) => {
+                format!("vector<{}>", inner.get_name(compilation_ctx))
+            }
+            IntermediateType::IRef(inner) => format!("&{}", inner.get_name(compilation_ctx)),
+            IntermediateType::IMutRef(inner) => format!("&mut {}", inner.get_name(compilation_ctx)),
+            IntermediateType::IStruct {
+                module_id, index, ..
+            }
+            | IntermediateType::IGenericStructInstance {
+                module_id, index, ..
+            } => {
+                let struct_ = compilation_ctx
+                    .get_struct_by_index(module_id, *index)
+                    .unwrap();
+
+                struct_.identifier.clone()
+            }
+            IntermediateType::ITypeParameter(_) => {
+                panic!("cannot get the name of a type parameter, expected a concrete type",)
+            }
+            IntermediateType::IEnum(name) => todo!(),
+        }
+    }
 }
 
 impl From<&IntermediateType> for ValType {

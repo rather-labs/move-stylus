@@ -9,7 +9,12 @@ use crate::{
     },
     runtime::RuntimeFunction,
     storage::encoding::field_size,
-    translation::intermediate_types::{IntermediateType, address::IAddress, structs::IStruct},
+    translation::intermediate_types::{
+        IntermediateType,
+        address::IAddress,
+        heap_integers::{IU128, IU256},
+        structs::IStruct,
+    },
     utils::keccak_string_to_memory,
     vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
 };
@@ -547,6 +552,17 @@ fn add_delete_slot_instructions(
     }
 }
 
+/// Computes a keccak256 hash from:
+/// - parent address (32 bytes)
+/// - key (variable size)
+/// - Key type name
+///
+/// Arguments
+/// * `parent_address` - i32 pointer to the parent address in memory
+/// * `key_ptr` - i32 pointer to the key in memory
+///
+/// Returns
+/// * i32 pointer to the resulting hash in memory
 pub fn add_hash_type_and_key_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -563,9 +579,115 @@ pub fn add_hash_type_and_key_fn(
         &[ValType::I32],
     );
 
+    let mut builder = function.name(name).func_body();
+
     // Arguments
     let parent_address = module.locals.add(ValType::I32);
     let key_ptr = module.locals.add(ValType::I32);
+    let type_name = itype.get_name(compilation_ctx);
+
+    let data_start = module.locals.add(ValType::I32);
+
+    // Fist we allocate space for the address
+    builder
+        .i32_const(IAddress::HEAP_SIZE)
+        .call(compilation_ctx.allocator)
+        .local_set(data_start);
+
+    builder
+        .local_get(data_start)
+        .local_get(parent_address)
+        .i32_const(IAddress::HEAP_SIZE)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+    // Copy the data after the parent addresss
+    match itype {
+        IntermediateType::IAddress => {
+            builder
+                .i32_const(IAddress::HEAP_SIZE)
+                .call(compilation_ctx.allocator);
+
+            builder
+                .local_get(parent_address)
+                .i32_const(IAddress::HEAP_SIZE)
+                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+        }
+        // 4 bytes numbers should be in the stack
+        IntermediateType::IBool
+        | IntermediateType::IU8
+        | IntermediateType::IU16
+        | IntermediateType::IU32 => {
+            builder
+                .i32_const(itype.stack_data_size() as i32)
+                .call(compilation_ctx.allocator);
+
+            builder.local_get(key_ptr).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+        }
+        IntermediateType::IU64 => {
+            builder
+                .i32_const(itype.stack_data_size() as i32)
+                .call(compilation_ctx.allocator);
+
+            builder.local_get(key_ptr).store(
+                compilation_ctx.memory_id,
+                StoreKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+        }
+        IntermediateType::IU128 => {
+            builder
+                .i32_const(IU128::HEAP_SIZE)
+                .call(compilation_ctx.allocator);
+
+            builder
+                .local_get(parent_address)
+                .i32_const(IU128::HEAP_SIZE)
+                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+        }
+        IntermediateType::IU256 => {
+            builder
+                .i32_const(IU256::HEAP_SIZE)
+                .call(compilation_ctx.allocator);
+
+            builder
+                .local_get(parent_address)
+                .i32_const(IU256::HEAP_SIZE)
+                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+        }
+        _ => {
+            panic!(
+                r#"there was an error linking "{}" function, unsupported key type {itype:?}"#,
+                NativeFunction::NATIVE_HASH_TYPE_AND_KEY
+            );
+        }
+    }
+
+    let type_name = itype.get_name(compilation_ctx);
+
+    for chunk in type_name.as_bytes().chunks(4) {
+        builder.i32_const(4).call(compilation_ctx.allocator);
+
+        builder
+            .i32_const(i32::from_be_bytes(chunk.try_into().unwrap()))
+            .store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+    }
 
     function.finish(vec![parent_address, key_ptr], &mut module.funcs)
 }
