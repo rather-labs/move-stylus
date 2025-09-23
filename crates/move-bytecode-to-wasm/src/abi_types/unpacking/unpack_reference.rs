@@ -40,7 +40,7 @@ impl IRef {
                 // This is the only place where we pass the flag unpack_frozen = true.
                 // This is because we only want to unpack frozen objects from the storage
                 // if the object is passed as an immutable reference to the function arguments.
-                if struct_.saved_in_storage {
+                if struct_.has_key {
                     load_struct_storage_id(
                         builder,
                         module,
