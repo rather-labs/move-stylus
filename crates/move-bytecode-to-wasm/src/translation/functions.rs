@@ -227,6 +227,7 @@ pub fn prepare_function_arguments(
     // Verify that the types currently on the types stack correspond to the expected argument types.
     // Additionally, determine if any of these arguments are references.
     let mut has_ref = false;
+    println!("Preparing function arguments: {arguments:?}");
     for arg in arguments.iter().rev() {
         types_stack.pop_expecting(arg)?;
 

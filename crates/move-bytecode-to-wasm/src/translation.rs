@@ -213,6 +213,8 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
+                    println!("\nTranslating instruction: {instruction:?}");
+                    println!("Current stack: {:?}", ctx.types_stack);
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx.compilation_ctx,
@@ -230,6 +232,7 @@ fn translate_flow(
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
                     });
+                    println!("Stack after instruction: {:?}\n", ctx.types_stack);
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
@@ -436,6 +439,8 @@ fn translate_instruction(
             let function_id = &module_data.functions.generic_calls
                 [function_instantiation_handle_index.into_index()];
 
+            println!("1");
+
             // Obtain the generic function information
             let function_information = {
                 let dependency_data = compilation_ctx
@@ -455,8 +460,11 @@ fn translate_instruction(
                     .unwrap()
             };
 
+            println!("2");
+
             let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
 
+            println!("3 type instantiations {type_instantiations:?}");
             // If the type_instantiations contains generic parameters, those generic parameters
             // refer to instantiations whithin this context. Instantiatons are obtained using
             // the caller's function type instances (located in
@@ -516,17 +524,25 @@ fn translate_instruction(
                 if let Some(caller_type_instances) =
                     &mapped_function.function_id.type_instantiations
                 {
+                    println!("4 {caller_type_instances:?}");
                     let mut instantiations = Vec::new();
                     for (index, field) in type_instantiations.iter().enumerate() {
+                        instantiations.push(replace_type_parameters(field, caller_type_instances));
+
+                        /*
                         if let Some(res) =
                             extract_type_instances_from_stack(field, &type_instantiations[index])
                         {
+                            println!("4.5");
                             instantiations.push(res);
                         } else {
                             instantiations.push(field.clone());
                         }
+                        */
                     }
 
+                    println!("5 {:?}", instantiations);
+                    /*
                     let instantiations = instantiations
                         .into_iter()
                         .map(|f| {
@@ -538,6 +554,7 @@ fn translate_instruction(
                         })
                         .collect::<Vec<IntermediateType>>();
 
+                    */
                     function_information.instantiate(&instantiations)
                 }
                 // This should never happen
@@ -552,8 +569,10 @@ fn translate_instruction(
             let function_id = &function_information.function_id;
             let arguments = &function_information.signature.arguments;
 
+            println!("6 {function_id:?}");
             prepare_function_arguments(module, builder, arguments, compilation_ctx, types_stack)?;
 
+            println!("7");
             // If the function is in the table we call it directly
             if let Some(f) = function_table.get_by_function_id(function_id) {
                 call_indirect(

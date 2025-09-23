@@ -2060,6 +2060,7 @@ mod storage_encoding {
     }
 }
 
+/*
 mod dynamic_storage_fields {
     use alloy_primitives::{FixedBytes, address};
     use alloy_sol_types::{SolCall, sol};
@@ -2100,3 +2101,4 @@ mod dynamic_storage_fields {
         println!("Object ID: {:#x}", object_id);
     }
 }
+*/

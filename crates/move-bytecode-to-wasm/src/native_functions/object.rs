@@ -546,3 +546,26 @@ fn add_delete_slot_instructions(
         _ => {}
     }
 }
+
+pub fn add_hash_type_and_key_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) -> FunctionId {
+    let name = get_generic_function_name(NativeFunction::NATIVE_HASH_TYPE_AND_KEY, &[itype]);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    };
+
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+
+    // Arguments
+    let parent_address = module.locals.add(ValType::I32);
+    let key_ptr = module.locals.add(ValType::I32);
+
+    function.finish(vec![parent_address, key_ptr], &mut module.funcs)
+}

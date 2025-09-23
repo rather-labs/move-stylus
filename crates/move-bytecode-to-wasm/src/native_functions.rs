@@ -48,6 +48,7 @@ impl NativeFunction {
     // Object functions
     pub const NATIVE_DELETE_OBJECT: &str = "delete";
     pub const NATIVE_COMPUTE_NAMED_ID: &str = "compute_named_id";
+    const NATIVE_HASH_TYPE_AND_KEY: &str = "hash_type_and_key";
 
     // Host functions
     const HOST_BLOCK_NUMBER: &str = "block_number";
@@ -236,6 +237,16 @@ impl NativeFunction {
                 );
 
                 object::add_compute_named_id_fn(module, compilation_ctx, &generics[0])
+            }
+            Self::NATIVE_HASH_TYPE_AND_KEY => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {name} expected 1 type parameter, found {}",
+                    generics.len(),
+                );
+
+                object::add_hash_type_and_key_fn(module, compilation_ctx, &generics[0])
             }
             _ => panic!("generic native function {name} not supported yet"),
         }
