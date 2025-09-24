@@ -50,6 +50,14 @@ mod hash_type_and_key {
         function hashU256(uint256 a) public view;
         function hashBool(bool a) public view;
         function hashAddress(address a) public view;
+        function hashVectorU8(uint8[] a) public view;
+        function hashVectorU16(uint16[] a) public view;
+        function hashVectorU32(uint32[] a) public view;
+        function hashVectorU64(uint64[] a) public view;
+        function hashVectorU128(uint128[] a) public view;
+        function hashVectorU256(uint256[] a) public view;
+        function hashVectorBool(bool[] a) public view;
+        function hashVectorAddress(address[] a) public view;
     );
 
     #[rstest]
@@ -65,12 +73,10 @@ mod hash_type_and_key {
         hashU32Call::new((42424242,)),
         merge_arrays(&[ADDRESS, &42424242u32.to_le_bytes(), b"u32".as_slice()])
     )]
-    /*
     #[case(
         hashU64Call::new((42424242424242,)),
         merge_arrays(&[ADDRESS, &42424242424242u64.to_le_bytes(), b"u64".as_slice()])
     )]
-    */
     #[case(
         hashU128Call::new((42424242424242_u128,)),
         merge_arrays(&[ADDRESS, &42424242424242_u128.to_le_bytes(), b"u128".as_slice()])
@@ -90,6 +96,49 @@ mod hash_type_and_key {
     #[case(
         hashAddressCall::new((address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),)),
         merge_arrays(&[ADDRESS, ADDRESS_2, b"address".as_slice()])
+    )]
+    #[case(
+        hashVectorU8Call::new((vec![1u8, 2, 3, 4, 5],)),
+        merge_arrays(&[ADDRESS, &[1u8, 2, 3, 4, 5], b"vector<u8>".as_slice()])
+    )]
+    #[case(
+        hashVectorU16Call::new((vec![1u16, 2, 3, 4, 5],)),
+        merge_arrays(&[ADDRESS, &1u16.to_le_bytes(), &2u16.to_le_bytes(), &3u16.to_le_bytes(), &4u16.to_le_bytes(), &5u16.to_le_bytes(), b"vector<u16>".as_slice()])
+    )]
+    #[case(
+        hashVectorU32Call::new((vec![1u32, 2, 3, 4, 5],)),
+        merge_arrays(&[ADDRESS, &1u32.to_le_bytes(), &2u32.to_le_bytes(), &3u32.to_le_bytes(), &4u32.to_le_bytes(), &5u32.to_le_bytes(), b"vector<u32>".as_slice()])
+    )]
+    #[case(
+        hashVectorU64Call::new((vec![1u64, 2, 3, 4, 5],)),
+        merge_arrays(&[ADDRESS, &1u64.to_le_bytes(), &2u64.to_le_bytes(), &3u64.to_le_bytes(), &4u64.to_le_bytes(), &5u64.to_le_bytes(), b"vector<u64>".as_slice()])
+    )]
+    #[case(
+        hashVectorU128Call::new((vec![1u128, 2, 3, 4, 5],)),
+        merge_arrays(&[ADDRESS, &1u128.to_le_bytes(), &2u128.to_le_bytes(), &3u128.to_le_bytes(), &4u128.to_le_bytes(), &5u128.to_le_bytes(), b"vector<u128>".as_slice()])
+    )]
+    #[case(
+        hashVectorU256Call::new((vec![
+            U256::from(1u64),
+            U256::from(2u64),
+            U256::from(3u64),
+            U256::from(4u64),
+            U256::from(5u64)
+        ],)),
+        merge_arrays(&[ADDRESS, &U256::from(1u64).to_le_bytes::<32>(), &U256::from(2u64).to_le_bytes::<32>(), &U256::from(3u64).to_le_bytes::<32>(), &U256::from(4u64).to_le_bytes::<32>(), &U256::from(5u64).to_le_bytes::<32>(), b"vector<u256>".as_slice()])
+    )]
+    #[case(
+        hashVectorBoolCall::new((vec![true, false, true, false],)),
+        merge_arrays(&[ADDRESS, &[1, 0, 1, 0], b"vector<bool>".as_slice()])
+    )]
+    #[case(
+        hashVectorAddressCall::new((
+            vec![
+                address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
+                address!("0xcafecafecafecafecafecafecafecafecafecafe")
+            ]
+        ,)),
+        merge_arrays(&[ADDRESS, ADDRESS_2, ADDRESS, b"vector<address>".as_slice()])
     )]
     fn test_hash_type_and_key_primitives<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,

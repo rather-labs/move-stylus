@@ -53,3 +53,48 @@ public fun hash_address(a: address): u32 {
     hash_type_and_key(ADDRESS, a);
     get_last_memory_position()
 }
+
+
+public fun hash_vector_u8(a: vector<u8>): u32 {
+    hash_type_and_key(ADDRESS, a);
+    get_last_memory_position()
+}
+
+public fun hash_vector_u16(a: vector<u16>): u32 {
+    hash_type_and_key(ADDRESS, a);
+    get_last_memory_position()
+}
+
+public fun hash_vector_u32(a: vector<u32>): u32 {
+    hash_type_and_key(ADDRESS, a);
+    get_last_memory_position()
+}
+
+public fun hash_vector_u64(a: vector<u64>): u32 {
+    hash_type_and_key(ADDRESS, a);
+    get_last_memory_position()
+}
+
+public fun hash_vector_u128(a: vector<u128>): u32 {
+    hash_type_and_key(ADDRESS, a);
+    get_last_memory_position()
+}
+
+public fun hash_vector_u256(a: vector<u256>): u32 {
+    hash_type_and_key(ADDRESS, a);
+    get_last_memory_position()
+}
+
+public fun hash_vector_bool(a: vector<bool>): u32 {
+    hash_type_and_key(ADDRESS, a);
+    get_last_memory_position()
+}
+
+public fun hash_vector_address(a: vector<address>): u32 {
+    hash_type_and_key(ADDRESS, a);
+    get_last_memory_position()
+}
+
+
+
+

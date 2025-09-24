@@ -785,7 +785,7 @@ fn copy_data_to_memory(
             let len = module.locals.add(ValType::I32);
             let i = module.locals.add(ValType::I32);
             builder
-                .local_tee(data)
+                .local_get(data)
                 .load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -810,7 +810,7 @@ fn copy_data_to_memory(
                 )
             };
 
-            builder.i32_const(1).local_set(i);
+            builder.i32_const(0).local_set(i);
             builder.skip_vec_header(data).local_set(data);
 
             builder.block(None, |block| {
@@ -841,6 +841,8 @@ fn copy_data_to_memory(
                     loop_
                         .local_get(i)
                         .local_get(len)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Sub)
                         .binop(BinaryOp::I32Eq)
                         .br_if(block_id);
 
