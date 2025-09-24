@@ -22,7 +22,7 @@ use walrus::{
 ///
 /// Arguments
 /// * `parent_address` - i32 pointer to the parent address in memory
-/// * `key_ptr` - i32 pointer to the key in memory
+/// * `key` - i32 pointer to the key in memory
 ///
 /// Returns
 /// * i32 pointer to the resulting hash in memory
@@ -40,8 +40,7 @@ pub fn add_hash_type_and_key_fn(
 
     // Arguments
     let parent_address = module.locals.add(ValType::I32);
-    let (key_ptr, valtype) = if itype == &IntermediateType::IU64 {
-        println!("Using I64 for key_ptr");
+    let (key, valtype) = if itype == &IntermediateType::IU64 {
         (module.locals.add(ValType::I64), ValType::I64)
     } else {
         (module.locals.add(ValType::I32), ValType::I32)
@@ -69,7 +68,7 @@ pub fn add_hash_type_and_key_fn(
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     // Copy the data after the parent addresss
-    copy_data_to_memory(&mut builder, compilation_ctx, module, itype, key_ptr);
+    copy_data_to_memory(&mut builder, compilation_ctx, module, itype, key);
 
     let type_name = itype.get_name(compilation_ctx);
 
@@ -102,7 +101,7 @@ pub fn add_hash_type_and_key_fn(
 
     builder.call(native_keccak).local_get(result_ptr);
 
-    function.finish(vec![parent_address, key_ptr], &mut module.funcs)
+    function.finish(vec![parent_address, key], &mut module.funcs)
 }
 
 fn copy_data_to_memory(
