@@ -600,17 +600,19 @@ pub fn add_hash_type_and_key_fn(
 
     let (native_keccak, _) = native_keccak256(module);
 
-    let mut function = FunctionBuilder::new(
-        &mut module.types,
-        &[ValType::I32, ValType::I32],
-        &[ValType::I32],
-    );
-
-    let mut builder = function.name(name).func_body();
-
     // Arguments
     let parent_address = module.locals.add(ValType::I32);
-    let key_ptr = module.locals.add(ValType::I32);
+    let (key_ptr, valtype) = if itype == &IntermediateType::IU64 {
+        println!("Using I64 for key_ptr");
+        (module.locals.add(ValType::I64), ValType::I64)
+    } else {
+        (module.locals.add(ValType::I32), ValType::I32)
+    };
+
+    let mut function =
+        FunctionBuilder::new(&mut module.types, &[ValType::I32, valtype], &[ValType::I32]);
+
+    let mut builder = function.name(name).func_body();
 
     // Locals
     let data_start = module.locals.add(ValType::I32);
@@ -723,9 +725,7 @@ fn copy_data_to_memory(
             );
         }
         IntermediateType::IU64 => {
-            builder
-                .i32_const(itype.stack_data_size() as i32)
-                .call(compilation_ctx.allocator);
+            builder.i32_const(8).call(compilation_ctx.allocator);
 
             builder.local_get(data).store(
                 compilation_ctx.memory_id,

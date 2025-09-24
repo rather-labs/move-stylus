@@ -29,12 +29,10 @@ public fun hash_u32(a: u32): u32 {
     get_last_memory_position()
 }
 
-/*
 public fun hash_u64(a: u64): u32 {
     hash_type_and_key(ADDRESS, a);
     get_last_memory_position()
 }
-*/
 
 public fun hash_u128(a: u128): u32 {
     hash_type_and_key(ADDRESS, a);
