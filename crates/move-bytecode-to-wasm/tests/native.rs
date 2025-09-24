@@ -5,7 +5,7 @@ use common::runtime_sandbox::RuntimeSandbox;
 use rstest::{fixture, rstest};
 
 mod hash_type_and_key {
-    use alloy_primitives::address;
+    use alloy_primitives::{address, keccak256};
     use alloy_sol_types::{SolCall, sol};
 
     use crate::common::{runtime_sandbox::ExecutionData, translate_test_package};
@@ -395,7 +395,7 @@ mod hash_type_and_key {
         } = runtime
             .call_entrypoint_with_data(call_data.abi_encode())
             .unwrap();
-        let read_from = i32::from_be_bytes(
+        let last_allocation = i32::from_be_bytes(
             return_data[return_data.len() - 4..return_data.len()]
                 .try_into()
                 .unwrap(),
@@ -403,7 +403,7 @@ mod hash_type_and_key {
         // The last allocated position belongs to the 32 bytes allocated for the keccak function,
         // so, to read what we are really hashing we need to extract that, and the expected result
         // length
-        let read_from = read_from as usize - 32 - expected_result.len();
+        let read_from = last_allocation as usize - 32 - expected_result.len();
 
         let read_memory = RuntimeSandbox::read_memory_from(
             &instance,
@@ -414,5 +414,17 @@ mod hash_type_and_key {
         .unwrap();
 
         assert_eq!(expected_result, read_memory);
+
+        let hashed_data = RuntimeSandbox::read_memory_from(
+            &instance,
+            &mut store,
+            last_allocation as usize - 32,
+            32,
+        )
+        .unwrap();
+
+        let expected_hashed = keccak256(&expected_result);
+
+        assert_eq!(expected_hashed.as_slice(), hashed_data.as_slice());
     }
 }
