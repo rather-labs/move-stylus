@@ -650,9 +650,9 @@ pub fn add_hash_type_and_key_fn(
 
     // Call allocator to get the end of the data to Hash and substract the start to get the length
     builder
-        .local_get(data_start)
         .i32_const(0)
         .call(compilation_ctx.allocator)
+        .local_get(data_start)
         .binop(BinaryOp::I32Sub);
 
     builder
