@@ -2,8 +2,10 @@
 //!
 //! Native functions in Move are functions directly implemented inside the Move VM. To emulate that
 //! mechanism, we direcly implement them in WASM and limk them into the file.
+mod dynamic_field;
 mod event;
 pub mod object;
+mod tests;
 mod transaction;
 mod transfer;
 mod types;
@@ -120,7 +122,7 @@ impl NativeFunction {
                 Self::NATIVE_FRESH_ID => object::add_native_fresh_id_fn(module, compilation_ctx),
                 #[cfg(debug_assertions)]
                 Self::NATIVE_GET_LAST_MEMORY_POSITION => {
-                    object::add_get_last_memory_position_fn(module, compilation_ctx)
+                    tests::add_get_last_memory_position_fn(module, compilation_ctx)
                 }
                 _ => panic!("native function {name} not supported yet"),
             }
@@ -262,7 +264,7 @@ impl NativeFunction {
                     generics.len(),
                 );
 
-                object::add_hash_type_and_key_fn(module, compilation_ctx, &generics[0])
+                dynamic_field::add_hash_type_and_key_fn(module, compilation_ctx, &generics[0])
             }
 
             _ => panic!("generic native function {name} not supported yet"),
