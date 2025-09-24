@@ -1,7 +1,13 @@
+use std::process::Child;
+
 use super::NativeFunction;
 use crate::{
-    CompilationContext, get_generic_function_name,
+    CompilationContext,
+    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    get_generic_function_name,
     hostio::host_functions::native_keccak256,
+    runtime::RuntimeFunction,
+    storage::encoding::add_encode_and_save_into_storage_struct_instructions,
     translation::intermediate_types::{
         IntermediateType,
         address::IAddress,
@@ -14,6 +20,46 @@ use walrus::{
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
+
+pub fn add_child_object_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) -> FunctionId {
+    let name = get_generic_function_name(NativeFunction::NATIVE_ADD_CHILD_OBJECT, &[itype]);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    };
+
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+    let derive_slot_fn = RuntimeFunction::DeriveMappingSlot.get(module, Some(compilation_ctx));
+    let save_struct_into_storage_fn =
+        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+
+    let mut builder = function.name(name).func_body();
+
+    // Arguments
+    let parent_address = module.locals.add(ValType::I32);
+    let child_ptr = module.locals.add(ValType::I32);
+
+    // Calculate the destiny slot
+    builder
+        .local_get(parent_address)
+        .local_get(child_ptr)
+        .call(get_id_bytes_ptr_fn)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(derive_slot_fn);
+
+    // Save the field into storage
+    builder
+        .local_get(child_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(save_struct_into_storage_fn);
+
+    function.finish(vec![parent_address, child_ptr], &mut module.funcs)
+}
 
 /// Computes a keccak256 hash from:
 /// - parent address (32 bytes)
