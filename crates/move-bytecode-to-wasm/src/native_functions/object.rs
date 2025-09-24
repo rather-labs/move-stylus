@@ -638,7 +638,6 @@ pub fn add_hash_type_and_key_fn(
     for chunk in type_name.as_bytes() {
         builder.i32_const(1).call(compilation_ctx.allocator);
 
-        println!("Storing byte: {}", chunk);
         builder.i32_const(*chunk as i32).store(
             compilation_ctx.memory_id,
             StoreKind::I32_8 { atomic: false },
@@ -779,10 +778,20 @@ fn copy_data_to_memory(
         }
         IntermediateType::IStruct {
             module_id, index, ..
+        }
+        | IntermediateType::IGenericStructInstance {
+            module_id, index, ..
         } => {
             let struct_ = compilation_ctx
                 .get_struct_by_index(module_id, *index)
                 .unwrap();
+
+            let struct_ = match itype {
+                IntermediateType::IGenericStructInstance { types, .. } => {
+                    &struct_.instantiate(types)
+                }
+                _ => struct_,
+            };
 
             let field_data_32 = module.locals.add(ValType::I32);
             let field_data_64 = module.locals.add(ValType::I64);

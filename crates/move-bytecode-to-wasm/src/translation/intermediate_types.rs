@@ -1092,15 +1092,30 @@ impl IntermediateType {
             IntermediateType::IMutRef(inner) => format!("&mut {}", inner.get_name(compilation_ctx)),
             IntermediateType::IStruct {
                 module_id, index, ..
-            }
-            | IntermediateType::IGenericStructInstance {
-                module_id, index, ..
             } => {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
                     .unwrap();
 
                 struct_.identifier.clone()
+            }
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+                ..
+            } => {
+                let struct_ = compilation_ctx
+                    .get_struct_by_index(module_id, *index)
+                    .unwrap();
+
+                let types = types
+                    .iter()
+                    .map(|t| t.get_name(compilation_ctx))
+                    .collect::<Vec<String>>()
+                    .join(",");
+
+                format!("{}<{types}>", struct_.identifier.clone())
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot get the name of a type parameter, expected a concrete type",)

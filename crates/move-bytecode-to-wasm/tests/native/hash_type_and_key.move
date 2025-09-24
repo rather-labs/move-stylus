@@ -33,6 +33,21 @@ public struct Foo has copy, drop, store {
     z: u256,
 }
 
+public struct Baz<T: copy + drop + store> has copy, drop, store {
+    g: T,
+    p: Bar,
+    q: address,
+    r: vector<u32>,
+    s: vector<u128>,
+    t: bool,
+    u: u8,
+    v: u16,
+    w: u32,
+    x: u64,
+    y: u128,
+    z: u256,
+}
+
 public fun hash_u8(a: u8): u32 {
     hash_type_and_key(ADDRESS, a);
     get_last_memory_position()
@@ -124,3 +139,12 @@ public fun hash_foo(a: Foo): u32 {
     get_last_memory_position()
 }
 
+public fun hash_baz_u8(a: Baz<u8>): u32 {
+    hash_type_and_key(ADDRESS, a);
+    get_last_memory_position()
+}
+
+public fun hash_baz_v_u16(a: Baz<vector<u16>>): u32 {
+    hash_type_and_key(ADDRESS, a);
+    get_last_memory_position()
+}
