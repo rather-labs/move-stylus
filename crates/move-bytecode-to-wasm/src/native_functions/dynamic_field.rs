@@ -1,22 +1,12 @@
 use super::NativeFunction;
 use crate::{
-    CompilationContext,
-    data::DATA_SLOT_DATA_PTR_OFFSET,
-    get_generic_function_name,
-    hostio::host_functions::{
-        block_number, block_timestamp, emit_log, native_keccak256, storage_cache_bytes32,
-        storage_flush_cache, storage_load_bytes32,
-    },
-    runtime::RuntimeFunction,
-    storage::encoding::field_size,
+    CompilationContext, get_generic_function_name,
+    hostio::host_functions::native_keccak256,
     translation::intermediate_types::{
         IntermediateType,
         address::IAddress,
         heap_integers::{IU128, IU256},
-        structs::IStruct,
     },
-    utils::keccak_string_to_memory,
-    vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
     wasm_builder_extensions::WasmBuilderExtension,
 };
 

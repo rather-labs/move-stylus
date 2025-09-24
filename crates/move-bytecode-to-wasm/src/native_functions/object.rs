@@ -9,15 +9,9 @@ use crate::{
     },
     runtime::RuntimeFunction,
     storage::encoding::field_size,
-    translation::intermediate_types::{
-        IntermediateType,
-        address::IAddress,
-        heap_integers::{IU128, IU256},
-        structs::IStruct,
-    },
+    translation::intermediate_types::{IntermediateType, address::IAddress, structs::IStruct},
     utils::keccak_string_to_memory,
     vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
-    wasm_builder_extensions::WasmBuilderExtension,
 };
 use walrus::{
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,

@@ -1,12 +1,11 @@
 mod common;
 
-use alloy_primitives::{FixedBytes, U256, keccak256};
-use common::runtime_sandbox::constants::SIGNER_ADDRESS;
-use common::{runtime_sandbox::RuntimeSandbox, translate_test_package_with_framework};
+use alloy_primitives::U256;
+use common::runtime_sandbox::RuntimeSandbox;
 use rstest::{fixture, rstest};
 
 mod hash_type_and_key {
-    use alloy_primitives::{FixedBytes, address};
+    use alloy_primitives::address;
     use alloy_sol_types::{SolCall, sol};
 
     use crate::common::{runtime_sandbox::ExecutionData, translate_test_package};
@@ -387,7 +386,7 @@ mod hash_type_and_key {
         #[case] expected_result: Vec<u8>,
     ) {
         let ExecutionData {
-            result,
+            result: _,
             return_data,
             instance,
             mut store,
@@ -411,20 +410,6 @@ mod hash_type_and_key {
             expected_result.len(),
         )
         .unwrap();
-        /*
-        println!(
-            "Return data: {} {:?} {:?}",
-            read_from - 32 - expected_result.len() - 4,
-            return_data,
-            RuntimeSandbox::read_memory_from(
-                &instance,
-                &mut store,
-                312,
-                expected_result.len() + 32
-            )
-            .unwrap()
-        );
-        */
 
         assert_eq!(expected_result, read_memory);
     }

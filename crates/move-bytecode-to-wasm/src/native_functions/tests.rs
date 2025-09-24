@@ -2,30 +2,8 @@
 #![cfg(debug_assertions)]
 
 use super::NativeFunction;
-use crate::{
-    CompilationContext,
-    data::DATA_SLOT_DATA_PTR_OFFSET,
-    get_generic_function_name,
-    hostio::host_functions::{
-        block_number, block_timestamp, emit_log, native_keccak256, storage_cache_bytes32,
-        storage_flush_cache, storage_load_bytes32,
-    },
-    runtime::RuntimeFunction,
-    storage::encoding::field_size,
-    translation::intermediate_types::{
-        IntermediateType,
-        address::IAddress,
-        heap_integers::{IU128, IU256},
-        structs::IStruct,
-    },
-    utils::keccak_string_to_memory,
-    vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
-    wasm_builder_extensions::WasmBuilderExtension,
-};
-use walrus::{
-    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
-};
+use crate::CompilationContext;
+use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
 pub fn add_get_last_memory_position_fn(
     module: &mut Module,

@@ -1120,7 +1120,7 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot get the name of a type parameter, expected a concrete type",)
             }
-            IntermediateType::IEnum(name) => todo!(),
+            IntermediateType::IEnum(_) => todo!(),
         }
     }
 }
