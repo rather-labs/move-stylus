@@ -1,4 +1,4 @@
-//! This module hold functtions used only in tests and debug builds.
+//! This module hold functions used only in tests and debug builds.
 #![cfg(debug_assertions)]
 
 use super::NativeFunction;

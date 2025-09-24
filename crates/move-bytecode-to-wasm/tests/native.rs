@@ -380,7 +380,9 @@ mod hash_type_and_key {
             b"Baz<vector<u16>>".as_slice(),
         ])
     )]
-    fn test_hash_type_and_key_primitives<T: SolCall>(
+    // This checks that the data that will be hashed is correct by inspecting the memoery of what
+    // we are about to hash and comparing it to the expected result
+    fn test_hash_type_and_key_hashing_data<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: Vec<u8>,
