@@ -18,6 +18,11 @@ mod hash_type_and_key {
         0xfe, 0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe,
     ];
 
+    const ADDRESS_2: &[u8] = &[
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xbe, 0xef, 0xbe, 0xef, 0xbe, 0xef, 0xbe, 0xef, 0xbe,
+        0xef, 0xbe, 0xef, 0xbe, 0xef, 0xbe, 0xef, 0xbe, 0xef, 0xbe, 0xef,
+    ];
+
     fn merge_arrays<T: Clone>(arrays: &[&[T]]) -> Vec<T> {
         arrays
             .iter()
@@ -38,12 +43,53 @@ mod hash_type_and_key {
     sol!(
         #[allow(missing_docs)]
         function hashU8(uint8 a) public view;
+        function hashU16(uint16 a) public view;
+        function hashU32(uint32 a) public view;
+        function hashU64(uint64 a) public view;
+        function hashU128(uint128 a) public view;
+        function hashU256(uint256 a) public view;
+        function hashBool(bool a) public view;
+        function hashAddress(address a) public view;
     );
 
     #[rstest]
     #[case(
         hashU8Call::new((42,)),
         merge_arrays(&[ADDRESS, &[42], b"u8".as_slice()])
+    )]
+    #[case(
+        hashU16Call::new((4242,)),
+        merge_arrays(&[ADDRESS, &4242u16.to_le_bytes(), b"u16".as_slice()])
+    )]
+    #[case(
+        hashU32Call::new((42424242,)),
+        merge_arrays(&[ADDRESS, &42424242u32.to_le_bytes(), b"u32".as_slice()])
+    )]
+    /*
+    #[case(
+        hashU64Call::new((42424242424242,)),
+        merge_arrays(&[ADDRESS, &42424242424242u64.to_le_bytes(), b"u64".as_slice()])
+    )]
+    */
+    #[case(
+        hashU128Call::new((42424242424242_u128,)),
+        merge_arrays(&[ADDRESS, &42424242424242_u128.to_le_bytes(), b"u128".as_slice()])
+    )]
+    #[case(
+        hashU256Call::new((U256::from_str_radix("115792089237316195423570985008687907853269984665640564039457584007913129639935", 10).unwrap(),)),
+        merge_arrays(&[ADDRESS, &U256::from_str_radix("115792089237316195423570985008687907853269984665640564039457584007913129639935", 10).unwrap().to_le_bytes::<32>(), b"u256".as_slice()])
+    )]
+    #[case(
+        hashBoolCall::new((true,)),
+        merge_arrays(&[ADDRESS, &[1], b"bool".as_slice()])
+    )]
+    #[case(
+        hashBoolCall::new((false,)),
+        merge_arrays(&[ADDRESS, &[0], b"bool".as_slice()])
+    )]
+    #[case(
+        hashAddressCall::new((address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),)),
+        merge_arrays(&[ADDRESS, ADDRESS_2, b"address".as_slice()])
     )]
     fn test_hash_type_and_key_primitives<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
@@ -63,7 +109,10 @@ mod hash_type_and_key {
                 .try_into()
                 .unwrap(),
         );
-        let read_from = read_from as usize - 32 - expected_result.len() - 3;
+        // The last allocated position belongs to the 32 bytes allocated for the keccak function,
+        // so, to read what we are really hashing we need to extract that, and the expected result
+        // length
+        let read_from = read_from as usize - 32 - expected_result.len();
 
         let read_memory = RuntimeSandbox::read_memory_from(
             &instance,
@@ -72,13 +121,20 @@ mod hash_type_and_key {
             expected_result.len(),
         )
         .unwrap();
+        /*
         println!(
             "Return data: {} {:?} {:?}",
             read_from - 32 - expected_result.len() - 4,
             return_data,
-            RuntimeSandbox::read_memory_from(&instance, &mut store, 312, expected_result.len())
-                .unwrap()
+            RuntimeSandbox::read_memory_from(
+                &instance,
+                &mut store,
+                312,
+                expected_result.len() + 32
+            )
+            .unwrap()
         );
+        */
 
         assert_eq!(expected_result, read_memory);
     }

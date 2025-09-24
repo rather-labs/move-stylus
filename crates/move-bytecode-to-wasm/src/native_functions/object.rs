@@ -636,6 +636,7 @@ pub fn add_hash_type_and_key_fn(
     for chunk in type_name.as_bytes() {
         builder.i32_const(1).call(compilation_ctx.allocator);
 
+        println!("Storing byte: {}", chunk);
         builder.i32_const(*chunk as i32).store(
             compilation_ctx.memory_id,
             StoreKind::I32_8 { atomic: false },
@@ -685,13 +686,32 @@ fn copy_data_to_memory(
                 .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         }
         // 4 bytes numbers should be in the stack
-        IntermediateType::IBool
-        | IntermediateType::IU8
-        | IntermediateType::IU16
-        | IntermediateType::IU32 => {
-            builder
-                .i32_const(itype.stack_data_size() as i32)
-                .call(compilation_ctx.allocator);
+        IntermediateType::IBool | IntermediateType::IU8 => {
+            builder.i32_const(1).call(compilation_ctx.allocator);
+
+            builder.local_get(data).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32_8 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+        }
+        IntermediateType::IU16 => {
+            builder.i32_const(2).call(compilation_ctx.allocator);
+
+            builder.local_get(data).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32_16 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+        }
+        IntermediateType::IU32 => {
+            builder.i32_const(4).call(compilation_ctx.allocator);
 
             builder.local_get(data).store(
                 compilation_ctx.memory_id,
