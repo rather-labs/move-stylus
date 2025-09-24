@@ -42,6 +42,25 @@ mod hash_type_and_key {
 
     sol!(
         #[allow(missing_docs)]
+        struct Bar {
+            uint32 n;
+            uint128 o;
+        }
+
+        struct Foo {
+            Bar p;
+            address q;
+            uint32[] r;
+            uint128[] s;
+            bool t;
+            uint8 u;
+            uint16 v;
+            uint32 w;
+            uint64 x;
+            uint128 y;
+            uint256 z;
+        }
+
         function hashU8(uint8 a) public view;
         function hashU16(uint16 a) public view;
         function hashU32(uint32 a) public view;
@@ -58,6 +77,8 @@ mod hash_type_and_key {
         function hashVectorU256(uint256[] a) public view;
         function hashVectorBool(bool[] a) public view;
         function hashVectorAddress(address[] a) public view;
+        function hashFoo(Foo a) public view;
+        function hashBar(Bar a) public view;
     );
 
     #[rstest]
@@ -140,6 +161,76 @@ mod hash_type_and_key {
         ,)),
         merge_arrays(&[ADDRESS, ADDRESS_2, ADDRESS, b"vector<address>".as_slice()])
     )]
+    #[case(
+        hashBarCall::new((
+            Bar {
+                n: 42,
+                o: 42424242424242_u128,
+            },
+        )),
+        merge_arrays(&[
+            ADDRESS,
+            &42u32.to_le_bytes(),
+            &42424242424242_u128.to_le_bytes(),
+            b"Bar".as_slice(),
+        ])
+    )]
+    #[case(
+        hashFooCall::new((
+            Foo {
+                p: Bar {
+                    n: 42,
+                    o: 42424242424242_u128,
+                },
+                q: address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
+                r: vec![1u32, 2, 3, 4, 5],
+                s: vec![1u128, 2, 3, 4, 5],
+                t: true,
+                u: 8,
+                v: 16,
+                w: 32,
+                x: 64,
+                y: 128,
+                z: U256::from(256),
+            },
+        )),
+        merge_arrays(&[
+            ADDRESS,
+            // Bar
+            &42u32.to_le_bytes(),
+            &42424242424242_u128.to_le_bytes(),
+            // address
+            ADDRESS_2,
+            // vector<u32>
+            &1u32.to_le_bytes(),
+            &2u32.to_le_bytes(),
+            &3u32.to_le_bytes(),
+            &4u32.to_le_bytes(),
+            &5u32.to_le_bytes(),
+            // vector<u128>
+            &1u128.to_le_bytes(),
+            &2u128.to_le_bytes(),
+            &3u128.to_le_bytes(),
+            &4u128.to_le_bytes(),
+            &5u128.to_le_bytes(),
+            // bool
+            &[1],
+            // u8
+            &[8],
+            // u16
+            &16u16.to_le_bytes(),
+            // u32
+            &32u32.to_le_bytes(),
+            // u64
+            &64u64.to_le_bytes(),
+            // u128
+            &128u128.to_le_bytes(),
+            // u256
+            &U256::from(256).to_le_bytes::<32>(),
+            b"Foo".as_slice(),
+        ])
+    )]
+
     fn test_hash_type_and_key_primitives<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

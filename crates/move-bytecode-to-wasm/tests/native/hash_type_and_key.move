@@ -14,6 +14,25 @@ native fun hash_type_and_key<K: copy + drop + store>(
 // is correct.
 native fun get_last_memory_position(): u32;
 
+public struct Bar has copy, drop, store {
+    n: u32,
+    o: u128,
+}
+
+public struct Foo has copy, drop, store {
+    p: Bar,
+    q: address,
+    r: vector<u32>,
+    s: vector<u128>,
+    t: bool,
+    u: u8,
+    v: u16,
+    w: u32,
+    x: u64,
+    y: u128,
+    z: u256,
+}
+
 public fun hash_u8(a: u8): u32 {
     hash_type_and_key(ADDRESS, a);
     get_last_memory_position()
@@ -95,6 +114,13 @@ public fun hash_vector_address(a: vector<address>): u32 {
     get_last_memory_position()
 }
 
+public fun hash_bar(a: Bar): u32 {
+    hash_type_and_key(ADDRESS, a);
+    get_last_memory_position()
+}
 
-
+public fun hash_foo(a: Foo): u32 {
+    hash_type_and_key(ADDRESS, a);
+    get_last_memory_position()
+}
 

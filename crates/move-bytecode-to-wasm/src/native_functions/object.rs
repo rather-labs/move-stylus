@@ -675,6 +675,27 @@ fn copy_data_to_memory(
     itype: &IntermediateType,
     data: LocalId,
 ) {
+    let load_value_to_stack = |field: &IntermediateType, builder: &mut InstrSeqBuilder<'_>| {
+        if field.stack_data_size() == 8 {
+            builder.load(
+                compilation_ctx.memory_id,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+        } else {
+            builder.load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+        }
+    };
     // Copy the data after the parent addresss
     match itype {
         IntermediateType::IAddress => {
@@ -763,20 +784,30 @@ fn copy_data_to_memory(
                 .get_struct_by_index(module_id, *index)
                 .unwrap();
 
-            let field_data = module.locals.add(ValType::I32);
+            let field_data_32 = module.locals.add(ValType::I32);
+            let field_data_64 = module.locals.add(ValType::I64);
 
             for (index, field) in struct_.fields.iter().enumerate() {
-                builder
-                    .local_get(data)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: index as u32 * 4,
-                        },
-                    )
-                    .local_set(field_data);
+                let field_data = if field == &IntermediateType::IU64 {
+                    field_data_64
+                } else {
+                    field_data_32
+                };
+
+                builder.local_get(data).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: index as u32 * 4,
+                    },
+                );
+
+                if field.is_stack_type() {
+                    load_value_to_stack(field, builder);
+                }
+
+                builder.local_set(field_data);
 
                 copy_data_to_memory(builder, compilation_ctx, module, field, field_data);
             }
