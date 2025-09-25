@@ -357,7 +357,7 @@ impl ModuleData {
                 .identifier_at(struct_datatype_handle.name)
                 .to_string();
 
-            let is_saved_in_storage = struct_datatype_handle
+            let has_key = struct_datatype_handle
                 .abilities
                 .into_iter()
                 .any(|a| a == Ability::Key);
@@ -369,7 +369,7 @@ impl ModuleData {
                 identifier,
                 all_fields,
                 fields_map,
-                is_saved_in_storage,
+                has_key,
                 is_one_time_witness,
             ));
         }

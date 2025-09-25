@@ -2,6 +2,9 @@ module stylus::object;
 
 use stylus::tx_context::TxContext;
 
+/// Allows calling `.to_address` on a `UID` to get an `address`.
+public use fun uid_to_address as UID.to_address;
+
 /// References a object ID
 public struct ID has copy, drop, store {
     bytes: address,
@@ -25,6 +28,16 @@ public fun new(ctx: &mut TxContext): UID {
 
 /// Deletes the object from the storage.
 public native fun delete(id: UID);
+
+/// Generate a new UID specifically used for creating a UID from a hash
+public(package) fun new_uid_from_hash(bytes: address): UID {
+    UID { id: ID { bytes } }
+}
+
+/// Get the inner bytes of `id` as an address.
+public fun uid_to_address(uid: &UID): address {
+    uid.id.bytes
+}
 
 /// Named IDs are used know where the object will saved in storage, so we don't depend on the
 /// user to pass the object UID to retrieve it from storage.
@@ -52,3 +65,6 @@ native fun compute_named_id<T: key>(): address;
 public fun new_named_id<T: key>(): NamedId<T> {
     NamedId { id: ID { bytes: compute_named_id<T>() } }
 }
+
+/// Deletes the object with a `NamedId` from the storage.
+public native fun remove<T: key>(id: NamedId<T>);

@@ -113,7 +113,7 @@ pub fn pack(
     // If the struct is saved in storage (has key ability), the owner's id must be prepended to the
     // struct memory representation. Since we are packing it, means it is a new structure, so it
     // has no owner (all zeroes). We just allocate the space
-    if struct_.saved_in_storage {
+    if struct_.has_key {
         builder.i32_const(32).call(compilation_ctx.allocator).drop();
     }
 
