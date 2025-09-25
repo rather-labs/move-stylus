@@ -169,6 +169,7 @@ pub fn prepare_function_return(
     returns: &[IntermediateType],
     compilation_ctx: &CompilationContext,
 ) {
+    println!("Returns: {:?}", returns);
     if !returns.is_empty() {
         let mut locals = Vec::new();
         let mut total_size = 0;
