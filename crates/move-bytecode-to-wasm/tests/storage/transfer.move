@@ -10,13 +10,13 @@ use stylus::transfer as transfer;
 // ============================================================================
 
 // Simple struct with a single value field
-public struct Foo has key {
+public struct Foo has key, store {
     id: UID,
     value: u64
 }
 
 // Struct with a vector field
-public struct Bar has key {
+public struct Bar has key, store {
     id: UID,
     a: u64,
     c: vector<u64>
@@ -58,6 +58,11 @@ public struct Biz<T: copy> has key {
     a: T,
     b: Quz<T>,
     c: vector<Quz<T>>,
+}
+
+public struct Var has key {
+    id: UID,
+    a: Bar,
 }
 
 // ============================================================================
@@ -235,4 +240,56 @@ public fun get_biz(biz: &Biz<u64>): &Biz<u64> {
 public fun delete_biz(biz: Biz<u64>) {
     let Biz { id, a: _, b: _, c: _ } = biz;
     id.delete();
+}
+
+// ============================================================================
+// VAR FUNCTIONS
+// ============================================================================
+
+public fun create_var(recipient: address, ctx: &mut TxContext) {
+    let var = Var {
+        id: object::new(ctx),
+        a: Bar { id: object::new(ctx), a: 42, c: vector[1, 2, 3] },
+    };
+    transfer::transfer(var, recipient);
+}
+
+public fun create_var_shared(ctx: &mut TxContext) {
+    let var = Var {
+        id: object::new(ctx),
+        a: Bar { id: object::new(ctx), a: 42, c: vector[1, 2, 3] },
+    };
+    transfer::share_object(var);
+}
+
+public fun share_var(var: Var) {
+    transfer::share_object(var);
+}
+
+public fun freeze_var(var: Var) {
+    transfer::freeze_object(var);
+}
+
+public fun get_var(var: &Var): &Var {
+    var
+}
+
+public fun delete_var(var: Var) {
+    let Var { id, a: bar } = var;
+    let Bar { id: bar_id, a: _, c: _ } = bar;
+    bar_id.delete();
+    id.delete();
+}
+
+// TODO
+public fun delete_var_2(var: Var): Bar {
+    let Var { id, a: bar } = var;
+    id.delete();
+    bar
+}
+
+public fun delete_var_and_transfer_bar(var: Var) {
+    let Var { id, a: bar } = var;
+    id.delete();
+    transfer::share_object(bar);
 }

@@ -1,9 +1,17 @@
 mod common;
 
+use alloy_primitives::hex;
 use alloy_primitives::{FixedBytes, U256, keccak256};
 use common::runtime_sandbox::constants::SIGNER_ADDRESS;
 use common::{runtime_sandbox::RuntimeSandbox, translate_test_package_with_framework};
 use rstest::{fixture, rstest};
+
+const SHARED: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+const FROZEN: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2];
+const COUNTER_KEY: [u8; 32] = [
+    88, 181, 235, 71, 20, 200, 162, 193, 179, 99, 195, 177, 236, 158, 218, 42, 168, 26, 11, 70, 66,
+    173, 6, 207, 222, 175, 248, 56, 236, 49, 87, 253,
+];
 
 /// Right-align `data` into a 32-byte word (EVM storage encoding for value types).
 #[inline]
@@ -36,6 +44,32 @@ pub fn derive_object_slot(owner: &[u8], object_id: &[u8]) -> FixedBytes<32> {
 pub fn get_next_slot(slot: &[u8; 32]) -> [u8; 32] {
     let slot_value = U256::from_be_bytes(*slot);
     (slot_value + U256::from(1)).to_be_bytes()
+}
+
+// Helper function to assert that all storage slots are empty after a delete operation
+// It takes the storage before and after delete, which is needed not only to assert that the storage is empty,
+// but also to assert that the key existed in storage before deletion.
+pub fn assert_empty_storage(
+    storage_before_delete: &std::collections::HashMap<[u8; 32], [u8; 32]>,
+    storage_after_delete: &std::collections::HashMap<[u8; 32], [u8; 32]>,
+) {
+    // Assert that all storage slots are empty except for the counter key
+    for (key, value) in storage_after_delete.iter() {
+        if *key != COUNTER_KEY {
+            // Assert that the key existed in storage before deletion
+            assert!(
+                storage_before_delete.contains_key(key),
+                "Key {:?} should exist in storage_before_delete",
+                key
+            );
+
+            assert_eq!(
+                *value, [0u8; 32],
+                "Unexpected non-zero value at key: {:?}",
+                key
+            );
+        }
+    }
 }
 
 mod counter {
@@ -294,7 +328,7 @@ mod capability {
 }
 
 mod storage_transfer_named_id {
-    use alloy_primitives::{FixedBytes, U256, address, keccak256};
+    use alloy_primitives::address;
     use alloy_sol_types::{SolCall, SolValue, sol};
 
     use super::*;
@@ -394,12 +428,6 @@ mod storage_transfer_named_id {
         function deleteBiz() public view;
     );
 
-    const SHARED: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
-    const FROZEN: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2];
-    const COUNTER_KEY: [u8; 32] = [
-        88, 181, 235, 71, 20, 200, 162, 193, 179, 99, 195, 177, 236, 158, 218, 42, 168, 26, 11, 70,
-        66, 173, 6, 207, 222, 175, 248, 56, 236, 49, 87, 253,
-    ];
     const FOO_ID: [u8; 32] = [
         0x04, 0xd9, 0x56, 0x9c, 0xa9, 0x35, 0xbc, 0x8c, 0x4d, 0x83, 0x5e, 0xf7, 0x49, 0xba, 0x26,
         0x04, 0x0d, 0x5a, 0x5a, 0xbc, 0x33, 0xe3, 0xe3, 0x4e, 0x4a, 0x9e, 0xe6, 0x91, 0xe2, 0x93,
@@ -425,39 +453,6 @@ mod storage_transfer_named_id {
         0xdc, 0x35, 0x8f, 0xef, 0x5a, 0x22, 0x54, 0x83, 0xfd, 0xee, 0x94, 0x3d, 0x54, 0xf0, 0x75,
         0xc0, 0xc8,
     ];
-
-    /// Right-align `data` into a 32-byte word (EVM storage encoding for value types).
-    #[inline]
-    fn pad32_right(data: &[u8]) -> [u8; 32] {
-        let mut out = [0u8; 32];
-        let n = data.len().min(32);
-        out[32 - n..].copy_from_slice(&data[..n]); // <-- right-align
-        out
-    }
-
-    /// mapping(address => mapping(bytes32 => V)) at base slot 0
-    /// slot(owner, id) = keccak256( pad32(id) || keccak256( pad32(owner) || pad32(0) ) )
-    pub fn derive_object_slot(owner: &[u8], object_id: &[u8]) -> FixedBytes<32> {
-        // parent = keccak256( pad32(owner) || pad32(0) )
-        let owner_padded = pad32_right(owner);
-        let zero_slot = [0u8; 32];
-
-        let mut buf = [0u8; 64];
-        buf[..32].copy_from_slice(&owner_padded);
-        buf[32..].copy_from_slice(&zero_slot);
-        let parent = keccak256(buf);
-
-        // slot = keccak256( pad32(id) || pad32(parent) )
-        let id_padded = pad32_right(object_id); // object_id is already 32B, this is a no-op
-        buf[..32].copy_from_slice(&id_padded);
-        buf[32..].copy_from_slice(parent.as_slice());
-        keccak256(buf)
-    }
-
-    pub fn get_next_slot(slot: &[u8; 32]) -> [u8; 32] {
-        let slot_value = U256::from_be_bytes(*slot);
-        (slot_value + U256::from(1)).to_be_bytes()
-    }
 
     // Test create frozen object
     #[rstest]
@@ -868,7 +863,7 @@ mod storage_transfer_named_id {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_slot = derive_object_slot(&SIGNER_ADDRESS, &FOO_ID);
+        let storage_before_delete = runtime.get_storage();
 
         // Read value before delete
         let call_data = readValueCall::new(()).abi_encode();
@@ -882,22 +877,10 @@ mod storage_transfer_named_id {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        // Read the storage from the original slots and check that they are empty
-        // Foo takes 2 slots
+        let storage_after_delete = runtime.get_storage();
 
-        // First slot
-        assert_eq!(
-            [0u8; 32],
-            runtime.get_storage_at_slot(object_slot.0),
-            "Expected storage value to be 32 zeros"
-        );
-
-        // Second slot
-        assert_eq!(
-            [0u8; 32],
-            runtime.get_storage_at_slot(get_next_slot(&object_slot.0)),
-            "Expected storage value to be 32 zeros at next slot"
-        );
+        // Assert that all storage slots are empty except for the specified key
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
     }
 
     // Test delete owned object
@@ -907,7 +890,7 @@ mod storage_transfer_named_id {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_slot = derive_object_slot(&SHARED, &FOO_ID);
+        let storage_before_delete = runtime.get_storage();
 
         // Read value before delete
         let call_data = readValueCall::new(()).abi_encode();
@@ -921,22 +904,10 @@ mod storage_transfer_named_id {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        // Read the storage from the original slots and check that they are empty
-        // Foo takes 2 slots
+        let storage_after_delete = runtime.get_storage();
 
-        // First slot
-        assert_eq!(
-            [0u8; 32],
-            runtime.get_storage_at_slot(object_slot.0),
-            "Expected storage value to be 32 zeros"
-        );
-
-        // Second slot
-        assert_eq!(
-            [0u8; 32],
-            runtime.get_storage_at_slot(get_next_slot(&object_slot.0)),
-            "Expected storage value to be 32 zeros at next slot"
-        );
+        // Assert that all storage slots are empty except for the specified key
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
     }
 
     #[rstest]
@@ -990,21 +961,7 @@ mod storage_transfer_named_id {
         let storage_after_delete = runtime.get_storage();
 
         // Assert that all storage slots are empty except for the specified key
-        for (key, value) in storage_after_delete.iter() {
-            if *key != COUNTER_KEY {
-                assert!(
-                    storage_before_delete.contains_key(key),
-                    "Key {:?} should exist in storage_before_delete",
-                    key
-                );
-
-                assert_eq!(
-                    *value, [0u8; 32],
-                    "Unexpected non-zero value at key: {:?}",
-                    key
-                );
-            }
-        }
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
     }
 
     #[rstest]
@@ -1042,21 +999,7 @@ mod storage_transfer_named_id {
         let storage_after_delete = runtime.get_storage();
 
         // Assert that all storage slots are empty except for the specified key
-        for (key, value) in storage_after_delete.iter() {
-            if *key != COUNTER_KEY {
-                assert!(
-                    storage_before_delete.contains_key(key),
-                    "Key {:?} should exist in storage_before_delete",
-                    key
-                );
-
-                assert_eq!(
-                    *value, [0u8; 32],
-                    "Unexpected non-zero value at key: {:?}",
-                    key
-                );
-            }
-        }
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
     }
 
     #[rstest]
@@ -1106,22 +1049,7 @@ mod storage_transfer_named_id {
         let storage_after_delete = runtime.get_storage();
 
         // Assert that all storage slots are empty except for the specified key
-        for (key, value) in storage_after_delete.iter() {
-            if *key != COUNTER_KEY {
-                // Assert that the key existed in storage before deletion
-                assert!(
-                    storage_before_delete.contains_key(key),
-                    "Key {:?} should exist in storage_before_delete",
-                    key
-                );
-
-                assert_eq!(
-                    *value, [0u8; 32],
-                    "Unexpected non-zero value at key: {:?}",
-                    key
-                );
-            }
-        }
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
     }
 
     #[rstest]
@@ -1174,22 +1102,7 @@ mod storage_transfer_named_id {
         let storage_after_delete = runtime.get_storage();
 
         // Assert that all storage slots are empty except for the specified key
-        for (key, value) in storage_after_delete.iter() {
-            if *key != COUNTER_KEY {
-                // Assert that the key existed in storage before deletion
-                assert!(
-                    storage_before_delete.contains_key(key),
-                    "Key {:?} should exist in storage_before_delete",
-                    key
-                );
-
-                assert_eq!(
-                    *value, [0u8; 32],
-                    "Unexpected non-zero value at key: {:?}",
-                    key
-                );
-            }
-        }
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
     }
 }
 
@@ -1267,6 +1180,10 @@ mod storage_transfer {
             Quz[] c;
         }
 
+        struct Var {
+            UID id;
+            Bar a;
+        }
 
         #[allow(missing_docs)]
         function createShared() public view;
@@ -1292,8 +1209,15 @@ mod storage_transfer {
         function createBiz() public view;
         function getBiz(bytes32 id) public view returns (Biz);
         function deleteBiz(bytes32 id) public view;
-
         function deleteObj2(bytes32 id1, bytes32 id2) public view;
+        // Structs with wrapped objects
+        function createVar(address recipient) public view;
+        function createVarShared() public view;
+        function getVar(bytes32 id) public view returns (Var);
+        function shareVar(bytes32 id) public view;
+        function freezeVar(bytes32 id) public view;
+        function deleteVar(bytes32 id) public view;
+        function deleteVarAndTransferBar(bytes32 id) public view;
     );
 
     const SHARED: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
@@ -1753,7 +1677,6 @@ mod storage_transfer {
 
         let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let object_id = FixedBytes::<32>::from_slice(&object_id);
-        let object_slot = derive_object_slot(&SIGNER_ADDRESS, &object_id.0);
 
         // Read value before delete
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1762,30 +1685,18 @@ mod storage_transfer {
         assert_eq!(101, return_data);
         assert_eq!(0, result);
 
+        let storage_before_delete = runtime.get_storage();
+
         // Delete the object
         let call_data = deleteObjCall::new((object_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        // Read the storage from the original slots and check that they are empty
-        // Foo takes 2 slots
+        let storage_after_delete = runtime.get_storage();
 
-        // First slot
-        assert_eq!(
-            [0u8; 32],
-            runtime.get_storage_at_slot(object_slot.0),
-            "Expected storage value to be 32 zeros"
-        );
-
-        // Second slot
-        assert_eq!(
-            [0u8; 32],
-            runtime.get_storage_at_slot(get_next_slot(&object_slot.0)),
-            "Expected storage value to be 32 zeros at next slot"
-        );
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
     }
 
-    // Test delete owned object
     #[rstest]
     fn test_delete_shared_object(runtime: RuntimeSandbox) {
         let call_data = createSharedCall::new(()).abi_encode();
@@ -1794,7 +1705,6 @@ mod storage_transfer {
 
         let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let object_id = FixedBytes::<32>::from_slice(&object_id);
-        let object_slot = derive_object_slot(&SHARED, &object_id.0);
 
         // Read value before delete
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1803,27 +1713,16 @@ mod storage_transfer {
         assert_eq!(101, return_data);
         assert_eq!(0, result);
 
+        let storage_before_delete = runtime.get_storage();
+
         // Delete the object
         let call_data = deleteObjCall::new((object_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        // Read the storage from the original slots and check that they are empty
-        // Foo takes 2 slots
+        let storage_after_delete = runtime.get_storage();
 
-        // First slot
-        assert_eq!(
-            [0u8; 32],
-            runtime.get_storage_at_slot(object_slot.0),
-            "Expected storage value to be 32 zeros"
-        );
-
-        // Second slot
-        assert_eq!(
-            [0u8; 32],
-            runtime.get_storage_at_slot(get_next_slot(&object_slot.0)),
-            "Expected storage value to be 32 zeros at next slot"
-        );
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
     }
 
     #[rstest]
@@ -1880,21 +1779,7 @@ mod storage_transfer {
         let storage_after_delete = runtime.get_storage();
 
         // Assert that all storage slots are empty except for the specified key
-        for (key, value) in storage_after_delete.iter() {
-            if *key != COUNTER_KEY {
-                assert!(
-                    storage_before_delete.contains_key(key),
-                    "Key {:?} should exist in storage_before_delete",
-                    key
-                );
-
-                assert_eq!(
-                    *value, [0u8; 32],
-                    "Unexpected non-zero value at key: {:?}",
-                    key
-                );
-            }
-        }
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
     }
 
     #[rstest]
@@ -1933,21 +1818,7 @@ mod storage_transfer {
         let storage_after_delete = runtime.get_storage();
 
         // Assert that all storage slots are empty except for the specified key
-        for (key, value) in storage_after_delete.iter() {
-            if *key != COUNTER_KEY {
-                assert!(
-                    storage_before_delete.contains_key(key),
-                    "Key {:?} should exist in storage_before_delete",
-                    key
-                );
-
-                assert_eq!(
-                    *value, [0u8; 32],
-                    "Unexpected non-zero value at key: {:?}",
-                    key
-                );
-            }
-        }
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
     }
 
     #[rstest]
@@ -2110,15 +1981,293 @@ mod storage_transfer {
         let storage_after_delete = runtime.get_storage();
 
         // Assert that all storage slots are empty except for the specified key
-        for (key, value) in storage_after_delete.iter() {
-            if *key != COUNTER_KEY {
-                // Assert that the key existed in storage before deletion
-                assert!(
-                    storage_before_delete.contains_key(key),
-                    "Key {:?} should exist in storage_before_delete",
-                    key
-                );
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
+    }
 
+    #[rstest]
+    fn test_delete_owned_var(runtime: RuntimeSandbox) {
+        let call_data = createVarCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        let call_data = getVarCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Var::abi_encode(&Var {
+            id: UID {
+                id: ID {
+                    bytes: U256::from_str_radix(
+                        "7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de",
+                        16,
+                    )
+                    .unwrap()
+                    .into(),
+                },
+            },
+            a: Bar {
+                id: UID {
+                    id: ID {
+                        bytes: U256::from_str_radix(
+                            "bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989",
+                            16,
+                        )
+                        .unwrap()
+                        .into(),
+                    },
+                },
+                a: 42,
+                c: vec![1, 2, 3],
+            },
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let call_data = deleteVarCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
+    }
+
+    // First we test deleting a Var shared upon creation
+    // Then we test deleting a Var owned upon creation and later shared
+    #[rstest]
+    fn test_delete_shared_var(runtime: RuntimeSandbox) {
+        let call_data = createVarSharedCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        let call_data = getVarCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Var::abi_encode(&Var {
+            id: UID {
+                id: ID {
+                    bytes: U256::from_str_radix(
+                        "7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de",
+                        16,
+                    )
+                    .unwrap()
+                    .into(),
+                },
+            },
+            a: Bar {
+                id: UID {
+                    id: ID {
+                        bytes: U256::from_str_radix(
+                            "bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989",
+                            16,
+                        )
+                        .unwrap()
+                        .into(),
+                    },
+                },
+                a: 42,
+                c: vec![1, 2, 3],
+            },
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let call_data = deleteVarCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
+
+        // Create owned var and share it, then delete it
+        let call_data = createVarCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_id = FixedBytes::<32>::from_slice(
+            &hex::decode("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255")
+                .unwrap(),
+        );
+
+        let call_data = getVarCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Var::abi_encode(&Var {
+            id: UID {
+                id: ID {
+                    bytes: U256::from_str_radix(
+                        "b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255",
+                        16,
+                    )
+                    .unwrap()
+                    .into(),
+                },
+            },
+            a: Bar {
+                id: UID {
+                    id: ID {
+                        bytes: U256::from_str_radix(
+                            "1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741",
+                            16,
+                        )
+                        .unwrap()
+                        .into(),
+                    },
+                },
+                a: 42,
+                c: vec![1, 2, 3],
+            },
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+
+        let call_data = shareVarCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = getVarCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Var::abi_encode(&Var {
+            id: UID {
+                id: ID {
+                    bytes: U256::from_str_radix(
+                        "b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255",
+                        16,
+                    )
+                    .unwrap()
+                    .into(),
+                },
+            },
+            a: Bar {
+                id: UID {
+                    id: ID {
+                        bytes: U256::from_str_radix(
+                            "1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741",
+                            16,
+                        )
+                        .unwrap()
+                        .into(),
+                    },
+                },
+                a: 42,
+                c: vec![1, 2, 3],
+            },
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let call_data = deleteVarCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
+    }
+
+    #[rstest]
+    fn test_freeze_owned_var(runtime: RuntimeSandbox) {
+        // Create owned var and freeze it
+        let call_data = createVarCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_id = FixedBytes::<32>::from_slice(
+            &hex::decode("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")
+                .unwrap(),
+        );
+
+        let call_data = freezeVarCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Check if the 2 slots corresponding to the Var struct under the SIGNER_ADDRESS key are empty after the freeze
+        let var_uid_slot_bytes: [u8; 32] = [
+            93, 247, 165, 32, 139, 166, 195, 236, 47, 167, 72, 117, 174, 153, 62, 53, 76, 142, 238,
+            122, 118, 205, 148, 75, 134, 218, 76, 250, 55, 149, 13, 24,
+        ];
+        let bar_uid_slot_bytes: [u8; 32] = [
+            93, 247, 165, 32, 139, 166, 195, 236, 47, 167, 72, 117, 174, 153, 62, 53, 76, 142, 238,
+            122, 118, 205, 148, 75, 134, 218, 76, 250, 55, 149, 13, 25,
+        ];
+
+        // Check if the slots exist and are zero
+        let value = runtime.get_storage_at_slot(var_uid_slot_bytes);
+        assert_eq!(value, [0u8; 32], "Var UID slot should be zero");
+
+        let value = runtime.get_storage_at_slot(bar_uid_slot_bytes);
+        assert_eq!(value, [0u8; 32], "Bar UID slot should be zero");
+
+        let call_data = getVarCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Var::abi_encode(&Var {
+            id: UID {
+                id: ID {
+                    bytes: U256::from_str_radix(
+                        "7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de",
+                        16,
+                    )
+                    .unwrap()
+                    .into(),
+                },
+            },
+            a: Bar {
+                id: UID {
+                    id: ID {
+                        bytes: U256::from_str_radix(
+                            "bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989",
+                            16,
+                        )
+                        .unwrap()
+                        .into(),
+                    },
+                },
+                a: 42,
+                c: vec![1, 2, 3],
+            },
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+    }
+
+    #[rstest]
+    // Delete var and share bar
+    // Check that all original slots are empty: Var is delete and Bar is moved
+    // After that, try getting bar and then deleting it
+    fn test_delete_var_and_transfer_bar(runtime: RuntimeSandbox) {
+        let call_data = createVarCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_id = FixedBytes::<32>::from_slice(
+            &hex::decode("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")
+                .unwrap(),
+        );
+
+        let storage_before_delete = runtime.get_storage();
+
+        // Delete var and share bar
+        let call_data = deleteVarAndTransferBarCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete: std::collections::HashMap<[u8; 32], [u8; 32]> =
+            runtime.get_storage();
+        for key in storage_before_delete.keys() {
+            if *key != COUNTER_KEY {
+                let value = storage_after_delete.get(key).unwrap_or(&[0u8; 32]);
                 assert_eq!(
                     *value, [0u8; 32],
                     "Unexpected non-zero value at key: {:?}",
@@ -2126,6 +2275,42 @@ mod storage_transfer {
                 );
             }
         }
+
+        // Bar id
+        let object_id = FixedBytes::<32>::from_slice(
+            &hex::decode("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989")
+                .unwrap(),
+        );
+
+        let call_data = getBarCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        let expected_result = Bar::abi_encode(&Bar {
+            id: UID {
+                id: ID {
+                    bytes: U256::from_str_radix(
+                        "bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989",
+                        16,
+                    )
+                    .unwrap()
+                    .into(),
+                },
+            },
+            a: 42,
+            c: vec![1, 2, 3],
+        });
+        assert_eq!(result_data, expected_result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let call_data = deleteBarCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
     }
 }
 

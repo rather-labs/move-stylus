@@ -312,7 +312,7 @@ impl RuntimeSandbox {
                             _ => panic!("failed to find host memory"),
                         };
 
-                        let mut result = [0; 512];
+                        let mut result = [0; 32];
                         memory.read(&caller, ptr as usize, &mut result).unwrap();
                         println!("Data {result:?}");
                         println!("--- --- ---\n");

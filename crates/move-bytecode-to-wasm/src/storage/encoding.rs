@@ -25,7 +25,6 @@ use crate::{
     vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
     wasm_builder_extensions::WasmBuilderExtension,
 };
-
 /// Adds the instructions to encode and save into storage an specific struct.
 ///
 /// # Arguments
@@ -894,17 +893,17 @@ pub fn add_encode_intermediate_type_instructions(
             let child_struct_ptr = module.locals.add(ValType::I32);
             builder.local_set(child_struct_ptr);
 
-            // Get base definition by (module_id, index)
-            let base_def = compilation_ctx
+            // Get child struct by (module_id, index)
+            let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)
                 .expect("struct not found");
 
             // If it's a generic instance, instantiate; otherwise use as-is
             let child_struct = if let IntermediateType::IGenericStructInstance { types, .. } = itype
             {
-                base_def.instantiate(types)
+                child_struct.instantiate(types)
             } else {
-                base_def.clone()
+                child_struct.clone()
             };
 
             if child_struct.has_key {
@@ -1362,6 +1361,13 @@ pub fn add_decode_intermediate_type_instructions(
                     .i32_const(32)
                     .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
+                // Set the owner of the child struct to the parent struct id
+                builder
+                    .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+                    .local_get(parent_struct_id_ptr)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
                 // Reset read bytes counter for the child struct decoding
                 builder.i32_const(0).local_set(read_bytes_in_slot);
 
@@ -1443,9 +1449,9 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
             module_id, index, ..
         } if NamedId::is_vm_type(module_id, *index, compilation_ctx) => 32,
 
-        // Structs are 0 because we don't know how much they will occupy, this depends on the
-        // fields of the child struct, whether they are dynamic or static. The store function
-        // called will take care of this.
+        // Structs default to size 0 since their size depends on whether their fields are dynamic or static.
+        // The store function will handle this. If a struct has the 'key' ability, it at least occupies 32 bytes for the UID.
+        // The store function will manage the rest of the fields.
         IntermediateType::IGenericStructInstance {
             module_id, index, ..
         }
