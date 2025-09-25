@@ -1185,6 +1185,22 @@ mod storage_transfer {
             Bar a;
         }
 
+        struct Vaz {
+            UID id;
+            uint32 a;
+            Bar b;
+            uint64 c;
+            Bar d;
+        }
+
+        struct EpicVar {
+            UID id;
+            uint32 a;
+            Bar b;
+            uint64 c;
+            Bar[] d;
+        }
+
         #[allow(missing_docs)]
         function createShared() public view;
         function createOwned(address recipient) public view;
@@ -1218,6 +1234,12 @@ mod storage_transfer {
         function freezeVar(bytes32 id) public view;
         function deleteVar(bytes32 id) public view;
         function deleteVarAndTransferBar(bytes32 id) public view;
+        function createVaz() public view;
+        function getVaz(bytes32 id) public view returns (Vaz);
+        function deleteVaz(bytes32 id) public view;
+        function createEpicVar() public view;
+        function getEpicVar(bytes32 id) public view returns (EpicVar);
+        function deleteEpicVar(bytes32 id) public view;
     );
 
     const SHARED: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
@@ -2306,6 +2328,163 @@ mod storage_transfer {
         let call_data = deleteBarCall::new((object_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
+    }
+
+    #[rstest]
+    fn test_delete_vaz(runtime: RuntimeSandbox) {
+        let call_data = createVazCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        let call_data = getVazCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        let expected_result = Vaz::abi_encode(&Vaz {
+            id: UID {
+                id: ID {
+                    bytes: U256::from_str_radix(
+                        "7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de",
+                        16,
+                    )
+                    .unwrap()
+                    .into(),
+                },
+            },
+            a: 101,
+            b: Bar {
+                id: UID {
+                    id: ID {
+                        bytes: U256::from_str_radix(
+                            "bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989",
+                            16,
+                        )
+                        .unwrap()
+                        .into(),
+                    },
+                },
+                a: 42,
+                c: vec![1, 2, 3],
+            },
+            c: 102,
+            d: Bar {
+                id: UID {
+                    id: ID {
+                        bytes: U256::from_str_radix(
+                            "b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255",
+                            16,
+                        )
+                        .unwrap()
+                        .into(),
+                    },
+                },
+                a: 43,
+                c: vec![4, 5, 6],
+            },
+        });
+        assert_eq!(0, result);
+        assert_eq!(result_data, expected_result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let call_data = deleteVazCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
+    }
+
+    #[rstest]
+    fn test_delete_epic_var(runtime: RuntimeSandbox) {
+        let call_data = createEpicVarCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        runtime.print_storage();
+
+        let call_data = getEpicVarCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        let expected_result = EpicVar::abi_encode(&EpicVar {
+            id: UID {
+                id: ID {
+                    bytes: U256::from_str_radix(
+                        "7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de",
+                        16,
+                    )
+                    .unwrap()
+                    .into(),
+                },
+            },
+            a: 101,
+            b: Bar {
+                id: UID {
+                    id: ID {
+                        bytes: U256::from_str_radix(
+                            "bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989",
+                            16,
+                        )
+                        .unwrap()
+                        .into(),
+                    },
+                },
+                a: 41,
+                c: vec![1, 2, 3],
+            },
+            c: 102,
+            d: vec![
+                Bar {
+                    id: UID {
+                        id: ID {
+                            bytes: U256::from_str_radix(
+                                "b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255",
+                                16,
+                            )
+                            .unwrap()
+                            .into(),
+                        },
+                    },
+                    a: 42,
+                    c: vec![42, 43],
+                },
+                Bar {
+                    id: UID {
+                        id: ID {
+                            bytes: U256::from_str_radix(
+                                "1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741",
+                                16,
+                            )
+                            .unwrap()
+                            .into(),
+                        },
+                    },
+                    a: 43,
+                    c: vec![44, 45, 46],
+                },
+            ],
+        });
+        assert_eq!(result_data, expected_result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let call_data = deleteEpicVarCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        runtime.print_storage();
+
 
         let storage_after_delete = runtime.get_storage();
 

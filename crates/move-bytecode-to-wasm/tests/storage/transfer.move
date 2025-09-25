@@ -65,6 +65,22 @@ public struct Var has key {
     a: Bar,
 }
 
+public struct Vaz has key {
+    id: UID,
+    a: u32,
+    b: Bar,
+    c: u64,
+    d: Bar
+}
+
+public struct EpicVar has key {
+    id: UID,
+    a: u32,
+    b: Bar,
+    c: u64,
+    d: vector<Bar>,
+}
+
 // ============================================================================
 // FOO FUNCTIONS
 // ============================================================================
@@ -292,4 +308,68 @@ public fun delete_var_and_transfer_bar(var: Var) {
     let Var { id, a: bar } = var;
     id.delete();
     transfer::share_object(bar);
+}
+
+// ============================================================================
+// VAZ FUNCTIONS
+// ============================================================================
+
+public fun create_vaz(ctx: &mut TxContext) {
+    let vaz = Vaz {
+        id: object::new(ctx),
+        a: 101,
+        b: Bar { id: object::new(ctx), a: 42, c: vector[1, 2, 3] },
+        c: 102,
+        d: Bar { id: object::new(ctx), a: 43, c: vector[4, 5, 6] },
+    };
+    transfer::share_object(vaz);
+}
+
+public fun get_vaz(vaz: &Vaz): &Vaz {
+    vaz
+}
+
+public fun delete_vaz(vaz: Vaz) {
+    let Vaz { id, a: _, b: bar1, c: _ , d: bar2} = vaz;
+    let Bar { id: bar_id1, a: _, c: _ } = bar1;
+    let Bar { id: bar_id2, a: _, c: _ } = bar2;
+    bar_id1.delete();
+    bar_id2.delete();
+    id.delete();
+}
+
+// ============================================================================
+// EPIC VAR FUNCTIONS
+// ============================================================================
+
+public fun create_epic_var(ctx: &mut TxContext) {
+    let epic_var = EpicVar {
+        id: object::new(ctx),
+        a: 101,
+        b: Bar { id: object::new(ctx), a: 41, c: vector[1, 2, 3] },
+        c: 102,
+        d: vector[Bar { id: object::new(ctx), a: 42, c: vector[42, 43] }, Bar { id: object::new(ctx), a: 43, c: vector[44, 45, 46] }],
+    };
+    transfer::share_object(epic_var);
+}
+
+public fun get_epic_var(epic_var: &EpicVar): &EpicVar {
+    epic_var
+}
+
+public fun delete_epic_var(epic_var: EpicVar) {
+    let EpicVar { id, a: _, b: bar, c: _, d: mut vector_bar } = epic_var;
+    id.delete();
+    let Bar { id, a: _, c: _ } = bar;
+    id.delete();
+    
+    // Iterate through the vector and delete each Bar
+    while (!vector::is_empty(&vector_bar)) {
+        let bar = vector::pop_back(&mut vector_bar);
+        let Bar { id, a: _, c: _ } = bar;
+        id.delete();
+    };
+    
+    // Consume the empty vector
+    vector::destroy_empty(vector_bar);
 }
