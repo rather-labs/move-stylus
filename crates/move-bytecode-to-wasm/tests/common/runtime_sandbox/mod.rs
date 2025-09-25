@@ -15,9 +15,16 @@ use constants::{
 use walrus::Module;
 use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store};
 
-struct ModuleData {
+pub struct ModuleData {
     pub data: Vec<u8>,
     pub return_data: Vec<u8>,
+}
+
+pub struct ExecutionData {
+    pub result: i32,
+    pub return_data: Vec<u8>,
+    pub instance: wasmtime::Instance,
+    pub store: Store<ModuleData>,
 }
 
 pub struct RuntimeSandbox {
@@ -142,6 +149,10 @@ impl RuntimeSandbox {
                       input_data_ptr: u32,
                       data_length: u32,
                       return_data_ptr: u32| {
+                    println!(
+                        "native_keccak256 called with input_data_ptr: {}, data_length: {}, return_data_ptr: {}",
+                        input_data_ptr, data_length, return_data_ptr
+                    );
                     let mem = match caller.get_module_export(&mem_export) {
                         Some(Extern::Memory(mem)) => mem,
                         _ => panic!("failed to find host memory"),
@@ -379,6 +390,49 @@ impl RuntimeSandbox {
             .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
 
         Ok((result, store.data().return_data.clone()))
+    }
+
+    /// Crates a temporary runtime sandbox instance and calls the entrypoint with the given data.
+    ///
+    /// Returns the result of the entrypoint call and the return data.
+    pub fn call_entrypoint_with_data(&self, data: Vec<u8>) -> Result<ExecutionData> {
+        let data_len = data.len() as i32;
+        let mut store = Store::new(
+            &self.engine,
+            ModuleData {
+                data,
+                return_data: vec![],
+            },
+        );
+        let instance = self.linker.instantiate(&mut store, &self.module)?;
+
+        let entrypoint = instance.get_typed_func::<i32, i32>(&mut store, "user_entrypoint")?;
+
+        let result = entrypoint
+            .call(&mut store, data_len)
+            .map_err(|e| anyhow::anyhow!("error calling entrypoint: {e:?}"))?;
+
+        Ok(ExecutionData {
+            result,
+            return_data: store.data().return_data.clone(),
+            instance,
+            store,
+        })
+    }
+
+    pub fn read_memory_from(
+        instance: &wasmtime::Instance,
+        store: &mut Store<ModuleData>,
+        from: usize,
+        len: usize,
+    ) -> Result<Vec<u8>> {
+        // Get exported memory
+        let memory = instance
+            .get_export(&mut *store, "memory")
+            .and_then(|e| e.into_memory())
+            .expect("Wasm module must export memory");
+
+        Ok(memory.data(&store)[from..from + len].to_vec())
     }
 
     pub fn set_tx_origin(&self, new_address: [u8; 20]) {
