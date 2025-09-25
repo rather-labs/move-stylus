@@ -2412,8 +2412,6 @@ mod storage_transfer {
         let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let object_id = FixedBytes::<32>::from_slice(&object_id);
 
-        runtime.print_storage();
-
         let call_data = getEpicVarCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -2482,9 +2480,6 @@ mod storage_transfer {
         let call_data = deleteEpicVarCall::new((object_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-
-        runtime.print_storage();
-
 
         let storage_after_delete = runtime.get_storage();
 
