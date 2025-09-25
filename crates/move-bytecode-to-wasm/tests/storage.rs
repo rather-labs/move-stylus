@@ -3215,7 +3215,6 @@ mod storage_encoding {
     }
 }
 
-/*
 mod dynamic_storage_fields {
     use alloy_primitives::{FixedBytes, address};
     use alloy_sol_types::{SolCall, sol};
@@ -3239,7 +3238,13 @@ mod dynamic_storage_fields {
 
     sol!(
         #[allow(missing_docs)]
+
+        struct String {
+            uint8[] bytes;
+        }
+
         function createFoo() public view;
+        function attachDynamicField(bytes32 foo, String name, uint64 value) public view;
     );
 
     #[rstest]
@@ -3254,6 +3259,18 @@ mod dynamic_storage_fields {
         let object_id = FixedBytes::<32>::from_slice(&object_id);
 
         println!("Object ID: {:#x}", object_id);
+
+        runtime.print_storage();
+        println!("\n---\n");
+
+        // Attach a dynamic field
+        let field_name = String {
+            bytes: b"test_key".to_ascii_lowercase(),
+        };
+        let call_data = attachDynamicFieldCall::new((object_id, field_name, 42)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        runtime.print_storage();
     }
 }
-*/

@@ -32,7 +32,7 @@ pub fn add_child_object_fn(
     };
 
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
-    let derive_slot_fn = RuntimeFunction::DeriveMappingSlot.get(module, Some(compilation_ctx));
+    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
     let save_struct_into_storage_fn =
         RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
 
@@ -49,8 +49,7 @@ pub fn add_child_object_fn(
         .local_get(parent_address)
         .local_get(child_ptr)
         .call(get_id_bytes_ptr_fn)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .call(derive_slot_fn);
+        .call(write_object_slot_fn);
 
     // Save the field into storage
     builder
