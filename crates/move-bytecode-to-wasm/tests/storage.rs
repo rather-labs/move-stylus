@@ -3217,7 +3217,7 @@ mod storage_encoding {
 
 mod dynamic_storage_fields {
     use alloy_primitives::{FixedBytes, address};
-    use alloy_sol_types::{SolCall, sol};
+    use alloy_sol_types::{SolCall, SolValue, sol};
 
     use super::*;
 
@@ -3245,6 +3245,7 @@ mod dynamic_storage_fields {
 
         function createFoo() public view;
         function attachDynamicField(bytes32 foo, String name, uint64 value) public view;
+        function readDynamicField(bytes32 foo, String name) public view returns (uint64);
     );
 
     #[rstest]
@@ -3260,17 +3261,24 @@ mod dynamic_storage_fields {
 
         println!("Object ID: {:#x}", object_id);
 
-        runtime.print_storage();
-        println!("\n---\n");
+        // runtime.print_storage();
+        // println!("\n---\n");
 
         // Attach a dynamic field
         let field_name = String {
-            bytes: b"test_key".to_ascii_lowercase(),
+            bytes: b"test_key_1".to_ascii_lowercase(),
         };
-        let call_data = attachDynamicFieldCall::new((object_id, field_name, 42)).abi_encode();
+        let call_data =
+            attachDynamicFieldCall::new((object_id, field_name.clone(), 42)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
         runtime.print_storage();
+
+        // Read the dynamic field
+        let call_data = readDynamicFieldCall::new((object_id, field_name)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(42u64.abi_encode(), result_data);
     }
 }

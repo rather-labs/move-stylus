@@ -3,7 +3,7 @@ use std::process::Child;
 use super::NativeFunction;
 use crate::{
     CompilationContext,
-    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_STORAGE_OBJECT_OWNER_OFFSET},
     get_generic_function_name,
     hostio::host_functions::native_keccak256,
     runtime::RuntimeFunction,
@@ -58,6 +58,114 @@ pub fn add_child_object_fn(
         .call(save_struct_into_storage_fn);
 
     function.finish(vec![parent_address, child_ptr], &mut module.funcs)
+}
+
+pub fn add_borrow_object_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) -> FunctionId {
+    let name = get_generic_function_name(NativeFunction::NATIVE_BORROW_CHILD_OBJECT, &[itype]);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    };
+
+    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let decode_and_read_from_storage_fn =
+        RuntimeFunction::DecodeAndReadFromStorage.get_generic(module, compilation_ctx, &[itype]);
+
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+
+    let mut builder = function.name(name).func_body();
+
+    // Arguments
+    let parent_uid = module.locals.add(ValType::I32);
+    let child_id = module.locals.add(ValType::I32);
+
+    let (print_i32, _, print_m, print_address, _, _) = crate::declare_host_debug_functions!(module);
+
+    // Calculate the destiny slot
+    builder
+        .local_get(parent_uid)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_tee(parent_uid)
+        .local_get(child_id)
+        .call(write_object_slot_fn);
+
+    // Write the owner
+    builder
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+        .local_get(parent_uid)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+    let tmp = module.locals.add(ValType::I32);
+
+    /*
+    builder.i32_const(551515151).call(print_i32);
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(print_m);
+    builder.i32_const(551515151).call(print_i32);
+    */
+
+    // Read from storage
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(decode_and_read_from_storage_fn)
+        .local_tee(tmp);
+
+    /*
+    builder.i32_const(43434343).call(print_i32);
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(print_m);
+    builder.local_get(parent_uid).call(print_m);
+    builder.local_get(child_id).call(print_m);
+    builder.i32_const(43434343).call(print_i32);
+    */
+
+    builder
+        .local_get(tmp)
+        .i32_const(8)
+        .binop(BinaryOp::I32Add)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .call(print_i32);
+    function.finish(vec![parent_uid, child_id], &mut module.funcs)
 }
 
 /// Computes a keccak256 hash from:

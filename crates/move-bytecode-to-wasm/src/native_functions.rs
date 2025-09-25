@@ -59,6 +59,7 @@ impl NativeFunction {
     pub const NATIVE_GET_LAST_MEMORY_POSITION: &str = "get_last_memory_position";
     const NATIVE_HASH_TYPE_AND_KEY: &str = "hash_type_and_key";
     const NATIVE_ADD_CHILD_OBJECT: &str = "add_child_object";
+    const NATIVE_BORROW_CHILD_OBJECT: &str = "borrow_child_object";
 
     // Host functions
     const HOST_BLOCK_NUMBER: &str = "block_number";
@@ -276,6 +277,16 @@ impl NativeFunction {
                 );
 
                 dynamic_field::add_child_object_fn(module, compilation_ctx, &generics[0])
+            }
+            Self::NATIVE_BORROW_CHILD_OBJECT => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {name} expected 1 type parameter, found {}",
+                    generics.len(),
+                );
+
+                dynamic_field::add_borrow_object_fn(module, compilation_ctx, &generics[0])
             }
 
             _ => panic!("generic native function {name} not supported yet"),

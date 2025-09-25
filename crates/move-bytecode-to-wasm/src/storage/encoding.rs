@@ -144,6 +144,9 @@ pub fn add_read_and_decode_storage_struct_instructions(
     let struct_ptr = module.locals.add(ValType::I32);
     let field_ptr = module.locals.add(ValType::I32);
 
+    let (print_i32, _, print_m, print_address, _, _) = crate::declare_host_debug_functions!(module);
+    builder.i32_const(1).call(print_i32);
+
     // If we are reading an struct from the storage, means this struct has an owner and that owner
     // is saved in the DATA_STORAGE_OBJECT_OWNER_OFFSET piece of reserved memory. To be able to
     // know its owner when manipulating the reconstructed structure (for example for the saving the
@@ -158,12 +161,14 @@ pub fn add_read_and_decode_storage_struct_instructions(
             .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
     }
 
+    builder.i32_const(2).call(print_i32);
     // Allocate space for the struct
     builder
         .i32_const(struct_.heap_size as i32)
         .call(compilation_ctx.allocator)
         .local_set(struct_ptr);
 
+    builder.i32_const(3).call(print_i32);
     // Load data from slot
     if !reading_nested_struct {
         builder
@@ -172,14 +177,18 @@ pub fn add_read_and_decode_storage_struct_instructions(
             .call(storage_load);
     }
 
+    builder.i32_const(4).call(print_i32);
+
     for (index, field) in struct_.fields.iter().enumerate() {
+        builder.i32_const(55).call(print_i32);
         let field_size = field_size(field, compilation_ctx) as i32;
+        builder.i32_const(field_size).call(print_i32);
         builder
             .local_get(read_bytes_in_slot)
             .i32_const(field_size)
             .binop(BinaryOp::I32Add)
             .i32_const(32)
-            .binop(BinaryOp::I32GtS)
+            .binop(BinaryOp::I32GtU)
             .if_else(
                 None,
                 |then| {
@@ -203,6 +212,8 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 },
             );
 
+        builder.local_get(slot_ptr).call(print_m);
+
         add_decode_intermediate_type_instructions(
             module,
             builder,
@@ -214,6 +225,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
             read_bytes_in_slot,
         );
 
+        builder.i32_const(1010).call(print_i32);
         if matches!(
             field,
             IntermediateType::IStruct { module_id, index, ..}
@@ -237,6 +249,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 );
         }
 
+        builder.i32_const(1011).call(print_i32);
         // Save the ptr value to the struct
         builder.local_get(struct_ptr).local_get(field_ptr).store(
             compilation_ctx.memory_id,
@@ -246,6 +259,8 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 offset: index as u32 * 4,
             },
         );
+
+        builder.i32_const(1012).call(print_i32);
     }
 
     struct_ptr
@@ -1213,6 +1228,9 @@ pub fn add_decode_intermediate_type_instructions(
         } if Uid::is_vm_type(module_id, *index, compilation_ctx)
             || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
         {
+            let (print_i32, _, print_m, print_address, _, _) =
+                crate::declare_host_debug_functions!(module);
+            builder.i32_const(888).call(print_i32);
             // Reserve 4 bytes to fill with the mem address of the struct that wraps this id.
             // This will be filled outside this function where the struct pointer is available
             builder.i32_const(4).call(compilation_ctx.allocator).drop();
@@ -1305,6 +1323,9 @@ pub fn add_decode_intermediate_type_instructions(
             };
 
             if child_struct.has_key {
+                let (print_i32, _, print_m, print_address, _, _) =
+                    crate::declare_host_debug_functions!(module);
+                builder.i32_const(71).call(print_i32);
                 // ====================================================================
                 // CHILD STRUCT WITH KEY - Decode from Separate Object
                 // ====================================================================
@@ -1391,6 +1412,9 @@ pub fn add_decode_intermediate_type_instructions(
                 // flattened within the parent struct's data. We can decode it directly
                 // from the current slot without needing to calculate separate storage.
 
+                let (print_i32, _, print_m, print_address, _, _) =
+                    crate::declare_host_debug_functions!(module);
+                builder.i32_const(72).call(print_i32);
                 // Decode the child struct directly from the current slot
                 // The child struct's fields are stored inline within the parent's data
                 let child_struct_ptr = add_read_and_decode_storage_struct_instructions(
@@ -1408,6 +1432,9 @@ pub fn add_decode_intermediate_type_instructions(
             }
         }
         IntermediateType::IVector(inner_) => {
+            let (print_i32, _, print_m, print_address, _, _) =
+                crate::declare_host_debug_functions!(module);
+            builder.i32_const(70).call(print_i32);
             add_read_and_decode_storage_vector_instructions(
                 module,
                 builder,
@@ -1420,6 +1447,10 @@ pub fn add_decode_intermediate_type_instructions(
         }
         _ => todo!(),
     };
+
+    let (print_i32, _, print_m, print_address, print_s, _) =
+        crate::declare_host_debug_functions!(module);
+    builder.call(print_s);
 }
 
 /// Return the storage-encoded field size in bytes
