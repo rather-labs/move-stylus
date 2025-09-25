@@ -48,6 +48,7 @@ pub fn add_transfer_object_fn(
     // Locals
     let owner_ptr = module.locals.add(ValType::I32);
     let id_bytes_ptr = module.locals.add(ValType::I32);
+    let slot_ptr = module.locals.add(ValType::I32);
 
     builder.block(None, |block| {
         let block_id = block.id();
@@ -114,10 +115,20 @@ pub fn add_transfer_object_fn(
         .local_get(id_bytes_ptr)
         .call(write_object_slot_fn);
 
+    // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
+    // This is needed because DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET might be overwritten later on
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_tee(slot_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
     // Store the struct in the slot associated with the new owner's mapping
     builder
         .local_get(struct_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .local_get(slot_ptr)
         .call(storage_save_fn);
 
     function.finish(vec![struct_ptr, recipient_ptr], &mut module.funcs)
@@ -151,6 +162,7 @@ pub fn add_share_object_fn(
     // Locals
     let owner_ptr = module.locals.add(ValType::I32);
     let struct_ptr = module.locals.add(ValType::I32);
+    let slot_ptr = module.locals.add(ValType::I32);
 
     builder.block(None, |block| {
         let block_id = block.id();
@@ -209,10 +221,20 @@ pub fn add_share_object_fn(
                     .call(get_id_bytes_ptr_fn)
                     .call(write_object_slot_fn);
 
+                // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
+                // This is needed because DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET might be overwritten later on
+                else_
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(slot_ptr)
+                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
                 // Save the struct in the shared objects mapping
                 else_
                     .local_get(struct_ptr)
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .local_get(slot_ptr)
                     .call(storage_save_fn);
             },
         );
@@ -249,6 +271,7 @@ pub fn add_freeze_object_fn(
     // Locals
     let owner_ptr = module.locals.add(ValType::I32);
     let struct_ptr = module.locals.add(ValType::I32);
+    let slot_ptr = module.locals.add(ValType::I32);
 
     builder.block(None, |block| {
         let block_id = block.id();
@@ -315,10 +338,19 @@ pub fn add_freeze_object_fn(
                     .call(get_id_bytes_ptr_fn)
                     .call(write_object_slot_fn);
 
+                // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
+                else_
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(slot_ptr)
+                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
                 // Save the struct into the frozen objects mapping
                 else_
                     .local_get(struct_ptr)
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .local_get(slot_ptr)
                     .call(storage_save_fn);
             },
         );
