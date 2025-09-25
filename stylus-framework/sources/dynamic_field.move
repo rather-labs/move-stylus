@@ -56,7 +56,6 @@ public fun add<Name: copy + drop + store, Value: store>(
     add_child_object(object_addr, field)
 }
 
-/*
 /// Immutably borrows the `object`s dynamic field with the name specified by `name: Name`.
 /// Aborts with `EFieldDoesNotExist` if the object does not have a field with that name.
 /// Aborts with `EFieldTypeMismatch` if the field exists, but the value does not have the specified
@@ -68,6 +67,7 @@ public fun borrow<Name: copy + drop + store, Value: store>(object: &UID, name: N
     &field.value
 }
 
+/*
 /// Mutably borrows the `object`s dynamic field with the name specified by `name: Name`.
 /// Aborts with `EFieldDoesNotExist` if the object does not have a field with that name.
 /// Aborts with `EFieldTypeMismatch` if the field exists, but the value does not have the specified
