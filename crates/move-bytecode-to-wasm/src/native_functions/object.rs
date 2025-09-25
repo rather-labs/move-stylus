@@ -475,60 +475,41 @@ fn add_delete_slot_instructions(
     match itype {
         IntermediateType::IStruct {
             module_id, index, ..
-        } if !Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+        }
+        | IntermediateType::IGenericStructInstance {
+            module_id, index, ..
+        } if !Uid::is_vm_type(module_id, *index, compilation_ctx)
+            && !NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
+        {
+            // Get child struct by (module_id, index)
             let child_struct = compilation_ctx
                 .get_struct_by_index(module_id, *index)
-                .unwrap();
+                .expect("struct not found");
 
-            // Delete the child struct
-            // If the child struct has key, then its stored under the parent object key in storage.
-            // We need to calculate its slot and pass that to add_delete_storage_struct_instructions
-            let has_key = false;
-            if has_key {
-                // TODO: Implement this
-                // call write_object_slot with [parent_struct_id_ptr, child_struct_id_ptr]
-                // use that slot_ptr in add_delete_storage_struct_instructions
+            // If it's a generic instance, instantiate; otherwise use as-is
+            let child_struct = if let IntermediateType::IGenericStructInstance { types, .. } = itype
+            {
+                child_struct.instantiate(types)
             } else {
-                // If the struct does not have key, then we can delete it directly
+                child_struct.clone()
+            };
 
-                // This function modifies the original elem_slot_ptr passed as argument
-                // After exiting the function, elem_slot_ptr is advanced and used_bytes_in_slot is updated
+            if child_struct.has_key {
+                // Child struct has 'key' ability: it's stored as a separate object with its own UID.
+                // When deleting the parent, we only remove the reference to the child object,
+                // but the child object itself remains in storage and must be deleted separately.
+            } else {
+                // Child struct has no 'key' ability: it's stored inline/flattened within the parent.
+                // When deleting the parent, we must also delete the child's data from storage
+                // since it's not a separate object and will be orphaned.
                 add_delete_storage_struct_instructions(
                     module,
                     builder,
                     compilation_ctx,
                     slot_ptr,
-                    child_struct,
+                    &child_struct,
                     used_bytes_in_slot,
                 );
-            }
-        }
-        IntermediateType::IGenericStructInstance {
-            module_id,
-            index,
-            types,
-            ..
-        } => {
-            if !NamedId::is_vm_type(module_id, *index, compilation_ctx) {
-                let child_struct = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
-                let child_struct = child_struct.instantiate(types);
-
-                let has_key = false;
-                if has_key {
-                    // TODO: Implement this
-                } else {
-                    // If the struct does not have key, then we can delete it directly
-                    add_delete_storage_struct_instructions(
-                        module,
-                        builder,
-                        compilation_ctx,
-                        slot_ptr,
-                        &child_struct,
-                        used_bytes_in_slot,
-                    );
-                }
             }
         }
         IntermediateType::IVector(inner_) => {
