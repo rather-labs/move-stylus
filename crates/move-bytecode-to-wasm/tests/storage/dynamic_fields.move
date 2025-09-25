@@ -20,5 +20,5 @@ public fun attach_dynamic_field(foo: &mut Foo, name: String, value: u64) {
 }
 
 public fun read_dynamic_field(foo: &Foo, name: String): &u64 {
-    let a = dynamic_field::borrow(&foo.id, name)
+    dynamic_field::borrow(&foo.id, name)
 }

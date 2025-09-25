@@ -86,8 +86,6 @@ pub fn add_borrow_object_fn(
     let parent_uid = module.locals.add(ValType::I32);
     let child_id = module.locals.add(ValType::I32);
 
-    let (print_i32, _, print_m, print_address, _, _) = crate::declare_host_debug_functions!(module);
-
     // Calculate the destiny slot
     builder
         .local_get(parent_uid)
@@ -120,51 +118,12 @@ pub fn add_borrow_object_fn(
 
     let tmp = module.locals.add(ValType::I32);
 
-    /*
-    builder.i32_const(551515151).call(print_i32);
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .call(print_m);
-    builder.i32_const(551515151).call(print_i32);
-    */
-
     // Read from storage
     builder
         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
         .call(decode_and_read_from_storage_fn)
         .local_tee(tmp);
 
-    /*
-    builder.i32_const(43434343).call(print_i32);
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .call(print_m);
-    builder.local_get(parent_uid).call(print_m);
-    builder.local_get(child_id).call(print_m);
-    builder.i32_const(43434343).call(print_i32);
-    */
-
-    builder
-        .local_get(tmp)
-        .i32_const(8)
-        .binop(BinaryOp::I32Add)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
-        .call(print_i32);
     function.finish(vec![parent_uid, child_id], &mut module.funcs)
 }
 
