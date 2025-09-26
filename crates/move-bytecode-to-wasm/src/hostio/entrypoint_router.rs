@@ -1,11 +1,13 @@
 use walrus::{
-    FunctionBuilder, FunctionId, Module, ValType,
+    FunctionBuilder, FunctionId, GlobalId, Module, ValType,
     ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg},
 };
 
 use crate::{
     CompilationContext, abi_types::public_function::PublicFunction,
-    error_encoding::build_error_message, runtime_error_codes::ERROR_NO_FUNCTION_MATCH,
+    error_encoding::build_error_message, runtime::RuntimeFunction,
+    runtime_error_codes::ERROR_NO_FUNCTION_MATCH,
+    translation::intermediate_types::IntermediateType,
 };
 
 use super::host_functions;
@@ -18,10 +20,16 @@ pub fn build_entrypoint_router(
     module: &mut Module,
     functions: &[PublicFunction],
     compilation_ctx: &CompilationContext,
+    dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
 ) {
     let (read_args_function, _) = host_functions::read_args(module);
     let (write_return_data_function, _) = host_functions::write_result(module);
     let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
+    let commit_changes_to_storage_function = RuntimeFunction::get_commit_changes_to_storage_fn(
+        module,
+        compilation_ctx,
+        dynamic_fields_global_variables,
+    );
 
     let args_len = module.locals.add(ValType::I32);
     let selector_variable = module.locals.add(ValType::I32);
@@ -100,9 +108,12 @@ pub fn build_entrypoint_router(
         .call(write_return_data_function);
 
     // Flush cache
+    /*
     router_builder
         .i32_const(0)
         .call(storage_flush_cache_function);
+    */
+    router_builder.call(commit_changes_to_storage_function);
 
     // Push the error code and return
     router_builder.i32_const(1).return_();

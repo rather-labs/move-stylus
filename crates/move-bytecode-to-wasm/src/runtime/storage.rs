@@ -5,7 +5,7 @@ use crate::data::{
     DATA_STORAGE_OBJECT_OWNER_OFFSET,
 };
 use crate::get_generic_function_name;
-use crate::hostio::host_functions::{self, storage_load_bytes32, tx_origin};
+use crate::hostio::host_functions::{self, storage_flush_cache, storage_load_bytes32, tx_origin};
 use crate::native_functions::object::add_delete_storage_struct_instructions;
 use crate::storage::encoding::{
     add_encode_and_save_into_storage_struct_instructions,
@@ -15,6 +15,7 @@ use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::heap_integers::IU256;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, data::DATA_U256_ONE_OFFSET};
+use walrus::GlobalId;
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
@@ -1240,4 +1241,50 @@ mod tests {
 
         assert_eq!(result, expected);
     }
+}
+
+// TODO: We probably want to mark what fields we deleted so we don't rewrite them
+// we must do that at runtime
+pub fn add_commit_changes_to_storage_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::CommitChangesToStorage.name().to_owned())
+        .func_body();
+
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let (storage_flush_cache, _) = storage_flush_cache(module);
+
+    for (dynamic_field_ptr, itype) in dynamic_fields_global_variables {
+        let save_struct_into_storage_fn =
+            RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
+
+        // Calculate the destiny slot
+
+        // Put in stack the parent address
+        builder
+            .global_get(*dynamic_field_ptr)
+            .i32_const(32)
+            .binop(BinaryOp::I32Sub);
+
+        // Put in the stack the field id
+        builder
+            .global_get(*dynamic_field_ptr)
+            .call(get_id_bytes_ptr_fn)
+            .call(write_object_slot_fn);
+
+        // Save struct changes
+        builder
+            .global_get(*dynamic_field_ptr)
+            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+            .call(save_struct_into_storage_fn);
+    }
+
+    builder.i32_const(1).call(storage_flush_cache);
+
+    function.finish(vec![], &mut module.funcs)
 }
