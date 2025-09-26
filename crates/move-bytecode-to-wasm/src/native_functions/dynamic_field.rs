@@ -3,9 +3,12 @@ use std::process::Child;
 use super::NativeFunction;
 use crate::{
     CompilationContext,
-    data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_STORAGE_OBJECT_OWNER_OFFSET},
+    data::{
+        DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
+        DATA_STORAGE_OBJECT_OWNER_OFFSET,
+    },
     get_generic_function_name,
-    hostio::host_functions::native_keccak256,
+    hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
     storage::encoding::add_encode_and_save_into_storage_struct_instructions,
     translation::intermediate_types::{
@@ -21,6 +24,11 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
+/// Adds a dynamic field for a given parent and child ID
+///
+/// Arguments
+/// * `parent_address` - i32 pointer to the parent object's address in memory
+/// * `child_ptr` - i32 pointer to the child object's data in memory
 pub fn add_child_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -62,6 +70,18 @@ pub fn add_child_object_fn(
 
 // TODO: Check if object exists
 // TODO: Check object type
+/// Borrows a dynamic field's value for a given parent and child ID
+///
+/// NOTE: This function is used for both `borrow_child_object` and `borrow_child_object_mut` since
+/// the underlying implementation is the same. The mutability is handled at a higher level in the
+/// using the type system and does not affect the WebAssembly code generation.
+///
+/// Arguments
+/// * `parent_uid` - i32 pointer to the parent object's UID in memory
+/// * `child_id` - i32 pointer to the child ID in memory
+///
+/// Returns
+/// * i32 pointer to a reference to the borrowed object's data in memory
 pub fn add_borrow_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -142,6 +162,56 @@ pub fn add_borrow_object_fn(
         );
 
     builder.local_get(result);
+
+    function.finish(vec![parent_uid, child_id], &mut module.funcs)
+}
+
+/// Checks if a child object exists for a given parent and child ID
+///
+/// Arguments
+/// * `parent_uid` - i32 pointer to the parent object's UID in memory
+/// * `child_id` - i32 pointer to the child ID in memory
+///
+/// Returns
+/// * i32 - 1 if the child object exists, 0 otherwise
+pub fn add_has_child_object_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+
+    let mut builder = function
+        .name(NativeFunction::NATIVE_HAS_CHILD_OBJECT.to_owned())
+        .func_body();
+
+    let (storage_load, _) = storage_load_bytes32(module);
+    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
+
+    // Arguments
+    let parent_uid = module.locals.add(ValType::I32);
+    let child_id = module.locals.add(ValType::I32);
+
+    // Calculate the destiny slot
+    builder
+        .local_get(parent_uid)
+        .local_get(child_id)
+        .call(write_object_slot_fn);
+
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .call(storage_load);
+
+    builder
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .i32_const(32)
+        .call(is_zero_fn)
+        .negate();
 
     function.finish(vec![parent_uid, child_id], &mut module.funcs)
 }

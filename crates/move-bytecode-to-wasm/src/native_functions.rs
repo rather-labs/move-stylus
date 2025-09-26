@@ -61,6 +61,7 @@ impl NativeFunction {
     const NATIVE_ADD_CHILD_OBJECT: &str = "add_child_object";
     const NATIVE_BORROW_CHILD_OBJECT: &str = "borrow_child_object";
     const NATIVE_BORROW_CHILD_OBJECT_MUT: &str = "borrow_child_object_mut";
+    const NATIVE_HAS_CHILD_OBJECT: &str = "has_child_object";
 
     // Host functions
     const HOST_BLOCK_NUMBER: &str = "block_number";
@@ -123,6 +124,9 @@ impl NativeFunction {
                     transaction::add_native_tx_gas_price_fn(module, compilation_ctx)
                 }
                 Self::NATIVE_FRESH_ID => object::add_native_fresh_id_fn(module, compilation_ctx),
+                Self::NATIVE_HAS_CHILD_OBJECT => {
+                    dynamic_field::add_has_child_object_fn(module, compilation_ctx)
+                }
                 #[cfg(debug_assertions)]
                 Self::NATIVE_GET_LAST_MEMORY_POSITION => {
                     tests::add_get_last_memory_position_fn(module, compilation_ctx)

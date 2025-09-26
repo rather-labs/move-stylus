@@ -22,3 +22,7 @@ public fun attach_dynamic_field(foo: &mut Foo, name: String, value: u64) {
 public fun read_dynamic_field(foo: &Foo, name: String): &u64 {
     dynamic_field::borrow(&foo.id, name)
 }
+
+public fun dynamic_field_exists(foo: &Foo, name: String): bool {
+    dynamic_field::exists_(&foo.id, name)
+}
