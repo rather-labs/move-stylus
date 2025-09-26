@@ -3638,14 +3638,20 @@ mod trusted_swap {
         // Read the object id emmited from the contract's events
         let obj_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let obj_a_id = FixedBytes::<32>::from_slice(&obj_a_id);
-        println!("Object A ID: {:#x}", obj_a_id);
 
         let obj_a_slot = derive_object_slot(&OWNER_A, &obj_a_id.0);
 
         let call_data = readObjectCall::new((obj_a_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
-        assert_eq!(obj_a_id, return_data.id.id.bytes);
+        let obj_a_expected = Object::abi_encode(&Object {
+            id: UID {
+                id: ID { bytes: obj_a_id },
+            },
+            scarcity: 7,
+            style: 2,
+        });
+        assert_eq!(Object::abi_encode(&return_data), obj_a_expected);
         assert_eq!(0, result);
 
         let call_data = requestSwapCall::new((obj_a_id, SERVICE.into(), fee_a)).abi_encode();
@@ -3681,14 +3687,20 @@ mod trusted_swap {
         // Read the object id emmited from the contract's events
         let obj_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let obj_b_id = FixedBytes::<32>::from_slice(&obj_b_id);
-        println!("Object B ID: {:#x}", obj_b_id);
 
         let obj_b_slot = derive_object_slot(&OWNER_B, &obj_b_id.0);
 
         let call_data = readObjectCall::new((obj_b_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
-        assert_eq!(obj_b_id, return_data.id.id.bytes);
+        let obj_b_expected = Object::abi_encode(&Object {
+            id: UID {
+                id: ID { bytes: obj_b_id },
+            },
+            scarcity: 7,
+            style: 3,
+        });
+        assert_eq!(Object::abi_encode(&return_data), obj_b_expected);
         assert_eq!(0, result);
 
         let call_data = requestSwapCall::new((obj_b_id, SERVICE.into(), fee_b)).abi_encode();
@@ -3697,7 +3709,6 @@ mod trusted_swap {
 
         let swap_request_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let swap_request_b_id = FixedBytes::<32>::from_slice(&swap_request_b_id);
-        println!("Swap Request B ID: {:#x}", swap_request_b_id);
 
         // Assert that both slots are empty
         assert_eq!(
@@ -3741,7 +3752,7 @@ mod trusted_swap {
         let call_data = readObjectCall::new((obj_b_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
-        assert_eq!(obj_b_id, return_data.id.id.bytes);
+        assert_eq!(Object::abi_encode(&return_data), obj_b_expected);
         assert_eq!(0, result);
 
         runtime.set_msg_sender(OWNER_B.into());
@@ -3750,9 +3761,136 @@ mod trusted_swap {
         let call_data = readObjectCall::new((obj_a_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
-        assert_eq!(obj_a_id, return_data.id.id.bytes);
+        assert_eq!(Object::abi_encode(&return_data), obj_a_expected);
+        assert_eq!(0, result);
+    }
+
+    #[rstest]
+    #[should_panic]
+    fn test_swap_too_cheap(runtime: RuntimeSandbox) {
+        // Create an object
+        runtime.set_msg_sender(OWNER_A.into());
+        runtime.set_tx_origin(OWNER_A.into());
+
+        let call_data = createObjectCall::new((7, 2)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
+        // Read the object id emmited from the contract's events
+        let obj_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let obj_a_id = FixedBytes::<32>::from_slice(&obj_a_id);
+
+        // Request a swap with a fee too low
+        let fee_a = 999;
+        let call_data = requestSwapCall::new((obj_a_id, SERVICE.into(), fee_a)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+    }
+
+    #[rstest]
+    #[should_panic]
+    fn test_swap_different_scarcity(runtime: RuntimeSandbox) {
+        ////// First owner creates an object //////
+        runtime.set_msg_sender(OWNER_A.into());
+        runtime.set_tx_origin(OWNER_A.into());
+        let fee_a = 1000;
+
+        let call_data = createObjectCall::new((7, 2)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the object id emmited from the contract's events
+        let obj_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let obj_a_id = FixedBytes::<32>::from_slice(&obj_a_id);
+
+        let call_data = requestSwapCall::new((obj_a_id, SERVICE.into(), fee_a)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the swap request id emmited from the contract's events
+        let swap_request_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let swap_request_a_id = FixedBytes::<32>::from_slice(&swap_request_a_id);
+
+        ////// Second owner requests a swap //////
+        runtime.set_msg_sender(OWNER_B.into());
+        runtime.set_tx_origin(OWNER_B.into());
+        let fee_b = 1250;
+
+        let call_data = createObjectCall::new((8, 3)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the object id emmited from the contract's events
+        let obj_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let obj_b_id = FixedBytes::<32>::from_slice(&obj_b_id);
+
+        let call_data = requestSwapCall::new((obj_b_id, SERVICE.into(), fee_b)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let swap_request_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let swap_request_b_id = FixedBytes::<32>::from_slice(&swap_request_b_id);
+
+        ////// Execute the swap //////
+        runtime.set_msg_sender(SERVICE.into());
+        runtime.set_tx_origin(SERVICE.into());
+
+        let call_data = executeSwapCall::new((swap_request_a_id, swap_request_b_id)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+    }
+
+    #[rstest]
+    #[should_panic]
+    fn test_swap_same_style(runtime: RuntimeSandbox) {
+        ////// First owner creates an object //////
+        runtime.set_msg_sender(OWNER_A.into());
+        runtime.set_tx_origin(OWNER_A.into());
+        let fee_a = 1000;
+
+        let call_data = createObjectCall::new((7, 3)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the object id emmited from the contract's events
+        let obj_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let obj_a_id = FixedBytes::<32>::from_slice(&obj_a_id);
+
+        let call_data = requestSwapCall::new((obj_a_id, SERVICE.into(), fee_a)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the swap request id emmited from the contract's events
+        let swap_request_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let swap_request_a_id = FixedBytes::<32>::from_slice(&swap_request_a_id);
+
+        ////// Second owner requests a swap //////
+        runtime.set_msg_sender(OWNER_B.into());
+        runtime.set_tx_origin(OWNER_B.into());
+        let fee_b = 1250;
+
+        let call_data = createObjectCall::new((7, 3)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the object id emmited from the contract's events
+        let obj_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let obj_b_id = FixedBytes::<32>::from_slice(&obj_b_id);
+
+        let call_data = requestSwapCall::new((obj_b_id, SERVICE.into(), fee_b)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let swap_request_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let swap_request_b_id = FixedBytes::<32>::from_slice(&swap_request_b_id);
+
+        ////// Execute the swap //////
+        runtime.set_msg_sender(SERVICE.into());
+        runtime.set_tx_origin(SERVICE.into());
+
+        let call_data = executeSwapCall::new((swap_request_a_id, swap_request_b_id)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
     }
 }
 /*
