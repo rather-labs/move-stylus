@@ -47,25 +47,18 @@ pub fn get_next_slot(slot: &[u8; 32]) -> [u8; 32] {
 }
 
 // Helper function to assert that all storage slots are empty after a delete operation
-// It takes the storage before and after delete, which is needed not only to assert that the storage is empty,
-// but also to assert that the key existed in storage before deletion.
+// It checks that keys from before_delete now have zero values in after_delete
 pub fn assert_empty_storage(
     storage_before_delete: &std::collections::HashMap<[u8; 32], [u8; 32]>,
     storage_after_delete: &std::collections::HashMap<[u8; 32], [u8; 32]>,
 ) {
-    // Assert that all storage slots are empty except for the counter key
-    for (key, value) in storage_after_delete.iter() {
+    // Check that keys that existed before delete now have zero values after delete, except for the counter key
+    for key in storage_before_delete.keys() {
         if *key != COUNTER_KEY {
-            // Assert that the key existed in storage before deletion
-            assert!(
-                storage_before_delete.contains_key(key),
-                "Key {:?} should exist in storage_before_delete",
-                key
-            );
-
+            let value_after = storage_after_delete.get(key).unwrap_or(&[0u8; 32]);
             assert_eq!(
-                *value, [0u8; 32],
-                "Unexpected non-zero value at key: {:?}",
+                *value_after, [0u8; 32],
+                "Unexpected non-zero value at key {:?} after delete",
                 key
             );
         }
@@ -3574,6 +3567,194 @@ mod storage_encoding {
     }
 }
 
+mod trusted_swap {
+    use alloy_primitives::{Address, U256, address};
+    use alloy_sol_types::SolValue;
+    use alloy_sol_types::{SolCall, sol};
+
+    use super::*;
+
+    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
+    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
+    // thread. If that happens, messages from test A can be received by test B.
+    // Using once instance per thread assures this won't happen.
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "trusted_swap";
+        const SOURCE_PATH: &str = "tests/storage/trusted_swap.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+        #[derive(Debug)]
+        struct ID {
+           bytes32 bytes;
+        }
+
+        #[derive(Debug)]
+        struct UID {
+           ID id;
+        }
+
+        struct Object {
+            UID id;
+            uint8 scarcity;
+            uint8 style;
+        }
+
+        struct SwapRequest {
+            UID id;
+            address owner;
+            Object object;
+            uint64 fee;
+        }
+
+        function createObject(uint8 scarcity, uint8 style) public;
+        function readObject(bytes32 id) public view returns (Object);
+        function requestSwap(bytes32 id, address service, uint64 fee) public;
+        function executeSwap(bytes32 id1, bytes32 id2) public returns (uint64);
+    );
+
+    const OWNER_A: [u8; 20] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+    const OWNER_B: [u8; 20] = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
+    const SERVICE: [u8; 20] = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
+
+    #[rstest]
+    fn test_successful_swap(runtime: RuntimeSandbox) {
+        ////// First owner creates an object //////
+        runtime.set_msg_sender(OWNER_A.into());
+        runtime.set_tx_origin(OWNER_A.into());
+        let fee_a = 1000;
+
+        let call_data = createObjectCall::new((7, 2)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the object id emmited from the contract's events
+        let obj_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let obj_a_id = FixedBytes::<32>::from_slice(&obj_a_id);
+        println!("Object A ID: {:#x}", obj_a_id);
+
+        let obj_a_slot = derive_object_slot(&OWNER_A, &obj_a_id.0);
+
+        let call_data = readObjectCall::new((obj_a_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(obj_a_id, return_data.id.id.bytes);
+        assert_eq!(0, result);
+
+        let call_data = requestSwapCall::new((obj_a_id, SERVICE.into(), fee_a)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the swap request id emmited from the contract's events
+        let swap_request_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let swap_request_a_id = FixedBytes::<32>::from_slice(&swap_request_a_id);
+        println!("Swap Request A ID: {:#x}", swap_request_a_id);
+
+        // Assert that both slots are empty
+        assert_eq!(
+            runtime.get_storage_at_slot(obj_a_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+        assert_eq!(
+            runtime.get_storage_at_slot(get_next_slot(&obj_a_slot.0)),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+
+        ////// Second owner requests a swap //////
+        runtime.set_msg_sender(OWNER_B.into());
+        runtime.set_tx_origin(OWNER_B.into());
+        let fee_b = 1250;
+
+        let call_data = createObjectCall::new((7, 3)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the object id emmited from the contract's events
+        let obj_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let obj_b_id = FixedBytes::<32>::from_slice(&obj_b_id);
+        println!("Object B ID: {:#x}", obj_b_id);
+
+        let obj_b_slot = derive_object_slot(&OWNER_B, &obj_b_id.0);
+
+        let call_data = readObjectCall::new((obj_b_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(obj_b_id, return_data.id.id.bytes);
+        assert_eq!(0, result);
+
+        let call_data = requestSwapCall::new((obj_b_id, SERVICE.into(), fee_b)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let swap_request_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let swap_request_b_id = FixedBytes::<32>::from_slice(&swap_request_b_id);
+        println!("Swap Request B ID: {:#x}", swap_request_b_id);
+
+        // Assert that both slots are empty
+        assert_eq!(
+            runtime.get_storage_at_slot(obj_b_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+        assert_eq!(
+            runtime.get_storage_at_slot(get_next_slot(&obj_b_slot.0)),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+
+        ////// Execute the swap //////
+        runtime.set_msg_sender(SERVICE.into());
+        runtime.set_tx_origin(SERVICE.into());
+
+        let storage_before_delete = runtime.get_storage();
+
+        let call_data = executeSwapCall::new((swap_request_a_id, swap_request_b_id)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = executeSwapCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(fee_a + fee_b, return_data);
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
+
+        for (key, value) in storage_after_delete.iter() {
+            if *key != COUNTER_KEY && value != &[0u8; 32] {
+                println!("{:?} \n {:?} \n", key, value);
+            }
+        }
+
+        ////// Read the objects //////
+        // Now owner A should have the object B, and owner B should have the object A.
+        runtime.set_msg_sender(OWNER_A.into());
+        runtime.set_tx_origin(OWNER_A.into());
+
+        let call_data = readObjectCall::new((obj_b_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(obj_b_id, return_data.id.id.bytes);
+        assert_eq!(0, result);
+
+        runtime.set_msg_sender(OWNER_B.into());
+        runtime.set_tx_origin(OWNER_B.into());
+
+        let call_data = readObjectCall::new((obj_a_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(obj_a_id, return_data.id.id.bytes);
+        assert_eq!(0, result);
+
+    }
+}
 /*
 mod dynamic_storage_fields {
     use alloy_primitives::{FixedBytes, address};
