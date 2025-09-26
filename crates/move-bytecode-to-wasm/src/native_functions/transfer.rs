@@ -1,6 +1,6 @@
 use walrus::{
-    FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, UnaryOp},
+    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, UnaryOp},
 };
 
 use crate::{
@@ -12,6 +12,7 @@ use crate::{
     get_generic_function_name,
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
+    vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
 };
 
 use super::NativeFunction;
@@ -85,6 +86,7 @@ pub fn add_transfer_object_fn(
         block.unreachable();
     });
 
+    // Delete the object from the owner mapping on the storage
     builder.block(None, |block| {
         let block_id = block.id();
 
@@ -95,6 +97,16 @@ pub fn add_transfer_object_fn(
 
         block.local_get(struct_ptr).call(delete_object_fn);
     });
+
+    // If the struct has wrapped objects, those objects need to be deleted from the current owner's mapping too,
+    // as they are being transfered to the recipient's mapping
+    add_delete_wrapped_objects_instructions(
+        module,
+        &mut builder,
+        compilation_ctx,
+        struct_ptr,
+        itype,
+    );
 
     // Update the object ownership in memory to the recipient's address
     builder
@@ -194,7 +206,7 @@ pub fn add_share_object_fn(
                 // Object cannot be frozen
                 then.unreachable();
             },
-            |else_| {
+            |mut else_| {
                 // Delete the object from owner mapping on the storage
                 else_.block(None, |block| {
                     let block_id = block.id();
@@ -206,6 +218,16 @@ pub fn add_share_object_fn(
 
                     block.local_get(struct_ptr).call(delete_object_fn);
                 });
+
+                // If the struct has wrapped objects, those objects need to be deleted from the current owner's mapping too,
+                // as they are being transfered to the shared mapping
+                add_delete_wrapped_objects_instructions(
+                    module,
+                    &mut else_,
+                    compilation_ctx,
+                    struct_ptr,
+                    itype,
+                );
 
                 // Update the object ownership in memory to the shared objects key
                 else_
@@ -311,7 +333,7 @@ pub fn add_freeze_object_fn(
                 // Shared objects cannot be frozen
                 then.unreachable();
             },
-            |else_| {
+            |mut else_| {
                 // Delete the object from the owner mapping on the storage
                 else_.block(None, |block| {
                     let block_id = block.id();
@@ -323,6 +345,16 @@ pub fn add_freeze_object_fn(
 
                     block.local_get(struct_ptr).call(delete_object_fn);
                 });
+
+                // If the struct has wrapped objects, those objects need to be deleted from the current owner's mapping too,
+                // as they are being transfered to the frozen mapping
+                add_delete_wrapped_objects_instructions(
+                    module,
+                    &mut else_,
+                    compilation_ctx,
+                    struct_ptr,
+                    itype,
+                );
 
                 // Update the object ownership in memory to the frozen objects key
                 else_
@@ -357,4 +389,79 @@ pub fn add_freeze_object_fn(
     });
 
     function.finish(vec![struct_ptr], &mut module.funcs)
+}
+
+/// Helper function to delete wrapped objects from storage.
+/// Useful when transfering an object with wrapped objects.
+fn add_delete_wrapped_objects_instructions(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    struct_ptr: LocalId,
+    itype: &IntermediateType,
+) {
+    let struct_ = compilation_ctx
+        .get_struct_by_intermediate_type(itype)
+        .unwrap();
+
+    let mut offset: i32 = 0;
+    // Iterate over the fields of the struct
+    // If the field is a struct with key ability, delete it from storage
+    for field in struct_.fields.iter() {
+        match field {
+            IntermediateType::IStruct {
+                module_id, index, ..
+            }
+            | IntermediateType::IGenericStructInstance {
+                module_id, index, ..
+            } if !Uid::is_vm_type(module_id, *index, compilation_ctx)
+                && !NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
+            {
+                let child_struct = compilation_ctx
+                    .get_struct_by_index(module_id, *index)
+                    .expect("struct not found");
+
+                // If it's a generic instance, instantiate; otherwise use as-is
+                let child_struct =
+                    if let IntermediateType::IGenericStructInstance { types, .. } = field {
+                        child_struct.instantiate(types)
+                    } else {
+                        child_struct.clone()
+                    };
+
+                // If the child struct has 'key' ability, we need to delete it from storage
+                if child_struct.has_key {
+                    let child_struct_ptr = module.locals.add(ValType::I32);
+                    // Get the pointer to the child struct
+                    builder
+                        .local_get(struct_ptr)
+                        .i32_const(offset)
+                        .binop(BinaryOp::I32Add)
+                        // Load the intermediate pointer to the child struct
+                        .load(
+                            compilation_ctx.memory_id,
+                            LoadKind::I32 { atomic: false },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        )
+                        .local_set(child_struct_ptr);
+
+                    // Get the delete function for the child struct
+                    let delete_wrapped_object_fn = RuntimeFunction::DeleteFromStorage.get_generic(
+                        module,
+                        compilation_ctx,
+                        &[field],
+                    );
+
+                    builder
+                        .local_get(child_struct_ptr)
+                        .call(delete_wrapped_object_fn);
+                }
+            }
+            _ => {}
+        }
+        offset = offset + 4;
+    }
 }
