@@ -1,5 +1,3 @@
-use std::process::Child;
-
 use super::NativeFunction;
 use crate::{
     CompilationContext,
@@ -10,7 +8,6 @@ use crate::{
     get_generic_function_name,
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
-    storage::encoding::add_encode_and_save_into_storage_struct_instructions,
     translation::intermediate_types::{
         IntermediateType,
         address::IAddress,
