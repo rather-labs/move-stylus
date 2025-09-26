@@ -3568,7 +3568,6 @@ mod storage_encoding {
 }
 
 mod trusted_swap {
-    use alloy_primitives::{Address, U256, address};
     use alloy_sol_types::SolValue;
     use alloy_sol_types::{SolCall, sol};
 
@@ -3627,8 +3626,8 @@ mod trusted_swap {
     #[rstest]
     fn test_successful_swap(runtime: RuntimeSandbox) {
         ////// First owner creates an object //////
-        runtime.set_msg_sender(OWNER_A.into());
-        runtime.set_tx_origin(OWNER_A.into());
+        runtime.set_msg_sender(OWNER_A);
+        runtime.set_tx_origin(OWNER_A);
         let fee_a = 1000;
 
         let call_data = createObjectCall::new((7, 2)).abi_encode();
@@ -3676,8 +3675,8 @@ mod trusted_swap {
         );
 
         ////// Second owner requests a swap //////
-        runtime.set_msg_sender(OWNER_B.into());
-        runtime.set_tx_origin(OWNER_B.into());
+        runtime.set_msg_sender(OWNER_B);
+        runtime.set_tx_origin(OWNER_B);
         let fee_b = 1250;
 
         let call_data = createObjectCall::new((7, 3)).abi_encode();
@@ -3723,8 +3722,8 @@ mod trusted_swap {
         );
 
         ////// Execute the swap //////
-        runtime.set_msg_sender(SERVICE.into());
-        runtime.set_tx_origin(SERVICE.into());
+        runtime.set_msg_sender(SERVICE);
+        runtime.set_tx_origin(SERVICE);
 
         let storage_before_delete = runtime.get_storage();
 
@@ -3746,8 +3745,8 @@ mod trusted_swap {
 
         ////// Read the objects //////
         // Now owner A should have the object B, and owner B should have the object A.
-        runtime.set_msg_sender(OWNER_A.into());
-        runtime.set_tx_origin(OWNER_A.into());
+        runtime.set_msg_sender(OWNER_A);
+        runtime.set_tx_origin(OWNER_A);
 
         let call_data = readObjectCall::new((obj_b_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -3755,8 +3754,8 @@ mod trusted_swap {
         assert_eq!(Object::abi_encode(&return_data), obj_b_expected);
         assert_eq!(0, result);
 
-        runtime.set_msg_sender(OWNER_B.into());
-        runtime.set_tx_origin(OWNER_B.into());
+        runtime.set_msg_sender(OWNER_B);
+        runtime.set_tx_origin(OWNER_B);
 
         let call_data = readObjectCall::new((obj_a_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -3769,8 +3768,8 @@ mod trusted_swap {
     #[should_panic]
     fn test_swap_too_cheap(runtime: RuntimeSandbox) {
         // Create an object
-        runtime.set_msg_sender(OWNER_A.into());
-        runtime.set_tx_origin(OWNER_A.into());
+        runtime.set_msg_sender(OWNER_A);
+        runtime.set_tx_origin(OWNER_A);
 
         let call_data = createObjectCall::new((7, 2)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -3791,8 +3790,8 @@ mod trusted_swap {
     #[should_panic]
     fn test_swap_different_scarcity(runtime: RuntimeSandbox) {
         ////// First owner creates an object //////
-        runtime.set_msg_sender(OWNER_A.into());
-        runtime.set_tx_origin(OWNER_A.into());
+        runtime.set_msg_sender(OWNER_A);
+        runtime.set_tx_origin(OWNER_A);
         let fee_a = 1000;
 
         let call_data = createObjectCall::new((7, 2)).abi_encode();
@@ -3812,8 +3811,8 @@ mod trusted_swap {
         let swap_request_a_id = FixedBytes::<32>::from_slice(&swap_request_a_id);
 
         ////// Second owner requests a swap //////
-        runtime.set_msg_sender(OWNER_B.into());
-        runtime.set_tx_origin(OWNER_B.into());
+        runtime.set_msg_sender(OWNER_B);
+        runtime.set_tx_origin(OWNER_B);
         let fee_b = 1250;
 
         let call_data = createObjectCall::new((8, 3)).abi_encode();
@@ -3832,8 +3831,8 @@ mod trusted_swap {
         let swap_request_b_id = FixedBytes::<32>::from_slice(&swap_request_b_id);
 
         ////// Execute the swap //////
-        runtime.set_msg_sender(SERVICE.into());
-        runtime.set_tx_origin(SERVICE.into());
+        runtime.set_msg_sender(SERVICE);
+        runtime.set_tx_origin(SERVICE);
 
         let call_data = executeSwapCall::new((swap_request_a_id, swap_request_b_id)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -3844,8 +3843,8 @@ mod trusted_swap {
     #[should_panic]
     fn test_swap_same_style(runtime: RuntimeSandbox) {
         ////// First owner creates an object //////
-        runtime.set_msg_sender(OWNER_A.into());
-        runtime.set_tx_origin(OWNER_A.into());
+        runtime.set_msg_sender(OWNER_A);
+        runtime.set_tx_origin(OWNER_A);
         let fee_a = 1000;
 
         let call_data = createObjectCall::new((7, 3)).abi_encode();
@@ -3865,8 +3864,8 @@ mod trusted_swap {
         let swap_request_a_id = FixedBytes::<32>::from_slice(&swap_request_a_id);
 
         ////// Second owner requests a swap //////
-        runtime.set_msg_sender(OWNER_B.into());
-        runtime.set_tx_origin(OWNER_B.into());
+        runtime.set_msg_sender(OWNER_B);
+        runtime.set_tx_origin(OWNER_B);
         let fee_b = 1250;
 
         let call_data = createObjectCall::new((7, 3)).abi_encode();
@@ -3885,8 +3884,8 @@ mod trusted_swap {
         let swap_request_b_id = FixedBytes::<32>::from_slice(&swap_request_b_id);
 
         ////// Execute the swap //////
-        runtime.set_msg_sender(SERVICE.into());
-        runtime.set_tx_origin(SERVICE.into());
+        runtime.set_msg_sender(SERVICE);
+        runtime.set_tx_origin(SERVICE);
 
         let call_data = executeSwapCall::new((swap_request_a_id, swap_request_b_id)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
