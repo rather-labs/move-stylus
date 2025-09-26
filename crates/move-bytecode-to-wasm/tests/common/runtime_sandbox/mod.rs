@@ -149,13 +149,6 @@ impl RuntimeSandbox {
                       input_data_ptr: u32,
                       data_length: u32,
                       return_data_ptr: u32| {
-                    /*
-                                        println!(
-                                             "native_keccak256 called with input_data_ptr: {}, data_length: {}, return_data_ptr: {}",
-                                            input_data_ptr,
-                                            data_length, return_data_ptr
-                                        );
-                    */
                     let mem = match caller.get_module_export(&mem_export) {
                         Some(Extern::Memory(mem)) => mem,
                         _ => panic!("failed to find host memory"),
