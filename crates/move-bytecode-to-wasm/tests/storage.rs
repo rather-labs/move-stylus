@@ -3251,6 +3251,7 @@ mod dynamic_storage_fields {
         function attachDynamicFieldAddrU256(bytes32 foo, address name, uint256 value) public view;
         function readDynamicFieldAddrU256(bytes32 foo, address name) public view returns (uint256);
         function dynamicFieldExistsAddrU256(bytes32 foo, address name) public view returns (bool);
+        function mutateDynamicField(bytes32 foo, String name, uint64 value) public view;
     );
 
     #[rstest]
@@ -3365,5 +3366,27 @@ mod dynamic_storage_fields {
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
         assert_eq!(true.abi_encode(), result_data);
+
+        // Mutatate the values
+        let call_data =
+            mutateDynamicFieldCall::new((object_id, field_name_1.clone(), 1)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+
+        let call_data =
+            mutateDynamicFieldCall::new((object_id, field_name_2.clone(), 2)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+
+        runtime.print_storage();
+
+        // Read modified dynamic fields
+        let call_data = readDynamicFieldCall::new((object_id, field_name_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(43u64.abi_encode(), result_data);
+
+        let call_data = readDynamicFieldCall::new((object_id, field_name_2)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(85u64.abi_encode(), result_data);
     }
 }

@@ -17,8 +17,8 @@ use crate::{
 };
 
 use walrus::{
-    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+    FunctionBuilder, FunctionId, GlobalId, InstrSeqBuilder, LocalId, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind, Value},
 };
 
 /// Adds a dynamic field for a given parent and child ID
@@ -76,6 +76,7 @@ pub fn add_child_object_fn(
 /// Arguments
 /// * `parent_uid` - i32 pointer to the parent object's UID in memory
 /// * `child_id` - i32 pointer to the child ID in memory
+/// *
 ///
 /// Returns
 /// * i32 pointer to a reference to the borrowed object's data in memory

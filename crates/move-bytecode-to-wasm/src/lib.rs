@@ -18,7 +18,7 @@ use translation::{
     translate_function,
 };
 
-use walrus::{Module, RefType};
+use walrus::{GlobalId, Module, RefType};
 use wasm_validation::validate_stylus_wasm;
 
 pub(crate) mod abi_types;
@@ -85,6 +85,11 @@ pub fn translate_package(
 
     // TODO: a lot of clones, we must create a symbol pool
     for root_compiled_module in &root_compiled_units {
+        // This is used to keep track of dynamic fields global variables that were retrieved from
+        // storage as mutable. This vector is used at the end of the entrypoint function to save
+        // the possible changes made to those variables.
+        let mut dynamic_fields_global_variables: Vec<(GlobalId, IntermediateType)> = Vec::new();
+
         let module_name = root_compiled_module.unit.name.to_string();
         println!("compiling module {module_name}...");
         let root_compiled_module = &root_compiled_module.unit.module;
@@ -133,6 +138,7 @@ pub fn translate_package(
                 &function_definitions,
                 &mut module,
                 &compilation_ctx,
+                &mut dynamic_fields_global_variables,
             );
 
             if function_information.is_entry {
@@ -266,6 +272,7 @@ fn translate_and_link_functions(
     function_definitions: &GlobalFunctionTable,
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
+    dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
 ) {
     // Obtain the function information and module's data
     let (function_information, module_data) = if let Some(fi) = compilation_ctx
@@ -332,6 +339,7 @@ fn translate_and_link_functions(
             function_table,
             function_information,
             move_bytecode,
+            dynamic_fields_global_variables,
         )
         .unwrap_or_else(|_| panic!("there was an error translating {}", function_id));
 
@@ -347,6 +355,7 @@ fn translate_and_link_functions(
                 function_definitions,
                 module,
                 compilation_ctx,
+                dynamic_fields_global_variables,
             )
         });
     }
