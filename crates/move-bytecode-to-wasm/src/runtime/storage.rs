@@ -1259,9 +1259,16 @@ pub fn add_commit_changes_to_storage_fn(
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
     let (storage_flush_cache, _) = storage_flush_cache(module);
 
+    let (print_i32, _, _, print_m, print_s, _) = crate::declare_host_debug_functions!(module);
+
     for (dynamic_field_ptr, itype) in dynamic_fields_global_variables {
         let save_struct_into_storage_fn =
             RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
+
+        println!("commit {dynamic_field_ptr:?}");
+
+        builder.call(print_s);
+        builder.global_get(*dynamic_field_ptr).call(print_i32);
 
         // Calculate the destiny slot
 
