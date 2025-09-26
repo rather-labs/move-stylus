@@ -60,6 +60,8 @@ pub fn add_child_object_fn(
     function.finish(vec![parent_address, child_ptr], &mut module.funcs)
 }
 
+// TODO: Check if object exists
+// TODO: Check object type
 pub fn add_borrow_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -116,13 +118,30 @@ pub fn add_borrow_object_fn(
         .i32_const(32)
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-    let tmp = module.locals.add(ValType::I32);
+    let result_struct = module.locals.add(ValType::I32);
 
     // Read from storage
     builder
         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
         .call(decode_and_read_from_storage_fn)
-        .local_tee(tmp);
+        .local_set(result_struct);
+
+    let result = module.locals.add(ValType::I32);
+    builder
+        .i32_const(4)
+        .call(compilation_ctx.allocator)
+        .local_tee(result)
+        .local_get(result_struct)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    builder.local_get(result);
 
     function.finish(vec![parent_uid, child_id], &mut module.funcs)
 }

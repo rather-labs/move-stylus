@@ -169,7 +169,6 @@ pub fn prepare_function_return(
     returns: &[IntermediateType],
     compilation_ctx: &CompilationContext,
 ) {
-    println!("Returns: {:?}", returns);
     if !returns.is_empty() {
         let mut locals = Vec::new();
         let mut total_size = 0;
@@ -190,6 +189,7 @@ pub fn prepare_function_return(
         for (return_ty, local) in returns.iter().zip(locals.iter()) {
             builder.local_get(pointer);
             builder.local_get(*local);
+
             if return_ty.stack_data_size() == 4 {
                 builder.store(
                     compilation_ctx.memory_id,

@@ -18,9 +18,6 @@ impl IRef {
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) {
-        let (print_i32, _, print_m, print_address, _, _) =
-            crate::declare_host_debug_functions!(module);
-        builder.i32_const(91).call(print_i32);
         match inner {
             IntermediateType::ISigner
             | IntermediateType::IU128
@@ -57,8 +54,6 @@ impl IRef {
             | IntermediateType::IU32
             | IntermediateType::IU64
             | IntermediateType::IBool => {
-                builder.i32_const(92).call(print_i32);
-                builder.local_get(local).call(print_m);
                 // Load the intermediate pointer
                 builder
                     .local_get(local)
@@ -72,7 +67,6 @@ impl IRef {
                     )
                     .local_tee(local);
 
-                builder.i32_const(93).call(print_i32);
                 builder.load(
                     compilation_ctx.memory_id,
                     match inner.stack_data_size() {
@@ -86,7 +80,6 @@ impl IRef {
                     },
                 );
 
-                builder.i32_const(94).call(print_i32);
                 let value_local = module.locals.add(match inner.stack_data_size() {
                     4 => ValType::I32,
                     8 => ValType::I64,

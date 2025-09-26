@@ -1531,6 +1531,7 @@ fn translate_instruction(
                                 },
                             );
 
+                            // TODO: This should be at the end of the router
                             let (storage_flush_cache, _) = storage_flush_cache(module);
                             builder.i32_const(1).call(storage_flush_cache);
                         }

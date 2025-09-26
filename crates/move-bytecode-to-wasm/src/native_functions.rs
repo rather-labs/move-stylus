@@ -60,6 +60,7 @@ impl NativeFunction {
     const NATIVE_HASH_TYPE_AND_KEY: &str = "hash_type_and_key";
     const NATIVE_ADD_CHILD_OBJECT: &str = "add_child_object";
     const NATIVE_BORROW_CHILD_OBJECT: &str = "borrow_child_object";
+    const NATIVE_BORROW_CHILD_OBJECT_MUT: &str = "borrow_child_object_mut";
 
     // Host functions
     const HOST_BLOCK_NUMBER: &str = "block_number";
@@ -278,7 +279,7 @@ impl NativeFunction {
 
                 dynamic_field::add_child_object_fn(module, compilation_ctx, &generics[0])
             }
-            Self::NATIVE_BORROW_CHILD_OBJECT => {
+            Self::NATIVE_BORROW_CHILD_OBJECT | Self::NATIVE_BORROW_CHILD_OBJECT_MUT => {
                 assert_eq!(
                     1,
                     generics.len(),
