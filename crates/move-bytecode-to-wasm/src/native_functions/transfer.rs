@@ -206,7 +206,7 @@ pub fn add_share_object_fn(
                 // Object cannot be frozen
                 then.unreachable();
             },
-            |mut else_| {
+            |else_| {
                 // Delete the object from owner mapping on the storage
                 else_.block(None, |block| {
                     let block_id = block.id();
@@ -223,7 +223,7 @@ pub fn add_share_object_fn(
                 // as they are being transfered to the shared mapping
                 add_delete_wrapped_objects_instructions(
                     module,
-                    &mut else_,
+                    else_,
                     compilation_ctx,
                     struct_ptr,
                     itype,
@@ -333,7 +333,7 @@ pub fn add_freeze_object_fn(
                 // Shared objects cannot be frozen
                 then.unreachable();
             },
-            |mut else_| {
+            |else_| {
                 // Delete the object from the owner mapping on the storage
                 else_.block(None, |block| {
                     let block_id = block.id();
@@ -350,7 +350,7 @@ pub fn add_freeze_object_fn(
                 // as they are being transfered to the frozen mapping
                 add_delete_wrapped_objects_instructions(
                     module,
-                    &mut else_,
+                    else_,
                     compilation_ctx,
                     struct_ptr,
                     itype,
@@ -462,6 +462,6 @@ fn add_delete_wrapped_objects_instructions(
             }
             _ => {}
         }
-        offset = offset + 4;
+        offset += 4;
     }
 }
