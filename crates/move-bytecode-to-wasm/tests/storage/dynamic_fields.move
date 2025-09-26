@@ -15,6 +15,11 @@ public fun create_foo(ctx: &mut TxContext) {
     transfer::share_object(foo);
 }
 
+public fun create_foo_owned(ctx: &mut TxContext) {
+    let foo = Foo { id: object::new(ctx) };
+    transfer::transfer(foo, ctx.sender());
+}
+
 public fun attach_dynamic_field(foo: &mut Foo, name: String, value: u64) {
     dynamic_field::add(&mut foo.id, name, value);
 }
