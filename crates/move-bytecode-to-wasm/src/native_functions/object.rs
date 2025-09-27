@@ -1,7 +1,7 @@
 use super::NativeFunction;
 use crate::{
     CompilationContext,
-    data::DATA_SLOT_DATA_PTR_OFFSET,
+    data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_ZERO_OFFSET},
     get_generic_function_name,
     hostio::host_functions::{
         block_number, block_timestamp, emit_log, native_keccak256, storage_cache_bytes32,
@@ -261,7 +261,7 @@ pub fn add_delete_storage_struct_instructions(
     // Iterate over the fields of the struct and delete them
     for field in struct_.fields.iter() {
         let field_size = field_size(field, compilation_ctx) as i32;
-        add_delete_slot_instructions(
+        add_delete_field_instructions(
             module,
             builder,
             compilation_ctx,
@@ -275,7 +275,7 @@ pub fn add_delete_storage_struct_instructions(
     // Wipe out the last slot before exiting
     builder
         .local_get(slot_ptr)
-        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .i32_const(DATA_ZERO_OFFSET)
         .call(storage_cache);
 }
 
@@ -334,18 +334,10 @@ pub fn add_delete_storage_vector_instructions(
         .call(swap_fn)
         .local_set(len);
 
-    // Wipe the slot data memory again
-    // This is important because we are going to use it to wipe the vector slots
-    builder
-        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-        .i32_const(0)
-        .i32_const(32)
-        .memory_fill(compilation_ctx.memory_id);
-
     // Wipe the header slot
     builder
         .local_get(slot_ptr)
-        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .i32_const(DATA_ZERO_OFFSET)
         .call(storage_cache);
 
     builder.block(None, |block| {
@@ -379,7 +371,7 @@ pub fn add_delete_storage_vector_instructions(
             inner_block.loop_(None, |loop_| {
                 let loop_id = loop_.id();
 
-                add_delete_slot_instructions(
+                add_delete_field_instructions(
                     module,
                     loop_,
                     compilation_ctx,
@@ -410,7 +402,7 @@ pub fn add_delete_storage_vector_instructions(
         // Delete the last slot before exiting
         block
             .local_get(elem_slot_ptr)
-            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .i32_const(DATA_ZERO_OFFSET)
             .call(storage_cache);
     });
 }
@@ -426,7 +418,7 @@ pub fn add_delete_storage_vector_instructions(
 /// `itype` - intermediate type of the element to be deleted
 /// `size` - size of the itype in storage
 /// `used_bytes_in_slot` - number of bytes already used in the current slot
-fn add_delete_slot_instructions(
+fn add_delete_field_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
@@ -450,7 +442,7 @@ fn add_delete_slot_instructions(
             |then| {
                 // Wipe the slot
                 then.local_get(slot_ptr)
-                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                    .i32_const(DATA_ZERO_OFFSET)
                     .call(storage_cache);
 
                 // Calculate next slot
