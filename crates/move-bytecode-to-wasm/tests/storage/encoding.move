@@ -17,7 +17,7 @@ use stylus::object;
 
 /// Native functions to facilitate testing storage operations
 native fun save_in_slot<T: key>(value: T, slot: u256);
-native fun read_slot<T: key>(slot: u256): T;
+native fun read_slot<T: key>(slot: u256, uid: u256): T;
 
 // ============================================================================
 // Static Field Structures
@@ -205,7 +205,7 @@ public fun save_static_fields(
 
 /// Read a StaticFields structure from storage
 public fun read_static_fields(): StaticFields {
-    read_slot<StaticFields>(0)
+    read_slot<StaticFields>(0, 0)
 }
 
 /// Save a StaticFields2 structure to storage
@@ -226,7 +226,7 @@ public fun save_static_fields_2(
 
 /// Read a StaticFields2 structure from storage
 public fun read_static_fields_2(): StaticFields2 {
-    read_slot<StaticFields2>(0)
+    read_slot<StaticFields2>(0, 0)
 }
 
 /// Save a StaticFields3 structure to storage
@@ -246,7 +246,7 @@ public fun save_static_fields_3(
 
 /// Read a StaticFields3 structure from storage
 public fun read_static_fields_3(): StaticFields3 {
-    read_slot<StaticFields3>(0)
+    read_slot<StaticFields3>(0, 0)
 }
 
 /// Save a StaticNestedStruct structure to storage
@@ -269,7 +269,7 @@ public fun save_static_nested_struct(
 
 /// Read a StaticNestedStruct structure from storage
 public fun read_static_nested_struct(): StaticNestedStruct {
-    read_slot<StaticNestedStruct>(0)
+    read_slot<StaticNestedStruct>(0, 0)
 }
 
 // ============================================================================
@@ -296,7 +296,7 @@ public fun save_dynamic_struct(
 
 /// Read a DynamicStruct structure from storage
 public fun read_dynamic_struct(): DynamicStruct {
-    read_slot<DynamicStruct>(0)
+    read_slot<DynamicStruct>(0, 0)
 }
 
 /// Save a DynamicStruct2 structure to storage
@@ -320,7 +320,7 @@ public fun save_dynamic_struct_2(
 
 /// Read a DynamicStruct2 structure from storage
 public fun read_dynamic_struct_2(): DynamicStruct2 {
-    read_slot<DynamicStruct2>(0)
+    read_slot<DynamicStruct2>(0, 0)
 }
 
 /// Save a DynamicStruct3 structure to storage
@@ -340,7 +340,7 @@ public fun save_dynamic_struct_3(
 
 /// Read a DynamicStruct3 structure from storage
 public fun read_dynamic_struct_3(): DynamicStruct3 {
-    read_slot<DynamicStruct3>(0)
+    read_slot<DynamicStruct3>(0, 0)
 }
 
 /// Save a DynamicStruct4 structure to storage
@@ -369,7 +369,7 @@ public fun save_dynamic_struct_4(
 
 /// Read a DynamicStruct4 structure from storage
 public fun read_dynamic_struct_4(): DynamicStruct4 {
-    read_slot<DynamicStruct4>(0)
+    read_slot<DynamicStruct4>(0, 0)
 }
 
 /// Save a DynamicStruct5 structure to storage
@@ -412,7 +412,7 @@ public fun save_dynamic_struct_5(
 
 /// Read a DynamicStruct5 structure from storage
 public fun read_dynamic_struct_5(): DynamicStruct5 {
-    read_slot<DynamicStruct5>(0)
+    read_slot<DynamicStruct5>(0, 0)
 }
 
 /// Save a GenericStruct<u32> structure to storage
@@ -430,7 +430,7 @@ public fun save_generic_struct_32(
 
 /// Read a GenericStruct<u32> structure from storage
 public fun read_generic_struct_32(): GenericStruct<u32> {
-    read_slot<GenericStruct<u32>>(0)
+    read_slot<GenericStruct<u32>>(0, 0)
 }
 
 // ============================================================================
@@ -456,7 +456,7 @@ public fun save_foo(ctx: &mut TxContext) {
 
 /// Read a Foo structure from storage
 public fun read_foo(): Foo {
-    read_slot<Foo>(0)
+    read_slot<Foo>(0, 0)
 }
 
 /// Save a MegaFoo structure to storage
@@ -485,7 +485,7 @@ public fun save_mega_foo(ctx: &mut TxContext) {
 
 /// Read a MegaFoo structure from storage
 public fun read_mega_foo(): MegaFoo {
-    read_slot<MegaFoo>(0)
+    read_slot<MegaFoo>(0, 0)
 }
 
 /// Save a Var structure to storage
@@ -534,7 +534,7 @@ public fun save_var(ctx: &mut TxContext) {
 
 /// Read a Var structure from storage
 public fun read_var(): Var {
-    read_slot<Var>(0)
+    read_slot<Var>(0, 0)
 }
 
 public fun save_generic_wrapper_32(ctx: &mut TxContext) {
@@ -548,5 +548,5 @@ public fun save_generic_wrapper_32(ctx: &mut TxContext) {
 }
 
 public fun read_generic_wrapper_32(): GenericWrapper<u32> {
-    read_slot<GenericWrapper<u32>>(0)
+    read_slot<GenericWrapper<u32>>(0, 0)
 }

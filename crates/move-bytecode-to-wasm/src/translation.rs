@@ -14,7 +14,9 @@ pub mod table;
 use crate::{
     CompilationContext,
     compilation_context::{ModuleData, ModuleId},
-    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET},
+    data::{
+        DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
+    },
     error_encoding::build_error_message,
     generics::{instantiate_vec_type_parameters, replace_type_parameters, type_contains_generics},
     hostio::host_functions::storage_flush_cache,
@@ -1489,6 +1491,7 @@ fn translate_instruction(
                                 .get(module, Some(compilation_ctx));
 
                             let struct_ptr = module.locals.add(ValType::I32);
+                            
                             builder
                                 .local_get(function_locals[arg_index])
                                 .load(
@@ -1522,11 +1525,25 @@ fn translate_instruction(
                                     let save_in_slot_fn = RuntimeFunction::EncodeAndSaveInStorage
                                         .get_generic(module, compilation_ctx, &[itype]);
 
+                                    // else_.i32_const(DATA_SLOT_DATA_PTR_OFFSET).i32_const(0).i32_const(32).memory_fill(compilation_ctx.memory_id);
+
+                                    let slot_ptr = module.locals.add(ValType::I32);
+                                    else_
+                                        .i32_const(32)
+                                        .call(compilation_ctx.allocator)
+                                        .local_tee(slot_ptr)
+                                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                                        .i32_const(32)
+                                        .memory_copy(
+                                            compilation_ctx.memory_id,
+                                            compilation_ctx.memory_id,
+                                        );
+
                                     // Load the struct memory representation to pass it to the save
                                     // function
                                     else_
                                         .local_get(struct_ptr)
-                                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                                        .local_get(slot_ptr)
                                         .call(save_in_slot_fn);
                                 },
                             );

@@ -666,11 +666,17 @@ pub fn add_read_struct_from_storage_fn(
         .get_struct_by_intermediate_type(itype)
         .unwrap();
 
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
     let mut builder = function.name(name).func_body();
 
     let slot_ptr = module.locals.add(ValType::I32);
+    let uid_ptr = module.locals.add(ValType::I32);
     let read_bytes_in_slot = module.locals.add(ValType::I32);
+
     builder.i32_const(0).local_set(read_bytes_in_slot);
 
     let struct_ptr = add_read_and_decode_storage_struct_instructions(
@@ -678,6 +684,7 @@ pub fn add_read_struct_from_storage_fn(
         &mut builder,
         compilation_ctx,
         slot_ptr,
+        uid_ptr,
         &struct_,
         false,
         read_bytes_in_slot,
@@ -685,7 +692,7 @@ pub fn add_read_struct_from_storage_fn(
 
     builder.local_get(struct_ptr);
 
-    function.finish(vec![slot_ptr], &mut module.funcs)
+    function.finish(vec![slot_ptr, uid_ptr], &mut module.funcs)
 }
 
 /// Generates a function that deletes an object from storage.

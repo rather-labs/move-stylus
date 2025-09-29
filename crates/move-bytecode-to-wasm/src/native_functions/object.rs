@@ -260,16 +260,26 @@ pub fn add_delete_storage_struct_instructions(
 
     // Iterate over the fields of the struct and delete them
     for field in struct_.fields.iter() {
-        let field_size = field_size(field, compilation_ctx) as i32;
-        add_delete_field_instructions(
-            module,
-            builder,
-            compilation_ctx,
-            slot_ptr,
+        if matches!(
             field,
-            field_size,
-            used_bytes_in_slot,
-        );
+            IntermediateType::IStruct { module_id, index, ..}
+                | IntermediateType::IGenericStructInstance { module_id, index, ..}
+                    if Uid::is_vm_type(module_id, *index, compilation_ctx)
+                        || NamedId::is_vm_type(module_id, *index, compilation_ctx))
+        {
+            // Nothing to do as we are not saving the UID anymore
+        } else {
+            let field_size = field_size(field, compilation_ctx) as i32;
+            add_delete_field_instructions(
+                module,
+                builder,
+                compilation_ctx,
+                slot_ptr,
+                field,
+                field_size,
+                used_bytes_in_slot,
+            );
+        }
     }
 
     // Wipe out the last slot before exiting
