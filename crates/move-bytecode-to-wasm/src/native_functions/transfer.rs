@@ -453,6 +453,7 @@ fn add_delete_new_wrapped_objects_instructions(
                     builder.block(None, |block| {
                         let block_id = block.id();
 
+                        let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
                         let equality_fn =
                             RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
                         let get_id_bytes_ptr_fn =
@@ -483,6 +484,14 @@ fn add_delete_new_wrapped_objects_instructions(
                             .i32_const(32)
                             .binop(BinaryOp::I32Sub)
                             .local_set(child_struct_owner_ptr);
+
+                        // Check if the owner is zero (means there's no owner, so we don't need to delete anything)
+                        // This can happen if we have just created the struct and not transfered it yet.
+                        block
+                            .local_get(child_struct_owner_ptr)
+                            .i32_const(32)
+                            .call(is_zero_fn)
+                            .br_if(block_id);
 
                         // Verify if the owner of the child struct matches the ID of the parent struct.
                         // If they differ, it indicates that the child struct has been just wrapped into the wrapper struct
