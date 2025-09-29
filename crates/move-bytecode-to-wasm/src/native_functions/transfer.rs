@@ -18,6 +18,7 @@ use crate::{
 use super::NativeFunction;
 
 /// Adds the instructions to transfer an object to a recipient.
+/// This implies deleting the object from the original owner's mapping and adding it to the recipient's mapping.
 pub fn add_transfer_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -98,16 +99,36 @@ pub fn add_transfer_object_fn(
         block.local_get(struct_ptr).call(delete_object_fn);
     });
 
-    // If the struct has wrapped objects, those objects need to be deleted from the current owner's mapping too,
-    // as they are being transfered to the recipient's mapping
-    add_delete_wrapped_objects_instructions(
+    // If the struct has objects that were just wrapped into another struct, we need to delete those too from storage.
+    //
+    // Example: The Object 'obj' is initially owned by the sender. It is then passed as a value to the 'request_swap' function,
+    // where it gets wrapped within the 'SwapRequest' struct. This struct is subsequently transferred to the service address.
+    // In this scenario, 'obj' must be removed from the sender's ownership mapping (the original owner) because the 'SwapRequest' struct is now the actual owner.
+    //
+    // public fun request_swap(
+    //     obj: Object,
+    //     service: address,
+    //     fee: u64,
+    //     ctx: &mut TxContext,
+    // ) {
+    //     assert!(fee >= MIN_FEE, EFeeTooLow);
+
+    //     let request = SwapRequest {
+    //         id: object::new(ctx),
+    //         owner: ctx.sender(),
+    //         object: obj,
+    //         fee,
+    //     };
+
+    //     transfer::transfer(request, service)
+    // }
+    add_delete_new_wrapped_objects_instructions(
         module,
         &mut builder,
         compilation_ctx,
         struct_ptr,
         itype,
     );
-
     // Update the object ownership in memory to the recipient's address
     builder
         .local_get(owner_ptr)
@@ -219,9 +240,7 @@ pub fn add_share_object_fn(
                     block.local_get(struct_ptr).call(delete_object_fn);
                 });
 
-                // If the struct has wrapped objects, those objects need to be deleted from the current owner's mapping too,
-                // as they are being transfered to the shared mapping
-                add_delete_wrapped_objects_instructions(
+                add_delete_new_wrapped_objects_instructions(
                     module,
                     else_,
                     compilation_ctx,
@@ -346,9 +365,7 @@ pub fn add_freeze_object_fn(
                     block.local_get(struct_ptr).call(delete_object_fn);
                 });
 
-                // If the struct has wrapped objects, those objects need to be deleted from the current owner's mapping too,
-                // as they are being transfered to the frozen mapping
-                add_delete_wrapped_objects_instructions(
+                add_delete_new_wrapped_objects_instructions(
                     module,
                     else_,
                     compilation_ctx,
@@ -391,9 +408,8 @@ pub fn add_freeze_object_fn(
     function.finish(vec![struct_ptr], &mut module.funcs)
 }
 
-/// Helper function to delete wrapped objects from storage.
-/// Useful when transfering an object with wrapped objects.
-fn add_delete_wrapped_objects_instructions(
+/// Helper function to delete objects that were just wrapped into another struct from storage.
+fn add_delete_new_wrapped_objects_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
@@ -404,9 +420,9 @@ fn add_delete_wrapped_objects_instructions(
         .get_struct_by_intermediate_type(itype)
         .unwrap();
 
-    let mut offset: i32 = 0;
     // Iterate over the fields of the struct
     // If the field is a struct with key ability, delete it from storage
+    let mut offset: i32 = 0;
     for field in struct_.fields.iter() {
         match field {
             IntermediateType::IStruct {
@@ -429,35 +445,64 @@ fn add_delete_wrapped_objects_instructions(
                         child_struct.clone()
                     };
 
-                // If the child struct has 'key' ability, we need to delete it from storage
+                // If the child struct has the 'key' ability,
+                // verify if its owner matches the ID of the wrapper struct.
+                // If they match, it means that the wrapped object was already owned by the wrapper struct,
+                // and no further action is required.
                 if child_struct.has_key {
-                    let child_struct_ptr = module.locals.add(ValType::I32);
-                    // Get the pointer to the child struct
-                    builder
-                        .local_get(struct_ptr)
-                        .i32_const(offset)
-                        .binop(BinaryOp::I32Add)
-                        // Load the intermediate pointer to the child struct
-                        .load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        )
-                        .local_set(child_struct_ptr);
+                    builder.block(None, |block| {
+                        let block_id = block.id();
 
-                    // Get the delete function for the child struct
-                    let delete_wrapped_object_fn = RuntimeFunction::DeleteFromStorage.get_generic(
-                        module,
-                        compilation_ctx,
-                        &[field],
-                    );
+                        let equality_fn =
+                            RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+                        let get_id_bytes_ptr_fn =
+                            RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
 
-                    builder
-                        .local_get(child_struct_ptr)
-                        .call(delete_wrapped_object_fn);
+                        let child_struct_ptr = module.locals.add(ValType::I32);
+                        let child_struct_owner_ptr = module.locals.add(ValType::I32);
+
+                        // Get the pointer to the child struct
+                        block
+                            .local_get(struct_ptr)
+                            .i32_const(offset)
+                            .binop(BinaryOp::I32Add)
+                            // Load the intermediate pointer to the child struct
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            )
+                            .local_set(child_struct_ptr);
+
+                        // Get the pointer to the child struct owner
+                        block
+                            .local_get(child_struct_ptr)
+                            .i32_const(32)
+                            .binop(BinaryOp::I32Sub)
+                            .local_set(child_struct_owner_ptr);
+
+                        // Verify if the owner of the child struct matches the ID of the parent struct.
+                        // If they differ, it indicates that the child struct has been just wrapped into the wrapper struct
+                        // and should be removed from the original owner's storage mapping.
+                        block
+                            .local_get(struct_ptr)
+                            .call(get_id_bytes_ptr_fn)
+                            .local_get(child_struct_owner_ptr)
+                            .i32_const(32)
+                            .call(equality_fn)
+                            .br_if(block_id);
+
+                        // Get the delete function for the child struct
+                        let delete_wrapped_object_fn = RuntimeFunction::DeleteFromStorage
+                            .get_generic(module, compilation_ctx, &[field]);
+
+                        block
+                            .local_get(child_struct_ptr)
+                            .call(delete_wrapped_object_fn);
+                    });
                 }
             }
             _ => {}
