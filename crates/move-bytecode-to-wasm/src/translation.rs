@@ -14,9 +14,7 @@ pub mod table;
 use crate::{
     CompilationContext,
     compilation_context::{ModuleData, ModuleId},
-    data::{
-        DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
-    },
+    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET},
     error_encoding::build_error_message,
     generics::{instantiate_vec_type_parameters, replace_type_parameters, type_contains_generics},
     hostio::host_functions::storage_flush_cache,
@@ -1491,7 +1489,7 @@ fn translate_instruction(
                                 .get(module, Some(compilation_ctx));
 
                             let struct_ptr = module.locals.add(ValType::I32);
-                            
+
                             builder
                                 .local_get(function_locals[arg_index])
                                 .load(

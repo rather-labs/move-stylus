@@ -55,7 +55,31 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                     if Uid::is_vm_type(module_id, *index, compilation_ctx)
                         || NamedId::is_vm_type(module_id, *index, compilation_ctx))
         {
-            // Nothing to do as we are not saving the UID anymore
+            if struct_.fields.len() == 1 {
+                let get_struct_id_fn =
+                    RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+                // This is a unique scenario where the struct contains only a UID field.
+                // The problem arises because UIDs are not stored in the storage, resulting in no data being saved for this struct.
+                // Consequently, when the `locate_storage_data` function is called to retrieve the struct from storage, it emits a trap due to the slot being empty.
+                // To prevent this issue, we explicitly write the UID into the designated storage slot.
+                let child_struct_id_ptr = module.locals.add(ValType::I32);
+
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_set(child_struct_id_ptr);
+
+                builder
+                    .local_get(struct_ptr)
+                    .call(get_struct_id_fn)
+                    .local_set(child_struct_id_ptr);
+
+                builder
+                    .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                    .local_get(child_struct_id_ptr)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+            }
         } else {
             let field_size = field_size(field, compilation_ctx);
             builder
