@@ -62,6 +62,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                 // The problem arises because UIDs are not stored in the storage, resulting in no data being saved for this struct.
                 // Consequently, when the `locate_storage_data` function is called to retrieve the struct from storage, it emits a trap due to the slot being empty.
                 // To prevent this issue, we explicitly write the UID into the designated storage slot.
+                // TODO: this is a temporary workaround. Later when we write the typehash to the storage, we will not need this anymore.
                 let child_struct_id_ptr = module.locals.add(ValType::I32);
 
                 builder

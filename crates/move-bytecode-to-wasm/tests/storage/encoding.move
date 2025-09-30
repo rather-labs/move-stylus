@@ -89,6 +89,7 @@ public struct DynamicStruct has key {
 /// Test structure with various vector types
 public struct DynamicStruct2 has key {
     id: UID,
+    fake_id: u256,
     a: vector<bool>,
     b: vector<u8>,
     c: vector<u16>,
@@ -102,6 +103,7 @@ public struct DynamicStruct2 has key {
 /// Test structure with nested vectors
 public struct DynamicStruct3 has key {
     id: UID,
+    fake_id: u256,
     a: vector<vector<u8>>,
     b: vector<vector<u32>>,
     c: vector<vector<u64>>,
@@ -111,6 +113,7 @@ public struct DynamicStruct3 has key {
 /// Test structure with nested struct vectors
 public struct DynamicStruct4 has key {
     id: UID,
+    fake_id: u256,
     a: vector<DynamicNestedStructChild>,
     b: vector<StaticNestedStructChild>,
 }
@@ -118,6 +121,7 @@ public struct DynamicStruct4 has key {
 /// Test structure with complex nested wrappers
 public struct DynamicStruct5 has key {
     id: UID,
+    fake_id: u256,
     a: vector<NestedStructChildWrapper>,
 }
 
@@ -204,8 +208,8 @@ public fun save_static_fields(
 }
 
 /// Read a StaticFields structure from storage
-public fun read_static_fields(): StaticFields {
-    read_slot<StaticFields>(0, 0)
+public fun read_static_fields(uid: u256): StaticFields {
+    read_slot<StaticFields>(0, uid)
 }
 
 /// Save a StaticFields2 structure to storage
@@ -225,8 +229,8 @@ public fun save_static_fields_2(
 }
 
 /// Read a StaticFields2 structure from storage
-public fun read_static_fields_2(): StaticFields2 {
-    read_slot<StaticFields2>(0, 0)
+public fun read_static_fields_2(uid: u256): StaticFields2 {
+    read_slot<StaticFields2>(0, uid)
 }
 
 /// Save a StaticFields3 structure to storage
@@ -245,8 +249,8 @@ public fun save_static_fields_3(
 }
 
 /// Read a StaticFields3 structure from storage
-public fun read_static_fields_3(): StaticFields3 {
-    read_slot<StaticFields3>(0, 0)
+public fun read_static_fields_3(uid: u256): StaticFields3 {
+    read_slot<StaticFields3>(0, uid)
 }
 
 /// Save a StaticNestedStruct structure to storage
@@ -268,8 +272,8 @@ public fun save_static_nested_struct(
 }
 
 /// Read a StaticNestedStruct structure from storage
-public fun read_static_nested_struct(): StaticNestedStruct {
-    read_slot<StaticNestedStruct>(0, 0)
+public fun read_static_nested_struct(uid: u256): StaticNestedStruct {
+    read_slot<StaticNestedStruct>(0, uid)
 }
 
 // ============================================================================
@@ -295,12 +299,13 @@ public fun save_dynamic_struct(
 }
 
 /// Read a DynamicStruct structure from storage
-public fun read_dynamic_struct(): DynamicStruct {
-    read_slot<DynamicStruct>(0, 0)
+public fun read_dynamic_struct(uid: u256): DynamicStruct {
+    read_slot<DynamicStruct>(0, uid)
 }
 
 /// Save a DynamicStruct2 structure to storage
 public fun save_dynamic_struct_2(
+    fake_id: u256,
     a: vector<bool>,
     b: vector<u8>,
     c: vector<u16>,
@@ -313,18 +318,19 @@ public fun save_dynamic_struct_2(
 ) {
     let struct_ = DynamicStruct2 { 
         id: object::new(ctx), 
-        a, b, c, d, e, f, g, h 
+        fake_id, a, b, c, d, e, f, g, h 
     };
     save_in_slot(struct_, 0);
 }
 
 /// Read a DynamicStruct2 structure from storage
-public fun read_dynamic_struct_2(): DynamicStruct2 {
-    read_slot<DynamicStruct2>(0, 0)
+public fun read_dynamic_struct_2(uid: u256): DynamicStruct2 {
+    read_slot<DynamicStruct2>(0, uid)
 }
 
 /// Save a DynamicStruct3 structure to storage
 public fun save_dynamic_struct_3(
+    fake_id: u256,
     a: vector<vector<u8>>,
     b: vector<vector<u32>>,
     c: vector<vector<u64>>,
@@ -333,18 +339,19 @@ public fun save_dynamic_struct_3(
 ) {
     let struct_ = DynamicStruct3 { 
         id: object::new(ctx), 
-        a, b, c, d 
+        fake_id, a, b, c, d 
     };
     save_in_slot(struct_, 0);
 }
 
 /// Read a DynamicStruct3 structure from storage
-public fun read_dynamic_struct_3(): DynamicStruct3 {
-    read_slot<DynamicStruct3>(0, 0)
+public fun read_dynamic_struct_3(uid: u256): DynamicStruct3 {
+    read_slot<DynamicStruct3>(0, uid)
 }
 
 /// Save a DynamicStruct4 structure to storage
 public fun save_dynamic_struct_4(
+    fake_id: u256,
     x: vector<u32>,
     y: u64,
     z: u128,
@@ -362,18 +369,19 @@ public fun save_dynamic_struct_4(
     ];
     let struct_ = DynamicStruct4 { 
         id: object::new(ctx), 
-        a, b 
+        fake_id, a, b 
     };
     save_in_slot(struct_, 0);
 }
 
 /// Read a DynamicStruct4 structure from storage
-public fun read_dynamic_struct_4(): DynamicStruct4 {
-    read_slot<DynamicStruct4>(0, 0)
+public fun read_dynamic_struct_4(uid: u256): DynamicStruct4 {
+    read_slot<DynamicStruct4>(0, uid)
 }
 
 /// Save a DynamicStruct5 structure to storage
 public fun save_dynamic_struct_5(
+    fake_id: u256,
     x: u32,
     y: u64,
     z: u128,
@@ -405,14 +413,14 @@ public fun save_dynamic_struct_5(
     ];
     let struct_ = DynamicStruct5 { 
         id: object::new(ctx), 
-        a 
+        fake_id, a 
     };
     save_in_slot(struct_, 0);
 }
 
 /// Read a DynamicStruct5 structure from storage
-public fun read_dynamic_struct_5(): DynamicStruct5 {
-    read_slot<DynamicStruct5>(0, 0)
+public fun read_dynamic_struct_5(uid: u256): DynamicStruct5 {
+    read_slot<DynamicStruct5>(0, uid)
 }
 
 /// Save a GenericStruct<u32> structure to storage
@@ -429,8 +437,8 @@ public fun save_generic_struct_32(
 }
 
 /// Read a GenericStruct<u32> structure from storage
-public fun read_generic_struct_32(): GenericStruct<u32> {
-    read_slot<GenericStruct<u32>>(0, 0)
+public fun read_generic_struct_32(uid: u256): GenericStruct<u32> {
+    read_slot<GenericStruct<u32>>(0, uid)
 }
 
 // ============================================================================
@@ -454,9 +462,10 @@ public fun save_foo(ctx: &mut TxContext) {
     save_in_slot(foo, 0);
 }
 
-/// Read a Foo structure from storage
-public fun read_foo(): Foo {
-    read_slot<Foo>(0, 0)
+
+/// Read a Foo structure from storage with a specific UID pointer
+public fun read_foo(uid: u256): Foo {
+    read_slot<Foo>(0, uid)
 }
 
 /// Save a MegaFoo structure to storage
@@ -484,8 +493,8 @@ public fun save_mega_foo(ctx: &mut TxContext) {
 }
 
 /// Read a MegaFoo structure from storage
-public fun read_mega_foo(): MegaFoo {
-    read_slot<MegaFoo>(0, 0)
+public fun read_mega_foo(uid: u256): MegaFoo {
+    read_slot<MegaFoo>(0, uid)
 }
 
 /// Save a Var structure to storage
@@ -533,8 +542,8 @@ public fun save_var(ctx: &mut TxContext) {
 }
 
 /// Read a Var structure from storage
-public fun read_var(): Var {
-    read_slot<Var>(0, 0)
+public fun read_var(uid: u256): Var {
+    read_slot<Var>(0, uid)
 }
 
 public fun save_generic_wrapper_32(ctx: &mut TxContext) {
@@ -547,6 +556,6 @@ public fun save_generic_wrapper_32(ctx: &mut TxContext) {
     save_in_slot(wrapper, 0);
 }
 
-public fun read_generic_wrapper_32(): GenericWrapper<u32> {
-    read_slot<GenericWrapper<u32>>(0, 0)
+public fun read_generic_wrapper_32(uid: u256): GenericWrapper<u32> {
+    read_slot<GenericWrapper<u32>>(0, uid)
 }
