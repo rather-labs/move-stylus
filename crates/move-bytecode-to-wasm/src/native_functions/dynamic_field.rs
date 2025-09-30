@@ -76,7 +76,6 @@ pub fn add_child_object_fn(
 /// Arguments
 /// * `parent_uid` - i32 pointer to the parent object's UID in memory
 /// * `child_id` - i32 pointer to the child ID in memory
-/// *
 ///
 /// Returns
 /// * i32 pointer to a reference to the borrowed object's data in memory

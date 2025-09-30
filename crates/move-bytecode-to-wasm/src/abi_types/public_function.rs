@@ -126,6 +126,8 @@ impl<'a> PublicFunction<'a> {
             // Stack: [return_data_pointer] [return_data_length]
             block.call(write_return_data_function);
 
+            // TODO: This is repeated for every function, we should move this and the return below
+            // outside this into the main body of the entrypoint so we don't needlesly repeat code
             let commit_changes_to_storage_function =
                 RuntimeFunction::get_commit_changes_to_storage_fn(
                     module,

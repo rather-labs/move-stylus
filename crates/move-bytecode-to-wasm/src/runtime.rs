@@ -300,6 +300,12 @@ impl RuntimeFunction {
         }
     }
 
+    /// Links the function `commit_changes_to_storage` into the module and returns its id.
+    ///
+    /// This funciton is idempotent.
+    ///
+    /// It is not possible to obtain this function with the `get` method because it need the extra
+    /// parameter `dynamic_fields_global_variables`
     pub fn get_commit_changes_to_storage_fn(
         module: &mut Module,
         compilation_ctx: &CompilationContext,

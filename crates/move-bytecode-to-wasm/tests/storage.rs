@@ -3376,8 +3376,6 @@ mod dynamic_storage_fields {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        // runtime.print_storage();
-
         // Read modified dynamic fields
         let call_data = readDynamicFieldCall::new((object_id, field_name_1)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();

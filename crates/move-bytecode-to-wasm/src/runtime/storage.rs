@@ -1243,6 +1243,13 @@ mod tests {
     }
 }
 
+/// This function loops over all the mutably borrowed dynamic fields and save their changes into
+/// the storage's cache.
+///
+/// After that, it flushes the cache, commiting the changes made for common storage structures (the
+/// changes are saved in the `Ret` function that obtains them) and dynamic fields.
+///
+/// This function is executed after the the entrypoint called function finishes.
 pub fn add_commit_changes_to_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

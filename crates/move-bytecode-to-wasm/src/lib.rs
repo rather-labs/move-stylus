@@ -85,9 +85,13 @@ pub fn translate_package(
 
     // TODO: a lot of clones, we must create a symbol pool
     for root_compiled_module in &root_compiled_units {
-        // This is used to keep track of dynamic fields global variables that were retrieved from
-        // storage as mutable. This vector is used at the end of the entrypoint function to save
-        // the possible changes made to those variables.
+        // This is used to keep track of dynamic fields were retrieved from storage as mutable.
+        // This vector is used at the end of the entrypoint function to commit the possible changes
+        // made to those variables. The variables will be declared in the source code even if the
+        // code does not follow a path that executes a borrow_mut function for dynamic fields. The
+        // value of those variables will be:
+        // - a pointer to the dynamic field
+        // - -1 if the code never executed borrow_mut for that variable
         let mut dynamic_fields_global_variables: Vec<(GlobalId, IntermediateType)> = Vec::new();
 
         let module_name = root_compiled_module.unit.name.to_string();
