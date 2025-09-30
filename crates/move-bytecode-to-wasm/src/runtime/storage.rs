@@ -802,6 +802,87 @@ pub fn get_struct_owner_fn(
     function.finish(vec![struct_ptr], &mut module.funcs)
 }
 
+/// This function loops over all the mutably borrowed dynamic fields and save their changes into
+/// the storage's cache.
+///
+/// After that, it flushes the cache, commiting the changes made for common storage structures (the
+/// changes are saved in the `Ret` function that obtains them) and dynamic fields.
+///
+/// This function is executed after the the entrypoint called function finishes.
+pub fn add_commit_changes_to_storage_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::CommitChangesToStorage.name().to_owned())
+        .func_body();
+
+    let (storage_flush_cache, _) = storage_flush_cache(module);
+
+    // If we have dynamic fields to process, we put the code to process them.
+    if !dynamic_fields_global_variables.is_empty() {
+        let get_struct_owner_fn =
+            RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
+        let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+        let write_object_slot_fn =
+            RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+        let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
+
+        let owner_ptr = module.locals.add(ValType::I32);
+
+        for (dynamic_field_ptr, itype) in dynamic_fields_global_variables {
+            let save_struct_into_storage_fn = RuntimeFunction::EncodeAndSaveInStorage.get_generic(
+                module,
+                compilation_ctx,
+                &[itype],
+            );
+
+            builder.block(None, |block| {
+                let block_id = block.id();
+                // The global id can be declares but never filled because the path that the code
+                // took never called the borrow_mut function. In that case it will have assigned te
+                // -1 value, we skip processing it
+                block
+                    .global_get(*dynamic_field_ptr)
+                    .i32_const(-1)
+                    .binop(BinaryOp::I32Eq)
+                    .br_if(block_id);
+
+                // Calculate the destiny slot
+
+                // Put in stack the parent address
+                block
+                    .global_get(*dynamic_field_ptr)
+                    .call(get_struct_owner_fn)
+                    .local_tee(owner_ptr);
+
+                // If the owner id is all zeroes, means the struct has no owner, and probably was
+                // deleted from storage, so we skip the save
+                block.i32_const(32).call(is_zero_fn).br_if(block_id);
+
+                // Put in the stack the field id
+                block
+                    .local_get(owner_ptr)
+                    .global_get(*dynamic_field_ptr)
+                    .call(get_id_bytes_ptr_fn)
+                    .call(write_object_slot_fn);
+
+                // Save struct changes
+                block
+                    .global_get(*dynamic_field_ptr)
+                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .call(save_struct_into_storage_fn);
+            });
+        }
+    }
+
+    builder.i32_const(1).call(storage_flush_cache);
+
+    function.finish(vec![], &mut module.funcs)
+}
+
 // The expected slot values were calculated using Remix to ensure the tests are correct.
 #[cfg(test)]
 mod tests {
@@ -1241,85 +1322,4 @@ mod tests {
 
         assert_eq!(result, expected);
     }
-}
-
-/// This function loops over all the mutably borrowed dynamic fields and save their changes into
-/// the storage's cache.
-///
-/// After that, it flushes the cache, commiting the changes made for common storage structures (the
-/// changes are saved in the `Ret` function that obtains them) and dynamic fields.
-///
-/// This function is executed after the the entrypoint called function finishes.
-pub fn add_commit_changes_to_storage_fn(
-    module: &mut Module,
-    compilation_ctx: &CompilationContext,
-    dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
-) -> FunctionId {
-    let mut function = FunctionBuilder::new(&mut module.types, &[], &[]);
-    let mut builder = function
-        .name(RuntimeFunction::CommitChangesToStorage.name().to_owned())
-        .func_body();
-
-    let (storage_flush_cache, _) = storage_flush_cache(module);
-
-    // If we have dynamic fields to process, we put the code to process them.
-    if !dynamic_fields_global_variables.is_empty() {
-        let get_struct_owner_fn =
-            RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
-        let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
-        let write_object_slot_fn =
-            RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-        let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
-
-        let owner_ptr = module.locals.add(ValType::I32);
-
-        for (dynamic_field_ptr, itype) in dynamic_fields_global_variables {
-            let save_struct_into_storage_fn = RuntimeFunction::EncodeAndSaveInStorage.get_generic(
-                module,
-                compilation_ctx,
-                &[itype],
-            );
-
-            builder.block(None, |block| {
-                let block_id = block.id();
-                // The global id can be declares but never filled because the path that the code
-                // took never called the borrow_mut function. In that case it will have assigned te
-                // -1 value, we skip processing it
-                block
-                    .global_get(*dynamic_field_ptr)
-                    .i32_const(-1)
-                    .binop(BinaryOp::I32Eq)
-                    .br_if(block_id);
-
-                // Calculate the destiny slot
-
-                // Put in stack the parent address
-                block
-                    .global_get(*dynamic_field_ptr)
-                    .call(get_struct_owner_fn)
-                    .local_tee(owner_ptr);
-
-                // If the owner id is all zeroes, means the struct has no owner, and probably was
-                // deleted from storage, so we skip the save
-                block.i32_const(32).call(is_zero_fn).br_if(block_id);
-
-                // Put in the stack the field id
-                block
-                    .local_get(owner_ptr)
-                    .global_get(*dynamic_field_ptr)
-                    .call(get_id_bytes_ptr_fn)
-                    .call(write_object_slot_fn);
-
-                // Save struct changes
-                block
-                    .global_get(*dynamic_field_ptr)
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                    .call(save_struct_into_storage_fn);
-            });
-        }
-    }
-
-    builder.i32_const(1).call(storage_flush_cache);
-
-    function.finish(vec![], &mut module.funcs)
 }

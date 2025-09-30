@@ -117,10 +117,8 @@ mod tests {
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
     use crate::{
-        test_compilation_context,
-        test_tools::{build_module, get_linker_with_native_keccak256},
-        translation::intermediate_types::ISignature,
-        utils::display_module,
+        test_compilation_context, test_tools::build_module,
+        translation::intermediate_types::ISignature, utils::display_module,
     };
 
     use super::*;
