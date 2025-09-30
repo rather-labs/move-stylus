@@ -179,7 +179,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
             .i32_const(field_size)
             .binop(BinaryOp::I32Add)
             .i32_const(32)
-            .binop(BinaryOp::I32GtS)
+            .binop(BinaryOp::I32GtU)
             .if_else(
                 None,
                 |then| {

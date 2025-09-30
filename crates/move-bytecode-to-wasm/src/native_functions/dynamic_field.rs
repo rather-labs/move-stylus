@@ -1,7 +1,13 @@
 use super::NativeFunction;
 use crate::{
-    CompilationContext, get_generic_function_name,
-    hostio::host_functions::native_keccak256,
+    CompilationContext,
+    data::{
+        DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
+        DATA_STORAGE_OBJECT_OWNER_OFFSET,
+    },
+    get_generic_function_name,
+    hostio::host_functions::{native_keccak256, storage_load_bytes32},
+    runtime::RuntimeFunction,
     translation::intermediate_types::{
         IntermediateType,
         address::IAddress,
@@ -14,6 +20,198 @@ use walrus::{
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
+
+/// Adds a dynamic field for a given parent and child ID
+///
+/// Arguments
+/// * `parent_address` - i32 pointer to the parent object's address in memory
+/// * `child_ptr` - i32 pointer to the child object's data in memory
+pub fn add_child_object_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) -> FunctionId {
+    let name = get_generic_function_name(NativeFunction::NATIVE_ADD_CHILD_OBJECT, &[itype]);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    };
+
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let save_struct_into_storage_fn =
+        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+
+    let mut builder = function.name(name).func_body();
+
+    // Arguments
+    let parent_address = module.locals.add(ValType::I32);
+    let child_ptr = module.locals.add(ValType::I32);
+
+    // Calculate the destiny slot
+    builder
+        .local_get(parent_address)
+        .local_get(child_ptr)
+        .call(get_id_bytes_ptr_fn)
+        .call(write_object_slot_fn);
+
+    // Save the field into storage
+    builder
+        .local_get(child_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(save_struct_into_storage_fn);
+
+    function.finish(vec![parent_address, child_ptr], &mut module.funcs)
+}
+
+// TODO: Check if object exists
+// TODO: Check object type
+/// Borrows a dynamic field's value for a given parent and child ID
+///
+/// NOTE: This function is used for both `borrow_child_object` and `borrow_child_object_mut` since
+/// the underlying implementation is the same. The mutability is handled at a higher level in the
+/// using the type system and does not affect the WebAssembly code generation.
+///
+/// Arguments
+/// * `parent_uid` - i32 pointer to the parent object's UID in memory
+/// * `child_id` - i32 pointer to the child ID in memory
+///
+/// Returns
+/// * i32 pointer to a reference to the borrowed object's data in memory
+pub fn add_borrow_object_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) -> FunctionId {
+    let name = get_generic_function_name(NativeFunction::NATIVE_BORROW_CHILD_OBJECT, &[itype]);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    };
+
+    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let decode_and_read_from_storage_fn =
+        RuntimeFunction::DecodeAndReadFromStorage.get_generic(module, compilation_ctx, &[itype]);
+
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+
+    let mut builder = function.name(name).func_body();
+
+    // Arguments
+    let parent_uid = module.locals.add(ValType::I32);
+    let child_id = module.locals.add(ValType::I32);
+
+    // Calculate the destiny slot
+    builder
+        .local_get(parent_uid)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_tee(parent_uid)
+        .local_get(child_id)
+        .call(write_object_slot_fn);
+
+    // Write the owner
+    builder
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+        .local_get(parent_uid)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+    let result_struct = module.locals.add(ValType::I32);
+
+    // Read from storage
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .call(decode_and_read_from_storage_fn)
+        .local_set(result_struct);
+
+    let result = module.locals.add(ValType::I32);
+    builder
+        .i32_const(4)
+        .call(compilation_ctx.allocator)
+        .local_tee(result)
+        .local_get(result_struct)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    builder.local_get(result);
+
+    function.finish(vec![parent_uid, child_id], &mut module.funcs)
+}
+
+/// Checks if a child object exists for a given parent and child ID
+///
+/// Arguments
+/// * `parent_uid` - i32 pointer to the parent object's UID in memory
+/// * `child_id` - i32 pointer to the child ID in memory
+///
+/// Returns
+/// * i32 - 1 if the child object exists, 0 otherwise
+pub fn add_has_child_object_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+
+    let mut builder = function
+        .name(NativeFunction::NATIVE_HAS_CHILD_OBJECT.to_owned())
+        .func_body();
+
+    let (storage_load, _) = storage_load_bytes32(module);
+    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
+
+    // Arguments
+    let parent_uid = module.locals.add(ValType::I32);
+    let child_id = module.locals.add(ValType::I32);
+
+    // Calculate the destiny slot
+    builder
+        .local_get(parent_uid)
+        .local_get(child_id)
+        .call(write_object_slot_fn);
+
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .call(storage_load);
+
+    builder
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .i32_const(32)
+        .call(is_zero_fn)
+        .negate();
+
+    function.finish(vec![parent_uid, child_id], &mut module.funcs)
+}
 
 /// Computes a keccak256 hash from:
 /// - parent address (32 bytes)

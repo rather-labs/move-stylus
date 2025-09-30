@@ -15,6 +15,31 @@ public fun create_foo(ctx: &mut TxContext) {
     transfer::share_object(foo);
 }
 
+public fun create_foo_owned(ctx: &mut TxContext) {
+    let foo = Foo { id: object::new(ctx) };
+    transfer::transfer(foo, ctx.sender());
+}
+
 public fun attach_dynamic_field(foo: &mut Foo, name: String, value: u64) {
     dynamic_field::add(&mut foo.id, name, value);
+}
+
+public fun read_dynamic_field(foo: &Foo, name: String): &u64 {
+    dynamic_field::borrow(&foo.id, name)
+}
+
+public fun dynamic_field_exists(foo: &Foo, name: String): bool {
+    dynamic_field::exists_(&foo.id, name)
+}
+
+public fun attach_dynamic_field_addr_u256(foo: &mut Foo, name: address, value: u256) {
+    dynamic_field::add(&mut foo.id, name, value);
+}
+
+public fun read_dynamic_field_addr_u256(foo: &Foo, name: address): &u256 {
+    dynamic_field::borrow(&foo.id, name)
+}
+
+public fun dynamic_field_exists_addr_u256(foo: &Foo, name: address): bool {
+    dynamic_field::exists_(&foo.id, name)
 }
