@@ -1,11 +1,12 @@
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
+    FunctionId, GlobalId, InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg},
 };
 
 use crate::{
     CompilationContext,
     data::DATA_ABORT_MESSAGE_PTR_OFFSET,
+    runtime::RuntimeFunction,
     translation::{
         functions::add_unpack_function_return_values_instructions,
         intermediate_types::{ISignature, IntermediateType},
@@ -80,6 +81,7 @@ impl<'a> PublicFunction<'a> {
         write_return_data_function: FunctionId,
         storage_flush_cache_function: FunctionId,
         compilation_ctx: &CompilationContext,
+        dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
     ) {
         router_builder.block(None, |block| {
             let block_id = block.id();
@@ -125,8 +127,15 @@ impl<'a> PublicFunction<'a> {
             // Stack: [return_data_pointer] [return_data_length]
             block.call(write_return_data_function);
 
-            block.i32_const(0); // Do not clear cache
-            block.call(storage_flush_cache_function);
+            let commit_changes_to_storage_function =
+                RuntimeFunction::get_commit_changes_to_storage_fn(
+                    module,
+                    compilation_ctx,
+                    dynamic_fields_global_variables,
+                );
+            block.call(commit_changes_to_storage_function);
+            // block.i32_const(0); // Do not clear cache
+            // block.call(storage_flush_cache_function);
 
             // Return status
             block.local_get(status);

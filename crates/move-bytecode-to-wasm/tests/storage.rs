@@ -3370,11 +3370,13 @@ mod dynamic_storage_fields {
         // Mutatate the values
         let call_data = mutateDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
 
         let call_data = mutateDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
 
-        runtime.print_storage();
+        // runtime.print_storage();
 
         // Read modified dynamic fields
         let call_data = readDynamicFieldCall::new((object_id, field_name_1)).abi_encode();

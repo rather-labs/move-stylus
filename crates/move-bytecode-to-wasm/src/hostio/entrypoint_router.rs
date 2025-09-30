@@ -25,11 +25,8 @@ pub fn build_entrypoint_router(
     let (read_args_function, _) = host_functions::read_args(module);
     let (write_return_data_function, _) = host_functions::write_result(module);
     let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
-    let commit_changes_to_storage_function = RuntimeFunction::get_commit_changes_to_storage_fn(
-        module,
-        compilation_ctx,
-        dynamic_fields_global_variables,
-    );
+
+    let (print_i32, _, _, print_m, print_s, _) = crate::declare_host_debug_functions!(module);
 
     let args_len = module.locals.add(ValType::I32);
     let selector_variable = module.locals.add(ValType::I32);
@@ -39,6 +36,7 @@ pub fn build_entrypoint_router(
 
     let mut router_builder = router.func_body();
 
+    router_builder.i32_const(2).call(print_i32);
     // TODO: handle case where no args data, now we just panic
     router_builder.block(None, |block| {
         let block_id = block.id();
@@ -68,6 +66,7 @@ pub fn build_entrypoint_router(
         },
     );
     router_builder.local_set(selector_variable);
+    router_builder.i32_const(3).call(print_i32);
 
     for function in functions {
         function.build_router_block(
@@ -79,6 +78,7 @@ pub fn build_entrypoint_router(
             write_return_data_function,
             storage_flush_cache_function,
             compilation_ctx,
+            dynamic_fields_global_variables,
         );
     }
 
@@ -106,14 +106,6 @@ pub fn build_entrypoint_router(
         )
         // Write
         .call(write_return_data_function);
-
-    // Flush cache
-    /*
-    router_builder
-        .i32_const(0)
-        .call(storage_flush_cache_function);
-    */
-    router_builder.call(commit_changes_to_storage_function);
 
     // Push the error code and return
     router_builder.i32_const(1).return_();

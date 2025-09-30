@@ -641,13 +641,18 @@ fn translate_instruction(
                         &function_id.module_id,
                         &function_id.identifier,
                     ) {
+                        let (print_i32, _, _, print_m, print_s, _) =
+                            crate::declare_host_debug_functions!(module);
+                        builder.i32_const(333333).call(print_i32);
                         let global_struct_ptr = module.globals.add_local(
                             ValType::I32,
                             true,
                             false,
-                            walrus::ConstExpr::Value(Value::I32(0)),
+                            walrus::ConstExpr::Value(Value::I32(-1)),
                         );
                         let field_ref_ptr = module.locals.add(ValType::I32);
+
+                        println!("added {global_struct_ptr:?}");
 
                         // Set the global that with the boroowed struct pointer
                         builder
@@ -661,6 +666,8 @@ fn translate_instruction(
                                 },
                             )
                             .global_set(global_struct_ptr);
+
+                        builder.global_get(global_struct_ptr).call(print_i32);
 
                         dynamic_fields_global_variables
                             .push((global_struct_ptr, type_instantiations[0].clone()));
