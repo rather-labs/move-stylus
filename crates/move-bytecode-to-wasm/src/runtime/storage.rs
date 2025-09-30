@@ -1253,42 +1253,63 @@ pub fn add_commit_changes_to_storage_fn(
         .name(RuntimeFunction::CommitChangesToStorage.name().to_owned())
         .func_body();
 
-    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
-    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
     let (storage_flush_cache, _) = storage_flush_cache(module);
 
-    for (dynamic_field_ptr, itype) in dynamic_fields_global_variables {
-        let save_struct_into_storage_fn =
-            RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
+    // If we have dynamic fields to process, we put the code to process them.
+    if !dynamic_fields_global_variables.is_empty() {
+        let get_struct_owner_fn =
+            RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
+        let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+        let write_object_slot_fn =
+            RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+        let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
 
-        builder.block(None, |block| {
-            let block_id = block.id();
-            block
-                .global_get(*dynamic_field_ptr)
-                .i32_const(-1)
-                .binop(BinaryOp::I32Eq)
-                .br_if(block_id);
+        let owner_ptr = module.locals.add(ValType::I32);
 
-            // Calculate the destiny slot
+        for (dynamic_field_ptr, itype) in dynamic_fields_global_variables {
+            let save_struct_into_storage_fn = RuntimeFunction::EncodeAndSaveInStorage.get_generic(
+                module,
+                compilation_ctx,
+                &[itype],
+            );
 
-            // Put in stack the parent address
-            block
-                .global_get(*dynamic_field_ptr)
-                .i32_const(32)
-                .binop(BinaryOp::I32Sub);
+            builder.block(None, |block| {
+                let block_id = block.id();
+                // The global id can be declares but never filled because the path that the code
+                // took never called the borrow_mut function. In that case it will have assigned te
+                // -1 value, we skip processing it
+                block
+                    .global_get(*dynamic_field_ptr)
+                    .i32_const(-1)
+                    .binop(BinaryOp::I32Eq)
+                    .br_if(block_id);
 
-            // Put in the stack the field id
-            block
-                .global_get(*dynamic_field_ptr)
-                .call(get_id_bytes_ptr_fn)
-                .call(write_object_slot_fn);
+                // Calculate the destiny slot
 
-            // Save struct changes
-            block
-                .global_get(*dynamic_field_ptr)
-                .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                .call(save_struct_into_storage_fn);
-        });
+                // Put in stack the parent address
+                block
+                    .global_get(*dynamic_field_ptr)
+                    .call(get_struct_owner_fn)
+                    .local_tee(owner_ptr);
+
+                // If the owner id is all zeroes, means the struct has no owner, and probably was
+                // deleted from storage, so we skip the save
+                block.i32_const(32).call(is_zero_fn).br_if(block_id);
+
+                // Put in the stack the field id
+                block
+                    .local_get(owner_ptr)
+                    .global_get(*dynamic_field_ptr)
+                    .call(get_id_bytes_ptr_fn)
+                    .call(write_object_slot_fn);
+
+                // Save struct changes
+                block
+                    .global_get(*dynamic_field_ptr)
+                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .call(save_struct_into_storage_fn);
+            });
+        }
     }
 
     builder.i32_const(1).call(storage_flush_cache);
