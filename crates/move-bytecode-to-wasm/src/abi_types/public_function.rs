@@ -79,7 +79,6 @@ impl<'a> PublicFunction<'a> {
         args_pointer: LocalId,
         args_len: LocalId,
         write_return_data_function: FunctionId,
-        storage_flush_cache_function: FunctionId,
         compilation_ctx: &CompilationContext,
         dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
     ) {
@@ -134,8 +133,6 @@ impl<'a> PublicFunction<'a> {
                     dynamic_fields_global_variables,
                 );
             block.call(commit_changes_to_storage_function);
-            // block.i32_const(0); // Do not clear cache
-            // block.call(storage_flush_cache_function);
 
             // Return status
             block.local_get(status);
@@ -335,6 +332,35 @@ mod tests {
         linker
             .func_wrap(
                 "vm_hooks",
+                "native_keccak256",
+                |mut caller: wasmtime::Caller<'_, ()>,
+                 input_data_ptr: u32,
+                 data_length: u32,
+                 return_data_ptr: u32| {
+                    let memory = match caller.get_export("memory") {
+                        Some(wasmtime::Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    let mut input_data = vec![0; data_length as usize];
+                    memory
+                        .read(&caller, input_data_ptr as usize, &mut input_data)
+                        .unwrap();
+
+                    let hash = alloy_primitives::keccak256(input_data);
+
+                    memory
+                        .write(&mut caller, return_data_ptr as usize, hash.as_slice())
+                        .unwrap();
+
+                    Ok(())
+                },
+            )
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
                 "write_result",
                 move |mut caller: Caller<'_, ()>,
                       return_data_pointer: u32,
@@ -424,7 +450,6 @@ mod tests {
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
         // Build mock router
         let (write_return_data_function, _) = host_functions::write_result(module);
-        let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
 
         let selector = module.locals.add(ValType::I32);
         let args_pointer = module.locals.add(ValType::I32);
@@ -464,8 +489,8 @@ mod tests {
             args_pointer,
             args_len,
             write_return_data_function,
-            storage_flush_cache_function,
             &compilation_ctx,
+            &vec![],
         );
 
         // if no match, return -1

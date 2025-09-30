@@ -17,8 +17,8 @@ use crate::{
 };
 
 use walrus::{
-    FunctionBuilder, FunctionId, GlobalId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, StoreKind, Value},
+    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 /// Adds a dynamic field for a given parent and child ID

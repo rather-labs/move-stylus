@@ -1243,8 +1243,6 @@ mod tests {
     }
 }
 
-// TODO: We probably want to mark what fields we deleted so we don't rewrite them
-// we must do that at runtime
 pub fn add_commit_changes_to_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -1259,16 +1257,9 @@ pub fn add_commit_changes_to_storage_fn(
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
     let (storage_flush_cache, _) = storage_flush_cache(module);
 
-    let (print_i32, _, _, print_m, print_s, _) = crate::declare_host_debug_functions!(module);
-    builder.i32_const(22222222).call(print_i32);
     for (dynamic_field_ptr, itype) in dynamic_fields_global_variables {
         let save_struct_into_storage_fn =
             RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
-
-        println!("commit {dynamic_field_ptr:?}");
-
-        builder.call(print_s);
-        builder.global_get(*dynamic_field_ptr).call(print_i32);
 
         builder.block(None, |block| {
             let block_id = block.id();
@@ -1278,8 +1269,6 @@ pub fn add_commit_changes_to_storage_fn(
                 .binop(BinaryOp::I32Eq)
                 .br_if(block_id);
 
-            block.i32_const(44444444).call(print_i32);
-            block.global_get(*dynamic_field_ptr).call(print_i32);
             // Calculate the destiny slot
 
             // Put in stack the parent address

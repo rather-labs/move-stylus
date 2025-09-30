@@ -17,7 +17,6 @@ use crate::{
     data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET},
     error_encoding::build_error_message,
     generics::{instantiate_vec_type_parameters, replace_type_parameters, type_contains_generics},
-    hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
     vm_handled_types::{self, VmHandledType, named_id::NamedId, uid::Uid},
@@ -641,9 +640,6 @@ fn translate_instruction(
                         &function_id.module_id,
                         &function_id.identifier,
                     ) {
-                        let (print_i32, _, _, print_m, print_s, _) =
-                            crate::declare_host_debug_functions!(module);
-                        builder.i32_const(333333).call(print_i32);
                         let global_struct_ptr = module.globals.add_local(
                             ValType::I32,
                             true,
@@ -651,8 +647,6 @@ fn translate_instruction(
                             walrus::ConstExpr::Value(Value::I32(-1)),
                         );
                         let field_ref_ptr = module.locals.add(ValType::I32);
-
-                        println!("added {global_struct_ptr:?}");
 
                         // Set the global that with the boroowed struct pointer
                         builder
@@ -666,8 +660,6 @@ fn translate_instruction(
                                 },
                             )
                             .global_set(global_struct_ptr);
-
-                        builder.global_get(global_struct_ptr).call(print_i32);
 
                         dynamic_fields_global_variables
                             .push((global_struct_ptr, type_instantiations[0].clone()));
@@ -1579,10 +1571,6 @@ fn translate_instruction(
                                         .call(save_in_slot_fn);
                                 },
                             );
-
-                            // TODO: This should be at the end of the router
-                            let (storage_flush_cache, _) = storage_flush_cache(module);
-                            builder.i32_const(1).call(storage_flush_cache);
                         }
                     }
                 }

@@ -1,9 +1,4 @@
-use super::VmHandledType;
-use crate::{
-    CompilationContext,
-    compilation_context::{ModuleId, reserved_modules::STYLUS_FRAMEWORK_ADDRESS},
-};
-use walrus::{InstrSeqBuilder, Module};
+use crate::compilation_context::{ModuleId, reserved_modules::STYLUS_FRAMEWORK_ADDRESS};
 
 pub struct Field;
 

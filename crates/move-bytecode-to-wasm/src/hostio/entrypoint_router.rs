@@ -5,8 +5,7 @@ use walrus::{
 
 use crate::{
     CompilationContext, abi_types::public_function::PublicFunction,
-    error_encoding::build_error_message, runtime::RuntimeFunction,
-    runtime_error_codes::ERROR_NO_FUNCTION_MATCH,
+    error_encoding::build_error_message, runtime_error_codes::ERROR_NO_FUNCTION_MATCH,
     translation::intermediate_types::IntermediateType,
 };
 
@@ -24,9 +23,6 @@ pub fn build_entrypoint_router(
 ) {
     let (read_args_function, _) = host_functions::read_args(module);
     let (write_return_data_function, _) = host_functions::write_result(module);
-    let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
-
-    let (print_i32, _, _, print_m, print_s, _) = crate::declare_host_debug_functions!(module);
 
     let args_len = module.locals.add(ValType::I32);
     let selector_variable = module.locals.add(ValType::I32);
@@ -36,7 +32,6 @@ pub fn build_entrypoint_router(
 
     let mut router_builder = router.func_body();
 
-    router_builder.i32_const(2).call(print_i32);
     // TODO: handle case where no args data, now we just panic
     router_builder.block(None, |block| {
         let block_id = block.id();
@@ -66,7 +61,6 @@ pub fn build_entrypoint_router(
         },
     );
     router_builder.local_set(selector_variable);
-    router_builder.i32_const(3).call(print_i32);
 
     for function in functions {
         function.build_router_block(
@@ -76,7 +70,6 @@ pub fn build_entrypoint_router(
             args_pointer,
             args_len,
             write_return_data_function,
-            storage_flush_cache_function,
             compilation_ctx,
             dynamic_fields_global_variables,
         );
@@ -124,8 +117,10 @@ mod tests {
     use wasmtime::{Caller, Engine, Extern, Linker, Module as WasmModule, Store, TypedFunc};
 
     use crate::{
-        test_compilation_context, test_tools::build_module,
-        translation::intermediate_types::ISignature, utils::display_module,
+        test_compilation_context,
+        test_tools::{build_module, get_linker_with_native_keccak256},
+        translation::intermediate_types::ISignature,
+        utils::display_module,
     };
 
     use super::*;
@@ -182,6 +177,35 @@ mod tests {
             Some(Extern::Memory(mem)) => mem,
             _ => panic!("failed to find host memory"),
         };
+
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "native_keccak256",
+                |mut caller: wasmtime::Caller<'_, ReadArgsData>,
+                 input_data_ptr: u32,
+                 data_length: u32,
+                 return_data_ptr: u32| {
+                    let memory = match caller.get_export("memory") {
+                        Some(wasmtime::Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    let mut input_data = vec![0; data_length as usize];
+                    memory
+                        .read(&caller, input_data_ptr as usize, &mut input_data)
+                        .unwrap();
+
+                    let hash = alloy_primitives::keccak256(input_data);
+
+                    memory
+                        .write(&mut caller, return_data_ptr as usize, hash.as_slice())
+                        .unwrap();
+
+                    Ok(())
+                },
+            )
+            .unwrap();
 
         linker
             .func_wrap(
@@ -274,7 +298,7 @@ mod tests {
         let noop_selector_data = noop.get_selector().to_vec();
         let noop_2_selector_data = noop_2.get_selector().to_vec();
 
-        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx);
+        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx, &vec![]);
         display_module(&mut raw_module);
 
         let data = ReadArgsData {
@@ -310,7 +334,7 @@ mod tests {
         let noop = add_noop_function(&mut raw_module, &signature, &compilation_ctx);
         let noop_2 = add_noop_2_function(&mut raw_module, &signature, &compilation_ctx);
 
-        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx);
+        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx, &vec![]);
         display_module(&mut raw_module);
 
         // Invalid selector
@@ -333,7 +357,7 @@ mod tests {
         let noop = add_noop_function(&mut raw_module, &signature, &compilation_ctx);
         let noop_2 = add_noop_2_function(&mut raw_module, &signature, &compilation_ctx);
 
-        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx);
+        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx, &vec![]);
         display_module(&mut raw_module);
 
         // Invalid selector
