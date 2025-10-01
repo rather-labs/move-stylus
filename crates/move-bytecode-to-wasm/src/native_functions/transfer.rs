@@ -1,7 +1,3 @@
-use walrus::{
-    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, UnaryOp},
-};
 use crate::{
     CompilationContext,
     data::{
@@ -12,6 +8,10 @@ use crate::{
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
     wasm_builder_extensions::WasmBuilderExtension,
+};
+use walrus::{
+    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, UnaryOp},
 };
 
 use super::NativeFunction;

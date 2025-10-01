@@ -3994,7 +3994,6 @@ mod trusted_mega_swap {
 
         let wrapper_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let wrapper_a_id = FixedBytes::<32>::from_slice(&wrapper_a_id);
-        let wrapper_a_slot = derive_object_slot(&OWNER_A, &wrapper_a_id.0);
         println!("Wrapper A ID: {:#x}", wrapper_a_id);
 
         // Read the swap request id emmited from the contract's events
@@ -4073,7 +4072,6 @@ mod trusted_mega_swap {
 
         let wrapper_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let wrapper_b_id = FixedBytes::<32>::from_slice(&wrapper_b_id);
-        let wrapper_b_slot = derive_object_slot(&OWNER_B, &wrapper_b_id.0);
         println!("Wrapper B ID: {:#x}", wrapper_b_id);
 
         let swap_request_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
