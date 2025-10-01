@@ -7,7 +7,7 @@ mod event;
 pub mod object;
 mod tests;
 mod transaction;
-mod transfer;
+pub mod transfer;
 mod types;
 
 use walrus::{FunctionId, Module};
