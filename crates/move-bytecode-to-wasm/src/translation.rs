@@ -1563,8 +1563,8 @@ fn translate_instruction(
                                     let save_in_slot_fn = RuntimeFunction::EncodeAndSaveInStorage
                                         .get_generic(module, compilation_ctx, &[itype]);
 
-                                    // Load the struct memory representation to pass it to the save
-                                    // function
+                                    // Copy the slot number to a local to avoid overwriting it later
+                                    let slot_ptr = module.locals.add(ValType::I32);
                                     else_
                                         .local_get(struct_ptr)
                                         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
