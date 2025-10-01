@@ -32,6 +32,11 @@ public fun dynamic_field_exists(foo: &Foo, name: String): bool {
     dynamic_field::exists_(&foo.id, name)
 }
 
+public fun mutate_dynamic_field(foo: &mut Foo, name: String) {
+    let val = dynamic_field::borrow_mut(&mut foo.id, name);
+    *val = *val + 1;
+}
+
 public fun attach_dynamic_field_addr_u256(foo: &mut Foo, name: address, value: u256) {
     dynamic_field::add(&mut foo.id, name, value);
 }

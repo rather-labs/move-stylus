@@ -1,11 +1,12 @@
 use walrus::{
-    FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
+    FunctionId, GlobalId, InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg},
 };
 
 use crate::{
     CompilationContext,
     data::DATA_ABORT_MESSAGE_PTR_OFFSET,
+    runtime::RuntimeFunction,
     translation::{
         functions::add_unpack_function_return_values_instructions,
         intermediate_types::{ISignature, IntermediateType},
@@ -78,8 +79,8 @@ impl<'a> PublicFunction<'a> {
         args_pointer: LocalId,
         args_len: LocalId,
         write_return_data_function: FunctionId,
-        storage_flush_cache_function: FunctionId,
         compilation_ctx: &CompilationContext,
+        dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
     ) {
         router_builder.block(None, |block| {
             let block_id = block.id();
@@ -125,8 +126,15 @@ impl<'a> PublicFunction<'a> {
             // Stack: [return_data_pointer] [return_data_length]
             block.call(write_return_data_function);
 
-            block.i32_const(0); // Do not clear cache
-            block.call(storage_flush_cache_function);
+            // TODO: This is repeated for every function, we should move this and the return below
+            // outside this into the main body of the entrypoint so we don't needlesly repeat code
+            let commit_changes_to_storage_function =
+                RuntimeFunction::get_commit_changes_to_storage_fn(
+                    module,
+                    compilation_ctx,
+                    dynamic_fields_global_variables,
+                );
+            block.call(commit_changes_to_storage_function);
 
             // Return status
             block.local_get(status);
@@ -326,6 +334,35 @@ mod tests {
         linker
             .func_wrap(
                 "vm_hooks",
+                "native_keccak256",
+                |mut caller: wasmtime::Caller<'_, ()>,
+                 input_data_ptr: u32,
+                 data_length: u32,
+                 return_data_ptr: u32| {
+                    let memory = match caller.get_export("memory") {
+                        Some(wasmtime::Extern::Memory(mem)) => mem,
+                        _ => panic!("failed to find host memory"),
+                    };
+
+                    let mut input_data = vec![0; data_length as usize];
+                    memory
+                        .read(&caller, input_data_ptr as usize, &mut input_data)
+                        .unwrap();
+
+                    let hash = alloy_primitives::keccak256(input_data);
+
+                    memory
+                        .write(&mut caller, return_data_ptr as usize, hash.as_slice())
+                        .unwrap();
+
+                    Ok(())
+                },
+            )
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
                 "write_result",
                 move |mut caller: Caller<'_, ()>,
                       return_data_pointer: u32,
@@ -415,7 +452,6 @@ mod tests {
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
         // Build mock router
         let (write_return_data_function, _) = host_functions::write_result(module);
-        let (storage_flush_cache_function, _) = host_functions::storage_flush_cache(module);
 
         let selector = module.locals.add(ValType::I32);
         let args_pointer = module.locals.add(ValType::I32);
@@ -455,8 +491,8 @@ mod tests {
             args_pointer,
             args_len,
             write_return_data_function,
-            storage_flush_cache_function,
             &compilation_ctx,
+            &vec![],
         );
 
         // if no match, return -1
