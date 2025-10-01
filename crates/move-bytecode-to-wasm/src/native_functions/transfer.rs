@@ -406,24 +406,25 @@ pub fn add_freeze_object_fn(
 /// Example: The Object 'obj' is initially owned by the sender. It is then passed as a value to the 'request_swap' function,
 /// where it gets wrapped within the 'SwapRequest' struct. This struct is subsequently transferred to the service address.
 /// In this scenario, 'obj' must be removed from the sender's ownership mapping (the original owner) because the 'SwapRequest' struct is now the actual owner.
-//
-// public fun request_swap(
-//     obj: Object,
-//     service: address,
-//     fee: u64,
-//     ctx: &mut TxContext,
-// ) {
-//     assert!(fee >= MIN_FEE, EFeeTooLow);
-//
-//     let request = SwapRequest {
-//         id: object::new(ctx),
-//         owner: ctx.sender(),
-//         object: obj,
-//         fee,
-//     };
-//
-//     transfer::transfer(request, service)
-// }
+///```no_run
+/// public fun request_swap(
+///     obj: Object,
+///   service: address,
+///     fee: u64,
+///     ctx: &mut TxContext,
+/// ) {
+///     assert!(fee >= MIN_FEE, EFeeTooLow);
+///
+///    let request = SwapRequest {
+///         id: object::new(ctx),
+///        owner: ctx.sender(),
+///         object: obj,
+///         fee,
+///     };
+///
+///    transfer::transfer(request, service)
+/// }
+///```
 pub fn add_delete_tto_objects_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
