@@ -163,6 +163,56 @@ pub fn add_borrow_object_fn(
     function.finish(vec![parent_uid, child_id], &mut module.funcs)
 }
 
+pub fn add_remove_child_object_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) -> FunctionId {
+    let name = get_generic_function_name(
+        NativeFunction::NATIVE_REMOVE_CHILD_OBJECT,
+        &[&itype.clone()],
+    );
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    };
+
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function.name(name).func_body();
+
+    let native_borrow_child_fn = NativeFunction::get_generic(
+        NativeFunction::NATIVE_BORROW_CHILD_OBJECT,
+        module,
+        compilation_ctx,
+        &[itype.clone()],
+    );
+
+    // Arguments
+    let parent_uid = module.locals.add(ValType::I32);
+    let child_id = module.locals.add(ValType::I32);
+
+    // Borrow the field
+    builder
+        .local_get(parent_uid)
+        .local_get(child_id)
+        .call(native_borrow_child_fn);
+
+    // Dereference it
+    builder.load(
+        compilation_ctx.memory_id,
+        LoadKind::I32 { atomic: false },
+        MemArg {
+            align: 0,
+            offset: 0,
+        },
+    );
+
+    function.finish(vec![parent_uid, child_id], &mut module.funcs)
+}
+
 /// Checks if a child object exists for a given parent and child ID
 ///
 /// Arguments

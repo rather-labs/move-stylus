@@ -3248,10 +3248,12 @@ mod dynamic_storage_fields {
         function attachDynamicField(bytes32 foo, String name, uint64 value) public view;
         function readDynamicField(bytes32 foo, String name) public view returns (uint64);
         function dynamicFieldExists(bytes32 foo, String name) public view returns (bool);
+        function mutateDynamicField(bytes32 foo, String name) public view;
+        function removeDynamicField(bytes32 foo, String name) public view returns (uint64);
         function attachDynamicFieldAddrU256(bytes32 foo, address name, uint256 value) public view;
         function readDynamicFieldAddrU256(bytes32 foo, address name) public view returns (uint256);
         function dynamicFieldExistsAddrU256(bytes32 foo, address name) public view returns (bool);
-        function mutateDynamicField(bytes32 foo, String name) public view;
+        function removeDynamicFieldAddrU256(bytes32 foo, address name) public view returns (uint64);
     );
 
     #[rstest]
@@ -3377,14 +3379,56 @@ mod dynamic_storage_fields {
         assert_eq!(0, result);
 
         // Read modified dynamic fields
-        let call_data = readDynamicFieldCall::new((object_id, field_name_1)).abi_encode();
+        let call_data = readDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
         assert_eq!(43u64.abi_encode(), result_data);
 
-        let call_data = readDynamicFieldCall::new((object_id, field_name_2)).abi_encode();
+        let call_data = readDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
         assert_eq!(85u64.abi_encode(), result_data);
+
+        // Remove fields
+        let call_data = removeDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(43u64.abi_encode(), result_data);
+
+        let call_data = removeDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(85u64.abi_encode(), result_data);
+
+        let call_data = removeDynamicFieldAddrU256Call::new((object_id, field_name_3)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(U256::from(u128::MAX).abi_encode(), result_data);
+
+        let call_data = removeDynamicFieldAddrU256Call::new((object_id, field_name_4)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(U256::MAX.abi_encode(), result_data);
+
+        // Check existence of dynamic fields
+        let call_data = dynamicFieldExistsCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_3)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_4)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
     }
 }
