@@ -125,28 +125,6 @@ public fun exists_with_type<Name: copy + drop + store, Value: store>(
     has_child_object_with_ty<Field<Name, Value>>(object_addr, hash)
 }
 
-/*
-public(package) fun field_info<Name: copy + drop + store>(
-    object: &UID,
-    name: Name,
-): (&UID, address) {
-    let object_addr = object.to_address();
-    let hash = hash_type_and_key(object_addr, name);
-    let Field { id, name: _, value } = borrow_child_object<Field<Name, ID>>(object, hash);
-    (id, value.to_address())
-}
-
-public(package) fun field_info_mut<Name: copy + drop + store>(
-    object: &mut UID,
-    name: Name,
-): (&mut UID, address) {
-    let object_addr = object.to_address();
-    let hash = hash_type_and_key(object_addr, name);
-    let Field { id, name: _, value } = borrow_child_object_mut<Field<Name, ID>>(object, hash);
-    (id, value.to_address())
-}
-*/
-
 /// May abort with `EBCSSerializationFailure`.
 public(package) native fun hash_type_and_key<K: copy + drop + store>(
     parent: address,
