@@ -61,6 +61,7 @@ impl NativeFunction {
     const NATIVE_ADD_CHILD_OBJECT: &str = "add_child_object";
     const NATIVE_BORROW_CHILD_OBJECT: &str = "borrow_child_object";
     const NATIVE_BORROW_CHILD_OBJECT_MUT: &str = "borrow_child_object_mut";
+    const NATIVE_REMOVE_CHILD_OBJECT: &str = "remove_child_object";
     const NATIVE_HAS_CHILD_OBJECT: &str = "has_child_object";
 
     // Host functions
@@ -292,6 +293,16 @@ impl NativeFunction {
                 );
 
                 dynamic_field::add_borrow_object_fn(module, compilation_ctx, &generics[0])
+            }
+            Self::NATIVE_REMOVE_CHILD_OBJECT => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {name} expected 1 type parameter, found {}",
+                    generics.len(),
+                );
+
+                dynamic_field::add_remove_child_object_fn(module, compilation_ctx, &generics[0])
             }
 
             _ => panic!("generic native function {name} not supported yet"),

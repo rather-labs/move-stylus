@@ -37,6 +37,11 @@ public fun mutate_dynamic_field(foo: &mut Foo, name: String) {
     *val = *val + 1;
 }
 
+public fun remove_dynamic_field(foo: &mut Foo, name: String): u64 {
+    let value = dynamic_field::remove(&mut foo.id, name);
+    value
+}
+
 public fun attach_dynamic_field_addr_u256(foo: &mut Foo, name: address, value: u256) {
     dynamic_field::add(&mut foo.id, name, value);
 }
@@ -47,4 +52,9 @@ public fun read_dynamic_field_addr_u256(foo: &Foo, name: address): &u256 {
 
 public fun dynamic_field_exists_addr_u256(foo: &Foo, name: address): bool {
     dynamic_field::exists_(&foo.id, name)
+}
+
+public fun remove_dynamic_field_addr_u256(foo: &mut Foo, name: address): u256 {
+    let value = dynamic_field::remove(&mut foo.id, name);
+    value
 }
