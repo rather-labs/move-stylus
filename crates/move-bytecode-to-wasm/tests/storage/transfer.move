@@ -297,13 +297,6 @@ public fun delete_var(var: Var) {
     id.delete();
 }
 
-// TODO
-public fun delete_var_2(var: Var): Bar {
-    let Var { id, a: bar } = var;
-    id.delete();
-    bar
-}
-
 public fun delete_var_and_transfer_bar(var: Var) {
     let Var { id, a: bar } = var;
     id.delete();
