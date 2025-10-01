@@ -89,7 +89,7 @@ public fun borrow_mut<Name: copy + drop + store, Value: store>(
 public fun remove<Name: copy + drop + store, Value: store>(object: &mut UID, name: Name): Value {
     let object_addr = object.to_address();
     let hash = hash_type_and_key(object_addr, name);
-    let Field { id, name: _, value } = remove_child_object<Field<Name, Value>>(object_addr, hash);
+    let Field { id, name: _, value } = remove_child_object<Field<Name, Value>>(object, hash);
     id.delete();
     value
 }
@@ -169,7 +169,7 @@ public(package) native fun borrow_child_object_mut<Child: key>(
 /// throws `EFieldDoesNotExist` if a child does not exist with that ID
 /// or throws `EFieldTypeMismatch` if the type does not match,
 /// and may also abort with `EBCSSerializationFailure`.
-public(package) native fun remove_child_object<Child: key>(parent: address, id: address): Child;
+public(package) native fun remove_child_object<Child: key>(object: &UID, id: address): Child;
 
 public(package) native fun has_child_object(parent: address, id: address): bool;
 
