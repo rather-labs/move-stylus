@@ -56,7 +56,6 @@ public fun add<Name: copy + drop + store, Value: store>(
     add_child_object(object_addr, field)
 }
 
-/*
 /// Immutably borrows the `object`s dynamic field with the name specified by `name: Name`.
 /// Aborts with `EFieldDoesNotExist` if the object does not have a field with that name.
 /// Aborts with `EFieldTypeMismatch` if the field exists, but the value does not have the specified
@@ -126,6 +125,7 @@ public fun exists_with_type<Name: copy + drop + store, Value: store>(
     has_child_object_with_ty<Field<Name, Value>>(object_addr, hash)
 }
 
+/*
 public(package) fun field_info<Name: copy + drop + store>(
     object: &UID,
     name: Name,
