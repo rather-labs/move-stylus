@@ -4171,6 +4171,463 @@ mod trusted_mega_swap {
     }
 }
 
+mod wrapped_objects {
+    use alloy_primitives::FixedBytes;
+    use alloy_sol_types::{SolCall, SolValue, sol};
+    use crate::common::runtime_sandbox::constants::MSG_SENDER_ADDRESS;
+
+
+    use super::*;
+
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "wrapped_objects";
+        const SOURCE_PATH: &str = "tests/storage/wrapped_objects.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        let runtime = RuntimeSandbox::new(&mut translated_package);
+        runtime.set_tx_origin(MSG_SENDER_ADDRESS);
+        runtime
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+        #[derive(Debug)]
+        struct ID {
+           bytes32 bytes;
+        }
+
+        #[derive(Debug)]
+        struct UID {
+           ID id;
+        }
+
+        struct Alpha {
+            UID id;
+            uint64 value;
+        }
+
+        struct Beta {
+            UID id;
+            Alpha a;
+        }
+
+        struct Gamma {
+            UID id;
+            Beta a;
+        }
+
+        struct Delta {
+            UID id;
+            Alpha[] a;
+        }
+
+        struct Epsilon {
+            UID id;
+            Delta[] a;
+        }
+
+        function createAlpha(uint64 value) public view;
+        function createBeta() public view;
+        function createGamma() public view;
+        function createDelta() public view;
+        function createEpsilon() public view;
+        function createBetaTto(bytes32 a) public view;
+        function createGammaTto(bytes32 a) public view;
+        function createDeltaTto(bytes32 a, bytes32 b) public view;
+        function createEpsilonTto(bytes32 a, bytes32 b) public view;
+        function readBeta(bytes32 b) public view returns (Beta);
+        function readGamma(bytes32 g) public view returns (Gamma);
+        function readDelta(bytes32 d) public view returns (Delta);
+        function readEpsilon(bytes32 e) public view returns (Epsilon);
+        function deleteBeta(bytes32 b) public view;
+        function deleteGamma(bytes32 g) public view;
+        function deleteDelta(bytes32 d) public view;
+        function deleteEpsilon(bytes32 e) public view;
+    );
+
+    // In all tests, we use the tto flag to indicate if the creation method should take
+    // the object to be wrapped as argument or create it directly.
+    #[rstest]
+    #[case(false)]
+    #[case(true)]
+    fn test_beta(runtime: RuntimeSandbox, #[case] tto: bool) {
+        let (alpha_id, beta_id) = if tto {
+            // Create alpha first for TTO method
+            let call_data = createAlphaCall::new((102,)).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+
+            let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
+
+            // Create beta, passing alpha as argument to be wrapped in it
+            let call_data = createBetaTtoCall::new((alpha_id,)).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+
+            let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let beta_id = FixedBytes::<32>::from_slice(&beta_id);
+
+            (alpha_id, beta_id)
+        } else {
+            // Create beta directly
+            let call_data = createBetaCall::new(()).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+
+            // Get the object ids
+            let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
+
+            let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let beta_id = FixedBytes::<32>::from_slice(&beta_id);
+
+            (alpha_id, beta_id)
+        };
+
+        // Read beta and assert the returned data
+        let call_data = readBetaCall::new((beta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readBetaCall::abi_decode_returns(&return_data).unwrap();
+        let expected_value = if tto { 102 } else { 101 };
+        let beta_expected = Beta::abi_encode(&Beta {
+            id: UID {
+                id: ID { bytes: beta_id },
+            },
+            a: Alpha {
+                id: UID {
+                    id: ID { bytes: alpha_id },
+                },
+                value: expected_value,
+            },
+        });
+        assert_eq!(Beta::abi_encode(&return_data), beta_expected);
+        assert_eq!(0, result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        // Delete beta and assert the storage is empty afterwards
+        let call_data = deleteBetaCall::new((beta_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
+    }
+
+    #[rstest]
+    #[case(false)]
+    #[case(true)]
+    fn test_gamma(runtime: RuntimeSandbox, #[case] tto: bool) {
+        let (alpha_id, beta_id, gamma_id) = if tto {
+            // Create beta first for TTO method
+            let call_data = createBetaCall::new(()).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+
+            let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
+
+            let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let beta_id = FixedBytes::<32>::from_slice(&beta_id);
+
+            // Create gamma, passing beta as argument to be wrapped in it
+            let call_data = createGammaTtoCall::new((beta_id,)).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+
+            let gamma_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let gamma_id = FixedBytes::<32>::from_slice(&gamma_id);
+
+            (alpha_id, beta_id, gamma_id)
+        } else {
+            // Create gamma directly
+            let call_data = createGammaCall::new(()).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+
+            // Get the object ids
+            let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
+
+            let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let beta_id = FixedBytes::<32>::from_slice(&beta_id);
+
+            let gamma_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let gamma_id = FixedBytes::<32>::from_slice(&gamma_id);
+
+            (alpha_id, beta_id, gamma_id)
+        };
+
+        // Read gamma and assert the returned data
+        let call_data = readGammaCall::new((gamma_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readGammaCall::abi_decode_returns(&return_data).unwrap();
+        let gamma_expected = Gamma::abi_encode(&Gamma {
+            id: UID {
+                id: ID { bytes: gamma_id },
+            },
+            a: Beta {
+                id: UID {
+                    id: ID { bytes: beta_id },
+                },
+                a: Alpha {
+                id: UID {
+                    id: ID { bytes: alpha_id },
+                },
+                    value: 101,
+                },
+            },
+        });
+        assert_eq!(Gamma::abi_encode(&return_data), gamma_expected);
+        assert_eq!(0, result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        // Delete gamma and assert the storage is empty afterwards
+        let call_data = deleteGammaCall::new((gamma_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
+    }
+
+    #[rstest]
+    #[case(false)]
+    #[case(true)]
+    fn test_delta(runtime: RuntimeSandbox, #[case] tto: bool) {
+        let (alpha_1_id, alpha_2_id, delta_id) = if tto {
+            // Create alphas first for TTO method
+            let call_data = createAlphaCall::new((101,)).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+
+            let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+
+            let call_data = createAlphaCall::new((102,)).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+
+            let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+
+            // Create delta using TTO method
+            let call_data = createDeltaTtoCall::new((alpha_1_id, alpha_2_id)).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+
+            let delta_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let delta_id = FixedBytes::<32>::from_slice(&delta_id);
+
+            (alpha_1_id, alpha_2_id, delta_id)
+        } else {
+            // Create delta directly
+            let call_data = createDeltaCall::new(()).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+        
+            let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+
+            let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+
+            let delta_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let delta_id = FixedBytes::<32>::from_slice(&delta_id);
+
+            (alpha_1_id, alpha_2_id, delta_id)
+        };
+
+        // Read delta and assert the returned data
+        let call_data = readDeltaCall::new((delta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readDeltaCall::abi_decode_returns(&return_data).unwrap();
+        let delta_expected = Delta::abi_encode(&Delta {
+            id: UID {
+                id: ID { bytes: delta_id },
+            },
+            a: vec![Alpha {
+                id: UID {
+                    id: ID { bytes: alpha_1_id },
+                },
+                value: 101,
+            }, Alpha {
+                id: UID {
+                    id: ID { bytes: alpha_2_id },
+                },
+                value: 102,
+            }],
+        });
+        assert_eq!(Delta::abi_encode(&return_data), delta_expected);
+        assert_eq!(0, result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        // Delete delta and assert the storage is empty afterwards
+        let call_data = deleteDeltaCall::new((delta_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
+    }
+
+    #[rstest]
+    #[case(false)]
+    #[case(true)]
+    fn test_epsilon(runtime: RuntimeSandbox, #[case] tto: bool) {
+         let (alpha_1_id, alpha_2_id, alpha_3_id, alpha_4_id, delta_1_id, delta_2_id, epsilon_id) = if tto {
+            let call_data = createAlphaCall::new((101,)).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+
+            let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+
+            let call_data = createAlphaCall::new((102,)).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+
+            let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+            let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+
+             // Create deltas first for TTO method
+             let call_data = createDeltaTtoCall::new((alpha_1_id, alpha_2_id)).abi_encode();
+             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+             assert_eq!(0, result);
+
+             let delta_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+             let delta_1_id = FixedBytes::<32>::from_slice(&delta_1_id);
+
+             let call_data = createAlphaCall::new((103,)).abi_encode();
+             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+             assert_eq!(0, result);
+
+             let alpha_3_id = runtime.log_events.lock().unwrap().recv().unwrap();
+             let alpha_3_id = FixedBytes::<32>::from_slice(&alpha_3_id);
+
+             let call_data = createAlphaCall::new((104,)).abi_encode();
+             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+             assert_eq!(0, result);
+
+             let alpha_4_id = runtime.log_events.lock().unwrap().recv().unwrap();
+             let alpha_4_id = FixedBytes::<32>::from_slice(&alpha_4_id);
+
+             let call_data = createDeltaTtoCall::new((alpha_3_id, alpha_4_id)).abi_encode();
+             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+             assert_eq!(0, result);
+
+             let delta_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+             let delta_2_id = FixedBytes::<32>::from_slice(&delta_2_id);
+
+             // Create epsilon using TTO method
+             let call_data = createEpsilonTtoCall::new((delta_1_id, delta_2_id)).abi_encode();
+             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+             assert_eq!(0, result);
+
+             let epsilon_id = runtime.log_events.lock().unwrap().recv().unwrap();
+             let epsilon_id = FixedBytes::<32>::from_slice(&epsilon_id);
+
+             (alpha_1_id, alpha_2_id, alpha_3_id, alpha_4_id, delta_1_id, delta_2_id, epsilon_id)
+         } else {
+             // Create epsilon directly
+             let call_data = createEpsilonCall::new(()).abi_encode();
+             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+             assert_eq!(0, result);
+
+             let delta_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+             let delta_1_id = FixedBytes::<32>::from_slice(&delta_1_id);
+
+             let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+             let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+
+             let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+             let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+
+             let delta_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+             let delta_2_id = FixedBytes::<32>::from_slice(&delta_2_id);
+
+             let alpha_3_id = runtime.log_events.lock().unwrap().recv().unwrap();
+             let alpha_3_id = FixedBytes::<32>::from_slice(&alpha_3_id);
+
+             let alpha_4_id = runtime.log_events.lock().unwrap().recv().unwrap();
+             let alpha_4_id = FixedBytes::<32>::from_slice(&alpha_4_id);
+
+             let epsilon_id = runtime.log_events.lock().unwrap().recv().unwrap();
+             let epsilon_id = FixedBytes::<32>::from_slice(&epsilon_id);
+
+             (alpha_1_id, alpha_2_id, alpha_3_id, alpha_4_id, delta_1_id, delta_2_id, epsilon_id)
+         };
+
+        // Read epsilon and assert the returned data
+        let call_data = readEpsilonCall::new((epsilon_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readEpsilonCall::abi_decode_returns(&return_data).unwrap();
+        let epsilon_expected = Epsilon::abi_encode(&Epsilon {
+            id: UID {
+                id: ID { bytes: epsilon_id },
+            },
+            a: vec![
+                Delta {
+                    id: UID {
+                        id: ID { bytes: delta_1_id },
+                    },
+                    a: vec![
+                        Alpha {
+                            id: UID {
+                                id: ID { bytes: alpha_1_id },
+                            },
+                            value: 101,
+                        },
+                        Alpha {
+                            id: UID {
+                                id: ID { bytes: alpha_2_id },
+                            },
+                            value: 102,
+                        },
+                    ],
+                },
+                Delta {
+                    id: UID {
+                        id: ID { bytes: delta_2_id },
+                    },
+                    a: vec![
+                        Alpha {
+                            id: UID {
+                                id: ID { bytes: alpha_3_id },
+                            },
+                            value: 103,
+                        },
+                        Alpha {
+                            id: UID {
+                                id: ID { bytes: alpha_4_id },
+                            },
+                            value: 104,
+                        },
+                    ],
+                },
+            ],
+        });
+        assert_eq!(Epsilon::abi_encode(&return_data), epsilon_expected);
+        assert_eq!(0, result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        // Delete epsilon and assert the storage is empty afterwards
+        let call_data = deleteEpsilonCall::new((epsilon_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
+    }
+}
+
 /*
 mod dynamic_storage_fields {
     use alloy_primitives::{FixedBytes, address};
