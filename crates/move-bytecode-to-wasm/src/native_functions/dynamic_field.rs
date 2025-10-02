@@ -1,6 +1,10 @@
 use super::NativeFunction;
 use crate::{
     CompilationContext,
+    compilation_context::{
+        ModuleId,
+        reserved_modules::{SF_MODULE_NAME_DYNAMIC_FIELD, STYLUS_FRAMEWORK_ADDRESS},
+    },
     data::{
         DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
         DATA_STORAGE_OBJECT_OWNER_OFFSET,
@@ -187,6 +191,10 @@ pub fn add_remove_child_object_fn(
         NativeFunction::NATIVE_BORROW_CHILD_OBJECT,
         module,
         compilation_ctx,
+        &ModuleId {
+            address: STYLUS_FRAMEWORK_ADDRESS,
+            module_name: SF_MODULE_NAME_DYNAMIC_FIELD.to_owned(),
+        },
         &[itype.clone()],
     );
 

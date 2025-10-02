@@ -629,6 +629,7 @@ fn translate_instruction(
                         &function_id.identifier,
                         module,
                         compilation_ctx,
+                        &function_id.module_id,
                         type_instantiations,
                     );
 
@@ -791,8 +792,12 @@ fn translate_instruction(
                 // and linking
                 // If the function IS native, we link it and call it directly
                 else if function_information.is_native {
-                    let native_function_id =
-                        NativeFunction::get(&function_id.identifier, module, compilation_ctx);
+                    let native_function_id = NativeFunction::get(
+                        &function_id.identifier,
+                        module,
+                        compilation_ctx,
+                        &function_information.function_id.module_id,
+                    );
                     builder.call(native_function_id);
                 } else {
                     let table_id = function_table.get_table_id();
@@ -1563,11 +1568,24 @@ fn translate_instruction(
                                     let save_in_slot_fn = RuntimeFunction::EncodeAndSaveInStorage
                                         .get_generic(module, compilation_ctx, &[itype]);
 
+                                    // Copy the slot number to a local to avoid overwriting it later
+                                    let slot_ptr = module.locals.add(ValType::I32);
+                                    else_
+                                        .i32_const(32)
+                                        .call(compilation_ctx.allocator)
+                                        .local_tee(slot_ptr)
+                                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                                        .i32_const(32)
+                                        .memory_copy(
+                                            compilation_ctx.memory_id,
+                                            compilation_ctx.memory_id,
+                                        );
+
                                     // Load the struct memory representation to pass it to the save
                                     // function
                                     else_
                                         .local_get(struct_ptr)
-                                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                                        .local_get(slot_ptr)
                                         .call(save_in_slot_fn);
                                 },
                             );
