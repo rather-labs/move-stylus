@@ -3976,6 +3976,7 @@ mod wrapped_objects {
         function destructDeltaToBeta(bytes32 d) public view;
         function pushAlphaToDelta(bytes32 d, bytes32 a) public view;
         function popAlphaFromDelta(bytes32 d) public view;
+        function destructEpsilon(bytes32 e, bytes32 a) public view;
     );
 
     // In all tests, we use the tto flag to indicate if the creation method should take
@@ -4838,6 +4839,113 @@ mod wrapped_objects {
 
         // Assert that all storage slots are empty except for the specified key
         assert_empty_storage(&storage_before_delete, &storage_after_delete);
+    }
+
+    #[rstest]
+    fn test_destruct_epsilon(runtime: RuntimeSandbox) {
+        let call_data = createEpsilonCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let delta_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let delta_1_id = FixedBytes::<32>::from_slice(&delta_1_id);
+
+        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+
+        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+
+        let delta_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let delta_2_id = FixedBytes::<32>::from_slice(&delta_2_id);
+
+        let alpha_3_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_3_id = FixedBytes::<32>::from_slice(&alpha_3_id);
+
+        let alpha_4_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_4_id = FixedBytes::<32>::from_slice(&alpha_4_id);
+
+        let epsilon_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let epsilon_id = FixedBytes::<32>::from_slice(&epsilon_id);
+
+        let call_data = createAlphaCall::new((105,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let alpha_5_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_5_id = FixedBytes::<32>::from_slice(&alpha_5_id);
+
+        let call_data = destructEpsilonCall::new((epsilon_id, alpha_5_id)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read delta and assert the returned data
+        let call_data = readDeltaCall::new((delta_2_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readDeltaCall::abi_decode_returns(&return_data).unwrap();
+        let delta_expected = Delta::abi_encode(&Delta {
+            id: UID {
+                id: ID { bytes: delta_2_id },
+            },
+            a: vec![
+                Alpha {
+                    id: UID {
+                        id: ID { bytes: alpha_3_id },
+                    },
+                    value: 103,
+                },
+                Alpha {
+                    id: UID {
+                        id: ID { bytes: alpha_4_id },
+                    },
+                    value: 104,
+                },
+                Alpha {
+                    id: UID {
+                        id: ID { bytes: alpha_5_id },
+                    },
+                    value: 105,
+                },
+            ],
+        });
+        assert_eq!(Delta::abi_encode(&return_data), delta_expected);
+        assert_eq!(0, result);
+
+        let new_epsilon_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let new_epsilon_id = FixedBytes::<32>::from_slice(&new_epsilon_id);
+
+        // Read epsilon and assert the returned data
+        let call_data = readEpsilonCall::new((new_epsilon_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readEpsilonCall::abi_decode_returns(&return_data).unwrap();
+        let epsilon_expected = Epsilon::abi_encode(&Epsilon {
+            id: UID {
+                id: ID {
+                    bytes: new_epsilon_id,
+                },
+            },
+            a: vec![Delta {
+                id: UID {
+                    id: ID { bytes: delta_1_id },
+                },
+                a: vec![
+                    Alpha {
+                        id: UID {
+                            id: ID { bytes: alpha_1_id },
+                        },
+                        value: 101,
+                    },
+                    Alpha {
+                        id: UID {
+                            id: ID { bytes: alpha_2_id },
+                        },
+                        value: 102,
+                    },
+                ],
+            }],
+        });
+        assert_eq!(Epsilon::abi_encode(&return_data), epsilon_expected);
+        assert_eq!(0, result);
     }
 }
 

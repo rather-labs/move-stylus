@@ -218,3 +218,20 @@ public fun pop_alpha_from_delta(delta: &mut Delta) {
     let alpha = delta.a.pop_back();
     transfer::share_object(alpha);
 }
+
+public fun destruct_epsilon(epsilon: Epsilon, alpha: Alpha, ctx: &mut TxContext) {
+    let Epsilon { id, a: mut vector_delta } = epsilon;
+    id.delete();
+
+    if (!vector::is_empty(&vector_delta)) {
+        let mut delta = vector::pop_back(&mut vector_delta);
+        delta.a.push_back(alpha);
+        transfer::transfer(delta, ctx.sender());
+    } else {
+        let Alpha { id, value: _ } = alpha;
+        id.delete();
+    };
+
+    let new_epsilon = Epsilon { id: object::new(ctx), a: vector_delta };
+    transfer::share_object(new_epsilon);
+}
