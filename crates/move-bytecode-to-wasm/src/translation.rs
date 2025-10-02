@@ -11,6 +11,7 @@ pub mod functions;
 pub mod intermediate_types;
 pub mod table;
 
+use crate::native_functions::transfer::add_delete_tto_objects_instructions;
 use crate::{
     CompilationContext,
     compilation_context::{ModuleData, ModuleId},
@@ -50,7 +51,6 @@ use walrus::{
     },
 };
 use walrus::{GlobalId, TableId};
-
 /// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs.
 /// It is used to translate the branching instructions: Branch, BrFalse, BrTrue
 struct BranchTargets {
@@ -1575,6 +1575,16 @@ fn translate_instruction(
                                             compilation_ctx.memory_id,
                                             compilation_ctx.memory_id,
                                         );
+
+                                    // Call the function to delete any recently tto objects within the struct
+                                    // This is particularly needed when pushing objects with key ability into a vector field of a struct
+                                    add_delete_tto_objects_instructions(
+                                        module,
+                                        else_,
+                                        compilation_ctx,
+                                        struct_ptr,
+                                        &struct_,
+                                    );
 
                                     // Save the struct in the slot
                                     else_
