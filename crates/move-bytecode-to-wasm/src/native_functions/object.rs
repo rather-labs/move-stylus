@@ -63,6 +63,42 @@ pub fn add_compute_named_id_fn(
     }
 }
 
+/// Takes a reference of a NamedId<T> and returns it casted as a UID
+///
+/// This function is used internally by the stylus framework
+pub fn add_as_uid_fn(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+    if let Some(function) = module.funcs.by_name(NativeFunction::NATIVE_AS_UID) {
+        return function;
+    };
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+
+    let named_id_ptr = module.locals.add(ValType::I32);
+
+    let mut builder = function
+        .name(NativeFunction::NATIVE_AS_UID.to_owned())
+        .func_body();
+
+    let result = module.locals.add(ValType::I32);
+    builder
+        .i32_const(4)
+        .call(compilation_ctx.allocator)
+        .local_tee(result)
+        .local_get(named_id_ptr)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    builder.local_get(result);
+
+    function.finish(vec![named_id_ptr], &mut module.funcs)
+}
+
 pub fn add_native_fresh_id_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
