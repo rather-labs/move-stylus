@@ -2,6 +2,10 @@ use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
     CompilationContext,
+    compilation_context::{
+        ModuleId,
+        reserved_modules::{SF_MODULE_NAME_OBJECT, STYLUS_FRAMEWORK_ADDRESS},
+    },
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
@@ -316,6 +320,10 @@ fn load_struct_storage_id(
                 NativeFunction::NATIVE_COMPUTE_NAMED_ID,
                 module,
                 compilation_ctx,
+                &ModuleId {
+                    address: STYLUS_FRAMEWORK_ADDRESS,
+                    module_name: SF_MODULE_NAME_OBJECT.to_owned(),
+                },
                 types,
             );
 
