@@ -162,6 +162,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 ///
 /// # Returns
 /// pointer where the read struct is allocated
+#[allow(clippy::too_many_arguments)]
 pub fn add_read_and_decode_storage_struct_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
@@ -538,6 +539,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
 /// `data_ptr` - pointer to the memory region where the vector data will be written
 /// `slot_ptr` - pointer to the vector header slot
 /// `inner` - inner type of the vector
+#[allow(clippy::too_many_arguments)]
 pub fn add_read_and_decode_storage_vector_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,

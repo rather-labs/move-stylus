@@ -3956,7 +3956,6 @@ mod trusted_mega_swap {
         let swap_request_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let swap_request_a_id = FixedBytes::<32>::from_slice(&swap_request_a_id);
 
-
         // Assert that the original objects slots are empty
         assert_eq!(
             runtime.get_storage_at_slot(obj_1_a_slot.0),
