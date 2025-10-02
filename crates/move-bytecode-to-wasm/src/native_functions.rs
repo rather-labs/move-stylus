@@ -13,7 +13,17 @@ mod types;
 use walrus::{FunctionId, Module};
 
 use crate::{
-    CompilationContext, hostio, runtime::RuntimeFunction,
+    CompilationContext,
+    compilation_context::{
+        ModuleId,
+        reserved_modules::{
+            SF_MODULE_NAME_DYNAMIC_FIELD, SF_MODULE_NAME_EVENT, SF_MODULE_NAME_OBJECT,
+            SF_MODULE_NAME_TRANSFER, SF_MODULE_NAME_TX_CONTEXT, SF_MODULE_NAME_TYPES,
+            STYLUS_FRAMEWORK_ADDRESS,
+        },
+    },
+    hostio,
+    runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
 };
 
@@ -78,27 +88,44 @@ impl NativeFunction {
         name: &str,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
+        module_id: &ModuleId,
     ) -> FunctionId {
+        let ModuleId {
+            address,
+            module_name,
+        } = module_id;
         // Some functions are implemented by host functions directly. For those, we just import and
         // use them without wrapping them.
         if let Some(host_fn_name) = Self::host_fn_name(name) {
             if let Ok(function_id) = module.imports.get_func("vm_hooks", host_fn_name) {
                 return function_id;
             } else {
-                match host_fn_name {
-                    Self::HOST_BLOCK_NUMBER => {
+                match (host_fn_name, *address, module_name.as_str()) {
+                    (
+                        Self::HOST_BLOCK_NUMBER,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_NAME_TX_CONTEXT,
+                    ) => {
                         let (function_id, _) = hostio::host_functions::block_number(module);
                         return function_id;
                     }
-                    Self::HOST_BLOCK_GAS_LIMIT => {
+                    (
+                        Self::HOST_BLOCK_GAS_LIMIT,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_NAME_TX_CONTEXT,
+                    ) => {
                         let (function_id, _) = hostio::host_functions::block_gas_limit(module);
                         return function_id;
                     }
-                    Self::HOST_BLOCK_TIMESTAMP => {
+                    (
+                        Self::HOST_BLOCK_TIMESTAMP,
+                        STYLUS_FRAMEWORK_ADDRESS,
+                        SF_MODULE_NAME_TX_CONTEXT,
+                    ) => {
                         let (function_id, _) = hostio::host_functions::block_timestamp(module);
                         return function_id;
                     }
-                    Self::HOST_CHAIN_ID => {
+                    (Self::HOST_CHAIN_ID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
                         let (function_id, _) = hostio::host_functions::chain_id(module);
                         return function_id;
                     }
@@ -113,26 +140,34 @@ impl NativeFunction {
         if let Some(function) = module.funcs.by_name(name) {
             function
         } else {
-            match name {
-                Self::NATIVE_SENDER => transaction::add_native_sender_fn(module, compilation_ctx),
-                Self::NATIVE_MSG_VALUE => {
+            match (name, *address, module_name.as_str()) {
+                (Self::NATIVE_SENDER, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
+                    transaction::add_native_sender_fn(module, compilation_ctx)
+                }
+                (Self::NATIVE_MSG_VALUE, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
                     transaction::add_native_msg_value_fn(module, compilation_ctx)
                 }
-                Self::NATIVE_BLOCK_BASEFEE => {
-                    transaction::add_native_block_basefee_fn(module, compilation_ctx)
-                }
-                Self::NATIVE_GAS_PRICE => {
+                (
+                    Self::NATIVE_BLOCK_BASEFEE,
+                    STYLUS_FRAMEWORK_ADDRESS,
+                    SF_MODULE_NAME_TX_CONTEXT,
+                ) => transaction::add_native_block_basefee_fn(module, compilation_ctx),
+                (Self::NATIVE_GAS_PRICE, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
                     transaction::add_native_tx_gas_price_fn(module, compilation_ctx)
                 }
-                Self::NATIVE_FRESH_ID => object::add_native_fresh_id_fn(module, compilation_ctx),
-                Self::NATIVE_HAS_CHILD_OBJECT => {
-                    dynamic_field::add_has_child_object_fn(module, compilation_ctx)
+                (Self::NATIVE_FRESH_ID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
+                    object::add_native_fresh_id_fn(module, compilation_ctx)
                 }
+                (
+                    Self::NATIVE_HAS_CHILD_OBJECT,
+                    STYLUS_FRAMEWORK_ADDRESS,
+                    SF_MODULE_NAME_DYNAMIC_FIELD,
+                ) => dynamic_field::add_has_child_object_fn(module, compilation_ctx),
                 #[cfg(debug_assertions)]
-                Self::NATIVE_GET_LAST_MEMORY_POSITION => {
+                (Self::NATIVE_GET_LAST_MEMORY_POSITION, _, _) => {
                     tests::add_get_last_memory_position_fn(module, compilation_ctx)
                 }
-                _ => panic!("native function {name} not supported yet"),
+                _ => panic!("native function {module_id}::{name} not supported yet"),
             }
         }
     }
@@ -146,47 +181,33 @@ impl NativeFunction {
         name: &str,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
+        module_id: &ModuleId,
         generics: &[IntermediateType],
     ) -> FunctionId {
-        match name {
-            Self::NATIVE_SHARE_OBJECT => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {name} expected 1 type parameter, found {}",
-                    generics.len(),
-                );
+        let ModuleId {
+            address,
+            module_name,
+        } = module_id;
 
+        match (name, *address, module_name.as_str()) {
+            //
+            // Transfer
+            //
+            (Self::NATIVE_SHARE_OBJECT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TRANSFER) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
                 transfer::add_share_object_fn(module, compilation_ctx, &generics[0])
             }
-            Self::NATIVE_TRANSFER_OBJECT => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {name} expected 1 type parameter, found {}",
-                    generics.len(),
-                );
-
+            (Self::NATIVE_TRANSFER_OBJECT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TRANSFER) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
                 transfer::add_transfer_object_fn(module, compilation_ctx, &generics[0])
             }
-            Self::NATIVE_FREEZE_OBJECT => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {name} expected 1 type parameter, found {}",
-                    generics.len(),
-                );
-
+            (Self::NATIVE_FREEZE_OBJECT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TRANSFER) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
                 transfer::add_freeze_object_fn(module, compilation_ctx, &generics[0])
             }
-            Self::NATIVE_DELETE_OBJECT | Self::NATIVE_REMOVE_OBJECT => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {name} expected 1 type parameter, found {}",
-                    generics.len(),
-                );
-
+            (Self::NATIVE_DELETE_OBJECT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TRANSFER)
+            | (Self::NATIVE_REMOVE_OBJECT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TRANSFER) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
                 // In this case the native function implementation is the same as the runtime one.
                 // So we reuse the runtime function.
                 RuntimeFunction::DeleteFromStorage.get_generic(
@@ -195,27 +216,76 @@ impl NativeFunction {
                     &[&generics[0]],
                 )
             }
-            Self::NATIVE_EMIT => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {name} expected 1 type parameter, found {}",
-                    generics.len(),
-                );
-
+            //
+            // Event
+            //
+            (Self::NATIVE_EMIT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_EVENT) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
                 event::add_emit_log_fn(module, compilation_ctx, &generics[0])
             }
+
+            //
+            // Types
+            //
+            (Self::NATIVE_IS_ONE_TIME_WITNESS, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TYPES) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
+                types::add_is_one_time_witness_fn(module, compilation_ctx, &generics[0])
+            }
+
+            //
+            // Object
+            //
+            (Self::NATIVE_COMPUTE_NAMED_ID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
+                object::add_compute_named_id_fn(module, compilation_ctx, &generics[0])
+            }
+
+            //
+            // Dynamic field
+            //
+            (
+                Self::NATIVE_HASH_TYPE_AND_KEY,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_DYNAMIC_FIELD,
+            ) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
+                dynamic_field::add_hash_type_and_key_fn(module, compilation_ctx, &generics[0])
+            }
+            (
+                Self::NATIVE_ADD_CHILD_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_DYNAMIC_FIELD,
+            ) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
+                dynamic_field::add_child_object_fn(module, compilation_ctx, &generics[0])
+            }
+            (
+                Self::NATIVE_BORROW_CHILD_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_DYNAMIC_FIELD,
+            )
+            | (
+                Self::NATIVE_BORROW_CHILD_OBJECT_MUT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_DYNAMIC_FIELD,
+            ) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
+                dynamic_field::add_borrow_object_fn(module, compilation_ctx, &generics[0])
+            }
+            (
+                Self::NATIVE_REMOVE_CHILD_OBJECT,
+                STYLUS_FRAMEWORK_ADDRESS,
+                SF_MODULE_NAME_DYNAMIC_FIELD,
+            ) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
+                dynamic_field::add_remove_child_object_fn(module, compilation_ctx, &generics[0])
+            }
+
             // This native function is only available in debug mode to help with testing. It should
             // not be compiled in release mode.
             #[cfg(debug_assertions)]
-            Self::SAVE_IN_SLOT => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {name} expected 1 type parameter, found {}",
-                    generics.len(),
-                );
-
+            (Self::SAVE_IN_SLOT, _, _) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
                 // In this case the native function implementation is the same as the runtime one.
                 // So we reuse the runtime function.
                 RuntimeFunction::EncodeAndSaveInStorage.get_generic(
@@ -227,13 +297,8 @@ impl NativeFunction {
             // This native function is only available in debug mode to help with testing. It should
             // not be compiled in release mode.
             #[cfg(debug_assertions)]
-            Self::READ_SLOT => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {name} expected 1 type parameter, found {}",
-                    generics.len(),
-                );
+            (Self::READ_SLOT, _, _) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
 
                 // In this case the native function implementation is the same as the runtime one.
                 // So we reuse the runtime function.
@@ -243,69 +308,13 @@ impl NativeFunction {
                     &[&generics[0]],
                 )
             }
-
-            Self::NATIVE_IS_ONE_TIME_WITNESS => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {name} expected 1 type parameter, found {}",
-                    generics.len(),
-                );
-
-                types::add_is_one_time_witness_fn(module, compilation_ctx, &generics[0])
-            }
-            Self::NATIVE_COMPUTE_NAMED_ID => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {name} expected 1 type parameter, found {}",
-                    generics.len(),
-                );
-
-                object::add_compute_named_id_fn(module, compilation_ctx, &generics[0])
-            }
-            Self::NATIVE_HASH_TYPE_AND_KEY => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {name} expected 1 type parameter, found {}",
-                    generics.len(),
-                );
-
+            #[cfg(debug_assertions)]
+            (Self::NATIVE_HASH_TYPE_AND_KEY, _, _) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
                 dynamic_field::add_hash_type_and_key_fn(module, compilation_ctx, &generics[0])
             }
-            Self::NATIVE_ADD_CHILD_OBJECT => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {name} expected 1 type parameter, found {}",
-                    generics.len(),
-                );
 
-                dynamic_field::add_child_object_fn(module, compilation_ctx, &generics[0])
-            }
-            Self::NATIVE_BORROW_CHILD_OBJECT | Self::NATIVE_BORROW_CHILD_OBJECT_MUT => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {name} expected 1 type parameter, found {}",
-                    generics.len(),
-                );
-
-                dynamic_field::add_borrow_object_fn(module, compilation_ctx, &generics[0])
-            }
-            Self::NATIVE_REMOVE_CHILD_OBJECT => {
-                assert_eq!(
-                    1,
-                    generics.len(),
-                    "there was an error linking {name} expected 1 type parameter, found {}",
-                    generics.len(),
-                );
-
-                dynamic_field::add_remove_child_object_fn(module, compilation_ctx, &generics[0])
-            }
-
-            _ => panic!("generic native function {name} not supported yet"),
+            _ => panic!("generic native function {module_id}::{name} not supported yet"),
         }
     }
 
@@ -318,5 +327,12 @@ impl NativeFunction {
             Self::NATIVE_CHAIN_ID => Some(Self::HOST_CHAIN_ID),
             _ => None,
         }
+    }
+
+    fn assert_generics_length(len: usize, expected: usize, name: &str, module_id: &ModuleId) {
+        assert_eq!(
+            expected, len,
+            "there was an error linking {module_id}::{name} expected {expected} type parameter(s), found {len}"
+        );
     }
 }
