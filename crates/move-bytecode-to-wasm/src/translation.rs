@@ -629,6 +629,7 @@ fn translate_instruction(
                         &function_id.identifier,
                         module,
                         compilation_ctx,
+                        &function_id.module_id,
                         type_instantiations,
                     );
 
@@ -791,8 +792,12 @@ fn translate_instruction(
                 // and linking
                 // If the function IS native, we link it and call it directly
                 else if function_information.is_native {
-                    let native_function_id =
-                        NativeFunction::get(&function_id.identifier, module, compilation_ctx);
+                    let native_function_id = NativeFunction::get(
+                        &function_id.identifier,
+                        module,
+                        compilation_ctx,
+                        &function_information.function_id.module_id,
+                    );
                     builder.call(native_function_id);
                 } else {
                     let table_id = function_table.get_table_id();
