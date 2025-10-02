@@ -3848,10 +3848,260 @@ mod trusted_swap {
         assert_eq!(0, result);
     }
 }
+
+mod trusted_mega_swap {
+    use alloy_sol_types::{SolCall, sol};
+
+    use super::*;
+
+    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
+    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
+    // thread. If that happens, messages from test A can be received by test B.
+    // Using once instance per thread assures this won't happen.
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "trusted_mega_swap";
+        const SOURCE_PATH: &str = "tests/storage/trusted_mega_swap.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+        #[derive(Debug)]
+        struct ID {
+           bytes32 bytes;
+        }
+
+        #[derive(Debug)]
+        struct UID {
+           ID id;
+        }
+
+        struct ObjectWrapper {
+            UID id;
+            Object object;
+            Object[] vec_object;
+        }
+
+        struct Object {
+            UID id;
+            uint8 scarcity;
+            uint8 style;
+        }
+        struct SwapRequest {
+            UID id;
+            address owner;
+            ObjectWrapper wrapper;
+            uint64 fee;
+        }
+        function createObject(uint8 scarcity, uint8 style) public;
+        function readObject(bytes32 id) public view returns (Object);
+        function requestMegaSwap(bytes32 id1, bytes32 id2, bytes32 id3, address service, uint64 fee) public;
+        function executeMegaSwap(bytes32 id1, bytes32 id2) public returns (uint64);
+    );
+
+    const OWNER_A: [u8; 20] = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+    const OWNER_B: [u8; 20] = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
+    const SERVICE: [u8; 20] = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3];
+
+    #[rstest]
+    fn test_successful_mega_swap(runtime: RuntimeSandbox) {
+        ////// First owner creates an object //////
+        runtime.set_msg_sender(OWNER_A);
+        runtime.set_tx_origin(OWNER_A);
+        let fee_a = 1000;
+
+        let call_data = createObjectCall::new((7, 2)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // First object
+        let obj_1_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let obj_1_a_id = FixedBytes::<32>::from_slice(&obj_1_a_id);
+        let obj_1_a_slot = derive_object_slot(&OWNER_A, &obj_1_a_id.0);
+
+        let call_data = createObjectCall::new((17, 12)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Second object
+        let obj_2_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let obj_2_a_id = FixedBytes::<32>::from_slice(&obj_2_a_id);
+        let obj_2_a_slot = derive_object_slot(&OWNER_A, &obj_2_a_id.0);
+
+        let call_data = createObjectCall::new((4, 14)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Third object
+        let obj_3_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let obj_3_a_id = FixedBytes::<32>::from_slice(&obj_3_a_id);
+        let obj_3_a_slot = derive_object_slot(&OWNER_A, &obj_3_a_id.0);
+
+        let call_data =
+            requestMegaSwapCall::new((obj_1_a_id, obj_2_a_id, obj_3_a_id, SERVICE.into(), fee_a))
+                .abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let wrapper_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let wrapper_a_id = FixedBytes::<32>::from_slice(&wrapper_a_id);
+        println!("Wrapper A ID: {:#x}", wrapper_a_id);
+
+        // Read the swap request id emmited from the contract's events
+        let swap_request_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let swap_request_a_id = FixedBytes::<32>::from_slice(&swap_request_a_id);
+
+
+        // Assert that the original objects slots are empty
+        assert_eq!(
+            runtime.get_storage_at_slot(obj_1_a_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+        assert_eq!(
+            runtime.get_storage_at_slot(obj_2_a_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+        assert_eq!(
+            runtime.get_storage_at_slot(obj_3_a_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+
+        ////// Second owner requests a swap //////
+        runtime.set_msg_sender(OWNER_B);
+        runtime.set_tx_origin(OWNER_B);
+        let fee_b = 1250;
+
+        let call_data = createObjectCall::new((7, 3)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the object id emmited from the contract's events
+        let obj_1_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let obj_1_b_id = FixedBytes::<32>::from_slice(&obj_1_b_id);
+        let obj_1_b_slot = derive_object_slot(&OWNER_B, &obj_1_b_id.0);
+
+        let call_data = createObjectCall::new((17, 12)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Second object
+        let obj_2_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let obj_2_b_id = FixedBytes::<32>::from_slice(&obj_2_b_id);
+        let obj_2_b_slot = derive_object_slot(&OWNER_B, &obj_2_b_id.0);
+
+        let call_data = createObjectCall::new((4, 14)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Third object
+        let obj_3_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let obj_3_b_id = FixedBytes::<32>::from_slice(&obj_3_b_id);
+        let obj_3_b_slot = derive_object_slot(&OWNER_B, &obj_3_b_id.0);
+
+        let call_data =
+            requestMegaSwapCall::new((obj_1_b_id, obj_2_b_id, obj_3_b_id, SERVICE.into(), fee_b))
+                .abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let wrapper_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let wrapper_b_id = FixedBytes::<32>::from_slice(&wrapper_b_id);
+        println!("Wrapper B ID: {:#x}", wrapper_b_id);
+
+        let swap_request_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let swap_request_b_id = FixedBytes::<32>::from_slice(&swap_request_b_id);
+
+        // Assert that both slots are empty
+        assert_eq!(
+            runtime.get_storage_at_slot(obj_1_b_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+        assert_eq!(
+            runtime.get_storage_at_slot(obj_2_b_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+        assert_eq!(
+            runtime.get_storage_at_slot(obj_3_b_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+        ////// Execute the swap //////
+        runtime.set_msg_sender(SERVICE);
+        runtime.set_tx_origin(SERVICE);
+
+        let storage_before_delete = runtime.get_storage();
+
+        let call_data =
+            executeMegaSwapCall::new((swap_request_a_id, swap_request_b_id)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = executeMegaSwapCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(fee_a + fee_b, return_data);
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
+
+        ////// Read the objects //////
+        // Now owner A should have the object B, and owner B should have the object A.
+        runtime.set_msg_sender(OWNER_A);
+        runtime.set_tx_origin(OWNER_A);
+
+        let call_data = readObjectCall::new((obj_1_b_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(return_data.id.id.bytes, obj_1_b_id);
+        assert_eq!(0, result);
+
+        let call_data = readObjectCall::new((obj_2_b_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(return_data.id.id.bytes, obj_2_b_id);
+        assert_eq!(0, result);
+
+        let call_data = readObjectCall::new((obj_3_b_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(return_data.id.id.bytes, obj_3_b_id);
+        assert_eq!(0, result);
+
+        runtime.set_msg_sender(OWNER_B);
+        runtime.set_tx_origin(OWNER_B);
+
+        let call_data = readObjectCall::new((obj_1_a_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(return_data.id.id.bytes, obj_1_a_id);
+        assert_eq!(0, result);
+
+        let call_data = readObjectCall::new((obj_2_a_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(return_data.id.id.bytes, obj_2_a_id);
+        assert_eq!(0, result);
+
+        let call_data = readObjectCall::new((obj_3_a_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readObjectCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(return_data.id.id.bytes, obj_3_a_id);
+        assert_eq!(0, result);
+    }
+}
+
 /*
 mod dynamic_storage_fields {
     use alloy_primitives::{FixedBytes, address};
-    use alloy_sol_types::{SolCall, sol};
+    use alloy_sol_types::{SolCall, SolValue, sol};
 
     use super::*;
 
@@ -3872,11 +4122,32 @@ mod dynamic_storage_fields {
 
     sol!(
         #[allow(missing_docs)]
+
+        struct String {
+            uint8[] bytes;
+        }
+
         function createFoo() public view;
+        function createFooOwned() public view;
+        function attachDynamicField(bytes32 foo, String name, uint64 value) public view;
+        function readDynamicField(bytes32 foo, String name) public view returns (uint64);
+        function dynamicFieldExists(bytes32 foo, String name) public view returns (bool);
+        function mutateDynamicField(bytes32 foo, String name) public view;
+        function removeDynamicField(bytes32 foo, String name) public view returns (uint64);
+        function attachDynamicFieldAddrU256(bytes32 foo, address name, uint256 value) public view;
+        function readDynamicFieldAddrU256(bytes32 foo, address name) public view returns (uint256);
+        function dynamicFieldExistsAddrU256(bytes32 foo, address name) public view returns (bool);
+        function removeDynamicFieldAddrU256(bytes32 foo, address name) public view returns (uint64);
     );
 
     #[rstest]
-    fn test_dynamic_fields_shared(runtime: RuntimeSandbox) {
+    #[case(true)]
+    #[case(false)]
+    fn test_dynamic_fields(runtime: RuntimeSandbox, #[case] owned: bool) {
+        if owned {
+            runtime.set_msg_sender(SIGNER_ADDRESS);
+        }
+
         // Create a new counter
         let call_data = createFooCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -3886,7 +4157,163 @@ mod dynamic_storage_fields {
         let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let object_id = FixedBytes::<32>::from_slice(&object_id);
 
-        println!("Object ID: {:#x}", object_id);
+        let field_name_1 = String {
+            bytes: b"test_key_1".to_ascii_lowercase(),
+        };
+
+        let field_name_2 = String {
+            bytes: b"test_key_2".to_ascii_lowercase(),
+        };
+
+        let field_name_3 = address!("0x1234567890abcdef1234567890abcdef12345678");
+        let field_name_4 = address!("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
+
+        // Check existence of dynamic fields before attaching them
+        let call_data = dynamicFieldExistsCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_3)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_4)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        // Attach a dynamic fields
+        let call_data =
+            attachDynamicFieldCall::new((object_id, field_name_1.clone(), 42)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data =
+            attachDynamicFieldCall::new((object_id, field_name_2.clone(), 84)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data =
+            attachDynamicFieldAddrU256Call::new((object_id, field_name_3, U256::from(u128::MAX)))
+                .abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data =
+            attachDynamicFieldAddrU256Call::new((object_id, field_name_4, U256::MAX)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the dynamic fields
+        let call_data = readDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(42u64.abi_encode(), result_data);
+
+        let call_data = readDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(84u64.abi_encode(), result_data);
+
+        let call_data = readDynamicFieldAddrU256Call::new((object_id, field_name_3)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(U256::from(u128::MAX).abi_encode(), result_data);
+
+        let call_data = readDynamicFieldAddrU256Call::new((object_id, field_name_4)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(U256::MAX.abi_encode(), result_data);
+
+        // Check existence of dynamic fields
+        let call_data = dynamicFieldExistsCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_3)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_4)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
+
+        // Mutatate the values
+        let call_data = mutateDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = mutateDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read modified dynamic fields
+        let call_data = readDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(43u64.abi_encode(), result_data);
+
+        let call_data = readDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(85u64.abi_encode(), result_data);
+
+        // Remove fields
+        let call_data = removeDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(43u64.abi_encode(), result_data);
+
+        let call_data = removeDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(85u64.abi_encode(), result_data);
+
+        let call_data = removeDynamicFieldAddrU256Call::new((object_id, field_name_3)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(U256::from(u128::MAX).abi_encode(), result_data);
+
+        let call_data = removeDynamicFieldAddrU256Call::new((object_id, field_name_4)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(U256::MAX.abi_encode(), result_data);
+
+        // Check existence of dynamic fields
+        let call_data = dynamicFieldExistsCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_3)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_4)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
     }
 }
 */

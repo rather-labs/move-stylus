@@ -4,7 +4,7 @@ use walrus::{
 };
 
 use super::RuntimeFunction;
-use crate::wasm_builder_extensions::WasmBuilderExtension;
+use crate::{CompilationContext, wasm_builder_extensions::WasmBuilderExtension};
 
 /// Verifies if two elements a and b are equal
 ///
@@ -233,7 +233,7 @@ pub fn vec_equality_heap_type(
 ///    - length of the data
 /// # Returns:
 ///    - 1 if all the bytes are zero, 0 otherwise
-pub fn is_zero(module: &mut Module, compilation_ctx: &crate::CompilationContext) -> FunctionId {
+pub fn is_zero(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],

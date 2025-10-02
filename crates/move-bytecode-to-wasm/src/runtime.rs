@@ -1,4 +1,4 @@
-use walrus::{FunctionId, Module};
+use walrus::{FunctionId, GlobalId, Module};
 
 use crate::{
     CompilationContext,
@@ -67,6 +67,7 @@ pub enum RuntimeFunction {
     DecodeAndReadFromStorage,
     DeleteFromStorage,
     GetStructOwner,
+    CommitChangesToStorage,
     // ASCII conversion
     U64ToAsciiBase10,
 }
@@ -126,6 +127,7 @@ impl RuntimeFunction {
             Self::DeleteFromStorage => "delete_from_storage",
             Self::GetStructOwner => "get_struct_owner",
             Self::U64ToAsciiBase10 => "u64_to_ascii_base_10",
+            Self::CommitChangesToStorage => "commit_changes_to_storage",
         }
     }
 
@@ -295,6 +297,28 @@ impl RuntimeFunction {
                 r#"there was an error linking "{}" runtime function, is this function generic?"#,
                 self.name()
             ),
+        }
+    }
+
+    /// Links the function `commit_changes_to_storage` into the module and returns its id.
+    ///
+    /// This funciton is idempotent.
+    ///
+    /// It is not possible to obtain this function with the `get` method because it need the extra
+    /// parameter `dynamic_fields_global_variables`
+    pub fn get_commit_changes_to_storage_fn(
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
+    ) -> FunctionId {
+        if let Some(function) = module.funcs.by_name(Self::CommitChangesToStorage.name()) {
+            function
+        } else {
+            storage::add_commit_changes_to_storage_fn(
+                module,
+                compilation_ctx,
+                dynamic_fields_global_variables,
+            )
         }
     }
 }
