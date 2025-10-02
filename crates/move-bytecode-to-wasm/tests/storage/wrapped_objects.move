@@ -164,11 +164,17 @@ public fun transfer_beta(beta: Beta, recipient: address) {
     transfer::transfer(beta, recipient);
 }
 
-// TODO THIS FAILS!
 public fun transfer_gamma(gamma: Gamma, recipient: address) {
     transfer::transfer(gamma, recipient);
 }
 
+public fun transfer_delta(delta: Delta, recipient: address) {
+    transfer::transfer(delta, recipient);
+}
+
+// Miscellaneous operations on structs
+
+// Destructs gamma and wraps beta in a new gamma
 public fun rebuild_gamma(gamma: Gamma, recipient: address, ctx: &mut TxContext) {
     let Gamma { id, a: beta } = gamma;
     id.delete();
@@ -176,10 +182,14 @@ public fun rebuild_gamma(gamma: Gamma, recipient: address, ctx: &mut TxContext) 
     transfer::transfer(new_gamma, recipient);
 }
 
-public fun transfer_delta(delta: Delta, recipient: address) {
-    transfer::transfer(delta, recipient);
-}
-
-public fun transfer_epsilon(epsilon: Epsilon, recipient: address) {
-    transfer::transfer(epsilon, recipient);
+// Destructs delta and wraps each alpha in a beta
+public fun destruct_delta_to_beta(delta: Delta, ctx: &mut TxContext) {
+    let Delta { id, a: mut vector_alpha } = delta;
+    id.delete();
+    while (!vector::is_empty(&vector_alpha)) {
+        let alpha = vector::pop_back(&mut vector_alpha);
+        let beta = Beta { id: object::new(ctx), a: alpha };
+        transfer::share_object(beta);
+    };
+    vector::destroy_empty(vector_alpha);
 }

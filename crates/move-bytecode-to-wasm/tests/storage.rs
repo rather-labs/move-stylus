@@ -4247,7 +4247,9 @@ mod wrapped_objects {
         function deleteEpsilon(bytes32 e) public view;
         function transferBeta(bytes32 b, address recipient) public view;
         function transferGamma(bytes32 g, address recipient) public view;
+        function transferDelta(bytes32 d, address recipient) public view;
         function rebuildGamma(bytes32 g, address recipient) public view;
+        function destructDeltaToBeta(bytes32 d) public view;
     );
 
     // In all tests, we use the tto flag to indicate if the creation method should take
@@ -4751,6 +4753,65 @@ mod wrapped_objects {
     }
 
     #[rstest]
+    fn test_transferring_delta(runtime: RuntimeSandbox) {
+        let call_data = createDeltaCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+
+        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+
+        let delta_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let delta_id = FixedBytes::<32>::from_slice(&delta_id);
+        let delta_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &delta_id.0);
+
+        let call_data = transferDeltaCall::new((delta_id, RECIPIENT_ADDRESS.into())).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        runtime.set_tx_origin(RECIPIENT_ADDRESS.into());
+        // Read delta and assert the returned data
+        let call_data = readDeltaCall::new((delta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readDeltaCall::abi_decode_returns(&return_data).unwrap();
+        let delta_expected = Delta::abi_encode(&Delta {
+            id: UID {
+                id: ID { bytes: delta_id },
+            },
+            a: vec![
+                Alpha {
+                    id: UID {
+                        id: ID { bytes: alpha_1_id },
+                    },
+                    value: 101,
+                },
+                Alpha {
+                    id: UID {
+                        id: ID { bytes: alpha_2_id },
+                    },
+                    value: 102,
+                },
+            ],
+        });
+        assert_eq!(Delta::abi_encode(&return_data), delta_expected);
+        assert_eq!(0, result);
+
+        // Assert delta was deleted from the original namespace
+        assert_eq!(
+            runtime.get_storage_at_slot(delta_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+        assert_eq!(
+            runtime.get_storage_at_slot(get_next_slot(&delta_slot.0)),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+    }
+    #[rstest]
     fn test_rebuilding_gamma(runtime: RuntimeSandbox) {
         let call_data = createGammaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -4811,6 +4872,74 @@ mod wrapped_objects {
             [0u8; 32],
             "Slot should be empty"
         );
+    }
+
+    #[rstest]
+    fn test_destruct_delta_to_beta(runtime: RuntimeSandbox) {
+        let call_data = createDeltaCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+
+        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+
+        let delta_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let delta_id = FixedBytes::<32>::from_slice(&delta_id);
+
+        let storage_before_destruct = runtime.get_storage();
+
+        let call_data = destructDeltaToBetaCall::new((delta_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_destruct = runtime.get_storage();
+
+        // Delta is deleted and each alpha is wrapped in a new beta, hence all the original slots should be empty
+        assert_empty_storage(&storage_before_destruct, &storage_after_destruct);
+
+        let beta_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let beta_1_id = FixedBytes::<32>::from_slice(&beta_1_id);
+
+        let beta_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let beta_2_id = FixedBytes::<32>::from_slice(&beta_2_id);
+
+        // Read the betas and assert the returned data is correct
+        let call_data = readBetaCall::new((beta_1_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readBetaCall::abi_decode_returns(&return_data).unwrap();
+        let beta_expected = Beta::abi_encode(&Beta {
+            id: UID {
+                id: ID { bytes: beta_1_id },
+            },
+            a: Alpha {
+                id: UID {
+                    id: ID { bytes: alpha_2_id },
+                },
+                value: 102,
+            },
+        });
+        assert_eq!(Beta::abi_encode(&return_data), beta_expected);
+        assert_eq!(0, result);
+
+        let call_data = readBetaCall::new((beta_2_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readBetaCall::abi_decode_returns(&return_data).unwrap();
+        let beta_expected = Beta::abi_encode(&Beta {
+            id: UID {
+                id: ID { bytes: beta_2_id },
+            },
+            a: Alpha {
+                id: UID {
+                    id: ID { bytes: alpha_1_id },
+                },
+                value: 101,
+            },
+        });
+        assert_eq!(Beta::abi_encode(&return_data), beta_expected);
+        assert_eq!(0, result);
     }
 }
 
