@@ -243,7 +243,7 @@ impl NativeFunction {
             }
             (Self::NATIVE_AS_UID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT)
             | (Self::NATIVE_AS_UID_MUT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
-                // Generics are not used in this function because que just conver &NamedId to &UID,
+                // Generics are not used in this function because it just converts &NamedId to &UID,
                 // which, under the hood they have the same structure. Generic type is not used in
                 // the function, just to detect that the function was called correctly
                 Self::assert_generics_length(generics.len(), 1, name, module_id);
