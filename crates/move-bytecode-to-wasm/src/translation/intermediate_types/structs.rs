@@ -214,6 +214,19 @@ impl IStruct {
 
         builder.local_set(original_struct_ptr);
 
+        // If the struct has the key ability, we need to copy the owner id too,
+        // which is prepended 32 bytes before the struct in memory.
+        if self.has_key {
+            builder
+                .i32_const(32)
+                .call(compilation_ctx.allocator)
+                .local_get(original_struct_ptr)
+                .i32_const(32)
+                .binop(BinaryOp::I32Sub)
+                .i32_const(32)
+                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+        }
+
         // Allocate space for the new struct
         builder
             .i32_const(self.heap_size as i32)
