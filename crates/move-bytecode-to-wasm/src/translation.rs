@@ -11,7 +11,6 @@ pub mod functions;
 pub mod intermediate_types;
 pub mod table;
 
-use crate::native_functions::transfer::add_delete_tto_objects_instructions;
 use crate::{
     CompilationContext,
     compilation_context::{ModuleData, ModuleId},
@@ -1577,14 +1576,10 @@ fn translate_instruction(
                                         );
 
                                     // Call the function to delete any recently tto objects within the struct
-                                    // This is particularly needed when pushing objects with key ability into a vector field of a struct
-                                    add_delete_tto_objects_instructions(
-                                        module,
-                                        else_,
-                                        compilation_ctx,
-                                        struct_ptr,
-                                        &struct_,
-                                    );
+                                    // This needed when pushing objects with the key ability into a vector field of a struct
+                                    let delete_tto_objects_fn = RuntimeFunction::DeleteTtoObject
+                                        .get_generic(module, compilation_ctx, &[itype]);
+                                    else_.local_get(struct_ptr).call(delete_tto_objects_fn);
 
                                     // Save the struct in the slot
                                     else_
