@@ -4384,7 +4384,7 @@ mod wrapped_objects {
         assert_eq!(0, result);
 
         // Read beta from the recipient namespace in storage
-        runtime.set_tx_origin(RECIPIENT_ADDRESS.into());
+        runtime.set_tx_origin(RECIPIENT_ADDRESS);
         let call_data = readBetaCall::new((beta_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = readBetaCall::abi_decode_returns(&return_data).unwrap();
@@ -4437,7 +4437,7 @@ mod wrapped_objects {
         assert_eq!(0, result);
 
         // Read beta from the recipient namespace in storage
-        runtime.set_tx_origin(RECIPIENT_ADDRESS.into());
+        runtime.set_tx_origin(RECIPIENT_ADDRESS);
         let call_data = readGammaCall::new((gamma_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = readGammaCall::abi_decode_returns(&return_data).unwrap();
@@ -4493,7 +4493,7 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        runtime.set_tx_origin(RECIPIENT_ADDRESS.into());
+        runtime.set_tx_origin(RECIPIENT_ADDRESS);
         // Read delta and assert the returned data
         let call_data = readDeltaCall::new((delta_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -4557,7 +4557,7 @@ mod wrapped_objects {
         let new_gamma_id = FixedBytes::<32>::from_slice(&new_gamma_id);
 
         // Read gamma from the recipient namespace in storage
-        runtime.set_tx_origin(RECIPIENT_ADDRESS.into());
+        runtime.set_tx_origin(RECIPIENT_ADDRESS);
         let call_data = readGammaCall::new((new_gamma_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = readGammaCall::abi_decode_returns(&return_data).unwrap();
