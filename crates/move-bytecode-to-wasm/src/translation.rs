@@ -1566,8 +1566,21 @@ fn translate_instruction(
                                     // Copy the slot number to a local to avoid overwriting it later
                                     let slot_ptr = module.locals.add(ValType::I32);
                                     else_
-                                        .local_get(struct_ptr)
+                                        .i32_const(32)
+                                        .call(compilation_ctx.allocator)
+                                        .local_tee(slot_ptr)
                                         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                                        .i32_const(32)
+                                        .memory_copy(
+                                            compilation_ctx.memory_id,
+                                            compilation_ctx.memory_id,
+                                        );
+
+                                    // Load the struct memory representation to pass it to the save
+                                    // function
+                                    else_
+                                        .local_get(struct_ptr)
+                                        .local_get(slot_ptr)
                                         .call(save_in_slot_fn);
                                 },
                             );
