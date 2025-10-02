@@ -33,6 +33,7 @@ public struct Delta has key, store {
     a: vector<Alpha>,
 }
 
+// Struct with a vector of wrapped objects, which in turn have a vector of wrapped objects as field
 public struct Epsilon has key {
     id: UID,
     a: vector<Delta>,
