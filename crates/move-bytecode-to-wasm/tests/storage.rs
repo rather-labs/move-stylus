@@ -4664,7 +4664,6 @@ mod wrapped_objects {
     }
 }
 
-/*
 mod dynamic_storage_fields {
     use alloy_primitives::{FixedBytes, address};
     use alloy_sol_types::{SolCall, SolValue, sol};
@@ -4712,12 +4711,14 @@ mod dynamic_storage_fields {
     fn test_dynamic_fields(runtime: RuntimeSandbox, #[case] owned: bool) {
         if owned {
             runtime.set_msg_sender(SIGNER_ADDRESS);
+            let call_data = createFooOwnedCall::new(()).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+        } else {
+            let call_data = createFooCall::new(()).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
         }
-
-        // Create a new counter
-        let call_data = createFooCall::new(()).abi_encode();
-        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
         let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
@@ -4882,4 +4883,215 @@ mod dynamic_storage_fields {
         assert_eq!(false.abi_encode(), result_data);
     }
 }
-*/
+
+mod dynamic_storage_fields_named_id {
+    use alloy_primitives::address;
+    use alloy_sol_types::{SolCall, SolValue, sol};
+
+    use super::*;
+
+    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
+    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
+    // thread. If that happens, messages from test A can be received by test B.
+    // Using once instance per thread assures this won't happen.
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "dynamic_fields_named_id";
+        const SOURCE_PATH: &str = "tests/storage/dynamic_fields_named_id.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+
+        struct String {
+            uint8[] bytes;
+        }
+
+        function createFoo() public view;
+        function createFooOwned() public view;
+        function attachDynamicField(String name, uint64 value) public view;
+        function readDynamicField(String name) public view returns (uint64);
+        function dynamicFieldExists(String name) public view returns (bool);
+        function mutateDynamicField(String name) public view;
+        function removeDynamicField(String name) public view returns (uint64);
+        function attachDynamicFieldAddrU256(address name, uint256 value) public view;
+        function readDynamicFieldAddrU256(address name) public view returns (uint256);
+        function dynamicFieldExistsAddrU256(address name) public view returns (bool);
+        function removeDynamicFieldAddrU256(address name) public view returns (uint64);
+    );
+
+    #[rstest]
+    #[case(true)]
+    #[case(false)]
+    fn test_dynamic_fields_named_id(runtime: RuntimeSandbox, #[case] owned: bool) {
+        if owned {
+            runtime.set_msg_sender(SIGNER_ADDRESS);
+            let call_data = createFooOwnedCall::new(()).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+        } else {
+            let call_data = createFooCall::new(()).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+        }
+
+        let field_name_1 = String {
+            bytes: b"test_key_1".to_ascii_lowercase(),
+        };
+
+        let field_name_2 = String {
+            bytes: b"test_key_2".to_ascii_lowercase(),
+        };
+
+        let field_name_3 = address!("0x1234567890abcdef1234567890abcdef12345678");
+        let field_name_4 = address!("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
+
+        // Check existence of dynamic fields before attaching them
+        let call_data = dynamicFieldExistsCall::new((field_name_1.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsCall::new((field_name_2.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsAddrU256Call::new((field_name_3,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsAddrU256Call::new((field_name_4,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        // Attach a dynamic fields
+        let call_data = attachDynamicFieldCall::new((field_name_1.clone(), 42)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = attachDynamicFieldCall::new((field_name_2.clone(), 84)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data =
+            attachDynamicFieldAddrU256Call::new((field_name_3, U256::from(u128::MAX))).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = attachDynamicFieldAddrU256Call::new((field_name_4, U256::MAX)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the dynamic fields
+        let call_data = readDynamicFieldCall::new((field_name_1.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(42u64.abi_encode(), result_data);
+
+        let call_data = readDynamicFieldCall::new((field_name_2.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(84u64.abi_encode(), result_data);
+
+        let call_data = readDynamicFieldAddrU256Call::new((field_name_3,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(U256::from(u128::MAX).abi_encode(), result_data);
+
+        let call_data = readDynamicFieldAddrU256Call::new((field_name_4,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(U256::MAX.abi_encode(), result_data);
+
+        // Check existence of dynamic fields
+        let call_data = dynamicFieldExistsCall::new((field_name_1.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsCall::new((field_name_2.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsAddrU256Call::new((field_name_3,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsAddrU256Call::new((field_name_4,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
+
+        // Mutatate the values
+        let call_data = mutateDynamicFieldCall::new((field_name_1.clone(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = mutateDynamicFieldCall::new((field_name_2.clone(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read modified dynamic fields
+        let call_data = readDynamicFieldCall::new((field_name_1.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(43u64.abi_encode(), result_data);
+
+        let call_data = readDynamicFieldCall::new((field_name_2.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(85u64.abi_encode(), result_data);
+
+        // Remove fields
+        let call_data = removeDynamicFieldCall::new((field_name_1.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(43u64.abi_encode(), result_data);
+
+        let call_data = removeDynamicFieldCall::new((field_name_2.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(85u64.abi_encode(), result_data);
+
+        let call_data = removeDynamicFieldAddrU256Call::new((field_name_3,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(U256::from(u128::MAX).abi_encode(), result_data);
+
+        let call_data = removeDynamicFieldAddrU256Call::new((field_name_4,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(U256::MAX.abi_encode(), result_data);
+
+        // Check existence of dynamic fields
+        let call_data = dynamicFieldExistsCall::new((field_name_1.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsCall::new((field_name_2.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsAddrU256Call::new((field_name_3,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+
+        let call_data = dynamicFieldExistsAddrU256Call::new((field_name_4,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
+    }
+}

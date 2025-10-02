@@ -63,6 +63,8 @@ impl NativeFunction {
     // This is for objects with NamedId as id.
     pub const NATIVE_REMOVE_OBJECT: &str = "remove";
     pub const NATIVE_COMPUTE_NAMED_ID: &str = "compute_named_id";
+    pub const NATIVE_AS_UID: &str = "as_uid";
+    pub const NATIVE_AS_UID_MUT: &str = "as_uid_mut";
 
     // Dynamic fields
     #[cfg(debug_assertions)]
@@ -238,6 +240,14 @@ impl NativeFunction {
             (Self::NATIVE_COMPUTE_NAMED_ID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id);
                 object::add_compute_named_id_fn(module, compilation_ctx, &generics[0])
+            }
+            (Self::NATIVE_AS_UID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT)
+            | (Self::NATIVE_AS_UID_MUT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
+                // Generics are not used in this function because que just conver &NamedId to &UID,
+                // which, under the hood they have the same structure. Generic type is not used in
+                // the function, just to detect that the function was called correctly
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
+                object::add_as_uid_fn(module, compilation_ctx)
             }
 
             //
