@@ -849,8 +849,6 @@ pub fn add_encode_intermediate_type_instructions(
             // At the end of the load chain we point to the 32 bytes holding the data
 
             let tmp = module.locals.add(ValType::I32);
-            let tmp2 = module.locals.add(ValType::I32);
-            builder.local_tee(tmp2);
             builder
                 .load(
                     compilation_ctx.memory_id,

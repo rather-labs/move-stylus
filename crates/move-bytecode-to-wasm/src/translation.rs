@@ -1576,8 +1576,7 @@ fn translate_instruction(
                                             compilation_ctx.memory_id,
                                         );
 
-                                    // Load the struct memory representation to pass it to the save
-                                    // function
+                                    // Save the struct in the slot
                                     else_
                                         .local_get(struct_ptr)
                                         .local_get(slot_ptr)
