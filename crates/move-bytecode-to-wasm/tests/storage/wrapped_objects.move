@@ -158,3 +158,28 @@ public fun delete_epsilon(epsilon: Epsilon) {
     };
     vector::destroy_empty(vector_delta);
 }
+
+// Transferring structs
+public fun transfer_beta(beta: Beta, recipient: address) {
+    transfer::transfer(beta, recipient);
+}
+
+// TODO THIS FAILS!
+public fun transfer_gamma(gamma: Gamma, recipient: address) {
+    transfer::transfer(gamma, recipient);
+}
+
+public fun rebuild_gamma(gamma: Gamma, recipient: address, ctx: &mut TxContext) {
+    let Gamma { id, a: beta } = gamma;
+    id.delete();
+    let new_gamma = Gamma { id: object::new(ctx), a: beta };
+    transfer::transfer(new_gamma, recipient);
+}
+
+public fun transfer_delta(delta: Delta, recipient: address) {
+    transfer::transfer(delta, recipient);
+}
+
+public fun transfer_epsilon(epsilon: Epsilon, recipient: address) {
+    transfer::transfer(epsilon, recipient);
+}
