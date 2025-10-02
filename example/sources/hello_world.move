@@ -7,7 +7,10 @@ use stylus::tx_context::TxContext;
 use stylus::transfer as transfer;
 use stylus::object as object;
 use stylus::object::NamedId;
+use stylus::object::UID;
 use stylus::dynamic_field_named_id as field;
+use stylus::table::Table;
+use stylus::table as table;
 
 public struct TOTAL_SUPPLY has key {}
 public struct CONTRACT_INFO has key {}
@@ -32,12 +35,22 @@ public struct Transfer has copy, drop {
     value: u256
 }
 
+public struct Approval has copy, drop {
+    owner: address,
+    spender: address,
+    value: u256
+}
+
 public struct Balance has key {
     id: NamedId<BALANCE_>,
 }
 
 public struct Allowance has key {
     id: NamedId<ALLOWANCE_>,
+}
+
+public struct AccountAllowance has key {
+    id: UID,
 }
 
 public fun create(ctx: &mut TxContext) {
@@ -113,3 +126,30 @@ public fun transfer(
     true
 }
 
+public fun approve(
+    spender: address,
+    amount: u256,
+    allowance: &mut Allowance,
+    ctx: &mut TxContext,
+): bool {
+    let spender_allowance = if (field::exists_(&allowance.id, spender)) {
+        field::borrow_mut<ALLOWANCE_, address, Table<address, u256>>(&mut allowance.id, ctx.sender())
+    } else {
+        field::add(
+            &mut allowance.id,
+            ctx.sender(),
+            table::new<address, u256>(ctx)
+        );
+        field::borrow_mut<ALLOWANCE_, address, Table<address, u256>>(&mut allowance.id, ctx.sender())
+    };
+
+    spender_allowance.add(spender, amount);
+
+    emit(Approval {
+        owner: ctx.sender(),
+        spender,
+        value: amount
+    });
+
+    true
+}
