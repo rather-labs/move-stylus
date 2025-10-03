@@ -615,15 +615,14 @@ pub fn add_save_struct_into_storage_fn(
         return function;
     }
 
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
-
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
 
-    let struct_ptr = module.locals.add(ValType::I32);
+    // Arguments
     let slot_ptr = module.locals.add(ValType::I32);
+    let struct_ptr = module.locals.add(ValType::I32);
+
+    // Locals
     let written_bytes_in_slot = module.locals.add(ValType::I32);
     builder.i32_const(0).local_set(written_bytes_in_slot);
 
@@ -633,7 +632,7 @@ pub fn add_save_struct_into_storage_fn(
         compilation_ctx,
         struct_ptr,
         slot_ptr,
-        &struct_,
+        itype,
         written_bytes_in_slot,
     );
 
@@ -663,10 +662,6 @@ pub fn add_read_struct_from_storage_fn(
         return function;
     }
 
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
-
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
@@ -674,10 +669,12 @@ pub fn add_read_struct_from_storage_fn(
     );
     let mut builder = function.name(name).func_body();
 
-    let slot_ptr = module.locals.add(ValType::I32);
+    // Arguments
     let uid_ptr = module.locals.add(ValType::I32);
-    let read_bytes_in_slot = module.locals.add(ValType::I32);
+    let slot_ptr = module.locals.add(ValType::I32);
 
+    // Locals
+    let read_bytes_in_slot = module.locals.add(ValType::I32);
     builder.i32_const(0).local_set(read_bytes_in_slot);
 
     let struct_ptr = add_read_and_decode_storage_struct_instructions(
@@ -686,7 +683,7 @@ pub fn add_read_struct_from_storage_fn(
         compilation_ctx,
         slot_ptr,
         uid_ptr,
-        &struct_,
+        itype,
         false,
         read_bytes_in_slot,
     );
@@ -764,7 +761,9 @@ pub fn add_delete_struct_from_storage_fn(
 
             // Initialize the number of bytes used in the slot to zero
             let used_bytes_in_slot = module.locals.add(ValType::I32);
-            else_.i32_const(0).local_set(used_bytes_in_slot);
+
+            // Initialize the number of bytes used in the slot to 8, as this are the bytes occupied by the type hash of the struct
+            else_.i32_const(8).local_set(used_bytes_in_slot);
 
             // Delete the struct from storage
             add_delete_storage_struct_instructions(

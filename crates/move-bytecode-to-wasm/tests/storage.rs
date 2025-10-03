@@ -2602,7 +2602,6 @@ mod storage_encoding {
 
         struct DynamicStruct2 {
             UID id;
-            uint256 fake_id;
             bool[] a;
             uint8[] b;
             uint16[] c;
@@ -2615,7 +2614,6 @@ mod storage_encoding {
 
         struct DynamicStruct3 {
             UID id;
-            uint256 fake_id;
             uint8[][] a;
             uint32[][] b;
             uint64[][] c;
@@ -2624,7 +2622,6 @@ mod storage_encoding {
 
         struct DynamicStruct4 {
             UID id;
-            uint256 fake_id;
             DynamicNestedStructChild[] a;
             StaticNestedStructChild[] b;
         }
@@ -2662,7 +2659,6 @@ mod storage_encoding {
         function readDynamicStruct(uint256 uid) public view returns (DynamicStruct);
 
         function saveDynamicStruct2(
-            uint256 fake_id,
             bool[] a,
             uint8[] b,
             uint16[] c,
@@ -2675,7 +2671,6 @@ mod storage_encoding {
         function readDynamicStruct2(uint256 uid) public view returns (DynamicStruct2);
 
         function saveDynamicStruct3(
-            uint256 fake_id,
             uint8[][] a,
             uint32[][] b,
             uint64[][] c,
@@ -2684,7 +2679,6 @@ mod storage_encoding {
         function readDynamicStruct3(uint256 uid) public view returns (DynamicStruct3);
 
         function saveDynamicStruct4(
-            uint256 fake_id,
             uint32[] x,
             uint64 y,
             uint128 z,
@@ -2757,11 +2751,12 @@ mod storage_encoding {
         0xdddddddd,
         0xeeee,
         0xff,
-        address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+        address!("0xcccccccccccccccccccccccccccccccccccccccc"),
     )), vec![
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000048c3f1c3917932d1", 16).unwrap().to_be_bytes(),
         [0xaa; 32],
         U256::from_str_radix("ffeeeeddddddddccccccccccccccccbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("cccccccccccccccccccccccccccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
     readStaticFieldsCall::new((FixedBytes::<32>::from_slice(&U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()).into(),)),
         StaticFields {
@@ -2772,7 +2767,7 @@ mod storage_encoding {
             d: 0xdddddddd,
             e: 0xeeee,
             f: 0xff,
-            g: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+            g: address!("0xcccccccccccccccccccccccccccccccccccccccc"),
         }
     )]
     #[case(saveStaticFieldsCall::new((
@@ -2784,6 +2779,7 @@ mod storage_encoding {
         6,
         address!("0xcafecafecafecafecafecafecafecafecafecafe"),
     )), vec![
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000048c3f1c3917932d1", 16).unwrap().to_be_bytes(),
         U256::from(1).to_be_bytes(),
         U256::from_str_radix("06000500000004000000000000000300000000000000000000000000000002", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
@@ -2807,7 +2803,8 @@ mod storage_encoding {
         0xeeee,
         0xff,
     )), vec![
-        U256::from_str_radix("ffeeeecccccccccccccccccafecafecafecafecafecafecafecafecafecafeff", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000cafecafecafecafecafecafecafecafecafecafeffe9e2482e212d98f1", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000000000000000ffeeeecccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
         readStaticFields2Call::new((FixedBytes::<32>::from_slice(&U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()).into(),)),
         StaticFields2 {
@@ -2826,8 +2823,9 @@ mod storage_encoding {
         3,
         4,
     )), vec![
-        U256::from_str_radix("0400030000000000000002cafecafecafecafecafecafecafecafecafecafe01", 16).unwrap().to_be_bytes(),
-    ],
+        U256::from_str_radix("00cafecafecafecafecafecafecafecafecafecafe01e9e2482e212d98f1", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000400030000000000000002", 16).unwrap().to_be_bytes(),
+        ],
         readStaticFields2Call::new((FixedBytes::<32>::from_slice(&U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()).into(),)),
         StaticFields2 {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
@@ -2840,38 +2838,39 @@ mod storage_encoding {
     )]
     #[case(saveStaticFields3Call::new((
         1,
-        address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+        address!("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+
         2,
-        address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
+        address!("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
     )), vec![
-        U256::from_str_radix("0000000000000000000002cafecafecafecafecafecafecafecafecafecafe01", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("000000000000000000000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeef", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0156e27099af020ce4", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb0000000000000002", 16).unwrap().to_be_bytes(),
     ],
         readStaticFields3Call::new((FixedBytes::<32>::from_slice(&U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()).into(),)),
         StaticFields3 {
            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: 1,
-           b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+           b: address!("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
            c: 2,
-           d: address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
+           d: address!("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
         }
     )]
     #[case(saveStaticFields3Call::new((
         0xff,
-        address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+        address!("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
         0xcccccccccccccccc,
-        address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
+        address!("0xffffffffffffffffffffffffffffffffffffffff"),
     )), vec![
-        U256::from_str_radix("000000cccccccccccccccccafecafecafecafecafecafecafecafecafecafeff", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("000000000000000000000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeef", 16).unwrap().to_be_bytes(),
-    ],
+        U256::from_str_radix("000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaff56e27099af020ce4", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000ffffffffffffffffffffffffffffffffffffffffcccccccccccccccc", 16).unwrap().to_be_bytes(),
+        ],
         readStaticFields3Call::new((FixedBytes::<32>::from_slice(&U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()).into(),)),
         StaticFields3 {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: 0xff,
-            b: address!("0xcafecafecafecafecafecafecafecafecafecafe"),
+            b: address!("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
             c: 0xcccccccccccccccc,
-            d: address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
+            d: address!("0xffffffffffffffffffffffffffffffffffffffff"),
         }
     )]
     #[case(saveStaticNestedStructCall::new((
@@ -2882,7 +2881,7 @@ mod storage_encoding {
         3,
         4
     )), vec![
-        U256::from_str_radix("0000000000000002010000000000000001", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000002010000000000000001c481f5cb4e57a4ff", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000400000000000000000000000000000003", 16).unwrap().to_be_bytes(),
     ],
@@ -2907,7 +2906,7 @@ mod storage_encoding {
         0xcccccccccccccccccccccccccccccccc,
         0xdddddddd,
     )), vec![
-        U256::from_str_radix("000000000000000000000000000000bbbbbbbbbbbbbbbb01aaaaaaaaaaaaaaaa", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000bbbbbbbbbbbbbbbb01aaaaaaaaaaaaaaaac481f5cb4e57a4ff", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000ddddddddcccccccccccccccccccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
@@ -2974,7 +2973,7 @@ mod storage_encoding {
 
     ],
     vec![
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000010000002e", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000010000002ed703a469deda2bde", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000005", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000000000000000000030000000000000002f", 16).unwrap().to_be_bytes(),
@@ -3015,7 +3014,7 @@ mod storage_encoding {
         U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5acf", 16).unwrap().to_be_bytes(), // vector elements second slot
     ],
     vec![
-        U256::from_str_radix("00000000000000000000000000000000000000000000000000000001ffffffff", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000001ffffffffd703a469deda2bde", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("00000000000000000000000000000000000000000000030ffffffffffffffff", 16).unwrap().to_be_bytes(),
@@ -3036,7 +3035,6 @@ mod storage_encoding {
         }
     )]
     #[case(saveDynamicStruct2Call::new((
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap(),
         vec![true, false, true],
         vec![1, 2, 3, 4, 5], // u8
         vec![6, 7, 8, 9], // u16
@@ -3070,7 +3068,7 @@ mod storage_encoding {
         U256::from_str_radix("f3f7a9fe364faab93b216da50a3214154f22a0a2b415b23a84c8169e8b636ee4", 16).unwrap().to_be_bytes(), // address vec, elem slot #2
     ],
     vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000d9fb85866186b1bf", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000010001", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000005", 16).unwrap().to_be_bytes(),
@@ -3095,7 +3093,6 @@ mod storage_encoding {
         readDynamicStruct2Call::new((FixedBytes::<32>::from_slice(&U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()).into(),)),
         DynamicStruct2 {
         id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
-        fake_id: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap(),
            a: vec![true, false, true],
            b: vec![1, 2, 3, 4, 5],
            c: vec![6, 7, 8, 9],
@@ -3107,7 +3104,6 @@ mod storage_encoding {
         }
     )]
     #[case(saveDynamicStruct3Call::new((
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap(),
         vec![vec![1, 2, 3], vec![4, 5]],
         vec![vec![6, 7], vec![8], vec![9, 10]],
         vec![vec![11, 12, 13, 14], vec![], vec![15, 16]],
@@ -3142,7 +3138,7 @@ mod storage_encoding {
         U256::from_str_radix("c167b0e3c82238f4f2d1a50a8b3a44f96311d77b148c30dc0ef863e1a060dcb7", 16).unwrap().to_be_bytes(), // u128[] elements slot #2
     ],
     vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000000027c61e2e651ea057", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // u32[][] len
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // first u8[] len
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000030201", 16).unwrap().to_be_bytes(), // first u8[] elements
@@ -3172,7 +3168,6 @@ mod storage_encoding {
         readDynamicStruct3Call::new((FixedBytes::<32>::from_slice(&U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()).into(),)),
         DynamicStruct3 {
            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
-           fake_id: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap(),
            a: vec![vec![1, 2, 3], vec![4, 5]],
            b: vec![vec![6, 7], vec![8], vec![9, 10]],
            c: vec![vec![11, 12, 13, 14], vec![], vec![15, 16]],
@@ -3180,7 +3175,6 @@ mod storage_encoding {
         }
     )]
     #[case(saveDynamicStruct4Call::new((
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap(),
         vec![1, 2, 3],
         47,
         123,
@@ -3207,7 +3201,7 @@ mod storage_encoding {
         U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ad0", 16).unwrap().to_be_bytes(), // Third element
     ],
     vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000001de3e45a3dd236f7", 16).unwrap().to_be_bytes(),
         // Field a: DynamicNestedStructChild[]
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
         // First element
@@ -3227,7 +3221,6 @@ mod storage_encoding {
         readDynamicStruct4Call::new((FixedBytes::<32>::from_slice(&U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()).into(),)),
         DynamicStruct4 {
         id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
-        fake_id: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap(),
            a: vec![DynamicNestedStructChild { a: vec![1, 2, 3], b: 123 }, DynamicNestedStructChild { a: vec![1, 2, 3], b: 124 }],
            b: vec![StaticNestedStructChild { d: 47, e: address!("0x1111111111111111111111111111111111111111") }, StaticNestedStructChild { d: 48, e: address!("0x1111111111111111111111111111111111111111") }, StaticNestedStructChild { d: 49, e: address!("0x1111111111111111111111111111111111111111") }],
         }
@@ -3241,9 +3234,11 @@ mod storage_encoding {
     )),
     vec![
         [0x00; 32], // 0x0
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // Header slot
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
     ],
     vec![
+        U256::from_str_radix("000000000000000000000000000000000000000000000000588fded0496ea82d", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
     ],
@@ -3283,9 +3278,11 @@ mod storage_encoding {
     vec![
         [0x00; 32], // 0x0
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e563", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6", 16).unwrap().to_be_bytes(),
     ],
     vec![
+        U256::from_str_radix("000000000000000000000000000000000000000000000000d065a5d629744903", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), 
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000030000000200000001", 16).unwrap().to_be_bytes(),
@@ -3333,10 +3330,10 @@ mod storage_encoding {
         U256::from_str_radix("b3f87769e0f4505eb27364fe9b31c117ff789e8aa785586680a6c1cb0f592652", 16).unwrap().to_be_bytes(),
     ],
     vec![
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000065", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000659f5966d803a3b9c3", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002a", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000002ab3b50e1768d8c8ca", 16).unwrap().to_be_bytes(),
     ],
     readFooCall::new((FixedBytes::<32>::from_slice(&U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_le_bytes::<32>()).into(),)),
         Foo {
@@ -3364,15 +3361,15 @@ mod storage_encoding {
     ],
     vec![
         // MegaFoo
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000004d", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000004ddb2ab683e10642fe", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000058", 16).unwrap().to_be_bytes(),
         // Foo
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000065", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000659f5966d803a3b9c3", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
         // Bar
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002a", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000002ab3b50e1768d8c8ca", 16).unwrap().to_be_bytes(),
 
     ],
     readMegaFooCall::new((FixedBytes::<32>::from_slice(&U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().to_le_bytes::<32>()).into(),)),
@@ -3406,40 +3403,27 @@ mod storage_encoding {
         //Bar in Foo
         U256::from_str_radix("751256a7a9ce5df532239c40b31940a9a4fe03b965b20192b8f02653745a9369", 16).unwrap().to_be_bytes(),
         // Bar vector
-        U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5acf", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ad0", 16).unwrap().to_be_bytes(),
-
-        U256::from_str_radix("ae7e0571fa79d756545e084ec0d0c624cdbe4a05e898a1cf0e32a0821c5a6911", 16).unwrap().to_be_bytes(),
-
-        U256::from_str_radix("26a28b6df88122dd5c0e1993dcda278372d63dbd74d0b08e3d76c6012a7da7f8", 16).unwrap().to_be_bytes(),
-
-        U256::from_str_radix("e41226abe04fb72908c78250de568834065f6d35bc75081a3368d6a693296f5a", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85c", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85d", 16).unwrap().to_be_bytes(),
     ],
     vec![
         // Var
+        U256::from_str_radix("000000000000000000000000000000000000000000000000f0717c7026b21422", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("d929b3310243fae82a39e83032462fceb274b042b98732db8c6e9fbeab70c3c9", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         // Bar
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002a", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000002ab3b50e1768d8c8ca", 16).unwrap().to_be_bytes(),
         // Foo
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000065", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000659f5966d803a3b9c3", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
         // Bar in Foo
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000029", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000029b3b50e1768d8c8ca", 16).unwrap().to_be_bytes(),
         // Bar vector
         U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("60b770a33dfbcb5aaea4306257d155502df85b76449b216c476fcfcd437c152e", 16).unwrap().to_be_bytes(),
-
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002b", 16).unwrap().to_be_bytes(),
-
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002c", 16).unwrap().to_be_bytes(),
-
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002d", 16).unwrap().to_be_bytes(),
-
     ],
     readVarCall::new((FixedBytes::<32>::from_slice(&U256::from_str_radix("d51bb5edad7d1535fb0a47b2d03d08c0fe02560a3de80e55815fedb1ce1be09b", 16).unwrap().to_le_bytes::<32>()).into(),)),
         Var {
@@ -3481,13 +3465,15 @@ mod storage_encoding {
 
         U256::from_str_radix("398fdf7528e5068055009aa3b7c48e06f0127b5d8c57be483a07b5cd9100322e", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("398fdf7528e5068055009aa3b7c48e06f0127b5d8c57be483a07b5cd9100322f", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("fa3c262b05ca4b2e529a0b6981db5b6be4c8424f8b5d3199bd398d8520881a35", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("398fdf7528e5068055009aa3b7c48e06f0127b5d8c57be483a07b5cd91003230", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("580978fee9799ff96dcfcd540232ed2f7cd5bade678a1ccae6650e39d39559dd", 16).unwrap().to_be_bytes(),
     ],
     vec![
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000065", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000654fbbc9bca39c8cbb", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
 
+        U256::from_str_radix("000000000000000000000000000000000000000000000000d065a5d629744903", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("00000000000000000000000000000000000000000000000000000000000004d2", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000000000000000000063000000580000004d", 16).unwrap().to_be_bytes(),

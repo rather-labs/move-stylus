@@ -1,4 +1,7 @@
-use std::{collections::HashMap, hash::Hash};
+use std::{
+    collections::HashMap,
+    hash::{DefaultHasher, Hash, Hasher},
+};
 
 use crate::{
     CompilationContext, UserDefinedType,
@@ -1122,6 +1125,13 @@ impl IntermediateType {
             }
             IntermediateType::IEnum(_) => todo!(),
         }
+    }
+
+    // Returns the hash of the type
+    pub fn get_hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
     }
 }
 

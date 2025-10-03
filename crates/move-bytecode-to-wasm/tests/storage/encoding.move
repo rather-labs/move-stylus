@@ -89,7 +89,6 @@ public struct DynamicStruct has key {
 /// Test structure with various vector types
 public struct DynamicStruct2 has key {
     id: UID,
-    fake_id: u256,
     a: vector<bool>,
     b: vector<u8>,
     c: vector<u16>,
@@ -103,7 +102,6 @@ public struct DynamicStruct2 has key {
 /// Test structure with nested vectors
 public struct DynamicStruct3 has key {
     id: UID,
-    fake_id: u256,
     a: vector<vector<u8>>,
     b: vector<vector<u32>>,
     c: vector<vector<u64>>,
@@ -113,7 +111,6 @@ public struct DynamicStruct3 has key {
 /// Test structure with nested struct vectors
 public struct DynamicStruct4 has key {
     id: UID,
-    fake_id: u256,
     a: vector<DynamicNestedStructChild>,
     b: vector<StaticNestedStructChild>,
 }
@@ -305,7 +302,6 @@ public fun read_dynamic_struct(uid: u256): DynamicStruct {
 
 /// Save a DynamicStruct2 structure to storage
 public fun save_dynamic_struct_2(
-    fake_id: u256,
     a: vector<bool>,
     b: vector<u8>,
     c: vector<u16>,
@@ -318,7 +314,7 @@ public fun save_dynamic_struct_2(
 ) {
     let struct_ = DynamicStruct2 { 
         id: object::new(ctx), 
-        fake_id, a, b, c, d, e, f, g, h 
+        a, b, c, d, e, f, g, h 
     };
     save_in_slot(struct_, 0);
 }
@@ -330,7 +326,6 @@ public fun read_dynamic_struct_2(uid: u256): DynamicStruct2 {
 
 /// Save a DynamicStruct3 structure to storage
 public fun save_dynamic_struct_3(
-    fake_id: u256,
     a: vector<vector<u8>>,
     b: vector<vector<u32>>,
     c: vector<vector<u64>>,
@@ -339,7 +334,7 @@ public fun save_dynamic_struct_3(
 ) {
     let struct_ = DynamicStruct3 { 
         id: object::new(ctx), 
-        fake_id, a, b, c, d 
+        a, b, c, d 
     };
     save_in_slot(struct_, 0);
 }
@@ -351,7 +346,6 @@ public fun read_dynamic_struct_3(uid: u256): DynamicStruct3 {
 
 /// Save a DynamicStruct4 structure to storage
 public fun save_dynamic_struct_4(
-    fake_id: u256,
     x: vector<u32>,
     y: u64,
     z: u128,
@@ -369,7 +363,7 @@ public fun save_dynamic_struct_4(
     ];
     let struct_ = DynamicStruct4 { 
         id: object::new(ctx), 
-        fake_id, a, b 
+        a, b 
     };
     save_in_slot(struct_, 0);
 }
