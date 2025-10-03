@@ -99,6 +99,37 @@ public fun mint(
     });
 }
 
+public fun burn(
+    from: address,
+    amount: u256,
+    total_supply: &mut TotalSupply,
+    balance: &mut Balance
+) {
+    if (amount > 0 && !field::exists_(&balance.id, from)) {
+        abort(EInssuficientFunds);
+    };
+
+    let balance_amount = field::borrow_mut(&mut balance.id, from);
+
+    if (*balance_amount < amount) {
+        abort(EInssuficientFunds);
+    };
+
+    if (amount > total_supply.total) {
+        *balance_amount = 0;
+        total_supply.total = 0;
+    } else {
+        *balance_amount = *balance_amount - amount;
+        total_supply.total = total_supply.total - amount;
+    };
+
+    emit(Transfer {
+        from,
+        to: @0x0,
+        value: amount
+    });
+}
+
 public fun total_supply(t_supply: &TotalSupply): u256 {
     t_supply.total
 }
@@ -124,7 +155,7 @@ public fun balance_of(account: address, balance: &Balance): u256 {
     }
 }
 
-public fun transferr(
+public fun transfer(
     recipient: address,
     amount: u256,
     tx_context: &TxContext,

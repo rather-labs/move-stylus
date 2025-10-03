@@ -15,9 +15,10 @@ sol!(
     contract Example {
         function create() public view;
         function mint(address to, uint256 amount) external view;
+        function burn(address from, uint256 amount) external view;
         function balanceOf(address account) public view returns (uint256);
         function totalSupply() external view returns (uint256);
-        function transferr(address recipient, uint256 amount) external returns (bool);
+        function transfer(address recipient, uint256 amount) external returns (bool);
         function allowance(address owner, address spender) external view returns (uint256);
         function approve(address spender, uint256 amount) external returns (bool);
         function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
@@ -50,7 +51,9 @@ async fn main() -> eyre::Result<()> {
 
     let address_1 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
 
+    println!("====================");
     println!("Creating a new erc20");
+    println!("====================");
     let pending_tx = example.create().send().await?;
     let _receipt = pending_tx.get_receipt().await?;
     /*
@@ -65,6 +68,10 @@ async fn main() -> eyre::Result<()> {
 
     println!("created");
 
+
+    println!("\n====================");
+    println!("Contract Info");
+    println!("====================");
 
     let res = example.totalSupply().call().await?;
     println!("Total Supply = {}", res);
@@ -81,7 +88,12 @@ async fn main() -> eyre::Result<()> {
     let res = example.balanceOf(sender).call().await?;
     println!("Balance of target address = {}", res);
 
-    println!("Mintin 555555 coins to target address");
+    println!("\n====================");
+    println!("Mint");
+    println!("====================");
+
+    println!("Minting 555555 coins to target address");
+
     let pending_tx = example.mint(sender, U256::from(555555)).send().await?;
     let receipt = pending_tx.get_receipt().await?;
 
@@ -96,6 +108,10 @@ async fn main() -> eyre::Result<()> {
     let res = example.balanceOf(sender).call().await?;
     println!("Balance of target address = {}", res);
 
+    println!("\n====================");
+    println!("Transfer");
+    println!("====================");
+
     println!("Transfering 1000 TST to {address_1}");
 
     let res = example.balanceOf(sender).call().await?;
@@ -103,7 +119,7 @@ async fn main() -> eyre::Result<()> {
     let res = example.balanceOf(address_1).call().await?;
     println!("  Balance of target address {address_1} before transaction = {}", res);
 
-    let pending_tx = example.transferr(address_1, U256::from(1000)).send().await?;
+    let pending_tx = example.transfer(address_1, U256::from(1000)).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
@@ -117,82 +133,25 @@ async fn main() -> eyre::Result<()> {
     println!("  Balance of target address {address_1} after transaction = {}", res);
 
 
-    /*
-    println!("\nReading value before increment");
-    let res = example.read(counter_id).call().await?;
-    println!("counter = {}", res);
+    println!("\n====================");
+    println!("Burn");
+    println!("====================");
 
-    println!("\nSending increment tx");
-    let pending_tx = example.increment(counter_id).send().await?;
+    println!("Burning 11111 coins to from {sender}");
+
+    let pending_tx = example.burn(sender, U256::from(11111)).send().await?;
     let receipt = pending_tx.get_receipt().await?;
+
+    println!("Burn events");
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
+        println!("create tx 0x{}", hex::encode(&raw));
     }
+    let res = example.totalSupply().call().await?;
+    println!("Total Supply after burn= {}", res);
 
-    println!("\nReading value after increment");
-    let res = example.read(counter_id).call().await?;
-    println!("counter = {}", res);
+    let res = example.balanceOf(sender).call().await?;
+    println!("Balance of target address = {}", res);
 
-    println!("\nSetting counter to number 42");
-    let pending_tx = example.setValue(counter_id, 42).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
-
-    println!("\nReading counter after set");
-    let res = example.read(counter_id).call().await?;
-    println!("counter = {}", res);
-
-    println!("\nSending increment tx");
-    let pending_tx = example.increment(counter_id).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
-
-    println!("\nReading value after increment");
-    let res = example.read(counter_id).call().await?;
-    println!("counter = {}", res);
-
-    // Add a new sender and try to set the value
-    let priv_key_2 =
-        std::env::var("PRIV_KEY_2").map_err(|_| eyre!("No {} env var set", "PRIV_KEY_2"))?;
-    let signer_2 = PrivateKeySigner::from_str(&priv_key_2)?;
-    let sender_2 = signer_2.address();
-
-    let provider_2 = Arc::new(
-        ProviderBuilder::new()
-            .wallet(signer_2)
-            .with_chain_id(412346)
-            .connect_http(Url::from_str(&rpc_url).unwrap()),
-    );
-    let example_2 = Example::new(address, provider_2.clone());
-
-    println!("\nFunding {sender_2} with some ETH to pay for the gas");
-    let tx = TransactionRequest::default()
-        .from(sender)
-        .to(sender_2)
-        .value(U256::from(5_000_000_000_000_000_000u128)); // 5 eth in wei
-    let pending_tx = provider.send_transaction(tx).await?;
-    pending_tx.get_receipt().await?;
-
-    println!("\nSending set value to 100 tx with the account that is not the owner");
-    let pending_tx = example_2.setValue(counter_id, 100).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("set value logs 0: 0x{}", hex::encode(raw));
-    }
-
-    // Value did not change as the sender is not the owner
-    println!("\nReading value after set value");
-    let res = example_2.read(counter_id).call().await?;
-    println!("counter = {}", res);
-
-    */
     Ok(())
 }
