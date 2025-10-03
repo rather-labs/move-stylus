@@ -5095,3 +5095,59 @@ mod dynamic_storage_fields_named_id {
         assert_eq!(false.abi_encode(), result_data);
     }
 }
+
+mod erc20 {
+    use alloy_primitives::address;
+    use alloy_sol_types::{SolCall, SolValue, sol};
+
+    use super::*;
+
+    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
+    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
+    // thread. If that happens, messages from test A can be received by test B.
+    // Using once instance per thread assures this won't happen.
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "erc20";
+        const SOURCE_PATH: &str = "tests/storage/erc20.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+
+        struct String {
+            uint8[] bytes;
+        }
+
+
+        function create() public view;
+        function balanceOf(address address) public view returns (uint256);
+        function totalSupply() external view returns (uint256);
+        function transfer(address recipient, uint256 amount) external returns (bool);
+        function allowance(address owner, address spender) external view returns (uint256);
+        function approve(address spender, uint256 amount) external returns (bool);
+        function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+        function name() external view returns (string);
+        function symbol() external view returns (string);
+        function decimals() external view returns (uint8);
+    );
+
+    #[rstest]
+    fn test_erc20(runtime: RuntimeSandbox) {
+        let call_data = createCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        runtime.print_storage();
+
+        let call_data = totalSupplyCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(0.abi_encode(), result_data);
+    }
+}
