@@ -1,10 +1,10 @@
 use crate::{
     CompilationContext,
+    compilation_context::ModuleId,
     data::{
         DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
         DATA_SHARED_OBJECTS_KEY_OFFSET,
     },
-    get_generic_function_name,
     runtime::RuntimeFunction,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
     wasm_builder_extensions::WasmBuilderExtension,
@@ -22,8 +22,13 @@ pub fn add_transfer_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
+    module_id: &ModuleId,
 ) -> FunctionId {
-    let name = get_generic_function_name(NativeFunction::NATIVE_TRANSFER_OBJECT, &[itype]);
+    let name = NativeFunction::get_generic_function_name(
+        NativeFunction::NATIVE_TRANSFER_OBJECT,
+        &[itype],
+        module_id,
+    );
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -153,8 +158,13 @@ pub fn add_share_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
+    module_id: &ModuleId,
 ) -> FunctionId {
-    let name = get_generic_function_name(NativeFunction::NATIVE_SHARE_OBJECT, &[itype]);
+    let name = NativeFunction::get_generic_function_name(
+        NativeFunction::NATIVE_SHARE_OBJECT,
+        &[itype],
+        module_id,
+    );
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -275,8 +285,13 @@ pub fn add_freeze_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
+    module_id: &ModuleId,
 ) -> FunctionId {
-    let name = get_generic_function_name(NativeFunction::NATIVE_FREEZE_OBJECT, &[itype]);
+    let name = NativeFunction::get_generic_function_name(
+        NativeFunction::NATIVE_FREEZE_OBJECT,
+        &[itype],
+        module_id,
+    );
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };

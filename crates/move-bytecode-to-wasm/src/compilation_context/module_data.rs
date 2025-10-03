@@ -34,6 +34,7 @@ use move_package::{
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
+    hash::{DefaultHasher, Hash, Hasher},
 };
 use struct_data::StructData;
 
@@ -88,6 +89,14 @@ impl From<[u8; 32]> for Address {
 pub struct ModuleId {
     pub address: Address,
     pub module_name: String,
+}
+
+impl ModuleId {
+    pub fn hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        Hash::hash(self, &mut hasher);
+        hasher.finish()
+    }
 }
 
 impl Display for ModuleId {

@@ -1,3 +1,5 @@
+use std::hash::{DefaultHasher, Hash, Hasher};
+
 use walrus::{FunctionId, GlobalId, Module};
 
 use crate::{
@@ -320,5 +322,17 @@ impl RuntimeFunction {
                 dynamic_fields_global_variables,
             )
         }
+    }
+
+    pub fn get_generic_function_name(&self, generics: &[&IntermediateType]) -> String {
+        if generics.is_empty() {
+            panic!("generic_function_name called with no generics");
+        }
+
+        let mut hasher = DefaultHasher::new();
+        generics.iter().for_each(|t| t.hash(&mut hasher));
+        let hash = format!("{:x}", hasher.finish());
+
+        format!("runtime_{}_{hash}", self.name())
     }
 }

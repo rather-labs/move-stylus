@@ -1,7 +1,7 @@
 use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
 use crate::{
-    CompilationContext, get_generic_function_name,
+    CompilationContext, compilation_context::ModuleId,
     translation::intermediate_types::IntermediateType,
 };
 
@@ -18,9 +18,14 @@ pub fn add_is_one_time_witness_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
+    module_id: &ModuleId,
 ) -> FunctionId {
     // TODO: should we check if itype is a reference to a struct here?
-    let name = get_generic_function_name(NativeFunction::NATIVE_IS_ONE_TIME_WITNESS, &[itype]);
+    let name = NativeFunction::get_generic_function_name(
+        NativeFunction::NATIVE_IS_ONE_TIME_WITNESS,
+        &[itype],
+        &module_id,
+    );
 
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
