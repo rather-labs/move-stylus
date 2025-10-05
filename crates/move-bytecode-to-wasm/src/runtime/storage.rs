@@ -858,7 +858,8 @@ pub fn add_delete_tto_objects_fn(
                 .local_set(child_struct_ptr);
 
             // Call the function recursively to delete any recently tto objects within the child struct
-            add_delete_tto_objects_fn(module, compilation_ctx, field);
+            let delete_tto_objects_fn = add_delete_tto_objects_fn(module, compilation_ctx, field);
+            builder.local_get(child_struct_ptr).call(delete_tto_objects_fn);
 
             // If the child struct has key, remove it from the original owner's storage if it's still there.
             if child_struct.has_key {
@@ -973,7 +974,8 @@ pub fn add_delete_tto_objects_fn(
                                 .local_set(elem_ptr);
 
                             // Call the function recursively to delete any recently tto objects within the vector element struct
-                            add_delete_tto_objects_fn(module, compilation_ctx, inner.as_ref());
+                            let delete_tto_objects_fn = add_delete_tto_objects_fn(module, compilation_ctx, inner.as_ref());
+                            loop_.local_get(elem_ptr).call(delete_tto_objects_fn);
 
                             // If the vector element struct has a key, remove it from the original owner's storage if it's still there.
                             if child_struct.has_key {
