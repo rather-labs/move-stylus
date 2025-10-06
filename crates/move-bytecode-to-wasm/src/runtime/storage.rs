@@ -810,7 +810,7 @@ pub fn add_delete_struct_from_storage_fn(
 ///```
 /// Arguments:
 /// - parent_struct_ptr
-pub fn add_delete_tto_objects_fn(
+pub fn add_check_struct_tto_fields_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
@@ -979,6 +979,11 @@ pub fn add_delete_tto_objects_fn(
     function.finish(vec![parent_struct_ptr], &mut module.funcs)
 }
 
+/// This function deletes a recently transferred wrapped object from the original owner's storage.
+///
+/// Arguments:
+/// - parent_struct_ptr
+/// - child_struct_ptr
 pub fn add_delete_tto_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -1048,6 +1053,7 @@ pub fn add_delete_tto_object_fn(
 
     function.finish(vec![parent_struct_ptr, child_struct_ptr], &mut module.funcs)
 }
+
 /// This function returns a pointer to the struct owner, given a struct pointer as input
 pub fn get_struct_owner_fn(
     module: &mut Module,

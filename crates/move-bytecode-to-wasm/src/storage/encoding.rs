@@ -117,7 +117,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             true,
         );
 
-        // We do it a second time because after encoding the field, the data owner
+        // After encoding the field, update the data owner offset with the struct id in case it has been changed
         if struct_.has_key {
             builder
                 .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
