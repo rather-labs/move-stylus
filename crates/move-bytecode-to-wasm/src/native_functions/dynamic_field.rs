@@ -278,28 +278,16 @@ pub fn add_has_child_object_fn(
     let parent_uid = module.locals.add(ValType::I32);
     let child_id = module.locals.add(ValType::I32);
 
-    let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
-
-    builder.i32_const(1).call(print_i32);
-
     // Calculate the destiny slot
     builder
         .local_get(parent_uid)
         .local_get(child_id)
         .call(write_object_slot_fn);
 
-    builder.local_get(parent_uid).call(print_m);
-    builder.local_get(child_id).call(print_m);
     builder
         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .call(storage_load);
-
-    builder.i32_const(2).call(print_i32);
-    builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .call(print_m);
-    builder.i32_const(DATA_SLOT_DATA_PTR_OFFSET).call(print_m);
 
     builder
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
