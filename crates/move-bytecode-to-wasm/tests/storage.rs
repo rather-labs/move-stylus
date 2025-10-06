@@ -3550,6 +3550,44 @@ mod storage_encoding {
             .unwrap();
         assert_eq!(0, result);
 
+        // let UID_PARENT: [u8; 32] = U256::from_str_radix(
+        //     "d51bb5edad7d1535fb0a47b2d03d08c0fe02560a3de80e55815fedb1ce1be09b",
+        //     16,
+        // )
+        // .unwrap()
+        // .to_be_bytes();
+        // let UID_CHILD_A: [u8; 32] = U256::from_str_radix(
+        //     "b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255",
+        //     16,
+        // )
+        // .unwrap()
+        // .to_be_bytes();
+        // let UID_CHILD_B: [u8; 32] = U256::from_str_radix(
+        //     "1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741",
+        //     16,
+        // )
+        // .unwrap()
+        // .to_be_bytes();
+        // let UID_CHILD_C: [u8; 32] = U256::from_str_radix(
+        //     "60b770a33dfbcb5aaea4306257d155502df85b76449b216c476fcfcd437c152e",
+        //     16,
+        // )
+        // .unwrap()
+        // .to_be_bytes();
+
+        // println!("UID_PARENT: {:x?}", hex::encode(UID_PARENT));
+        // println!("UID_CHILD_A: {:x?}", hex::encode(UID_CHILD_A));
+        // println!("UID_CHILD_B: {:x?}", hex::encode(UID_CHILD_B));
+        // println!("UID_CHILD_C: {:x?}", hex::encode(UID_CHILD_C));
+
+        // let UID_CHILD_A_SLOT = derive_object_slot(&UID_PARENT, &UID_CHILD_A);
+        // let UID_CHILD_B_SLOT = derive_object_slot(&UID_PARENT, &UID_CHILD_B);
+        // let UID_CHILD_C_SLOT = derive_object_slot(&UID_PARENT, &UID_CHILD_C);
+
+        // println!("UID_CHILD_A_SLOT: {:?}", UID_CHILD_A_SLOT.to_vec());
+        // println!("UID_CHILD_B_SLOT: {:?}", UID_CHILD_B_SLOT.to_vec());
+        // println!("UID_CHILD_C_SLOT: {:?}", UID_CHILD_C_SLOT.to_vec());
+
         runtime.print_storage();
 
         // Check if it is encoded correctly in storage
@@ -5378,5 +5416,251 @@ mod dynamic_storage_fields_named_id {
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
         assert_eq!(false.abi_encode(), result_data);
+    }
+}
+
+mod simple_warrior {
+    use super::*;
+    use crate::common::runtime_sandbox::constants::SIGNER_ADDRESS;
+    use alloy_primitives::FixedBytes;
+    use alloy_sol_types::{SolCall, SolValue, sol};
+
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "simple_warrior";
+        const SOURCE_PATH: &str = "tests/storage/simple_warrior.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+
+        #[derive(Debug)]
+        struct ID {
+            bytes32 bytes;
+        }
+
+        #[derive(Debug)]
+        struct UID {
+            ID id;
+        }
+
+        struct OptionSword {
+            Sword[] vec;
+        }
+
+        struct OptionShield {
+            Shield[] vec;
+        }
+
+        struct Sword {
+            UID id;
+            uint8 strength;
+        }
+
+        struct Shield {
+            UID id;
+            uint8 armor;
+        }
+
+        struct Warrior {
+            UID id;
+            OptionSword sword;
+            OptionShield shield;
+        }
+
+        function createWarrior() public view;
+        function createSword(uint8 strength) public view;
+        function createShield(uint8 armor) public view;
+        function equipSword(bytes32 id, bytes32 sword) public;
+        function equipShield(bytes32 id, bytes32 shield) public;
+        function inspectWarrior(bytes32 id) public view returns (Warrior);
+        function inspectSword(bytes32 id) public view returns (Sword);
+        function inspectShield(bytes32 id) public view returns (Shield);
+        function destroyWarrior(bytes32 id) public;
+        function destroySword(bytes32 id) public;
+    );
+
+    #[rstest]
+    fn test_equip_empty(runtime: RuntimeSandbox) {
+        runtime.set_msg_sender(SIGNER_ADDRESS);
+
+        // Create warrior
+        let call_data = createWarriorCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let warrior_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let warrior_id = FixedBytes::<32>::from_slice(&warrior_id);
+
+        // Inspect warrior and assert it has no sword or shield
+        let call_data = inspectWarriorCall::new((warrior_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = inspectWarriorCall::abi_decode_returns(&return_data).unwrap();
+        let expected_return_data = Warrior::abi_encode(&Warrior {
+            id: UID {
+                id: ID { bytes: warrior_id },
+            },
+            sword: OptionSword { vec: vec![] },
+            shield: OptionShield { vec: vec![] },
+        });
+        assert_eq!(Warrior::abi_encode(&return_data), expected_return_data);
+        assert_eq!(0, result);
+
+        // Create sword
+        let call_data = createSwordCall::new((66,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let sword_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let sword_id = FixedBytes::<32>::from_slice(&sword_id);
+        let sword_slot = derive_object_slot(&SIGNER_ADDRESS, &sword_id.0);
+
+        // Equip sword
+        let call_data = equipSwordCall::new((warrior_id, sword_id)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Inspect warrior and assert it has the sword equiped
+        let call_data = inspectWarriorCall::new((warrior_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = inspectWarriorCall::abi_decode_returns(&return_data).unwrap();
+        let expected_return_data = Warrior::abi_encode(&Warrior {
+            id: UID {
+                id: ID { bytes: warrior_id },
+            },
+            sword: OptionSword {
+                vec: vec![Sword {
+                    id: UID {
+                        id: ID { bytes: sword_id },
+                    },
+                    strength: 66,
+                }],
+            },
+            shield: OptionShield { vec: vec![] },
+        });
+        assert_eq!(Warrior::abi_encode(&return_data), expected_return_data);
+        assert_eq!(0, result);
+
+        // Assert that the original sword slot (under the sender's address) is now empty
+        assert_eq!(runtime.get_storage_at_slot(sword_slot.0), [0u8; 32]);
+        assert_eq!(runtime.get_storage_at_slot(get_next_slot(&sword_slot.0)), [0u8; 32]);
+
+        // Create new sword
+        let call_data = createSwordCall::new((77,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let new_sword_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let new_sword_id = FixedBytes::<32>::from_slice(&new_sword_id);
+        let new_sword_slot = derive_object_slot(&SIGNER_ADDRESS, &new_sword_id.0);
+
+        // Equip new sword
+        let call_data = equipSwordCall::new((warrior_id, new_sword_id)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Inspect warrior and assert it has the new sword equiped
+        let call_data = inspectWarriorCall::new((warrior_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = inspectWarriorCall::abi_decode_returns(&return_data).unwrap();
+        let expected_return_data = Warrior::abi_encode(&Warrior {
+            id: UID {
+                id: ID { bytes: warrior_id },
+            },
+            sword: OptionSword {
+                vec: vec![Sword {
+                    id: UID {
+                        id: ID { bytes: new_sword_id },
+                    },
+                    strength: 77,
+                }],
+            },
+            shield: OptionShield { vec: vec![] },
+        });
+        assert_eq!(Warrior::abi_encode(&return_data), expected_return_data);
+        assert_eq!(0, result);
+
+        // Assert that the original new sword slot (under the sender's address) is now empty
+        assert_eq!(runtime.get_storage_at_slot(new_sword_slot.0), [0u8; 32]);
+        assert_eq!(runtime.get_storage_at_slot(get_next_slot(&new_sword_slot.0)), [0u8; 32]);
+
+        // Assert that the original old sword slot (under the sender's address) holds the old sword now
+        assert_ne!(runtime.get_storage_at_slot(sword_slot.0), [0u8; 32]);
+        assert_ne!(runtime.get_storage_at_slot(get_next_slot(&sword_slot.0)), [0u8; 32]);
+
+        let call_data = inspectSwordCall::new((sword_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = inspectSwordCall::abi_decode_returns(&return_data).unwrap();
+        let expected_return_data = Sword::abi_encode(&Sword {
+            id: UID {
+                id: ID { bytes: sword_id },
+            },
+            strength: 66,
+        });
+        assert_eq!(Sword::abi_encode(&return_data), expected_return_data);
+        assert_eq!(0, result);
+
+        // Create shield
+        let call_data = createShieldCall::new((42,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let shield_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let shield_id = FixedBytes::<32>::from_slice(&shield_id);
+        let shield_slot = derive_object_slot(&SIGNER_ADDRESS, &shield_id.0);
+
+        let call_data = equipShieldCall::new((warrior_id, shield_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Inspect warrior and assert it has the shield equiped
+        let call_data = inspectWarriorCall::new((warrior_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = inspectWarriorCall::abi_decode_returns(&return_data).unwrap();
+        let expected_return_data = Warrior::abi_encode(&Warrior {
+            id: UID {
+                id: ID { bytes: warrior_id },
+            },
+            sword: OptionSword { vec: vec![Sword {
+                id: UID {
+                    id: ID { bytes: new_sword_id },
+                },
+                strength: 77,
+            }] },
+            shield: OptionShield { vec: vec![Shield {
+                id: UID {
+                    id: ID { bytes: shield_id },
+                },
+                armor: 42,
+            }] },
+        });
+        assert_eq!(Warrior::abi_encode(&return_data), expected_return_data);
+        assert_eq!(0, result);
+
+        // Assert that the original shield slot (under the sender's address) is now empty
+        assert_eq!(runtime.get_storage_at_slot(shield_slot.0), [0u8; 32]);
+        assert_eq!(runtime.get_storage_at_slot(get_next_slot(&shield_slot.0)), [0u8; 32]);
+
+        let storage_before_destroy = runtime.get_storage();
+        // Destroy warrior
+        let call_data = destroyWarriorCall::new((warrior_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Destroy the old sword too, just to make the test simpler
+        let call_data = destroySwordCall::new((sword_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_destroy = runtime.get_storage();
+
+        // Assert that the storage is empty
+        assert_empty_storage(&storage_before_destroy, &storage_after_destroy);
+      
     }
 }
