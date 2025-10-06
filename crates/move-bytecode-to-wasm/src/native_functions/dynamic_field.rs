@@ -57,6 +57,8 @@ pub fn add_child_object_fn(
     let parent_address = module.locals.add(ValType::I32);
     let child_ptr = module.locals.add(ValType::I32);
 
+    let slot_ptr = module.locals.add(ValType::I32);
+
     // Calculate the destiny slot
     builder
         .local_get(parent_address)
@@ -64,10 +66,20 @@ pub fn add_child_object_fn(
         .call(get_id_bytes_ptr_fn)
         .call(write_object_slot_fn);
 
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_tee(slot_ptr);
+
+    builder
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
     // Save the field into storage
     builder
         .local_get(child_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .local_get(slot_ptr)
         .call(save_struct_into_storage_fn);
 
     function.finish(vec![parent_address, child_ptr], &mut module.funcs)

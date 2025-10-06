@@ -924,8 +924,8 @@ pub fn add_encode_intermediate_type_instructions(
 
             if child_struct.has_key {
                 let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
-                builder.i32_const(555).call(print_i32);
-                //builder.local_get(child_struct_id_ptr).call(print_m);
+                builder.i32_const(5551).call(print_i32);
+                builder.local_get(slot_ptr).call(print_m);
                 // ====================================================================
                 // CHILD STRUCT WITH KEY - Store as Separate Object
                 // ====================================================================
@@ -946,6 +946,8 @@ pub fn add_encode_intermediate_type_instructions(
                     .call(get_struct_id_fn)
                     .local_set(parent_struct_id_ptr);
 
+                builder.i32_const(5552).call(print_i32);
+                builder.local_get(slot_ptr).call(print_m);
                 // Extract child struct ID for slot calculation
                 let child_struct_id_ptr = module.locals.add(ValType::I32);
                 builder
@@ -953,6 +955,8 @@ pub fn add_encode_intermediate_type_instructions(
                     .call(get_struct_id_fn)
                     .local_set(child_struct_id_ptr);
 
+                builder.i32_const(5553).call(print_i32);
+                builder.local_get(slot_ptr).call(print_m);
                 // Calculate the unique slot for the child struct
                 builder
                     .local_get(parent_struct_id_ptr)
@@ -962,6 +966,8 @@ pub fn add_encode_intermediate_type_instructions(
                 // Allocate memory for the child struct slot and copy the calculated
                 // slot data to avoid overwriting during recursive encoding.
 
+                builder.i32_const(5554).call(print_i32);
+                builder.local_get(slot_ptr).call(print_m);
                 // Allocate memory for child struct slot (32 bytes for slot data)
                 let child_struct_slot_ptr = module.locals.add(ValType::I32);
                 builder
@@ -976,6 +982,8 @@ pub fn add_encode_intermediate_type_instructions(
                     .i32_const(32)
                     .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
+                builder.i32_const(5556).call(print_i32);
+                builder.local_get(slot_ptr).call(print_m);
                 // Reset written bytes counter for the child struct encoding
                 builder.i32_const(0).local_set(written_bytes_in_slot);
 
@@ -990,6 +998,8 @@ pub fn add_encode_intermediate_type_instructions(
                     written_bytes_in_slot,
                 );
 
+                builder.i32_const(5557).call(print_i32);
+                builder.local_get(slot_ptr).call(print_m);
                 // After encoding the child struct, we need to store its UID in the
                 // parent struct's data so the parent can reference the child.
                 // The UID takes exactly 32 bytes (one full slot).
