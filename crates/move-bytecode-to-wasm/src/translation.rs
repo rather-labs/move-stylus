@@ -1582,7 +1582,7 @@ fn translate_instruction(
 
                                     // Call the function to delete any recently tto objects within the struct
                                     // This needed when pushing objects with the key ability into a vector field of a struct
-                                    let delete_tto_objects_fn = RuntimeFunction::DeleteTtoObject
+                                    let delete_tto_objects_fn = RuntimeFunction::DeleteTtoObjects
                                         .get_generic(module, compilation_ctx, &[itype]);
                                     else_.local_get(struct_ptr).call(delete_tto_objects_fn);
 

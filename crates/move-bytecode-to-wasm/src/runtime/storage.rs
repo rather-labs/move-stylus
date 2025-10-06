@@ -815,7 +815,7 @@ pub fn add_delete_tto_objects_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
-    let name = get_generic_function_name(RuntimeFunction::DeleteTtoObject.name(), &[itype]);
+    let name = get_generic_function_name(RuntimeFunction::DeleteTtoObjects.name(), &[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -826,12 +826,6 @@ pub fn add_delete_tto_objects_fn(
     // Arguments
     let parent_struct_ptr = module.locals.add(ValType::I32);
 
-    // Runtime functions
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
-    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
-    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
-
     let struct_ = compilation_ctx
         .get_struct_by_intermediate_type(itype)
         .unwrap();
@@ -839,7 +833,10 @@ pub fn add_delete_tto_objects_fn(
     // Iterate over the fields of the struct
     let mut offset: i32 = 0;
     for field in struct_.fields.iter() {
-        if let Ok(child_struct) = compilation_ctx.get_struct_by_intermediate_type(field) {
+        if matches!(
+            field,
+            IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. }
+        ) {
             let child_struct_ptr = module.locals.add(ValType::I32);
 
             // Get the pointer to the child struct
@@ -859,59 +856,24 @@ pub fn add_delete_tto_objects_fn(
                 .local_set(child_struct_ptr);
 
             // Call the function recursively to delete any recently tto objects within the child struct
-            let delete_tto_objects_fn = add_delete_tto_objects_fn(module, compilation_ctx, field);
+            let delete_tto_objects_fn =
+                RuntimeFunction::DeleteTtoObjects.get_generic(module, compilation_ctx, &[field]);
             builder
                 .local_get(child_struct_ptr)
                 .call(delete_tto_objects_fn);
 
             // If the child struct has key, remove it from the original owner's storage if it's still there.
-            if child_struct.has_key {
-                builder.block(None, |block| {
-                    let block_id = block.id();
-
-                    let child_struct_owner_ptr = module.locals.add(ValType::I32);
-
-                    // Get the pointer to the child struct owner
-                    block
-                        .local_get(child_struct_ptr)
-                        .call(get_struct_owner_fn)
-                        .local_set(child_struct_owner_ptr);
-
-                    // Check if the owner is zero (means there's no owner, so we don't need to delete anything)
-                    // This can happen if we have just created the struct and not transfered it yet.
-                    block
-                        .local_get(child_struct_owner_ptr)
-                        .i32_const(32)
-                        .call(is_zero_fn)
-                        .br_if(block_id);
-
-                    // Verify if the owner of the child struct matches the ID of the parent struct.
-                    // If they differ, it indicates that the child struct has been just wrapped into the parent struct
-                    // and should be removed from the original owner's storage mapping.
-                    block
-                        .local_get(parent_struct_ptr)
-                        .call(get_id_bytes_ptr_fn)
-                        .local_get(child_struct_owner_ptr)
-                        .i32_const(32)
-                        .call(equality_fn)
-                        .br_if(block_id);
-
-                    // Get the delete function for the child struct
-                    let delete_wrapped_object_fn = RuntimeFunction::DeleteFromStorage.get_generic(
-                        module,
-                        compilation_ctx,
-                        &[field],
-                    );
-
-                    block
-                        .local_get(child_struct_ptr)
-                        .call(delete_wrapped_object_fn);
-                });
-            }
+            let delete_tto_object_fn =
+                RuntimeFunction::DeleteTtoObject.get_generic(module, compilation_ctx, &[field]);
+            builder
+                .local_get(parent_struct_ptr)
+                .local_get(child_struct_ptr)
+                .call(delete_tto_object_fn);
         } else if let IntermediateType::IVector(inner) = field {
-            if let Ok(child_struct) =
-                compilation_ctx.get_struct_by_intermediate_type(inner.as_ref())
-            {
+            if matches!(
+                inner.as_ref(),
+                IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. }
+            ) {
                 let vector_ptr = module.locals.add(ValType::I32);
                 let len = module.locals.add(ValType::I32);
 
@@ -977,52 +939,18 @@ pub fn add_delete_tto_objects_fn(
                                 .local_set(elem_ptr);
 
                             // Call the function recursively to delete any recently tto objects within the vector element struct
-                            let delete_tto_objects_fn =
-                                add_delete_tto_objects_fn(module, compilation_ctx, inner.as_ref());
+                            let delete_tto_objects_fn = RuntimeFunction::DeleteTtoObjects
+                                .get_generic(module, compilation_ctx, &[inner.as_ref()]);
+
                             loop_.local_get(elem_ptr).call(delete_tto_objects_fn);
 
-                            // If the vector element struct has a key, remove it from the original owner's storage if it's still there.
-                            if child_struct.has_key {
-                                loop_.block(None, |block| {
-                                    let block_id = block.id();
+                            let delete_tto_object_fn = RuntimeFunction::DeleteTtoObject
+                                .get_generic(module, compilation_ctx, &[inner.as_ref()]);
 
-                                    let child_struct_owner_ptr = module.locals.add(ValType::I32);
-
-                                    // Get the pointer to the child struct owner
-                                    block
-                                        .local_get(elem_ptr)
-                                        .call(get_struct_owner_fn)
-                                        .local_set(child_struct_owner_ptr);
-
-                                    // Check if the owner is zero (means there's no owner, so we don't need to delete anything)
-                                    block
-                                        .local_get(child_struct_owner_ptr)
-                                        .i32_const(32)
-                                        .call(is_zero_fn)
-                                        .br_if(block_id);
-
-                                    // Verify if the owner of the child struct matches the ID of the parent struct.
-                                    // If they differ, it indicates that the child struct has been just wrapped into the parent struct
-                                    // and should be removed from the original owner's storage mapping.
-                                    block
-                                        .local_get(parent_struct_ptr)
-                                        .call(get_id_bytes_ptr_fn)
-                                        .local_get(child_struct_owner_ptr)
-                                        .i32_const(32)
-                                        .call(equality_fn)
-                                        .br_if(block_id);
-
-                                    // Get the delete function for the child struct
-                                    let delete_wrapped_object_fn =
-                                        RuntimeFunction::DeleteFromStorage.get_generic(
-                                            module,
-                                            compilation_ctx,
-                                            &[inner.as_ref()],
-                                        );
-
-                                    block.local_get(elem_ptr).call(delete_wrapped_object_fn);
-                                });
-                            }
+                            loop_
+                                .local_get(parent_struct_ptr)
+                                .local_get(elem_ptr)
+                                .call(delete_tto_object_fn);
 
                             // Exit after processing all elements
                             loop_
@@ -1051,6 +979,75 @@ pub fn add_delete_tto_objects_fn(
     function.finish(vec![parent_struct_ptr], &mut module.funcs)
 }
 
+pub fn add_delete_tto_object_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) -> FunctionId {
+    let name = get_generic_function_name(RuntimeFunction::DeleteTtoObject.name(), &[itype]);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    };
+
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function.name(name).func_body();
+
+    let parent_struct_ptr = module.locals.add(ValType::I32);
+    let child_struct_ptr = module.locals.add(ValType::I32);
+
+    let struct_ = compilation_ctx
+        .get_struct_by_intermediate_type(itype)
+        .unwrap();
+
+    // If the child struct has key, remove it from the original owner's storage if it's still there.
+    if struct_.has_key {
+        builder.block(None, |block| {
+            let block_id = block.id();
+
+            let child_struct_owner_ptr = module.locals.add(ValType::I32);
+
+            // Get the pointer to the child struct owner
+            block
+                .local_get(child_struct_ptr)
+                .call(get_struct_owner_fn)
+                .local_set(child_struct_owner_ptr);
+
+            // Check if the owner is zero (means there's no owner, so we don't need to delete anything)
+            // This can happen if we have just created the struct and not transfered it yet.
+            block
+                .local_get(child_struct_owner_ptr)
+                .i32_const(32)
+                .call(is_zero_fn)
+                .br_if(block_id);
+
+            // Verify if the owner of the child struct matches the ID of the parent struct.
+            // If they differ, it indicates that the child struct has been just wrapped into the parent struct
+            // and should be removed from the original owner's storage mapping.
+            block
+                .local_get(parent_struct_ptr)
+                .call(get_id_bytes_ptr_fn)
+                .local_get(child_struct_owner_ptr)
+                .i32_const(32)
+                .call(equality_fn)
+                .br_if(block_id);
+
+            // Get the delete function for the child struct
+            let delete_wrapped_object_fn =
+                RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype]);
+
+            block
+                .local_get(child_struct_ptr)
+                .call(delete_wrapped_object_fn);
+        });
+    }
+
+    function.finish(vec![parent_struct_ptr, child_struct_ptr], &mut module.funcs)
+}
 /// This function returns a pointer to the struct owner, given a struct pointer as input
 pub fn get_struct_owner_fn(
     module: &mut Module,
