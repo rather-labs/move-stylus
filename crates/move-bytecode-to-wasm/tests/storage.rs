@@ -5486,7 +5486,7 @@ mod simple_warrior {
     );
 
     #[rstest]
-    fn test_equip_empty(runtime: RuntimeSandbox) {
+    fn test_equip_warrior(runtime: RuntimeSandbox) {
         runtime.set_msg_sender(SIGNER_ADDRESS);
 
         // Create warrior
