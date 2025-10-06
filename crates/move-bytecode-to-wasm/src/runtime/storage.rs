@@ -624,6 +624,8 @@ pub fn add_save_struct_into_storage_fn(
 
     let struct_ptr = module.locals.add(ValType::I32);
     let slot_ptr = module.locals.add(ValType::I32);
+
+    // Set the written bytes in the slot to 0
     let written_bytes_in_slot = module.locals.add(ValType::I32);
     builder.i32_const(0).local_set(written_bytes_in_slot);
 
@@ -680,7 +682,6 @@ pub fn add_read_struct_from_storage_fn(
         compilation_ctx,
         slot_ptr,
         &struct_,
-        false,
         read_bytes_in_slot,
     );
 
@@ -859,7 +860,9 @@ pub fn add_delete_tto_objects_fn(
 
             // Call the function recursively to delete any recently tto objects within the child struct
             let delete_tto_objects_fn = add_delete_tto_objects_fn(module, compilation_ctx, field);
-            builder.local_get(child_struct_ptr).call(delete_tto_objects_fn);
+            builder
+                .local_get(child_struct_ptr)
+                .call(delete_tto_objects_fn);
 
             // If the child struct has key, remove it from the original owner's storage if it's still there.
             if child_struct.has_key {
@@ -974,7 +977,8 @@ pub fn add_delete_tto_objects_fn(
                                 .local_set(elem_ptr);
 
                             // Call the function recursively to delete any recently tto objects within the vector element struct
-                            let delete_tto_objects_fn = add_delete_tto_objects_fn(module, compilation_ctx, inner.as_ref());
+                            let delete_tto_objects_fn =
+                                add_delete_tto_objects_fn(module, compilation_ctx, inner.as_ref());
                             loop_.local_get(elem_ptr).call(delete_tto_objects_fn);
 
                             // If the vector element struct has a key, remove it from the original owner's storage if it's still there.
