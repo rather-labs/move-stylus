@@ -810,12 +810,15 @@ pub fn add_delete_struct_from_storage_fn(
 ///```
 /// Arguments:
 /// - parent_struct_ptr
-pub fn add_check_struct_tto_fields_fn(
+pub fn add_check_and_delete_struct_tto_fields_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
-    let name = get_generic_function_name(RuntimeFunction::DeleteTtoObjects.name(), &[itype]);
+    let name = get_generic_function_name(
+        RuntimeFunction::CheckAndDeleteStructTtoFields.name(),
+        &[itype],
+    );
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -856,8 +859,11 @@ pub fn add_check_struct_tto_fields_fn(
                 .local_set(child_struct_ptr);
 
             // Call the function recursively to delete any recently tto objects within the child struct
-            let delete_tto_objects_fn =
-                RuntimeFunction::DeleteTtoObjects.get_generic(module, compilation_ctx, &[field]);
+            let delete_tto_objects_fn = RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic(
+                module,
+                compilation_ctx,
+                &[field],
+            );
             builder
                 .local_get(child_struct_ptr)
                 .call(delete_tto_objects_fn);
@@ -939,8 +945,12 @@ pub fn add_check_struct_tto_fields_fn(
                                 .local_set(elem_ptr);
 
                             // Call the function recursively to delete any recently tto objects within the vector element struct
-                            let delete_tto_objects_fn = RuntimeFunction::DeleteTtoObjects
-                                .get_generic(module, compilation_ctx, &[inner.as_ref()]);
+                            let delete_tto_objects_fn =
+                                RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic(
+                                    module,
+                                    compilation_ctx,
+                                    &[inner.as_ref()],
+                                );
 
                             loop_.local_get(elem_ptr).call(delete_tto_objects_fn);
 

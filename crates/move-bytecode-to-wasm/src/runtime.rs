@@ -66,7 +66,7 @@ pub enum RuntimeFunction {
     EncodeAndSaveInStorage,
     DecodeAndReadFromStorage,
     DeleteFromStorage,
-    DeleteTtoObjects,
+    CheckAndDeleteStructTtoFields,
     DeleteTtoObject,
     GetStructOwner,
     CommitChangesToStorage,
@@ -127,7 +127,7 @@ impl RuntimeFunction {
             Self::EncodeAndSaveInStorage => "encode_and_save_in_storage",
             Self::DecodeAndReadFromStorage => "decode_and_read_from_storage",
             Self::DeleteFromStorage => "delete_from_storage",
-            Self::DeleteTtoObjects => "delete_tto_objects",
+            Self::CheckAndDeleteStructTtoFields => "check_and_delete_struct_tto_fields",
             Self::DeleteTtoObject => "delete_tto_object",
             Self::GetStructOwner => "get_struct_owner",
             Self::U64ToAsciiBase10 => "u64_to_ascii_base_10",
@@ -297,7 +297,7 @@ impl RuntimeFunction {
 
                 storage::add_delete_struct_from_storage_fn(module, compilation_ctx, generics[0])
             }
-            Self::DeleteTtoObjects => {
+            Self::CheckAndDeleteStructTtoFields => {
                 assert_eq!(
                     1,
                     generics.len(),
@@ -306,7 +306,7 @@ impl RuntimeFunction {
                     generics.len(),
                 );
 
-                storage::add_check_struct_tto_fields_fn(module, compilation_ctx, generics[0])
+                storage::add_check_and_delete_struct_tto_fields_fn(module, compilation_ctx, generics[0])
             }
             Self::DeleteTtoObject => {
                 assert_eq!(

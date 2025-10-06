@@ -98,9 +98,11 @@ pub fn add_transfer_object_fn(
     });
 
     // Remove any objects that have been recently transferred into the struct from the original owner's mapping in storage.
-    let delete_tto_objects_fn =
-        RuntimeFunction::DeleteTtoObjects.get_generic(module, compilation_ctx, &[itype]);
-    builder.local_get(struct_ptr).call(delete_tto_objects_fn);
+    let check_and_delete_struct_tto_fields_fn = RuntimeFunction::CheckAndDeleteStructTtoFields
+        .get_generic(module, compilation_ctx, &[itype]);
+    builder
+        .local_get(struct_ptr)
+        .call(check_and_delete_struct_tto_fields_fn);
 
     // Update the object ownership in memory to the recipient's address
     builder
@@ -214,12 +216,15 @@ pub fn add_share_object_fn(
                 });
 
                 // Remove any objects that have been recently transferred into the struct from the original owner's mapping in storage.
-                let delete_tto_objects_fn = RuntimeFunction::DeleteTtoObjects.get_generic(
-                    module,
-                    compilation_ctx,
-                    &[itype],
-                );
-                else_.local_get(struct_ptr).call(delete_tto_objects_fn);
+                let check_and_delete_struct_tto_fields_fn =
+                    RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic(
+                        module,
+                        compilation_ctx,
+                        &[itype],
+                    );
+                else_
+                    .local_get(struct_ptr)
+                    .call(check_and_delete_struct_tto_fields_fn);
 
                 // Update the object ownership in memory to the shared objects key
                 else_
@@ -339,12 +344,15 @@ pub fn add_freeze_object_fn(
                 });
 
                 // Remove any objects that have been recently transferred into the struct from the original owner's mapping in storage.
-                let delete_tto_objects_fn = RuntimeFunction::DeleteTtoObjects.get_generic(
-                    module,
-                    compilation_ctx,
-                    &[itype],
-                );
-                else_.local_get(struct_ptr).call(delete_tto_objects_fn);
+                let check_and_delete_struct_tto_fields_fn =
+                    RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic(
+                        module,
+                        compilation_ctx,
+                        &[itype],
+                    );
+                else_
+                    .local_get(struct_ptr)
+                    .call(check_and_delete_struct_tto_fields_fn);
 
                 // Update the object ownership in memory to the frozen objects key
                 else_
