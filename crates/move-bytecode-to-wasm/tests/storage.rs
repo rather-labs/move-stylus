@@ -5548,7 +5548,10 @@ mod simple_warrior {
 
         // Assert that the original sword slot (under the sender's address) is now empty
         assert_eq!(runtime.get_storage_at_slot(sword_slot.0), [0u8; 32]);
-        assert_eq!(runtime.get_storage_at_slot(get_next_slot(&sword_slot.0)), [0u8; 32]);
+        assert_eq!(
+            runtime.get_storage_at_slot(get_next_slot(&sword_slot.0)),
+            [0u8; 32]
+        );
 
         // Create new sword
         let call_data = createSwordCall::new((77,)).abi_encode();
@@ -5575,7 +5578,9 @@ mod simple_warrior {
             sword: OptionSword {
                 vec: vec![Sword {
                     id: UID {
-                        id: ID { bytes: new_sword_id },
+                        id: ID {
+                            bytes: new_sword_id,
+                        },
                     },
                     strength: 77,
                 }],
@@ -5587,11 +5592,17 @@ mod simple_warrior {
 
         // Assert that the original new sword slot (under the sender's address) is now empty
         assert_eq!(runtime.get_storage_at_slot(new_sword_slot.0), [0u8; 32]);
-        assert_eq!(runtime.get_storage_at_slot(get_next_slot(&new_sword_slot.0)), [0u8; 32]);
+        assert_eq!(
+            runtime.get_storage_at_slot(get_next_slot(&new_sword_slot.0)),
+            [0u8; 32]
+        );
 
         // Assert that the original old sword slot (under the sender's address) holds the old sword now
         assert_ne!(runtime.get_storage_at_slot(sword_slot.0), [0u8; 32]);
-        assert_ne!(runtime.get_storage_at_slot(get_next_slot(&sword_slot.0)), [0u8; 32]);
+        assert_ne!(
+            runtime.get_storage_at_slot(get_next_slot(&sword_slot.0)),
+            [0u8; 32]
+        );
 
         let call_data = inspectSwordCall::new((sword_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -5614,7 +5625,7 @@ mod simple_warrior {
         let shield_id = FixedBytes::<32>::from_slice(&shield_id);
         let shield_slot = derive_object_slot(&SIGNER_ADDRESS, &shield_id.0);
 
-        let call_data = equipShieldCall::new((warrior_id, shield_id,)).abi_encode();
+        let call_data = equipShieldCall::new((warrior_id, shield_id)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
@@ -5626,25 +5637,34 @@ mod simple_warrior {
             id: UID {
                 id: ID { bytes: warrior_id },
             },
-            sword: OptionSword { vec: vec![Sword {
-                id: UID {
-                    id: ID { bytes: new_sword_id },
-                },
-                strength: 77,
-            }] },
-            shield: OptionShield { vec: vec![Shield {
-                id: UID {
-                    id: ID { bytes: shield_id },
-                },
-                armor: 42,
-            }] },
+            sword: OptionSword {
+                vec: vec![Sword {
+                    id: UID {
+                        id: ID {
+                            bytes: new_sword_id,
+                        },
+                    },
+                    strength: 77,
+                }],
+            },
+            shield: OptionShield {
+                vec: vec![Shield {
+                    id: UID {
+                        id: ID { bytes: shield_id },
+                    },
+                    armor: 42,
+                }],
+            },
         });
         assert_eq!(Warrior::abi_encode(&return_data), expected_return_data);
         assert_eq!(0, result);
 
         // Assert that the original shield slot (under the sender's address) is now empty
         assert_eq!(runtime.get_storage_at_slot(shield_slot.0), [0u8; 32]);
-        assert_eq!(runtime.get_storage_at_slot(get_next_slot(&shield_slot.0)), [0u8; 32]);
+        assert_eq!(
+            runtime.get_storage_at_slot(get_next_slot(&shield_slot.0)),
+            [0u8; 32]
+        );
 
         let storage_before_destroy = runtime.get_storage();
         // Destroy warrior
@@ -5661,6 +5681,5 @@ mod simple_warrior {
 
         // Assert that the storage is empty
         assert_empty_storage(&storage_before_destroy, &storage_after_destroy);
-      
     }
 }
