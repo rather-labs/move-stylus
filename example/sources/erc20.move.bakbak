@@ -207,9 +207,12 @@ public fun approve(
 
     if (spender_allowance.contains(spender)) {
         let allowance = spender_allowance.borrow_mut(spender);
-        *allowance = amount;
+        // *allowance = amount;
+
+        *allowance = 500;
     } else {
-        spender_allowance.add(spender, amount);
+        // spender_allowance.add(spender, amount);
+        spender_allowance.add(spender, 600);
     };
 
     emit(Approval {
@@ -258,9 +261,8 @@ public fun transfer_from(
             abort(ENotAllowed);
         };
 
-        *allowance = *allowance - amount;
+        *allowance =  0;
 
-        /*
         let sender_balance = field::borrow_mut<BALANCE_, address, u256>(
             &mut balance.id,
             sender
@@ -270,7 +272,7 @@ public fun transfer_from(
             abort(EInssuficientFunds);
         };
 
-
+        /*
         *sender_balance = *sender_balance - amount;
 
         if (field::exists_(&balance.id, recipient)) {
@@ -285,11 +287,13 @@ public fun transfer_from(
         abort(ENotAllowed)
     };
 
+    /*
     emit(Transfer {
         from: sender,
         to: recipient,
         value: amount
     });
+    */
 
     true
 }

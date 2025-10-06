@@ -184,6 +184,7 @@ async fn main() -> eyre::Result<()> {
 
     println!();
 
+    println!("Checking balances and allowance");
     let res = example.allowance(address_1, sender).call().await?;
     println!("  Current allowance = {} TST", res);
     let res = example.balanceOf(sender).call().await?;
@@ -208,9 +209,9 @@ async fn main() -> eyre::Result<()> {
         println!("transfer 0x{}", hex::encode(&raw));
     }
 
-
     println!();
 
+    println!("Checking balances and allowance");
     let res = example.allowance(address_1, sender).call().await?;
     println!("  Current allowance = {} TST", res);
     let res = example.balanceOf(sender).call().await?;
@@ -219,10 +220,6 @@ async fn main() -> eyre::Result<()> {
     println!("  Current balance of {address_1}= {} TST", res);
     let res = example.balanceOf(address_2).call().await?;
     println!("  Current balance of {address_2}= {} TST", res);
-
-
-    let res = example.allowance(address_1, sender).call().await?;
-    println!("  Current allowance = {} TST", res);
 
     Ok(())
 }
