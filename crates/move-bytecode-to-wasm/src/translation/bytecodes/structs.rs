@@ -162,13 +162,7 @@ pub fn pack(
 
                     // If we find an UID or NamedId struct, in the 4 bytes before its pointer, we
                     // write the address of the struct holding it
-                    IntermediateType::IStruct {
-                        module_id, index, ..
-                    }
-                    | IntermediateType::IGenericStructInstance {
-                        module_id, index, ..
-                    } if Uid::is_vm_type(module_id, *index, compilation_ctx)
-                        || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
+                    pack_type if pack_type.is_uid_or_named_id(compilation_ctx) =>
                     {
                         builder.local_set(ptr_to_data);
 

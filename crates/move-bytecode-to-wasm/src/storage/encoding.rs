@@ -261,12 +261,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         }
 
-        if matches!(
-            field,
-            IntermediateType::IStruct { module_id, index, ..}
-                | IntermediateType::IGenericStructInstance { module_id, index, ..}
-                    if Uid::is_vm_type(module_id, *index, compilation_ctx)
-                        || NamedId::is_vm_type(module_id, *index, compilation_ctx))
+        if field.is_uid_or_named_id(compilation_ctx)
         {
             // Save the struct pointer in the reserved space of the UID
             builder
@@ -902,9 +897,7 @@ pub fn add_encode_intermediate_type_instructions(
 
             builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         }
-        IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. }
-            if itype.is_uid_or_named_id(compilation_ctx) =>
-        {
+        itype if itype.is_uid_or_named_id(compilation_ctx) => {
             // The UID and NamedId structs has the following form
             //
             // [UID | NamedId] { id: ID { bytes: <bytes> } }
@@ -1257,8 +1250,7 @@ pub fn add_decode_intermediate_type_instructions(
             // Copy the chunk of memory
             builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         }
-        IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. }
-            if itype.is_uid_or_named_id(compilation_ctx) =>
+        itype if itype.is_uid_or_named_id(compilation_ctx) =>
         {
             // Reserve 4 bytes to fill with the mem address of the struct that wraps this id.
             // This will be filled outside this function where the struct pointer is available
