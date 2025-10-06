@@ -22,7 +22,6 @@ use crate::{
         structs::IStruct,
         vector::IVector,
     },
-    vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
@@ -261,8 +260,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         }
 
-        if field.is_uid_or_named_id(compilation_ctx)
-        {
+        if field.is_uid_or_named_id(compilation_ctx) {
             // Save the struct pointer in the reserved space of the UID
             builder
                 .local_get(field_ptr)
@@ -1250,8 +1248,7 @@ pub fn add_decode_intermediate_type_instructions(
             // Copy the chunk of memory
             builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         }
-        itype if itype.is_uid_or_named_id(compilation_ctx) =>
-        {
+        itype if itype.is_uid_or_named_id(compilation_ctx) => {
             // Reserve 4 bytes to fill with the mem address of the struct that wraps this id.
             // This will be filled outside this function where the struct pointer is available
             builder.i32_const(4).call(compilation_ctx.allocator).drop();
