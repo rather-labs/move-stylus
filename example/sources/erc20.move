@@ -224,10 +224,10 @@ public fun approve(
 public fun allowance(
     owner: address,
     spender: address,
-    allowance: &mut Allowance,
+    allowance: &Allowance,
 ): u256 {
     if (field::exists_(&allowance.id, owner)) {
-        let owner_allowance = field::borrow_mut<ALLOWANCE_, address, Table<address, u256>>(
+        let owner_allowance = field::borrow<ALLOWANCE_, address, Table<address, u256>>(
             &mut allowance.id,
             owner
         );
@@ -253,14 +253,7 @@ public fun transfer_from(
             sender,
         );
 
-        let allowance = spender_allowance.borrow_mut(ctx.sender());
-        if (*allowance < amount) {
-            abort(ENotAllowed);
-        };
 
-        *allowance = *allowance - amount;
-
-        /*
         let sender_balance = field::borrow_mut<BALANCE_, address, u256>(
             &mut balance.id,
             sender
@@ -273,13 +266,20 @@ public fun transfer_from(
 
         *sender_balance = *sender_balance - amount;
 
+let allowance = spender_allowance.borrow_mut(ctx.sender());
+        if (*allowance < amount) {
+            abort(ENotAllowed);
+        };
+
+        *allowance = *allowance - amount;
+
+
         if (field::exists_(&balance.id, recipient)) {
             let recipient_balance = field::borrow_mut(&mut balance.id, recipient);
             *recipient_balance = *recipient_balance + amount;
         } else {
             field::add(&mut balance.id, recipient, amount);
         };
-        */
 
     } else {
         abort(ENotAllowed)

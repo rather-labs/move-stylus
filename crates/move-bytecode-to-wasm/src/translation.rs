@@ -647,6 +647,11 @@ fn translate_instruction(
                             false,
                             walrus::ConstExpr::Value(Value::I32(-1)),
                         );
+                        println!("adding global struct ptr {global_struct_ptr:?}");
+                        println!(
+                            "while processing {function_id} from {}",
+                            &mapped_function.function_id
+                        );
                         let field_ref_ptr = module.locals.add(ValType::I32);
 
                         // Set the global that with the boroowed struct pointer
