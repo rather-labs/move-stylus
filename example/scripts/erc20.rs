@@ -32,6 +32,9 @@ sol!(
 async fn main() -> eyre::Result<()> {
     dotenv().ok();
     let priv_key = std::env::var("PRIV_KEY").map_err(|_| eyre!("No {} env var set", "PRIV_KEY"))?;
+    let priv_key_2 =
+        std::env::var("PRIV_KEY_2").map_err(|_| eyre!("No {} env var set", "PRIV_KEY_2"))?;
+
     let rpc_url = std::env::var("RPC_URL").map_err(|_| eyre!("No {} env var set", "RPC_URL"))?;
     let contract_address = std::env::var("CONTRACT_ADDRESS_ERC20")
         .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_ERC20"))?;
@@ -49,28 +52,37 @@ async fn main() -> eyre::Result<()> {
     let example = Example::new(address, provider.clone());
 
 
-    let address_1 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
+    // Testing capability with another user
+    let signer_2 = PrivateKeySigner::from_str(&priv_key_2)?;
+    let address_1 = signer_2.address();
+
+    let provider_2 = Arc::new(
+        ProviderBuilder::new()
+            .wallet(signer_2)
+            .with_chain_id(412346)
+            .connect_http(Url::from_str(&rpc_url).unwrap()),
+    );
+    let example_2 = Example::new(address, provider_2.clone());
+
+    let address_2 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
+
+    let tx = TransactionRequest::default()
+        .from(sender)
+        .to(address_1)
+        .value(U256::from(1_000_000_000_000_000_000u128)); // 1 eth in wei
+    let pending_tx = provider.send_transaction(tx).await?;
+    pending_tx.get_receipt().await?;
 
     println!("====================");
     println!("Creating a new erc20");
     println!("====================");
     let pending_tx = example.create().send().await?;
     let _receipt = pending_tx.get_receipt().await?;
-    /*
-    let counter_id = receipt.logs()[0].data().data.0.clone();
-    let counter_id = FixedBytes::<32>::new(<[u8; 32]>::try_from(counter_id.to_vec()).unwrap());
-    println!("Captured counter_id {:?}", counter_id);
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("create tx 0x{}", hex::encode(&raw));
-    }
-    */
-
-    println!("created");
+    println!("Created!");
 
 
     println!("\n====================");
-    println!("Contract Info");
+    println!("  Contract Info");
     println!("====================");
 
     let res = example.totalSupply().call().await?;
@@ -89,7 +101,7 @@ async fn main() -> eyre::Result<()> {
     println!("Balance of target address = {}", res);
 
     println!("\n====================");
-    println!("Mint");
+    println!("  Mint");
     println!("====================");
 
     println!("Minting 555555 coins to target address");
@@ -109,7 +121,7 @@ async fn main() -> eyre::Result<()> {
     println!("Balance of target address = {}", res);
 
     println!("\n====================");
-    println!("Transfer");
+    println!("  Transfer");
     println!("====================");
 
     println!("Transfering 1000 TST to {address_1}");
@@ -126,15 +138,13 @@ async fn main() -> eyre::Result<()> {
         println!("create tx 0x{}", hex::encode(&raw));
     }
 
-
     let res = example.balanceOf(sender).call().await?;
     println!("  Balance of origin address {sender} after transaction = {}", res);
     let res = example.balanceOf(address_1).call().await?;
     println!("  Balance of target address {address_1} after transaction = {}", res);
 
-
     println!("\n====================");
-    println!("Burn");
+    println!("  Burn");
     println!("====================");
 
     println!("Burning 11111 coins to from {sender}");
@@ -152,6 +162,67 @@ async fn main() -> eyre::Result<()> {
 
     let res = example.balanceOf(sender).call().await?;
     println!("Balance of target address = {}", res);
+
+    println!("\n==============================");
+    println!("  Allowance and transfer from");
+    println!("================================");
+
+    println!("Allow {sender} to spend 100 TST from {address_1}");
+    let res = example.allowance(address_1, sender).call().await?;
+    println!("  Current allowance = {}", res);
+
+    println!();
+
+    println!("Executing allow...");
+    let pending_tx = example_2.approve(sender, U256::from(100)).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    println!("Approval events");
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("approval 0x{}", hex::encode(&raw));
+    }
+
+    println!();
+
+    let res = example.allowance(address_1, sender).call().await?;
+    println!("  Current allowance = {} TST", res);
+    let res = example.balanceOf(sender).call().await?;
+    println!("  Current balance of {sender}= {} TST", res);
+    let res = example.balanceOf(address_1).call().await?;
+    println!("  Current balance of {address_1}= {} TST", res);
+    let res = example.balanceOf(address_2).call().await?;
+    println!("  Current balance of {address_2}= {} TST", res);
+
+
+    println!();
+
+    println!("Using transfer from:");
+    println!(" sender: {sender}");
+    println!(" spender: {address_1}");
+    println!(" receiver: {address_2}");
+    let pending_tx = example.transferFrom(address_1, address_2, U256::from(100)).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    println!("Transfer events");
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("transfer 0x{}", hex::encode(&raw));
+    }
+
+
+    println!();
+
+    let res = example.allowance(address_1, sender).call().await?;
+    println!("  Current allowance = {} TST", res);
+    let res = example.balanceOf(sender).call().await?;
+    println!("  Current balance of {sender}= {} TST", res);
+    let res = example.balanceOf(address_1).call().await?;
+    println!("  Current balance of {address_1}= {} TST", res);
+    let res = example.balanceOf(address_2).call().await?;
+    println!("  Current balance of {address_2}= {} TST", res);
+
+
+    let res = example.allowance(address_1, sender).call().await?;
+    println!("  Current allowance = {} TST", res);
 
     Ok(())
 }

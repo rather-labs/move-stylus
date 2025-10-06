@@ -122,7 +122,9 @@ public fun exists_with_type<Name: copy + drop + store, Value: store>(
 ): bool {
     let object_addr = object.to_address();
     let hash = hash_type_and_key(object_addr, name);
-    has_child_object_with_ty<Field<Name, Value>>(object_addr, hash)
+    // has_child_object_with_ty<Field<Name, Value>>(object_addr, hash)
+    // TODO: implement function above when typehash implemented
+    has_child_object(object_addr, hash)
 }
 
 /// May abort with `EBCSSerializationFailure`.
