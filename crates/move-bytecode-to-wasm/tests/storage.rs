@@ -5144,10 +5144,44 @@ mod erc20 {
         assert_eq!(0, result);
 
         runtime.print_storage();
+        /*
+        runtime.print_storage();
 
         let call_data = totalSupplyCall::new(()).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
         assert_eq!(0.abi_encode(), result_data);
+        */
+
+        let address_1 = address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef");
+        let address_2 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
+        runtime.set_msg_sender(**address_2);
+        runtime.set_tx_origin(**address_2);
+
+        let call_data = approveCall::new((address_1, U256::from(1))).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        /*
+        runtime.print_storage();
+        let call_data = allowanceCall::new((address_2, address_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(6.abi_encode(), result_data);
+        println!("\n-----------------------------------\n");
+
+        let call_data = approveCall::new((address_1, U256::from(1))).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        */
+
+        /*
+        let call_data = allowanceCall::new((address_2, address_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        //assert_eq!(5.abi_encode(), result_data);
+
+        */
+        runtime.print_storage();
     }
 }

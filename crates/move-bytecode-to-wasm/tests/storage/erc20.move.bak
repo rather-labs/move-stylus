@@ -1,4 +1,4 @@
-module hello_world::erc20;
+module test::erc20;
 
 use stylus::event::emit;
 use std::ascii::String;
@@ -57,6 +57,7 @@ public struct AccountAllowance has key {
 }
 
 public fun create(ctx: &mut TxContext) {
+    /*
     transfer::freeze_object(Info {
         id: object::new_named_id<CONTRACT_INFO>(),
         name: ascii::string(b"Test Coin"),
@@ -68,16 +69,21 @@ public fun create(ctx: &mut TxContext) {
         id: object::new_named_id<TOTAL_SUPPLY>(),
         total: 0,
     });
+    */
 
     transfer::share_object(Allowance {
         id: object::new_named_id<ALLOWANCE_>(),
     });
 
+
+    /*
     transfer::share_object(Balance {
         id: object::new_named_id<BALANCE_>(),
     });
+    */
 }
 
+    /*
 public fun mint(
     to: address,
     amount: u256,
@@ -187,6 +193,7 @@ public fun transfer(
 
     true
 }
+*/
 
 public fun approve(
     spender: address,
@@ -194,36 +201,38 @@ public fun approve(
     allowance: &mut Allowance,
     ctx: &mut TxContext,
 ): bool {
+    /*
     let spender_allowance = if (field::exists_(&allowance.id, ctx.sender())) {
         field::borrow_mut<ALLOWANCE_, address, Table<address, u256>>(&mut allowance.id, ctx.sender())
     } else {
+    */
         field::add(
             &mut allowance.id,
             ctx.sender(),
             table::new<address, u256>(ctx)
         );
+    /*
         field::borrow_mut<ALLOWANCE_, address, Table<address, u256>>(&mut allowance.id, ctx.sender())
     };
+    */
 
+    /*
     if (spender_allowance.contains(spender)) {
         let allowance = spender_allowance.borrow_mut(spender);
         // *allowance = amount;
 
-        *allowance = 500;
+        *allowance = 5;
     } else {
         // spender_allowance.add(spender, amount);
-        spender_allowance.add(spender, 600);
+        spender_allowance.add(spender, 6);
     };
+    */
 
-    emit(Approval {
-        owner: ctx.sender(),
-        spender,
-        value: amount
-    });
 
     true
 }
 
+/*
 public fun allowance(
     owner: address,
     spender: address,
@@ -299,3 +308,4 @@ public fun transfer_from(
 
     true
 }
+*/
