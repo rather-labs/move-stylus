@@ -306,7 +306,11 @@ impl RuntimeFunction {
                     generics.len(),
                 );
 
-                storage::add_check_and_delete_struct_tto_fields_fn(module, compilation_ctx, generics[0])
+                storage::add_check_and_delete_struct_tto_fields_fn(
+                    module,
+                    compilation_ctx,
+                    generics[0],
+                )
             }
             Self::DeleteTtoObject => {
                 assert_eq!(
