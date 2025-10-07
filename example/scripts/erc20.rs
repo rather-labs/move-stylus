@@ -1,8 +1,8 @@
-use alloy::{hex, primitives::address};
 use alloy::primitives::U256;
 use alloy::providers::Provider;
 use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
+use alloy::{hex, primitives::address};
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
 use eyre::eyre;
@@ -51,7 +51,6 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
-
     // Testing capability with another user
     let signer_2 = PrivateKeySigner::from_str(&priv_key_2)?;
     let address_1 = signer_2.address();
@@ -80,7 +79,6 @@ async fn main() -> eyre::Result<()> {
     let _receipt = pending_tx.get_receipt().await?;
     println!("Created!");
 
-
     println!("\n====================");
     println!("  Contract Info");
     println!("====================");
@@ -96,7 +94,6 @@ async fn main() -> eyre::Result<()> {
 
     let res = example.symbol().call().await?;
     println!("symbol = {}", res);
-
 
     println!("\n====================");
     println!("  Mint");
@@ -128,9 +125,15 @@ async fn main() -> eyre::Result<()> {
     println!("Transfering 1000 TST to {address_1}");
 
     let res = example.balanceOf(sender).call().await?;
-    println!("  Balance of origin address {sender} before transaction = {}", res);
+    println!(
+        "  Balance of origin address {sender} before transaction = {}",
+        res
+    );
     let res = example.balanceOf(address_1).call().await?;
-    println!("  Balance of target address {address_1} before transaction = {}", res);
+    println!(
+        "  Balance of target address {address_1} before transaction = {}",
+        res
+    );
 
     let pending_tx = example.transfer(address_1, U256::from(1000)).send().await?;
     let receipt = pending_tx.get_receipt().await?;
@@ -140,9 +143,15 @@ async fn main() -> eyre::Result<()> {
     }
 
     let res = example.balanceOf(sender).call().await?;
-    println!("  Balance of origin address {sender} after transaction = {}", res);
+    println!(
+        "  Balance of origin address {sender} after transaction = {}",
+        res
+    );
     let res = example.balanceOf(address_1).call().await?;
-    println!("  Balance of target address {address_1} after transaction = {}", res);
+    println!(
+        "  Balance of target address {address_1} after transaction = {}",
+        res
+    );
 
     println!("\n====================");
     println!("  Burn");
@@ -195,14 +204,16 @@ async fn main() -> eyre::Result<()> {
     let res = example.balanceOf(address_2).call().await?;
     println!("  Current balance of {address_2}= {} TST", res);
 
-
     println!();
 
     println!("Using transfer from:");
     println!(" sender: {sender}");
     println!(" spender: {address_1}");
     println!(" receiver: {address_2}");
-    let pending_tx = example.transferFrom(address_1, address_2, U256::from(100)).send().await?;
+    let pending_tx = example
+        .transferFrom(address_1, address_2, U256::from(100))
+        .send()
+        .await?;
     let receipt = pending_tx.get_receipt().await?;
     println!("Transfer events");
     for log in receipt.logs() {

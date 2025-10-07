@@ -24,7 +24,7 @@ pub fn add_is_one_time_witness_fn(
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_IS_ONE_TIME_WITNESS,
         &[itype],
-        &module_id,
+        module_id,
     );
 
     if let Some(function) = module.funcs.by_name(&name) {
