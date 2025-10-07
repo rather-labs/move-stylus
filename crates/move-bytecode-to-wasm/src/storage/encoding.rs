@@ -48,6 +48,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
     let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
 
+    // If the struct has the key ability, set the object owner data to the struct id
+    // This might be used when encoding wrapped objects.
     if struct_.has_key {
         builder
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
@@ -1460,11 +1462,7 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
         IntermediateType::IAddress | IntermediateType::ISigner => 20,
         // Dynamic data occupies the whole slot, but the data is saved somewhere else
         IntermediateType::IVector(_) => 32,
-        IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. }
-            if field.is_uid_or_named_id(compilation_ctx) =>
-        {
-            32
-        }
+        field if field.is_uid_or_named_id(compilation_ctx) => 32,
 
         // Structs default to size 0 since their size depends on whether their fields are dynamic or static.
         // The store function will handle this. If a struct has the 'key' ability, it at least occupies 32 bytes for the UID.

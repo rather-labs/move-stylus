@@ -3550,46 +3550,6 @@ mod storage_encoding {
             .unwrap();
         assert_eq!(0, result);
 
-        // let UID_PARENT: [u8; 32] = U256::from_str_radix(
-        //     "d51bb5edad7d1535fb0a47b2d03d08c0fe02560a3de80e55815fedb1ce1be09b",
-        //     16,
-        // )
-        // .unwrap()
-        // .to_be_bytes();
-        // let UID_CHILD_A: [u8; 32] = U256::from_str_radix(
-        //     "b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255",
-        //     16,
-        // )
-        // .unwrap()
-        // .to_be_bytes();
-        // let UID_CHILD_B: [u8; 32] = U256::from_str_radix(
-        //     "1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741",
-        //     16,
-        // )
-        // .unwrap()
-        // .to_be_bytes();
-        // let UID_CHILD_C: [u8; 32] = U256::from_str_radix(
-        //     "60b770a33dfbcb5aaea4306257d155502df85b76449b216c476fcfcd437c152e",
-        //     16,
-        // )
-        // .unwrap()
-        // .to_be_bytes();
-
-        // println!("UID_PARENT: {:x?}", hex::encode(UID_PARENT));
-        // println!("UID_CHILD_A: {:x?}", hex::encode(UID_CHILD_A));
-        // println!("UID_CHILD_B: {:x?}", hex::encode(UID_CHILD_B));
-        // println!("UID_CHILD_C: {:x?}", hex::encode(UID_CHILD_C));
-
-        // let UID_CHILD_A_SLOT = derive_object_slot(&UID_PARENT, &UID_CHILD_A);
-        // let UID_CHILD_B_SLOT = derive_object_slot(&UID_PARENT, &UID_CHILD_B);
-        // let UID_CHILD_C_SLOT = derive_object_slot(&UID_PARENT, &UID_CHILD_C);
-
-        // println!("UID_CHILD_A_SLOT: {:?}", UID_CHILD_A_SLOT.to_vec());
-        // println!("UID_CHILD_B_SLOT: {:?}", UID_CHILD_B_SLOT.to_vec());
-        // println!("UID_CHILD_C_SLOT: {:?}", UID_CHILD_C_SLOT.to_vec());
-
-        runtime.print_storage();
-
         // Check if it is encoded correctly in storage
         for (i, slot) in expected_slots.iter().enumerate() {
             let storage = runtime.get_storage_at_slot(*slot);
@@ -4708,7 +4668,7 @@ mod wrapped_objects {
     }
 
     #[rstest]
-    fn test_pushing_alpha_to_delta(runtime: RuntimeSandbox) {
+    fn test_pushing_alpha_into_delta(runtime: RuntimeSandbox) {
         // Create empty delta
         let call_data = createEmptyDeltaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -4905,6 +4865,7 @@ mod wrapped_objects {
 
         let epsilon_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let epsilon_id = FixedBytes::<32>::from_slice(&epsilon_id);
+        let epsilon_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &epsilon_id.0);
 
         let call_data = createAlphaCall::new((105,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -4912,10 +4873,25 @@ mod wrapped_objects {
 
         let alpha_5_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let alpha_5_id = FixedBytes::<32>::from_slice(&alpha_5_id);
+        let alpha_5_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_5_id.0);
 
         let call_data = destructEpsilonCall::new((epsilon_id, alpha_5_id)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
+
+        // Assert that epsilon is deleted from the original namespace
+        assert_eq!(
+            runtime.get_storage_at_slot(epsilon_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+
+        // Assert that alpha 5 is deleted from the original namespace
+        assert_eq!(
+            runtime.get_storage_at_slot(alpha_5_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
 
         // Read delta and assert the returned data
         let call_data = readDeltaCall::new((delta_2_id,)).abi_encode();
