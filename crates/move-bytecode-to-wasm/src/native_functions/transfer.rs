@@ -6,12 +6,11 @@ use crate::{
     },
     get_generic_function_name,
     runtime::RuntimeFunction,
-    translation::intermediate_types::{IntermediateType, structs::IStruct},
-    wasm_builder_extensions::WasmBuilderExtension,
+    translation::intermediate_types::IntermediateType,
 };
 use walrus::{
-    FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, LoadKind, MemArg, UnaryOp},
+    FunctionBuilder, FunctionId, Module, ValType,
+    ir::{BinaryOp, UnaryOp},
 };
 
 use super::NativeFunction;
@@ -98,18 +97,13 @@ pub fn add_transfer_object_fn(
         block.local_get(struct_ptr).call(delete_object_fn);
     });
 
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
-
     // Remove any objects that have been recently transferred into the struct from the original owner's mapping in storage.
-    add_delete_tto_objects_instructions(
-        module,
-        &mut builder,
-        compilation_ctx,
-        struct_ptr,
-        &struct_,
-    );
+    let check_and_delete_struct_tto_fields_fn = RuntimeFunction::CheckAndDeleteStructTtoFields
+        .get_generic(module, compilation_ctx, &[itype]);
+    builder
+        .local_get(struct_ptr)
+        .call(check_and_delete_struct_tto_fields_fn);
+
     // Update the object ownership in memory to the recipient's address
     builder
         .local_get(owner_ptr)
@@ -221,18 +215,16 @@ pub fn add_share_object_fn(
                     block.local_get(struct_ptr).call(delete_object_fn);
                 });
 
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(itype)
-                    .unwrap();
-
                 // Remove any objects that have been recently transferred into the struct from the original owner's mapping in storage.
-                add_delete_tto_objects_instructions(
-                    module,
-                    else_,
-                    compilation_ctx,
-                    struct_ptr,
-                    &struct_,
-                );
+                let check_and_delete_struct_tto_fields_fn =
+                    RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic(
+                        module,
+                        compilation_ctx,
+                        &[itype],
+                    );
+                else_
+                    .local_get(struct_ptr)
+                    .call(check_and_delete_struct_tto_fields_fn);
 
                 // Update the object ownership in memory to the shared objects key
                 else_
@@ -351,18 +343,16 @@ pub fn add_freeze_object_fn(
                     block.local_get(struct_ptr).call(delete_object_fn);
                 });
 
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(itype)
-                    .unwrap();
-
                 // Remove any objects that have been recently transferred into the struct from the original owner's mapping in storage.
-                add_delete_tto_objects_instructions(
-                    module,
-                    else_,
-                    compilation_ctx,
-                    struct_ptr,
-                    &struct_,
-                );
+                let check_and_delete_struct_tto_fields_fn =
+                    RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic(
+                        module,
+                        compilation_ctx,
+                        &[itype],
+                    );
+                else_
+                    .local_get(struct_ptr)
+                    .call(check_and_delete_struct_tto_fields_fn);
 
                 // Update the object ownership in memory to the frozen objects key
                 else_
@@ -397,274 +387,4 @@ pub fn add_freeze_object_fn(
     });
 
     function.finish(vec![struct_ptr], &mut module.funcs)
-}
-
-/// Remove any objects that have been recently transferred into the struct (transfer-to-object feature or TTO)
-/// from the original owner's mapping in storage.
-///
-/// Example: The Object 'obj' is initially owned by the sender. It is then passed as a value to the 'request_swap' function,
-/// where it gets wrapped within the 'SwapRequest' struct. This struct is subsequently transferred to the service address.
-/// In this scenario, 'obj' must be removed from the sender's ownership mapping (the original owner) because the 'SwapRequest' struct is now the actual owner.
-///```ignore
-/// public fun request_swap(
-///     obj: Object,
-///   service: address,
-///     fee: u64,
-///     ctx: &mut TxContext,
-/// ) {
-///     assert!(fee >= MIN_FEE, EFeeTooLow);
-///
-///    let request = SwapRequest {
-///         id: object::new(ctx),
-///        owner: ctx.sender(),
-///         object: obj,
-///         fee,
-///     };
-///
-///    transfer::transfer(request, service)
-/// }
-///```
-pub fn add_delete_tto_objects_instructions(
-    module: &mut Module,
-    builder: &mut InstrSeqBuilder,
-    compilation_ctx: &CompilationContext,
-    parent_struct_ptr: LocalId,
-    struct_: &IStruct,
-) {
-    // Iterate over the fields of the struct
-    let mut offset: i32 = 0;
-    for field in struct_.fields.iter() {
-        if let Ok(child_struct) = compilation_ctx.get_struct_by_intermediate_type(field) {
-            let child_struct_ptr = module.locals.add(ValType::I32);
-
-            // Get the pointer to the child struct
-            builder
-                .local_get(parent_struct_ptr)
-                .i32_const(offset)
-                .binop(BinaryOp::I32Add)
-                // Load the intermediate pointer to the child struct
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .local_set(child_struct_ptr);
-
-            // Call the function recursively to delete any recently wrapped objects within the child struct
-            //
-            // Example: the Object 'obj' is initially owned by the sender. It is then passed to the 'request_swap' function,
-            // where it gets wrapped into the ObjectWrapper struct, which in turn is wrapped into the SwapRequest.
-            // In this scenario, 'obj' must be removed from the sender's ownership mapping (the original owner) and stored in the wrapper struct mapping,
-            // which in turn is stored into the SwapRequest struct mapping.
-            //```no_run
-            // public fun request_swap(
-            //     obj: Object,
-            //     service: address,
-            //     fee: u64,
-            //     ctx: &mut TxContext,
-            // ) {
-            //     assert!(fee >= MIN_FEE, EFeeTooLow);
-            //
-            //     let wrapper = ObjectWrapper { id: object::new(ctx), object: obj };
-            //
-            //     let request = SwapRequest {
-            //         id: object::new(ctx),
-            //         owner: ctx.sender(),
-            //         wrapper,
-            //         fee,
-            //     };
-            //
-            //     transfer::transfer(request, service)
-            // }
-            //```
-            add_delete_tto_objects_instructions(
-                module,
-                builder,
-                compilation_ctx,
-                child_struct_ptr,
-                &child_struct,
-            );
-            if child_struct.has_key {
-                // Delete the wrapped object field
-                add_delete_wrapped_object_field_instructions(
-                    module,
-                    builder,
-                    compilation_ctx,
-                    parent_struct_ptr,
-                    child_struct_ptr,
-                    field,
-                );
-            }
-        } else if let IntermediateType::IVector(inner) = field {
-            if let Ok(child_struct) =
-                compilation_ctx.get_struct_by_intermediate_type(inner.as_ref())
-            {
-                let vector_ptr = module.locals.add(ValType::I32);
-                let len = module.locals.add(ValType::I32);
-
-                // Get the pointer to the vector
-                builder
-                    .local_get(parent_struct_ptr)
-                    .i32_const(offset)
-                    .binop(BinaryOp::I32Add)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_tee(vector_ptr);
-
-                // Load vector length from its header
-                builder
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .local_set(len);
-
-                // Outer block: if the vector length is 0, we skip to the end
-                builder.block(None, |outer_block| {
-                    let outer_block_id = outer_block.id();
-
-                    // Check if length == 0
-                    outer_block
-                        .local_get(len)
-                        .i32_const(0)
-                        .binop(BinaryOp::I32Eq)
-                        .br_if(outer_block_id);
-
-                    outer_block.block(None, |inner_block| {
-                        let inner_block_id = inner_block.id();
-
-                        let i = module.locals.add(ValType::I32);
-                        let elem_ptr = module.locals.add(ValType::I32);
-
-                        // Set the aux locals to 0 to start the loop
-                        inner_block.i32_const(0).local_set(i);
-                        inner_block.loop_(None, |loop_| {
-                            let loop_id = loop_.id();
-
-                            loop_
-                                .vec_elem_ptr(vector_ptr, i, 4)
-                                .load(
-                                    compilation_ctx.memory_id,
-                                    LoadKind::I32 { atomic: false },
-                                    MemArg {
-                                        align: 0,
-                                        offset: 0,
-                                    },
-                                )
-                                .local_set(elem_ptr);
-
-                            // Call the function recursively to delete any recently tto objects within the vector element struct
-                            add_delete_tto_objects_instructions(
-                                module,
-                                loop_,
-                                compilation_ctx,
-                                elem_ptr,
-                                &child_struct,
-                            );
-
-                            if child_struct.has_key {
-                                // Delete the wrapped object field
-                                add_delete_wrapped_object_field_instructions(
-                                    module,
-                                    loop_,
-                                    compilation_ctx,
-                                    parent_struct_ptr,
-                                    elem_ptr,
-                                    inner.as_ref(),
-                                );
-                            }
-
-                            // Exit after processing all elements
-                            loop_
-                                .local_get(i)
-                                .local_get(len)
-                                .i32_const(1)
-                                .binop(BinaryOp::I32Sub)
-                                .binop(BinaryOp::I32Eq)
-                                .br_if(inner_block_id);
-
-                            // i = i + 1 and continue the loop
-                            loop_
-                                .local_get(i)
-                                .i32_const(1)
-                                .binop(BinaryOp::I32Add)
-                                .local_set(i)
-                                .br(loop_id);
-                        });
-                    });
-                });
-            }
-        }
-        offset += 4;
-    }
-}
-
-/// Helper function to delete a single struct field that has the key ability.
-/// This function checks if the field should be deleted and performs the deletion if needed.
-fn add_delete_wrapped_object_field_instructions(
-    module: &mut Module,
-    builder: &mut InstrSeqBuilder,
-    compilation_ctx: &CompilationContext,
-    parent_struct_ptr: LocalId,
-    child_struct_ptr: LocalId,
-    field_type: &IntermediateType,
-) {
-    builder.block(None, |block| {
-        let block_id = block.id();
-
-        // Runtime functions
-        let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
-        let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-        let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
-        let get_struct_owner_fn =
-            RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
-
-        let child_struct_owner_ptr = module.locals.add(ValType::I32);
-
-        // Get the pointer to the child struct owner
-        block
-            .local_get(child_struct_ptr)
-            .call(get_struct_owner_fn)
-            .local_set(child_struct_owner_ptr);
-
-        // Check if the owner is zero (means there's no owner, so we don't need to delete anything)
-        // This can happen if we have just created the struct and not transfered it yet.
-        block
-            .local_get(child_struct_owner_ptr)
-            .i32_const(32)
-            .call(is_zero_fn)
-            .br_if(block_id); // Exit early if owner is zero
-
-        // Verify if the owner of the child struct matches the ID of the parent struct.
-        // If they differ, it indicates that the child struct has been just wrapped into the wrapper struct
-        // and should be removed from the original owner's storage mapping.
-        block
-            .local_get(parent_struct_ptr)
-            .call(get_id_bytes_ptr_fn)
-            .local_get(child_struct_owner_ptr)
-            .i32_const(32)
-            .call(equality_fn)
-            .br_if(block_id); // Exit early if owners match
-
-        // Get the delete function for the child struct
-        let delete_wrapped_object_fn =
-            RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[field_type]);
-
-        block
-            .local_get(child_struct_ptr)
-            .call(delete_wrapped_object_fn);
-    });
 }

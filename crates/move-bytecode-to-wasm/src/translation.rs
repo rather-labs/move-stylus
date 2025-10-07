@@ -50,7 +50,6 @@ use walrus::{
     },
 };
 use walrus::{GlobalId, TableId};
-
 /// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs.
 /// It is used to translate the branching instructions: Branch, BrFalse, BrTrue
 struct BranchTargets {
@@ -1581,8 +1580,19 @@ fn translate_instruction(
                                             compilation_ctx.memory_id,
                                         );
 
-                                    // Load the struct memory representation to pass it to the save
-                                    // function
+                                    // Call the function to delete any recently tto objects within the struct
+                                    // This needed when pushing objects with the key ability into a vector field of a struct
+                                    let check_and_delete_struct_tto_fields_fn =
+                                        RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic(
+                                            module,
+                                            compilation_ctx,
+                                            &[itype],
+                                        );
+                                    else_
+                                        .local_get(struct_ptr)
+                                        .call(check_and_delete_struct_tto_fields_fn);
+
+                                    // Save the struct in the slot
                                     else_
                                         .local_get(struct_ptr)
                                         .local_get(slot_ptr)

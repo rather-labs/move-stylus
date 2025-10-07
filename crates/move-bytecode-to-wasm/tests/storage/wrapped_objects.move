@@ -69,6 +69,11 @@ public fun create_delta(ctx: &mut TxContext) {
     transfer::transfer(delta, ctx.sender());
 }
 
+public fun create_empty_delta(ctx: &mut TxContext) {
+    let delta = Delta { id: object::new(ctx), a: vector[] };
+    transfer::transfer(delta, ctx.sender());
+}
+
 public fun create_epsilon(ctx: &mut TxContext) {
     let delta_1 = Delta { id: object::new(ctx), a: vector[Alpha { id: object::new(ctx), value: 101 }, Alpha { id: object::new(ctx), value: 102 }] };
     let delta_2 = Delta { id: object::new(ctx), a: vector[Alpha { id: object::new(ctx), value: 103 }, Alpha { id: object::new(ctx), value: 104 }] };
@@ -98,6 +103,10 @@ public fun create_epsilon_tto(delta_1: Delta, delta_2: Delta, ctx: &mut TxContex
 }
 
 // Reading structs
+public fun read_alpha(alpha: &Alpha): &Alpha {
+    alpha
+}
+
 public fun read_beta(beta: &Beta): &Beta {
     beta
 }
@@ -112,6 +121,11 @@ public fun read_delta(delta: &Delta): &Delta {
 
 public fun read_epsilon(epsilon: &Epsilon): &Epsilon {
     epsilon
+}
+
+public fun delete_alpha(alpha: Alpha) {
+    let Alpha { id, value: _ } = alpha;
+    id.delete();
 }
 
 // Deleting structs
@@ -192,4 +206,32 @@ public fun destruct_delta_to_beta(delta: Delta, ctx: &mut TxContext) {
         transfer::share_object(beta);
     };
     vector::destroy_empty(vector_alpha);
+}
+
+// Pushing Alpha to Delta
+public fun push_alpha_to_delta(delta: &mut Delta, alpha: Alpha) {
+    delta.a.push_back(alpha);
+}
+
+// Popping Alpha from Delta
+public fun pop_alpha_from_delta(delta: &mut Delta) {
+    let alpha = delta.a.pop_back();
+    transfer::share_object(alpha);
+}
+
+public fun destruct_epsilon(epsilon: Epsilon, alpha: Alpha, ctx: &mut TxContext) {
+    let Epsilon { id, a: mut vector_delta } = epsilon;
+    id.delete();
+
+    if (!vector::is_empty(&vector_delta)) {
+        let mut delta = vector::pop_back(&mut vector_delta);
+        delta.a.push_back(alpha);
+        transfer::transfer(delta, ctx.sender());
+    } else {
+        let Alpha { id, value: _ } = alpha;
+        id.delete();
+    };
+
+    let new_epsilon = Epsilon { id: object::new(ctx), a: vector_delta };
+    transfer::share_object(new_epsilon);
 }

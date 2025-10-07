@@ -3550,8 +3550,6 @@ mod storage_encoding {
             .unwrap();
         assert_eq!(0, result);
 
-        runtime.print_storage();
-
         // Check if it is encoded correctly in storage
         for (i, slot) in expected_slots.iter().enumerate() {
             let storage = runtime.get_storage_at_slot(*slot);
@@ -3953,15 +3951,18 @@ mod wrapped_objects {
         function createBeta() public view;
         function createGamma() public view;
         function createDelta() public view;
+        function createEmptyDelta() public view;
         function createEpsilon() public view;
         function createBetaTto(bytes32 a) public view;
         function createGammaTto(bytes32 a) public view;
         function createDeltaTto(bytes32 a, bytes32 b) public view;
         function createEpsilonTto(bytes32 a, bytes32 b) public view;
+        function readAlpha(bytes32 a) public view returns (Alpha);
         function readBeta(bytes32 b) public view returns (Beta);
         function readGamma(bytes32 g) public view returns (Gamma);
         function readDelta(bytes32 d) public view returns (Delta);
         function readEpsilon(bytes32 e) public view returns (Epsilon);
+        function deleteAlpha(bytes32 a) public view;
         function deleteBeta(bytes32 b) public view;
         function deleteGamma(bytes32 g) public view;
         function deleteDelta(bytes32 d) public view;
@@ -3971,6 +3972,9 @@ mod wrapped_objects {
         function transferDelta(bytes32 d, address recipient) public view;
         function rebuildGamma(bytes32 g, address recipient) public view;
         function destructDeltaToBeta(bytes32 d) public view;
+        function pushAlphaToDelta(bytes32 d, bytes32 a) public view;
+        function popAlphaFromDelta(bytes32 d) public view;
+        function destructEpsilon(bytes32 e, bytes32 a) public view;
     );
 
     // In all tests, we use the tto flag to indicate if the creation method should take
@@ -4662,6 +4666,301 @@ mod wrapped_objects {
         assert_eq!(Beta::abi_encode(&return_data), beta_expected);
         assert_eq!(0, result);
     }
+
+    #[rstest]
+    fn test_pushing_alpha_into_delta(runtime: RuntimeSandbox) {
+        // Create empty delta
+        let call_data = createEmptyDeltaCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let delta_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let delta_id = FixedBytes::<32>::from_slice(&delta_id);
+
+        // Create alpha
+        let call_data = createAlphaCall::new((101,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+        let alpha_1_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_1_id.0);
+
+        // Push alpha to delta
+        let call_data = pushAlphaToDeltaCall::new((delta_id, alpha_1_id)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read delta and assert the returned data is correct
+        let call_data = readDeltaCall::new((delta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readDeltaCall::abi_decode_returns(&return_data).unwrap();
+        let delta_expected = Delta::abi_encode(&Delta {
+            id: UID {
+                id: ID { bytes: delta_id },
+            },
+            a: vec![Alpha {
+                id: UID {
+                    id: ID { bytes: alpha_1_id },
+                },
+                value: 101,
+            }],
+        });
+        assert_eq!(Delta::abi_encode(&return_data), delta_expected);
+        assert_eq!(0, result);
+
+        // Assert alpha is deleted from the original namespace
+        assert_eq!(
+            runtime.get_storage_at_slot(alpha_1_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+        assert_eq!(
+            runtime.get_storage_at_slot(get_next_slot(&alpha_1_slot.0)),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+
+        // Create second alpha
+        let call_data = createAlphaCall::new((102,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+        let alpha_2_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_2_id.0);
+
+        // Push second alpha to delta
+        let call_data = pushAlphaToDeltaCall::new((delta_id, alpha_2_id)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read delta and assert the returned data is correct
+        let call_data = readDeltaCall::new((delta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readDeltaCall::abi_decode_returns(&return_data).unwrap();
+        let delta_expected = Delta::abi_encode(&Delta {
+            id: UID {
+                id: ID { bytes: delta_id },
+            },
+            a: vec![
+                Alpha {
+                    id: UID {
+                        id: ID { bytes: alpha_1_id },
+                    },
+                    value: 101,
+                },
+                Alpha {
+                    id: UID {
+                        id: ID { bytes: alpha_2_id },
+                    },
+                    value: 102,
+                },
+            ],
+        });
+        assert_eq!(Delta::abi_encode(&return_data), delta_expected);
+        assert_eq!(0, result);
+
+        // Assert second alpha is deleted from the original namespace
+        assert_eq!(
+            runtime.get_storage_at_slot(alpha_2_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+        assert_eq!(
+            runtime.get_storage_at_slot(get_next_slot(&alpha_2_slot.0)),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+
+        // Pop one alpha from delta and assert the returned data is correct
+        let call_data = popAlphaFromDeltaCall::new((delta_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = readAlphaCall::new((alpha_2_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readAlphaCall::abi_decode_returns(&return_data).unwrap();
+        let alpha_expected = Alpha::abi_encode(&Alpha {
+            id: UID {
+                id: ID { bytes: alpha_2_id },
+            },
+            value: 102,
+        });
+        assert_eq!(Alpha::abi_encode(&return_data), alpha_expected);
+        assert_eq!(0, result);
+
+        // Read delta after the pop and assert the data is correct
+        let call_data = readDeltaCall::new((delta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readDeltaCall::abi_decode_returns(&return_data).unwrap();
+        let delta_expected = Delta::abi_encode(&Delta {
+            id: UID {
+                id: ID { bytes: delta_id },
+            },
+            a: vec![Alpha {
+                id: UID {
+                    id: ID { bytes: alpha_1_id },
+                },
+                value: 101,
+            }],
+        });
+        assert_eq!(Delta::abi_encode(&return_data), delta_expected);
+        assert_eq!(0, result);
+
+        // Create third alpha
+        let call_data = createAlphaCall::new((103,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let alpha_3_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_3_id = FixedBytes::<32>::from_slice(&alpha_3_id);
+
+        // Push one more alpha to delta
+        let call_data = pushAlphaToDeltaCall::new((delta_id, alpha_3_id)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_before_delete = runtime.get_storage();
+
+        // Delete delta
+        let call_data = deleteDeltaCall::new((delta_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Delete the alpha we popped from delta, which is now shared
+        let call_data = deleteAlphaCall::new((alpha_2_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+
+        // Assert that all storage slots are empty except for the specified key
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
+    }
+
+    #[rstest]
+    fn test_destruct_epsilon(runtime: RuntimeSandbox) {
+        let call_data = createEpsilonCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let delta_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let delta_1_id = FixedBytes::<32>::from_slice(&delta_1_id);
+
+        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+
+        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+
+        let delta_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let delta_2_id = FixedBytes::<32>::from_slice(&delta_2_id);
+
+        let alpha_3_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_3_id = FixedBytes::<32>::from_slice(&alpha_3_id);
+
+        let alpha_4_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_4_id = FixedBytes::<32>::from_slice(&alpha_4_id);
+
+        let epsilon_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let epsilon_id = FixedBytes::<32>::from_slice(&epsilon_id);
+        let epsilon_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &epsilon_id.0);
+
+        let call_data = createAlphaCall::new((105,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let alpha_5_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_5_id = FixedBytes::<32>::from_slice(&alpha_5_id);
+        let alpha_5_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_5_id.0);
+
+        let call_data = destructEpsilonCall::new((epsilon_id, alpha_5_id)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Assert that epsilon is deleted from the original namespace
+        assert_eq!(
+            runtime.get_storage_at_slot(epsilon_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+
+        // Assert that alpha 5 is deleted from the original namespace
+        assert_eq!(
+            runtime.get_storage_at_slot(alpha_5_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+
+        // Read delta and assert the returned data
+        let call_data = readDeltaCall::new((delta_2_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readDeltaCall::abi_decode_returns(&return_data).unwrap();
+        let delta_expected = Delta::abi_encode(&Delta {
+            id: UID {
+                id: ID { bytes: delta_2_id },
+            },
+            a: vec![
+                Alpha {
+                    id: UID {
+                        id: ID { bytes: alpha_3_id },
+                    },
+                    value: 103,
+                },
+                Alpha {
+                    id: UID {
+                        id: ID { bytes: alpha_4_id },
+                    },
+                    value: 104,
+                },
+                Alpha {
+                    id: UID {
+                        id: ID { bytes: alpha_5_id },
+                    },
+                    value: 105,
+                },
+            ],
+        });
+        assert_eq!(Delta::abi_encode(&return_data), delta_expected);
+        assert_eq!(0, result);
+
+        let new_epsilon_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let new_epsilon_id = FixedBytes::<32>::from_slice(&new_epsilon_id);
+
+        // Read epsilon and assert the returned data
+        let call_data = readEpsilonCall::new((new_epsilon_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readEpsilonCall::abi_decode_returns(&return_data).unwrap();
+        let epsilon_expected = Epsilon::abi_encode(&Epsilon {
+            id: UID {
+                id: ID {
+                    bytes: new_epsilon_id,
+                },
+            },
+            a: vec![Delta {
+                id: UID {
+                    id: ID { bytes: delta_1_id },
+                },
+                a: vec![
+                    Alpha {
+                        id: UID {
+                            id: ID { bytes: alpha_1_id },
+                        },
+                        value: 101,
+                    },
+                    Alpha {
+                        id: UID {
+                            id: ID { bytes: alpha_2_id },
+                        },
+                        value: 102,
+                    },
+                ],
+            }],
+        });
+        assert_eq!(Epsilon::abi_encode(&return_data), epsilon_expected);
+        assert_eq!(0, result);
+    }
 }
 
 mod dynamic_storage_fields {
@@ -5093,5 +5392,270 @@ mod dynamic_storage_fields_named_id {
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
         assert_eq!(false.abi_encode(), result_data);
+    }
+}
+
+mod simple_warrior {
+    use super::*;
+    use crate::common::runtime_sandbox::constants::SIGNER_ADDRESS;
+    use alloy_primitives::FixedBytes;
+    use alloy_sol_types::{SolCall, SolValue, sol};
+
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "simple_warrior";
+        const SOURCE_PATH: &str = "tests/storage/simple_warrior.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+
+        #[derive(Debug)]
+        struct ID {
+            bytes32 bytes;
+        }
+
+        #[derive(Debug)]
+        struct UID {
+            ID id;
+        }
+
+        struct OptionSword {
+            Sword[] vec;
+        }
+
+        struct OptionShield {
+            Shield[] vec;
+        }
+
+        struct Sword {
+            UID id;
+            uint8 strength;
+        }
+
+        struct Shield {
+            UID id;
+            uint8 armor;
+        }
+
+        struct Warrior {
+            UID id;
+            OptionSword sword;
+            OptionShield shield;
+        }
+
+        function createWarrior() public view;
+        function createSword(uint8 strength) public view;
+        function createShield(uint8 armor) public view;
+        function equipSword(bytes32 id, bytes32 sword) public;
+        function equipShield(bytes32 id, bytes32 shield) public;
+        function inspectWarrior(bytes32 id) public view returns (Warrior);
+        function inspectSword(bytes32 id) public view returns (Sword);
+        function inspectShield(bytes32 id) public view returns (Shield);
+        function destroyWarrior(bytes32 id) public;
+        function destroySword(bytes32 id) public;
+    );
+
+    #[rstest]
+    fn test_equip_warrior(runtime: RuntimeSandbox) {
+        runtime.set_msg_sender(SIGNER_ADDRESS);
+
+        // Create warrior
+        let call_data = createWarriorCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let warrior_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let warrior_id = FixedBytes::<32>::from_slice(&warrior_id);
+
+        // Inspect warrior and assert it has no sword or shield
+        let call_data = inspectWarriorCall::new((warrior_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = inspectWarriorCall::abi_decode_returns(&return_data).unwrap();
+        let expected_return_data = Warrior::abi_encode(&Warrior {
+            id: UID {
+                id: ID { bytes: warrior_id },
+            },
+            sword: OptionSword { vec: vec![] },
+            shield: OptionShield { vec: vec![] },
+        });
+        assert_eq!(Warrior::abi_encode(&return_data), expected_return_data);
+        assert_eq!(0, result);
+
+        // Create sword
+        let call_data = createSwordCall::new((66,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let sword_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let sword_id = FixedBytes::<32>::from_slice(&sword_id);
+        let sword_slot = derive_object_slot(&SIGNER_ADDRESS, &sword_id.0);
+
+        // Equip sword
+        let call_data = equipSwordCall::new((warrior_id, sword_id)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Inspect warrior and assert it has the sword equiped
+        let call_data = inspectWarriorCall::new((warrior_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = inspectWarriorCall::abi_decode_returns(&return_data).unwrap();
+        let expected_return_data = Warrior::abi_encode(&Warrior {
+            id: UID {
+                id: ID { bytes: warrior_id },
+            },
+            sword: OptionSword {
+                vec: vec![Sword {
+                    id: UID {
+                        id: ID { bytes: sword_id },
+                    },
+                    strength: 66,
+                }],
+            },
+            shield: OptionShield { vec: vec![] },
+        });
+        assert_eq!(Warrior::abi_encode(&return_data), expected_return_data);
+        assert_eq!(0, result);
+
+        // Assert that the original sword slot (under the sender's address) is now empty
+        assert_eq!(runtime.get_storage_at_slot(sword_slot.0), [0u8; 32]);
+        assert_eq!(
+            runtime.get_storage_at_slot(get_next_slot(&sword_slot.0)),
+            [0u8; 32]
+        );
+
+        // Create new sword
+        let call_data = createSwordCall::new((77,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let new_sword_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let new_sword_id = FixedBytes::<32>::from_slice(&new_sword_id);
+        let new_sword_slot = derive_object_slot(&SIGNER_ADDRESS, &new_sword_id.0);
+
+        // Equip new sword
+        let call_data = equipSwordCall::new((warrior_id, new_sword_id)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Inspect warrior and assert it has the new sword equiped
+        let call_data = inspectWarriorCall::new((warrior_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = inspectWarriorCall::abi_decode_returns(&return_data).unwrap();
+        let expected_return_data = Warrior::abi_encode(&Warrior {
+            id: UID {
+                id: ID { bytes: warrior_id },
+            },
+            sword: OptionSword {
+                vec: vec![Sword {
+                    id: UID {
+                        id: ID {
+                            bytes: new_sword_id,
+                        },
+                    },
+                    strength: 77,
+                }],
+            },
+            shield: OptionShield { vec: vec![] },
+        });
+        assert_eq!(Warrior::abi_encode(&return_data), expected_return_data);
+        assert_eq!(0, result);
+
+        // Assert that the original new sword slot (under the sender's address) is now empty
+        assert_eq!(runtime.get_storage_at_slot(new_sword_slot.0), [0u8; 32]);
+        assert_eq!(
+            runtime.get_storage_at_slot(get_next_slot(&new_sword_slot.0)),
+            [0u8; 32]
+        );
+
+        // Assert that the original old sword slot (under the sender's address) holds the old sword now
+        assert_ne!(runtime.get_storage_at_slot(sword_slot.0), [0u8; 32]);
+        assert_ne!(
+            runtime.get_storage_at_slot(get_next_slot(&sword_slot.0)),
+            [0u8; 32]
+        );
+
+        let call_data = inspectSwordCall::new((sword_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = inspectSwordCall::abi_decode_returns(&return_data).unwrap();
+        let expected_return_data = Sword::abi_encode(&Sword {
+            id: UID {
+                id: ID { bytes: sword_id },
+            },
+            strength: 66,
+        });
+        assert_eq!(Sword::abi_encode(&return_data), expected_return_data);
+        assert_eq!(0, result);
+
+        // Create shield
+        let call_data = createShieldCall::new((42,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let shield_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let shield_id = FixedBytes::<32>::from_slice(&shield_id);
+        let shield_slot = derive_object_slot(&SIGNER_ADDRESS, &shield_id.0);
+
+        let call_data = equipShieldCall::new((warrior_id, shield_id)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Inspect warrior and assert it has the shield equiped
+        let call_data = inspectWarriorCall::new((warrior_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = inspectWarriorCall::abi_decode_returns(&return_data).unwrap();
+        let expected_return_data = Warrior::abi_encode(&Warrior {
+            id: UID {
+                id: ID { bytes: warrior_id },
+            },
+            sword: OptionSword {
+                vec: vec![Sword {
+                    id: UID {
+                        id: ID {
+                            bytes: new_sword_id,
+                        },
+                    },
+                    strength: 77,
+                }],
+            },
+            shield: OptionShield {
+                vec: vec![Shield {
+                    id: UID {
+                        id: ID { bytes: shield_id },
+                    },
+                    armor: 42,
+                }],
+            },
+        });
+        assert_eq!(Warrior::abi_encode(&return_data), expected_return_data);
+        assert_eq!(0, result);
+
+        // Assert that the original shield slot (under the sender's address) is now empty
+        assert_eq!(runtime.get_storage_at_slot(shield_slot.0), [0u8; 32]);
+        assert_eq!(
+            runtime.get_storage_at_slot(get_next_slot(&shield_slot.0)),
+            [0u8; 32]
+        );
+
+        let storage_before_destroy = runtime.get_storage();
+        // Destroy warrior
+        let call_data = destroyWarriorCall::new((warrior_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Destroy the old sword too, just to make the test simpler
+        let call_data = destroySwordCall::new((sword_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_destroy = runtime.get_storage();
+
+        // Assert that the storage is empty
+        assert_empty_storage(&storage_before_destroy, &storage_after_destroy);
     }
 }
