@@ -248,12 +248,10 @@ public fun transfer_from(
     ctx: &mut TxContext,
 ): bool {
     if (field::exists_(&allowance.id, sender)) {
-        /*
         let spender_allowance = field::borrow_mut<ALLOWANCE_, address, Table<address, u256>>(
             &mut allowance.id,
             sender,
         );
-
 
         let allowance = spender_allowance.borrow_mut(ctx.sender());
         if (*allowance < amount) {
@@ -261,7 +259,6 @@ public fun transfer_from(
         };
 
         *allowance = *allowance - amount;
-
 
         let sender_balance = field::borrow_mut<BALANCE_, address, u256>(
             &mut balance.id,
@@ -275,14 +272,12 @@ public fun transfer_from(
 
         *sender_balance = *sender_balance - amount;
 
-
         if (field::exists_(&balance.id, recipient)) {
             let recipient_balance = field::borrow_mut(&mut balance.id, recipient);
             *recipient_balance = *recipient_balance + amount;
         } else {
             field::add(&mut balance.id, recipient, amount);
         };
-        */
 
     } else {
         abort(ENotAllowed)

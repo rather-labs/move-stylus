@@ -1,5 +1,5 @@
 use alloy::{hex, primitives::address};
-use alloy::primitives::{FixedBytes, U256};
+use alloy::primitives::U256;
 use alloy::providers::Provider;
 use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;

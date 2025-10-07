@@ -5127,6 +5127,7 @@ mod erc20 {
 
         function mint(address to, uint256 amount) external view;
         function create() public view;
+        function burn(address from, uint256 amount) external view;
         function balanceOf(address address) public view returns (uint256);
         function totalSupply() external view returns (uint256);
         function transfer(address recipient, uint256 amount) external returns (bool);
@@ -5140,19 +5141,97 @@ mod erc20 {
 
     #[rstest]
     fn test_erc20(runtime: RuntimeSandbox) {
-        let call_data = createCall::new(()).abi_encode();
-        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
-
         let address_1 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
         runtime.set_msg_sender(**address_1);
         runtime.set_tx_origin(**address_1);
         let address_2 = address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef");
         let address_3 = address!("0xabcabcabcabcabcabcabcabcabcabcabcabcabca");
 
-        let call_data = mintCall::new((address_2, U256::from(9999999))).abi_encode();
+        // Create the contract
+        let call_data = createCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
+
+        /// Check frozen info
+        let call_data = decimalsCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(18.abi_encode(), result_data);
+
+        // TODO: add name and symbol when processing strings correctly
+
+        // Mint new coins
+        let call_data = totalSupplyCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(0.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_1,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(0.abi_encode(), result_data);
+
+        let call_data = mintCall::new((address_1, U256::from(9999999))).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = totalSupplyCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9999999.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_1,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9999999.abi_encode(), result_data);
+
+        // Transfer
+        let call_data = transferCall::new((address_2, U256::from(1111))).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_1,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9998888.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_2,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(1111.abi_encode(), result_data);
+
+        // Burn
+        let call_data = totalSupplyCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9999999.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_1,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9998888.abi_encode(), result_data);
+
+        let call_data = burnCall::new((address_1, U256::from(2222))).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = totalSupplyCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9997777.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_1,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9996666.abi_encode(), result_data);
+
+        /// Allowance
+        /// Allow address_1 to spend 100 TST from address_2
+        let call_data = allowanceCall::new((address_2, address_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(0.abi_encode(), result_data);
 
         runtime.set_msg_sender(**address_2);
         runtime.set_tx_origin(**address_2);
@@ -5162,89 +5241,45 @@ mod erc20 {
 
         runtime.set_msg_sender(**address_1);
         runtime.set_tx_origin(**address_1);
-
         let call_data = allowanceCall::new((address_2, address_1)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
         assert_eq!(100.abi_encode(), result_data);
 
-        runtime.print_storage();
+        /// Transfer from
+        /// Transfer from address_2 100 TST using address_1 to address_3
+        let call_data = balanceOfCall::new((address_1,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9996666.abi_encode(), result_data);
 
-        println!("Calling transfer from");
+        let call_data = balanceOfCall::new((address_2,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(1111.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_3,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(0.abi_encode(), result_data);
+
         let call_data = transferFromCall::new((address_2, address_3, U256::from(100))).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        println!();
-        println!();
-        println!("End");
-        runtime.print_storage();
+        let call_data = balanceOfCall::new((address_1,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9996666.abi_encode(), result_data);
 
-        println!("Balance");
         let call_data = balanceOfCall::new((address_2,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-        assert_eq!(U256::from(9999899).abi_encode(), result_data);
+        assert_eq!(1011.abi_encode(), result_data);
 
-        println!("Balance");
         let call_data = balanceOfCall::new((address_3,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-        assert_eq!(U256::from(100).abi_encode(), result_data);
-
-        println!("Allowance");
-        let call_data = allowanceCall::new((address_2, address_1)).abi_encode();
-        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
-        assert_eq!(0.abi_encode(), result_data);
-    }
-
-    #[rstest]
-    #[ignore]
-    fn test_erc20_bak(runtime: RuntimeSandbox) {
-        let call_data = createCall::new(()).abi_encode();
-        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
-
-        runtime.print_storage();
-        /*
-        runtime.print_storage();
-
-        let call_data = totalSupplyCall::new(()).abi_encode();
-        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
-        assert_eq!(0.abi_encode(), result_data);
-        */
-
-        let address_1 = address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef");
-        let address_2 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
-        runtime.set_msg_sender(**address_2);
-        runtime.set_tx_origin(**address_2);
-
-        let call_data = approveCall::new((address_1, U256::from(1))).abi_encode();
-        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
-
-        /*
-        runtime.print_storage();
-        let call_data = allowanceCall::new((address_2, address_1)).abi_encode();
-        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
-        assert_eq!(6.abi_encode(), result_data);
-        println!("\n-----------------------------------\n");
-
-        let call_data = approveCall::new((address_1, U256::from(1))).abi_encode();
-        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
-        */
-
-        /*
-        let call_data = allowanceCall::new((address_2, address_1)).abi_encode();
-        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
-        //assert_eq!(5.abi_encode(), result_data);
-
-        */
-        runtime.print_storage();
+        assert_eq!(100.abi_encode(), result_data);
     }
 }
