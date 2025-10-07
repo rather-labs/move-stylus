@@ -47,6 +47,14 @@ public fun create_entry(foo: &mut Foo, key: address, value: u64) {
     table.add(key, value);
 }
 
+public fun contains_entry(foo: &Foo, key: address): bool {
+    let table = field::borrow<String, Table<address, u64>>(
+        &foo.id,
+        ascii::string(b"table")
+    );
+    table.contains(key)
+}
+
 public fun mutate_table_entry(foo: &mut Foo, key: address) {
     let table = field::borrow_mut<String, Table<address, u64>>(
         &mut foo.id,
@@ -66,4 +74,12 @@ public fun mutate_two_entry_values(foo: &mut Foo, key: address, key_2: address) 
 
     let val_2 = table.borrow_mut(key_2);
     *val_2 = *val_2 + 1;
+}
+
+public fun remove_entry(foo: &mut Foo, key: address): u64 {
+    let table = field::borrow_mut<String, Table<address, u64>>(
+        &mut foo.id,
+        ascii::string(b"table")
+    );
+    table.remove(key)
 }
