@@ -5134,6 +5134,128 @@ mod dynamic_storage_fields_named_id {
     }
 }
 
+mod dynamic_table {
+    use alloy_primitives::{FixedBytes, address};
+    use alloy_sol_types::{SolCall, SolValue, sol};
+
+    use super::*;
+
+    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
+    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
+    // thread. If that happens, messages from test A can be received by test B.
+    // Using once instance per thread assures this won't happen.
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "dynamic_table";
+        const SOURCE_PATH: &str = "tests/storage/dynamic_table.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+
+        struct String {
+            uint8[] bytes;
+        }
+
+        function createFoo() public view;
+        function createFooOwned() public view;
+        function attachTable(bytes32 foo) public view;
+        function createEntry(bytes32 foo, address key, uint64 value) public view;
+        function readTableEntryValue(bytes32 foo, address key) public view returns (uint64);
+        function mutateTableEntry(bytes32 foo, address key) public view;
+        function mutateTwoEntryValues(bytes32 foo, address key, address key2) public view;
+    );
+
+    #[rstest]
+    #[case(true)]
+    #[case(false)]
+    fn test_dynamic_table(runtime: RuntimeSandbox, #[case] owned: bool) {
+        if owned {
+            runtime.set_msg_sender(SIGNER_ADDRESS);
+            let call_data = createFooOwnedCall::new(()).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+        } else {
+            let call_data = createFooCall::new(()).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+        }
+
+        // Read the object id emmited from the contract's events
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        let key_1 = address!("0x1234567890abcdef1234567890abcdef12345678");
+        let key_2 = address!("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
+
+        // Attach the table
+        let call_data = attachTableCall::new((object_id,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Create entry
+        let call_data = createEntryCall::new((object_id, key_1, 42)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = createEntryCall::new((object_id, key_2, 84)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read recently created entries
+        let call_data = readTableEntryValueCall::new((object_id, key_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(42.abi_encode(), result_data);
+
+        let call_data = readTableEntryValueCall::new((object_id, key_2)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(84.abi_encode(), result_data);
+
+        // Mutate entries individually
+        let call_data = mutateTableEntryCall::new((object_id, key_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = mutateTableEntryCall::new((object_id, key_2)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read recently mutated entries
+        let call_data = readTableEntryValueCall::new((object_id, key_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(43.abi_encode(), result_data);
+
+        let call_data = readTableEntryValueCall::new((object_id, key_2)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(85.abi_encode(), result_data);
+
+        // Mutate both entries simultaneusly
+        let call_data = mutateTwoEntryValuesCall::new((object_id, key_1, key_2)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read recently mutated entries
+        let call_data = readTableEntryValueCall::new((object_id, key_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(44.abi_encode(), result_data);
+
+        let call_data = readTableEntryValueCall::new((object_id, key_2)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(86.abi_encode(), result_data);
+    }
+}
+
 mod erc20 {
     use alloy_primitives::address;
     use alloy_sol_types::{SolCall, SolValue, sol};
