@@ -12,9 +12,10 @@ use crate::{
     CompilationContext,
     data::{
         DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
-        DATA_STORAGE_OBJECT_OWNER_OFFSET,
+        DATA_STORAGE_OBJECT_OWNER_OFFSET, DATA_ZERO_OFFSET,
     },
     hostio::host_functions::{native_keccak256, storage_cache_bytes32, storage_load_bytes32},
+    native_functions::object::add_delete_field_instructions,
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         IntermediateType,
@@ -24,7 +25,6 @@ use crate::{
     },
     wasm_builder_extensions::WasmBuilderExtension,
 };
-
 /// Adds the instructions to encode and save into storage an specific struct.
 ///
 /// # Arguments
@@ -312,17 +312,28 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
 ) {
     // Host functions
     let (storage_cache, _) = storage_cache_bytes32(module);
+    let (storage_load, _) = storage_load_bytes32(module);
     let (native_keccak, _) = native_keccak256(module);
 
     // Runtime functions
     let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None);
     let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
+    let derive_dyn_array_slot_fn =
+        RuntimeFunction::DeriveDynArraySlot.get(module, Some(compilation_ctx));
 
     // Locals
     let elem_slot_ptr = module.locals.add(ValType::I32);
     let len = module.locals.add(ValType::I32);
-
     let owner_ptr = module.locals.add(ValType::I32);
+
+    // Stack size of the inner type
+    let stack_size = inner.stack_data_size() as i32;
+
+    // Element size in storage
+    let elem_size = field_size(inner, compilation_ctx) as i32;
+
+    // Save DATA_STORAGE_OBJECT_OWNER_OFFSET to the owner_ptr
+    // This keeps track of the owner of the vector in the storage, and is needed when decoding wrapped objects.
     builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
@@ -357,7 +368,112 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
         )
         .local_set(len);
 
-    // Outer block: if the vector length is 0, we skip to the end
+    // When elements are popped from the vector, they must be cleared from storage.
+    // The encoding process updates the storage to reflect the current vector state (in-memory), but if the original vector (currently stored) was longer,
+    // any leftover data will persist unless explicitly removed.
+    let old_len = module.locals.add(ValType::I32);
+
+    // Load original vector header slot data
+    builder
+        .local_get(slot_ptr)
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .call(storage_load);
+
+    // Get the original length of the vector
+    builder
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 28,
+            },
+        )
+        .call(swap_fn)
+        .local_set(old_len);
+
+    // Set aux locals for looping
+    let i = module.locals.add(ValType::I32);
+    let bytes_in_slot_offset = module.locals.add(ValType::I32);
+
+    // If the old length is greater than the new length, we need to delete those residual elements from the storage.
+    builder.block(None, |outer_block| {
+        let outer_block_id = outer_block.id();
+
+        // Check if the old length is greater than the new length else skip the rest of the instructions.
+        outer_block
+            .local_get(old_len)
+            .local_get(len)
+            .binop(BinaryOp::I32LeU)
+            .br_if(outer_block_id);
+
+        outer_block.block(None, |inner_block| {
+            let inner_block_id = inner_block.id();
+
+            // Set the index to the current length of the vector,
+            // to start deleting from there on.
+            inner_block.local_get(len).local_set(i);
+
+            let elem_size_local = module.locals.add(ValType::I32);
+            inner_block.i32_const(elem_size).local_set(elem_size_local);
+
+            // Compute the slot for the first element after the current vector's last element
+            inner_block
+                .local_get(slot_ptr)
+                .local_get(len)
+                .local_get(elem_size_local)
+                .local_get(elem_slot_ptr)
+                .call(derive_dyn_array_slot_fn);
+
+            inner_block.loop_(None, |loop_| {
+                let loop_id = loop_.id();
+
+                // Delete the field from the storage
+                add_delete_field_instructions(
+                    module,
+                    loop_,
+                    compilation_ctx,
+                    elem_slot_ptr,
+                    inner,
+                    elem_size,
+                    bytes_in_slot_offset,
+                );
+
+                // Exit after processing all elements (from len to old_len)
+                loop_
+                    .local_get(i)
+                    .local_get(old_len)
+                    .i32_const(1)
+                    .binop(BinaryOp::I32Sub)
+                    .binop(BinaryOp::I32GeU)
+                    .br_if(inner_block_id);
+
+                // i = i + 1 and continue the loop
+                loop_
+                    .local_get(i)
+                    .i32_const(1)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(i)
+                    .br(loop_id);
+            });
+        });
+
+        // Wipe out the last slot before exiting
+        // This ensures that the last slot is always deleted, as the add_delete_field_instructions
+        // only deletes the slot if all the bytes in the slot are used.
+        outer_block
+            .local_get(elem_slot_ptr)
+            .i32_const(DATA_ZERO_OFFSET)
+            .call(storage_cache);
+    });
+
+    // Reset the aux locals for the next loop
+    // This loop encodes and saves the vector in memory to the storage.
+    builder.i32_const(0).local_set(i);
+    builder.i32_const(0).local_set(bytes_in_slot_offset);
+
+    // Loop through the vector and encode and save the elements to the storage.
     builder.block(None, |outer_block| {
         let outer_block_id = outer_block.id();
 
@@ -367,12 +483,6 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
             .i32_const(0)
             .binop(BinaryOp::I32Eq)
             .br_if(outer_block_id);
-
-        // Stack size of the inner type
-        let stack_size = inner.stack_data_size() as i32;
-
-        // Element size in storage
-        let elem_size = field_size(inner, compilation_ctx) as i32;
 
         // First slot = keccak(header_slot)
         outer_block
@@ -384,19 +494,12 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
         outer_block.block(None, |inner_block| {
             let inner_block_id = inner_block.id();
 
-            let i = module.locals.add(ValType::I32);
-            let written_bytes_in_slot = module.locals.add(ValType::I32);
-
-            // Set the aux locals to 0 to start the loop
-            inner_block.i32_const(0).local_set(i);
-            inner_block.i32_const(0).local_set(written_bytes_in_slot);
-
             inner_block.loop_(None, |loop_| {
                 let loop_id = loop_.id();
 
                 // If we have written the whole slot, save to storage and calculate the next slot
                 loop_
-                    .local_get(written_bytes_in_slot)
+                    .local_get(bytes_in_slot_offset)
                     .i32_const(elem_size)
                     .binop(BinaryOp::I32Add)
                     .i32_const(32)
@@ -421,15 +524,15 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                                 .local_set(elem_slot_ptr);
 
                             // Set the written bytes in slot to the element size
-                            then.i32_const(elem_size).local_set(written_bytes_in_slot);
+                            then.i32_const(elem_size).local_set(bytes_in_slot_offset);
                         },
                         |else_| {
                             // Increment the written bytes in slot by the element size
                             else_
-                                .local_get(written_bytes_in_slot)
+                                .local_get(bytes_in_slot_offset)
                                 .i32_const(elem_size)
                                 .binop(BinaryOp::I32Add)
-                                .local_set(written_bytes_in_slot);
+                                .local_set(bytes_in_slot_offset);
                         },
                     );
 
@@ -454,7 +557,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                     compilation_ctx,
                     elem_slot_ptr,
                     inner,
-                    written_bytes_in_slot,
+                    bytes_in_slot_offset,
                     false,
                 );
 
@@ -489,28 +592,28 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
             .local_get(elem_slot_ptr)
             .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
             .call(storage_cache);
-
-        // Wipe the data so we can write the length of the vector
-        outer_block
-            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-            .i32_const(0)
-            .i32_const(32)
-            .memory_fill(compilation_ctx.memory_id);
-
-        // Write the length in the slot data
-        outer_block
-            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-            .local_get(len)
-            .call(swap_fn)
-            .store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 28,
-                },
-            );
     });
+
+    // Wipe the data so we can write the length of the vector
+    builder
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .i32_const(0)
+        .i32_const(32)
+        .memory_fill(compilation_ctx.memory_id);
+
+    // Write the length in the slot data. This will be cached to the storage by the caller.
+    builder
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .local_get(len)
+        .call(swap_fn)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 28,
+            },
+        );
 }
 
 /// Adds the instructions to encode and save a vector (as a field in a struct) into storage.

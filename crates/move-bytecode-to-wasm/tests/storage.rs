@@ -3946,35 +3946,62 @@ mod wrapped_objects {
             UID id;
             Delta[] a;
         }
+        struct Zeta {
+            UID id;
+            Astra b;
+        }
 
+        struct Astra {
+            Alpha[] a;
+        }
+
+        struct Eta {
+            UID id;
+            Bora b;
+        }
+
+        struct Bora {
+            uint64[] a;
+            uint64[][] b;
+        }
         function createAlpha(uint64 value) public view;
         function createBeta() public view;
         function createGamma() public view;
         function createDelta() public view;
         function createEmptyDelta() public view;
         function createEpsilon() public view;
+        function createEmptyZeta() public view;
         function createBetaTto(bytes32 a) public view;
         function createGammaTto(bytes32 a) public view;
         function createDeltaTto(bytes32 a, bytes32 b) public view;
         function createEpsilonTto(bytes32 a, bytes32 b) public view;
+        function createEta() public view;
         function readAlpha(bytes32 a) public view returns (Alpha);
         function readBeta(bytes32 b) public view returns (Beta);
         function readGamma(bytes32 g) public view returns (Gamma);
         function readDelta(bytes32 d) public view returns (Delta);
         function readEpsilon(bytes32 e) public view returns (Epsilon);
+        function readZeta(bytes32 z) public view returns (Zeta);
+        function readEta(bytes32 id) public view returns (Eta);
         function deleteAlpha(bytes32 a) public view;
         function deleteBeta(bytes32 b) public view;
         function deleteGamma(bytes32 g) public view;
         function deleteDelta(bytes32 d) public view;
+        function deleteZeta(bytes32 z) public view;
         function deleteEpsilon(bytes32 e) public view;
         function transferBeta(bytes32 b, address recipient) public view;
         function transferGamma(bytes32 g, address recipient) public view;
         function transferDelta(bytes32 d, address recipient) public view;
+        function transferZeta(bytes32 z, address recipient) public view;
         function rebuildGamma(bytes32 g, address recipient) public view;
         function destructDeltaToBeta(bytes32 d) public view;
         function pushAlphaToDelta(bytes32 d, bytes32 a) public view;
         function popAlphaFromDelta(bytes32 d) public view;
         function destructEpsilon(bytes32 e, bytes32 a) public view;
+        function pushAlphaToZeta(bytes32 z, bytes32 a) public view;
+        function popAlphaFromZeta(bytes32 z) public view;
+        function pushToBora(bytes32 e, uint64 v) public view;
+        function popFromBora(bytes32 e) public returns (uint64, uint64[]);
     );
 
     // In all tests, we use the tto flag to indicate if the creation method should take
@@ -4778,17 +4805,13 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let call_data = readAlphaCall::new((alpha_2_id,)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        let return_data = readAlphaCall::abi_decode_returns(&return_data).unwrap();
-        let alpha_expected = Alpha::abi_encode(&Alpha {
-            id: UID {
-                id: ID { bytes: alpha_2_id },
-            },
-            value: 102,
-        });
-        assert_eq!(Alpha::abi_encode(&return_data), alpha_expected);
-        assert_eq!(0, result);
+        // Read alpha_2 from the shared namespace and assert the data is correct
+        let alpha_2_shared_slot = derive_object_slot(&SHARED, &alpha_2_id.0);
+        assert_eq!(
+            runtime.get_storage_at_slot(alpha_2_shared_slot.0),
+            alpha_2_id.0,
+            "Slot should be the same as the original alpha"
+        );
 
         // Read delta after the pop and assert the data is correct
         let call_data = readDeltaCall::new((delta_id,)).abi_encode();
@@ -4808,6 +4831,46 @@ mod wrapped_objects {
         assert_eq!(Delta::abi_encode(&return_data), delta_expected);
         assert_eq!(0, result);
 
+        // Pop the last alpha from delta and assert the data is correct
+        // In this case the beta vector is left empty.
+        let call_data = popAlphaFromDeltaCall::new((delta_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read alpha_1 from the shared namespace and assert the data is correct
+        let alpha_1_shared_slot = derive_object_slot(&SHARED, &alpha_1_id.0);
+        assert_eq!(
+            runtime.get_storage_at_slot(alpha_1_shared_slot.0),
+            alpha_1_id.0,
+            "Slot should be the same as the original alpha"
+        );
+
+        // Read the popped alpha and assert the returned data is correct
+        let call_data = readAlphaCall::new((alpha_1_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readAlphaCall::abi_decode_returns(&return_data).unwrap();
+        let alpha_expected = Alpha::abi_encode(&Alpha {
+            id: UID {
+                id: ID { bytes: alpha_1_id },
+            },
+            value: 101,
+        });
+        assert_eq!(Alpha::abi_encode(&return_data), alpha_expected);
+        assert_eq!(0, result);
+
+        // Read delta after the pop and assert the data is correct
+        let call_data = readDeltaCall::new((delta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readDeltaCall::abi_decode_returns(&return_data).unwrap();
+        let delta_expected = Delta::abi_encode(&Delta {
+            id: UID {
+                id: ID { bytes: delta_id },
+            },
+            a: vec![],
+        });
+        assert_eq!(Delta::abi_encode(&return_data), delta_expected);
+        assert_eq!(0, result);
+
         // Create third alpha
         let call_data = createAlphaCall::new((103,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -4823,13 +4886,17 @@ mod wrapped_objects {
 
         let storage_before_delete = runtime.get_storage();
 
-        // Delete delta
-        let call_data = deleteDeltaCall::new((delta_id,)).abi_encode();
+        // Delete the shared alphas
+        let call_data = deleteAlphaCall::new((alpha_1_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        // Delete the alpha we popped from delta, which is now shared
         let call_data = deleteAlphaCall::new((alpha_2_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Delete delta
+        let call_data = deleteDeltaCall::new((delta_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
@@ -4959,6 +5026,332 @@ mod wrapped_objects {
             }],
         });
         assert_eq!(Epsilon::abi_encode(&return_data), epsilon_expected);
+        assert_eq!(0, result);
+    }
+
+    #[rstest]
+    fn test_pushing_and_popping_alpha_from_zeta(runtime: RuntimeSandbox) {
+        let call_data = createEmptyZetaCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let zeta_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let zeta_id = FixedBytes::<32>::from_slice(&zeta_id);
+
+        let call_data = readZetaCall::new((zeta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readZetaCall::abi_decode_returns(&return_data).unwrap();
+        let zeta_expected = Zeta::abi_encode(&Zeta {
+            id: UID {
+                id: ID { bytes: zeta_id },
+            },
+            b: Astra { a: vec![] },
+        });
+        assert_eq!(Zeta::abi_encode(&return_data), zeta_expected);
+        assert_eq!(0, result);
+
+        // Create alpha 1 and alpha 2
+        let call_data = createAlphaCall::new((101,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+        let alpha_1_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_1_id.0);
+
+        let call_data = createAlphaCall::new((102,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+        let alpha_2_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_2_id.0);
+
+        // Pushback alpha 1 and alpha 2 to zeta
+        let call_data = pushAlphaToZetaCall::new((zeta_id, alpha_1_id)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = pushAlphaToZetaCall::new((zeta_id, alpha_2_id)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read zeta and assert the returned data
+        let call_data = readZetaCall::new((zeta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readZetaCall::abi_decode_returns(&return_data).unwrap();
+        let zeta_expected = Zeta::abi_encode(&Zeta {
+            id: UID {
+                id: ID { bytes: zeta_id },
+            },
+            b: Astra {
+                a: vec![
+                    Alpha {
+                        id: UID {
+                            id: ID { bytes: alpha_1_id },
+                        },
+                        value: 101,
+                    },
+                    Alpha {
+                        id: UID {
+                            id: ID { bytes: alpha_2_id },
+                        },
+                        value: 102,
+                    },
+                ],
+            },
+        });
+        assert_eq!(Zeta::abi_encode(&return_data), zeta_expected);
+        assert_eq!(0, result);
+
+        // Assert that alpha 1 and alpha 2 are deleted from the original namespace
+        assert_eq!(
+            runtime.get_storage_at_slot(alpha_1_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+        assert_eq!(
+            runtime.get_storage_at_slot(alpha_2_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+
+        // Popback the last alpha from zeta
+        let call_data = popAlphaFromZetaCall::new((zeta_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read zeta and assert the returned data
+        let call_data = readZetaCall::new((zeta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readZetaCall::abi_decode_returns(&return_data).unwrap();
+        let zeta_expected = Zeta::abi_encode(&Zeta {
+            id: UID {
+                id: ID { bytes: zeta_id },
+            },
+            b: Astra {
+                a: vec![Alpha {
+                    id: UID {
+                        id: ID { bytes: alpha_1_id },
+                    },
+                    value: 101,
+                }],
+            },
+        });
+        assert_eq!(Zeta::abi_encode(&return_data), zeta_expected);
+        assert_eq!(0, result);
+
+        // Assert that alpha 2 is under the shared namespace now
+        let alpha_2_shared_slot = derive_object_slot(&SHARED, &alpha_2_id.0);
+        assert_ne!(
+            runtime.get_storage_at_slot(alpha_2_shared_slot.0),
+            [0u8; 32],
+            "Slot should not be empty"
+        );
+
+        let storage_before_delete = runtime.get_storage();
+
+        // Delete zeta
+        let call_data = deleteZetaCall::new((zeta_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Delete alpha 2
+        let call_data = deleteAlphaCall::new((alpha_2_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let storage_after_delete = runtime.get_storage();
+        assert_empty_storage(&storage_before_delete, &storage_after_delete);
+    }
+
+    #[rstest]
+    fn test_popping_from_empty_zeta(runtime: RuntimeSandbox) {
+        let call_data = createEmptyZetaCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let zeta_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let zeta_id = FixedBytes::<32>::from_slice(&zeta_id);
+
+        let call_data = readZetaCall::new((zeta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readZetaCall::abi_decode_returns(&return_data).unwrap();
+        let zeta_expected = Zeta::abi_encode(&Zeta {
+            id: UID {
+                id: ID { bytes: zeta_id },
+            },
+            b: Astra { a: vec![] },
+        });
+        assert_eq!(Zeta::abi_encode(&return_data), zeta_expected);
+        assert_eq!(0, result);
+
+        // Create alpha 1 and alpha 2
+        let call_data = createAlphaCall::new((101,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+        let alpha_1_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_1_id.0);
+
+        let call_data = createAlphaCall::new((102,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Pushback alpha 1 to zeta
+        let call_data = pushAlphaToZetaCall::new((zeta_id, alpha_1_id)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read zeta and assert the returned data
+        let call_data = readZetaCall::new((zeta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readZetaCall::abi_decode_returns(&return_data).unwrap();
+        let zeta_expected = Zeta::abi_encode(&Zeta {
+            id: UID {
+                id: ID { bytes: zeta_id },
+            },
+            b: Astra {
+                a: vec![Alpha {
+                    id: UID {
+                        id: ID { bytes: alpha_1_id },
+                    },
+                    value: 101,
+                }],
+            },
+        });
+        assert_eq!(Zeta::abi_encode(&return_data), zeta_expected);
+        assert_eq!(0, result);
+
+        // Assert that alpha 1 and alpha 2 are deleted from the original namespace
+        assert_eq!(
+            runtime.get_storage_at_slot(alpha_1_slot.0),
+            [0u8; 32],
+            "Slot should be empty"
+        );
+
+        // Popback alpha from zeta
+        let call_data = popAlphaFromZetaCall::new((zeta_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read zeta and assert the returned data
+        let call_data = readZetaCall::new((zeta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readZetaCall::abi_decode_returns(&return_data).unwrap();
+        let zeta_expected = Zeta::abi_encode(&Zeta {
+            id: UID {
+                id: ID { bytes: zeta_id },
+            },
+            b: Astra { a: vec![] },
+        });
+        assert_eq!(Zeta::abi_encode(&return_data), zeta_expected);
+        assert_eq!(0, result);
+
+        // Assert that alpha 2 is under the shared namespace now
+        let alpha_2_shared_slot = derive_object_slot(&SHARED, &alpha_1_id.0);
+        assert_ne!(
+            runtime.get_storage_at_slot(alpha_2_shared_slot.0),
+            [0u8; 32],
+            "Slot should not be empty"
+        );
+
+        // Popback again, even though the vector is empty
+        let call_data = popAlphaFromZetaCall::new((zeta_id,)).abi_encode();
+        let result = runtime.call_entrypoint(call_data);
+        assert!(result.is_err());
+    }
+
+    #[rstest]
+    fn test_pushing_and_popping_from_bora(runtime: RuntimeSandbox) {
+        let call_data = createEtaCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let eta_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let eta_id = FixedBytes::<32>::from_slice(&eta_id);
+
+        let call_data = readEtaCall::new((eta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readEtaCall::abi_decode_returns(&return_data).unwrap();
+        let eta_expected = Eta::abi_encode(&Eta {
+            id: UID {
+                id: ID { bytes: eta_id },
+            },
+            b: Bora {
+                a: vec![],
+                b: vec![],
+            },
+        });
+        assert_eq!(Eta::abi_encode(&return_data), eta_expected);
+        assert_eq!(0, result);
+
+        // Push to bora
+        let call_data = pushToBoraCall::new((eta_id, 1)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read bora and assert the returned data
+        let call_data = readEtaCall::new((eta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readEtaCall::abi_decode_returns(&return_data).unwrap();
+        let eta_expected = Eta::abi_encode(&Eta {
+            id: UID {
+                id: ID { bytes: eta_id },
+            },
+            b: Bora {
+                a: vec![1],
+                b: vec![vec![1, 2, 3]],
+            },
+        });
+        assert_eq!(Eta::abi_encode(&return_data), eta_expected);
+        assert_eq!(0, result);
+
+        // Push to bora
+        let call_data = pushToBoraCall::new((eta_id, 10)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read bora and assert the returned data
+        let call_data = readEtaCall::new((eta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readEtaCall::abi_decode_returns(&return_data).unwrap();
+        let eta_expected = Eta::abi_encode(&Eta {
+            id: UID {
+                id: ID { bytes: eta_id },
+            },
+            b: Bora {
+                a: vec![1, 10],
+                b: vec![vec![1, 2, 3], vec![10, 11, 12]],
+            },
+        });
+        assert_eq!(Eta::abi_encode(&return_data), eta_expected);
+        assert_eq!(0, result);
+
+        // Pop from bora
+        let call_data = popFromBoraCall::new((eta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = popFromBoraCall::abi_decode_returns(&return_data).unwrap();
+        let value = return_data._0;
+        let vector = return_data._1;
+        assert_eq!(value, 10);
+        assert_eq!(vector, vec![10, 11, 12]);
+        assert_eq!(0, result);
+
+        let call_data = readEtaCall::new((eta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readEtaCall::abi_decode_returns(&return_data).unwrap();
+        let eta_expected = Eta::abi_encode(&Eta {
+            id: UID {
+                id: ID { bytes: eta_id },
+            },
+            b: Bora {
+                a: vec![1],
+                b: vec![vec![1, 2, 3]],
+            },
+        });
+        assert_eq!(Eta::abi_encode(&return_data), eta_expected);
         assert_eq!(0, result);
     }
 }
