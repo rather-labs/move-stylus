@@ -22,9 +22,9 @@ use crate::{
         structs::IStruct,
         vector::IVector,
     },
-    vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
     wasm_builder_extensions::WasmBuilderExtension,
 };
+
 /// Adds the instructions to encode and save into storage an specific struct.
 ///
 /// # Arguments
@@ -46,6 +46,18 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 ) {
     let (storage_cache, _) = storage_cache_bytes32(module);
     let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
+    let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+
+    // If the struct has the key ability, set the object owner data to the struct id
+    // This might be used when encoding wrapped objects.
+    if struct_.has_key {
+        builder
+            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+            .local_get(struct_ptr)
+            .call(get_struct_id_fn)
+            .i32_const(32)
+            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+    }
 
     for (index, field) in struct_.fields.iter().enumerate() {
         let field_size = field_size(field, compilation_ctx);
@@ -101,11 +113,20 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             builder,
             compilation_ctx,
             slot_ptr,
-            struct_ptr,
             field,
             written_bytes_in_slot,
             true,
         );
+
+        // After encoding the field, update the data owner offset with the struct id in case it has been changed
+        if struct_.has_key {
+            builder
+                .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+                .local_get(struct_ptr)
+                .call(get_struct_id_fn)
+                .i32_const(32)
+                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+        }
     }
 
     builder
@@ -121,7 +142,6 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 /// `builder` - insturctions sequence builder
 /// `slot_ptr` - storage's slot where the data will be saved
 /// `struct_` - structural information of the struct to be encoded and saved
-/// `reading_nested_struct` - if true, this function is called to read a nested struct inside
 /// `read_bytes_in_slot` - number of bytes already read in the slot.
 /// another struct.
 ///
@@ -133,7 +153,6 @@ pub fn add_read_and_decode_storage_struct_instructions(
     compilation_ctx: &CompilationContext,
     slot_ptr: LocalId,
     struct_: &IStruct,
-    reading_nested_struct: bool,
     read_bytes_in_slot: LocalId,
 ) -> LocalId {
     let (storage_load, _) = storage_load_bytes32(module);
@@ -142,34 +161,55 @@ pub fn add_read_and_decode_storage_struct_instructions(
     // Locals
     let struct_ptr = module.locals.add(ValType::I32);
     let field_ptr = module.locals.add(ValType::I32);
+    let owner_ptr = module.locals.add(ValType::I32);
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_set(owner_ptr);
 
-    // If we are reading an struct from the storage, means this struct has an owner and that owner
-    // is saved in the DATA_STORAGE_OBJECT_OWNER_OFFSET piece of reserved memory. To be able to
-    // know its owner when manipulating the reconstructed structure (for example for the saving the
-    // changes in storage or transfering it) before its representation in memory, we save the owner
-    // id
-    if !reading_nested_struct {
+    // If the struct has the key ability, prepend the owner to the struct memory representation
+    // and update DATA_STORAGE_OBJECT_OWNER_OFFSET to the UID of this struct, for later use when
+    // decoding wrapped objects.
+    if struct_.has_key {
+        // If we are reading an struct from the storage, means this struct has an owner and that owner
+        // is saved in the DATA_STORAGE_OBJECT_OWNER_OFFSET piece of reserved memory. To be able to
+        // know its owner when manipulating the reconstructed structure (for example when saving the
+        // changes in storage or transfering it) before its representation in memory, we save the owner
+        // id
         builder
             .i32_const(32)
             .call(compilation_ctx.allocator)
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
             .i32_const(32)
             .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-    }
 
-    // Allocate space for the struct
-    builder
-        .i32_const(struct_.heap_size as i32)
-        .call(compilation_ctx.allocator)
-        .local_set(struct_ptr);
-
-    // Load data from slot
-    if !reading_nested_struct {
+        // Load the first slot, where the UID of the current struct is stored
         builder
             .local_get(slot_ptr)
             .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
             .call(storage_load);
+
+        // Update DATA_STORAGE_OBJECT_OWNER_OFFSET to the UID of this struct.
+        // When decoding wrapped objects, this memory will be read and the UID of this struct will be used
+        // as the owner of the wrapped object.
+        builder
+            .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .i32_const(32)
+            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+        builder
+            .local_get(owner_ptr)
+            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .i32_const(32)
+            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
     }
+
+    // Allocate memory for the struct
+    builder
+        .i32_const(struct_.heap_size as i32)
+        .call(compilation_ctx.allocator)
+        .local_set(struct_ptr);
 
     for (index, field) in struct_.fields.iter().enumerate() {
         let field_size = field_size(field, compilation_ctx) as i32;
@@ -202,24 +242,27 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 },
             );
 
+        // Decode the field according to its type
         add_decode_intermediate_type_instructions(
             module,
             builder,
             compilation_ctx,
             field_ptr,
             slot_ptr,
-            struct_ptr,
             field,
             read_bytes_in_slot,
         );
 
-        if matches!(
-            field,
-            IntermediateType::IStruct { module_id, index, ..}
-                | IntermediateType::IGenericStructInstance { module_id, index, ..}
-                    if Uid::is_vm_type(module_id, *index, compilation_ctx)
-                        || NamedId::is_vm_type(module_id, *index, compilation_ctx))
-        {
+        // After decoding the field, write the owner to the data owner memory again, as it might have changed
+        if struct_.has_key {
+            builder
+                .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+                .local_get(owner_ptr)
+                .i32_const(32)
+                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+        }
+
+        if field.is_uid_or_named_id(compilation_ctx) {
             // Save the struct pointer in the reserved space of the UID
             builder
                 .local_get(field_ptr)
@@ -265,7 +308,6 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     compilation_ctx: &CompilationContext,
     vector_ptr: LocalId,
     slot_ptr: LocalId,
-    parent_struct_ptr: LocalId,
     inner: &IntermediateType,
 ) {
     // Host functions
@@ -279,6 +321,15 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     // Locals
     let elem_slot_ptr = module.locals.add(ValType::I32);
     let len = module.locals.add(ValType::I32);
+
+    let owner_ptr = module.locals.add(ValType::I32);
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_tee(owner_ptr)
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     // Wipe the data so we write on it safely
     builder
@@ -402,11 +453,16 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                     loop_,
                     compilation_ctx,
                     elem_slot_ptr,
-                    parent_struct_ptr,
                     inner,
                     written_bytes_in_slot,
                     false,
                 );
+
+                loop_
+                    .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+                    .local_get(owner_ptr)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
                 // Exit after processing all elements
                 loop_
@@ -472,7 +528,6 @@ pub fn add_read_and_decode_storage_vector_instructions(
     compilation_ctx: &CompilationContext,
     data_ptr: LocalId,
     slot_ptr: LocalId,
-    parent_struct_ptr: LocalId,
     inner: &IntermediateType,
 ) {
     // Host functions
@@ -487,6 +542,15 @@ pub fn add_read_and_decode_storage_vector_instructions(
     let len = module.locals.add(ValType::I32);
     let elem_slot_ptr = module.locals.add(ValType::I32);
     let elem_data_ptr = module.locals.add(ValType::I32);
+
+    let owner_ptr = module.locals.add(ValType::I32);
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_tee(owner_ptr)
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     // Wipe the data so we write on it safely
     builder
@@ -610,10 +674,16 @@ pub fn add_read_and_decode_storage_vector_instructions(
                         compilation_ctx,
                         elem_data_ptr,
                         elem_slot_ptr,
-                        parent_struct_ptr,
                         inner,
                         read_bytes_in_slot,
                     );
+
+                    // After decoding the element, write the owner to the data owner memory again, as it might have changed
+                    loop_
+                        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+                        .local_get(owner_ptr)
+                        .i32_const(32)
+                        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
                     // Destination address of the element in memory
                     loop_.vec_elem_ptr(data_ptr, i, stack_size);
@@ -691,7 +761,6 @@ pub fn add_encode_intermediate_type_instructions(
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     slot_ptr: LocalId,
-    parent_struct_ptr: LocalId,
     itype: &IntermediateType,
     written_bytes_in_slot: LocalId,
     is_field: bool,
@@ -828,14 +897,7 @@ pub fn add_encode_intermediate_type_instructions(
 
             builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         }
-        IntermediateType::IStruct {
-            module_id, index, ..
-        }
-        | IntermediateType::IGenericStructInstance {
-            module_id, index, ..
-        } if Uid::is_vm_type(module_id, *index, compilation_ctx)
-            || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
-        {
+        itype if itype.is_uid_or_named_id(compilation_ctx) => {
             // The UID and NamedId structs has the following form
             //
             // [UID | NamedId] { id: ID { bytes: <bytes> } }
@@ -849,8 +911,6 @@ pub fn add_encode_intermediate_type_instructions(
             // At the end of the load chain we point to the 32 bytes holding the data
 
             let tmp = module.locals.add(ValType::I32);
-            let tmp2 = module.locals.add(ValType::I32);
-            builder.local_tee(tmp2);
             builder
                 .load(
                     compilation_ctx.memory_id,
@@ -917,16 +977,6 @@ pub fn add_encode_intermediate_type_instructions(
                 // 2. Recursively encoding the child struct in its own slot
                 // 3. Storing the child struct UID in the parent's data
 
-                // Calculate the slot for the child struct according to Solidity storage layout:
-                // child_struct_slot = keccak256(child_struct_id || keccak256(parent_struct_id || 0))
-
-                // Extract parent struct ID for slot calculation
-                let parent_struct_id_ptr = module.locals.add(ValType::I32);
-                builder
-                    .local_get(parent_struct_ptr)
-                    .call(get_struct_id_fn)
-                    .local_set(parent_struct_id_ptr);
-
                 // Extract child struct ID for slot calculation
                 let child_struct_id_ptr = module.locals.add(ValType::I32);
                 builder
@@ -934,9 +984,9 @@ pub fn add_encode_intermediate_type_instructions(
                     .call(get_struct_id_fn)
                     .local_set(child_struct_id_ptr);
 
-                // Calculate the unique slot for the child struct
+                // Calculate the slot for the child struct
                 builder
-                    .local_get(parent_struct_id_ptr)
+                    .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
                     .local_get(child_struct_id_ptr)
                     .call(write_object_slot_fn);
 
@@ -1014,11 +1064,9 @@ pub fn add_encode_intermediate_type_instructions(
                 compilation_ctx,
                 val_32,
                 slot_ptr,
-                parent_struct_ptr,
                 inner,
             );
 
-            // TODO: is this needed?
             builder.i32_const(32).local_set(written_bytes_in_slot);
         }
 
@@ -1043,7 +1091,6 @@ pub fn add_decode_intermediate_type_instructions(
     compilation_ctx: &CompilationContext,
     data_ptr: LocalId,
     slot_ptr: LocalId,
-    parent_struct_ptr: LocalId,
     itype: &IntermediateType,
     read_bytes_in_slot: LocalId,
 ) {
@@ -1055,7 +1102,6 @@ pub fn add_decode_intermediate_type_instructions(
     let (storage_load, _) = storage_load_bytes32(module);
 
     // Runtime functions
-    let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
 
     match itype {
@@ -1204,14 +1250,7 @@ pub fn add_decode_intermediate_type_instructions(
             // Copy the chunk of memory
             builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         }
-        IntermediateType::IStruct {
-            module_id, index, ..
-        }
-        | IntermediateType::IGenericStructInstance {
-            module_id, index, ..
-        } if Uid::is_vm_type(module_id, *index, compilation_ctx)
-            || NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
-        {
+        itype if itype.is_uid_or_named_id(compilation_ctx) => {
             // Reserve 4 bytes to fill with the mem address of the struct that wraps this id.
             // This will be filled outside this function where the struct pointer is available
             builder.i32_const(4).call(compilation_ctx.allocator).drop();
@@ -1314,13 +1353,6 @@ pub fn add_decode_intermediate_type_instructions(
                 // 3. Decode the child struct from its dedicated slot
                 // 4. Return the decoded child struct
 
-                // Get parent struct ID
-                let parent_struct_id_ptr = module.locals.add(ValType::I32);
-                builder
-                    .local_get(parent_struct_ptr)
-                    .call(get_struct_id_fn)
-                    .local_set(parent_struct_id_ptr);
-
                 // Retrieve the 32-byte UID of the child struct from the current slot.
                 // This UID, saved during the encoding process in the parent struct, links the child struct to its parent.
 
@@ -1340,7 +1372,7 @@ pub fn add_decode_intermediate_type_instructions(
                 // Calculate the child struct's storage slot
                 // child_struct_slot = keccak256(child_struct_id || keccak256(parent_struct_id || 0))
                 builder
-                    .local_get(parent_struct_id_ptr)
+                    .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
                     .local_get(child_struct_id_ptr)
                     .call(write_object_slot_fn);
 
@@ -1361,13 +1393,6 @@ pub fn add_decode_intermediate_type_instructions(
                     .i32_const(32)
                     .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-                // Set the owner of the child struct to the parent struct id
-                builder
-                    .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-                    .local_get(parent_struct_id_ptr)
-                    .i32_const(32)
-                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
                 // Reset read bytes counter for the child struct decoding
                 builder.i32_const(0).local_set(read_bytes_in_slot);
 
@@ -1380,7 +1405,6 @@ pub fn add_decode_intermediate_type_instructions(
                     compilation_ctx,
                     child_struct_slot_ptr,
                     &child_struct,
-                    false,
                     read_bytes_in_slot,
                 );
 
@@ -1405,7 +1429,6 @@ pub fn add_decode_intermediate_type_instructions(
                     compilation_ctx,
                     slot_ptr,
                     &child_struct,
-                    true,
                     read_bytes_in_slot,
                 );
 
@@ -1420,7 +1443,6 @@ pub fn add_decode_intermediate_type_instructions(
                 compilation_ctx,
                 data_ptr,
                 slot_ptr,
-                parent_struct_ptr,
                 inner_,
             );
         }
@@ -1440,14 +1462,7 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
         IntermediateType::IAddress | IntermediateType::ISigner => 20,
         // Dynamic data occupies the whole slot, but the data is saved somewhere else
         IntermediateType::IVector(_) => 32,
-
-        IntermediateType::IStruct {
-            module_id, index, ..
-        } if Uid::is_vm_type(module_id, *index, compilation_ctx) => 32,
-
-        IntermediateType::IGenericStructInstance {
-            module_id, index, ..
-        } if NamedId::is_vm_type(module_id, *index, compilation_ctx) => 32,
+        field if field.is_uid_or_named_id(compilation_ctx) => 32,
 
         // Structs default to size 0 since their size depends on whether their fields are dynamic or static.
         // The store function will handle this. If a struct has the 'key' ability, it at least occupies 32 bytes for the UID.

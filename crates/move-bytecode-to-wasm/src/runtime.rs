@@ -68,6 +68,8 @@ pub enum RuntimeFunction {
     EncodeAndSaveInStorage,
     DecodeAndReadFromStorage,
     DeleteFromStorage,
+    CheckAndDeleteStructTtoFields,
+    DeleteTtoObject,
     GetStructOwner,
     CommitChangesToStorage,
     // ASCII conversion
@@ -127,6 +129,8 @@ impl RuntimeFunction {
             Self::EncodeAndSaveInStorage => "encode_and_save_in_storage",
             Self::DecodeAndReadFromStorage => "decode_and_read_from_storage",
             Self::DeleteFromStorage => "delete_from_storage",
+            Self::CheckAndDeleteStructTtoFields => "check_and_delete_struct_tto_fields",
+            Self::DeleteTtoObject => "delete_tto_object",
             Self::GetStructOwner => "get_struct_owner",
             Self::U64ToAsciiBase10 => "u64_to_ascii_base_10",
             Self::CommitChangesToStorage => "commit_changes_to_storage",
@@ -294,6 +298,32 @@ impl RuntimeFunction {
                 );
 
                 storage::add_delete_struct_from_storage_fn(module, compilation_ctx, generics[0])
+            }
+            Self::CheckAndDeleteStructTtoFields => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {} expected 1 type parameter, found {}",
+                    self.name(),
+                    generics.len(),
+                );
+
+                storage::add_check_and_delete_struct_tto_fields_fn(
+                    module,
+                    compilation_ctx,
+                    generics[0],
+                )
+            }
+            Self::DeleteTtoObject => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {} expected 1 type parameter, found {}",
+                    self.name(),
+                    generics.len(),
+                );
+
+                storage::add_delete_tto_object_fn(module, compilation_ctx, generics[0])
             }
             _ => panic!(
                 r#"there was an error linking "{}" runtime function, is this function generic?"#,
