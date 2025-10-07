@@ -39,6 +39,31 @@ public struct Epsilon has key {
     a: vector<Delta>,
 }
 
+// Struct wrapping another struct without the key ability
+// but which in turn has a vector of wrapped objects as field
+public struct Zeta has key {
+    id: UID,
+    b: Astra
+}
+
+// Struct wrapping another struct without the key ability
+// containing only vectors of primitive types
+public struct Eta has key {
+    id: UID,
+    a: Bora
+}
+
+// This struct does not have the key ability, even though it has a vector of wrapped objects
+public struct Astra has store {
+    a: vector<Alpha>
+}
+
+// Struct containing only vectors of primitive types
+public struct Bora has store {
+    a: vector<u64>,
+    b: vector<vector<u64>>
+}
+
 // ============================================================================
 // FUNCTION DEFINITIONS
 // ============================================================================
@@ -102,6 +127,18 @@ public fun create_epsilon_tto(delta_1: Delta, delta_2: Delta, ctx: &mut TxContex
     transfer::transfer(epsilon, ctx.sender());
 }
 
+public fun create_empty_zeta(ctx: &mut TxContext) {
+    let astra = Astra { a: vector[] };
+    let zeta = Zeta { id: object::new(ctx), b: astra };
+    transfer::transfer(zeta, ctx.sender());
+}
+
+public fun create_eta(ctx: &mut TxContext) {
+    let bora = Bora { a: vector[], b: vector[] };
+    let eta = Eta { id: object::new(ctx), a: bora };
+    transfer::transfer(eta, ctx.sender());
+}
+
 // Reading structs
 public fun read_alpha(alpha: &Alpha): &Alpha {
     alpha
@@ -121,6 +158,14 @@ public fun read_delta(delta: &Delta): &Delta {
 
 public fun read_epsilon(epsilon: &Epsilon): &Epsilon {
     epsilon
+}
+
+public fun read_zeta(zeta: &Zeta): &Zeta {
+    zeta
+}
+
+public fun read_eta(eta: &Eta): &Eta {
+    eta
 }
 
 public fun delete_alpha(alpha: Alpha) {
@@ -173,6 +218,18 @@ public fun delete_epsilon(epsilon: Epsilon) {
     vector::destroy_empty(vector_delta);
 }
 
+public fun delete_zeta(zeta: Zeta) {
+    let Zeta { id, b: astra } = zeta;
+    id.delete();
+    let Astra { a: mut vector_alpha } = astra;
+    while (!vector::is_empty(&vector_alpha)) {
+        let alpha = vector::pop_back(&mut vector_alpha);
+        let Alpha { id, value: _ } = alpha;
+        id.delete();
+    };
+    vector::destroy_empty(vector_alpha);
+}
+
 // Transferring structs
 public fun transfer_beta(beta: Beta, recipient: address) {
     transfer::transfer(beta, recipient);
@@ -184,6 +241,10 @@ public fun transfer_gamma(gamma: Gamma, recipient: address) {
 
 public fun transfer_delta(delta: Delta, recipient: address) {
     transfer::transfer(delta, recipient);
+}
+
+public fun transfer_zeta(zeta: Zeta, recipient: address) {
+    transfer::transfer(zeta, recipient);
 }
 
 // Miscellaneous operations on structs
@@ -234,4 +295,23 @@ public fun destruct_epsilon(epsilon: Epsilon, alpha: Alpha, ctx: &mut TxContext)
 
     let new_epsilon = Epsilon { id: object::new(ctx), a: vector_delta };
     transfer::share_object(new_epsilon);
+}
+
+public fun push_alpha_to_zeta(zeta: &mut Zeta, alpha: Alpha) {
+    zeta.b.a.push_back(alpha);
+}
+
+public fun pop_alpha_from_zeta(zeta: &mut Zeta) {
+    let alpha = zeta.b.a.pop_back();
+    transfer::share_object(alpha);
+}
+
+public fun push_to_bora(eta: &mut Eta, value: u64) {
+    eta.a.a.push_back(value);
+    let v = vector[value, value + 1, value + 2];
+    eta.a.b.push_back(v);
+}
+
+public fun pop_from_bora(eta: &mut Eta): (u64, vector<u64>) {
+    (eta.a.a.pop_back(), eta.a.b.pop_back())
 }
