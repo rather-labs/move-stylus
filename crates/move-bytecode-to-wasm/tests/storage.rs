@@ -4778,17 +4778,13 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let call_data = readAlphaCall::new((alpha_2_id,)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        let return_data = readAlphaCall::abi_decode_returns(&return_data).unwrap();
-        let alpha_expected = Alpha::abi_encode(&Alpha {
-            id: UID {
-                id: ID { bytes: alpha_2_id },
-            },
-            value: 102,
-        });
-        assert_eq!(Alpha::abi_encode(&return_data), alpha_expected);
-        assert_eq!(0, result);
+        // Read alpha_2 from the shared namespace and assert the data is correct
+        let alpha_2_shared_slot = derive_object_slot(&SHARED, &alpha_2_id.0);
+        assert_eq!(
+            runtime.get_storage_at_slot(alpha_2_shared_slot.0),
+            alpha_2_id.0,
+            "Slot should be the same as the original alpha"
+        );
 
         // Read delta after the pop and assert the data is correct
         let call_data = readDeltaCall::new((delta_id,)).abi_encode();
@@ -4808,6 +4804,46 @@ mod wrapped_objects {
         assert_eq!(Delta::abi_encode(&return_data), delta_expected);
         assert_eq!(0, result);
 
+        // Pop the last alpha from delta and assert the data is correct
+        // In this case the beta vector is left empty.
+        let call_data = popAlphaFromDeltaCall::new((delta_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read alpha_1 from the shared namespace and assert the data is correct
+        let alpha_1_shared_slot = derive_object_slot(&SHARED, &alpha_1_id.0);
+        assert_eq!(
+            runtime.get_storage_at_slot(alpha_1_shared_slot.0),
+            alpha_1_id.0,
+            "Slot should be the same as the original alpha"
+        );
+
+        // Read the popped alpha and assert the returned data is correct
+        let call_data = readAlphaCall::new((alpha_1_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readAlphaCall::abi_decode_returns(&return_data).unwrap();
+        let alpha_expected = Alpha::abi_encode(&Alpha {
+            id: UID {
+                id: ID { bytes: alpha_1_id },
+            },
+            value: 101,
+        });
+        assert_eq!(Alpha::abi_encode(&return_data), alpha_expected);
+        assert_eq!(0, result);
+
+        // Read delta after the pop and assert the data is correct
+        let call_data = readDeltaCall::new((delta_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readDeltaCall::abi_decode_returns(&return_data).unwrap();
+        let delta_expected = Delta::abi_encode(&Delta {
+            id: UID {
+                id: ID { bytes: delta_id },
+            },
+            a: vec![],
+        });
+        assert_eq!(Delta::abi_encode(&return_data), delta_expected);
+        assert_eq!(0, result);
+
         // Create third alpha
         let call_data = createAlphaCall::new((103,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -4823,13 +4859,17 @@ mod wrapped_objects {
 
         let storage_before_delete = runtime.get_storage();
 
-        // Delete delta
-        let call_data = deleteDeltaCall::new((delta_id,)).abi_encode();
+        // Delete the shared alphas
+        let call_data = deleteAlphaCall::new((alpha_1_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        // Delete the alpha we popped from delta, which is now shared
         let call_data = deleteAlphaCall::new((alpha_2_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Delete delta
+        let call_data = deleteDeltaCall::new((delta_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 

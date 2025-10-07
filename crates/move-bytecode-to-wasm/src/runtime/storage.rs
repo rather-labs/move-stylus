@@ -544,12 +544,7 @@ pub fn derive_dyn_array_slot(
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     function.finish(
-        vec![
-            array_slot_ptr,
-            elem_index,
-            elem_size,
-            derived_elem_slot_ptr,
-        ],
+        vec![array_slot_ptr, elem_index, elem_size, derived_elem_slot_ptr],
         &mut module.funcs,
     )
 }
@@ -1440,7 +1435,9 @@ mod tests {
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut module, data, "test_fn", Some(linker));
 
-        let pointer: i32 = entrypoint.call(&mut store, (0, index_ as i32, elem_size_ as i32)).unwrap();
+        let pointer: i32 = entrypoint
+            .call(&mut store, (0, index_ as i32, elem_size_ as i32))
+            .unwrap();
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_bytes = vec![0; 32];
         memory
@@ -1541,7 +1538,17 @@ mod tests {
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut module, data, "test_fn", Some(linker));
 
-        let pointer: i32 = entrypoint.call(&mut store, (0, outer_index_ as i32, inner_index_ as i32, elem_size_ as i32)).unwrap();
+        let pointer: i32 = entrypoint
+            .call(
+                &mut store,
+                (
+                    0,
+                    outer_index_ as i32,
+                    inner_index_ as i32,
+                    elem_size_ as i32,
+                ),
+            )
+            .unwrap();
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_bytes = vec![0; 32];
         memory
