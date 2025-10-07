@@ -1,155 +1,227 @@
 module hello_world::hello_world;
 
-use stylus::event::emit;
-use std::ascii::String;
-use std::ascii as ascii;
 use stylus::tx_context::TxContext;
-use stylus::transfer as transfer;
-use stylus::object as object;
-use stylus::object::NamedId;
-use stylus::object::UID;
-use stylus::dynamic_field_named_id as field;
-use stylus::table::Table;
-use stylus::table as table;
+use hello_world::other_mod::Test;
 
-public struct TOTAL_SUPPLY has key {}
-public struct CONTRACT_INFO has key {}
-public struct ALLOWANCE_ has key {}
-public struct BALANCE_ has key {}
+const INT_AS_CONST: u128 = 128128128;
 
-public struct TotalSupply has key {
-    id: NamedId<TOTAL_SUPPLY>,
-    total: u256,
+/// Struct with generic type T
+public struct Bar has drop, copy {
+    a: u32,
+    b: u128,
 }
 
-public struct Info has key {
-    id: NamedId<CONTRACT_INFO>,
-    name: String,
-    symbol: String,
-    decimals: u8,
+public struct Foo<T> has drop, copy {
+    c: T,
+    d: Bar,
+    e: address,
+    f: bool,
+    g: u64,
+    h: u256,
+    i: vector<u32>,
 }
 
-public struct Transfer has copy, drop {
-    from: address,
-    to: address,
-    value: u256
+public struct Baz<T> has drop, copy {
+    c: T,
+    d: Bar,
+    e: address,
+    f: bool,
+    g: u64,
+    h: u256,
 }
 
-public struct Approval has copy, drop {
-    owner: address,
-    spender: address,
-    value: u256
+// Enum
+public enum TestEnum has drop {
+    FirstVariant,
+    SecondVariant,
 }
 
-public struct Balance has key {
-    id: NamedId<BALANCE_>,
+/// Return a constant
+public fun get_constant(): u128 {
+  INT_AS_CONST
 }
 
-public struct Allowance has key {
-    id: NamedId<ALLOWANCE_>,
+/// Set constant as local
+public fun get_constant_local(): u128 {
+  let x: u128 = INT_AS_CONST;
+  x
 }
 
-public struct AccountAllowance has key {
-    id: UID,
+// Forces the compiler to store literals on locals
+public fun get_local(_z: u128): u128 {
+  let x: u128 = 100;
+  let y: u128 = 50;
+  identity(x);
+
+  identity_2(x, y)
 }
 
-public fun create(ctx: &mut TxContext) {
-    transfer::freeze_object(Info {
-        id: object::new_named_id<CONTRACT_INFO>(),
-        name: ascii::string(b"Test Coin"),
-        symbol: ascii::string(b"TST"),
-        decimals: 18,
-    });
+// Forces the compiler to store literals on locals
+public fun get_copied_local(): u128 {
+  let x: u128 = 100;
 
-    transfer::share_object(TotalSupply {
-        id: object::new_named_id<TOTAL_SUPPLY>(),
-        total: 0,
-    });
+  let y = x; // copy
+  let mut _z = x; // move
+  identity(y);
+  identity(_z);
 
-    transfer::share_object(Allowance {
-        id: object::new_named_id<ALLOWANCE_>(),
-    });
-
-    transfer::share_object(Balance {
-        id: object::new_named_id<BALANCE_>(),
-    });
+  _z = 111;
+  y
 }
 
-public fun mint(
-    to: address,
-    amount: u256,
-    total_supply: &mut TotalSupply,
-    balance: &mut Balance
-) {
-    if (field::exists_(&balance.id, to)) {
-        let balance_amount = field::borrow_mut(&mut balance.id, to);
-        *balance_amount = *balance_amount + amount;
-    } else {
-        field::add(&mut balance.id, to, amount);
+public fun echo(x: u128): u128 {
+  identity(x)
+}
+
+public fun echo_2(x: u128, y: u128): u128 {
+  identity_2(x, y)
+}
+
+fun identity(x: u128): u128 {
+  x
+}
+
+fun identity_2(_x: u128, y: u128): u128 {
+  y
+}
+
+/// Exposition of EVM global variables through TxContext object
+public fun tx_context_properties(ctx: &TxContext): (address, u256, u64, u256, u64, u64, u64, u256) {
+    (
+        ctx.sender(),
+        ctx.msg_value(),
+        ctx.block_number(),
+        ctx.block_basefee(),
+        ctx.block_gas_limit(),
+        ctx.block_timestamp(),
+        ctx.chain_id(),
+        ctx.gas_price(),
+    )
+}
+
+// Control Flow
+public fun fibonacci(n: u64): u64 {
+    if (n == 0) return 0;
+    if (n == 1) return 1;
+    let mut a = 0;
+    let mut b = 1;
+    let mut count = 2;
+    while (count <= n) {
+        let temp = a + b;
+        a = b;
+        b = temp;
+        count = count + 1;
+    };
+    b
+}
+
+// Just an intrincated contrl flow example
+public fun sum_special(n: u64): u64 {
+    let mut total = 0;
+    let mut i = 1;
+
+    'outer: loop {
+        if (i > n) {
+            break
+        };
+
+        if (i > 1) {
+            let mut j = 2;
+            let mut x = 1;
+            while (j * j <= i) {
+                if (i % j == 0) {
+                    x = 0;
+                    break
+                };
+                j = j + 1;
+            };
+
+            if (x == 1) {
+                total = total + 7;
+            };
+        };
+
+        i = i + 1;
     };
 
-    total_supply.total = total_supply.total + amount;
-
-    emit(Transfer {
-        from: @0x0,
-        to,
-        value: amount
-    });
-}
-
-public fun total_supply(t_supply: &TotalSupply): u256 {
-    t_supply.total
+    total
 }
 
 
-public fun balance_of(account: address, balance: &Balance): u256 {
-    *field::borrow<BALANCE_, address, u256>(&balance.id, account)
-}
-
-public fun transfer(
-    recipient: address,
-    amount: u256,
-    tx_context: &TxContext,
-    balance: &mut Balance,
-): bool {
-    let sender_balance = field::borrow_mut(&mut balance.id, tx_context.sender());
-    *sender_balance = *sender_balance - amount;
-    let recipient_balance = field::borrow_mut(&mut balance.id, recipient);
-    *recipient_balance = *recipient_balance + amount;
-
-    emit(Transfer {
-        from: tx_context.sender(),
-        to: recipient,
-        value: amount
-    });
-
-    true
-}
-
-public fun approve(
-    spender: address,
-    amount: u256,
-    allowance: &mut Allowance,
-    ctx: &mut TxContext,
-): bool {
-    let spender_allowance = if (field::exists_(&allowance.id, spender)) {
-        field::borrow_mut<ALLOWANCE_, address, Table<address, u256>>(&mut allowance.id, ctx.sender())
-    } else {
-        field::add(
-            &mut allowance.id,
-            ctx.sender(),
-            table::new<address, u256>(ctx)
-        );
-        field::borrow_mut<ALLOWANCE_, address, Table<address, u256>>(&mut allowance.id, ctx.sender())
+// Structs
+public fun create_foo_u16(a: u16, b: u16): Foo<u16> {
+    let mut foo = Foo {
+        c: a,
+        d: Bar { a: 42, b: 4242 },
+        e: @0x7357,
+        f: true,
+        g: 1,
+        h: 2,
+        i: vector[0xFFFFFFFF],
     };
 
-    spender_allowance.add(spender, amount);
+    foo.c = b;
 
-    emit(Approval {
-        owner: ctx.sender(),
-        spender,
-        value: amount
-    });
-
-    true
+    foo
 }
+
+public fun create_foo2_u16(a: u16, b: u16): (Foo<u16>, Foo<u16>) {
+    let mut foo = Foo {
+        c: a,
+        d: Bar { a: 42, b: 4242 },
+        e: @0x7357,
+        f: true,
+        g: 1,
+        h: 2,
+        i: vector[0xFFFFFFFF],
+    };
+
+    foo.c = b;
+
+    (foo, copy(foo))
+}
+
+public fun create_baz_u16(a: u16, _b: u16): Baz<u16> {
+    let baz = Baz {
+        c: a,
+        d: Bar { a: 42, b: 4242 },
+        e: @0x7357,
+        f: true,
+        g: 1,
+        h: 2,
+    };
+
+    baz
+}
+
+public fun create_baz2_u16(a: u16, _b: u16): (Baz<u16>, Baz<u16>) {
+    let baz = Baz {
+        c: a,
+        d: Bar { a: 42, b: 4242 },
+        e: @0x7357,
+        f: true,
+        g: 1,
+        h: 2,
+    };
+
+    (baz, copy(baz))
+}
+
+public fun multi_values_1(): (vector<u32>, vector<u128>, bool, u64) {
+    (vector[0xFFFFFFFF, 0xFFFFFFFF], vector[0xFFFFFFFFFF_u128], true, 42)
+}
+
+public fun multi_values_2(): (u8, bool, u64) {
+    (84, true, 42)
+}
+
+// Enums
+public fun echo_variant(x:  TestEnum): TestEnum {
+    x
+}
+
+// Use structs from other modules defined by us
+public fun test_values(test: &Test): (u8, u8) {
+    test.get_test_values()
+}
+
