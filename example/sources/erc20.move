@@ -7,7 +7,6 @@ use stylus::tx_context::TxContext;
 use stylus::transfer as transfer;
 use stylus::object as object;
 use stylus::object::NamedId;
-use stylus::object::UID;
 use stylus::dynamic_field_named_id as field;
 use stylus::table::Table;
 use stylus::table as table;
@@ -52,11 +51,7 @@ public struct Allowance has key {
     id: NamedId<ALLOWANCE_>,
 }
 
-public struct AccountAllowance has key {
-    id: UID,
-}
-
-public fun create(ctx: &mut TxContext) {
+public fun create() {
     transfer::freeze_object(Info {
         id: object::new_named_id<CONTRACT_INFO>(),
         name: ascii::string(b"Test Coin"),
@@ -107,13 +102,13 @@ public fun burn(
     balance: &mut Balance
 ) {
     if (amount > 0 && !field::exists_(&balance.id, from)) {
-        abort(EInssuficientFunds);
+        abort(EInssuficientFunds)
     };
 
     let balance_amount = field::borrow_mut(&mut balance.id, from);
 
     if (*balance_amount < amount) {
-        abort(EInssuficientFunds);
+        abort(EInssuficientFunds)
     };
 
     if (amount > total_supply.total) {
@@ -167,7 +162,7 @@ public fun transfer(
         tx_context.sender()
     );
     if (*sender_balance < amount) {
-        abort(EInssuficientFunds);
+        abort(EInssuficientFunds)
     };
 
     *sender_balance = *sender_balance - amount;
@@ -253,6 +248,12 @@ public fun transfer_from(
             sender,
         );
 
+        let allowance = spender_allowance.borrow_mut(ctx.sender());
+        if (*allowance < amount) {
+            abort(ENotAllowed)
+        };
+
+        *allowance = *allowance - amount;
 
         let sender_balance = field::borrow_mut<BALANCE_, address, u256>(
             &mut balance.id,
@@ -260,19 +261,11 @@ public fun transfer_from(
         );
 
         if (*sender_balance < amount) {
-            abort(EInssuficientFunds);
+            abort(EInssuficientFunds)
         };
 
 
         *sender_balance = *sender_balance - amount;
-
-let allowance = spender_allowance.borrow_mut(ctx.sender());
-        if (*allowance < amount) {
-            abort(ENotAllowed);
-        };
-
-        *allowance = *allowance - amount;
-
 
         if (field::exists_(&balance.id, recipient)) {
             let recipient_balance = field::borrow_mut(&mut balance.id, recipient);

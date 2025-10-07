@@ -4698,6 +4698,7 @@ mod dynamic_storage_fields {
         function readDynamicField(bytes32 foo, String name) public view returns (uint64);
         function dynamicFieldExists(bytes32 foo, String name) public view returns (bool);
         function mutateDynamicField(bytes32 foo, String name) public view;
+        function mutateDynamicFieldTwo(bytes32 foo, String name, String name2) public view;
         function removeDynamicField(bytes32 foo, String name) public view returns (uint64);
         function attachDynamicFieldAddrU256(bytes32 foo, address name, uint256 value) public view;
         function readDynamicFieldAddrU256(bytes32 foo, address name) public view returns (uint256);
@@ -4840,16 +4841,34 @@ mod dynamic_storage_fields {
         assert_eq!(0, result);
         assert_eq!(85u64.abi_encode(), result_data);
 
+        // Mutate both in the same function
+        let call_data =
+            mutateDynamicFieldTwoCall::new((object_id, field_name_1.clone(), field_name_2.clone()))
+                .abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read modified dynamic fields
+        let call_data = readDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(44u64.abi_encode(), result_data);
+
+        let call_data = readDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(86u64.abi_encode(), result_data);
+
         // Remove fields
         let call_data = removeDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-        assert_eq!(43u64.abi_encode(), result_data);
+        assert_eq!(44u64.abi_encode(), result_data);
 
         let call_data = removeDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-        assert_eq!(85u64.abi_encode(), result_data);
+        assert_eq!(86u64.abi_encode(), result_data);
 
         let call_data = removeDynamicFieldAddrU256Call::new((object_id, field_name_3)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -4918,6 +4937,7 @@ mod dynamic_storage_fields_named_id {
         function readDynamicField(String name) public view returns (uint64);
         function dynamicFieldExists(String name) public view returns (bool);
         function mutateDynamicField(String name) public view;
+        function mutateDynamicFieldTwo(String name, String name2) public view;
         function removeDynamicField(String name) public view returns (uint64);
         function attachDynamicFieldAddrU256(address name, uint256 value) public view;
         function readDynamicFieldAddrU256(address name) public view returns (uint256);
@@ -5052,16 +5072,34 @@ mod dynamic_storage_fields_named_id {
         assert_eq!(0, result);
         assert_eq!(85u64.abi_encode(), result_data);
 
+        // Mutate both in the same function
+        let call_data =
+            mutateDynamicFieldTwoCall::new((field_name_1.clone(), field_name_2.clone()))
+                .abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read modified dynamic fields
+        let call_data = readDynamicFieldCall::new((field_name_1.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(44u64.abi_encode(), result_data);
+
+        let call_data = readDynamicFieldCall::new((field_name_2.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(86u64.abi_encode(), result_data);
+
         // Remove fields
         let call_data = removeDynamicFieldCall::new((field_name_1.clone(),)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-        assert_eq!(43u64.abi_encode(), result_data);
+        assert_eq!(44u64.abi_encode(), result_data);
 
         let call_data = removeDynamicFieldCall::new((field_name_2.clone(),)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-        assert_eq!(85u64.abi_encode(), result_data);
+        assert_eq!(86u64.abi_encode(), result_data);
 
         let call_data = removeDynamicFieldAddrU256Call::new((field_name_3,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -5226,8 +5264,8 @@ mod erc20 {
         assert_eq!(0, result);
         assert_eq!(9996666.abi_encode(), result_data);
 
-        /// Allowance
-        /// Allow address_1 to spend 100 TST from address_2
+        // Allowance
+        // Allow address_1 to spend 100 TST from address_2
         let call_data = allowanceCall::new((address_2, address_1)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
@@ -5246,8 +5284,8 @@ mod erc20 {
         assert_eq!(0, result);
         assert_eq!(100.abi_encode(), result_data);
 
-        /// Transfer from
-        /// Transfer from address_2 100 TST using address_1 to address_3
+        // Transfer from
+        // Transfer from address_2 100 TST using address_1 to address_3
         let call_data = balanceOfCall::new((address_1,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
