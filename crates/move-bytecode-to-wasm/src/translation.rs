@@ -13,7 +13,12 @@ pub mod table;
 
 use crate::{
     CompilationContext,
-    compilation_context::{ModuleData, ModuleId},
+    compilation_context::{
+        ModuleData, ModuleId,
+        reserved_modules::{
+            SF_MODULE_NAME_DYNAMIC_FIELD, STYLUS_FRAMEWORK_ADDRESS, STYLUS_FRAMEWORK_NAME,
+        },
+    },
     data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET},
     error_encoding::build_error_message,
     generics::{instantiate_vec_type_parameters, replace_type_parameters, type_contains_generics},
@@ -131,6 +136,8 @@ pub fn translate_function(
 
     #[cfg(debug_assertions)]
     function.name(function_information.function_id.identifier.clone());
+
+    println!("translating {}", function_information.function_id);
 
     let mut builder = function.func_body();
 
@@ -603,6 +610,10 @@ fn translate_instruction(
                     types_stack,
                 )?;
 
+                println!(
+                    "\t 1 calling {}",
+                    function_id // , function_information.function_id.type_instantiations
+                );
                 // If the function is in the table we call it directly
                 if let Some(f) = function_table.get_by_function_id(function_id) {
                     call_indirect(
@@ -613,6 +624,82 @@ fn translate_instruction(
                         module,
                         compilation_ctx,
                     );
+
+                    // Every time `dynamic_fields::borrow_mut` or
+                    // `dynamic_fields_named_id::borrow_mut` are called, we must register a unique
+                    // global variable that will hold a `Field` pointer, used at the end of the
+                    // router to commit the changes made to the field to storage
+                    if vm_handled_types::dynamic_fields::Field::is_borrow_mut_fn(
+                        &function_id.module_id,
+                        &function_id.identifier,
+                    ) {
+                        let global_struct_ptr = module.globals.add_local(
+                            ValType::I32,
+                            true,
+                            false,
+                            walrus::ConstExpr::Value(Value::I32(-1)),
+                        );
+                        println!("adding global struct ptr {global_struct_ptr:?}");
+                        println!(
+                            "while processing {function_id} from {}",
+                            &mapped_function.function_id
+                        );
+                        let field_value_ref_ptr = module.locals.add(ValType::I32);
+
+                        // The borrow_mut functions borrows the value of a `Field`, which is the
+                        // third field. So, to get the struct pointer we just need to go 8 bytes
+                        // before it.
+                        builder
+                            .local_tee(field_value_ref_ptr)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            )
+                            .i32_const(8)
+                            .binop(BinaryOp::I32Sub)
+                            .global_set(global_struct_ptr);
+
+                        let borrow_mut_type_instantiations = function_id
+                            .type_instantiations
+                            .as_ref()
+                            .expect("calling field borrow mut without type instantiations");
+                        let field_types_instances = if function_id.module_id.module_name == vm_handled_types::dynamic_fields::Field::MODULE_DYNAMIC_FIELD_NAMED_ID {
+                            vec![borrow_mut_type_instantiations[1].clone(), borrow_mut_type_instantiations[2].clone()]
+                        } else {
+                            vec![borrow_mut_type_instantiations[0].clone(), borrow_mut_type_instantiations[1].clone()]
+                        };
+
+                        let dynamic_fields_module_id = ModuleId {
+                            address: STYLUS_FRAMEWORK_ADDRESS,
+                            module_name: SF_MODULE_NAME_DYNAMIC_FIELD.to_owned(),
+                        };
+
+                        let dynamic_fields_module =
+                            compilation_ctx.get_module_data_by_id(&dynamic_fields_module_id)?;
+
+                        let field_struct =
+                            dynamic_fields_module.structs.get_by_identifier("Field")?;
+
+                        println!("\t\tcalled borrow mut!");
+                        println!("\t\ttype parameters: {:?}", field_types_instances);
+
+                        dynamic_fields_global_variables.push((
+                            global_struct_ptr,
+                            IntermediateType::IGenericStructInstance {
+                                module_id: dynamic_fields_module_id,
+                                index: field_struct.index(),
+                                types: field_types_instances,
+                                vm_handled_struct: VmHandledStruct::None,
+                            },
+                        ));
+
+                        // Leave in the stack the field reference pointer
+                        builder.local_get(field_value_ref_ptr);
+                    }
                 }
                 // Otherwise
                 // If the function is not native, we add it to the table and declare it for translating
@@ -634,6 +721,12 @@ fn translate_instruction(
                     );
 
                     builder.call(native_function_id);
+                    /*
+                    println!(
+                        "\t\tcalling {} while processing {}",
+                        function_id, &mapped_function.function_id
+                    );
+                    */
 
                     // Save the dynamic field in a global variable so we can save the changes in
                     // storage later
@@ -2454,4 +2547,89 @@ pub fn box_args(
     for (index, pointer) in updates {
         function_locals[index] = pointer;
     }
+}
+
+pub fn add_field_borrow_mut_global_var_instructions(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    builder: &mut InstrSeqBuilder,
+    dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
+    function_id: &FunctionId,
+) -> Result<()> {
+    let global_struct_ptr = module.globals.add_local(
+        ValType::I32,
+        true,
+        false,
+        walrus::ConstExpr::Value(Value::I32(-1)),
+    );
+    println!("adding global struct ptr {global_struct_ptr:?}");
+    /*
+    println!(
+        "while processing {function_id} from {}",
+        &mapped_function.function_id
+    );
+    */
+    let field_value_ref_ptr = module.locals.add(ValType::I32);
+
+    // The borrow_mut functions borrows the value of a `Field`, which is the
+    // third field. So, to get the struct pointer we just need to go 8 bytes
+    // before it.
+    builder
+        .local_tee(field_value_ref_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .i32_const(8)
+        .binop(BinaryOp::I32Sub)
+        .global_set(global_struct_ptr);
+
+    let borrow_mut_type_instantiations = function_id
+        .type_instantiations
+        .as_ref()
+        .expect("calling field borrow mut without type instantiations");
+    let field_types_instances = if function_id.module_id.module_name
+        == vm_handled_types::dynamic_fields::Field::MODULE_DYNAMIC_FIELD_NAMED_ID
+    {
+        vec![
+            borrow_mut_type_instantiations[1].clone(),
+            borrow_mut_type_instantiations[2].clone(),
+        ]
+    } else {
+        vec![
+            borrow_mut_type_instantiations[0].clone(),
+            borrow_mut_type_instantiations[1].clone(),
+        ]
+    };
+
+    let dynamic_fields_module_id = ModuleId {
+        address: STYLUS_FRAMEWORK_ADDRESS,
+        module_name: SF_MODULE_NAME_DYNAMIC_FIELD.to_owned(),
+    };
+
+    let dynamic_fields_module = compilation_ctx.get_module_data_by_id(&dynamic_fields_module_id)?;
+
+    let field_struct = dynamic_fields_module.structs.get_by_identifier("Field")?;
+
+    println!("\t\tcalled borrow mut!");
+    println!("\t\ttype parameters: {:?}", field_types_instances);
+
+    dynamic_fields_global_variables.push((
+        global_struct_ptr,
+        IntermediateType::IGenericStructInstance {
+            module_id: dynamic_fields_module_id,
+            index: field_struct.index(),
+            types: field_types_instances,
+            vm_handled_struct: VmHandledStruct::None,
+        },
+    ));
+
+    // Leave in the stack the field reference pointer
+    builder.local_get(field_value_ref_ptr);
+
+    Ok(())
 }
