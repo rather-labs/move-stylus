@@ -515,13 +515,13 @@ pub fn derive_dyn_array_slot(
     let elem_offset_32 = elem_size;
     builder.local_set(elem_offset_32);
 
-    // Repurpose elem_index_ptr to allocate and hold the offset as U256
-    let elem_offset_256_ptr = elem_index;
+    // Repurpose elem_index to allocate and hold the offset as U256
+    let elem_offset_256 = elem_index;
     builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
-        .local_set(elem_offset_256_ptr)
-        .local_get(elem_offset_256_ptr)
+        .local_set(elem_offset_256)
+        .local_get(elem_offset_256)
         .local_get(elem_offset_32)
         // Store the u32 big-endian offset at the last 4 bytes of the memory to convert it to u256
         .store(
@@ -535,9 +535,7 @@ pub fn derive_dyn_array_slot(
 
     // Add base + offset → final element slot
     builder.local_get(derived_elem_slot_ptr);
-    builder
-        .local_get(elem_offset_256_ptr)
-        .local_get(base_slot_ptr);
+    builder.local_get(elem_offset_256).local_get(base_slot_ptr);
     IU256::add(&mut builder, module, compilation_ctx); // add(base, offset) with overflow check
     builder // copy add(base, offset) result to #derived_elem_slot_ptr
         .i32_const(32)
@@ -1382,9 +1380,9 @@ mod tests {
     ).unwrap()
     )]
     fn test_derive_dyn_array_slot(
-        #[case] slot_: U256,
-        #[case] index_: u32,
-        #[case] elem_size_: u32,
+        #[case] header_slot: U256,
+        #[case] element_index: u32,
+        #[case] element_size: u32,
         #[case] expected: U256,
     ) {
         let (mut module, allocator_func, memory_id) = build_module(Some(40)); // slot (32 bytes) + index (4 bytes) + elem_size (4 bytes)
@@ -1408,10 +1406,6 @@ mod tests {
 
         let ctx = test_compilation_context!(memory_id, allocator_func);
 
-        println!("slot_: {:?}", slot_);
-        println!("index_: {:?}", index_);
-        println!("elem_size_: {:?}", elem_size_);
-
         func_body
             .local_get(slot_ptr)
             .local_get(index)
@@ -1426,9 +1420,9 @@ mod tests {
         let linker = get_linker_with_native_keccak256();
 
         let data = [
-            slot_.to_be_bytes::<32>().to_vec(),
-            index_.to_le_bytes().to_vec(),
-            elem_size_.to_le_bytes().to_vec(),
+            header_slot.to_be_bytes::<32>().to_vec(),
+            element_index.to_le_bytes().to_vec(),
+            element_size.to_le_bytes().to_vec(),
         ]
         .concat();
 
@@ -1436,7 +1430,7 @@ mod tests {
             setup_wasmtime_module(&mut module, data, "test_fn", Some(linker));
 
         let pointer: i32 = entrypoint
-            .call(&mut store, (0, index_ as i32, elem_size_ as i32))
+            .call(&mut store, (0, element_index as i32, element_size as i32))
             .unwrap();
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_bytes = vec![0; 32];
@@ -1469,10 +1463,10 @@ mod tests {
     ).unwrap()
     )]
     fn test_derive_nested_dyn_array_slot(
-        #[case] slot_: U256,
-        #[case] outer_index_: u32,
-        #[case] inner_index_: u32,
-        #[case] elem_size_: u32,
+        #[case] header_slot: U256,
+        #[case] element_outer_index: u32,
+        #[case] element_inner_index: u32,
+        #[case] element_size: u32,
         #[case] expected: U256,
     ) {
         // slot (32 bytes) + outer_index (4 bytes) + inner_index (4 bytes) + elem_size (4 bytes)
@@ -1528,10 +1522,10 @@ mod tests {
         let linker = get_linker_with_native_keccak256();
 
         let data = [
-            slot_.to_be_bytes::<32>().to_vec(),
-            outer_index_.to_le_bytes().to_vec(),
-            inner_index_.to_le_bytes().to_vec(),
-            elem_size_.to_le_bytes().to_vec(),
+            header_slot.to_be_bytes::<32>().to_vec(),
+            element_outer_index.to_le_bytes().to_vec(),
+            element_inner_index.to_le_bytes().to_vec(),
+            element_size.to_le_bytes().to_vec(),
         ]
         .concat();
 
@@ -1543,9 +1537,9 @@ mod tests {
                 &mut store,
                 (
                     0,
-                    outer_index_ as i32,
-                    inner_index_ as i32,
-                    elem_size_ as i32,
+                    element_outer_index as i32,
+                    element_inner_index as i32,
+                    element_size as i32,
                 ),
             )
             .unwrap();

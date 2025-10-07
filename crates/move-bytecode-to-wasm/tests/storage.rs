@@ -5166,7 +5166,6 @@ mod wrapped_objects {
     }
 
     #[rstest]
-    #[should_panic]
     fn test_popping_from_empty_zeta(runtime: RuntimeSandbox) {
         let call_data = createEmptyZetaCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
@@ -5260,8 +5259,8 @@ mod wrapped_objects {
 
         // Popback again, even though the vector is empty
         let call_data = popAlphaFromZetaCall::new((zeta_id,)).abi_encode();
-        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
+        let result = runtime.call_entrypoint(call_data);
+        assert!(result.is_err());
     }
 
     #[rstest]
