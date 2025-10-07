@@ -259,8 +259,6 @@ pub fn heap_integers_div_mod(
                             else_.loop_(None, |substraction_loop| {
                                 let substraction_loop_id = substraction_loop.id();
 
-                                // substraction_loop.i32_const(2).call(print_i32);
-                                // substraction_loop.local_get(remainder_ptr).call(print_u128);
                                 // remainder -= divisor
                                 substraction_loop
                                     .local_get(remainder_ptr)

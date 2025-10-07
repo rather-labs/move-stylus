@@ -829,7 +829,6 @@ pub fn add_commit_changes_to_storage_fn(
         let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
 
         let owner_ptr = module.locals.add(ValType::I32);
-        let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
         for (dynamic_field_ptr, itype) in dynamic_fields_global_variables {
             let save_struct_into_storage_fn = RuntimeFunction::EncodeAndSaveInStorage.get_generic(
                 module,
@@ -842,13 +841,11 @@ pub fn add_commit_changes_to_storage_fn(
                 // The global id can be declares but never filled because the path that the code
                 // took never called the borrow_mut function. In that case it will have assigned te
                 // -1 value, we skip processing it
-                block.i32_const(1).call(print_i32);
                 block
                     .global_get(*dynamic_field_ptr)
                     .i32_const(-1)
                     .binop(BinaryOp::I32Eq)
                     .br_if(block_id);
-                block.i32_const(2).call(print_i32);
 
                 // Calculate the destiny slot
 

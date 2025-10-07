@@ -228,7 +228,7 @@ public fun allowance(
 ): u256 {
     if (field::exists_(&allowance.id, owner)) {
         let owner_allowance = field::borrow<ALLOWANCE_, address, Table<address, u256>>(
-            &mut allowance.id,
+            &allowance.id,
             owner
         );
 

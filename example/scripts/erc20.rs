@@ -97,12 +97,13 @@ async fn main() -> eyre::Result<()> {
     let res = example.symbol().call().await?;
     println!("symbol = {}", res);
 
-    let res = example.balanceOf(sender).call().await?;
-    println!("Balance of target address = {}", res);
 
     println!("\n====================");
     println!("  Mint");
     println!("====================");
+
+    let res = example.balanceOf(sender).call().await?;
+    println!("Balance of target address = {}", res);
 
     println!("Minting 555555 coins to target address");
 
