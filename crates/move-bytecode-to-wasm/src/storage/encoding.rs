@@ -20,7 +20,6 @@ use crate::{
     translation::intermediate_types::{
         IntermediateType,
         heap_integers::{IU128, IU256},
-        structs::IStruct,
         vector::IVector,
     },
     wasm_builder_extensions::WasmBuilderExtension,
@@ -41,91 +40,118 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     compilation_ctx: &CompilationContext,
     struct_ptr: LocalId,
     slot_ptr: LocalId,
-    struct_: &IStruct,
+    itype: &IntermediateType,
     written_bytes_in_slot: LocalId,
 ) {
+    // Host functions
     let (storage_cache, _) = storage_cache_bytes32(module);
+
+    // Runtime functions
     let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
     let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
 
-    // If the struct has the key ability, set the object owner data to the struct id
-    // This might be used when encoding wrapped objects.
+    // Get the IStruct representation
+    let struct_ = compilation_ctx
+        .get_struct_by_intermediate_type(itype)
+        .unwrap();
+
     if struct_.has_key {
+        // If the struct has the key ability, set the object owner data to the struct id
+        // This will be used when encoding wrapped objects.
         builder
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
             .local_get(struct_ptr)
             .call(get_struct_id_fn)
             .i32_const(32)
             .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-    }
 
-    for (index, field) in struct_.fields.iter().enumerate() {
-        let field_size = field_size(field, compilation_ctx);
+        // Save the type hash in the slot data at offset 24 (last 8 bytes)
         builder
-            .local_get(written_bytes_in_slot)
-            .i32_const(field_size as i32)
-            .binop(BinaryOp::I32Add)
-            .i32_const(32)
-            .binop(BinaryOp::I32GtS)
-            .if_else(
-                None,
-                |then| {
-                    // Save previous slot (maybe not needed...)
-                    then.local_get(slot_ptr)
-                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                        .call(storage_cache);
-
-                    // Wipe the data so we can fill it with new data
-                    then.i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                        .i32_const(0)
-                        .i32_const(32)
-                        .memory_fill(compilation_ctx.memory_id);
-
-                    then.local_get(slot_ptr)
-                        .call(next_slot_fn)
-                        .local_set(slot_ptr);
-
-                    then.i32_const(field_size as i32)
-                        .local_set(written_bytes_in_slot);
-                },
-                |else_| {
-                    else_
-                        .local_get(written_bytes_in_slot)
-                        .i32_const(field_size as i32)
-                        .binop(BinaryOp::I32Add)
-                        .local_set(written_bytes_in_slot);
+            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .i64_const(itype.get_hash() as i64)
+            .store(
+                compilation_ctx.memory_id,
+                StoreKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 24,
                 },
             );
 
-        // Load field's intermediate pointer
-        builder.local_get(struct_ptr).load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: index as u32 * 4,
-            },
-        );
+        // Update written bytes counter to reflect the 8-byte type hash
+        builder.i32_const(8).local_set(written_bytes_in_slot);
+    }
 
-        // Encode the field and write it to DATA_SLOT_DATA_PTR_OFFSET
-        add_encode_intermediate_type_instructions(
-            module,
-            builder,
-            compilation_ctx,
-            slot_ptr,
-            field,
-            written_bytes_in_slot,
-            true,
-        );
-
-        // After encoding the field, update the data owner offset with the struct id in case it has been changed
-        if struct_.has_key {
+    for (index, field) in struct_.fields.iter().enumerate() {
+        // UIDs are not written in storage, except for referencing nested child structs (wrapped objects).
+        if !field.is_uid_or_named_id(compilation_ctx) {
+            let field_size = field_size(field, compilation_ctx);
             builder
-                .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-                .local_get(struct_ptr)
-                .call(get_struct_id_fn)
+                .local_get(written_bytes_in_slot)
+                .i32_const(field_size as i32)
+                .binop(BinaryOp::I32Add)
                 .i32_const(32)
-                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                .binop(BinaryOp::I32GtS)
+                .if_else(
+                    None,
+                    |then| {
+                        // Save previous slot (maybe not needed...)
+                        then.local_get(slot_ptr)
+                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                            .call(storage_cache);
+
+                        // Wipe the data so we can fill it with new data
+                        then.i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                            .i32_const(0)
+                            .i32_const(32)
+                            .memory_fill(compilation_ctx.memory_id);
+
+                        then.local_get(slot_ptr)
+                            .call(next_slot_fn)
+                            .local_set(slot_ptr);
+
+                        then.i32_const(field_size as i32)
+                            .local_set(written_bytes_in_slot);
+                    },
+                    |else_| {
+                        else_
+                            .local_get(written_bytes_in_slot)
+                            .i32_const(field_size as i32)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(written_bytes_in_slot);
+                    },
+                );
+
+            // Load field's intermediate pointer
+            builder.local_get(struct_ptr).load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: index as u32 * 4,
+                },
+            );
+
+            // Encode the field and write it to DATA_SLOT_DATA_PTR_OFFSET
+            add_encode_intermediate_type_instructions(
+                module,
+                builder,
+                compilation_ctx,
+                slot_ptr,
+                field,
+                written_bytes_in_slot,
+                true,
+            );
+
+            // After encoding the field, update the data owner offset with the struct id in case it has been changed
+            if struct_.has_key {
+                builder
+                    .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+                    .local_get(struct_ptr)
+                    .call(get_struct_id_fn)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+            }
         }
     }
 
@@ -152,30 +178,29 @@ pub fn add_read_and_decode_storage_struct_instructions(
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     slot_ptr: LocalId,
-    struct_: &IStruct,
+    uid_ptr: LocalId,
+    itype: &IntermediateType,
     read_bytes_in_slot: LocalId,
 ) -> LocalId {
+    // Host functions
     let (storage_load, _) = storage_load_bytes32(module);
+
+    // Runtime functions
     let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
+
+    // Get the IStruct representation
+    let struct_ = compilation_ctx
+        .get_struct_by_intermediate_type(itype)
+        .unwrap();
 
     // Locals
     let struct_ptr = module.locals.add(ValType::I32);
     let field_ptr = module.locals.add(ValType::I32);
-    let owner_ptr = module.locals.add(ValType::I32);
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_set(owner_ptr);
 
-    // If the struct has the key ability, prepend the owner to the struct memory representation
-    // and update DATA_STORAGE_OBJECT_OWNER_OFFSET to the UID of this struct, for later use when
-    // decoding wrapped objects.
     if struct_.has_key {
-        // If we are reading an struct from the storage, means this struct has an owner and that owner
-        // is saved in the DATA_STORAGE_OBJECT_OWNER_OFFSET piece of reserved memory. To be able to
-        // know its owner when manipulating the reconstructed structure (for example when saving the
-        // changes in storage or transfering it) before its representation in memory, we save the owner
-        // id
+        // If the struct has the key ability, prepend the owner to the struct memory representation
+        // and update DATA_STORAGE_OBJECT_OWNER_OFFSET to the UID of this struct, for later use when
+        // decoding wrapped objects.
         builder
             .i32_const(32)
             .call(compilation_ctx.allocator)
@@ -183,26 +208,46 @@ pub fn add_read_and_decode_storage_struct_instructions(
             .i32_const(32)
             .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-        // Load the first slot, where the UID of the current struct is stored
-        builder
-            .local_get(slot_ptr)
-            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-            .call(storage_load);
-
         // Update DATA_STORAGE_OBJECT_OWNER_OFFSET to the UID of this struct.
         // When decoding wrapped objects, this memory will be read and the UID of this struct will be used
         // as the owner of the wrapped object.
         builder
             .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .local_get(uid_ptr)
             .i32_const(32)
             .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+    }
 
+    // If the struct has key, we need to check if the type hash is the same as the one in the storage
+    if struct_.has_key {
+        // Load the first slot data to inspect the type hash
         builder
-            .local_get(owner_ptr)
+            .local_get(slot_ptr)
             .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-            .i32_const(32)
-            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+            .call(storage_load);
+
+        // Compare the type hash with the retrieved one from the storage
+        builder
+            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I64 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 24,
+                },
+            )
+            .i64_const(itype.get_hash() as i64)
+            .binop(BinaryOp::I64Eq)
+            .if_else(
+                None,
+                |then| {
+                    then.i32_const(8).local_set(read_bytes_in_slot);
+                },
+                |else_| {
+                    else_.unreachable();
+                },
+            );
     }
 
     // Allocate memory for the struct
@@ -212,62 +257,11 @@ pub fn add_read_and_decode_storage_struct_instructions(
         .local_set(struct_ptr);
 
     for (index, field) in struct_.fields.iter().enumerate() {
-        let field_size = field_size(field, compilation_ctx) as i32;
-        builder
-            .local_get(read_bytes_in_slot)
-            .i32_const(field_size)
-            .binop(BinaryOp::I32Add)
-            .i32_const(32)
-            .binop(BinaryOp::I32GtU)
-            .if_else(
-                None,
-                |then| {
-                    then.local_get(slot_ptr)
-                        .call(next_slot_fn)
-                        .local_set(slot_ptr);
-
-                    // Load the slot data
-                    then.local_get(slot_ptr)
-                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                        .call(storage_load);
-
-                    then.i32_const(field_size).local_set(read_bytes_in_slot);
-                },
-                |else_| {
-                    else_
-                        .local_get(read_bytes_in_slot)
-                        .i32_const(field_size)
-                        .binop(BinaryOp::I32Add)
-                        .local_set(read_bytes_in_slot);
-                },
-            );
-
-        // Decode the field according to its type
-        add_decode_intermediate_type_instructions(
-            module,
-            builder,
-            compilation_ctx,
-            field_ptr,
-            slot_ptr,
-            field,
-            read_bytes_in_slot,
-        );
-
-        // After decoding the field, write the owner to the data owner memory again, as it might have changed
-        if struct_.has_key {
-            builder
-                .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-                .local_get(owner_ptr)
-                .i32_const(32)
-                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-        }
-
         if field.is_uid_or_named_id(compilation_ctx) {
-            // Save the struct pointer in the reserved space of the UID
+            // Save the struct pointer before the UID
             builder
-                .local_get(field_ptr)
                 .i32_const(4)
-                .binop(BinaryOp::I32Sub)
+                .call(compilation_ctx.allocator)
                 .local_get(struct_ptr)
                 .store(
                     compilation_ctx.memory_id,
@@ -277,8 +271,92 @@ pub fn add_read_and_decode_storage_struct_instructions(
                         offset: 0,
                     },
                 );
-        }
 
+            let uid_ptr_wrapper = module.locals.add(ValType::I32);
+
+            // Wrap the uid bytes
+            builder
+                .i32_const(4)
+                .call(compilation_ctx.allocator)
+                .local_set(field_ptr)
+                .i32_const(4)
+                .call(compilation_ctx.allocator)
+                .local_set(uid_ptr_wrapper);
+
+            // Point the id_field_ptr to the data
+            builder.local_get(uid_ptr_wrapper).local_get(uid_ptr).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+
+            // Write the data_ptr with the address of the ID struct
+            builder
+                .local_get(field_ptr)
+                .local_get(uid_ptr_wrapper)
+                .store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+        } else {
+            let field_size = field_size(field, compilation_ctx) as i32;
+            builder
+                .local_get(read_bytes_in_slot)
+                .i32_const(field_size)
+                .binop(BinaryOp::I32Add)
+                .i32_const(32)
+                .binop(BinaryOp::I32GtU)
+                .if_else(
+                    None,
+                    |then| {
+                        then.local_get(slot_ptr)
+                            .call(next_slot_fn)
+                            .local_set(slot_ptr);
+
+                        // Load the slot data
+                        then.local_get(slot_ptr)
+                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                            .call(storage_load);
+
+                        then.i32_const(field_size).local_set(read_bytes_in_slot);
+                    },
+                    |else_| {
+                        else_
+                            .local_get(read_bytes_in_slot)
+                            .i32_const(field_size)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(read_bytes_in_slot);
+                    },
+                );
+
+            // Decode the field according to its type
+            add_decode_intermediate_type_instructions(
+                module,
+                builder,
+                compilation_ctx,
+                field_ptr,
+                slot_ptr,
+                uid_ptr,
+                field,
+                read_bytes_in_slot,
+            );
+
+            // After decoding the field, write the owner to the data owner memory again, as it might have changed
+            if struct_.has_key {
+                builder
+                    .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+                    .local_get(uid_ptr)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+            }
+        }
         // Save the ptr value to the struct
         builder.local_get(struct_ptr).local_get(field_ptr).store(
             compilation_ctx.memory_id,
@@ -631,6 +709,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
     compilation_ctx: &CompilationContext,
     data_ptr: LocalId,
     slot_ptr: LocalId,
+    parent_struct_uid_ptr: LocalId,
     inner: &IntermediateType,
 ) {
     // Host functions
@@ -693,7 +772,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
         None,
         |then| {
             // If the vector is empty (len == 0) we reserve 8 bytes of empty data and skip the rest of the instructions.
-            // This is neeeded because the caller (add_read_and_decode_storage_struct_instructions) is going to save the field pointer in the struct data.
+            // This is needed because the caller (add_read_and_decode_storage_struct_instructions) is going to save the field pointer in the struct data.
             // If we dont reserve this memory, we can end up reading garbage data and messing up the decoding.
             then.i32_const(8)
                 .call(compilation_ctx.allocator)
@@ -777,6 +856,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
                         compilation_ctx,
                         elem_data_ptr,
                         elem_slot_ptr,
+                        parent_struct_uid_ptr,
                         inner,
                         read_bytes_in_slot,
                     );
@@ -1000,48 +1080,6 @@ pub fn add_encode_intermediate_type_instructions(
 
             builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         }
-        itype if itype.is_uid_or_named_id(compilation_ctx) => {
-            // The UID and NamedId structs has the following form
-            //
-            // [UID | NamedId] { id: ID { bytes: <bytes> } }
-            //
-            // At this point we have in stack a pointer to the field we are processing. The
-            // field's value is a pointer to the ID struct.
-            //
-            // The first load instruction puts in stack the pointer to the ID struct
-            // The second load instruction loads the ID's bytes field pointer
-            //
-            // At the end of the load chain we point to the 32 bytes holding the data
-
-            let tmp = module.locals.add(ValType::I32);
-            builder
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .local_tee(tmp)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
-                .local_set(val_32);
-
-            // Load the memory address
-            builder
-                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                .local_get(val_32)
-                .i32_const(32);
-
-            builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-        }
         IntermediateType::IStruct {
             module_id, index, ..
         }
@@ -1120,7 +1158,7 @@ pub fn add_encode_intermediate_type_instructions(
                     compilation_ctx,
                     child_struct_ptr,
                     child_struct_slot_ptr,
-                    &child_struct,
+                    itype,
                     written_bytes_in_slot,
                 );
 
@@ -1153,7 +1191,7 @@ pub fn add_encode_intermediate_type_instructions(
                     compilation_ctx,
                     child_struct_ptr,
                     slot_ptr,
-                    &child_struct,
+                    itype,
                     written_bytes_in_slot,
                 );
             }
@@ -1194,6 +1232,7 @@ pub fn add_decode_intermediate_type_instructions(
     compilation_ctx: &CompilationContext,
     data_ptr: LocalId,
     slot_ptr: LocalId,
+    parent_struct_uid_ptr: LocalId,
     itype: &IntermediateType,
     read_bytes_in_slot: LocalId,
 ) {
@@ -1353,71 +1392,6 @@ pub fn add_decode_intermediate_type_instructions(
             // Copy the chunk of memory
             builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         }
-        itype if itype.is_uid_or_named_id(compilation_ctx) => {
-            // Reserve 4 bytes to fill with the mem address of the struct that wraps this id.
-            // This will be filled outside this function where the struct pointer is available
-            builder.i32_const(4).call(compilation_ctx.allocator).drop();
-
-            // Here we need to reconstruct the UID struct. To do that we first allocate 4 bytes
-            // that will contain the pointer to the UID struct data
-            //
-            // After that we need to create the ID struct. So we allocate 4 bytes for the first
-            // field's pointer, and 32 bytes that will hold the actual data.
-            let id_struct_ptr = module.locals.add(ValType::I32);
-            let id_field_ptr = module.locals.add(ValType::I32);
-
-            // Recreate the ID struct
-
-            // Create a pointer for the value. This pointer will point to the struct ID
-            builder
-                .i32_const(4)
-                .call(compilation_ctx.allocator)
-                .local_set(data_ptr);
-
-            // First, 4 bytes for the pointer that points to the ID
-            builder
-                .i32_const(4)
-                .call(compilation_ctx.allocator)
-                .local_set(id_struct_ptr);
-
-            // 32 bytes to save the actual id
-            builder
-                .i32_const(32)
-                .call(compilation_ctx.allocator)
-                .local_tee(id_field_ptr);
-
-            // Source address (plus offset)
-            builder.i32_const(DATA_SLOT_DATA_PTR_OFFSET);
-
-            // Number of bytes to copy
-            builder.i32_const(32);
-
-            // Copy the chunk of memory
-            builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
-            // Point the id_field_ptr to the data
-            builder
-                .local_get(id_struct_ptr)
-                .local_get(id_field_ptr)
-                .store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-
-            // Write the data_ptr with the address of the ID struct
-            builder.local_get(data_ptr).local_get(id_struct_ptr).store(
-                compilation_ctx.memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-        }
         IntermediateType::IStruct {
             module_id, index, ..
         }
@@ -1460,23 +1434,23 @@ pub fn add_decode_intermediate_type_instructions(
                 // This UID, saved during the encoding process in the parent struct, links the child struct to its parent.
 
                 // Allocate memory for the child struct UID (32 bytes)
-                let child_struct_id_ptr = module.locals.add(ValType::I32);
+                let child_struct_uid_ptr = module.locals.add(ValType::I32);
                 builder
                     .i32_const(32)
                     .call(compilation_ctx.allocator)
-                    .local_set(child_struct_id_ptr);
+                    .local_set(child_struct_uid_ptr);
 
                 // Load the child struct UID from storage
                 builder
                     .local_get(slot_ptr)
-                    .local_get(child_struct_id_ptr)
+                    .local_get(child_struct_uid_ptr)
                     .call(storage_load);
 
                 // Calculate the child struct's storage slot
                 // child_struct_slot = keccak256(child_struct_id || keccak256(parent_struct_id || 0))
                 builder
-                    .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
-                    .local_get(child_struct_id_ptr)
+                    .local_get(parent_struct_uid_ptr)
+                    .local_get(child_struct_uid_ptr)
                     .call(write_object_slot_fn);
 
                 // Allocate memory for the child struct slot and copy the calculated
@@ -1507,7 +1481,8 @@ pub fn add_decode_intermediate_type_instructions(
                     builder,
                     compilation_ctx,
                     child_struct_slot_ptr,
-                    &child_struct,
+                    child_struct_uid_ptr,
+                    itype,
                     read_bytes_in_slot,
                 );
 
@@ -1531,7 +1506,8 @@ pub fn add_decode_intermediate_type_instructions(
                     builder,
                     compilation_ctx,
                     slot_ptr,
-                    &child_struct,
+                    parent_struct_uid_ptr,
+                    itype,
                     read_bytes_in_slot,
                 );
 
@@ -1546,6 +1522,7 @@ pub fn add_decode_intermediate_type_instructions(
                 compilation_ctx,
                 data_ptr,
                 slot_ptr,
+                parent_struct_uid_ptr,
                 inner_,
             );
         }
