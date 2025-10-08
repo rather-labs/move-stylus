@@ -5385,155 +5385,155 @@ mod dynamic_storage_fields {
             bytes: b"test_key_2".to_ascii_lowercase(),
         };
 
-        // let field_name_3 = address!("0x1234567890abcdef1234567890abcdef12345678");
-        // let field_name_4 = address!("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
+        let field_name_3 = address!("0x1234567890abcdef1234567890abcdef12345678");
+        let field_name_4 = address!("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
 
-        // // Check existence of dynamic fields before attaching them
-        // let call_data = dynamicFieldExistsCall::new((object_id, field_name_1.clone())).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(false.abi_encode(), result_data);
+        // Check existence of dynamic fields before attaching them
+        let call_data = dynamicFieldExistsCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
 
-        // let call_data = dynamicFieldExistsCall::new((object_id, field_name_2.clone())).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(false.abi_encode(), result_data);
+        let call_data = dynamicFieldExistsCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
 
-        // let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_3)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(false.abi_encode(), result_data);
+        let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_3)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
 
-        // let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_4)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(false.abi_encode(), result_data);
+        let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_4)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
 
-        // // Attach a dynamic fields
-        // let call_data =
-        //     attachDynamicFieldCall::new((object_id, field_name_1.clone(), 42)).abi_encode();
-        // let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
+        // Attach a dynamic fields
+        let call_data =
+            attachDynamicFieldCall::new((object_id, field_name_1.clone(), 42)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
 
-        // let call_data =
-        //     attachDynamicFieldCall::new((object_id, field_name_2.clone(), 84)).abi_encode();
-        // let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
+        let call_data =
+            attachDynamicFieldCall::new((object_id, field_name_2.clone(), 84)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
 
-        // let call_data =
-        //     attachDynamicFieldAddrU256Call::new((object_id, field_name_3, U256::from(u128::MAX)))
-        //         .abi_encode();
-        // let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
+        let call_data =
+            attachDynamicFieldAddrU256Call::new((object_id, field_name_3, U256::from(u128::MAX)))
+                .abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
 
-        // let call_data =
-        //     attachDynamicFieldAddrU256Call::new((object_id, field_name_4, U256::MAX)).abi_encode();
-        // let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
+        let call_data =
+            attachDynamicFieldAddrU256Call::new((object_id, field_name_4, U256::MAX)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
 
-        // // Read the dynamic fields
-        // let call_data = readDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(42u64.abi_encode(), result_data);
+        // Read the dynamic fields
+        let call_data = readDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(42u64.abi_encode(), result_data);
 
-        // let call_data = readDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(84u64.abi_encode(), result_data);
+        let call_data = readDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(84u64.abi_encode(), result_data);
 
-        // let call_data = readDynamicFieldAddrU256Call::new((object_id, field_name_3)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(U256::from(u128::MAX).abi_encode(), result_data);
+        let call_data = readDynamicFieldAddrU256Call::new((object_id, field_name_3)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(U256::from(u128::MAX).abi_encode(), result_data);
 
-        // let call_data = readDynamicFieldAddrU256Call::new((object_id, field_name_4)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(U256::MAX.abi_encode(), result_data);
+        let call_data = readDynamicFieldAddrU256Call::new((object_id, field_name_4)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(U256::MAX.abi_encode(), result_data);
 
-        // // Check existence of dynamic fields
-        // let call_data = dynamicFieldExistsCall::new((object_id, field_name_1.clone())).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(true.abi_encode(), result_data);
+        // Check existence of dynamic fields
+        let call_data = dynamicFieldExistsCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
 
-        // let call_data = dynamicFieldExistsCall::new((object_id, field_name_2.clone())).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(true.abi_encode(), result_data);
+        let call_data = dynamicFieldExistsCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
 
-        // let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_3)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(true.abi_encode(), result_data);
+        let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_3)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
 
-        // let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_4)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(true.abi_encode(), result_data);
+        let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_4)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
 
-        // // Mutatate the values
-        // let call_data = mutateDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
-        // let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
+        // Mutatate the values
+        let call_data = mutateDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
 
-        // let call_data = mutateDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
-        // let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
+        let call_data = mutateDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
 
-        // // Read modified dynamic fields
-        // let call_data = readDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(43u64.abi_encode(), result_data);
+        // Read modified dynamic fields
+        let call_data = readDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(43u64.abi_encode(), result_data);
 
-        // let call_data = readDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(85u64.abi_encode(), result_data);
+        let call_data = readDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(85u64.abi_encode(), result_data);
 
-        // // Remove fields
-        // let call_data = removeDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(43u64.abi_encode(), result_data);
+        // Remove fields
+        let call_data = removeDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(43u64.abi_encode(), result_data);
 
-        // let call_data = removeDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(85u64.abi_encode(), result_data);
+        let call_data = removeDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(85u64.abi_encode(), result_data);
 
-        // let call_data = removeDynamicFieldAddrU256Call::new((object_id, field_name_3)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(U256::from(u128::MAX).abi_encode(), result_data);
+        let call_data = removeDynamicFieldAddrU256Call::new((object_id, field_name_3)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(U256::from(u128::MAX).abi_encode(), result_data);
 
-        // let call_data = removeDynamicFieldAddrU256Call::new((object_id, field_name_4)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(U256::MAX.abi_encode(), result_data);
+        let call_data = removeDynamicFieldAddrU256Call::new((object_id, field_name_4)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(U256::MAX.abi_encode(), result_data);
 
-        // // Check existence of dynamic fields
-        // let call_data = dynamicFieldExistsCall::new((object_id, field_name_1.clone())).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(false.abi_encode(), result_data);
+        // Check existence of dynamic fields
+        let call_data = dynamicFieldExistsCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
 
-        // let call_data = dynamicFieldExistsCall::new((object_id, field_name_2.clone())).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(false.abi_encode(), result_data);
+        let call_data = dynamicFieldExistsCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
 
-        // let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_3)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(false.abi_encode(), result_data);
+        let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_3)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
 
-        // let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_4)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(false.abi_encode(), result_data);
+        let call_data = dynamicFieldExistsAddrU256Call::new((object_id, field_name_4)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
     }
 }
 
