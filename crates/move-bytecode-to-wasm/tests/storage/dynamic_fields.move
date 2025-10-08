@@ -37,6 +37,15 @@ public fun mutate_dynamic_field(foo: &mut Foo, name: String) {
     *val = *val + 1;
 }
 
+// This test makes sures that two different fields with the same types for key and value get changed
+public fun mutate_dynamic_field_two(foo: &mut Foo, name: String, name_2: String) {
+    let val = dynamic_field::borrow_mut(&mut foo.id, name);
+    *val = *val + 1;
+
+    let val_2 = dynamic_field::borrow_mut(&mut foo.id, name_2);
+    *val_2 = *val_2 + 1;
+}
+
 public fun remove_dynamic_field(foo: &mut Foo, name: String): u64 {
     let value = dynamic_field::remove(&mut foo.id, name);
     value

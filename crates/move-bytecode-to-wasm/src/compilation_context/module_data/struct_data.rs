@@ -52,6 +52,15 @@ impl StructData {
             .ok_or(CompilationContextError::StructNotFound(index))
     }
 
+    pub fn get_by_identifier(&self, identifier: &str) -> Result<&IStruct> {
+        self.structs
+            .iter()
+            .find(|s| s.identifier == identifier)
+            .ok_or(CompilationContextError::StructByIdentifierNotFound(
+                identifier.to_owned(),
+            ))
+    }
+
     pub fn get_by_struct_definition_idx(
         &self,
         struct_index: &StructDefinitionIndex,

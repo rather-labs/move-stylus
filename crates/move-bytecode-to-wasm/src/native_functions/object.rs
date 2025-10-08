@@ -1,8 +1,8 @@
 use super::NativeFunction;
 use crate::{
     CompilationContext,
+    compilation_context::ModuleId,
     data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_ZERO_OFFSET},
-    get_generic_function_name,
     hostio::host_functions::{
         block_number, block_timestamp, emit_log, native_keccak256, storage_cache_bytes32,
         storage_flush_cache, storage_load_bytes32,
@@ -22,8 +22,13 @@ pub fn add_compute_named_id_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
+    module_id: &ModuleId,
 ) -> FunctionId {
-    let name = get_generic_function_name(NativeFunction::NATIVE_COMPUTE_NAMED_ID, &[itype]);
+    let name = NativeFunction::get_generic_function_name(
+        NativeFunction::NATIVE_COMPUTE_NAMED_ID,
+        &[itype],
+        module_id,
+    );
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -66,8 +71,13 @@ pub fn add_compute_named_id_fn(
 /// Takes a reference of a NamedId<T> and returns it casted as a UID
 ///
 /// This function is used internally by the stylus framework
-pub fn add_as_uid_fn(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
-    if let Some(function) = module.funcs.by_name(NativeFunction::NATIVE_AS_UID) {
+pub fn add_as_uid_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    module_id: &ModuleId,
+) -> FunctionId {
+    let name = NativeFunction::get_function_name(NativeFunction::NATIVE_AS_UID, module_id);
+    if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
 
@@ -75,9 +85,7 @@ pub fn add_as_uid_fn(module: &mut Module, compilation_ctx: &CompilationContext) 
 
     let named_id_ptr = module.locals.add(ValType::I32);
 
-    let mut builder = function
-        .name(NativeFunction::NATIVE_AS_UID.to_owned())
-        .func_body();
+    let mut builder = function.name(name).func_body();
 
     let result = module.locals.add(ValType::I32);
     builder
@@ -102,7 +110,13 @@ pub fn add_as_uid_fn(module: &mut Module, compilation_ctx: &CompilationContext) 
 pub fn add_native_fresh_id_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    module_id: &ModuleId,
 ) -> FunctionId {
+    let name = NativeFunction::get_function_name(NativeFunction::NATIVE_FRESH_ID, module_id);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    };
+
     let (native_keccak, _) = native_keccak256(module);
     let (block_number, _) = block_number(module);
     let (block_timestamp, _) = block_timestamp(module);
@@ -118,9 +132,7 @@ pub fn add_native_fresh_id_fn(
     let counter_key_ptr = module.locals.add(ValType::I32); // Pointer for the storage key
     let counter_value_ptr = module.locals.add(ValType::I32); // Pointer to receive value read from storage
 
-    let mut builder = function
-        .name(NativeFunction::NATIVE_FRESH_ID.to_owned())
-        .func_body();
+    let mut builder = function.name(name).func_body();
 
     // Counter key
     builder

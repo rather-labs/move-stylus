@@ -224,3 +224,4 @@ public fun echo_variant(x:  TestEnum): TestEnum {
 public fun test_values(test: &Test): (u8, u8) {
     test.get_test_values()
 }
+
