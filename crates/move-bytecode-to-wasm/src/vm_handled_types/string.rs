@@ -3,22 +3,22 @@ use crate::{
     CompilationContext,
     compilation_context::{
         ModuleId,
-        reserved_modules::{SF_MODULE_NAME_TX_CONTEXT, STYLUS_FRAMEWORK_ADDRESS},
+        reserved_modules::{STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_ASCII},
     },
 };
 use walrus::{InstrSeqBuilder, Module};
 
-pub struct TxContext;
+pub struct String_;
 
-impl VmHandledType for TxContext {
-    const IDENTIFIER: &str = "TxContext";
+impl VmHandledType for String_ {
+    const IDENTIFIER: &str = "String";
 
     fn inject(
-        block: &mut InstrSeqBuilder,
+        _block: &mut InstrSeqBuilder,
         _module: &mut Module,
-        compilation_ctx: &CompilationContext,
+        _compilation_ctx: &CompilationContext,
     ) {
-        block.i32_const(4).call(compilation_ctx.allocator);
+        // String are not injected, they are created by the user
     }
 
     fn is_vm_type(module_id: &ModuleId, index: u16, compilation_ctx: &CompilationContext) -> bool {
@@ -28,10 +28,10 @@ impl VmHandledType for TxContext {
             .identifier;
 
         if identifier == Self::IDENTIFIER {
-            if module_id.address != STYLUS_FRAMEWORK_ADDRESS
-                || module_id.module_name != SF_MODULE_NAME_TX_CONTEXT
+            if module_id.address != STANDARD_LIB_ADDRESS
+                || module_id.module_name != STDLIB_MODULE_NAME_ASCII
             {
-                panic!("invalid TxContext found, only the one from the stylus framework is valid");
+                panic!("invalid String found, only the one from the standard lib is valid");
             }
             return true;
         }
