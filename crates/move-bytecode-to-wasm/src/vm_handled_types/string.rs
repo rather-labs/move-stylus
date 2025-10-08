@@ -3,7 +3,9 @@ use crate::{
     CompilationContext,
     compilation_context::{
         ModuleId,
-        reserved_modules::{STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_ASCII},
+        reserved_modules::{
+            STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_ASCII, STDLIB_MODULE_NAME_STRING,
+        },
     },
 };
 use walrus::{InstrSeqBuilder, Module};
@@ -29,7 +31,8 @@ impl VmHandledType for String_ {
 
         if identifier == Self::IDENTIFIER {
             if module_id.address != STANDARD_LIB_ADDRESS
-                || module_id.module_name != STDLIB_MODULE_NAME_ASCII
+                || (module_id.module_name != STDLIB_MODULE_NAME_ASCII
+                    && module_id.module_name != STDLIB_MODULE_NAME_STRING)
             {
                 panic!("invalid String found, only the one from the standard lib is valid");
             }

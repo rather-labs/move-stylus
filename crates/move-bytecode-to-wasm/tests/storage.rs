@@ -6056,7 +6056,15 @@ mod erc20 {
         assert_eq!(0, result);
         assert_eq!(18.abi_encode(), result_data);
 
-        // TODO: add name and symbol when processing strings correctly
+        let call_data = nameCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!("Test Coin".abi_encode(), result_data);
+
+        let call_data = symbolCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!("TST".abi_encode(), result_data);
 
         // Mint new coins
         let call_data = totalSupplyCall::new(()).abi_encode();

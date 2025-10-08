@@ -20,3 +20,4 @@ pub const SF_MODULE_NAME_TABLE: &str = "table";
 
 // Module names for standard lib
 pub const STDLIB_MODULE_NAME_ASCII: &str = "ascii";
+pub const STDLIB_MODULE_NAME_STRING: &str = "string";
