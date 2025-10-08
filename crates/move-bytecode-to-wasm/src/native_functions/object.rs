@@ -296,16 +296,19 @@ pub fn add_delete_storage_struct_instructions(
 
     // Iterate over the fields of the struct and delete them
     for field in struct_.fields.iter() {
-        let field_size = field_size(field, compilation_ctx) as i32;
-        add_delete_field_instructions(
-            module,
-            builder,
-            compilation_ctx,
-            slot_ptr,
-            field,
-            field_size,
-            used_bytes_in_slot,
-        );
+        // If the field is a UID or NamedId, do nothing as UIDs are not stored in storage
+        if !field.is_uid_or_named_id(compilation_ctx) {
+            let field_size = field_size(field, compilation_ctx) as i32;
+            add_delete_field_instructions(
+                module,
+                builder,
+                compilation_ctx,
+                slot_ptr,
+                field,
+                field_size,
+                used_bytes_in_slot,
+            );
+        }
     }
 
     // Wipe out the last slot before exiting
