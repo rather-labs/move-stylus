@@ -1101,7 +1101,7 @@ pub fn add_commit_changes_to_storage_fn(
                     .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                     .i32_const(32)
                     .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-                
+
                 // Save struct changes
                 block
                     .global_get(*dynamic_field_ptr)

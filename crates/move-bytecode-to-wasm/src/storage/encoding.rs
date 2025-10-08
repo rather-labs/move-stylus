@@ -1242,7 +1242,7 @@ pub fn add_decode_intermediate_type_instructions(
     parent_struct_uid_ptr: LocalId,
     itype: &IntermediateType,
     read_bytes_in_slot: LocalId,
-) { 
+) {
     // Stack and storage size of the type
     let stack_size = itype.stack_data_size() as i32;
     let storage_size = field_size(itype, compilation_ctx) as i32;
