@@ -2,6 +2,10 @@ use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
     CompilationContext,
+    compilation_context::{
+        ModuleId,
+        reserved_modules::{SF_MODULE_NAME_OBJECT, STYLUS_FRAMEWORK_ADDRESS},
+    },
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
@@ -316,6 +320,10 @@ fn load_struct_storage_id(
                 NativeFunction::NATIVE_COMPUTE_NAMED_ID,
                 module,
                 compilation_ctx,
+                &ModuleId {
+                    address: STYLUS_FRAMEWORK_ADDRESS,
+                    module_name: SF_MODULE_NAME_OBJECT.to_owned(),
+                },
                 types,
             );
 
@@ -353,8 +361,18 @@ fn add_unpack_from_storage_instructions(
     let read_struct_from_storage_fn =
         RuntimeFunction::DecodeAndReadFromStorage.get_generic(module, compilation_ctx, &[itype]);
 
+    // Copy the slot number into a local to avoid overwriting it later
+    let slot_ptr = module.locals.add(ValType::I32);
     function_builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_tee(slot_ptr)
         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+    function_builder
+        .local_get(slot_ptr)
         .call(read_struct_from_storage_fn);
 }
 

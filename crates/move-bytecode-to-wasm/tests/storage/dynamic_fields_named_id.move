@@ -1,22 +1,24 @@
-module test::dynamic_fields;
+module test::dynamic_fields_named_id;
 
 use stylus::object as object;
 use stylus::tx_context::TxContext;
 use stylus::transfer as transfer;
-use stylus::dynamic_field as dynamic_field;
+use stylus::dynamic_field_named_id as dynamic_field;
 use std::ascii::String;
 
+public struct FOO_ has key {}
+
 public struct Foo has key {
-    id: object::UID,
+    id: object::NamedId<FOO_>,
 }
 
 public fun create_foo(ctx: &mut TxContext) {
-    let foo = Foo { id: object::new(ctx) };
+    let foo = Foo { id: object::new_named_id<FOO_>() };
     transfer::share_object(foo);
 }
 
 public fun create_foo_owned(ctx: &mut TxContext) {
-    let foo = Foo { id: object::new(ctx) };
+    let foo = Foo { id: object::new_named_id<FOO_>() };
     transfer::transfer(foo, ctx.sender());
 }
 

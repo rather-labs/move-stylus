@@ -79,6 +79,7 @@ impl IRef {
                         offset: 0,
                     },
                 );
+
                 let value_local = module.locals.add(match inner.stack_data_size() {
                     4 => ValType::I32,
                     8 => ValType::I64,

@@ -17,10 +17,9 @@ use crate::{
     data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET},
     error_encoding::build_error_message,
     generics::{instantiate_vec_type_parameters, replace_type_parameters, type_contains_generics},
-    hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
-    vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
+    vm_handled_types::{self, VmHandledType, named_id::NamedId, uid::Uid},
     wasm_builder_extensions::WasmBuilderExtension,
 };
 use anyhow::Result;
@@ -43,12 +42,14 @@ use relooper::BranchMode;
 use std::collections::{HashMap, HashSet};
 use table::{FunctionId, FunctionTable, TableEntry};
 use types_stack::TypesStack;
-use walrus::TableId;
 use walrus::{
     FunctionBuilder, FunctionId as WasmFunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, StoreKind, UnaryOp},
+    ir::{
+        BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, StoreKind, UnaryOp,
+        Value,
+    },
 };
-
+use walrus::{GlobalId, TableId};
 /// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs.
 /// It is used to translate the branching instructions: Branch, BrFalse, BrTrue
 struct BranchTargets {
@@ -101,6 +102,7 @@ struct TranslateFlowContext<'a> {
     function_locals: &'a Vec<LocalId>,
     uid_locals: &'a mut HashMap<u8, StorageIdParentInformation>,
     branch_targets: &'a mut BranchTargets,
+    dynamic_fields_global_variables: &'a mut Vec<(GlobalId, IntermediateType)>,
 }
 
 /// Translates a move function to WASM
@@ -115,6 +117,7 @@ pub fn translate_function(
     function_table: &mut FunctionTable,
     function_information: &MappedFunction,
     move_bytecode: &CodeUnit,
+    dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
 ) -> Result<(WasmFunctionId, HashSet<FunctionId>)> {
     anyhow::ensure!(
         move_bytecode.jump_tables.is_empty(),
@@ -161,6 +164,7 @@ pub fn translate_function(
         uid_locals: &mut uid_locals,
         types_stack: &mut types_stack,
         branch_targets: &mut branch_targets,
+        dynamic_fields_global_variables,
     };
 
     translate_flow(
@@ -223,6 +227,7 @@ fn translate_flow(
                         ctx.uid_locals,
                         branches,
                         ctx.branch_targets,
+                        ctx.dynamic_fields_global_variables,
                     )
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
@@ -362,6 +367,7 @@ fn translate_instruction(
     uid_locals: &mut HashMap<u8, StorageIdParentInformation>,
     branches: &HashMap<u16, BranchMode>,
     branch_targets: &BranchTargets,
+    dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
 ) -> Result<Vec<FunctionId>, TranslationError> {
     let mut functions_calls_to_link = Vec::new();
 
@@ -622,10 +628,45 @@ fn translate_instruction(
                         &function_id.identifier,
                         module,
                         compilation_ctx,
+                        &function_id.module_id,
                         type_instantiations,
                     );
 
                     builder.call(native_function_id);
+
+                    // Save the dynamic field in a global variable so we can save the changes in
+                    // storage later
+                    if vm_handled_types::dynamic_fields::Field::is_borrow_child_object_mut_fn(
+                        &function_id.module_id,
+                        &function_id.identifier,
+                    ) {
+                        let global_struct_ptr = module.globals.add_local(
+                            ValType::I32,
+                            true,
+                            false,
+                            walrus::ConstExpr::Value(Value::I32(-1)),
+                        );
+                        let field_ref_ptr = module.locals.add(ValType::I32);
+
+                        // Set the global that with the boroowed struct pointer
+                        builder
+                            .local_tee(field_ref_ptr)
+                            .load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            )
+                            .global_set(global_struct_ptr);
+
+                        dynamic_fields_global_variables
+                            .push((global_struct_ptr, type_instantiations[0].clone()));
+
+                        // Leave in the stack the field reference pointer
+                        builder.local_get(field_ref_ptr);
+                    }
                 } else {
                     let table_id = function_table.get_table_id();
                     let f_entry =
@@ -750,8 +791,12 @@ fn translate_instruction(
                 // and linking
                 // If the function IS native, we link it and call it directly
                 else if function_information.is_native {
-                    let native_function_id =
-                        NativeFunction::get(&function_id.identifier, module, compilation_ctx);
+                    let native_function_id = NativeFunction::get(
+                        &function_id.identifier,
+                        module,
+                        compilation_ctx,
+                        &function_information.function_id.module_id,
+                    );
                     builder.call(native_function_id);
                 } else {
                     let table_id = function_table.get_table_id();
@@ -1522,17 +1567,38 @@ fn translate_instruction(
                                     let save_in_slot_fn = RuntimeFunction::EncodeAndSaveInStorage
                                         .get_generic(module, compilation_ctx, &[itype]);
 
-                                    // Load the struct memory representation to pass it to the save
-                                    // function
+                                    // Copy the slot number to a local to avoid overwriting it later
+                                    let slot_ptr = module.locals.add(ValType::I32);
+                                    else_
+                                        .i32_const(32)
+                                        .call(compilation_ctx.allocator)
+                                        .local_tee(slot_ptr)
+                                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                                        .i32_const(32)
+                                        .memory_copy(
+                                            compilation_ctx.memory_id,
+                                            compilation_ctx.memory_id,
+                                        );
+
+                                    // Call the function to delete any recently tto objects within the struct
+                                    // This needed when pushing objects with the key ability into a vector field of a struct
+                                    let check_and_delete_struct_tto_fields_fn =
+                                        RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic(
+                                            module,
+                                            compilation_ctx,
+                                            &[itype],
+                                        );
                                     else_
                                         .local_get(struct_ptr)
-                                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                                        .call(check_and_delete_struct_tto_fields_fn);
+
+                                    // Save the struct in the slot
+                                    else_
+                                        .local_get(struct_ptr)
+                                        .local_get(slot_ptr)
                                         .call(save_in_slot_fn);
                                 },
                             );
-
-                            let (storage_flush_cache, _) = storage_flush_cache(module);
-                            builder.i32_const(1).call(storage_flush_cache);
                         }
                     }
                 }

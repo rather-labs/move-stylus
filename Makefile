@@ -4,6 +4,11 @@ test-move-bytecode-to-wasm:
 disassemble:
 	cargo run -p move-cli -- disassemble --name hello_world -p ./example --Xdebug
 
+disassemble-module:
+	cargo run -p move-cli -- disassemble --name $(filter-out $@,$(MAKECMDGOALS)) -p ./example --Xdebug
+%:
+	@:
+
 check-example:
 	cargo stylus check --wasm-file=./example/build/wasm/hello_world.wasm --endpoint http://127.0.0.1:8547
 

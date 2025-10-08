@@ -5,7 +5,7 @@ use crate::data::{
     DATA_STORAGE_OBJECT_OWNER_OFFSET,
 };
 use crate::get_generic_function_name;
-use crate::hostio::host_functions::{self, storage_load_bytes32, tx_origin};
+use crate::hostio::host_functions::{self, storage_flush_cache, storage_load_bytes32, tx_origin};
 use crate::native_functions::object::add_delete_storage_struct_instructions;
 use crate::storage::encoding::{
     add_encode_and_save_into_storage_struct_instructions,
@@ -15,6 +15,7 @@ use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::heap_integers::IU256;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, data::DATA_U256_ONE_OFFSET};
+use walrus::GlobalId;
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
@@ -399,8 +400,8 @@ pub fn derive_mapping_slot(
 ///
 /// Parameters:
 /// - `array_slot_ptr`: A pointer to the u256 slot `p`, which is the header slot of the array.
-/// - `elem_index_ptr`: A pointer to the u32 value representing the element's index in the array (little-endian).
-/// - `elem_size_ptr`: A pointer to the u32 value representing the size of each element in bytes (little-endian).
+/// - `elem_index`: u32 value representing the element's index in the array (little-endian).
+/// - `elem_size`: u32 value representing the size of each element in bytes (little-endian).
 ///
 /// The computed u256 slot value for the element, in big-endian format, is stored at `derived_elem_slot_ptr`.
 pub fn derive_dyn_array_slot(
@@ -419,8 +420,8 @@ pub fn derive_dyn_array_slot(
 
     // Arguments locals
     let array_slot_ptr = module.locals.add(ValType::I32);
-    let elem_index_ptr = module.locals.add(ValType::I32);
-    let elem_size_ptr = module.locals.add(ValType::I32);
+    let elem_index = module.locals.add(ValType::I32);
+    let elem_size = module.locals.add(ValType::I32);
     let derived_elem_slot_ptr = module.locals.add(ValType::I32);
 
     let (native_keccak, _) = host_functions::native_keccak256(module);
@@ -428,15 +429,7 @@ pub fn derive_dyn_array_slot(
 
     // Guard: check elem_size is greater than 0
     builder
-        .local_get(elem_size_ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
+        .local_get(elem_size)
         .i32_const(0)
         .binop(BinaryOp::I32LeU)
         .if_else(
@@ -465,15 +458,7 @@ pub fn derive_dyn_array_slot(
 
     // Check if the element size is less than 32 bytes, i.e. it fits in a storage slot
     builder
-        .local_get(elem_size_ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
+        .local_get(elem_size)
         .i32_const(32)
         .binop(BinaryOp::I32LtU);
 
@@ -487,27 +472,12 @@ pub fn derive_dyn_array_slot(
             //
             // offset = floor(index / floor(32 / elem_size))
             //
-            // Step 1: Load the index (u32)
-            then.local_get(elem_index_ptr).load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
+            // Step 1: Get the index (u32)
+            then.local_get(elem_index);
 
-            // Step 2: Load the element size and compute divisor = floor(32 / elem_size)
+            // Step 2: Get the element size and compute divisor = floor(32 / elem_size)
             then.i32_const(32)
-                .local_get(elem_size_ptr)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
+                .local_get(elem_size)
                 .binop(BinaryOp::I32DivU);
 
             // Step 3: Compute offset = floor(index / divisor)
@@ -522,27 +492,12 @@ pub fn derive_dyn_array_slot(
             // slots_per_element = ceil(elem_size / 32) = (elem_size + 31) / 32
             // offset = index * slots_per_element
             //
-            // Step 1: Load the index (u32)
-            else_.local_get(elem_index_ptr).load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
+            // Step 1: Get the index (u32)
+            else_.local_get(elem_index);
 
             // Step 2: Compute slots_per_element = (elem_size + 31) / 32
             else_
-                .local_get(elem_size_ptr)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
+                .local_get(elem_size)
                 .i32_const(31)
                 .binop(BinaryOp::I32Add)
                 .i32_const(32)
@@ -557,16 +512,16 @@ pub fn derive_dyn_array_slot(
     builder.call(swap_i32_bytes_fn);
 
     // Repurpose elem_size_ptr to hold the result (i.e., offset as I32)
-    let elem_offset_32 = elem_size_ptr;
+    let elem_offset_32 = elem_size;
     builder.local_set(elem_offset_32);
 
-    // Repurpose elem_index_ptr to allocate and hold the offset as U256
-    let elem_offset_256_ptr = elem_index_ptr;
+    // Repurpose elem_index to allocate and hold the offset as U256
+    let elem_offset_256 = elem_index;
     builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
-        .local_set(elem_offset_256_ptr)
-        .local_get(elem_offset_256_ptr)
+        .local_set(elem_offset_256)
+        .local_get(elem_offset_256)
         .local_get(elem_offset_32)
         // Store the u32 big-endian offset at the last 4 bytes of the memory to convert it to u256
         .store(
@@ -580,21 +535,14 @@ pub fn derive_dyn_array_slot(
 
     // Add base + offset → final element slot
     builder.local_get(derived_elem_slot_ptr);
-    builder
-        .local_get(elem_offset_256_ptr)
-        .local_get(base_slot_ptr);
+    builder.local_get(elem_offset_256).local_get(base_slot_ptr);
     IU256::add(&mut builder, module, compilation_ctx); // add(base, offset) with overflow check
     builder // copy add(base, offset) result to #derived_elem_slot_ptr
         .i32_const(32)
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     function.finish(
-        vec![
-            array_slot_ptr,
-            elem_index_ptr,
-            elem_size_ptr,
-            derived_elem_slot_ptr,
-        ],
+        vec![array_slot_ptr, elem_index, elem_size, derived_elem_slot_ptr],
         &mut module.funcs,
     )
 }
@@ -623,6 +571,8 @@ pub fn add_save_struct_into_storage_fn(
 
     let struct_ptr = module.locals.add(ValType::I32);
     let slot_ptr = module.locals.add(ValType::I32);
+
+    // Set the written bytes in the slot to 0
     let written_bytes_in_slot = module.locals.add(ValType::I32);
     builder.i32_const(0).local_set(written_bytes_in_slot);
 
@@ -679,7 +629,6 @@ pub fn add_read_struct_from_storage_fn(
         compilation_ctx,
         slot_ptr,
         &struct_,
-        false,
         read_bytes_in_slot,
     );
 
@@ -781,6 +730,287 @@ pub fn add_delete_struct_from_storage_fn(
     function.finish(vec![struct_ptr], &mut module.funcs)
 }
 
+/// Remove any objects that have been recently transferred into the struct (transfer-to-object feature or TTO)
+/// from the original owner's mapping in storage.
+///
+/// Example: The Object 'obj' is initially owned by the sender. It is then passed as a value to the 'request_swap' function,
+/// where it gets wrapped within the 'SwapRequest' struct. This struct is subsequently transferred to the service address.
+/// In this scenario, 'obj' must be removed from the sender's ownership mapping (the original owner) because the 'SwapRequest' struct is now the actual owner.
+///```ignore
+/// public fun request_swap(
+///     obj: Object,
+///   service: address,
+///     fee: u64,
+///     ctx: &mut TxContext,
+/// ) {
+///     assert!(fee >= MIN_FEE, EFeeTooLow);
+///
+///    let request = SwapRequest {
+///         id: object::new(ctx),
+///        owner: ctx.sender(),
+///         object: obj,
+///         fee,
+///     };
+///
+///    transfer::transfer(request, service)
+/// }
+///```
+/// Arguments:
+/// - parent_struct_ptr
+pub fn add_check_and_delete_struct_tto_fields_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) -> FunctionId {
+    let name = get_generic_function_name(
+        RuntimeFunction::CheckAndDeleteStructTtoFields.name(),
+        &[itype],
+    );
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    };
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
+    let mut builder = function.name(name).func_body();
+
+    // Arguments
+    let parent_struct_ptr = module.locals.add(ValType::I32);
+
+    let struct_ = compilation_ctx
+        .get_struct_by_intermediate_type(itype)
+        .unwrap();
+
+    // Iterate over the fields of the struct
+    let mut offset: i32 = 0;
+    for field in struct_.fields.iter() {
+        if matches!(
+            field,
+            IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. }
+        ) {
+            let child_struct_ptr = module.locals.add(ValType::I32);
+
+            // Get the pointer to the child struct
+            builder
+                .local_get(parent_struct_ptr)
+                .i32_const(offset)
+                .binop(BinaryOp::I32Add)
+                // Load the intermediate pointer to the child struct
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .local_set(child_struct_ptr);
+
+            // Call the function recursively to delete any recently tto objects within the child struct
+            let delete_tto_objects_fn = RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic(
+                module,
+                compilation_ctx,
+                &[field],
+            );
+            builder
+                .local_get(child_struct_ptr)
+                .call(delete_tto_objects_fn);
+
+            // If the child struct has key, remove it from the original owner's storage if it's still there.
+            let delete_tto_object_fn =
+                RuntimeFunction::DeleteTtoObject.get_generic(module, compilation_ctx, &[field]);
+            builder
+                .local_get(parent_struct_ptr)
+                .local_get(child_struct_ptr)
+                .call(delete_tto_object_fn);
+        } else if let IntermediateType::IVector(inner) = field {
+            if matches!(
+                inner.as_ref(),
+                IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. }
+            ) {
+                let vector_ptr = module.locals.add(ValType::I32);
+                let len = module.locals.add(ValType::I32);
+
+                // Get the pointer to the vector
+                builder
+                    .local_get(parent_struct_ptr)
+                    .i32_const(offset)
+                    .binop(BinaryOp::I32Add)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_tee(vector_ptr);
+
+                // Load vector length from its header
+                builder
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_set(len);
+
+                // Outer block: if the vector length is 0, we skip to the end
+                builder.block(None, |outer_block| {
+                    let outer_block_id = outer_block.id();
+
+                    // Check if length == 0
+                    outer_block
+                        .local_get(len)
+                        .i32_const(0)
+                        .binop(BinaryOp::I32Eq)
+                        .br_if(outer_block_id);
+
+                    outer_block.block(None, |inner_block| {
+                        let inner_block_id = inner_block.id();
+
+                        let i = module.locals.add(ValType::I32);
+                        let elem_ptr = module.locals.add(ValType::I32);
+
+                        // Set the aux locals to 0 to start the loop
+                        inner_block.i32_const(0).local_set(i);
+                        inner_block.loop_(None, |loop_| {
+                            let loop_id = loop_.id();
+
+                            loop_
+                                .vec_elem_ptr(vector_ptr, i, 4)
+                                .load(
+                                    compilation_ctx.memory_id,
+                                    LoadKind::I32 { atomic: false },
+                                    MemArg {
+                                        align: 0,
+                                        offset: 0,
+                                    },
+                                )
+                                .local_set(elem_ptr);
+
+                            // Call the function recursively to delete any recently tto objects within the vector element struct
+                            let delete_tto_objects_fn =
+                                RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic(
+                                    module,
+                                    compilation_ctx,
+                                    &[inner.as_ref()],
+                                );
+
+                            loop_.local_get(elem_ptr).call(delete_tto_objects_fn);
+
+                            let delete_tto_object_fn = RuntimeFunction::DeleteTtoObject
+                                .get_generic(module, compilation_ctx, &[inner.as_ref()]);
+
+                            loop_
+                                .local_get(parent_struct_ptr)
+                                .local_get(elem_ptr)
+                                .call(delete_tto_object_fn);
+
+                            // Exit after processing all elements
+                            loop_
+                                .local_get(i)
+                                .local_get(len)
+                                .i32_const(1)
+                                .binop(BinaryOp::I32Sub)
+                                .binop(BinaryOp::I32Eq)
+                                .br_if(inner_block_id);
+
+                            // i = i + 1 and continue the loop
+                            loop_
+                                .local_get(i)
+                                .i32_const(1)
+                                .binop(BinaryOp::I32Add)
+                                .local_set(i)
+                                .br(loop_id);
+                        });
+                    });
+                });
+            }
+        }
+        offset += 4;
+    }
+
+    function.finish(vec![parent_struct_ptr], &mut module.funcs)
+}
+
+/// This function deletes a recently transferred wrapped object from the original owner's storage.
+///
+/// Arguments:
+/// - parent_struct_ptr
+/// - child_struct_ptr
+pub fn add_delete_tto_object_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) -> FunctionId {
+    let name = get_generic_function_name(RuntimeFunction::DeleteTtoObject.name(), &[itype]);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    };
+
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
+    let mut builder = function.name(name).func_body();
+
+    let parent_struct_ptr = module.locals.add(ValType::I32);
+    let child_struct_ptr = module.locals.add(ValType::I32);
+
+    let struct_ = compilation_ctx
+        .get_struct_by_intermediate_type(itype)
+        .unwrap();
+
+    // If the child struct has key, remove it from the original owner's storage if it's still there.
+    if struct_.has_key {
+        builder.block(None, |block| {
+            let block_id = block.id();
+
+            let child_struct_owner_ptr = module.locals.add(ValType::I32);
+
+            // Get the pointer to the child struct owner
+            block
+                .local_get(child_struct_ptr)
+                .call(get_struct_owner_fn)
+                .local_set(child_struct_owner_ptr);
+
+            // Check if the owner is zero (means there's no owner, so we don't need to delete anything)
+            // This can happen if we have just created the struct and not transfered it yet.
+            block
+                .local_get(child_struct_owner_ptr)
+                .i32_const(32)
+                .call(is_zero_fn)
+                .br_if(block_id);
+
+            // Verify if the owner of the child struct matches the ID of the parent struct.
+            // If they differ, it indicates that the child struct has been just wrapped into the parent struct
+            // and should be removed from the original owner's storage mapping.
+            block
+                .local_get(parent_struct_ptr)
+                .call(get_id_bytes_ptr_fn)
+                .local_get(child_struct_owner_ptr)
+                .i32_const(32)
+                .call(equality_fn)
+                .br_if(block_id);
+
+            // Get the delete function for the child struct
+            let delete_wrapped_object_fn =
+                RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype]);
+
+            block
+                .local_get(child_struct_ptr)
+                .call(delete_wrapped_object_fn);
+        });
+    }
+
+    function.finish(vec![parent_struct_ptr, child_struct_ptr], &mut module.funcs)
+}
+
 /// This function returns a pointer to the struct owner, given a struct pointer as input
 pub fn get_struct_owner_fn(
     module: &mut Module,
@@ -799,6 +1029,87 @@ pub fn get_struct_owner_fn(
         .binop(BinaryOp::I32Sub);
 
     function.finish(vec![struct_ptr], &mut module.funcs)
+}
+
+/// This function loops over all the mutably borrowed dynamic fields and save their changes into
+/// the storage's cache.
+///
+/// After that, it flushes the cache, commiting the changes made for common storage structures (the
+/// changes are saved in the `Ret` function that obtains them) and dynamic fields.
+///
+/// This function is executed after the the entrypoint called function finishes.
+pub fn add_commit_changes_to_storage_fn(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(&mut module.types, &[], &[]);
+    let mut builder = function
+        .name(RuntimeFunction::CommitChangesToStorage.name().to_owned())
+        .func_body();
+
+    let (storage_flush_cache, _) = storage_flush_cache(module);
+
+    // If we have dynamic fields to process, we put the code to process them.
+    if !dynamic_fields_global_variables.is_empty() {
+        let get_struct_owner_fn =
+            RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
+        let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+        let write_object_slot_fn =
+            RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+        let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
+
+        let owner_ptr = module.locals.add(ValType::I32);
+
+        for (dynamic_field_ptr, itype) in dynamic_fields_global_variables {
+            let save_struct_into_storage_fn = RuntimeFunction::EncodeAndSaveInStorage.get_generic(
+                module,
+                compilation_ctx,
+                &[itype],
+            );
+
+            builder.block(None, |block| {
+                let block_id = block.id();
+                // The global id can be declares but never filled because the path that the code
+                // took never called the borrow_mut function. In that case it will have assigned te
+                // -1 value, we skip processing it
+                block
+                    .global_get(*dynamic_field_ptr)
+                    .i32_const(-1)
+                    .binop(BinaryOp::I32Eq)
+                    .br_if(block_id);
+
+                // Calculate the destiny slot
+
+                // Put in stack the parent address
+                block
+                    .global_get(*dynamic_field_ptr)
+                    .call(get_struct_owner_fn)
+                    .local_tee(owner_ptr);
+
+                // If the owner id is all zeroes, means the struct has no owner, and probably was
+                // deleted from storage, so we skip the save
+                block.i32_const(32).call(is_zero_fn).br_if(block_id);
+
+                // Put in the stack the field id
+                block
+                    .local_get(owner_ptr)
+                    .global_get(*dynamic_field_ptr)
+                    .call(get_id_bytes_ptr_fn)
+                    .call(write_object_slot_fn);
+
+                // Save struct changes
+                block
+                    .global_get(*dynamic_field_ptr)
+                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .call(save_struct_into_storage_fn);
+            });
+        }
+    }
+
+    builder.i32_const(1).call(storage_flush_cache);
+
+    function.finish(vec![], &mut module.funcs)
 }
 
 // The expected slot values were calculated using Remix to ensure the tests are correct.
@@ -1069,16 +1380,16 @@ mod tests {
     ).unwrap()
     )]
     fn test_derive_dyn_array_slot(
-        #[case] slot: U256,
-        #[case] index: u32,
-        #[case] elem_size: u32,
+        #[case] header_slot: U256,
+        #[case] element_index: u32,
+        #[case] element_size: u32,
         #[case] expected: U256,
     ) {
         let (mut module, allocator_func, memory_id) = build_module(Some(40)); // slot (32 bytes) + index (4 bytes) + elem_size (4 bytes)
 
         let slot_ptr = module.locals.add(ValType::I32);
-        let index_ptr = module.locals.add(ValType::I32);
-        let elem_size_ptr = module.locals.add(ValType::I32);
+        let index = module.locals.add(ValType::I32);
+        let elem_size = module.locals.add(ValType::I32);
         let result_ptr = module.locals.add(ValType::I32);
 
         let mut builder = FunctionBuilder::new(
@@ -1097,28 +1408,30 @@ mod tests {
 
         func_body
             .local_get(slot_ptr)
-            .local_get(index_ptr)
-            .local_get(elem_size_ptr)
+            .local_get(index)
+            .local_get(elem_size)
             .local_get(result_ptr)
             .call(derive_dyn_array_slot(&mut module, &ctx));
 
         func_body.local_get(result_ptr);
-        let function = builder.finish(vec![slot_ptr, index_ptr, elem_size_ptr], &mut module.funcs);
+        let function = builder.finish(vec![slot_ptr, index, elem_size], &mut module.funcs);
         module.exports.add("test_fn", function);
 
         let linker = get_linker_with_native_keccak256();
 
         let data = [
-            slot.to_be_bytes::<32>().to_vec(),
-            index.to_le_bytes().to_vec(),
-            elem_size.to_le_bytes().to_vec(),
+            header_slot.to_be_bytes::<32>().to_vec(),
+            element_index.to_le_bytes().to_vec(),
+            element_size.to_le_bytes().to_vec(),
         ]
         .concat();
 
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut module, data, "test_fn", Some(linker));
 
-        let pointer: i32 = entrypoint.call(&mut store, (0, 32, 36)).unwrap();
+        let pointer: i32 = entrypoint
+            .call(&mut store, (0, element_index as i32, element_size as i32))
+            .unwrap();
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_bytes = vec![0; 32];
         memory
@@ -1150,20 +1463,20 @@ mod tests {
     ).unwrap()
     )]
     fn test_derive_nested_dyn_array_slot(
-        #[case] slot: U256,
-        #[case] outer_index: u32,
-        #[case] inner_index: u32,
-        #[case] elem_size: u32,
+        #[case] header_slot: U256,
+        #[case] element_outer_index: u32,
+        #[case] element_inner_index: u32,
+        #[case] element_size: u32,
         #[case] expected: U256,
     ) {
         // slot (32 bytes) + outer_index (4 bytes) + inner_index (4 bytes) + elem_size (4 bytes)
         let (mut module, allocator_func, memory_id) = build_module(Some(44));
 
         let slot_ptr = module.locals.add(ValType::I32);
-        let outer_index_ptr = module.locals.add(ValType::I32);
-        let inner_index_ptr = module.locals.add(ValType::I32);
-        let elem_size_ptr = module.locals.add(ValType::I32);
-        let array_header_size_ptr = module.locals.add(ValType::I32);
+        let outer_index = module.locals.add(ValType::I32);
+        let inner_index = module.locals.add(ValType::I32);
+        let elem_size = module.locals.add(ValType::I32);
+        let array_header_size = module.locals.add(ValType::I32);
         let result_ptr = module.locals.add(ValType::I32);
 
         let mut builder = FunctionBuilder::new(
@@ -1179,39 +1492,29 @@ mod tests {
             .local_set(result_ptr);
 
         func_body // the header of the array occupies exactly 1 slot i.e. 32 bytes
-            .i32_const(4)
-            .call(allocator_func)
-            .local_tee(array_header_size_ptr)
             .i32_const(32)
-            .store(
-                memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
+            .local_set(array_header_size);
 
         let ctx = test_compilation_context!(memory_id, allocator_func);
 
         // Call derive_dyn_array_slot_for_index with the proper arguments
         func_body
             .local_get(slot_ptr)
-            .local_get(outer_index_ptr)
-            .local_get(array_header_size_ptr)
+            .local_get(outer_index)
+            .local_get(array_header_size)
             .local_get(result_ptr)
             .call(derive_dyn_array_slot(&mut module, &ctx));
 
         func_body
             .local_get(result_ptr)
-            .local_get(inner_index_ptr)
-            .local_get(elem_size_ptr)
+            .local_get(inner_index)
+            .local_get(elem_size)
             .local_get(result_ptr)
             .call(derive_dyn_array_slot(&mut module, &ctx));
 
         func_body.local_get(result_ptr);
         let function = builder.finish(
-            vec![slot_ptr, outer_index_ptr, inner_index_ptr, elem_size_ptr],
+            vec![slot_ptr, outer_index, inner_index, elem_size],
             &mut module.funcs,
         );
         module.exports.add("test_fn", function);
@@ -1219,17 +1522,27 @@ mod tests {
         let linker = get_linker_with_native_keccak256();
 
         let data = [
-            slot.to_be_bytes::<32>().to_vec(),
-            outer_index.to_le_bytes().to_vec(),
-            inner_index.to_le_bytes().to_vec(),
-            elem_size.to_le_bytes().to_vec(),
+            header_slot.to_be_bytes::<32>().to_vec(),
+            element_outer_index.to_le_bytes().to_vec(),
+            element_inner_index.to_le_bytes().to_vec(),
+            element_size.to_le_bytes().to_vec(),
         ]
         .concat();
 
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut module, data, "test_fn", Some(linker));
 
-        let pointer: i32 = entrypoint.call(&mut store, (0, 32, 36, 40)).unwrap();
+        let pointer: i32 = entrypoint
+            .call(
+                &mut store,
+                (
+                    0,
+                    element_outer_index as i32,
+                    element_inner_index as i32,
+                    element_size as i32,
+                ),
+            )
+            .unwrap();
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_bytes = vec![0; 32];
         memory

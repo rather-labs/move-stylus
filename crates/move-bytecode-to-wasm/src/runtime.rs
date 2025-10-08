@@ -1,4 +1,4 @@
-use walrus::{FunctionId, Module};
+use walrus::{FunctionId, GlobalId, Module};
 
 use crate::{
     CompilationContext,
@@ -66,7 +66,10 @@ pub enum RuntimeFunction {
     EncodeAndSaveInStorage,
     DecodeAndReadFromStorage,
     DeleteFromStorage,
+    CheckAndDeleteStructTtoFields,
+    DeleteTtoObject,
     GetStructOwner,
+    CommitChangesToStorage,
     // ASCII conversion
     U64ToAsciiBase10,
 }
@@ -124,8 +127,11 @@ impl RuntimeFunction {
             Self::EncodeAndSaveInStorage => "encode_and_save_in_storage",
             Self::DecodeAndReadFromStorage => "decode_and_read_from_storage",
             Self::DeleteFromStorage => "delete_from_storage",
+            Self::CheckAndDeleteStructTtoFields => "check_and_delete_struct_tto_fields",
+            Self::DeleteTtoObject => "delete_tto_object",
             Self::GetStructOwner => "get_struct_owner",
             Self::U64ToAsciiBase10 => "u64_to_ascii_base_10",
+            Self::CommitChangesToStorage => "commit_changes_to_storage",
         }
     }
 
@@ -291,10 +297,58 @@ impl RuntimeFunction {
 
                 storage::add_delete_struct_from_storage_fn(module, compilation_ctx, generics[0])
             }
+            Self::CheckAndDeleteStructTtoFields => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {} expected 1 type parameter, found {}",
+                    self.name(),
+                    generics.len(),
+                );
+
+                storage::add_check_and_delete_struct_tto_fields_fn(
+                    module,
+                    compilation_ctx,
+                    generics[0],
+                )
+            }
+            Self::DeleteTtoObject => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {} expected 1 type parameter, found {}",
+                    self.name(),
+                    generics.len(),
+                );
+
+                storage::add_delete_tto_object_fn(module, compilation_ctx, generics[0])
+            }
             _ => panic!(
                 r#"there was an error linking "{}" runtime function, is this function generic?"#,
                 self.name()
             ),
+        }
+    }
+
+    /// Links the function `commit_changes_to_storage` into the module and returns its id.
+    ///
+    /// This funciton is idempotent.
+    ///
+    /// It is not possible to obtain this function with the `get` method because it need the extra
+    /// parameter `dynamic_fields_global_variables`
+    pub fn get_commit_changes_to_storage_fn(
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
+    ) -> FunctionId {
+        if let Some(function) = module.funcs.by_name(Self::CommitChangesToStorage.name()) {
+            function
+        } else {
+            storage::add_commit_changes_to_storage_fn(
+                module,
+                compilation_ctx,
+                dynamic_fields_global_variables,
+            )
         }
     }
 }
