@@ -18,15 +18,11 @@ impl String_ {
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) {
-        let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
-        block.i32_const(41).call(print_i32);
         // Big-endian to Little-endian
         let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
 
         let data_reader_pointer = module.locals.add(ValType::I32);
 
-        block.i32_const(42).call(print_i32);
-        block.local_get(reader_pointer).call(print_m);
         // The ABI encoded value of a dynamic type is a reference to the location of the
         // values in the call data.
         // We are just assuming that the max value can fit in 32 bits, otherwise we cannot reference WASM memory
@@ -54,7 +50,6 @@ impl String_ {
             });
         }
 
-        block.i32_const(43).call(print_i32);
         block
             .local_get(reader_pointer)
             .load(
