@@ -552,7 +552,7 @@ pub fn derive_dyn_array_slot(
 /// Arguments:
 /// - struct_ptr
 /// - slot_ptr
-pub fn add_save_struct_into_storage_fn(
+pub fn add_encode_and_save_into_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
@@ -561,10 +561,6 @@ pub fn add_save_struct_into_storage_fn(
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     }
-
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
@@ -582,44 +578,48 @@ pub fn add_save_struct_into_storage_fn(
         compilation_ctx,
         struct_ptr,
         slot_ptr,
-        &struct_,
+        itype,
         written_bytes_in_slot,
     );
 
     function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs)
 }
 
-// Generates a function that reads an specific struct from the storage.
-//
-// This function:
-// 1. Locates the storage slot of the object.
-// 2. Reads and decodes the struct from storage.
-// 3. Returns a pointer to the in-memory representation of the struct.
-//
-// Arguments:
-// - slot_ptr
-//
-// Returns:
-// - struct_ptr
-pub fn add_read_struct_from_storage_fn(
+/// Generates a function that reads an specific struct from the storage.
+///
+/// This function:
+/// 1. Locates the storage slot of the object.
+/// 2. Reads and decodes the struct from storage.
+/// 3. Returns a pointer to the in-memory representation of the struct.
+///
+/// Arguments:
+/// - slot_ptr
+/// - uid_ptr
+///
+/// Returns:
+/// - struct_ptr
+pub fn add_read_and_decode_from_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
     let name =
-        get_generic_function_name(RuntimeFunction::DecodeAndReadFromStorage.name(), &[itype]);
+        get_generic_function_name(RuntimeFunction::ReadAndDecodeFromStorage.name(), &[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     }
 
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
-
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
     let mut builder = function.name(name).func_body();
 
+    // Arguments
     let slot_ptr = module.locals.add(ValType::I32);
+    let uid_ptr = module.locals.add(ValType::I32);
+
     let read_bytes_in_slot = module.locals.add(ValType::I32);
     builder.i32_const(0).local_set(read_bytes_in_slot);
 
@@ -628,13 +628,14 @@ pub fn add_read_struct_from_storage_fn(
         &mut builder,
         compilation_ctx,
         slot_ptr,
-        &struct_,
+        uid_ptr,
+        itype,
         read_bytes_in_slot,
     );
 
     builder.local_get(struct_ptr);
 
-    function.finish(vec![slot_ptr], &mut module.funcs)
+    function.finish(vec![slot_ptr, uid_ptr], &mut module.funcs)
 }
 
 /// Generates a function that deletes an object from storage.
@@ -705,7 +706,7 @@ pub fn add_delete_struct_from_storage_fn(
 
             // Initialize the number of bytes used in the slot to zero
             let used_bytes_in_slot = module.locals.add(ValType::I32);
-            else_.i32_const(0).local_set(used_bytes_in_slot);
+            else_.i32_const(8).local_set(used_bytes_in_slot);
 
             // Delete the struct from storage
             add_delete_storage_struct_instructions(

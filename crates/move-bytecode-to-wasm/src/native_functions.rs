@@ -312,7 +312,7 @@ impl NativeFunction {
 
                 // In this case the native function implementation is the same as the runtime one.
                 // So we reuse the runtime function.
-                RuntimeFunction::DecodeAndReadFromStorage.get_generic(
+                RuntimeFunction::ReadAndDecodeFromStorage.get_generic(
                     module,
                     compilation_ctx,
                     &[&generics[0]],

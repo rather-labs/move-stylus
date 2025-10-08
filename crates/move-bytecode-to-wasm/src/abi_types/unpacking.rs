@@ -339,7 +339,7 @@ fn load_struct_storage_id(
 /// This function searches in the storage for the structure that belongs to the object UID passed
 /// as argument.
 fn add_unpack_from_storage_instructions(
-    function_builder: &mut InstrSeqBuilder,
+    builder: &mut InstrSeqBuilder,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
@@ -349,21 +349,24 @@ fn add_unpack_from_storage_instructions(
     let locate_storage_data_fn =
         RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
 
+    let uid_ptr = module.locals.add(ValType::I32);
+    builder.local_tee(uid_ptr);
+
     if unpack_frozen {
-        function_builder.i32_const(1);
+        builder.i32_const(1);
     } else {
-        function_builder.i32_const(0);
+        builder.i32_const(0);
     }
 
-    function_builder.call(locate_storage_data_fn);
+    builder.call(locate_storage_data_fn);
 
     // Read the object
-    let read_struct_from_storage_fn =
-        RuntimeFunction::DecodeAndReadFromStorage.get_generic(module, compilation_ctx, &[itype]);
+    let read_and_decode_from_storage_fn =
+        RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype]);
 
     // Copy the slot number into a local to avoid overwriting it later
     let slot_ptr = module.locals.add(ValType::I32);
-    function_builder
+    builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
         .local_tee(slot_ptr)
@@ -371,9 +374,10 @@ fn add_unpack_from_storage_instructions(
         .i32_const(32)
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-    function_builder
+    builder
         .local_get(slot_ptr)
-        .call(read_struct_from_storage_fn);
+        .local_get(uid_ptr)
+        .call(read_and_decode_from_storage_fn);
 }
 
 #[cfg(test)]
