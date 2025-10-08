@@ -50,6 +50,7 @@ mod string {
         function packAscii3() external returns (string, uint16, string);
         function packAscii4() external returns (string, uint16[], string);
         function unpackAscii(string value) external returns (bool);
+        function unpackAscii2(string value, string value2) external returns (bool);
         function packUnpackAscii(string value) external returns (string);
         function packUnpackAscii2(string value, string value2) external returns (string, string);
     );
@@ -57,16 +58,11 @@ mod string {
     #[rstest]
     #[case(packAsciiCall::new(()), "hello world")]
     #[case(unpackAsciiCall::new(("dlrow olleh".to_owned(),)), true)]
-    #[case(packUnpackAsciiCall::new(("test string".to_owned(),)), "test string")]
-    /*
-    #[case(packUnpackAscii2Call::new((
+    #[case(unpackAscii2Call::new((
+        "hello world".to_owned(),
         "test string".to_owned(),
-        "hello world".to_owned()
-    )), (
-        "test string",
-        "hello world",
-    ))]
-    */
+    )), true)]
+    #[case(packUnpackAsciiCall::new(("test string".to_owned(),)), "test string")]
     fn test_ascii<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -84,6 +80,13 @@ mod string {
     #[case(packAscii2Call::new(()), ("hello world", "test string"))]
     #[case(packAscii3Call::new(()), ("hello world", 42, "test string"))]
     #[case(packAscii4Call::new(()), ("hello world", vec![3,1,4,1,5], "test string"))]
+    #[case(packUnpackAscii2Call::new((
+        "test string".to_owned(),
+        "hello world".to_owned()
+    )), (
+        "test string",
+        "hello world",
+    ))]
     fn test_ascii_multiple<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

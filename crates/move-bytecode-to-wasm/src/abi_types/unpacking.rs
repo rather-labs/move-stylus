@@ -64,6 +64,8 @@ pub fn build_unpack_instructions<T: Unpackable>(
     args_pointer: LocalId,
     compilation_ctx: &CompilationContext,
 ) {
+    let (print_i32, _, _, _, _, _) = crate::declare_host_debug_functions!(module);
+    function_builder.i32_const(31).call(print_i32);
     let reader_pointer = module.locals.add(ValType::I32);
     let calldata_reader_pointer = module.locals.add(ValType::I32);
 
@@ -71,6 +73,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
     function_builder.local_tee(reader_pointer);
     function_builder.local_set(calldata_reader_pointer);
 
+    function_builder.i32_const(32).call(print_i32);
     // The ABI encoded params are always a tuple
     // Static types are stored in-place, but dynamic types are referenced to the call data
     for signature_token in function_arguments_signature.iter() {
@@ -82,6 +85,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
             compilation_ctx,
         );
     }
+    function_builder.i32_const(33).call(print_i32);
 }
 
 impl Unpackable for IntermediateType {

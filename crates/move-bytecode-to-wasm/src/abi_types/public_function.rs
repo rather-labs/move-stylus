@@ -83,6 +83,7 @@ impl<'a> PublicFunction<'a> {
         dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
     ) {
         router_builder.block(None, |block| {
+            let (print_i32, _, _, _, _, _) = crate::declare_host_debug_functions!(module);
             let block_id = block.id();
 
             block.local_get(selector_variable);
@@ -96,6 +97,7 @@ impl<'a> PublicFunction<'a> {
             block.binop(BinaryOp::I32Add);
             block.local_set(args_pointer);
 
+            block.i32_const(0).call(print_i32);
             // If the first argument's type is signer, we inject the tx.origin into the stack as a
             // first parameter
             match self.signature.arguments.first() {
@@ -115,8 +117,11 @@ impl<'a> PublicFunction<'a> {
                 }
             }
 
+            block.i32_const(1).call(print_i32);
+
             // Wrap function to pack/unpack parameters
             self.wrap_public_function(module, block, args_pointer, compilation_ctx);
+            block.i32_const(2).call(print_i32);
 
             // Stack: [return_data_pointer] [return_data_length] [status]
             let status = module.locals.add(ValType::I32);
@@ -157,6 +162,9 @@ impl<'a> PublicFunction<'a> {
         let data_ptr = module.locals.add(ValType::I32);
         let data_len = module.locals.add(ValType::I32);
 
+        let (print_i32, _, _, _, _, _) = crate::declare_host_debug_functions!(module);
+        block.i32_const(11).call(print_i32);
+
         build_unpack_instructions(
             block,
             module,
@@ -165,8 +173,10 @@ impl<'a> PublicFunction<'a> {
             compilation_ctx,
         );
 
+        block.i32_const(12).call(print_i32);
         block.call(self.function_id);
 
+        block.i32_const(13).call(print_i32);
         // Unpack function return values
         add_unpack_function_return_values_instructions(
             block,
@@ -174,6 +184,8 @@ impl<'a> PublicFunction<'a> {
             &self.signature.returns,
             compilation_ctx.memory_id,
         );
+
+        block.i32_const(14).call(print_i32);
 
         if self.signature.returns.is_empty() {
             // Set data_ptr and data_len to 0

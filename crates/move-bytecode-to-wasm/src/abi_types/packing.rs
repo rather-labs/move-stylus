@@ -423,7 +423,6 @@ impl Packable for IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if String_::is_vm_type(module_id, *index, compilation_ctx) => {
-                println!("found string!");
                 String_::add_pack_instructions(
                     builder,
                     module,

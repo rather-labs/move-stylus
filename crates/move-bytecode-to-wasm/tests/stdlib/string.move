@@ -41,10 +41,7 @@ public fun unpack_ascii(value: String): bool {
     value.as_bytes() == b"dlrow olleh"
 }
 
-/*
-public fun pack_utf8(): string::String {
-     b"😀😃😄😁😆😅🤣".to_string()
+public fun unpack_ascii_2(value: String, value_2: String): bool {
+    value.as_bytes() == b"hello world"
+        && value_2.as_bytes() == b"test string"
 }
-*/
-
-

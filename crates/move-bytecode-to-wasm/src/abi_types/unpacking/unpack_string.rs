@@ -18,11 +18,15 @@ impl String_ {
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) {
+        let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
+        block.i32_const(41).call(print_i32);
         // Big-endian to Little-endian
         let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
 
         let data_reader_pointer = module.locals.add(ValType::I32);
 
+        block.i32_const(42).call(print_i32);
+        block.local_get(reader_pointer).call(print_m);
         // The ABI encoded value of a dynamic type is a reference to the location of the
         // values in the call data.
         // We are just assuming that the max value can fit in 32 bits, otherwise we cannot reference WASM memory
@@ -49,6 +53,8 @@ impl String_ {
                 inner_block.unreachable();
             });
         }
+
+        block.i32_const(43).call(print_i32);
         block
             .local_get(reader_pointer)
             .load(
@@ -156,14 +162,14 @@ impl String_ {
 
             loop_block.local_get(writer_pointer);
 
-            loop_block.local_get(reader_pointer).load(
+            loop_block.local_get(data_reader_pointer).load(
                 compilation_ctx.memory_id,
                 LoadKind::I32_8 {
                     kind: ExtendedLoad::ZeroExtend,
                 },
                 MemArg {
                     align: 0,
-                    offset: 32,
+                    offset: 0,
                 },
             );
 
@@ -178,10 +184,10 @@ impl String_ {
 
             // increment reader pointer
             loop_block
-                .local_get(reader_pointer)
+                .local_get(data_reader_pointer)
                 .i32_const(1)
                 .binop(BinaryOp::I32Add)
-                .local_set(reader_pointer);
+                .local_set(data_reader_pointer);
 
             // increment writer pointer
             loop_block
@@ -202,16 +208,6 @@ impl String_ {
                 .binop(BinaryOp::I32LtU)
                 .br_if(loop_block_id);
         });
-
-        // Move readed pointer to the end of the padding
-        // increment reader pointer
-        block
-            .i32_const(32)
-            .local_get(reader_pointer)
-            .binop(BinaryOp::I32Sub)
-            .local_get(reader_pointer)
-            .binop(BinaryOp::I32Add)
-            .local_set(reader_pointer);
 
         let struct_ptr = module.locals.add(ValType::I32);
         // Create the struct pointing to the vector
