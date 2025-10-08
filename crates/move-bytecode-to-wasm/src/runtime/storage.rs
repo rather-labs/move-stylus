@@ -4,7 +4,6 @@ use crate::data::{
     DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
     DATA_STORAGE_OBJECT_OWNER_OFFSET,
 };
-use crate::get_generic_function_name;
 use crate::hostio::host_functions::{self, storage_flush_cache, storage_load_bytes32, tx_origin};
 use crate::native_functions::object::add_delete_storage_struct_instructions;
 use crate::storage::encoding::{
@@ -557,7 +556,7 @@ pub fn add_encode_and_save_into_storage_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
-    let name = get_generic_function_name(RuntimeFunction::EncodeAndSaveInStorage.name(), &[itype]);
+    let name = RuntimeFunction::EncodeAndSaveInStorage.get_generic_function_name(&[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     }
@@ -603,8 +602,7 @@ pub fn add_read_and_decode_from_storage_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
-    let name =
-        get_generic_function_name(RuntimeFunction::ReadAndDecodeFromStorage.name(), &[itype]);
+    let name = RuntimeFunction::ReadAndDecodeFromStorage.get_generic_function_name(&[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     }
@@ -653,7 +651,7 @@ pub fn add_delete_struct_from_storage_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
-    let name = get_generic_function_name(RuntimeFunction::DeleteFromStorage.name(), &[itype]);
+    let name = RuntimeFunction::DeleteFromStorage.get_generic_function_name(&[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -763,10 +761,7 @@ pub fn add_check_and_delete_struct_tto_fields_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
-    let name = get_generic_function_name(
-        RuntimeFunction::CheckAndDeleteStructTtoFields.name(),
-        &[itype],
-    );
+    let name = RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic_function_name(&[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -947,7 +942,7 @@ pub fn add_delete_tto_object_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
-    let name = get_generic_function_name(RuntimeFunction::DeleteTtoObject.name(), &[itype]);
+    let name = RuntimeFunction::DeleteTtoObject.get_generic_function_name(&[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -1061,7 +1056,6 @@ pub fn add_commit_changes_to_storage_fn(
         let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
 
         let owner_ptr = module.locals.add(ValType::I32);
-
         for (dynamic_field_ptr, itype) in dynamic_fields_global_variables {
             let save_struct_into_storage_fn = RuntimeFunction::EncodeAndSaveInStorage.get_generic(
                 module,
@@ -1099,10 +1093,19 @@ pub fn add_commit_changes_to_storage_fn(
                     .call(get_id_bytes_ptr_fn)
                     .call(write_object_slot_fn);
 
+                let slot_ptr = module.locals.add(ValType::I32);
+                block
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(slot_ptr)
+                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                
                 // Save struct changes
                 block
                     .global_get(*dynamic_field_ptr)
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .local_get(slot_ptr)
                     .call(save_struct_into_storage_fn);
             });
         }

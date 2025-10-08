@@ -5351,6 +5351,7 @@ mod dynamic_storage_fields {
         function readDynamicField(bytes32 foo, String name) public view returns (uint64);
         function dynamicFieldExists(bytes32 foo, String name) public view returns (bool);
         function mutateDynamicField(bytes32 foo, String name) public view;
+        function mutateDynamicFieldTwo(bytes32 foo, String name, String name2) public view;
         function removeDynamicField(bytes32 foo, String name) public view returns (uint64);
         function attachDynamicFieldAddrU256(bytes32 foo, address name, uint256 value) public view;
         function readDynamicFieldAddrU256(bytes32 foo, address name) public view returns (uint256);
@@ -5493,16 +5494,34 @@ mod dynamic_storage_fields {
         assert_eq!(0, result);
         assert_eq!(85u64.abi_encode(), result_data);
 
+        // Mutate both in the same function
+        let call_data =
+            mutateDynamicFieldTwoCall::new((object_id, field_name_1.clone(), field_name_2.clone()))
+                .abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read modified dynamic fields
+        let call_data = readDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(44u64.abi_encode(), result_data);
+
+        let call_data = readDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(86u64.abi_encode(), result_data);
+
         // Remove fields
         let call_data = removeDynamicFieldCall::new((object_id, field_name_1.clone())).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-        assert_eq!(43u64.abi_encode(), result_data);
+        assert_eq!(44u64.abi_encode(), result_data);
 
         let call_data = removeDynamicFieldCall::new((object_id, field_name_2.clone())).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-        assert_eq!(85u64.abi_encode(), result_data);
+        assert_eq!(86u64.abi_encode(), result_data);
 
         let call_data = removeDynamicFieldAddrU256Call::new((object_id, field_name_3)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -5571,6 +5590,7 @@ mod dynamic_storage_fields_named_id {
         function readDynamicField(String name) public view returns (uint64);
         function dynamicFieldExists(String name) public view returns (bool);
         function mutateDynamicField(String name) public view;
+        function mutateDynamicFieldTwo(String name, String name2) public view;
         function removeDynamicField(String name) public view returns (uint64);
         function attachDynamicFieldAddrU256(address name, uint256 value) public view;
         function readDynamicFieldAddrU256(address name) public view returns (uint256);
@@ -5705,16 +5725,34 @@ mod dynamic_storage_fields_named_id {
         assert_eq!(0, result);
         assert_eq!(85u64.abi_encode(), result_data);
 
+        // Mutate both in the same function
+        let call_data =
+            mutateDynamicFieldTwoCall::new((field_name_1.clone(), field_name_2.clone()))
+                .abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read modified dynamic fields
+        let call_data = readDynamicFieldCall::new((field_name_1.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(44u64.abi_encode(), result_data);
+
+        let call_data = readDynamicFieldCall::new((field_name_2.clone(),)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(86u64.abi_encode(), result_data);
+
         // Remove fields
         let call_data = removeDynamicFieldCall::new((field_name_1.clone(),)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-        assert_eq!(43u64.abi_encode(), result_data);
+        assert_eq!(44u64.abi_encode(), result_data);
 
         let call_data = removeDynamicFieldCall::new((field_name_2.clone(),)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-        assert_eq!(85u64.abi_encode(), result_data);
+        assert_eq!(86u64.abi_encode(), result_data);
 
         let call_data = removeDynamicFieldAddrU256Call::new((field_name_3,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -5749,6 +5787,382 @@ mod dynamic_storage_fields_named_id {
     }
 }
 
+mod dynamic_table {
+    use alloy_primitives::{FixedBytes, address};
+    use alloy_sol_types::{SolCall, SolValue, sol};
+
+    use super::*;
+
+    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
+    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
+    // thread. If that happens, messages from test A can be received by test B.
+    // Using once instance per thread assures this won't happen.
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "dynamic_table";
+        const SOURCE_PATH: &str = "tests/storage/dynamic_table.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+
+        struct String {
+            uint8[] bytes;
+        }
+
+        function createFoo() public view;
+        function createFooOwned() public view;
+        function attachTable(bytes32 foo) public view;
+        function createEntry(bytes32 foo, address key, uint64 value) public view;
+        function containsEntry(bytes32 foo, address key) public view returns (bool);
+        function removeEntry(bytes32 foo, address key) public view returns (uint64);
+        function readTableEntryValue(bytes32 foo, address key) public view returns (uint64);
+        function mutateTableEntry(bytes32 foo, address key) public view;
+        function mutateTwoEntryValues(bytes32 foo, address key, address key2) public view;
+    );
+
+    #[rstest]
+    #[case(true)]
+    #[case(false)]
+    fn test_dynamic_table(runtime: RuntimeSandbox, #[case] owned: bool) {
+        if owned {
+            runtime.set_msg_sender(SIGNER_ADDRESS);
+            let call_data = createFooOwnedCall::new(()).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+        } else {
+            let call_data = createFooCall::new(()).abi_encode();
+            let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+            assert_eq!(0, result);
+        }
+
+        runtime.print_storage();
+        println!("-----------------------------------------------");
+
+        // Read the object id emmited from the contract's events
+        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
+        let object_id = FixedBytes::<32>::from_slice(&object_id);
+
+        let key_1 = address!("0x1234567890abcdef1234567890abcdef12345678");
+        let key_2 = address!("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
+
+        // Attach the table
+        let call_data = attachTableCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        runtime.print_storage();
+        println!("-----------------------------------------------");
+
+        // // Check entries we are going to create do not exist
+        // let call_data = containsEntryCall::new((object_id, key_1)).abi_encode();
+        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+        // assert_eq!(false.abi_encode(), result_data);
+
+        // let call_data = containsEntryCall::new((object_id, key_2)).abi_encode();
+        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+        // assert_eq!(false.abi_encode(), result_data);
+
+        // Create entry
+        let call_data = createEntryCall::new((object_id, key_1, 42)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        runtime.print_storage();
+        println!("-----------------------------------------------");
+
+        // Read recently created entries
+        let call_data = readTableEntryValueCall::new((object_id, key_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(42.abi_encode(), result_data);
+
+        runtime.print_storage();
+        println!("a-----------------------------------------------");
+
+        let call_data = createEntryCall::new((object_id, key_2, 84)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        runtime.print_storage();
+        println!("b-----------------------------------------------");
+
+        // // Check entries we are going to create exist
+        // let call_data = containsEntryCall::new((object_id, key_1)).abi_encode();
+        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+        // assert_eq!(true.abi_encode(), result_data);
+
+        // let call_data = containsEntryCall::new((object_id, key_2)).abi_encode();
+        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+        // assert_eq!(true.abi_encode(), result_data);
+
+        // // Read recently created entries
+        // let call_data = readTableEntryValueCall::new((object_id, key_1)).abi_encode();
+        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+        // assert_eq!(42.abi_encode(), result_data);
+
+        // let call_data = readTableEntryValueCall::new((object_id, key_2)).abi_encode();
+        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+        // assert_eq!(84.abi_encode(), result_data);
+
+        // // Mutate entries individually
+        // let call_data = mutateTableEntryCall::new((object_id, key_1)).abi_encode();
+        // let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+
+        // let call_data = mutateTableEntryCall::new((object_id, key_2)).abi_encode();
+        // let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+
+        // // Read recently mutated entries
+        // let call_data = readTableEntryValueCall::new((object_id, key_1)).abi_encode();
+        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+        // assert_eq!(43.abi_encode(), result_data);
+
+        // let call_data = readTableEntryValueCall::new((object_id, key_2)).abi_encode();
+        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+        // assert_eq!(85.abi_encode(), result_data);
+
+        // // Mutate both entries simultaneusly
+        // let call_data = mutateTwoEntryValuesCall::new((object_id, key_1, key_2)).abi_encode();
+        // let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+
+        // // Read recently mutated entries
+        // let call_data = readTableEntryValueCall::new((object_id, key_1)).abi_encode();
+        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+        // assert_eq!(44.abi_encode(), result_data);
+
+        // let call_data = readTableEntryValueCall::new((object_id, key_2)).abi_encode();
+        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+        // assert_eq!(86.abi_encode(), result_data);
+
+        // // Remove entries
+        // let call_data = removeEntryCall::new((object_id, key_1)).abi_encode();
+        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+        // assert_eq!(44.abi_encode(), result_data);
+
+        // let call_data = removeEntryCall::new((object_id, key_2)).abi_encode();
+        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+        // assert_eq!(86.abi_encode(), result_data);
+
+        // // Check entries we just deleted do not exist
+        // let call_data = containsEntryCall::new((object_id, key_1)).abi_encode();
+        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+        // assert_eq!(false.abi_encode(), result_data);
+
+        // let call_data = containsEntryCall::new((object_id, key_2)).abi_encode();
+        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        // assert_eq!(0, result);
+        // assert_eq!(false.abi_encode(), result_data);
+    }
+}
+
+mod erc20 {
+    use alloy_primitives::address;
+    use alloy_sol_types::{SolCall, SolValue, sol};
+
+    use super::*;
+
+    // NOTE: we can't use this fixture as #[once] because in order to catch events, we use an mpsc
+    // channel. If we use this as #[once], there's a possibility this runtime is used in more than one
+    // thread. If that happens, messages from test A can be received by test B.
+    // Using once instance per thread assures this won't happen.
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "erc20";
+        const SOURCE_PATH: &str = "tests/storage/erc20.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+
+        struct String {
+            uint8[] bytes;
+        }
+
+
+        function mint(address to, uint256 amount) external view;
+        function create() public view;
+        function burn(address from, uint256 amount) external view;
+        function balanceOf(address address) public view returns (uint256);
+        function totalSupply() external view returns (uint256);
+        function transfer(address recipient, uint256 amount) external returns (bool);
+        function allowance(address owner, address spender) external view returns (uint256);
+        function approve(address spender, uint256 amount) external returns (bool);
+        function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+        function name() external view returns (string);
+        function symbol() external view returns (string);
+        function decimals() external view returns (uint8);
+    );
+
+    #[rstest]
+    fn test_erc20(runtime: RuntimeSandbox) {
+        let address_1 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
+        runtime.set_msg_sender(**address_1);
+        runtime.set_tx_origin(**address_1);
+        let address_2 = address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef");
+        let address_3 = address!("0xabcabcabcabcabcabcabcabcabcabcabcabcabca");
+
+        // Create the contract
+        let call_data = createCall::new(()).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Check frozen info
+        let call_data = decimalsCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(18.abi_encode(), result_data);
+
+        // TODO: add name and symbol when processing strings correctly
+
+        // Mint new coins
+        let call_data = totalSupplyCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(0.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_1,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(0.abi_encode(), result_data);
+
+        let call_data = mintCall::new((address_1, U256::from(9999999))).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = totalSupplyCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9999999.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_1,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9999999.abi_encode(), result_data);
+
+        // Transfer
+        let call_data = transferCall::new((address_2, U256::from(1111))).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_1,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9998888.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_2,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(1111.abi_encode(), result_data);
+
+        // Burn
+        let call_data = totalSupplyCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9999999.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_1,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9998888.abi_encode(), result_data);
+
+        let call_data = burnCall::new((address_1, U256::from(2222))).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = totalSupplyCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9997777.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_1,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9996666.abi_encode(), result_data);
+
+        // Allowance
+        // Allow address_1 to spend 100 TST from address_2
+        let call_data = allowanceCall::new((address_2, address_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(0.abi_encode(), result_data);
+
+        runtime.set_msg_sender(**address_2);
+        runtime.set_tx_origin(**address_2);
+        let call_data = approveCall::new((address_1, U256::from(100))).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        runtime.set_msg_sender(**address_1);
+        runtime.set_tx_origin(**address_1);
+        let call_data = allowanceCall::new((address_2, address_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(100.abi_encode(), result_data);
+
+        // Transfer from
+        // Transfer from address_2 100 TST using address_1 to address_3
+        let call_data = balanceOfCall::new((address_1,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9996666.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_2,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(1111.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_3,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(0.abi_encode(), result_data);
+
+        let call_data = transferFromCall::new((address_2, address_3, U256::from(100))).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = balanceOfCall::new((address_1,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(9996666.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_2,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(1011.abi_encode(), result_data);
+
+        let call_data = balanceOfCall::new((address_3,)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(100.abi_encode(), result_data);
+    }
+}
 mod simple_warrior {
     use super::*;
     use crate::common::runtime_sandbox::constants::SIGNER_ADDRESS;

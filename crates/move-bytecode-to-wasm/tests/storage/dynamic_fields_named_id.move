@@ -12,7 +12,7 @@ public struct Foo has key {
     id: object::NamedId<FOO_>,
 }
 
-public fun create_foo(ctx: &mut TxContext) {
+public fun create_foo() {
     let foo = Foo { id: object::new_named_id<FOO_>() };
     transfer::share_object(foo);
 }
@@ -37,6 +37,15 @@ public fun dynamic_field_exists(foo: &Foo, name: String): bool {
 public fun mutate_dynamic_field(foo: &mut Foo, name: String) {
     let val = dynamic_field::borrow_mut(&mut foo.id, name);
     *val = *val + 1;
+}
+
+// This test makes sures that two different fields with the same types for key and value get changed
+public fun mutate_dynamic_field_two(foo: &mut Foo, name: String, name_2: String) {
+    let val = dynamic_field::borrow_mut(&mut foo.id, name);
+    *val = *val + 1;
+
+    let val_2 = dynamic_field::borrow_mut(&mut foo.id, name_2);
+    *val_2 = *val_2 + 1;
 }
 
 public fun remove_dynamic_field(foo: &mut Foo, name: String): u64 {

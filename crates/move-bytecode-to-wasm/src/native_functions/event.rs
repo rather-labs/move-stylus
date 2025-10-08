@@ -1,7 +1,7 @@
 use walrus::{FunctionBuilder, FunctionId, Module, ValType, ir::BinaryOp};
 
 use crate::{
-    CompilationContext, get_generic_function_name, hostio::host_functions::emit_log,
+    CompilationContext, compilation_context::ModuleId, hostio::host_functions::emit_log,
     translation::intermediate_types::IntermediateType,
 };
 
@@ -11,8 +11,10 @@ pub fn add_emit_log_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
+    module_id: &ModuleId,
 ) -> FunctionId {
-    let name = get_generic_function_name(NativeFunction::NATIVE_EMIT, &[itype]);
+    let name =
+        NativeFunction::get_generic_function_name(NativeFunction::NATIVE_EMIT, &[itype], module_id);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };

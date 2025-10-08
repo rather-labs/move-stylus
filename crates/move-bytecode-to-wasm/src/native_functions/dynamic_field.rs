@@ -9,7 +9,6 @@ use crate::{
         DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
         DATA_STORAGE_OBJECT_OWNER_OFFSET,
     },
-    get_generic_function_name,
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
     translation::intermediate_types::{
@@ -34,8 +33,13 @@ pub fn add_child_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
+    module_id: &ModuleId,
 ) -> FunctionId {
-    let name = get_generic_function_name(NativeFunction::NATIVE_ADD_CHILD_OBJECT, &[itype]);
+    let name = NativeFunction::get_generic_function_name(
+        NativeFunction::NATIVE_ADD_CHILD_OBJECT,
+        &[itype],
+        module_id,
+    );
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -53,6 +57,8 @@ pub fn add_child_object_fn(
     let parent_address = module.locals.add(ValType::I32);
     let child_ptr = module.locals.add(ValType::I32);
 
+    let slot_ptr = module.locals.add(ValType::I32);
+
     // Calculate the destiny slot
     builder
         .local_get(parent_address)
@@ -60,10 +66,18 @@ pub fn add_child_object_fn(
         .call(get_id_bytes_ptr_fn)
         .call(write_object_slot_fn);
 
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_tee(slot_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
     // Save the field into storage
     builder
         .local_get(child_ptr)
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .local_get(slot_ptr)
         .call(save_struct_into_storage_fn);
 
     function.finish(vec![parent_address, child_ptr], &mut module.funcs)
@@ -87,8 +101,13 @@ pub fn add_borrow_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
+    module_id: &ModuleId,
 ) -> FunctionId {
-    let name = get_generic_function_name(NativeFunction::NATIVE_BORROW_CHILD_OBJECT, &[itype]);
+    let name = NativeFunction::get_generic_function_name(
+        NativeFunction::NATIVE_BORROW_CHILD_OBJECT,
+        &[itype],
+        module_id,
+    );
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -141,9 +160,18 @@ pub fn add_borrow_object_fn(
 
     let result_struct = module.locals.add(ValType::I32);
 
+    let slot_ptr = module.locals.add(ValType::I32);
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_tee(slot_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
     // Read from storage
     builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .local_get(slot_ptr)
         .local_get(child_id)
         .call(read_and_decode_from_storage_fn)
         .local_set(result_struct);
@@ -172,10 +200,12 @@ pub fn add_remove_child_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
+    module_id: &ModuleId,
 ) -> FunctionId {
-    let name = get_generic_function_name(
+    let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_REMOVE_CHILD_OBJECT,
         &[&itype.clone()],
+        module_id,
     );
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
@@ -233,6 +263,7 @@ pub fn add_remove_child_object_fn(
 pub fn add_has_child_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    module_id: &ModuleId,
 ) -> FunctionId {
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -241,7 +272,10 @@ pub fn add_has_child_object_fn(
     );
 
     let mut builder = function
-        .name(NativeFunction::NATIVE_HAS_CHILD_OBJECT.to_owned())
+        .name(NativeFunction::get_function_name(
+            NativeFunction::NATIVE_HAS_CHILD_OBJECT,
+            module_id,
+        ))
         .func_body();
 
     let (storage_load, _) = storage_load_bytes32(module);
@@ -287,8 +321,13 @@ pub fn add_hash_type_and_key_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
+    module_id: &ModuleId,
 ) -> FunctionId {
-    let name = get_generic_function_name(NativeFunction::NATIVE_HASH_TYPE_AND_KEY, &[itype]);
+    let name = NativeFunction::get_generic_function_name(
+        NativeFunction::NATIVE_HASH_TYPE_AND_KEY,
+        &[itype],
+        module_id,
+    );
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
