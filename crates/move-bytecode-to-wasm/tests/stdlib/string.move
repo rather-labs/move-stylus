@@ -45,3 +45,15 @@ public fun unpack_ascii_2(value: String, value_2: String): bool {
     value.as_bytes() == b"hello world"
         && value_2.as_bytes() == b"test string"
 }
+
+public fun unpack_ascii_3(value: String, n: u16, value_2: String): bool {
+    value.as_bytes() == b"hello world"
+        && n == 42
+        && value_2.as_bytes() == b"test string"
+}
+
+public fun unpack_ascii_4(value: String, n: vector<u16>, value_2: String): bool {
+    value.as_bytes() == b"hello world"
+        && n == vector[3, 1, 4, 1, 5]
+        && value_2.as_bytes() == b"test string"
+}

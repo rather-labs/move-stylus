@@ -51,6 +51,8 @@ mod string {
         function packAscii4() external returns (string, uint16[], string);
         function unpackAscii(string value) external returns (bool);
         function unpackAscii2(string value, string value2) external returns (bool);
+        function unpackAscii3(string value, uint16 n, string value2) external returns (bool);
+        function unpackAscii4(string value, uint16[] n, string value2) external returns (bool);
         function packUnpackAscii(string value) external returns (string);
         function packUnpackAscii2(string value, string value2) external returns (string, string);
     );
@@ -60,6 +62,16 @@ mod string {
     #[case(unpackAsciiCall::new(("dlrow olleh".to_owned(),)), true)]
     #[case(unpackAscii2Call::new((
         "hello world".to_owned(),
+        "test string".to_owned(),
+    )), true)]
+    #[case(unpackAscii3Call::new((
+        "hello world".to_owned(),
+        42,
+        "test string".to_owned(),
+    )), true)]
+    #[case(unpackAscii4Call::new((
+        "hello world".to_owned(),
+        vec![3,1,4,1,5],
         "test string".to_owned(),
     )), true)]
     #[case(packUnpackAsciiCall::new(("test string".to_owned(),)), "test string")]
