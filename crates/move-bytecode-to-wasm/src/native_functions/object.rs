@@ -466,7 +466,7 @@ pub fn add_delete_storage_vector_instructions(
 /// `itype` - intermediate type of the element to be deleted
 /// `size` - size of the itype in storage
 /// `used_bytes_in_slot` - number of bytes already used in the current slot
-fn add_delete_field_instructions(
+pub fn add_delete_field_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,

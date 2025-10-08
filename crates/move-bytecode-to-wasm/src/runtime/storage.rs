@@ -399,8 +399,8 @@ pub fn derive_mapping_slot(
 ///
 /// Parameters:
 /// - `array_slot_ptr`: A pointer to the u256 slot `p`, which is the header slot of the array.
-/// - `elem_index_ptr`: A pointer to the u32 value representing the element's index in the array (little-endian).
-/// - `elem_size_ptr`: A pointer to the u32 value representing the size of each element in bytes (little-endian).
+/// - `elem_index`: u32 value representing the element's index in the array (little-endian).
+/// - `elem_size`: u32 value representing the size of each element in bytes (little-endian).
 ///
 /// The computed u256 slot value for the element, in big-endian format, is stored at `derived_elem_slot_ptr`.
 pub fn derive_dyn_array_slot(
@@ -419,8 +419,8 @@ pub fn derive_dyn_array_slot(
 
     // Arguments locals
     let array_slot_ptr = module.locals.add(ValType::I32);
-    let elem_index_ptr = module.locals.add(ValType::I32);
-    let elem_size_ptr = module.locals.add(ValType::I32);
+    let elem_index = module.locals.add(ValType::I32);
+    let elem_size = module.locals.add(ValType::I32);
     let derived_elem_slot_ptr = module.locals.add(ValType::I32);
 
     let (native_keccak, _) = host_functions::native_keccak256(module);
@@ -428,15 +428,7 @@ pub fn derive_dyn_array_slot(
 
     // Guard: check elem_size is greater than 0
     builder
-        .local_get(elem_size_ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
+        .local_get(elem_size)
         .i32_const(0)
         .binop(BinaryOp::I32LeU)
         .if_else(
@@ -465,15 +457,7 @@ pub fn derive_dyn_array_slot(
 
     // Check if the element size is less than 32 bytes, i.e. it fits in a storage slot
     builder
-        .local_get(elem_size_ptr)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        )
+        .local_get(elem_size)
         .i32_const(32)
         .binop(BinaryOp::I32LtU);
 
@@ -487,27 +471,12 @@ pub fn derive_dyn_array_slot(
             //
             // offset = floor(index / floor(32 / elem_size))
             //
-            // Step 1: Load the index (u32)
-            then.local_get(elem_index_ptr).load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
+            // Step 1: Get the index (u32)
+            then.local_get(elem_index);
 
-            // Step 2: Load the element size and compute divisor = floor(32 / elem_size)
+            // Step 2: Get the element size and compute divisor = floor(32 / elem_size)
             then.i32_const(32)
-                .local_get(elem_size_ptr)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
+                .local_get(elem_size)
                 .binop(BinaryOp::I32DivU);
 
             // Step 3: Compute offset = floor(index / divisor)
@@ -522,27 +491,12 @@ pub fn derive_dyn_array_slot(
             // slots_per_element = ceil(elem_size / 32) = (elem_size + 31) / 32
             // offset = index * slots_per_element
             //
-            // Step 1: Load the index (u32)
-            else_.local_get(elem_index_ptr).load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
+            // Step 1: Get the index (u32)
+            else_.local_get(elem_index);
 
             // Step 2: Compute slots_per_element = (elem_size + 31) / 32
             else_
-                .local_get(elem_size_ptr)
-                .load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                )
+                .local_get(elem_size)
                 .i32_const(31)
                 .binop(BinaryOp::I32Add)
                 .i32_const(32)
@@ -557,16 +511,16 @@ pub fn derive_dyn_array_slot(
     builder.call(swap_i32_bytes_fn);
 
     // Repurpose elem_size_ptr to hold the result (i.e., offset as I32)
-    let elem_offset_32 = elem_size_ptr;
+    let elem_offset_32 = elem_size;
     builder.local_set(elem_offset_32);
 
-    // Repurpose elem_index_ptr to allocate and hold the offset as U256
-    let elem_offset_256_ptr = elem_index_ptr;
+    // Repurpose elem_index to allocate and hold the offset as U256
+    let elem_offset_256 = elem_index;
     builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
-        .local_set(elem_offset_256_ptr)
-        .local_get(elem_offset_256_ptr)
+        .local_set(elem_offset_256)
+        .local_get(elem_offset_256)
         .local_get(elem_offset_32)
         // Store the u32 big-endian offset at the last 4 bytes of the memory to convert it to u256
         .store(
@@ -580,21 +534,14 @@ pub fn derive_dyn_array_slot(
 
     // Add base + offset → final element slot
     builder.local_get(derived_elem_slot_ptr);
-    builder
-        .local_get(elem_offset_256_ptr)
-        .local_get(base_slot_ptr);
+    builder.local_get(elem_offset_256).local_get(base_slot_ptr);
     IU256::add(&mut builder, module, compilation_ctx); // add(base, offset) with overflow check
     builder // copy add(base, offset) result to #derived_elem_slot_ptr
         .i32_const(32)
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     function.finish(
-        vec![
-            array_slot_ptr,
-            elem_index_ptr,
-            elem_size_ptr,
-            derived_elem_slot_ptr,
-        ],
+        vec![array_slot_ptr, elem_index, elem_size, derived_elem_slot_ptr],
         &mut module.funcs,
     )
 }
@@ -1427,16 +1374,16 @@ mod tests {
     ).unwrap()
     )]
     fn test_derive_dyn_array_slot(
-        #[case] slot: U256,
-        #[case] index: u32,
-        #[case] elem_size: u32,
+        #[case] header_slot: U256,
+        #[case] element_index: u32,
+        #[case] element_size: u32,
         #[case] expected: U256,
     ) {
         let (mut module, allocator_func, memory_id) = build_module(Some(40)); // slot (32 bytes) + index (4 bytes) + elem_size (4 bytes)
 
         let slot_ptr = module.locals.add(ValType::I32);
-        let index_ptr = module.locals.add(ValType::I32);
-        let elem_size_ptr = module.locals.add(ValType::I32);
+        let index = module.locals.add(ValType::I32);
+        let elem_size = module.locals.add(ValType::I32);
         let result_ptr = module.locals.add(ValType::I32);
 
         let mut builder = FunctionBuilder::new(
@@ -1455,28 +1402,30 @@ mod tests {
 
         func_body
             .local_get(slot_ptr)
-            .local_get(index_ptr)
-            .local_get(elem_size_ptr)
+            .local_get(index)
+            .local_get(elem_size)
             .local_get(result_ptr)
             .call(derive_dyn_array_slot(&mut module, &ctx));
 
         func_body.local_get(result_ptr);
-        let function = builder.finish(vec![slot_ptr, index_ptr, elem_size_ptr], &mut module.funcs);
+        let function = builder.finish(vec![slot_ptr, index, elem_size], &mut module.funcs);
         module.exports.add("test_fn", function);
 
         let linker = get_linker_with_native_keccak256();
 
         let data = [
-            slot.to_be_bytes::<32>().to_vec(),
-            index.to_le_bytes().to_vec(),
-            elem_size.to_le_bytes().to_vec(),
+            header_slot.to_be_bytes::<32>().to_vec(),
+            element_index.to_le_bytes().to_vec(),
+            element_size.to_le_bytes().to_vec(),
         ]
         .concat();
 
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut module, data, "test_fn", Some(linker));
 
-        let pointer: i32 = entrypoint.call(&mut store, (0, 32, 36)).unwrap();
+        let pointer: i32 = entrypoint
+            .call(&mut store, (0, element_index as i32, element_size as i32))
+            .unwrap();
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_bytes = vec![0; 32];
         memory
@@ -1508,20 +1457,20 @@ mod tests {
     ).unwrap()
     )]
     fn test_derive_nested_dyn_array_slot(
-        #[case] slot: U256,
-        #[case] outer_index: u32,
-        #[case] inner_index: u32,
-        #[case] elem_size: u32,
+        #[case] header_slot: U256,
+        #[case] element_outer_index: u32,
+        #[case] element_inner_index: u32,
+        #[case] element_size: u32,
         #[case] expected: U256,
     ) {
         // slot (32 bytes) + outer_index (4 bytes) + inner_index (4 bytes) + elem_size (4 bytes)
         let (mut module, allocator_func, memory_id) = build_module(Some(44));
 
         let slot_ptr = module.locals.add(ValType::I32);
-        let outer_index_ptr = module.locals.add(ValType::I32);
-        let inner_index_ptr = module.locals.add(ValType::I32);
-        let elem_size_ptr = module.locals.add(ValType::I32);
-        let array_header_size_ptr = module.locals.add(ValType::I32);
+        let outer_index = module.locals.add(ValType::I32);
+        let inner_index = module.locals.add(ValType::I32);
+        let elem_size = module.locals.add(ValType::I32);
+        let array_header_size = module.locals.add(ValType::I32);
         let result_ptr = module.locals.add(ValType::I32);
 
         let mut builder = FunctionBuilder::new(
@@ -1537,39 +1486,29 @@ mod tests {
             .local_set(result_ptr);
 
         func_body // the header of the array occupies exactly 1 slot i.e. 32 bytes
-            .i32_const(4)
-            .call(allocator_func)
-            .local_tee(array_header_size_ptr)
             .i32_const(32)
-            .store(
-                memory_id,
-                StoreKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
+            .local_set(array_header_size);
 
         let ctx = test_compilation_context!(memory_id, allocator_func);
 
         // Call derive_dyn_array_slot_for_index with the proper arguments
         func_body
             .local_get(slot_ptr)
-            .local_get(outer_index_ptr)
-            .local_get(array_header_size_ptr)
+            .local_get(outer_index)
+            .local_get(array_header_size)
             .local_get(result_ptr)
             .call(derive_dyn_array_slot(&mut module, &ctx));
 
         func_body
             .local_get(result_ptr)
-            .local_get(inner_index_ptr)
-            .local_get(elem_size_ptr)
+            .local_get(inner_index)
+            .local_get(elem_size)
             .local_get(result_ptr)
             .call(derive_dyn_array_slot(&mut module, &ctx));
 
         func_body.local_get(result_ptr);
         let function = builder.finish(
-            vec![slot_ptr, outer_index_ptr, inner_index_ptr, elem_size_ptr],
+            vec![slot_ptr, outer_index, inner_index, elem_size],
             &mut module.funcs,
         );
         module.exports.add("test_fn", function);
@@ -1577,17 +1516,27 @@ mod tests {
         let linker = get_linker_with_native_keccak256();
 
         let data = [
-            slot.to_be_bytes::<32>().to_vec(),
-            outer_index.to_le_bytes().to_vec(),
-            inner_index.to_le_bytes().to_vec(),
-            elem_size.to_le_bytes().to_vec(),
+            header_slot.to_be_bytes::<32>().to_vec(),
+            element_outer_index.to_le_bytes().to_vec(),
+            element_inner_index.to_le_bytes().to_vec(),
+            element_size.to_le_bytes().to_vec(),
         ]
         .concat();
 
         let (_, instance, mut store, entrypoint) =
             setup_wasmtime_module(&mut module, data, "test_fn", Some(linker));
 
-        let pointer: i32 = entrypoint.call(&mut store, (0, 32, 36, 40)).unwrap();
+        let pointer: i32 = entrypoint
+            .call(
+                &mut store,
+                (
+                    0,
+                    element_outer_index as i32,
+                    element_inner_index as i32,
+                    element_size as i32,
+                ),
+            )
+            .unwrap();
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let mut result_bytes = vec![0; 32];
         memory
