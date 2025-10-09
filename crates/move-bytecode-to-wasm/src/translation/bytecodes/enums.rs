@@ -76,16 +76,25 @@ pub fn pack_variant(
                         } else {
                             (val_32, StoreKind::I32 { atomic: false })
                         };
+                        
+                         // Save the actual value
+                         builder.local_set(val);
 
-                        // Save the actual value
-                        builder.local_set(val);
-
-                        // Store the actual value behind the middle_ptr
-                        builder.local_get(pointer).local_get(val).store(
-                            compilation_ctx.memory_id,
-                            store_kind,
-                            MemArg { align: 0, offset },
-                        );
+                         // Create a pointer for the value
+                         builder
+                             .i32_const(data_size as i32)
+                             .call(compilation_ctx.allocator)
+                             .local_tee(ptr_to_data);
+ 
+                         // Store the actual value behind the middle_ptr
+                         builder.local_get(val).store(
+                             compilation_ctx.memory_id,
+                             store_kind,
+                             MemArg {
+                                 align: 0,
+                                 offset: 0,
+                             },
+                         );
                     }
                     // Heap types: The stack data is a pointer to the value, store directly
                     // that pointer in the struct
