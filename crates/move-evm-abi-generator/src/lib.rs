@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Parses the AST of a package to extract the ABI
 //!
 //! NOTE: This is a POC and it is WIP
