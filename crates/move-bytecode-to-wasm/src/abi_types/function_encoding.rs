@@ -5,7 +5,9 @@ use crate::{
     CompilationContext,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
     utils::snake_to_camel,
-    vm_handled_types::{VmHandledType, named_id::NamedId, tx_context::TxContext, uid::Uid},
+    vm_handled_types::{
+        VmHandledType, named_id::NamedId, string::String_, tx_context::TxContext, uid::Uid,
+    },
 };
 
 pub type AbiFunctionSelector = [u8; 4];
@@ -61,6 +63,11 @@ impl SolName for IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } if TxContext::is_vm_type(module_id, *index, compilation_ctx) => None,
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } if String_::is_vm_type(module_id, *index, compilation_ctx) => {
+                Some(sol_data::String::SOL_NAME.to_string())
+            }
             IntermediateType::IStruct {
                 module_id, index, ..
             } => {

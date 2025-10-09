@@ -20,13 +20,16 @@ use crate::{
         structs::IStruct,
         vector::IVector,
     },
-    vm_handled_types::{VmHandledType, named_id::NamedId, tx_context::TxContext, uid::Uid},
+    vm_handled_types::{
+        VmHandledType, named_id::NamedId, string::String_, tx_context::TxContext, uid::Uid,
+    },
 };
 
 mod unpack_enum;
 mod unpack_heap_int;
 mod unpack_native_int;
 mod unpack_reference;
+mod unpack_string;
 mod unpack_struct;
 mod unpack_vector;
 
@@ -179,6 +182,17 @@ impl Unpackable for IntermediateType {
                 module_id, index, ..
             } if TxContext::is_vm_type(module_id, *index, compilation_ctx) => {
                 TxContext::inject(function_builder, module, compilation_ctx);
+            }
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } if String_::is_vm_type(module_id, *index, compilation_ctx) => {
+                String_::add_unpack_instructions(
+                    function_builder,
+                    module,
+                    reader_pointer,
+                    calldata_reader_pointer,
+                    compilation_ctx,
+                );
             }
             IntermediateType::IStruct {
                 module_id, index, ..

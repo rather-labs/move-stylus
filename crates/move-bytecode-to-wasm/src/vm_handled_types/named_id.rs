@@ -1,7 +1,10 @@
 use super::VmHandledType;
 use crate::{
     CompilationContext,
-    compilation_context::{ModuleId, reserved_modules::STYLUS_FRAMEWORK_ADDRESS},
+    compilation_context::{
+        ModuleId,
+        reserved_modules::{SF_MODULE_NAME_OBJECT, STYLUS_FRAMEWORK_ADDRESS},
+    },
 };
 use walrus::{InstrSeqBuilder, Module};
 
@@ -25,7 +28,9 @@ impl VmHandledType for NamedId {
             .identifier;
 
         if identifier == Self::IDENTIFIER {
-            if module_id.address != STYLUS_FRAMEWORK_ADDRESS || module_id.module_name != "object" {
+            if module_id.address != STYLUS_FRAMEWORK_ADDRESS
+                || module_id.module_name != SF_MODULE_NAME_OBJECT
+            {
                 panic!("invalid NamedId found, only the one from the stylus framework is valid");
             }
             return true;
@@ -40,6 +45,6 @@ impl NamedId {
     pub fn is_remove_function(module_id: &ModuleId, identifier: &str) -> bool {
         identifier == Self::REMOVE_FN_IDENTIFIER
             && module_id.address == STYLUS_FRAMEWORK_ADDRESS
-            && module_id.module_name == "object"
+            && module_id.module_name == SF_MODULE_NAME_OBJECT
     }
 }

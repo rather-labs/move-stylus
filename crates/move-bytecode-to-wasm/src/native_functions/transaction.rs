@@ -2,6 +2,7 @@
 use super::NativeFunction;
 use crate::{
     CompilationContext,
+    compilation_context::ModuleId,
     hostio::host_functions::{block_basefee, msg_sender, msg_value, tx_gas_price},
     translation::intermediate_types::{address::IAddress, heap_integers::IU256},
 };
@@ -13,6 +14,7 @@ macro_rules! define_host_fn_native_fn_wrapper {
         pub fn $name(
             module: &mut walrus::Module,
             compilation_ctx: &$crate::CompilationContext,
+            module_id: &$crate::compilation_context::ModuleId,
         ) -> walrus::FunctionId {
             let (host_function_id, _) = $host_fn(module);
 
@@ -21,7 +23,11 @@ macro_rules! define_host_fn_native_fn_wrapper {
 
             let ptr = module.locals.add(walrus::ValType::I32);
 
-            let mut builder = function.name($native_fn_name.to_owned()).func_body();
+            let name = $crate::native_functions::NativeFunction::get_function_name(
+                $native_fn_name,
+                module_id,
+            );
+            let mut builder = function.name(name).func_body();
 
             builder
                 .i32_const($alloc_size)
@@ -38,6 +44,7 @@ macro_rules! define_host_fn_native_fn_wrapper {
 pub fn add_native_sender_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
+    module_id: &ModuleId,
 ) -> FunctionId {
     let (msg_sender_function_id, _) = msg_sender(module);
 
@@ -46,7 +53,10 @@ pub fn add_native_sender_fn(
     let address_ptr = module.locals.add(ValType::I32);
 
     let mut builder = function
-        .name(NativeFunction::NATIVE_SENDER.to_owned())
+        .name(NativeFunction::get_function_name(
+            NativeFunction::NATIVE_SENDER,
+            module_id,
+        ))
         .func_body();
 
     builder

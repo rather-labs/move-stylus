@@ -5,6 +5,8 @@
 pub mod dynamic_fields;
 pub mod named_id;
 pub mod signer;
+pub mod string;
+pub mod table;
 pub mod tx_context;
 pub mod uid;
 

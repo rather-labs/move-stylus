@@ -7,11 +7,7 @@ use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
     source_package::parsed_manifest::PackageName,
 };
-use std::{
-    collections::HashMap,
-    hash::{DefaultHasher, Hash, Hasher},
-    path::Path,
-};
+use std::{collections::HashMap, path::Path};
 use translation::{
     intermediate_types::IntermediateType,
     table::{FunctionId, FunctionTable},
@@ -368,18 +364,6 @@ fn translate_and_link_functions(
             )
         });
     }
-}
-
-// TODO: Move somewhere else
-pub fn get_generic_function_name(base_name: &str, generics: &[&IntermediateType]) -> String {
-    if generics.is_empty() {
-        panic!("generic_function_name called with no generics");
-    }
-
-    let mut hasher = DefaultHasher::new();
-    generics.iter().for_each(|t| t.hash(&mut hasher));
-    let hash = format!("{:x}", hasher.finish());
-    format!("{base_name}_{hash}")
 }
 
 #[cfg(feature = "inject-host-debug-fns")]
