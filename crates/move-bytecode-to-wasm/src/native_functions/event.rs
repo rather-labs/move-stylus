@@ -21,7 +21,11 @@ pub fn add_emit_log_fn(
 
     let struct_ = compilation_ctx
         .get_struct_by_intermediate_type(itype)
-        .unwrap();
+        .unwrap_or_else(|e| {
+            panic!("there wsas an error encoding an struct for storage, found {itype:?}.\n{e}")
+        });
+
+    // println!("---> {}", struct_.get_abi_signature(compilation_ctx));
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();

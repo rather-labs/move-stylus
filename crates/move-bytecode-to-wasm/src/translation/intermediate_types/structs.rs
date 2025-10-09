@@ -534,4 +534,13 @@ impl IStruct {
             ..*self
         }
     }
+
+    /*
+    pub fn get_abi_signature(&self, compilation_ctx: &CompilationContext) -> String {
+        let params = self
+            .get_fields_abi_encoding(compilation_ctx)
+            .unwrap_or_default();
+        format!("{}({params})", self.identifier)
+    }
+    */
 }
