@@ -5821,9 +5821,6 @@ mod dynamic_table {
             assert_eq!(0, result);
         }
 
-        runtime.print_storage();
-        println!("-----------------------------------------------");
-
         // Read the object id emmited from the contract's events
         let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let object_id = FixedBytes::<32>::from_slice(&object_id);
@@ -5836,27 +5833,36 @@ mod dynamic_table {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        runtime.print_storage();
-        println!("-----------------------------------------------");
+        // Check entries we are going to create do not exist
+        let call_data = containsEntryCall::new((object_id, key_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
 
-        // // Check entries we are going to create do not exist
-        // let call_data = containsEntryCall::new((object_id, key_1)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(false.abi_encode(), result_data);
-
-        // let call_data = containsEntryCall::new((object_id, key_2)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(false.abi_encode(), result_data);
+        let call_data = containsEntryCall::new((object_id, key_2)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
 
         // Create entry
         let call_data = createEntryCall::new((object_id, key_1, 42)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        runtime.print_storage();
-        println!("-----------------------------------------------");
+        let call_data = createEntryCall::new((object_id, key_2, 84)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Check entries we are going to create exist
+        let call_data = containsEntryCall::new((object_id, key_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
+
+        let call_data = containsEntryCall::new((object_id, key_2)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(true.abi_encode(), result_data);
 
         // Read recently created entries
         let call_data = readTableEntryValueCall::new((object_id, key_1)).abi_encode();
@@ -5864,95 +5870,68 @@ mod dynamic_table {
         assert_eq!(0, result);
         assert_eq!(42.abi_encode(), result_data);
 
-        runtime.print_storage();
-        println!("a-----------------------------------------------");
+        let call_data = readTableEntryValueCall::new((object_id, key_2)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(84.abi_encode(), result_data);
 
-        let call_data = createEntryCall::new((object_id, key_2, 84)).abi_encode();
+        // Mutate entries individually
+        let call_data = mutateTableEntryCall::new((object_id, key_1)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        runtime.print_storage();
-        println!("b-----------------------------------------------");
+        let call_data = mutateTableEntryCall::new((object_id, key_2)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
 
-        // // Check entries we are going to create exist
-        // let call_data = containsEntryCall::new((object_id, key_1)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(true.abi_encode(), result_data);
+        // Read recently mutated entries
+        let call_data = readTableEntryValueCall::new((object_id, key_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(43.abi_encode(), result_data);
 
-        // let call_data = containsEntryCall::new((object_id, key_2)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(true.abi_encode(), result_data);
+        let call_data = readTableEntryValueCall::new((object_id, key_2)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(85.abi_encode(), result_data);
 
-        // // Read recently created entries
-        // let call_data = readTableEntryValueCall::new((object_id, key_1)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(42.abi_encode(), result_data);
+        // Mutate both entries simultaneusly
+        let call_data = mutateTwoEntryValuesCall::new((object_id, key_1, key_2)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
 
-        // let call_data = readTableEntryValueCall::new((object_id, key_2)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(84.abi_encode(), result_data);
+        // Read recently mutated entries
+        let call_data = readTableEntryValueCall::new((object_id, key_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(44.abi_encode(), result_data);
 
-        // // Mutate entries individually
-        // let call_data = mutateTableEntryCall::new((object_id, key_1)).abi_encode();
-        // let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
+        let call_data = readTableEntryValueCall::new((object_id, key_2)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(86.abi_encode(), result_data);
 
-        // let call_data = mutateTableEntryCall::new((object_id, key_2)).abi_encode();
-        // let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
+        // Remove entries
+        let call_data = removeEntryCall::new((object_id, key_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(44.abi_encode(), result_data);
 
-        // // Read recently mutated entries
-        // let call_data = readTableEntryValueCall::new((object_id, key_1)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(43.abi_encode(), result_data);
+        let call_data = removeEntryCall::new((object_id, key_2)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(86.abi_encode(), result_data);
 
-        // let call_data = readTableEntryValueCall::new((object_id, key_2)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(85.abi_encode(), result_data);
+        // Check entries we just deleted do not exist
+        let call_data = containsEntryCall::new((object_id, key_1)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
 
-        // // Mutate both entries simultaneusly
-        // let call_data = mutateTwoEntryValuesCall::new((object_id, key_1, key_2)).abi_encode();
-        // let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-
-        // // Read recently mutated entries
-        // let call_data = readTableEntryValueCall::new((object_id, key_1)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(44.abi_encode(), result_data);
-
-        // let call_data = readTableEntryValueCall::new((object_id, key_2)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(86.abi_encode(), result_data);
-
-        // // Remove entries
-        // let call_data = removeEntryCall::new((object_id, key_1)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(44.abi_encode(), result_data);
-
-        // let call_data = removeEntryCall::new((object_id, key_2)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(86.abi_encode(), result_data);
-
-        // // Check entries we just deleted do not exist
-        // let call_data = containsEntryCall::new((object_id, key_1)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(false.abi_encode(), result_data);
-
-        // let call_data = containsEntryCall::new((object_id, key_2)).abi_encode();
-        // let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
-        // assert_eq!(0, result);
-        // assert_eq!(false.abi_encode(), result_data);
+        let call_data = containsEntryCall::new((object_id, key_2)).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!(false.abi_encode(), result_data);
     }
 }
 
