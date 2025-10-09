@@ -2764,7 +2764,7 @@ mod storage_encoding {
         U256::from_str_radix("ffeeeeddddddddccccccccccccccccbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFieldsCall::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+        readStaticFieldsCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticFields {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: U256::from_str_radix("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 16).unwrap(),
@@ -2790,7 +2790,7 @@ mod storage_encoding {
         U256::from_str_radix("06000500000004000000000000000300000000000000000000000000000002", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFieldsCall::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+        readStaticFieldsCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticFields {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: U256::from(1),
@@ -2812,7 +2812,7 @@ mod storage_encoding {
         U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafeffe9e2482e212d98f1", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000000000000000ffeeeecccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFields2Call::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+        readStaticFields2Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticFields2 {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: 0xff,
@@ -2832,7 +2832,7 @@ mod storage_encoding {
         U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafe01e9e2482e212d98f1", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000400030000000000000002", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFields2Call::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+        readStaticFields2Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticFields2 {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: 1,
@@ -2851,7 +2851,7 @@ mod storage_encoding {
         U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafe0156e27099af020ce4", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("00000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeef0000000000000002", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFields3Call::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+        readStaticFields3Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticFields3 {
            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: 1,
@@ -2869,7 +2869,7 @@ mod storage_encoding {
         U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafeff56e27099af020ce4", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("00000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeefcccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFields3Call::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+        readStaticFields3Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticFields3 {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: 0xff,
@@ -2890,7 +2890,7 @@ mod storage_encoding {
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000400000000000000000000000000000003", 16).unwrap().to_be_bytes(),
     ],
-        readStaticNestedStructCall::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+        readStaticNestedStructCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticNestedStruct {
            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: 1,
@@ -2915,7 +2915,7 @@ mod storage_encoding {
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000ddddddddcccccccccccccccccccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
-        readStaticNestedStructCall::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+        readStaticNestedStructCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticNestedStruct {
            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: 0xaaaaaaaaaaaaaaaa,
@@ -2990,7 +2990,7 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000005000000000000000400000000000000030000000000000002", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000006", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicStructCall::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+        readDynamicStructCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         DynamicStruct {
            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: 46,
@@ -3029,7 +3029,7 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000800000000000000000000000000000007", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000009", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicStructCall::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+        readDynamicStructCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         DynamicStruct {
            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: u32::MAX,
@@ -3097,7 +3097,7 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000001111111111111111111111111111111111111111", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000002222222222222222222222222222222222222222", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicStruct2Call::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+        readDynamicStruct2Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         DynamicStruct2 {
         id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: vec![true, false, true],
@@ -3172,7 +3172,7 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000001200000000000000000000000000000011", 16).unwrap().to_be_bytes(), // u128[] elements #1
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000013", 16).unwrap().to_be_bytes(), // u128[] elements #2
     ],
-        readDynamicStruct3Call::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+        readDynamicStruct3Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         DynamicStruct3 {
            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: vec![vec![1, 2, 3], vec![4, 5]],
@@ -3225,7 +3225,7 @@ mod storage_encoding {
         U256::from_str_radix("0000000011111111111111111111111111111111111111110000000000000030", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000011111111111111111111111111111111111111110000000000000031", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicStruct4Call::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+        readDynamicStruct4Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         DynamicStruct4 {
         id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: vec![DynamicNestedStructChild { a: vec![1, 2, 3], b: 123 }, DynamicNestedStructChild { a: vec![1, 2, 3], b: 124 }],
@@ -3246,7 +3246,7 @@ mod storage_encoding {
         U256::from_str_radix("000000000000000000000000000000000000000000000000588fded0496ea82d", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicStruct5Call::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+        readDynamicStruct5Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         DynamicStruct5 {
         id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: vec![
@@ -3290,7 +3290,7 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000030000000200000001", 16).unwrap().to_be_bytes(), // First element
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // Second element
     ],
-        readGenericStruct32Call::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+        readGenericStruct32Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         GenericStruct32 {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: vec![1, 2, 3],
@@ -3340,7 +3340,7 @@ mod storage_encoding {
 
         U256::from_str_radix("00000000000000000000000000000000000000000000002ab3b50e1768d8c8ca", 16).unwrap().to_be_bytes(),
     ],
-        readFooCall::new((U256::from_be_bytes(U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_le_bytes::<32>()),)),
+        readFooCall::new((U256::from_le_bytes(hex!("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989")),)),
         Foo {
             id: UID { id: ID { bytes: U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().into()  } },
             a: 101,
@@ -3377,7 +3377,7 @@ mod storage_encoding {
         U256::from_str_radix("00000000000000000000000000000000000000000000002ab3b50e1768d8c8ca", 16).unwrap().to_be_bytes(),
 
     ],
-        readMegaFooCall::new((U256::from_be_bytes(U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().to_le_bytes::<32>()),)),
+        readMegaFooCall::new((U256::from_le_bytes(hex!("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255")),)),
     MegaFoo {
             id: UID { id: ID { bytes: U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().into()  } },
             a: 77,
@@ -3445,8 +3445,8 @@ mod storage_encoding {
         U256::from_str_radix("00000000000000000000000000000000000000000000002db3b50e1768d8c8ca", 16).unwrap().to_be_bytes(),
 
     ],
-        readVarCall::new((U256::from_be_bytes(U256::from_str_radix("d51bb5edad7d1535fb0a47b2d03d08c0fe02560a3de80e55815fedb1ce1be09b", 16).unwrap().to_le_bytes::<32>()),)),
-    Var {
+    readVarCall::new((U256::from_le_bytes(hex!("d51bb5edad7d1535fb0a47b2d03d08c0fe02560a3de80e55815fedb1ce1be09b")),)),
+            Var {
             id: UID { id: ID { bytes: U256::from_str_radix("d51bb5edad7d1535fb0a47b2d03d08c0fe02560a3de80e55815fedb1ce1be09b", 16).unwrap().into()  } },
             a: Bar {
                 id: UID { id: ID { bytes: U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().into()  } },
@@ -3500,7 +3500,7 @@ mod storage_encoding {
 
         U256::from_str_radix("000000000000000000000000000000000000000000000063000000580000004d", 16).unwrap().to_be_bytes(),
     ],
-    readGenericWrapper32Call::new((U256::from_be_bytes(U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_le_bytes::<32>()),)),
+    readGenericWrapper32Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
     GenericWrapper32 {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into()  } },
             a: 101,
