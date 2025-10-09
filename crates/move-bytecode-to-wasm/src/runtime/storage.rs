@@ -564,21 +564,12 @@ pub fn add_encode_and_save_into_storage_fn(
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
 
-    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
-
     // Arguments
     let struct_ptr = module.locals.add(ValType::I32);
     let slot_ptr = module.locals.add(ValType::I32);
 
     // Locals
-    let struct_id_ptr = module.locals.add(ValType::I32);
     let written_bytes_in_slot = module.locals.add(ValType::I32);
-
-    // Get the struct uid
-    builder
-        .local_get(struct_ptr)
-        .call(get_struct_owner_fn)
-        .local_set(struct_id_ptr);
 
     // Set the written bytes in the slot to 0
     builder.i32_const(0).local_set(written_bytes_in_slot);
@@ -589,7 +580,7 @@ pub fn add_encode_and_save_into_storage_fn(
         compilation_ctx,
         struct_ptr,
         slot_ptr,
-        struct_id_ptr,
+        None,
         itype,
         written_bytes_in_slot,
     );
@@ -629,7 +620,7 @@ pub fn add_read_and_decode_from_storage_fn(
 
     // Arguments
     let slot_ptr = module.locals.add(ValType::I32);
-    let uid_ptr = module.locals.add(ValType::I32);
+    let struct_id_ptr = module.locals.add(ValType::I32);
 
     // Locals
     let owner_ptr = module.locals.add(ValType::I32);
@@ -649,7 +640,7 @@ pub fn add_read_and_decode_from_storage_fn(
         &mut builder,
         compilation_ctx,
         slot_ptr,
-        uid_ptr,
+        Some(struct_id_ptr),
         owner_ptr,
         itype,
         read_bytes_in_slot,
@@ -657,7 +648,7 @@ pub fn add_read_and_decode_from_storage_fn(
 
     builder.local_get(struct_ptr);
 
-    function.finish(vec![slot_ptr, uid_ptr], &mut module.funcs)
+    function.finish(vec![slot_ptr, struct_id_ptr], &mut module.funcs)
 }
 
 /// Generates a function that deletes an object from storage.

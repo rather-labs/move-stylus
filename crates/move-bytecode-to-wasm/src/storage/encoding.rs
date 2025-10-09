@@ -24,7 +24,7 @@ use crate::{
 /// `builder` - insturctions sequence builder
 /// `struct_ptr` - pointer to the struct to be encoded
 /// `slot_ptr` - storage's slot where the data will be saved
-/// `struct_id_ptr` - pointer to the struct id. If the struct does not have the key ability, this will be the id of the (nearest) parent struct with the key ability.
+/// `owner_ptr` - Optional pointer to the owner struct id. If the struct has key this will be None.
 /// `itype` - intermediate type of the struct to be encoded and saved
 /// `written_bytes_in_slot` - number of bytes already written in the slot. This will be != 0 if
 /// this function is recusively called to save a struct inside another struct.
@@ -35,7 +35,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     compilation_ctx: &CompilationContext,
     struct_ptr: LocalId,
     slot_ptr: LocalId,
-    struct_id_ptr: LocalId,
+    owner_ptr: Option<LocalId>,
     itype: &IntermediateType,
     written_bytes_in_slot: LocalId,
 ) {
@@ -80,7 +80,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 
     // To encode wrapped objects, the owner (parent struct id) must be provided to determine the child struct slot.
     // If the current struct possesses the key ability, its struct id is used as the owner for wrapped objects.
-    // Otherwise, the struct id passed as argument is used as the owner.
+    // Otherwise, use the owner passed as argument.
     let field_owner_ptr = module.locals.add(ValType::I32);
     if struct_.has_key {
         builder
@@ -88,76 +88,79 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             .call(get_struct_id_fn)
             .local_set(field_owner_ptr);
     } else {
-        builder.local_get(struct_id_ptr).local_set(field_owner_ptr);
+        if let Some(owner_ptr) = owner_ptr {
+            builder.local_get(owner_ptr).local_set(field_owner_ptr);
+        } else {
+            builder.unreachable();
+        }
     }
 
     for (index, field) in struct_.fields.iter().enumerate() {
         if field.is_uid_or_named_id(compilation_ctx) {
             // UIDs are not written in storage, except for referencing nested child structs (wrapped objects).
             continue;
-        } else {
-            let field_size = field_size(field, compilation_ctx);
-            builder
-                .local_get(written_bytes_in_slot)
-                .i32_const(field_size as i32)
-                .binop(BinaryOp::I32Add)
-                .i32_const(32)
-                .binop(BinaryOp::I32GtS)
-                .if_else(
-                    None,
-                    |then| {
-                        // Save previous slot
-                        then.local_get(slot_ptr)
-                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                            .call(storage_cache);
+        }
+        let field_size = field_size(field, compilation_ctx);
+        builder
+            .local_get(written_bytes_in_slot)
+            .i32_const(field_size as i32)
+            .binop(BinaryOp::I32Add)
+            .i32_const(32)
+            .binop(BinaryOp::I32GtS)
+            .if_else(
+                None,
+                |then| {
+                    // Save previous slot
+                    then.local_get(slot_ptr)
+                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                        .call(storage_cache);
 
-                        // Wipe the data so it can be filled with new data
-                        then.i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                            .i32_const(0)
-                            .i32_const(32)
-                            .memory_fill(compilation_ctx.memory_id);
+                    // Wipe the data so it can be filled with new data
+                    then.i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                        .i32_const(0)
+                        .i32_const(32)
+                        .memory_fill(compilation_ctx.memory_id);
 
-                        // Next slot
-                        then.local_get(slot_ptr)
-                            .call(next_slot_fn)
-                            .local_set(slot_ptr);
+                    // Next slot
+                    then.local_get(slot_ptr)
+                        .call(next_slot_fn)
+                        .local_set(slot_ptr);
 
-                        // Set the written bytes in slot to the field size
-                        then.i32_const(field_size as i32)
-                            .local_set(written_bytes_in_slot);
-                    },
-                    |else_| {
-                        // Increment the written bytes in slot by the field size
-                        else_
-                            .local_get(written_bytes_in_slot)
-                            .i32_const(field_size as i32)
-                            .binop(BinaryOp::I32Add)
-                            .local_set(written_bytes_in_slot);
-                    },
-                );
-
-            // Load field's intermediate pointer
-            builder.local_get(struct_ptr).load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: index as u32 * 4,
+                    // Set the written bytes in slot to the field size
+                    then.i32_const(field_size as i32)
+                        .local_set(written_bytes_in_slot);
+                },
+                |else_| {
+                    // Increment the written bytes in slot by the field size
+                    else_
+                        .local_get(written_bytes_in_slot)
+                        .i32_const(field_size as i32)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(written_bytes_in_slot);
                 },
             );
 
-            // Encode the field
-            add_encode_intermediate_type_instructions(
-                module,
-                builder,
-                compilation_ctx,
-                slot_ptr,
-                field_owner_ptr,
-                field,
-                written_bytes_in_slot,
-                true,
-            );
-        }
+        // Load field's intermediate pointer
+        builder.local_get(struct_ptr).load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: index as u32 * 4,
+            },
+        );
+
+        // Encode the field
+        add_encode_intermediate_type_instructions(
+            module,
+            builder,
+            compilation_ctx,
+            slot_ptr,
+            field_owner_ptr,
+            field,
+            written_bytes_in_slot,
+            true,
+        );
     }
 
     // Always save the last slot
@@ -173,6 +176,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 /// `module` - walrus module
 /// `builder` - insturctions sequence builder
 /// `slot_ptr` - storage's slot where the data will be saved
+/// `struct_id_ptr` - pointer to the struct id. If the struct does not have the key ability, this will be the id of the (nearest) parent struct with the key ability.
+/// `owner_ptr` - pointer to the owner struct id.
 /// `struct_` - structural information of the struct to be encoded and saved
 /// `read_bytes_in_slot` - number of bytes already read in the slot.
 /// another struct.
@@ -185,7 +190,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     slot_ptr: LocalId,
-    struct_id_ptr: LocalId,
+    struct_id_ptr: Option<LocalId>,
     owner_ptr: LocalId,
     itype: &IntermediateType,
     read_bytes_in_slot: LocalId,
@@ -258,6 +263,16 @@ pub fn add_read_and_decode_storage_struct_instructions(
         .call(compilation_ctx.allocator)
         .local_set(struct_ptr);
 
+    let field_owner_ptr = module.locals.add(ValType::I32);
+    if struct_.has_key {
+        if let Some(struct_id_ptr) = struct_id_ptr {
+            builder.local_get(struct_id_ptr).local_set(field_owner_ptr);
+        } else {
+            builder.unreachable();
+        }
+    } else {
+        builder.local_get(owner_ptr).local_set(field_owner_ptr);
+    }
     // Iterate through the fields of the struct
     for (index, field) in struct_.fields.iter().enumerate() {
         // If the field is a UID or NamedId, don't call decode_intermediate_type_instructions and process it here
@@ -279,7 +294,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
             // Wrap the UID bytes and store the wrapper at the field pointer
             // This mimics the UID struct representation in memory
 
-            let uid_ptr_wrapper = module.locals.add(ValType::I32);
+            let struct_id_ptr_wrapper = module.locals.add(ValType::I32);
 
             // Allocate 4 bytes for the field pointer
             builder
@@ -291,25 +306,27 @@ pub fn add_read_and_decode_storage_struct_instructions(
             builder
                 .i32_const(4)
                 .call(compilation_ctx.allocator)
-                .local_set(uid_ptr_wrapper);
+                .local_set(struct_id_ptr_wrapper);
 
-            // Store the UID at the UID wrapper pointer
-            builder
-                .local_get(uid_ptr_wrapper)
-                .local_get(struct_id_ptr)
-                .store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
+            if let Some(struct_id_ptr) = struct_id_ptr {
+                // Store the UID at the UID wrapper pointer
+                builder
+                    .local_get(struct_id_ptr_wrapper)
+                    .local_get(struct_id_ptr)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+            };
 
             // Store the UID wrapper at the field pointer
             builder
                 .local_get(field_ptr)
-                .local_get(uid_ptr_wrapper)
+                .local_get(struct_id_ptr_wrapper)
                 .store(
                     compilation_ctx.memory_id,
                     StoreKind::I32 { atomic: false },
@@ -357,7 +374,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 compilation_ctx,
                 field_ptr,
                 slot_ptr,
-                struct_id_ptr,
+                field_owner_ptr,
                 field,
                 read_bytes_in_slot,
             );
@@ -384,6 +401,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
 /// `compilation_ctx` - compilation context
 /// `vector_ptr` - pointer to the vector in memory
 /// `slot_ptr` - pointer to the vector header slot
+/// `owner_ptr` - pointer to the owner struct id.
 /// `inner` - inner type of the vector
 pub fn add_encode_and_save_into_storage_vector_instructions(
     module: &mut Module,
@@ -391,7 +409,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     compilation_ctx: &CompilationContext,
     vector_ptr: LocalId,
     slot_ptr: LocalId,
-    parent_struct_id_ptr: LocalId,
+    owner_ptr: LocalId,
     inner: &IntermediateType,
 ) {
     // Host functions
@@ -623,13 +641,13 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                     },
                 );
 
-                // Encode the intermediate type and write it to DATA_SLOT_DATA_PTR_OFFSET
+                // Encode the intermediate type
                 add_encode_intermediate_type_instructions(
                     module,
                     loop_,
                     compilation_ctx,
                     elem_slot_ptr,
-                    parent_struct_id_ptr,
+                    owner_ptr,
                     inner,
                     bytes_in_slot_offset,
                     false,
@@ -692,7 +710,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
 /// `compilation_ctx` - compilation context
 /// `data_ptr` - pointer to the memory region where the vector data will be written
 /// `slot_ptr` - pointer to the vector header slot
-/// `parent_struct_uid_ptr` - pointer to the parent struct uid
+/// `owner_ptr` - pointer to the owner struct id.
 /// `inner` - inner type of the vector
 pub fn add_read_and_decode_storage_vector_instructions(
     module: &mut Module,
@@ -700,7 +718,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
     compilation_ctx: &CompilationContext,
     data_ptr: LocalId,
     slot_ptr: LocalId,
-    parent_struct_uid_ptr: LocalId,
+    owner_ptr: LocalId,
     inner: &IntermediateType,
 ) {
     // Host functions
@@ -830,7 +848,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
                     compilation_ctx,
                     elem_data_ptr,
                     elem_slot_ptr,
-                    parent_struct_uid_ptr,
+                    owner_ptr,
                     inner,
                     read_bytes_in_slot,
                 );
@@ -899,7 +917,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
 /// `builder` - insturctions sequence builder
 /// `compilation_ctx` - compilation context
 /// `slot_ptr` - storage's slot where the data will be saved
-/// `parent_struct_id_ptr` - pointer to the parent struct id.
+/// `owner_ptr` - pointer to the owner struct id.
 /// `itype` - intermediate type to be encoded
 /// `written_bytes_in_slot` - number of bytes already written in the slot.
 /// `is_field` - whether the type is a field from a struct or not.
@@ -911,7 +929,7 @@ pub fn add_encode_intermediate_type_instructions(
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     slot_ptr: LocalId,
-    parent_struct_id_ptr: LocalId,
+    owner_ptr: LocalId,
     itype: &IntermediateType,
     written_bytes_in_slot: LocalId,
     is_field: bool,
@@ -1095,7 +1113,7 @@ pub fn add_encode_intermediate_type_instructions(
 
                 // Calculate the child struct slot
                 builder
-                    .local_get(parent_struct_id_ptr)
+                    .local_get(owner_ptr)
                     .local_get(child_struct_id_ptr)
                     .call(write_object_slot_fn);
 
@@ -1120,7 +1138,7 @@ pub fn add_encode_intermediate_type_instructions(
                     compilation_ctx,
                     child_struct_ptr,
                     child_struct_slot_ptr,
-                    child_struct_id_ptr,
+                    None,
                     itype,
                     written_bytes_in_slot,
                 );
@@ -1154,7 +1172,7 @@ pub fn add_encode_intermediate_type_instructions(
                     compilation_ctx,
                     child_struct_ptr,
                     slot_ptr,
-                    parent_struct_id_ptr,
+                    Some(owner_ptr),
                     itype,
                     written_bytes_in_slot,
                 );
@@ -1169,7 +1187,7 @@ pub fn add_encode_intermediate_type_instructions(
                 compilation_ctx,
                 val_32,
                 slot_ptr,
-                parent_struct_id_ptr,
+                owner_ptr,
                 inner,
             );
 
@@ -1188,7 +1206,7 @@ pub fn add_encode_intermediate_type_instructions(
 /// `compilation_ctx` - compilation context
 /// `data_ptr` - pointer to where data is written
 /// `slot_ptr` - storage's slot where the data is read
-/// `parent_struct_uid_ptr` - pointer to the parent struct UID
+/// `owner_ptr` - pointer to the owner struct id.
 /// `itype` - intermediate type to be decoded
 /// `read_bytes_in_slot` - number of bytes already read in the slot.
 #[allow(clippy::too_many_arguments)]
@@ -1198,7 +1216,7 @@ pub fn add_decode_intermediate_type_instructions(
     compilation_ctx: &CompilationContext,
     data_ptr: LocalId,
     slot_ptr: LocalId,
-    parent_struct_id_ptr: LocalId,
+    owner_ptr: LocalId,
     itype: &IntermediateType,
     read_bytes_in_slot: LocalId,
 ) {
@@ -1396,9 +1414,9 @@ pub fn add_decode_intermediate_type_instructions(
                     .call(storage_load);
 
                 // Calculate the child struct's storage slot
-                // child_struct_slot = keccak256(child_struct_id || keccak256(parent_struct_id || 0))
+                // child_struct_slot = keccak256(child_struct_id || keccak256(owner || 0))
                 builder
-                    .local_get(parent_struct_id_ptr)
+                    .local_get(owner_ptr)
                     .local_get(child_struct_id_ptr)
                     .call(write_object_slot_fn);
 
@@ -1426,8 +1444,8 @@ pub fn add_decode_intermediate_type_instructions(
                     builder,
                     compilation_ctx,
                     child_struct_slot_ptr,
-                    child_struct_id_ptr,
-                    parent_struct_id_ptr,
+                    Some(child_struct_id_ptr),
+                    owner_ptr,
                     itype,
                     read_bytes_in_slot,
                 );
@@ -1452,8 +1470,8 @@ pub fn add_decode_intermediate_type_instructions(
                     builder,
                     compilation_ctx,
                     slot_ptr,
-                    parent_struct_id_ptr,
-                    parent_struct_id_ptr,
+                    None,
+                    owner_ptr,
                     itype,
                     read_bytes_in_slot,
                 );
@@ -1469,7 +1487,7 @@ pub fn add_decode_intermediate_type_instructions(
                 compilation_ctx,
                 data_ptr,
                 slot_ptr,
-                parent_struct_id_ptr,
+                owner_ptr,
                 inner_,
             );
         }
