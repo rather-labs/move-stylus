@@ -3162,6 +3162,7 @@ dependencies = [
  "move-coverage",
  "move-disassembler",
  "move-docgen",
+ "move-evm-abi-generator",
  "move-package",
  "move-packages-build",
  "move-stdlib-natives",
@@ -3312,6 +3313,13 @@ dependencies = [
  "once_cell",
  "regex",
  "serde",
+]
+
+[[package]]
+name = "move-evm-abi-generator"
+version = "0.1.0"
+dependencies = [
+ "move-compiler",
 ]
 
 [[package]]
