@@ -1,115 +1,94 @@
-use alloy_sol_types::{SolType, sol_data};
+use alloy_primitives::keccak256;
 
 use crate::{
     CompilationContext,
     translation::intermediate_types::{IntermediateType, structs::IStruct},
-    vm_handled_types::{
-        VmHandledType, named_id::NamedId, string::String_, tx_context::TxContext, uid::Uid,
-    },
+    vm_handled_types::{VmHandledType, string::String_, tx_context::TxContext},
 };
 
 use super::sol_name::SolName;
 
-pub fn move_signature_to_event_signature(
-    function_name: &str,
-    signature: &[IntermediateType],
+type AbiEventSignatureHash = [u8; 32];
+
+pub fn move_signature_to_event_signature_hash(
+    struct_: &IStruct,
     compilation_ctx: &CompilationContext,
-) -> AbiFunctionSelector {
-    let parameter_strings = signature
+) -> AbiEventSignatureHash {
+    let field_strings = struct_
+        .fields
         .iter()
         .filter_map(|s| solidity_name(s, compilation_ctx))
         .collect::<Vec<String>>()
         .join(",");
 
-    let function_name = snake_to_camel(function_name);
-
-    selector(format!("{}({})", function_name, parameter_strings))
+    *keccak256(format!("{}({})", struct_.identifier, field_strings).as_bytes())
 }
 
-impl SolName for IStruct {
-    fn sol_name(&self, compilation_ctx: &CompilationContext) -> Option<String> {
-        match self {
-            IntermediateType::IBool => Some(sol_data::Bool::SOL_NAME.to_string()),
-            IntermediateType::IU8 => Some(sol_data::Uint::<8>::SOL_NAME.to_string()),
-            IntermediateType::IU16 => Some(sol_data::Uint::<16>::SOL_NAME.to_string()),
-            IntermediateType::IU32 => Some(sol_data::Uint::<32>::SOL_NAME.to_string()),
-            IntermediateType::IU64 => Some(sol_data::Uint::<64>::SOL_NAME.to_string()),
-            IntermediateType::IU128 => Some(sol_data::Uint::<128>::SOL_NAME.to_string()),
-            IntermediateType::IU256 => Some(sol_data::Uint::<256>::SOL_NAME.to_string()),
-            IntermediateType::IAddress => Some(sol_data::Address::SOL_NAME.to_string()),
-            // According to the official documentation, enum types are encoded as uint8
-            // TODO: check if the enum is simple
-            IntermediateType::IEnum(_) => Some(sol_data::Uint::<8>::SOL_NAME.to_string()),
-            IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
-                inner.sol_name(compilation_ctx)
-            }
-            IntermediateType::IVector(inner) => inner
-                .sol_name(compilation_ctx)
-                .map(|sol_n| format!("{sol_n}[]")),
-            IntermediateType::IStruct {
-                module_id, index, ..
-            } if TxContext::is_vm_type(module_id, *index, compilation_ctx) => None,
-            IntermediateType::IStruct {
-                module_id, index, ..
-            } if String_::is_vm_type(module_id, *index, compilation_ctx) => {
-                Some(sol_data::String::SOL_NAME.to_string())
-            }
-            IntermediateType::IStruct {
-                module_id, index, ..
-            } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
-
-                if struct_.has_key {
-                    sol_name_storage_ids(struct_, compilation_ctx)
-                } else {
-                    Self::struct_fields_sol_name(struct_, compilation_ctx)
-                }
-            }
-            IntermediateType::IGenericStructInstance {
-                module_id,
-                index,
-                types,
-                ..
-            } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
-                let struct_instance = struct_.instantiate(types);
-
-                if struct_instance.has_key {
-                    sol_name_storage_ids(struct_, compilation_ctx)
-                } else {
-                    Self::struct_fields_sol_name(&struct_instance, compilation_ctx)
-                }
-            }
-            IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => None,
+fn solidity_name(
+    argument: &IntermediateType,
+    compilation_ctx: &CompilationContext,
+) -> Option<String> {
+    match argument {
+        IntermediateType::IBool
+        | IntermediateType::IU8
+        | IntermediateType::IU16
+        | IntermediateType::IU32
+        | IntermediateType::IU64
+        | IntermediateType::IU128
+        | IntermediateType::IU256
+        | IntermediateType::IAddress
+        | IntermediateType::IEnum(_) => argument.sol_name(compilation_ctx),
+        IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+            solidity_name(inner, compilation_ctx)
         }
+        IntermediateType::IVector(inner) => {
+            solidity_name(inner, compilation_ctx).map(|sol_n| format!("{sol_n}[]"))
+        }
+        IntermediateType::IStruct {
+            module_id, index, ..
+        } if TxContext::is_vm_type(module_id, *index, compilation_ctx) => None,
+        IntermediateType::IStruct {
+            module_id, index, ..
+        } if String_::is_vm_type(module_id, *index, compilation_ctx) => {
+            argument.sol_name(compilation_ctx)
+        }
+        IntermediateType::IStruct {
+            module_id, index, ..
+        } => {
+            let struct_ = compilation_ctx
+                .get_struct_by_index(module_id, *index)
+                .unwrap();
+
+            struct_fields_sol_name(struct_, compilation_ctx)
+        }
+        IntermediateType::IGenericStructInstance {
+            module_id,
+            index,
+            types,
+            ..
+        } => {
+            let struct_ = compilation_ctx
+                .get_struct_by_index(module_id, *index)
+                .unwrap();
+            let struct_instance = struct_.instantiate(types);
+
+            struct_fields_sol_name(&struct_instance, compilation_ctx)
+        }
+        IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => None,
     }
 }
 
-impl IStruct {
-    pub fn get_fields_abi_encoding(&self, compilation_ctx: &CompilationContext) -> Option<String> {
-        self.fields
-            .iter()
-            .map(|field| field.sol_name(compilation_ctx))
-            .collect::<Option<Vec<String>>>()
-            .map(|fields| fields.join(","))
-    }
-
-    fn struct_fields_sol_name(
-        struct_: &IStruct,
-        compilation_ctx: &CompilationContext,
-    ) -> Option<String> {
-        struct_
-            .fields
-            .iter()
-            .map(|field| field.sol_name(compilation_ctx))
-            .collect::<Option<Vec<String>>>()
-            .map(|fields| fields.join(","))
-            .map(|fields| format!("{fields}"))
-    }
+fn struct_fields_sol_name(
+    struct_: &IStruct,
+    compilation_ctx: &CompilationContext,
+) -> Option<String> {
+    struct_
+        .fields
+        .iter()
+        .map(|field| field.sol_name(compilation_ctx))
+        .collect::<Option<Vec<String>>>()
+        .map(|fields| fields.join(","))
+        .map(|fields| format!("({fields})"))
 }
 
 #[cfg(test)]
@@ -117,6 +96,7 @@ mod tests {
     use std::collections::HashMap;
 
     use move_binary_format::file_format::StructDefinitionIndex;
+    use rstest::rstest;
 
     use crate::{
         compilation_context::{ModuleData, ModuleId},
@@ -128,52 +108,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_move_signature_to_abi_selector() {
+    fn test_move_signature_to_event_signature_hash_nested() {
         let (_, allocator_func, memory_id) = build_module(None);
         let mut compilation_ctx = test_compilation_context!(memory_id, allocator_func);
-
-        let signature: &[IntermediateType] = &[IntermediateType::IU8, IntermediateType::IU16];
-        assert_eq!(
-            move_signature_to_abi_selector("test", signature, &compilation_ctx),
-            selector("test(uint8,uint16)")
-        );
-
-        let signature: &[IntermediateType] = &[IntermediateType::IAddress, IntermediateType::IU256];
-        assert_eq!(
-            move_signature_to_abi_selector("transfer", signature, &compilation_ctx),
-            selector("transfer(address,uint256)")
-        );
-
-        let signature: &[IntermediateType] = &[
-            IntermediateType::ISigner,
-            IntermediateType::IAddress,
-            IntermediateType::IU64,
-            IntermediateType::IVector(Box::new(IntermediateType::IBool)),
-        ];
-        assert_eq!(
-            move_signature_to_abi_selector("set_owner", signature, &compilation_ctx),
-            selector("setOwner(address,uint64,bool[])")
-        );
-
-        let signature: &[IntermediateType] = &[
-            IntermediateType::IVector(Box::new(IntermediateType::IU128)),
-            IntermediateType::IVector(Box::new(IntermediateType::IBool)),
-        ];
-        assert_eq!(
-            move_signature_to_abi_selector("test_array", signature, &compilation_ctx),
-            selector("testArray(uint128[],bool[])")
-        );
-
-        let signature: &[IntermediateType] = &[
-            IntermediateType::IVector(Box::new(IntermediateType::IVector(Box::new(
-                IntermediateType::IU128,
-            )))),
-            IntermediateType::IVector(Box::new(IntermediateType::IBool)),
-        ];
-        assert_eq!(
-            move_signature_to_abi_selector("test_array", signature, &compilation_ctx),
-            selector("testArray(uint128[][],bool[])")
-        );
 
         let struct_1 = IStruct::new(
             StructDefinitionIndex::new(0),
@@ -223,28 +160,77 @@ mod tests {
 
         let mut module_data = ModuleData::default();
 
-        let module_structs = vec![struct_1, struct_2];
+        let module_structs = vec![struct_1.clone(), struct_2];
         module_data.structs.structs = module_structs;
-
-        let signature: &[IntermediateType] = &[
-            IntermediateType::IStruct {
-                module_id: ModuleId::default(),
-                index: 0,
-                vm_handled_struct: VmHandledStruct::None,
-            },
-            IntermediateType::IVector(Box::new(IntermediateType::IStruct {
-                module_id: ModuleId::default(),
-                index: 1,
-                vm_handled_struct: VmHandledStruct::None,
-            })),
-        ];
 
         compilation_ctx.root_module_data = &module_data;
         assert_eq!(
-            move_signature_to_abi_selector("test_struct", signature, &compilation_ctx),
-            selector(
-                "testStruct((address,uint32[],uint128[],bool,uint8,uint16,uint32,uint64,uint128,uint256,(uint32,uint128)),(uint32,uint128)[])"
+            move_signature_to_event_signature_hash(&struct_1, &compilation_ctx),
+            *keccak256(
+                "TestStruct(address,uint32[],uint128[],bool,uint8,uint16,uint32,uint64,uint128,uint256,(uint32,uint128))"
             )
+        );
+    }
+
+    #[rstest]
+    #[case(
+        &IStruct::new(
+            StructDefinitionIndex::new(0),
+            "Approval".to_string(),
+            vec![
+                (None, IntermediateType::IAddress),
+                (None, IntermediateType::IAddress),
+                (None, IntermediateType::IU256),
+            ],
+            HashMap::new(),
+            false,
+            false,
+        ),
+        *keccak256(b"Approval(address,address,uint256)")
+    )]
+    #[case(
+        &IStruct::new(
+            StructDefinitionIndex::new(0),
+            "Transfer".to_string(),
+            vec![
+                (None, IntermediateType::IAddress),
+                (None, IntermediateType::IAddress),
+                (None, IntermediateType::IU256),
+            ],
+            HashMap::new(),
+            false,
+            false,
+        ),
+        *keccak256(b"Transfer(address,address,uint256)")
+    )]
+    #[case(
+        &IStruct::new(
+            StructDefinitionIndex::new(0),
+            "Empty".to_string(),
+            vec![],
+            HashMap::new(),
+            false,
+            false,
+        ),
+        *keccak256(b"Empty()")
+    )]
+    fn test_move_signature_to_event_signature_hash(
+        #[case] event_struct: &IStruct,
+        #[case] expected: AbiEventSignatureHash,
+    ) {
+        let (_, allocator_func, memory_id) = build_module(None);
+        let mut compilation_ctx = test_compilation_context!(memory_id, allocator_func);
+
+        let mut module_data = ModuleData::default();
+
+        let module_structs = vec![event_struct.clone()];
+        module_data.structs.structs = module_structs;
+
+        compilation_ctx.root_module_data = &module_data;
+
+        assert_eq!(
+            move_signature_to_event_signature_hash(event_struct, &compilation_ctx),
+            expected
         );
     }
 }

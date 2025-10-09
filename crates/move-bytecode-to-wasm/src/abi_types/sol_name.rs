@@ -38,7 +38,6 @@ impl SolName for IntermediateType {
             }
             // Depening on the contect, structs can be interpreted in different ways (i.e events vs
             // function selector)
-            // That logic must be handled by the particular context
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 None
             }
