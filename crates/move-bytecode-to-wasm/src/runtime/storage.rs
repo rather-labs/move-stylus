@@ -551,7 +551,7 @@ pub fn derive_dyn_array_slot(
 /// Arguments:
 /// - struct_ptr
 /// - slot_ptr
-pub fn add_save_struct_into_storage_fn(
+pub fn add_encode_and_save_into_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
@@ -561,18 +561,17 @@ pub fn add_save_struct_into_storage_fn(
         return function;
     }
 
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
-
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
 
+    // Arguments
     let struct_ptr = module.locals.add(ValType::I32);
     let slot_ptr = module.locals.add(ValType::I32);
 
-    // Set the written bytes in the slot to 0
+    // Locals
     let written_bytes_in_slot = module.locals.add(ValType::I32);
+
+    // Set the written bytes in the slot to 0
     builder.i32_const(0).local_set(written_bytes_in_slot);
 
     add_encode_and_save_into_storage_struct_instructions(
@@ -581,43 +580,58 @@ pub fn add_save_struct_into_storage_fn(
         compilation_ctx,
         struct_ptr,
         slot_ptr,
-        &struct_,
+        None,
+        itype,
         written_bytes_in_slot,
     );
 
     function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs)
 }
 
-// Generates a function that reads an specific struct from the storage.
-//
-// This function:
-// 1. Locates the storage slot of the object.
-// 2. Reads and decodes the struct from storage.
-// 3. Returns a pointer to the in-memory representation of the struct.
-//
-// Arguments:
-// - slot_ptr
-//
-// Returns:
-// - struct_ptr
-pub fn add_read_struct_from_storage_fn(
+/// Generates a function that reads an specific struct from the storage.
+///
+/// This function:
+/// 1. Locates the storage slot of the object.
+/// 2. Reads and decodes the struct from storage.
+/// 3. Returns a pointer to the in-memory representation of the struct.
+///
+/// Arguments:
+/// - slot_ptr
+/// - uid_ptr
+///
+/// Returns:
+/// - struct_ptr
+pub fn add_read_and_decode_from_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
-    let name = RuntimeFunction::DecodeAndReadFromStorage.get_generic_function_name(&[itype]);
+    let name = RuntimeFunction::ReadAndDecodeFromStorage.get_generic_function_name(&[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     }
 
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap();
-
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
     let mut builder = function.name(name).func_body();
 
+    // Arguments
     let slot_ptr = module.locals.add(ValType::I32);
+    let struct_id_ptr = module.locals.add(ValType::I32);
+
+    // Locals
+    let owner_ptr = module.locals.add(ValType::I32);
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_tee(owner_ptr)
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
     let read_bytes_in_slot = module.locals.add(ValType::I32);
     builder.i32_const(0).local_set(read_bytes_in_slot);
 
@@ -626,13 +640,15 @@ pub fn add_read_struct_from_storage_fn(
         &mut builder,
         compilation_ctx,
         slot_ptr,
-        &struct_,
+        Some(struct_id_ptr),
+        owner_ptr,
+        itype,
         read_bytes_in_slot,
     );
 
     builder.local_get(struct_ptr);
 
-    function.finish(vec![slot_ptr], &mut module.funcs)
+    function.finish(vec![slot_ptr, struct_id_ptr], &mut module.funcs)
 }
 
 /// Generates a function that deletes an object from storage.
@@ -701,9 +717,9 @@ pub fn add_delete_struct_from_storage_fn(
                 .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                 .local_set(slot_ptr);
 
-            // Initialize the number of bytes used in the slot to zero
+            // Initialize the number of bytes used in the slot to 8, to reflect the 8-byte type hash
             let used_bytes_in_slot = module.locals.add(ValType::I32);
-            else_.i32_const(0).local_set(used_bytes_in_slot);
+            else_.i32_const(8).local_set(used_bytes_in_slot);
 
             // Delete the struct from storage
             add_delete_storage_struct_instructions(
@@ -1092,10 +1108,19 @@ pub fn add_commit_changes_to_storage_fn(
                     .call(get_id_bytes_ptr_fn)
                     .call(write_object_slot_fn);
 
+                let slot_ptr = module.locals.add(ValType::I32);
+                block
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(slot_ptr)
+                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .i32_const(32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
                 // Save struct changes
                 block
                     .global_get(*dynamic_field_ptr)
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .local_get(slot_ptr)
                     .call(save_struct_into_storage_fn);
             });
         }

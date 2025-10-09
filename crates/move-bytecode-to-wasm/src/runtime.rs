@@ -66,7 +66,7 @@ pub enum RuntimeFunction {
     LocateStructSlot,
     GetIdBytesPtr,
     EncodeAndSaveInStorage,
-    DecodeAndReadFromStorage,
+    ReadAndDecodeFromStorage,
     DeleteFromStorage,
     CheckAndDeleteStructTtoFields,
     DeleteTtoObject,
@@ -127,7 +127,7 @@ impl RuntimeFunction {
             Self::LocateStructSlot => "locate_struct_slot",
             Self::GetIdBytesPtr => "get_id_bytes_ptr",
             Self::EncodeAndSaveInStorage => "encode_and_save_in_storage",
-            Self::DecodeAndReadFromStorage => "decode_and_read_from_storage",
+            Self::ReadAndDecodeFromStorage => "read_and_decode_from_storage",
             Self::DeleteFromStorage => "delete_from_storage",
             Self::CheckAndDeleteStructTtoFields => "check_and_delete_struct_tto_fields",
             Self::DeleteTtoObject => "delete_tto_object",
@@ -275,9 +275,9 @@ impl RuntimeFunction {
                     generics.len(),
                 );
 
-                storage::add_save_struct_into_storage_fn(module, compilation_ctx, generics[0])
+                storage::add_encode_and_save_into_storage_fn(module, compilation_ctx, generics[0])
             }
-            Self::DecodeAndReadFromStorage => {
+            Self::ReadAndDecodeFromStorage => {
                 assert_eq!(
                     1,
                     generics.len(),
@@ -286,7 +286,7 @@ impl RuntimeFunction {
                     generics.len(),
                 );
 
-                storage::add_read_struct_from_storage_fn(module, compilation_ctx, generics[0])
+                storage::add_read_and_decode_from_storage_fn(module, compilation_ctx, generics[0])
             }
             Self::DeleteFromStorage => {
                 assert_eq!(
