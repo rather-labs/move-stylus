@@ -53,6 +53,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             panic!("there wsas an error encoding an struct for storage, found {itype:?}")
         });
 
+    let field_owner_ptr = module.locals.add(ValType::I32);
+
     if struct_.has_key {
         // Set the slot data to zero
         builder
@@ -76,23 +78,17 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 
         // Update written bytes counter to reflect the 8-byte type hash
         builder.i32_const(8).local_set(written_bytes_in_slot);
-    }
 
-    // To encode wrapped objects, the owner (parent struct id) must be provided to determine the child struct slot.
-    // If the current struct possesses the key ability, its struct id is used as the owner for wrapped objects.
-    // Otherwise, use the owner passed as argument.
-    let field_owner_ptr = module.locals.add(ValType::I32);
-    if struct_.has_key {
+        // If the current struct has the key ability, its struct id is used as the owner for wrapped objects.
+        // Otherwise, use the owner passed as argument.
         builder
             .local_get(struct_ptr)
             .call(get_struct_id_fn)
             .local_set(field_owner_ptr);
+    } else if let Some(owner_ptr) = owner_ptr {
+        builder.local_get(owner_ptr).local_set(field_owner_ptr);
     } else {
-        if let Some(owner_ptr) = owner_ptr {
-            builder.local_get(owner_ptr).local_set(field_owner_ptr);
-        } else {
-            builder.unreachable();
-        }
+        builder.unreachable();
     }
 
     for (index, field) in struct_.fields.iter().enumerate() {
@@ -176,7 +172,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 /// `module` - walrus module
 /// `builder` - insturctions sequence builder
 /// `slot_ptr` - storage's slot where the data will be saved
-/// `struct_id_ptr` - pointer to the struct id. If the struct does not have the key ability, this will be the id of the (nearest) parent struct with the key ability.
+/// `struct_id_ptr` - optional pointer to the struct id. If the struct does not have the key ability, this will be None.
 /// `owner_ptr` - pointer to the owner struct id.
 /// `struct_` - structural information of the struct to be encoded and saved
 /// `read_bytes_in_slot` - number of bytes already read in the slot.
@@ -211,6 +207,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
     // Locals
     let struct_ptr = module.locals.add(ValType::I32);
     let field_ptr = module.locals.add(ValType::I32);
+    let field_owner_ptr = module.locals.add(ValType::I32);
 
     // If the struct has the key ability
     if struct_.has_key {
@@ -254,6 +251,17 @@ pub fn add_read_and_decode_storage_struct_instructions(
                     else_.unreachable();
                 },
             );
+
+        // Set the owner for the fields (wrapped objects).
+        // If the struct has key, then the owner is the struct id.
+        // Otherwise, use the owner pointer passed as argument.
+        if let Some(struct_id_ptr) = struct_id_ptr {
+            builder.local_get(struct_id_ptr).local_set(field_owner_ptr);
+        } else {
+            builder.unreachable();
+        }
+    } else {
+        builder.local_get(owner_ptr).local_set(field_owner_ptr);
     }
 
     // Allocate memory for the struct
@@ -263,16 +271,6 @@ pub fn add_read_and_decode_storage_struct_instructions(
         .call(compilation_ctx.allocator)
         .local_set(struct_ptr);
 
-    let field_owner_ptr = module.locals.add(ValType::I32);
-    if struct_.has_key {
-        if let Some(struct_id_ptr) = struct_id_ptr {
-            builder.local_get(struct_id_ptr).local_set(field_owner_ptr);
-        } else {
-            builder.unreachable();
-        }
-    } else {
-        builder.local_get(owner_ptr).local_set(field_owner_ptr);
-    }
     // Iterate through the fields of the struct
     for (index, field) in struct_.fields.iter().enumerate() {
         // If the field is a UID or NamedId, don't call decode_intermediate_type_instructions and process it here
