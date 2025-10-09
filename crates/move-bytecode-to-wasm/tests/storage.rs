@@ -5340,19 +5340,14 @@ mod dynamic_storage_fields {
 
     sol!(
         #[allow(missing_docs)]
-
-        struct String {
-            uint8[] bytes;
-        }
-
         function createFoo() public view;
         function createFooOwned() public view;
-        function attachDynamicField(bytes32 foo, String name, uint64 value) public view;
-        function readDynamicField(bytes32 foo, String name) public view returns (uint64);
-        function dynamicFieldExists(bytes32 foo, String name) public view returns (bool);
-        function mutateDynamicField(bytes32 foo, String name) public view;
-        function mutateDynamicFieldTwo(bytes32 foo, String name, String name2) public view;
-        function removeDynamicField(bytes32 foo, String name) public view returns (uint64);
+        function attachDynamicField(bytes32 foo, string name, uint64 value) public view;
+        function readDynamicField(bytes32 foo, string name) public view returns (uint64);
+        function dynamicFieldExists(bytes32 foo, string name) public view returns (bool);
+        function mutateDynamicField(bytes32 foo, string name) public view;
+        function mutateDynamicFieldTwo(bytes32 foo, string name, string name2) public view;
+        function removeDynamicField(bytes32 foo, string name) public view returns (uint64);
         function attachDynamicFieldAddrU256(bytes32 foo, address name, uint256 value) public view;
         function readDynamicFieldAddrU256(bytes32 foo, address name) public view returns (uint256);
         function dynamicFieldExistsAddrU256(bytes32 foo, address name) public view returns (bool);
@@ -5378,13 +5373,8 @@ mod dynamic_storage_fields {
         let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
         let object_id = FixedBytes::<32>::from_slice(&object_id);
 
-        let field_name_1 = String {
-            bytes: b"test_key_1".to_ascii_lowercase(),
-        };
-
-        let field_name_2 = String {
-            bytes: b"test_key_2".to_ascii_lowercase(),
-        };
+        let field_name_1 = "test_key_1".to_owned();
+        let field_name_2 = "test_key_2".to_owned();
 
         let field_name_3 = address!("0x1234567890abcdef1234567890abcdef12345678");
         let field_name_4 = address!("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
@@ -5579,19 +5569,14 @@ mod dynamic_storage_fields_named_id {
 
     sol!(
         #[allow(missing_docs)]
-
-        struct String {
-            uint8[] bytes;
-        }
-
         function createFoo() public view;
         function createFooOwned() public view;
-        function attachDynamicField(String name, uint64 value) public view;
-        function readDynamicField(String name) public view returns (uint64);
-        function dynamicFieldExists(String name) public view returns (bool);
-        function mutateDynamicField(String name) public view;
-        function mutateDynamicFieldTwo(String name, String name2) public view;
-        function removeDynamicField(String name) public view returns (uint64);
+        function attachDynamicField(string name, uint64 value) public view;
+        function readDynamicField(string name) public view returns (uint64);
+        function dynamicFieldExists(string name) public view returns (bool);
+        function mutateDynamicField(string name) public view;
+        function mutateDynamicFieldTwo(string name, string name2) public view;
+        function removeDynamicField(string name) public view returns (uint64);
         function attachDynamicFieldAddrU256(address name, uint256 value) public view;
         function readDynamicFieldAddrU256(address name) public view returns (uint256);
         function dynamicFieldExistsAddrU256(address name) public view returns (bool);
@@ -5613,13 +5598,8 @@ mod dynamic_storage_fields_named_id {
             assert_eq!(0, result);
         }
 
-        let field_name_1 = String {
-            bytes: b"test_key_1".to_ascii_lowercase(),
-        };
-
-        let field_name_2 = String {
-            bytes: b"test_key_2".to_ascii_lowercase(),
-        };
+        let field_name_1 = "test_key_1".to_owned();
+        let field_name_2 = "test_key_2".to_owned();
 
         let field_name_3 = address!("0x1234567890abcdef1234567890abcdef12345678");
         let field_name_4 = address!("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
@@ -6038,7 +6018,15 @@ mod erc20 {
         assert_eq!(0, result);
         assert_eq!(18.abi_encode(), result_data);
 
-        // TODO: add name and symbol when processing strings correctly
+        let call_data = nameCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!("Test Coin".abi_encode(), result_data);
+
+        let call_data = symbolCall::new(()).abi_encode();
+        let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        assert_eq!("TST".abi_encode(), result_data);
 
         // Mint new coins
         let call_data = totalSupplyCall::new(()).abi_encode();
@@ -6163,6 +6151,7 @@ mod erc20 {
         assert_eq!(100.abi_encode(), result_data);
     }
 }
+
 mod simple_warrior {
     use super::*;
     use crate::common::runtime_sandbox::constants::SIGNER_ADDRESS;
