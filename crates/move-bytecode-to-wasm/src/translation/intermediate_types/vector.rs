@@ -27,59 +27,59 @@ impl IVector {
         builder
             .local_get(capacity)
             .i32_const(0)
-            .binop(BinaryOp::I32Eq);
-        builder.if_else(
-            None,
-            |then| {
-                then.i32_const(8)
-                    .call(compilation_ctx.allocator)
-                    .local_set(pointer);
-            },
-            |else_| {
-                // This is a failsafe to prevent UB if static checks failed
-                else_
-                    .local_get(len)
-                    .local_get(capacity)
-                    .binop(BinaryOp::I32GtU)
-                    .if_else(
-                        None,
-                        |then_| {
-                            then_.unreachable(); // Trap if len > capacity
+            .binop(BinaryOp::I32Eq)
+            .if_else(
+                None,
+                |then| {
+                    then.i32_const(8)
+                        .call(compilation_ctx.allocator)
+                        .local_set(pointer);
+                },
+                |else_| {
+                    // This is a failsafe to prevent UB if static checks failed
+                    else_
+                        .local_get(len)
+                        .local_get(capacity)
+                        .binop(BinaryOp::I32GtU)
+                        .if_else(
+                            None,
+                            |then_| {
+                                then_.unreachable(); // Trap if len > capacity
+                            },
+                            |_| {},
+                        );
+
+                    // Allocate memory: capacity * element size + 8 bytes for header
+                    else_
+                        .local_get(capacity)
+                        .i32_const(data_size)
+                        .binop(BinaryOp::I32Mul)
+                        .i32_const(8)
+                        .binop(BinaryOp::I32Add)
+                        .call(compilation_ctx.allocator)
+                        .local_set(pointer);
+
+                    // Write length at offset 0
+                    else_.local_get(pointer).local_get(len).store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
                         },
-                        |_| {},
                     );
 
-                // Allocate memory: capacity * element size + 8 bytes for header
-                else_
-                    .local_get(capacity)
-                    .i32_const(data_size)
-                    .binop(BinaryOp::I32Mul)
-                    .i32_const(8)
-                    .binop(BinaryOp::I32Add)
-                    .call(compilation_ctx.allocator)
-                    .local_set(pointer);
-
-                // Write length at offset 0
-                else_.local_get(pointer).local_get(len).store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-
-                // Write capacity at offset 4
-                else_.local_get(pointer).local_get(capacity).store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 4,
-                    },
-                );
-            },
-        );
+                    // Write capacity at offset 4
+                    else_.local_get(pointer).local_get(capacity).store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 4,
+                        },
+                    );
+                },
+            );
     }
 
     pub fn load_constant_instructions(

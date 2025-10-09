@@ -618,6 +618,16 @@ pub fn add_read_and_decode_from_storage_fn(
     let slot_ptr = module.locals.add(ValType::I32);
     let uid_ptr = module.locals.add(ValType::I32);
 
+    // Locals
+    let owner_ptr = module.locals.add(ValType::I32);
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_tee(owner_ptr)
+        .i32_const(DATA_STORAGE_OBJECT_OWNER_OFFSET)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
     let read_bytes_in_slot = module.locals.add(ValType::I32);
     builder.i32_const(0).local_set(read_bytes_in_slot);
 
@@ -627,6 +637,7 @@ pub fn add_read_and_decode_from_storage_fn(
         compilation_ctx,
         slot_ptr,
         uid_ptr,
+        owner_ptr,
         itype,
         read_bytes_in_slot,
     );
