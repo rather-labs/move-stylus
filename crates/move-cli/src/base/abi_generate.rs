@@ -1,6 +1,4 @@
-use super::reroot_path;
 use clap::*;
-use move_bytecode_to_wasm::translate_package_cli;
 use move_evm_abi_generator::generate_abi;
 use move_package::BuildConfig;
 use std::path::Path;
@@ -11,7 +9,7 @@ use std::path::Path;
 pub struct AbiGenerate;
 
 impl AbiGenerate {
-    pub fn execute(self, path: Option<&Path>, config: BuildConfig) -> anyhow::Result<()> {
+    pub fn execute(self, path: Option<&Path>, _config: BuildConfig) -> anyhow::Result<()> {
         generate_abi(path);
         Ok(())
     }
