@@ -564,11 +564,23 @@ pub fn add_encode_and_save_into_storage_fn(
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
 
+    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
+
+    // Arguments
     let struct_ptr = module.locals.add(ValType::I32);
     let slot_ptr = module.locals.add(ValType::I32);
 
-    // Set the written bytes in the slot to 0
+    // Locals
+    let struct_id_ptr = module.locals.add(ValType::I32);
     let written_bytes_in_slot = module.locals.add(ValType::I32);
+
+    // Get the struct uid
+    builder
+        .local_get(struct_ptr)
+        .call(get_struct_owner_fn)
+        .local_set(struct_id_ptr);
+
+    // Set the written bytes in the slot to 0
     builder.i32_const(0).local_set(written_bytes_in_slot);
 
     add_encode_and_save_into_storage_struct_instructions(
@@ -577,6 +589,7 @@ pub fn add_encode_and_save_into_storage_fn(
         compilation_ctx,
         struct_ptr,
         slot_ptr,
+        struct_id_ptr,
         itype,
         written_bytes_in_slot,
     );
@@ -713,7 +726,7 @@ pub fn add_delete_struct_from_storage_fn(
                 .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
                 .local_set(slot_ptr);
 
-            // Initialize the number of bytes used in the slot to zero
+            // Initialize the number of bytes used in the slot to 8, to reflect the 8-byte type hash
             let used_bytes_in_slot = module.locals.add(ValType::I32);
             else_.i32_const(8).local_set(used_bytes_in_slot);
 
