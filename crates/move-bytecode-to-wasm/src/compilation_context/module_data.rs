@@ -31,6 +31,7 @@ use move_package::{
     compilation::compiled_package::CompiledUnitWithSource,
     source_package::parsed_manifest::PackageName,
 };
+use move_parse_special_attributes::process_special_attributes;
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -144,27 +145,33 @@ pub struct ModuleData {
 impl ModuleData {
     pub fn build_module_data<'move_package>(
         module_id: ModuleId,
-        move_module: &'move_package CompiledModule,
+        move_module: &'move_package CompiledUnitWithSource,
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
         root_compiled_units: &'move_package [CompiledUnitWithSource],
         function_definitions: &mut GlobalFunctionTable<'move_package>,
     ) -> Self {
+        println!("{:?}", move_module.source_path);
+
+        let special_attributes = process_special_attributes(&move_module.source_path);
+
+        let move_module_unit = &move_module.unit.module;
+
         let datatype_handles_map = Self::process_datatype_handles(
             &module_id,
-            move_module,
+            move_module_unit,
             move_module_dependencies,
             root_compiled_units,
         );
 
         // Module's structs
         let (module_structs, fields_to_struct_map) =
-            Self::process_concrete_structs(move_module, &datatype_handles_map);
+            Self::process_concrete_structs(move_module_unit, &datatype_handles_map);
 
         let (module_generic_structs_instances, generic_fields_to_struct_map) =
-            Self::process_generic_structs(move_module, &datatype_handles_map);
+            Self::process_generic_structs(move_module_unit, &datatype_handles_map);
 
         let instantiated_fields_to_generic_fields =
-            Self::process_generic_field_instances(move_module, &datatype_handles_map);
+            Self::process_generic_field_instances(move_module_unit, &datatype_handles_map);
 
         let structs = StructData {
             structs: module_structs,
@@ -176,7 +183,7 @@ impl ModuleData {
 
         // Module's enums
         let (module_enums, variants_to_enum_map) =
-            Self::process_concrete_enums(move_module, &datatype_handles_map);
+            Self::process_concrete_enums(move_module_unit, &datatype_handles_map);
 
         let enums = EnumData {
             enums: module_enums,
@@ -185,13 +192,13 @@ impl ModuleData {
 
         let functions = Self::process_function_definitions(
             module_id.clone(),
-            move_module,
+            move_module_unit,
             &datatype_handles_map,
             function_definitions,
             move_module_dependencies,
         );
 
-        let signatures = move_module
+        let signatures = move_module_unit
             .signatures()
             .iter()
             .map(|s| {
@@ -204,7 +211,7 @@ impl ModuleData {
 
         ModuleData {
             id: module_id,
-            constants: move_module.constant_pool.clone(), // TODO: Clone
+            constants: move_module_unit.constant_pool.clone(), // TODO: Clone
             functions,
             structs,
             enums,

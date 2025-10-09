@@ -1,0 +1,7 @@
+[package]
+name = "move-parse-special-attributes"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+move-compiler.workspace = true
