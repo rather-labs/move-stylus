@@ -3083,6 +3083,7 @@ dependencies = [
  "move-core-types",
  "move-package",
  "move-packages-build",
+ "move-parse-special-attributes",
  "relooper",
  "rstest",
  "thiserror 2.0.12",
@@ -3463,6 +3464,13 @@ name = "move-packages-build"
 version = "0.1.0"
 dependencies = [
  "move-package",
+]
+
+[[package]]
+name = "move-parse-special-attributes"
+version = "0.1.0"
+dependencies = [
+ "move-compiler",
 ]
 
 [[package]]
