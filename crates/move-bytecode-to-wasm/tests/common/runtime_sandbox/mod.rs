@@ -27,11 +27,13 @@ pub struct ExecutionData {
     pub store: Store<ModuleData>,
 }
 
+type LogEventReceiver = Arc<Mutex<mpsc::Receiver<(u32, Vec<u8>)>>>;
+
 pub struct RuntimeSandbox {
     engine: Engine,
     linker: Linker<ModuleData>,
     module: WasmModule,
-    pub log_events: Arc<Mutex<mpsc::Receiver<Vec<u8>>>>,
+    pub log_events: LogEventReceiver,
     current_tx_origin: Arc<Mutex<[u8; 20]>>,
     current_msg_sender: Arc<Mutex<[u8; 20]>>,
     storage: Arc<Mutex<HashMap<[u8; 32], [u8; 32]>>>,
@@ -81,7 +83,7 @@ impl RuntimeSandbox {
         let current_tx_origin = Arc::new(Mutex::new(SIGNER_ADDRESS));
         let current_msg_sender = Arc::new(Mutex::new(MSG_SENDER_ADDRESS));
 
-        let (log_sender, log_receiver) = mpsc::channel::<Vec<u8>>();
+        let (log_sender, log_receiver) = mpsc::channel::<(u32, Vec<u8>)>();
         let mut linker = Linker::new(&engine);
 
         let mem_export = module.get_export_index("memory").unwrap();
@@ -172,13 +174,13 @@ impl RuntimeSandbox {
             .func_wrap(
                 "vm_hooks",
                 "emit_log",
-                move |mut caller: Caller<'_, ModuleData>, ptr: u32, len: u32, _topic: u32| {
+                move |mut caller: Caller<'_, ModuleData>, ptr: u32, len: u32, topic: u32| {
                     let mem = get_memory(&mut caller);
                     let mut buffer = vec![0; len as usize];
 
                     mem.read(&mut caller, ptr as usize, &mut buffer).unwrap();
 
-                    log_sender.send(buffer.to_vec()).unwrap();
+                    log_sender.send((topic, buffer.to_vec())).unwrap();
                 },
             )
             .unwrap();

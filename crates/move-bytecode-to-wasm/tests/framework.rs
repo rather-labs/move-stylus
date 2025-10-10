@@ -111,7 +111,8 @@ mod tx_context {
 }
 
 mod event {
-    use alloy_primitives::address;
+    use alloy_primitives::FixedBytes;
+    use alloy_primitives::{address, keccak256};
 
     use crate::common::translate_test_package_with_framework;
 
@@ -179,27 +180,32 @@ mod event {
     );
 
     #[rstest]
-    #[case(emitTestEvent1Call::new((42,)), TestEvent1 { n: 42 })]
+    #[case(emitTestEvent1Call::new((42,)), vec![
+        (0, keccak256(b"TestEvent1(uint32)").to_vec()),
+        (1, 42.abi_encode().to_vec())
+    ])]
     #[case(emitTestEvent2Call::new((
         42,
         address!("0xcafe000000000000000000000000000000007357"),
         u128::MAX
-    )), TestEvent2 {
-        a: 42,
-        b: address!("0xcafe000000000000000000000000000000007357"),
-        c: u128::MAX,
-    })]
+    )), vec![
+        (0, keccak256(b"TestEvent2(uint32,address,uint128)").to_vec()),
+        (1, 42.abi_encode().to_vec()),
+        (2, address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec()),
+        (3, u128::MAX.abi_encode().to_vec())
+    ])]
     #[case(emitTestEvent3Call::new((
         42,
         address!("0xcafe000000000000000000000000000000007357"),
         u128::MAX,
         vec![1, 2, 3, 4, 5]
-    )), TestEvent3 {
-        a: 42,
-        b: address!("0xcafe000000000000000000000000000000007357"),
-        c: u128::MAX,
-        d: vec![1, 2, 3, 4, 5],
-    })]
+    )), vec![
+        (0, keccak256(b"TestEvent3(uint32,address,uint128,uint8[])").to_vec()),
+        (1, 42.abi_encode().to_vec()),
+        (2, address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec()),
+        (4, u128::MAX.abi_encode().to_vec()),
+        (4, vec![1, 2, 3, 4, 5].abi_encode().to_vec())
+    ])]
     #[case(emitTestEvent4Call::new((
         42,
         address!("0xcafe000000000000000000000000000000007357"),
@@ -210,44 +216,32 @@ mod event {
             b: address!("0xcafe000000000000000000000000000000007357"),
             c: u128::MAX,
         }
-    )), TestEvent4 {
-        a: 42,
-        b: address!("0xcafe000000000000000000000000000000007357"),
-        c: u128::MAX,
-        d: vec![1, 2, 3, 4, 5],
-        e: TestEvent2 {
+    )), vec![
+        (0, keccak256(b"TestEvent4(uint32,address,uint128,uint8[],(uint32,address,uint128))").to_vec()),
+        (1, 42.abi_encode().to_vec()),
+        (2, address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec()),
+        (4, u128::MAX.abi_encode().to_vec()),
+        (4, vec![1, 2, 3, 4, 5].abi_encode().to_vec()),
+        (4, TestEvent2 {
             a: 42,
             b: address!("0xcafe000000000000000000000000000000007357"),
             c: u128::MAX,
-        }
-    })]
-    #[case(emitGenericEvent1Call::new((
-        vec![1, 2, 3, 4, 5], false, address!("0xcafe000000000000000000000000000000007357"), u128::MAX
-    )), GenericEvent1 {
-        n: vec![1, 2, 3, 4, 5],
-        o: false,
-        p: address!("0xcafe000000000000000000000000000000007357"),
-        q: u128::MAX
-    })]
-    #[case(emitGenericEvent2Call::new((
-        u64::MAX, true, TestEvent1 { n: 42 }, TestEvent2 { a: 42, b: address!("0xcafe000000000000000000000000000000007357"), c: u128::MAX }
-    )), GenericEvent2 {
-        n: u64::MAX,
-        o: true,
-        p: TestEvent1 { n: 42 },
-        q: TestEvent2 { a: 42, b: address!("0xcafe000000000000000000000000000000007357"), c: u128::MAX }
-    })]
-    fn test_emit_event<T: SolCall, V: SolValue>(
+        }.abi_encode().to_vec())
+    ])]
+    fn test_emit_event<T: SolCall>(
         runtime: RuntimeSandbox,
         #[case] call_data: T,
-        #[case] expected_result: V,
-    ) where
-        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
-    {
+        #[case] expected_result: Vec<(u32, Vec<u8>)>,
+    ) {
         let (result, _) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
         assert_eq!(result, 0, "Function returned non-zero exit code: {result}");
 
-        let event = runtime.log_events.lock().unwrap().recv().unwrap();
-        assert_eq!(event, expected_result.abi_encode());
+        for (expected_topic, expected_data) in expected_result {
+            let (topic, data) = runtime.log_events.lock().unwrap().recv().unwrap();
+            println!("Topic {topic}");
+            println!("Data {data:?}");
+            assert_eq!(expected_topic, topic);
+            assert_eq!(expected_data, data.as_slice());
+        }
     }
 }

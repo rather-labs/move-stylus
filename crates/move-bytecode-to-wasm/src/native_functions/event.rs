@@ -68,10 +68,13 @@ pub fn add_emit_log_fn(
             .call(compilation_ctx.allocator)
             .local_set(writer_pointer);
 
+        println!("data event: {data:?}");
+
         for (index, chunk) in data.chunks_exact(8).enumerate() {
+            println!("saving chunk: {chunk:?}");
             builder
                 .local_get(writer_pointer)
-                .i64_const(i64::from_be_bytes(chunk.try_into().unwrap()))
+                .i64_const(i64::from_le_bytes(chunk.try_into().unwrap()))
                 .store(
                     compilation_ctx.memory_id,
                     walrus::ir::StoreKind::I64 { atomic: false },
@@ -85,9 +88,7 @@ pub fn add_emit_log_fn(
         // Log 0
         builder
             .local_get(writer_pointer)
-            .local_get(writer_pointer)
             .i32_const(32)
-            .binop(BinaryOp::I32Add)
             .i32_const(0)
             .call(emit_log_fn);
 
@@ -222,7 +223,7 @@ pub fn add_emit_log_fn(
 
         // If we used all indexed topics, we emit the fields in the LOG4 slot, that is, the data
         // topic
-        let topic = if used_topics == 4 || used_topics == indexes {
+        let topic = if used_topics == 4 || used_topics > indexes {
             4
         } else {
             used_topics

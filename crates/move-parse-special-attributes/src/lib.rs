@@ -41,8 +41,9 @@ pub fn process_special_attributes(path: &Path) -> SpecialAttributes {
                     }
                     ModuleMember::Struct(ref s) => {
                         println!("Processing struct {}", s.name);
-                        let event = Event::try_from(s).unwrap();
-                        result.events.insert(s.name.to_string(), event);
+                        if let Ok(event) = Event::try_from(s) {
+                            result.events.insert(s.name.to_string(), event);
+                        }
                     }
                     _ => continue,
                 }
