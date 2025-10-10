@@ -10,6 +10,7 @@ use stylus::object::UID;
 use stylus::tx_context::TxContext;
 use stylus::tx_context as tx_context;
 
+#[ext(event)]
 public struct IWalkTheDog has copy, drop { }
 
 public struct CanWalkDogCap has key { id: UID }

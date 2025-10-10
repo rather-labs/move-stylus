@@ -13,7 +13,7 @@ sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract Example {
-        function create() public view;
+        function constructor() public view;
         function mint(address to, uint256 amount) external view;
         function burn(address from, uint256 amount) external view;
         function balanceOf(address account) public view returns (uint256);
@@ -75,8 +75,7 @@ async fn main() -> eyre::Result<()> {
     println!("====================");
     println!("Creating a new erc20");
     println!("====================");
-    let pending_tx = example.create().send().await?;
-    let _receipt = pending_tx.get_receipt().await?;
+    let pending_tx_ = example.constructor().send().await?;
     println!("Created!");
 
     println!("\n====================");
@@ -109,6 +108,8 @@ async fn main() -> eyre::Result<()> {
 
     println!("Mint events");
     for log in receipt.logs() {
+
+    println!("Log {:?}", log);
         let raw = log.data().data.0.clone();
         println!("create tx 0x{}", hex::encode(&raw));
     }
