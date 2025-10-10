@@ -20,7 +20,11 @@ pub fn move_signature_to_event_signature_hash(
         .filter_map(|s| solidity_name(s, compilation_ctx))
         .collect::<Vec<String>>()
         .join(",");
-
+    println!("{}({})", struct_.identifier, field_strings);
+    println!(
+        "{:?}",
+        *keccak256(format!("{}({})", struct_.identifier, field_strings).as_bytes())
+    );
     *keccak256(format!("{}({})", struct_.identifier, field_strings).as_bytes())
 }
 

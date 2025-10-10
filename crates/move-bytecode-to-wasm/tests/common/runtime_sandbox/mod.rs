@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex, mpsc},
 };
 
-use alloy_primitives::keccak256;
+use alloy_primitives::{FixedBytes, keccak256};
 use anyhow::Result;
 use constants::{
     BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, CHAIN_ID, GAS_PRICE,
@@ -431,6 +431,15 @@ impl RuntimeSandbox {
             .expect("Wasm module must export memory");
 
         Ok(memory.data(&store)[from..from + len].to_vec())
+    }
+
+    pub fn obtain_uid(&self) -> FixedBytes<32> {
+        let (topic, data) = self.log_events.lock().unwrap().recv().unwrap();
+        assert_eq!(0, topic);
+        assert_eq!(*keccak256(b"NewUID(address)").as_slice(), data);
+        let (topic, data) = self.log_events.lock().unwrap().recv().unwrap();
+        assert_eq!(1, topic);
+        FixedBytes::<32>::from_slice(&data)
     }
 
     pub fn set_tx_origin(&self, new_address: [u8; 20]) {
