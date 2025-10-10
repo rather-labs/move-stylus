@@ -31,7 +31,7 @@ use move_package::{
     compilation::compiled_package::CompiledUnitWithSource,
     source_package::parsed_manifest::PackageName,
 };
-use move_parse_special_attributes::process_special_attributes;
+use move_parse_special_attributes::{SpecialAttributes, process_special_attributes};
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -164,8 +164,11 @@ impl ModuleData {
         );
 
         // Module's structs
-        let (module_structs, fields_to_struct_map) =
-            Self::process_concrete_structs(move_module_unit, &datatype_handles_map);
+        let (module_structs, fields_to_struct_map) = Self::process_concrete_structs(
+            move_module_unit,
+            &datatype_handles_map,
+            &special_attributes,
+        );
 
         let (module_generic_structs_instances, generic_fields_to_struct_map) =
             Self::process_generic_structs(move_module_unit, &datatype_handles_map);
@@ -324,6 +327,7 @@ impl ModuleData {
     fn process_concrete_structs(
         module: &CompiledModule,
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+        module_special_attributes: &SpecialAttributes,
     ) -> (
         Vec<IStruct>,
         HashMap<FieldHandleIndex, StructDefinitionIndex>,
@@ -380,6 +384,11 @@ impl ModuleData {
 
             let type_ = if Self::is_one_time_witness(module, struct_def.struct_handle) {
                 IStructType::OneTimeWitness
+            } else if let Some(event) = module_special_attributes.events.get(&identifier) {
+                IStructType::Event {
+                    indexes: event.indexes,
+                    is_anonymous: event.is_anonymous,
+                }
             } else {
                 IStructType::Common
             };

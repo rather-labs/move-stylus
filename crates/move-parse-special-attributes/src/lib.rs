@@ -4,7 +4,7 @@ pub use event::Event;
 
 #[derive(Default)]
 pub struct SpecialAttributes {
-    pub events: Vec<Event>,
+    pub events: HashMap<String, Event>,
 }
 
 use move_compiler::{
@@ -12,7 +12,10 @@ use move_compiler::{
     parser::ast::{Definition, ModuleMember},
     shared::NumericalAddress,
 };
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::Path,
+};
 
 pub fn process_special_attributes(path: &Path) -> SpecialAttributes {
     let (_, program_res) = Compiler::from_files(
@@ -38,7 +41,8 @@ pub fn process_special_attributes(path: &Path) -> SpecialAttributes {
                     }
                     ModuleMember::Struct(ref s) => {
                         println!("Processing struct {}", s.name);
-                        println!("{:?}", Event::try_from(s));
+                        let event = Event::try_from(s).unwrap();
+                        result.events.insert(s.name.to_string(), event);
                     }
                     _ => continue,
                 }

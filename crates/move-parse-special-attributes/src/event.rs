@@ -3,14 +3,14 @@ use move_compiler::parser::ast::{Attribute_, AttributeValue_, StructDefinition, 
 /// This struct represents the properties of a event struct.
 pub struct Event {
     /// Event name
-    name: String,
+    pub name: String,
 
     /// `true` if the  event is anonymous, otherwise `false`
-    is_anonymous: bool,
+    pub is_anonymous: bool,
 
     /// Indexed parameters. Indexed parameters are parsed in order and there can be max of 4
     /// anonymous events and 3 for non-anonymous parameters.
-    indexes: u8,
+    pub indexes: u8,
 }
 
 impl Event {
