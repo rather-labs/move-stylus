@@ -10,7 +10,7 @@ use crate::{
         intermediate_types::{
             IntermediateType,
             enums::{IEnum, IEnumVariant},
-            structs::IStruct,
+            structs::{IStruct, IStructType},
         },
         table::FunctionId,
     },
@@ -378,7 +378,11 @@ impl ModuleData {
                 .into_iter()
                 .any(|a| a == Ability::Key);
 
-            let is_one_time_witness = Self::is_one_time_witness(module, struct_def.struct_handle);
+            let type_ = if Self::is_one_time_witness(module, struct_def.struct_handle) {
+                IStructType::OneTimeWitness
+            } else {
+                IStructType::Common
+            };
 
             module_structs.push(IStruct::new(
                 struct_index,
@@ -386,7 +390,7 @@ impl ModuleData {
                 all_fields,
                 fields_map,
                 has_key,
-                is_one_time_witness,
+                type_,
             ));
         }
 

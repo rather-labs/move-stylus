@@ -102,7 +102,10 @@ mod tests {
         compilation_context::{ModuleData, ModuleId},
         test_compilation_context,
         test_tools::build_module,
-        translation::intermediate_types::{VmHandledStruct, structs::IStruct},
+        translation::intermediate_types::{
+            VmHandledStruct,
+            structs::{IStruct, IStructType},
+        },
     };
 
     use super::*;
@@ -143,7 +146,7 @@ mod tests {
             ],
             HashMap::new(),
             false,
-            false,
+            IStructType::Common,
         );
 
         let struct_2 = IStruct::new(
@@ -155,7 +158,7 @@ mod tests {
             ],
             HashMap::new(),
             false,
-            false,
+            IStructType::Common,
         );
 
         let mut module_data = ModuleData::default();
@@ -184,7 +187,7 @@ mod tests {
             ],
             HashMap::new(),
             false,
-            false,
+            IStructType::Common,
         ),
         *keccak256(b"Approval(address,address,uint256)")
     )]
@@ -199,7 +202,7 @@ mod tests {
             ],
             HashMap::new(),
             false,
-            false,
+            IStructType::Common,
         ),
         *keccak256(b"Transfer(address,address,uint256)")
     )]
@@ -210,7 +213,7 @@ mod tests {
             vec![],
             HashMap::new(),
             false,
-            false,
+            IStructType::Common,
         ),
         *keccak256(b"Empty()")
     )]
