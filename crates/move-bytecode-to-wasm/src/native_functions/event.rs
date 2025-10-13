@@ -1,6 +1,6 @@
 use walrus::{
-    FunctionBuilder, FunctionId, Module, ValType,
-    ir::{BinaryOp, MemArg},
+    FunctionBuilder, FunctionId, LocalId, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg},
 };
 
 use crate::{
@@ -55,6 +55,7 @@ pub fn add_emit_log_fn(
     let calldata_reference_pointer = module.locals.add(ValType::I32);
     let packed_data_begin = module.locals.add(ValType::I32);
     let local = module.locals.add(ValType::I32);
+    let local_64 = module.locals.add(ValType::I64);
     let abi_encoded_data_length = module.locals.add(ValType::I32);
 
     let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
@@ -65,19 +66,6 @@ pub fn add_emit_log_fn(
     let mut event_fields_encoded_data = Vec::new();
 
     for (field_index, field) in struct_.fields.iter().enumerate() {
-        // Get the pointer to the field
-        builder
-            .local_get(struct_ptr)
-            .load(
-                compilation_ctx.memory_id,
-                walrus::ir::LoadKind::I32 { atomic: false },
-                MemArg {
-                    offset: field_index as u32 * 4,
-                    align: 0,
-                },
-            )
-            .local_set(local);
-
         match field {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -165,7 +153,8 @@ pub fn add_emit_log_fn(
                 let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
                 let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
 
-                let size = if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
+                let is_dynamic = struct_.solidity_abi_encode_is_dynamic(compilation_ctx);
+                let size = if is_dynamic {
                     32
                 } else {
                     struct_.solidity_abi_encode_size(compilation_ctx) as i32
@@ -178,26 +167,23 @@ pub fn add_emit_log_fn(
                     .local_tee(abi_encoded_data_writer_pointer)
                     .local_set(abi_encoded_data_calldata_reference_pointer);
 
-                // ABI pack the struct before emitting the event
-                if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                    struct_.add_pack_instructions(
+                if is_dynamic {
+                    field.add_pack_instructions_dynamic(
                         &mut builder,
                         module,
                         local,
                         abi_encoded_data_writer_pointer,
                         abi_encoded_data_calldata_reference_pointer,
                         compilation_ctx,
-                        Some(abi_encoded_data_calldata_reference_pointer),
                     );
                 } else {
-                    struct_.add_pack_instructions(
+                    field.add_pack_instructions(
                         &mut builder,
                         module,
                         local,
                         abi_encoded_data_writer_pointer,
                         abi_encoded_data_calldata_reference_pointer,
                         compilation_ctx,
-                        None,
                     );
                 }
 
@@ -264,28 +250,38 @@ pub fn add_emit_log_fn(
         // Get the pointer to the field
         builder.local_get(struct_ptr).load(
             compilation_ctx.memory_id,
-            walrus::ir::LoadKind::I32 { atomic: false },
+            LoadKind::I32 { atomic: false },
             MemArg {
                 offset: field_index as u32 * 4,
                 align: 0,
             },
         );
+
         // If it is a stack type, we need to perform another load
         // TODO: u64 case
-        if field.is_stack_type() {
+        let local = if field.is_stack_type() {
+            let (local, load_kind) = if field.stack_data_size() == 8 {
+                (local_64, LoadKind::I64 { atomic: false })
+            } else {
+                (local, LoadKind::I32 { atomic: false })
+            };
+
             builder
                 .load(
                     compilation_ctx.memory_id,
-                    walrus::ir::LoadKind::I32 { atomic: false },
+                    load_kind,
                     MemArg {
                         offset: 0,
                         align: 0,
                     },
                 )
                 .local_set(local);
+
+            local
         } else {
             builder.local_set(local);
-        }
+            local
+        };
 
         match field {
             IntermediateType::IBool

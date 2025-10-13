@@ -144,6 +144,8 @@ mod event {
         function emitTestEvent5(uint32 a, address b, uint8[] c) external;
         function emitTestEvent6(uint32 a, address b, TestEvent2 c) external;
         function emitTestEvent7(uint32 a, uint8[] b, TestEvent2 c) external;
+        function emitTestEvent8(uint64 a, string b) external;
+        function emitTestEvent9(uint64 a, string b) external;
         function emitTestAnonEvent1(uint32 n) external;
         function emitTestAnonEvent2(uint32 a, address b, uint128 c) external;
         function emitTestAnonEvent3(uint32 a, address b, uint128 c, uint8[] d) external;
@@ -151,6 +153,8 @@ mod event {
         function emitTestAnonEvent5(uint32 a, address b, uint8[] c) external;
         function emitTestAnonEvent6(uint32 a, address b, TestEvent2 c) external;
         function emitTestAnonEvent7(uint32 a, uint8[] b, TestEvent2 c) external;
+        function emitTestAnonEvent8(uint64 a, string b) external;
+        function emitTestAnonEvent9(uint64 a, string b) external;
         function emitTestAnonymous(uint32 a, uint128 b, uint8[] c, TestEvent2 d) external;
         function emitTestAnonymous2(
             uint32 a,
@@ -265,6 +269,24 @@ mod event {
             c: u128::MAX,
         }.abi_encode()).to_vec()
     ].concat())]
+    #[case(emitTestEvent8Call::new((
+        42,
+        "test string".into(),
+    )), 2,
+    [
+        keccak256(b"TestEvent8(uint64,string)").to_vec(),
+        42.abi_encode().to_vec(),
+        "test string".abi_encode(),
+    ].concat())]
+    #[case(emitTestEvent9Call::new((
+        42,
+        "test string".into(),
+    )), 3,
+    [
+        keccak256(b"TestEvent9(uint64,string)").to_vec(),
+        42.abi_encode().to_vec(),
+        keccak256("test string".abi_encode()).to_vec(),
+    ].concat())]
     #[case(emitTestAnonEvent1Call::new((42,)), 1, [42.abi_encode().to_vec()].concat())]
     #[case(emitTestAnonEvent2Call::new((
         42,
@@ -354,6 +376,22 @@ mod event {
             b: address!("0xcafe000000000000000000000000000000007357"),
             c: u128::MAX,
         }.abi_encode()).to_vec()
+    ].concat())]
+    #[case(emitTestAnonEvent8Call::new((
+        42,
+        "test string".into(),
+    )), 1,
+    [
+        42.abi_encode().to_vec(),
+        "test string".abi_encode(),
+    ].concat())]
+    #[case(emitTestAnonEvent9Call::new((
+        42,
+        "test string".into(),
+    )), 2,
+    [
+        42.abi_encode().to_vec(),
+        keccak256("test string".abi_encode()).to_vec(),
     ].concat())]
     #[case(emitTestAnonymousCall::new((
         42,

@@ -52,6 +52,18 @@ public struct TestEvent7 has copy, drop {
     c: TestEvent2,
 }
 
+#[ext(event, indexes = 1)]
+public struct TestEvent8 has copy, drop {
+    a: u64,
+    b: std::ascii::String,
+}
+
+#[ext(event, indexes = 2)]
+public struct TestEvent9 has copy, drop {
+    a: u64,
+    b: std::ascii::String,
+}
+
 public fun emit_test_event1(n: u32) {
     emit(TestEvent1 { n });
 }
@@ -78,6 +90,14 @@ public fun emit_test_event6(a: u32, b: address, c: TestEvent2) {
 
 public fun emit_test_event7(a: u32, b: vector<u8>, c: TestEvent2) {
     emit(TestEvent7 { a, b, c });
+}
+
+public fun emit_test_event8(a: u64, b: std::ascii::String) {
+    emit(TestEvent8 { a, b });
+}
+
+public fun emit_test_event9(a: u64, b: std::ascii::String) {
+    emit(TestEvent9 { a, b });
 }
 
 #[ext(event, anonymous, indexes = 1)]
@@ -130,6 +150,18 @@ public struct TestEvent7Anon has copy, drop {
     c: TestEvent2,
 }
 
+#[ext(event, anonymous, indexes = 1)]
+public struct TestEvent8Anon has copy, drop {
+    a: u64,
+    b: std::ascii::String,
+}
+
+#[ext(event, anonymous, indexes = 2)]
+public struct TestEvent9Anon has copy, drop {
+    a: u64,
+    b: std::ascii::String,
+}
+
 #[ext(event, anonymous, indexes = 4)]
 public struct Anonymous has copy, drop {
     a: u32,
@@ -177,6 +209,14 @@ public fun emit_test_anon_event6(a: u32, b: address, c: TestEvent2) {
 
 public fun emit_test_anon_event7(a: u32, b: vector<u8>, c: TestEvent2) {
     emit(TestEvent7Anon { a, b, c });
+}
+
+public fun emit_test_anon_event8(a: u64, b: std::ascii::String) {
+    emit(TestEvent8Anon { a, b });
+}
+
+public fun emit_test_anon_event9(a: u64, b: std::ascii::String) {
+    emit(TestEvent9Anon { a, b });
 }
 
 public fun emit_test_anonymous(a: u32, b: u128, c: vector<u8>, d: TestEvent2) {
