@@ -84,6 +84,23 @@ pub fn add_emit_log_fn(
         builder.local_set(packed_data_begin);
     }
 
+    let mut total_event_size = 0;
+    // Calculate the encoded size for the whole event, so we can allocate it
+    for (index, field) in struct_.fields.iter().enumerate() {
+        // If it is indexed, it is just 32 bytes
+        if index < indexes as usize {
+            total_event_size += 32;
+        } else {
+            total_event_size += field.encoded_size(compilation_ctx);
+        }
+    }
+
+    builder
+        .i32_const(total_event_size as i32)
+        .call(compilation_ctx.allocator)
+        .local_tee(writer_pointer)
+        .local_set(calldata_reference_pointer);
+
     // ABI pack the struct before emitting the event
     for (field_index, field) in struct_.fields.iter().enumerate() {
         // Get the pointer to the field
@@ -120,14 +137,23 @@ pub fn add_emit_log_fn(
             | IntermediateType::IU64
             | IntermediateType::IU128
             | IntermediateType::IU256
-            | IntermediateType::IAddress
-            | IntermediateType::IVector(_) => {
+            | IntermediateType::IAddress => {
+                field.add_pack_instructions(
+                    &mut builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    compilation_ctx,
+                );
                 builder
                     .i32_const(32)
-                    .call(compilation_ctx.allocator)
+                    .local_get(writer_pointer)
+                    .binop(BinaryOp::I32Add)
                     .local_tee(writer_pointer)
                     .local_set(calldata_reference_pointer);
-
+            }
+            IntermediateType::IVector(_) => {
                 field.add_pack_instructions(
                     &mut builder,
                     module,
