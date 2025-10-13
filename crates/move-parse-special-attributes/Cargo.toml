@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 move-compiler.workspace = true
+thiserror = "2.0.17"

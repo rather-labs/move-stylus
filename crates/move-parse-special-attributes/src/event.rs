@@ -13,8 +13,26 @@ pub struct Event {
     pub indexes: u8,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum EventParseError {
+    #[error(r#"invalid event attribute "{0}""#)]
+    InvalidAttribute(String),
+
+    #[error(r#"invalid indexes attribute "{0:?}""#)]
+    InvalidIndexesAttribute(Box<AttributeValue_>),
+
+    #[error(r#"struct "{0}"  has too many indexed parameters (found {1}, max 3)"#)]
+    TooManyIndexedFields(String, u8),
+
+    #[error(r#"anonymous struct "{0}"  has too many indexed parameters (found {1}, max 4)"#)]
+    AnonymousTooManyIndexedFields(String, u8),
+
+    #[error(r#"struct "{0}" is not an event"#)]
+    NotAnEvent(String),
+}
+
 impl Event {
-    pub fn try_from(struct_definition: &StructDefinition) -> Result<Self, ()> {
+    pub fn try_from(struct_definition: &StructDefinition) -> Result<Self, EventParseError> {
         // Find the attribute we neekd
         for attribute in &struct_definition.attributes {
             for att in &attribute.value {
@@ -32,7 +50,11 @@ impl Event {
                         is_anonymous: false,
                         indexes: 0,
                     },
-                    _ => return Err(()),
+                    _ => {
+                        return Err(EventParseError::NotAnEvent(
+                            struct_definition.name.to_string(),
+                        ));
+                    }
                 };
 
                 for attribute in parametrized.iter().skip(1) {
@@ -49,31 +71,42 @@ impl Event {
                                             if indexes <= 4 {
                                                 event.indexes = indexes
                                             } else {
-                                                panic!(
-                                                    "an event can't have more than {indexes} indexes"
-                                                )
+                                                return Err(EventParseError::TooManyIndexedFields(
+                                                    event.name, indexes,
+                                                ));
                                             }
                                         }
                                         _ => todo!(),
                                     }
                                 }
-                                _ => panic!("invalid attribute {:?} in event", spanned1.value,),
+                                _ => {
+                                    return Err(EventParseError::InvalidIndexesAttribute(
+                                        Box::new(spanned1.value.clone()),
+                                    ));
+                                }
                             }
                         }
-                        _ => panic!(
-                            "invalid attribute {} in event",
-                            attribute.value.attribute_name()
-                        ),
+                        _ => {
+                            return Err(EventParseError::InvalidAttribute(
+                                attribute.value.attribute_name().to_string(),
+                            ));
+                        }
                     }
                 }
 
                 if !event.is_anonymous && event.indexes == 4 {
-                    panic!("event can't have 4 indexes if is not anonymous, maximum is 3");
+                    return Err(EventParseError::AnonymousTooManyIndexedFields(
+                        event.name,
+                        event.indexes,
+                    ));
                 }
 
                 return Ok(event);
             }
         }
-        Err(())
+
+        Err(EventParseError::NotAnEvent(
+            struct_definition.name.to_string(),
+        ))
     }
 }

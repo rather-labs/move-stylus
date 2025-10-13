@@ -1,12 +1,15 @@
 pub mod event;
+pub mod function_modifiers;
 
 pub use event::Event;
 
 #[derive(Default)]
 pub struct SpecialAttributes {
     pub events: HashMap<String, Event>,
+    pub functions: Vec<Function>,
 }
 
+use function_modifiers::{Function, FunctionModifier};
 use move_compiler::{
     Compiler, PASS_PARSER,
     parser::ast::{Definition, ModuleMember},
@@ -37,10 +40,20 @@ pub fn process_special_attributes(path: &Path) -> SpecialAttributes {
             for module_member in module.members {
                 match module_member {
                     ModuleMember::Function(f) => {
-                        // println!("found function!");
+                        if let Some(attributes) = f.attributes.first() {
+                            let modifiers = attributes
+                                .value
+                                .iter()
+                                .flat_map(|s| FunctionModifier::parse_modifiers(&s.value))
+                                .collect::<Vec<FunctionModifier>>();
+
+                            result.functions.push(Function {
+                                name: f.name.to_owned().to_string(),
+                                modifiers,
+                            });
+                        }
                     }
                     ModuleMember::Struct(ref s) => {
-                        println!("Processing struct {}", s.name);
                         if let Ok(event) = Event::try_from(s) {
                             result.events.insert(s.name.to_string(), event);
                         }
