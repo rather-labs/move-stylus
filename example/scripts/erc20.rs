@@ -75,7 +75,7 @@ async fn main() -> eyre::Result<()> {
     println!("====================");
     println!("Creating a new erc20");
     println!("====================");
-    let pending_tx_ = example.constructor().send().await?;
+    let _pending_tx_ = example.constructor().send().await?;
     println!("Created!");
 
     println!("\n====================");

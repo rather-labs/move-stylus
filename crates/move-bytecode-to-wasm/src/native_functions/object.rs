@@ -4,7 +4,7 @@ use crate::{
     compilation_context::ModuleId,
     data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_ZERO_OFFSET},
     hostio::host_functions::{
-        block_number, block_timestamp, emit_log, native_keccak256, storage_cache_bytes32,
+        block_number, block_timestamp, native_keccak256, storage_cache_bytes32,
         storage_flush_cache, storage_load_bytes32,
     },
     runtime::RuntimeFunction,

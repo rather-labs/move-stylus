@@ -435,11 +435,9 @@ impl RuntimeSandbox {
 
     pub fn obtain_uid(&self) -> FixedBytes<32> {
         let (topic, data) = self.log_events.lock().unwrap().recv().unwrap();
-        assert_eq!(0, topic);
-        assert_eq!(*keccak256(b"NewUID(address)").as_slice(), data);
-        let (topic, data) = self.log_events.lock().unwrap().recv().unwrap();
-        assert_eq!(1, topic);
-        FixedBytes::<32>::from_slice(&data)
+        assert_eq!(2, topic);
+        assert_eq!(*keccak256(b"NewUID(address)").as_slice(), data[..32]);
+        FixedBytes::<32>::from_slice(&data[32..])
     }
 
     pub fn set_tx_origin(&self, new_address: [u8; 20]) {

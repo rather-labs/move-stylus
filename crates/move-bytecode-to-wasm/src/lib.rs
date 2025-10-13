@@ -7,7 +7,6 @@ use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
     source_package::parsed_manifest::PackageName,
 };
-use move_parse_special_attributes::process_special_attributes;
 use std::{collections::HashMap, path::Path};
 use translation::{
     intermediate_types::IntermediateType,
