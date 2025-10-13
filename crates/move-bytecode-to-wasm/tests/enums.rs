@@ -79,3 +79,80 @@ mod enum_abi_packing_unpacking {
         runtime.call_entrypoint(call_data).unwrap();
     }
 }
+
+mod enum_match {
+    use super::*;
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "simple_enums_match";
+        const SOURCE_PATH: &str = "tests/enums/simple_enums_match.move";
+
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol! {
+        enum NumberEnum {
+            One,
+            Two,
+            Three,
+            Four,
+            Five,
+        }
+
+        enum ColorEnum {
+            Red,
+            Green,
+            Blue,
+        }
+
+        enum YinYangEnum {
+            Yin,
+            Yang,
+        }
+
+        function matchNumberEnum(NumberEnum x) external returns (uint32);
+        function matchNestedEnum(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
+    }
+
+    #[rstest]
+    #[case(NumberEnum::One, 11)]
+    #[case(NumberEnum::Two, 22)]
+    #[case(NumberEnum::Three, 33)]
+    #[case(NumberEnum::Four, 44)]
+    #[case(NumberEnum::Five, 44)]
+    fn test_basic_enum_match(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] input: NumberEnum,
+        #[case] expected: u32,
+    ) {
+        let call_data = matchNumberEnumCall::new((input,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(result, 0);
+        assert_eq!(return_data, expected.abi_encode());
+    }
+
+    #[rstest]
+    #[case(NumberEnum::One, ColorEnum::Red, YinYangEnum::Yin, 11)]
+    #[case(NumberEnum::Two, ColorEnum::Red, YinYangEnum::Yang, 22)]
+    #[case(NumberEnum::Two, ColorEnum::Green, YinYangEnum::Yin, 33)]
+    #[case(NumberEnum::Two, ColorEnum::Blue, YinYangEnum::Yang, 44)]
+    #[case(NumberEnum::Three, ColorEnum::Red, YinYangEnum::Yin, 55)]
+    #[case(NumberEnum::Four, ColorEnum::Blue, YinYangEnum::Yang, 66)]
+    #[case(NumberEnum::Five, ColorEnum::Green, YinYangEnum::Yang, 66)]
+    fn test_nested_enum_match(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] number: NumberEnum,
+        #[case] color: ColorEnum,
+        #[case] yin_yang: YinYangEnum,
+        #[case] expected: u32,
+    ) {
+        let call_data = matchNestedEnumCall::new((number, color, yin_yang)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(result, 0);
+        assert_eq!(return_data, expected.abi_encode());
+    }
+}

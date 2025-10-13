@@ -119,6 +119,7 @@ struct TranslateFlowContext<'a> {
     uid_locals: &'a mut HashMap<u8, StorageIdParentInformation>,
     branch_targets: &'a mut BranchTargets,
     jump_table_idx: &'a mut Option<usize>,
+    match_subject: &'a mut Option<LocalId>,
     case_label_to_switch_id: &'a mut HashMap<u16, InstrSeqId>,
     dynamic_fields_global_variables: &'a mut Vec<(GlobalId, IntermediateType)>,
 }
@@ -178,6 +179,7 @@ pub fn translate_function(
         types_stack: &mut types_stack,
         branch_targets: &mut branch_targets,
         jump_table_idx: &mut None, // Index of the current jump table being switched. This is populated when translating a VariantSwitch
+        match_subject: &mut None,  // The match subject (&IEnum)
         case_label_to_switch_id: &mut HashMap::new(), // Associates simple block case labels with the corresponding switch block id
         dynamic_fields_global_variables,
     };
@@ -252,6 +254,7 @@ fn translate_flow(
                         branches,
                         ctx.branch_targets,
                         ctx.jump_table_idx,
+                        ctx.match_subject,
                         ctx.dynamic_fields_global_variables,
                     )
                     .unwrap_or_else(|e| {
@@ -303,6 +306,13 @@ fn translate_flow(
         } => {
             let then_stack = then_body.get_stack();
             let else_stack = else_body.get_stack();
+
+            // In cases where the if/else flow corresponds to a two-arm match on an enum, the match subject must be pushed onto the stack first.
+            if let Some(match_subject) = ctx.match_subject {
+                builder.local_get(*match_subject);
+                builder.unop(UnaryOp::I32Eqz); // Flip the match subject to match the order of the cases in the if/else block
+                *ctx.match_subject = None;
+            }
 
             if then_stack == else_stack {
                 let ty = InstrSeqType::new(&mut module.types, &[], &then_stack);
@@ -424,6 +434,14 @@ fn translate_flow(
                         ftl: &mut HashSet<FunctionId>,
                     ) {
                         if i == cases.len() {
+                            // Get the match subject, push it to the stack and reset it
+                            if let Some(match_subject) = ctx.match_subject {
+                                b.local_get(*match_subject);
+                                *ctx.match_subject = None;
+                            } else {
+                                panic!("Match subject not found while translating Switch flow!");
+                            }
+                            case_ids.reverse();
                             b.br_table(case_ids.clone().into_boxed_slice(), default_id);
                             return;
                         }
@@ -485,6 +503,7 @@ fn translate_instruction(
     branches: &HashMap<u16, BranchMode>,
     branch_targets: &BranchTargets,
     jump_table_idx: &mut Option<usize>,
+    match_subject: &mut Option<LocalId>,
     dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
 ) -> Result<Vec<FunctionId>, TranslationError> {
     let mut functions_calls_to_link = Vec::new();
@@ -2475,13 +2494,55 @@ fn translate_instruction(
             types_stack.push(IntermediateType::IEnum(enum_.index));
         }
         Bytecode::UnpackVariant(index) => {
-            println!("UnpackVariant: {:?}", index);
+            let enum_ = module_data.enums.get_enum_by_variant_handle_idx(index)?;
+            types_stack.pop_expecting(&IntermediateType::IEnum(enum_.index))?;
+
+            let index_inside_enum = module_data
+                .enums
+                .get_variant_position_by_variant_handle_idx(index)?;
+            let variant = &enum_.variants[index_inside_enum as usize];
+
+            bytecodes::enums::unpack_variant(variant, module, builder, compilation_ctx)?;
+
+            // Push the variant fields to the types stack
+            for field in &variant.fields {
+                types_stack.push(field.clone());
+            }
         }
         Bytecode::UnpackVariantImmRef(index) => {
-            println!("UnpackVariantImmRef: {:?}", index);
+            let enum_ = module_data.enums.get_enum_by_variant_handle_idx(index)?;
+            types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
+                IntermediateType::IEnum(enum_.index),
+            )))?;
+
+            let tmp = module.locals.add(ValType::I32);
+            builder.local_set(tmp);
         }
         Bytecode::VariantSwitch(index) => {
-            println!("VariantSwitch: {:?}", index);
+            // The match subject (&IEnum) is on top of the stack
+            // The first load is to load the enum pointer from the reference
+            // The second load is to load the variant index from the enum pointer
+            let match_subject_local = module.locals.add(ValType::I32);
+            builder
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .local_set(match_subject_local);
+
+            *match_subject = Some(match_subject_local);
             *jump_table_idx = Some(index.0 as usize);
         }
         b => Err(TranslationError::UnsupportedOperation {

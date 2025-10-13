@@ -83,9 +83,7 @@ impl Flow {
             })
             .collect();
 
-        let flow = Self::build(&relooped, &blocks_ctx);
-        println!("Flow structure:\n{:#?}", flow);
-        flow
+        Self::build(&relooped, &blocks_ctx)
     }
 
     fn build(

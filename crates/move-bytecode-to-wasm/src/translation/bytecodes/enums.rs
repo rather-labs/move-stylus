@@ -7,7 +7,10 @@ use crate::{
     CompilationContext,
     translation::{
         TranslationError,
-        intermediate_types::{IntermediateType, enums::IEnum},
+        intermediate_types::{
+            IntermediateType,
+            enums::{IEnum, IEnumVariant},
+        },
         types_stack::TypesStack,
     },
 };
@@ -136,6 +139,20 @@ pub fn pack_variant(
     }
 
     builder.local_get(pointer);
+
+    Ok(())
+}
+
+pub fn unpack_variant(
+    variant: &IEnumVariant,
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+) -> Result<(), TranslationError> {
+    // Here we should unpack the variant fields. On top of the stack we should have the pointer to the variant.
+    let pointer = module.locals.add(ValType::I32);
+    // For now we just have variants without fields, so really nothing to do here.
+    builder.local_set(pointer);
 
     Ok(())
 }
