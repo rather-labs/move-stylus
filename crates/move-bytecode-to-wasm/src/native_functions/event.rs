@@ -1,5 +1,5 @@
 use walrus::{
-    FunctionBuilder, FunctionId, LocalId, Module, ValType,
+    FunctionBuilder, FunctionId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg},
 };
 
@@ -57,8 +57,6 @@ pub fn add_emit_log_fn(
     let local = module.locals.add(ValType::I32);
     let local_64 = module.locals.add(ValType::I64);
     let abi_encoded_data_length = module.locals.add(ValType::I32);
-
-    let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
 
     // Before encoding the event, abi encode complex fields such as structs, vectors and strings,
     // then, if those fields are dynamic, we just put the keccak256 in the corresponding topic,
@@ -186,11 +184,6 @@ pub fn add_emit_log_fn(
                         compilation_ctx,
                     );
                 }
-
-                builder.i32_const(size).call(print_i32);
-                builder
-                    .local_get(abi_encoded_data_calldata_reference_pointer)
-                    .call(print_m);
 
                 // Use the allocator to get a pointer to the end of the data
                 builder

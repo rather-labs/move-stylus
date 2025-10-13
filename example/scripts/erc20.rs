@@ -108,8 +108,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("Mint events");
     for log in receipt.logs() {
-
-    println!("Log {:?}", log);
+        println!("Log {:?}", log);
         let raw = log.data().data.0.clone();
         println!("create tx 0x{}", hex::encode(&raw));
     }

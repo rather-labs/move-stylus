@@ -26,5 +26,4 @@ rstest = "0.25.0"
 
 
 [features]
-default=["inject-host-debug-fns"]
 inject-host-debug-fns = []
