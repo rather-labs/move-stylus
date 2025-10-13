@@ -7,7 +7,7 @@ use crate::{
     CompilationContext,
     abi_types::{event_encoding::move_signature_to_event_signature_hash, packing::Packable},
     compilation_context::ModuleId,
-    hostio::host_functions::emit_log,
+    hostio::host_functions::{emit_log, native_keccak256},
     translation::intermediate_types::{IntermediateType, structs::IStructType},
 };
 
@@ -45,6 +45,7 @@ pub fn add_emit_log_fn(
     let mut builder = function.name(name).func_body();
 
     let (emit_log_fn, _) = emit_log(module);
+    let (native_keccak, _) = native_keccak256(module);
 
     // Function arguments
     let struct_ptr = module.locals.add(ValType::I32);
@@ -54,6 +55,153 @@ pub fn add_emit_log_fn(
     let calldata_reference_pointer = module.locals.add(ValType::I32);
     let packed_data_begin = module.locals.add(ValType::I32);
     let local = module.locals.add(ValType::I32);
+    let abi_encoded_data_length = module.locals.add(ValType::I32);
+
+    let (print_i32, _, _, _, _, _) = crate::declare_host_debug_functions!(module);
+
+    // Before encoding the event, abi encode complex fields such as structs, vectors and strings,
+    // then, if those fields are dynamic, we just put the keccak256 in the corresponding topic,
+    // otherwise, we copy the whole encoding
+    let mut event_fields_encoded_data = Vec::new();
+
+    // ABI pack the struct before emitting the event
+    for (field_index, field) in struct_.fields.iter().enumerate() {
+        // Get the pointer to the field
+        builder
+            .local_get(struct_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                walrus::ir::LoadKind::I32 { atomic: false },
+                MemArg {
+                    offset: field_index as u32 * 4,
+                    align: 0,
+                },
+            )
+            .local_set(local);
+
+        match field {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress => {
+                event_fields_encoded_data.push(None);
+                continue;
+            }
+            IntermediateType::IVector(_) => {
+                // Get the pointer to the field
+                builder
+                    .local_get(struct_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        walrus::ir::LoadKind::I32 { atomic: false },
+                        MemArg {
+                            offset: field_index as u32 * 4,
+                            align: 0,
+                        },
+                    )
+                    .local_set(local);
+
+                let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
+                let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
+
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(abi_encoded_data_writer_pointer)
+                    .local_set(abi_encoded_data_calldata_reference_pointer);
+
+                field.add_pack_instructions(
+                    &mut builder,
+                    module,
+                    local,
+                    abi_encoded_data_writer_pointer,
+                    abi_encoded_data_calldata_reference_pointer,
+                    compilation_ctx,
+                );
+
+                builder
+                    .i32_const(0)
+                    .call(compilation_ctx.allocator)
+                    .local_set(abi_encoded_data_writer_pointer);
+
+                event_fields_encoded_data.push(Some((
+                    abi_encoded_data_calldata_reference_pointer,
+                    abi_encoded_data_writer_pointer,
+                )));
+            }
+            IntermediateType::IStruct {
+                module_id, index, ..
+            }
+            | IntermediateType::IGenericStructInstance {
+                module_id, index, ..
+            } => {
+                let struct_ = compilation_ctx
+                    .get_struct_by_index(module_id, *index)
+                    .unwrap();
+
+                let struct_ = if let IntermediateType::IGenericStructInstance { types, .. } = field
+                {
+                    &struct_.instantiate(types)
+                } else {
+                    struct_
+                };
+
+                let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
+                let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
+
+                let size = if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
+                    32
+                } else {
+                    struct_.solidity_abi_encode_size(compilation_ctx) as i32
+                };
+                // Use the allocator to get a pointer to the end of the calldata
+                builder
+                    .i32_const(size)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(abi_encoded_data_writer_pointer)
+                    .local_set(abi_encoded_data_calldata_reference_pointer);
+
+                // ABI pack the struct before emitting the event
+                if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
+                    struct_.add_pack_instructions(
+                        &mut builder,
+                        module,
+                        struct_ptr,
+                        abi_encoded_data_writer_pointer,
+                        abi_encoded_data_calldata_reference_pointer,
+                        compilation_ctx,
+                        Some(abi_encoded_data_calldata_reference_pointer),
+                    );
+                } else {
+                    struct_.add_pack_instructions(
+                        &mut builder,
+                        module,
+                        struct_ptr,
+                        abi_encoded_data_writer_pointer,
+                        abi_encoded_data_calldata_reference_pointer,
+                        compilation_ctx,
+                        None,
+                    );
+                }
+
+                builder
+                    .i32_const(0)
+                    .call(compilation_ctx.allocator)
+                    .local_set(abi_encoded_data_writer_pointer);
+
+                event_fields_encoded_data.push(Some((
+                    abi_encoded_data_calldata_reference_pointer,
+                    abi_encoded_data_writer_pointer,
+                )));
+            }
+            IntermediateType::IEnum(_) => todo!(),
+            _ => panic!("invalid event field {field:?}"),
+        }
+    }
 
     // If the event is not anonymous, we should emit its signature in the first topic
     if !is_anonymous {
@@ -84,25 +232,15 @@ pub fn add_emit_log_fn(
         builder.local_set(packed_data_begin);
     }
 
-    let mut total_event_size = 0;
-    // Calculate the encoded size for the whole event, so we can allocate it
-    for (index, field) in struct_.fields.iter().enumerate() {
-        // If it is indexed, it is just 32 bytes
-        if index < indexes as usize {
-            total_event_size += 32;
-        } else {
-            total_event_size += field.encoded_size(compilation_ctx);
-        }
-    }
-
-    builder
-        .i32_const(total_event_size as i32)
-        .call(compilation_ctx.allocator)
-        .local_tee(writer_pointer)
-        .local_set(calldata_reference_pointer);
-
     // ABI pack the struct before emitting the event
-    for (field_index, field) in struct_.fields.iter().enumerate() {
+    for ((field_index, field), abi_encoded_data) in struct_
+        .fields
+        .iter()
+        .enumerate()
+        .zip(event_fields_encoded_data)
+    {
+        let is_indexed = field_index < indexes as usize;
+
         // Get the pointer to the field
         builder.local_get(struct_ptr).load(
             compilation_ctx.memory_id,
@@ -138,6 +276,12 @@ pub fn add_emit_log_fn(
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress => {
+                builder
+                    .i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(writer_pointer)
+                    .local_set(calldata_reference_pointer);
+
                 field.add_pack_instructions(
                     &mut builder,
                     module,
@@ -146,6 +290,8 @@ pub fn add_emit_log_fn(
                     calldata_reference_pointer,
                     compilation_ctx,
                 );
+
+                // Add 32 to the writer pointer to write the next topic
                 builder
                     .i32_const(32)
                     .local_get(writer_pointer)
@@ -153,73 +299,64 @@ pub fn add_emit_log_fn(
                     .local_tee(writer_pointer)
                     .local_set(calldata_reference_pointer);
             }
-            IntermediateType::IVector(_) => {
-                field.add_pack_instructions(
-                    &mut builder,
-                    module,
-                    local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                );
-            }
-            IntermediateType::IStruct {
-                module_id, index, ..
-            }
-            | IntermediateType::IGenericStructInstance {
-                module_id, index, ..
-            } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
-
-                let struct_ = if let IntermediateType::IGenericStructInstance { types, .. } = field
-                {
-                    &struct_.instantiate(types)
-                } else {
-                    struct_
+            IntermediateType::IVector(_)
+            | IntermediateType::IStruct { .. }
+            | IntermediateType::IGenericStructInstance { .. } => {
+                let Some((encode_start, encode_end)) = abi_encoded_data else {
+                    panic!(
+                        "there was an error instantiating an emit event function: vector does not have abi encoded data"
+                    )
                 };
 
-                let size = if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                    32
-                } else {
-                    struct_.solidity_abi_encode_size(compilation_ctx) as i32
-                };
-                // Use the allocator to get a pointer to the end of the calldata
                 builder
-                    .i32_const(size)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(writer_pointer)
-                    .local_set(calldata_reference_pointer);
+                    .local_get(encode_end)
+                    .local_get(encode_start)
+                    .binop(BinaryOp::I32Sub)
+                    .local_set(abi_encoded_data_length);
 
-                // ABI pack the struct before emitting the event
-                if struct_.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                    struct_.add_pack_instructions(
-                        &mut builder,
-                        module,
-                        struct_ptr,
-                        writer_pointer,
-                        calldata_reference_pointer,
-                        compilation_ctx,
-                        Some(calldata_reference_pointer),
-                    );
+                builder.local_get(encode_start).call(print_i32);
+                builder.local_get(encode_end).call(print_i32);
+
+                builder
+                    .local_get(abi_encoded_data_length)
+                    .call(compilation_ctx.allocator)
+                    .drop();
+
+                // If the vector is indexed, we need to calculate the keccak256 of its values and
+                // store them in the topic
+                if is_indexed {
+                    builder
+                        .local_get(encode_start)
+                        .local_get(abi_encoded_data_length)
+                        .local_get(writer_pointer)
+                        .call(native_keccak);
+
+                    builder
+                        .i32_const(32)
+                        .local_get(writer_pointer)
+                        .binop(BinaryOp::I32Add)
+                        .local_tee(writer_pointer)
+                        .local_set(calldata_reference_pointer);
                 } else {
-                    struct_.add_pack_instructions(
-                        &mut builder,
-                        module,
-                        struct_ptr,
-                        writer_pointer,
-                        calldata_reference_pointer,
-                        compilation_ctx,
-                        None,
-                    );
+                    // Copy the abi encoded data to its place in the event data
+                    builder
+                        .local_get(writer_pointer)
+                        .local_get(encode_start)
+                        .local_get(abi_encoded_data_length)
+                        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+                    // Update the calldata reference to the start of the new field (vector encoding
+                    // moves the writer pointer to the end of the encoding)
+                    builder
+                        .local_get(writer_pointer)
+                        .local_get(abi_encoded_data_length)
+                        .binop(BinaryOp::I32Add)
+                        .local_tee(writer_pointer)
+                        .local_set(calldata_reference_pointer);
                 }
             }
             IntermediateType::IEnum(_) => todo!(),
-            IntermediateType::IRef(intermediate_type) => todo!(),
-            IntermediateType::IMutRef(intermediate_type) => todo!(),
-            IntermediateType::ITypeParameter(_) => todo!(),
-            _ => todo!(),
+            _ => panic!("invalid event field {field:?}"),
         }
     }
 
