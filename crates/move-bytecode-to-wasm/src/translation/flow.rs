@@ -8,6 +8,7 @@ use walrus::ValType;
 #[derive(Debug, Clone)]
 pub enum Flow {
     Simple {
+        label: u16,
         stack: Vec<ValType>,
         instructions: Vec<Bytecode>,
         immediate: Box<Flow>,
@@ -25,6 +26,11 @@ pub enum Flow {
         then_body: Box<Flow>,
         else_body: Box<Flow>,
     },
+    Switch {
+        stack: Vec<ValType>,
+        cases: Vec<Flow>,
+        default: Box<Flow>,
+    },
     Empty,
 }
 
@@ -35,6 +41,7 @@ impl Flow {
             Flow::Simple { stack, next, .. } => [stack.clone(), next.get_stack()].concat(),
             Flow::Loop { stack, next, .. } => [stack.clone(), next.get_stack()].concat(),
             Flow::IfElse { stack, .. } => stack.clone(),
+            Flow::Switch { stack, .. } => stack.clone(),
             Flow::Empty => vec![],
         }
     }
@@ -67,6 +74,7 @@ impl Flow {
 
                 let mut stack: Vec<ValType> = vec![];
                 // If the block contains a Ret instruction, then set the types stack of this block to the expected return type of the function.
+                // https://github.com/MystenLabs/sui/blob/5608296d101d51613605685e7445ca8e8aee8021/external-crates/move/move-execution/v2/crates/move-bytecode-verifier/README.md
                 if code.contains(&Bytecode::Ret) {
                     stack = function_information.results.clone();
                 }
@@ -75,7 +83,9 @@ impl Flow {
             })
             .collect();
 
-        Self::build(&relooped, &blocks_ctx)
+        let flow = Self::build(&relooped, &blocks_ctx);
+        println!("Flow structure:\n{:#?}", flow);
+        flow
     }
 
     fn build(
@@ -112,6 +122,7 @@ impl Flow {
                 );
 
                 Flow::Simple {
+                    label: simple_block.label,
                     stack: [block_ctx.1.clone(), immediate_flow.get_stack()].concat(),
                     instructions: block_ctx.0.clone(),
                     immediate: Box::new(immediate_flow),
@@ -141,6 +152,67 @@ impl Flow {
                 // For instance, a Move function with a multi-branch match statement is transformed into nested multiple blocks.
                 // Alternatively, multiple blocks with a single branch can occur when there is no else condition --> while (true) { if (condition) { break } }
 
+                // Enums add complexity, introducing multiple blocks with more than two branches, typically due to match statements.
+                //
+                // Take the following example:
+                //
+                // public enum SimpleEnum has drop {
+                //     One,
+                //     Two,
+                //     Three,
+                // }
+                //
+                // public fun unpack_simple_enum(x: SimpleEnum) {
+                //     match (x) {
+                //         SimpleEnum::One => {
+                //             // Handle the One variant here
+                //         },
+                //         SimpleEnum::Two => {
+                //             // Handle the Two variant here
+                //         },
+                //         SimpleEnum::Three => {
+                //             // Handle the Three variant here
+                //         }
+                //     };
+                // }
+                //
+                // Generates this MultipleBlock after being relooped:
+                //
+                // MultipleBlock {
+                //     handled: [
+                //         HandledBlock {
+                //             labels: [6],
+                //             inner: Simple(SimpleBlock {
+                //                 label: 6,
+                //                 immediate: None,
+                //                 branches: {20: MergedBranch},
+                //                 next: None
+                //             }),
+                //             break_after: true
+                //         },
+                //         HandledBlock {
+                //             labels: [11],
+                //             inner: Simple(SimpleBlock {
+                //                 label: 11,
+                //                 immediate: None,
+                //                 branches: {20: MergedBranch},
+                //                 next: None
+                //             }),
+                //             break_after: true
+                //         },
+                //         HandledBlock {
+                //             labels: [16],
+                //             inner: Simple(SimpleBlock {
+                //                 label: 16,
+                //                 immediate: None,
+                //                 branches: {20: MergedBranch},
+                //                 next: None
+                //             }),
+                //             break_after: true
+                //         }
+                //     ]
+                // }
+
                 match multiple_block.handled.len() {
                     // If there is a single branch, then instead of creating an if/else flow with an empty arm, we just build the flow from the only handled block.
                     1 => Self::build(&multiple_block.handled[0].inner, blocks_ctx),
@@ -157,7 +229,7 @@ impl Flow {
                             && then_stack != else_stack
                         {
                             panic!(
-                                "Type stacks of if/else branches must be the same or one must be empty. If types: {:?}, Else types: {:?}",
+                                "Type stack of if/else branches must be the same or one must be empty. If types: {:?}, Else types: {:?}",
                                 then_stack, else_stack
                             );
                         } else if !then_stack.is_empty() {
@@ -172,10 +244,32 @@ impl Flow {
                             else_body: Box::new(else_arm),
                         }
                     }
-                    _ => panic!(
-                        "Found MultipleBlock with {} branches",
-                        multiple_block.handled.len()
-                    ),
+                    _ => {
+                        // Get the cases for the switch flow, each being a block from the MultipleBlock.
+                        let cases: Vec<Flow> = multiple_block
+                            .handled
+                            .iter()
+                            .map(|b| Self::build(&b.inner, blocks_ctx))
+                            .collect();
+
+                        let stack = cases
+                            .iter()
+                            .find_map(|case| {
+                                let case_stack = case.get_stack();
+                                if case_stack.is_empty() {
+                                    None
+                                } else {
+                                    Some(case_stack)
+                                }
+                            })
+                            .unwrap_or_else(|| vec![]); // return empty stack if all cases are empty
+
+                        Flow::Switch {
+                            stack,
+                            cases,
+                            default: Box::new(Flow::Empty),
+                        }
+                    }
                 }
             }
         }
