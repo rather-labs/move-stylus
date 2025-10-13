@@ -13,6 +13,15 @@ use crate::{
 
 use super::NativeFunction;
 
+/// This function ABI-encodes an event struct following the Solidity language specification:
+///
+/// https://docs.soliditylang.org/en/latest/abi-spec.html#events
+///
+/// Dynamic structures are first ABI-encoded in memory. Then:
+/// - If a dynamic structure is part of a topic, its Keccak-256 hash is computed over the encoded
+///   memory region and placed in the corresponding topic.
+/// - Otherwise, if it is part of the event data, the encoded memory is copied into the data section
+///   of the eve
 pub fn add_emit_log_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,

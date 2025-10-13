@@ -81,8 +81,6 @@ pub fn translate_package(
 
     // TODO: a lot of clones, we must create a symbol pool
     for root_compiled_module in &root_compiled_units {
-        println!("{:?}", root_compiled_module.source_path);
-
         // This is used to keep track of dynamic fields were retrieved from storage as mutable.
         // This vector is used at the end of the entrypoint function to commit the possible changes
         // made to those variables. The variables will be declared in the source code even if the
