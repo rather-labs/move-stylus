@@ -67,8 +67,8 @@ impl Event {
                     }
                 }
 
-                if event.is_anonymous && event.indexes == 4 {
-                    panic!("an anonymous event can't have 4 indexes, maximum is 3");
+                if !event.is_anonymous && event.indexes == 4 {
+                    panic!("event can't have 4 indexes if is not anonymous, maximum is 3");
                 }
 
                 return Ok(event);

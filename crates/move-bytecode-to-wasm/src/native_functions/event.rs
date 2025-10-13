@@ -57,14 +57,13 @@ pub fn add_emit_log_fn(
     let local = module.locals.add(ValType::I32);
     let abi_encoded_data_length = module.locals.add(ValType::I32);
 
-    let (print_i32, _, _, _, _, _) = crate::declare_host_debug_functions!(module);
+    let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
 
     // Before encoding the event, abi encode complex fields such as structs, vectors and strings,
     // then, if those fields are dynamic, we just put the keccak256 in the corresponding topic,
     // otherwise, we copy the whole encoding
     let mut event_fields_encoded_data = Vec::new();
 
-    // ABI pack the struct before emitting the event
     for (field_index, field) in struct_.fields.iter().enumerate() {
         // Get the pointer to the field
         builder
@@ -123,6 +122,7 @@ pub fn add_emit_log_fn(
                     compilation_ctx,
                 );
 
+                // Use the allocator to get a pointer to the end of the data
                 builder
                     .i32_const(0)
                     .call(compilation_ctx.allocator)
@@ -150,6 +150,18 @@ pub fn add_emit_log_fn(
                     struct_
                 };
 
+                builder
+                    .local_get(struct_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        walrus::ir::LoadKind::I32 { atomic: false },
+                        MemArg {
+                            offset: field_index as u32 * 4,
+                            align: 0,
+                        },
+                    )
+                    .local_set(local);
+
                 let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
                 let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
 
@@ -158,6 +170,7 @@ pub fn add_emit_log_fn(
                 } else {
                     struct_.solidity_abi_encode_size(compilation_ctx) as i32
                 };
+
                 // Use the allocator to get a pointer to the end of the calldata
                 builder
                     .i32_const(size)
@@ -170,7 +183,7 @@ pub fn add_emit_log_fn(
                     struct_.add_pack_instructions(
                         &mut builder,
                         module,
-                        struct_ptr,
+                        local,
                         abi_encoded_data_writer_pointer,
                         abi_encoded_data_calldata_reference_pointer,
                         compilation_ctx,
@@ -180,7 +193,7 @@ pub fn add_emit_log_fn(
                     struct_.add_pack_instructions(
                         &mut builder,
                         module,
-                        struct_ptr,
+                        local,
                         abi_encoded_data_writer_pointer,
                         abi_encoded_data_calldata_reference_pointer,
                         compilation_ctx,
@@ -188,6 +201,12 @@ pub fn add_emit_log_fn(
                     );
                 }
 
+                builder.i32_const(size).call(print_i32);
+                builder
+                    .local_get(abi_encoded_data_calldata_reference_pointer)
+                    .call(print_m);
+
+                // Use the allocator to get a pointer to the end of the data
                 builder
                     .i32_const(0)
                     .call(compilation_ctx.allocator)
@@ -226,10 +245,11 @@ pub fn add_emit_log_fn(
                     },
                 );
         }
-    }
-
-    if is_anonymous {
-        builder.local_set(packed_data_begin);
+    } else {
+        builder
+            .i32_const(0)
+            .call(compilation_ctx.allocator)
+            .local_set(packed_data_begin);
     }
 
     // ABI pack the struct before emitting the event
@@ -314,17 +334,11 @@ pub fn add_emit_log_fn(
                     .binop(BinaryOp::I32Sub)
                     .local_set(abi_encoded_data_length);
 
-                builder.local_get(encode_start).call(print_i32);
-                builder.local_get(encode_end).call(print_i32);
-
-                builder
-                    .local_get(abi_encoded_data_length)
-                    .call(compilation_ctx.allocator)
-                    .drop();
-
                 // If the vector is indexed, we need to calculate the keccak256 of its values and
                 // store them in the topic
                 if is_indexed {
+                    builder.i32_const(32).call(compilation_ctx.allocator).drop();
+
                     builder
                         .local_get(encode_start)
                         .local_get(abi_encoded_data_length)
@@ -338,6 +352,11 @@ pub fn add_emit_log_fn(
                         .local_tee(writer_pointer)
                         .local_set(calldata_reference_pointer);
                 } else {
+                    builder
+                        .local_get(abi_encoded_data_length)
+                        .call(compilation_ctx.allocator)
+                        .drop();
+
                     // Copy the abi encoded data to its place in the event data
                     builder
                         .local_get(writer_pointer)
@@ -359,8 +378,6 @@ pub fn add_emit_log_fn(
             _ => panic!("invalid event field {field:?}"),
         }
     }
-
-    // Emit the event with the ABI packed struct
 
     // Beginning of the packed data
     builder.local_get(packed_data_begin);
