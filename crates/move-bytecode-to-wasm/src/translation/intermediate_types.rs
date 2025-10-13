@@ -1,4 +1,7 @@
-use std::{collections::HashMap, hash::Hash};
+use std::{
+    collections::HashMap,
+    hash::{DefaultHasher, Hash, Hasher},
+};
 
 use crate::{
     CompilationContext, UserDefinedType,
@@ -7,13 +10,16 @@ use crate::{
     vm_handled_types::{VmHandledType, named_id, uid},
     wasm_builder_extensions::WasmBuilderExtension,
 };
+
+use move_binary_format::file_format::{DatatypeHandleIndex, Signature, SignatureToken};
+
 use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
-use move_binary_format::file_format::{DatatypeHandleIndex, Signature, SignatureToken};
 use simple_integers::{IU8, IU16, IU32, IU64};
 use structs::IStruct;
 use vector::IVector;
+
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
@@ -1123,6 +1129,13 @@ impl IntermediateType {
             }
             IntermediateType::IEnum(_) => todo!(),
         }
+    }
+
+    // Returns the hash of the type
+    pub fn get_hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
     }
 
     /// Returns true if this `IntermediateType` represents a UID or NamedId struct
