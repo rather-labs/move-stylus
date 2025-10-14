@@ -116,12 +116,12 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nSending set value to 100 tx with the account that is not the owner");
     let result = example_2.setValue(counter_id, 100).send().await;
-    
+
     // Assert that the transaction failed with a revert error
     match result {
         Err(e) => {
             println!("Transaction correctly failed as expected: {}", e);
-        },
+        }
         Ok(pending_tx) => {
             let receipt = pending_tx.get_receipt().await?;
             if !receipt.status() {
