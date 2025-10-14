@@ -388,6 +388,7 @@ fn translate_flow(
                 );
             }
         }
+        // Inside your switch arm
         Flow::Switch {
             stack,
             cases,
@@ -396,76 +397,91 @@ fn translate_flow(
             let ty = InstrSeqType::new(&mut module.types, &[], stack);
 
             builder.block(ty, |switch| {
-                // Open `default` target first; all case targets nest inside it.
+                // Per WASM rules, all `br_table` targets must be *enclosing* labels.
+                // First open the DEFAULT target as an enclosing block, all case blocks will be nested inside it.
                 switch.block(ty, |block| {
-                    let default_id = block.id();
-                    let mut case_ids: Vec<InstrSeqId> = Vec::with_capacity(cases.len());
-                    // Reverse the cases to match the order of the cases in the switch statement.
-                    let cases_reversed: Vec<&Flow> = cases.iter().rev().collect();
+                    let default_id = block.id(); // label used by `br_table` as the default target
 
-                    // Recursively open case target blocks; at the bottom emit `br_table`.
-                    fn open_cases(
-                        b: &mut InstrSeqBuilder,
-                        ty: InstrSeqType,
-                        i: usize,
-                        cases: &[&Flow],
-                        case_ids: &mut Vec<InstrSeqId>,
-                        default_id: InstrSeqId,
-                        ctx: &mut TranslateFlowContext,
-                        module: &mut Module,
-                        ftl: &mut HashSet<FunctionId>,
-                    ) {
-                        if i == cases.len() {
-                            // Get the match subject, push it to the stack and reset it
-                            if let Some(match_subject) = ctx.match_subject {
-                                b.local_get(*match_subject);
-                                *ctx.match_subject = None;
-                            } else {
-                                panic!("Match subject not found while translating Switch flow!");
-                            }
-                            case_ids.reverse();
-                            b.br_table(case_ids.clone().into_boxed_slice(), default_id);
-                            return;
+                    {
+                        // Keep the helper and its borrows scoped so they drop before emitting the `default` body.
+
+                        /// Helper to build the nested target blocks for the switch and emit `br_table`.
+                        struct SwitchGen<'a> {
+                            ty: InstrSeqType,
+                            cases: Vec<&'a Flow>,
+                            default_id: InstrSeqId,
                         }
 
-                        // Create target block for case `i`
-                        b.block(ty, |inner| {
-                            case_ids.push(inner.id());
-                            open_cases(
-                                inner,
-                                ty,
-                                i + 1,
-                                cases,
-                                case_ids,
-                                default_id,
-                                ctx,
-                                module,
-                                ftl,
-                            );
-                        });
+                        impl SwitchGen<'_> {
+                            /// Recursively:
+                            ///  - open one more nested `block` (the target for case `i`),
+                            ///  - when all targets are opened, push the match subject and emit `br_table`,
+                            ///  - then translate the body of case `i` (which lands right after its block).
+                            fn open_cases(
+                                &self,
+                                b: &mut InstrSeqBuilder,
+                                i: usize,
+                                case_ids: &mut Vec<InstrSeqId>,
+                                ctx: &mut TranslateFlowContext,
+                                module: &mut Module,
+                                ftl: &mut HashSet<FunctionId>,
+                            ) {
+                                // Base case: all case target labels created → emit `br_table`.
+                                if i == self.cases.len() {
+                                    // Load the match subject
+                                    let match_subject_local = ctx.match_subject.take().expect(
+                                        "Match subject not found while translating Switch flow!",
+                                    );
+                                    b.local_get(match_subject_local);
 
-                        // ← After `inner` closes, we are at the start of case `i` body.
-                        translate_flow(ctx, b, module, cases[i], ftl);
+                                    // We collected case_ids in nesting order; reverse to match case index order.
+                                    case_ids.reverse();
+
+                                    // Branch by index to case targets, or to `default_id` if out of range.
+                                    b.br_table(
+                                        case_ids.clone().into_boxed_slice(),
+                                        self.default_id,
+                                    );
+                                    return;
+                                }
+
+                                // Open the target block for case `i` (must be an enclosing label for `br_table`).
+                                b.block(self.ty, |inner| {
+                                    case_ids.push(inner.id());
+                                    // Keep nesting until all case targets exist.
+                                    self.open_cases(inner, i + 1, case_ids, ctx, module, ftl);
+                                });
+
+                                // After the inner block closes we are *at* the landing point for case `i`.
+                                // Emit the actual body for case `i`.
+                                translate_flow(ctx, b, module, self.cases[i], ftl);
+                            }
+                        }
+
+                        // Create targets deepest-first by iterating cases in reverse.
+                        let cases_reversed: Vec<&Flow> = cases.iter().rev().collect();
+                        let switch_gen = SwitchGen {
+                            ty,
+                            cases: cases_reversed,
+                            default_id,
+                        };
+
+                        // Build all case target labels and emit the `br_table`, then each case body.
+                        switch_gen.open_cases(
+                            block,
+                            0,
+                            &mut Vec::with_capacity(cases.len()),
+                            ctx,
+                            module,
+                            functions_to_link,
+                        );
                     }
-
-                    open_cases(
-                        block,
-                        ty,
-                        0,
-                        &cases_reversed,
-                        &mut case_ids,
-                        default_id,
-                        ctx,
-                        module,
-                        functions_to_link,
-                    );
                 });
 
-                // Default body (branch-to-default lands right before this)
+                // Emit the DEFAULT body. A `br_table` default-index (or out-of-range) lands right before this.
                 translate_flow(ctx, switch, module, default, functions_to_link);
             });
         }
-
         Flow::Empty => (),
     }
 }
