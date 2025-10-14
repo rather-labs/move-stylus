@@ -36,6 +36,7 @@ pub fn pack_variant(
     let val_32 = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
 
+    // This accounts for the variant that occupies most space in memory (plus the 4 bytes for the variant index)
     let heap_size = enum_
         .heap_size
         .ok_or(TranslationError::PackingGenericEnumVariant {
