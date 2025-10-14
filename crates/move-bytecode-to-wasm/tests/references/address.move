@@ -1,45 +1,45 @@
 module 0x01::ref_address;
 
-public fun deref_address(x: address): address {
+entry fun deref_address(x: address): address {
   let y = &x;
   *y
 }
 
-public fun deref_address_ref(y: &address): address {
+entry fun deref_address_ref(y: &address): address {
   *y
 }
 
-public fun identity_address_ref(x: &address): &address {
+entry fun identity_address_ref(x: &address): &address {
     x
 }
 
-public fun call_deref_address_ref(x: address): address {
+entry fun call_deref_address_ref(x: address): address {
     deref_address_ref(&x)
 }
 
-public fun deref_nested_address(x: address): address {
+entry fun deref_nested_address(x: address): address {
     let y = &x;
     let z = &*y;
     *z
 }
 
-public fun deref_mut_arg(x: &mut address ): address {
+entry fun deref_mut_arg(x: &mut address ): address {
  *x
 }
 
-public fun write_mut_ref(x: &mut address ): address {
+entry fun write_mut_ref(x: &mut address ): address {
  *x = @0x01;
  *x
 }
 
-public fun mut_borrow_local(): address {
+entry fun mut_borrow_local(): address {
  let mut x = @0x01;
  let y = &mut x;
  *y = @0x02;
  *y
 }
 
-public fun miscellaneous_0(): vector<address> {
+entry fun miscellaneous_0(): vector<address> {
  let mut x = @0x01;
  let y = x;
  x = @0x02;
@@ -47,7 +47,7 @@ public fun miscellaneous_0(): vector<address> {
  vector[y, w, x]
 }
 
-public fun miscellaneous_1():  vector<address> {
+entry fun miscellaneous_1():  vector<address> {
   let mut x = @0x01;
   let y = x;
   x = @0x02;
@@ -57,8 +57,7 @@ public fun miscellaneous_1():  vector<address> {
   vector[y, *z, w]
 }
 
-
-public fun freeze_ref(y: address): address {
+entry fun freeze_ref(y: address): address {
     let mut x = @0x01;
     let x_mut_ref: &mut address = &mut x;
     *x_mut_ref = y;

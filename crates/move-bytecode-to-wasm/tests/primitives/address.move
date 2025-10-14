@@ -2,17 +2,17 @@ module 0x01::address_type;
 
 const ADDRESS_AS_CONST: address = @0x01;
 
-public fun get_constant(): address {
+entry fun get_constant(): address {
   ADDRESS_AS_CONST
 }
 
-public fun get_constant_local(): address {
+entry fun get_constant_local(): address {
   let x: address = ADDRESS_AS_CONST;
   x
 }
 
 // Forces the compiler to store literals on locals
-public fun get_local(_z: address): address {
+entry fun get_local(_z: address): address {
   let x: address = @0xFF;
   let y: address = @0x11;
   identity(x);
@@ -21,7 +21,7 @@ public fun get_local(_z: address): address {
 }
 
 // Forces the compiler to store literals on locals
-public fun get_copied_local(): (address, address) {
+entry fun get_copied_local(): (address, address) {
   let x: address = @0x01;
 
   let y = x; // copy
@@ -33,11 +33,11 @@ public fun get_copied_local(): (address, address) {
   (y, z)
 }
 
-public fun echo(x: address): address {
+entry fun echo(x: address): address {
   identity(x)
 }
 
-public fun echo_2(x: address, y: address): address {
+entry fun echo_2(x: address, y: address): address {
   identity_2(x, y)
 }
 

@@ -2,17 +2,17 @@ module 0x01::uint_16;
 
 const INT_AS_CONST: u16 = 1616;
 
-public fun get_constant(): u16 {
+entry fun get_constant(): u16 {
   INT_AS_CONST
 }
 
-public fun get_constant_local(): u16 {
+entry fun get_constant_local(): u16 {
   let x: u16 = INT_AS_CONST;
   x
 }
 
 // Forces the compiler to store literals on locals
-public fun get_local(_z: u16): u16 {
+entry fun get_local(_z: u16): u16 {
   let x: u16 = 100;
   let y: u16 = 50;
   identity(x);
@@ -21,7 +21,7 @@ public fun get_local(_z: u16): u16 {
 }
 
 // Forces the compiler to store literals on locals
-public fun get_copied_local(): (u16, u16) {
+entry fun get_copied_local(): (u16, u16) {
   let x: u16 = 100;
 
   let y = x; // copy
@@ -33,11 +33,11 @@ public fun get_copied_local(): (u16, u16) {
   (y, z)
 }
 
-public fun echo(x: u16): u16 {
+entry fun echo(x: u16): u16 {
   identity(x)
 }
 
-public fun echo_2(x: u16, y: u16): u16 {
+entry fun echo_2(x: u16, y: u16): u16 {
   identity_2(x, y)
 }
 
@@ -49,22 +49,22 @@ fun identity_2(_x: u16, y: u16): u16 {
   y
 }
 
-public fun sum(x: u16, y: u16): u16 {
+entry fun sum(x: u16, y: u16): u16 {
     x + y
 }
 
-public fun sub(x: u16, y: u16): u16 {
+entry fun sub(x: u16, y: u16): u16 {
     x - y
 }
 
-public fun div(x: u16, y: u16): u16 {
+entry fun div(x: u16, y: u16): u16 {
     x / y
 }
 
-public fun mul(x: u16, y: u16): u16 {
+entry fun mul(x: u16, y: u16): u16 {
     x * y
 }
 
-public fun mod_(x: u16, y: u16): u16 {
+entry fun mod_(x: u16, y: u16): u16 {
     x % y
 }

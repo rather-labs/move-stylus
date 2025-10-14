@@ -38,18 +38,18 @@ const MIN_FEE: u64 = 1000;
 
 // === Public Functions ===
 
-public fun create_object(scarcity: u8, style: u8, ctx: &mut TxContext) {
+entry fun create_object(scarcity: u8, style: u8, ctx: &mut TxContext) {
     let obj = Object { id: object::new(ctx), scarcity, style };
     transfer::transfer(obj, ctx.sender());
 }
 
-public fun read_object(obj: &Object): &Object {
+entry fun read_object(obj: &Object): &Object {
     obj
 }
 
 /// Anyone who owns an `Object` can make it available for swapping, which
 /// sends a `SwapRequest` to a `service` responsible for matching swaps.
-public fun request_swap(
+entry fun request_swap(
     obj: Object,
     service: address,
     fee: u64,
@@ -69,7 +69,7 @@ public fun request_swap(
 
 /// When the service has two swap requests, it can execute them, sending the
 /// objects to the respective owners and taking its fee.
-public fun execute_swap(s1: SwapRequest, s2: SwapRequest): u64 {
+entry fun execute_swap(s1: SwapRequest, s2: SwapRequest): u64 {
     let SwapRequest {id: id1, owner: owner1, object: o1, fee: fee1} = s1;
     let SwapRequest {id: id2, owner: owner2, object: o2, fee: fee2} = s2;
 

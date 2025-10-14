@@ -19,7 +19,7 @@ public struct Foo has drop {
     z: u256,
 }
 
-public fun echo_bool(a: bool): bool {
+entry fun echo_bool(a: bool): bool {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -37,7 +37,7 @@ public fun echo_bool(a: bool): bool {
     foo.t
 }
 
-public fun echo_u8(a: u8): u8 {
+entry fun echo_u8(a: u8): u8 {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -55,7 +55,7 @@ public fun echo_u8(a: u8): u8 {
     foo.u
 }
 
-public fun echo_u16(a: u16): u16 {
+entry fun echo_u16(a: u16): u16 {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -73,7 +73,7 @@ public fun echo_u16(a: u16): u16 {
     foo.v
 }
 
-public fun echo_u32(a: u32): u32 {
+entry fun echo_u32(a: u32): u32 {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -91,7 +91,7 @@ public fun echo_u32(a: u32): u32 {
     foo.w
 }
 
-public fun echo_u64(a: u64): u64 {
+entry fun echo_u64(a: u64): u64 {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -109,7 +109,7 @@ public fun echo_u64(a: u64): u64 {
     foo.x
 }
 
-public fun echo_u128(a: u128): u128 {
+entry fun echo_u128(a: u128): u128 {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -127,7 +127,7 @@ public fun echo_u128(a: u128): u128 {
     foo.y
 }
 
-public fun echo_u256(a: u256): u256{
+entry fun echo_u256(a: u256): u256{
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -145,7 +145,7 @@ public fun echo_u256(a: u256): u256{
     foo.z
 }
 
-public fun echo_vec_stack_type(a: vector<u32>): vector<u32> {
+entry fun echo_vec_stack_type(a: vector<u32>): vector<u32> {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -163,7 +163,7 @@ public fun echo_vec_stack_type(a: vector<u32>): vector<u32> {
     foo.r
 }
 
-public fun echo_vec_heap_type(a: vector<u128>): vector<u128> {
+entry fun echo_vec_heap_type(a: vector<u128>): vector<u128> {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: @0x7357,
@@ -181,7 +181,7 @@ public fun echo_vec_heap_type(a: vector<u128>): vector<u128> {
     foo.s
 }
 
-public fun echo_address(a: address): address {
+entry fun echo_address(a: address): address {
     let foo = Foo {
         p: Bar { n: 42, o: 4242 },
         q: a,
@@ -199,7 +199,7 @@ public fun echo_address(a: address): address {
     foo.q
 }
 
-public fun echo_bar_struct_fields(a: u32, b: u128): (u32, u128) {
+entry fun echo_bar_struct_fields(a: u32, b: u128): (u32, u128) {
     let foo = Foo {
         p: Bar { n: a, o: b },
         q: @0x7357,

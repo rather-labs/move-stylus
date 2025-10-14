@@ -51,7 +51,7 @@ public struct Allowance has key {
     id: NamedId<ALLOWANCE_>,
 }
 
-public fun create() {
+entry fun create() {
     transfer::freeze_object(Info {
         id: object::new_named_id<CONTRACT_INFO>(),
         name: ascii::string(b"Test Coin"),
@@ -73,7 +73,7 @@ public fun create() {
     });
 }
 
-public fun mint(
+entry fun mint(
     to: address,
     amount: u256,
     total_supply: &mut TotalSupply,
@@ -95,7 +95,7 @@ public fun mint(
     });
 }
 
-public fun burn(
+entry fun burn(
     from: address,
     amount: u256,
     total_supply: &mut TotalSupply,
@@ -126,24 +126,23 @@ public fun burn(
     });
 }
 
-public fun total_supply(t_supply: &TotalSupply): u256 {
+entry fun total_supply(t_supply: &TotalSupply): u256 {
     t_supply.total
 }
 
-public fun decimals(contract_info: &Info): u8 {
+entry fun decimals(contract_info: &Info): u8 {
     contract_info.decimals
 }
 
-public fun name(contract_info: &Info): String {
+entry fun name(contract_info: &Info): String {
     contract_info.name
 }
 
-public fun symbol(contract_info: &Info): String {
+entry fun symbol(contract_info: &Info): String {
     contract_info.symbol
 }
 
-
-public fun balance_of(account: address, balance: &Balance): u256 {
+entry fun balance_of(account: address, balance: &Balance): u256 {
     if (field::exists_(&balance.id, account)) {
         *field::borrow<BALANCE_, address, u256>(&balance.id, account)
     } else {
@@ -151,7 +150,7 @@ public fun balance_of(account: address, balance: &Balance): u256 {
     }
 }
 
-public fun transfer(
+entry fun transfer(
     recipient: address,
     amount: u256,
     tx_context: &TxContext,
@@ -183,7 +182,7 @@ public fun transfer(
     true
 }
 
-public fun approve(
+entry fun approve(
     spender: address,
     amount: u256,
     allowance: &mut Allowance,
@@ -216,7 +215,7 @@ public fun approve(
     true
 }
 
-public fun allowance(
+entry fun allowance(
     owner: address,
     spender: address,
     allowance: &Allowance,
@@ -234,7 +233,7 @@ public fun allowance(
     }
 }
 
-public fun transfer_from(
+entry fun transfer_from(
     sender: address,
     recipient: address,
     amount: u256,

@@ -43,7 +43,7 @@ public struct Bazz has drop {
     b: vector<u256>,
 }
 
-public fun echo_foo_pack(
+entry fun echo_foo_pack(
     g: u32,
     q: address,
     t: bool,
@@ -59,7 +59,7 @@ public fun echo_foo_pack(
     Foo { g, q, t, u, v, w, x, y, z, baz: Baz { a: ba, b: bb } }
 }
 
-public fun echo_bar_pack(
+entry fun echo_bar_pack(
     g: vector<u32>,
     q: address,
     r: vector<u32>,
@@ -79,7 +79,7 @@ public fun echo_bar_pack(
     Bar { g, q, r, s, t, u, v, w, x, y, z, bazz: Bazz { a: ba, b: bb }, baz: Baz { a: bba, b: bbb } }
 }
 
-public fun echo_foo_unpack(foo: Foo<u32>): (u32, address, bool, u8, u16, u32, u64, u128, u256, u16, u128) {
+entry fun echo_foo_unpack(foo: Foo<u32>): (u32, address, bool, u8, u16, u32, u64, u128, u256, u16, u128) {
     (
         foo.g,
         foo.q,
@@ -95,7 +95,7 @@ public fun echo_foo_unpack(foo: Foo<u32>): (u32, address, bool, u8, u16, u32, u6
     )
 }
 
-public fun echo_bar_unpack(bar: Bar<vector<u32>>): (vector<u32>, address, vector<u32>, vector<u128>, bool, u8, u16, u32, u64, u128, u256, u16, vector<u256>, u16, u128) {
+entry fun echo_bar_unpack(bar: Bar<vector<u32>>): (vector<u32>, address, vector<u32>, vector<u128>, bool, u8, u16, u32, u64, u128, u256, u16, vector<u256>, u16, u128) {
     (
         bar.g,
         bar.q,
@@ -115,7 +115,7 @@ public fun echo_bar_unpack(bar: Bar<vector<u32>>): (vector<u32>, address, vector
     )
 }
 
-public fun pack_unpack_static(foo: Foo<u32>): Foo<u32> {
+entry fun pack_unpack_static(foo: Foo<u32>): Foo<u32> {
     Foo {
         g: foo.g,
         q: foo.q,
@@ -130,7 +130,7 @@ public fun pack_unpack_static(foo: Foo<u32>): Foo<u32> {
     }
 }
 
-public fun pack_unpack_dynamic(bar: Bar<vector<u32>>): Bar<vector<u32>> {
+entry fun pack_unpack_dynamic(bar: Bar<vector<u32>>): Bar<vector<u32>> {
     Bar {
         g: bar.g,
         q: bar.q,
@@ -149,7 +149,7 @@ public fun pack_unpack_dynamic(bar: Bar<vector<u32>>): Bar<vector<u32>> {
 }
 
 // This tests the packing/unpacking with the struct between other values
-public fun pack_unpack_between_vals_static(v1: bool, foo: Foo<u32>, v4: vector<u128>): (bool, Foo<u32>, vector<u128>) {
+entry fun pack_unpack_between_vals_static(v1: bool, foo: Foo<u32>, v4: vector<u128>): (bool, Foo<u32>, vector<u128>) {
     (
         v1,
         Foo {
@@ -168,7 +168,7 @@ public fun pack_unpack_between_vals_static(v1: bool, foo: Foo<u32>, v4: vector<u
     )
 }
 
-public fun pack_unpack_between_vals_dynamic(v1: bool, _v2: vector<u32>, bar: Bar<vector<u32>>, _v3: bool, v4: vector<u128>): (bool, Bar<vector<u32>>, vector<u128>) {
+entry fun pack_unpack_between_vals_dynamic(v1: bool, _v2: vector<u32>, bar: Bar<vector<u32>>, _v3: bool, v4: vector<u128>): (bool, Bar<vector<u32>>, vector<u128>) {
     (
         v1,
         Bar {

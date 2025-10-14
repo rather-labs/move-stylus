@@ -6,18 +6,18 @@ public enum SimpleEnum has drop {
     Three,
 }
 
-public fun pack_1(): SimpleEnum {
+entry fun pack_1(): SimpleEnum {
     SimpleEnum::One
 }
 
-public fun pack_2(): SimpleEnum {
+entry fun pack_2(): SimpleEnum {
     SimpleEnum::Two
 }
 
-public fun pack_3(): SimpleEnum {
+entry fun pack_3(): SimpleEnum {
     SimpleEnum::Three
 }
 
-public fun pack_unpack(x:  SimpleEnum): SimpleEnum {
+entry fun pack_unpack(x:  SimpleEnum): SimpleEnum {
     x
 }

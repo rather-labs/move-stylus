@@ -28,7 +28,7 @@ public struct Baz has drop, copy {
 }
 
 // Forces the compiler to store literals on locals
-public fun get_literal(): vector<Foo> {
+entry fun get_literal(): vector<Foo> {
   vector[
       Foo {
         q: @0x1deadbeef,
@@ -76,7 +76,7 @@ public fun get_literal(): vector<Foo> {
 }
 
 // Forces the compiler to store literals on locals
-public fun get_copied_local(): vector<Foo> {
+entry fun get_copied_local(): vector<Foo> {
   let x: vector<Foo> = vector[
       Foo {
         q: @0x1deadbeef,
@@ -126,74 +126,74 @@ public fun get_copied_local(): vector<Foo> {
   y
 }
 
-public fun echo(x: vector<Foo>): vector<Foo> {
+entry fun echo(x: vector<Foo>): vector<Foo> {
   x
 }
 
-public fun vec_from_struct(x: Foo, y: Foo): vector<Foo> {
+entry fun vec_from_struct(x: Foo, y: Foo): vector<Foo> {
   let z = vector[x, y, x];
   z
 }
 
-public fun vec_from_vec(x: vector<Foo>, y: vector<Foo>): vector<vector<Foo>> {
+entry fun vec_from_vec(x: vector<Foo>, y: vector<Foo>): vector<vector<Foo>> {
   let z = vector[x, y];
   z
 }
 
-public fun vec_from_vec_and_struct(x: vector<Foo>, y: Foo): vector<vector<Foo>> {
+entry fun vec_from_vec_and_struct(x: vector<Foo>, y: Foo): vector<vector<Foo>> {
   let z = vector[x, vector[y, y]];
   z
 }
 
-public fun vec_len(x: vector<Foo>): u64 {
+entry fun vec_len(x: vector<Foo>): u64 {
   x.length()
 }
 
-public fun vec_pop_back(x: vector<Foo>): vector<Foo> {
+entry fun vec_pop_back(x: vector<Foo>): vector<Foo> {
   let mut y = x;
   y.pop_back();
   y.pop_back();
   y
 }
 
-public fun vec_swap(x: vector<Foo>, id1: u64, id2: u64): vector<Foo> {
+entry fun vec_swap(x: vector<Foo>, id1: u64, id2: u64): vector<Foo> {
   let mut y = x;
   y.swap(id1, id2);
   y
 }
 
-public fun vec_push_back(x: vector<Foo>, y: Foo): vector<Foo> {
+entry fun vec_push_back(x: vector<Foo>, y: Foo): vector<Foo> {
   let mut z = x;
   z.push_back(y);
   z.push_back(y);
   z
 }
 
-public fun vec_push_and_pop_back(x: vector<Foo>, y: Foo): vector<Foo> {
+entry fun vec_push_and_pop_back(x: vector<Foo>, y: Foo): vector<Foo> {
   let mut z = x;
   z.push_back(y);
   z.pop_back();
   z
 }
 
-public fun vec_eq(x: vector<Foo>, y: vector<Foo>): bool {
+entry fun vec_eq(x: vector<Foo>, y: vector<Foo>): bool {
     x == y
 }
 
-public fun vec_neq(x: vector<Foo>, y: vector<Foo>): bool {
+entry fun vec_neq(x: vector<Foo>, y: vector<Foo>): bool {
     x != y
 }
 
-public fun vec_borrow(x: &vector<Foo>): &Foo {
+entry fun vec_borrow(x: &vector<Foo>): &Foo {
     &x[0]
 }
 
-public fun vec_mut_borrow(x: &mut vector<Foo>): &mut Foo {
+entry fun vec_mut_borrow(x: &mut vector<Foo>): &mut Foo {
     &mut x[0]
 }
 
 // This generates a VecUnpack instruction
-public fun vec_unpack(x: vector<Foo>): vector<Foo> {
+entry fun vec_unpack(x: vector<Foo>): vector<Foo> {
     let mut z = get_literal();
     x.do!(|e| z.push_back(e));
     z
