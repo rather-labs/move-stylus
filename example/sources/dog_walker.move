@@ -15,14 +15,14 @@ public struct IWalkTheDog has copy, drop { }
 public struct CanWalkDogCap has key { id: UID }
 
 // We replaced the constructor with a create function so we can use it more than once.
-public fun create(ctx: &mut TxContext) {
+entry fun create(ctx: &mut TxContext) {
     transfer::transfer(
         CanWalkDogCap { id: object::new(ctx) },
         tx_context::sender(ctx)
     );
 }
 
-public fun walk_the_dog(_: &CanWalkDogCap) {
+entry fun walk_the_dog(_: &CanWalkDogCap) {
     emit(IWalkTheDog { });
 }
 
