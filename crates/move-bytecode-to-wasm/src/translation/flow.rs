@@ -260,7 +260,7 @@ impl Flow {
                                     Some(case_stack)
                                 }
                             })
-                            .unwrap_or_else(|| vec![]); // return empty stack if all cases are empty
+                            .unwrap_or_else(Vec::new); // return empty stack if all cases are empty
 
                         Flow::Switch {
                             stack,

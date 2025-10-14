@@ -49,3 +49,51 @@ public fun match_nested_enum(x: NumberEnum, y: ColorEnum, z: YinYangEnum): u32 {
         },
     }
 }
+
+public fun match_with_conditional(x: NumberEnum, y: u32): u32 {
+    if (y > 42) {
+        match(x) {
+            NumberEnum::One => 1,
+            _ => 2,
+        }
+    } else {
+        match(x) {
+            NumberEnum::Five => 3,
+            NumberEnum::Four => {
+                if (y > 17) {
+                    4
+                } else {
+                    5
+                }
+            },
+            _ => 6,
+        }
+    }
+}
+
+public fun nested_match_with_conditional(x: NumberEnum, y: ColorEnum, z: u32): u32 {
+    if (z > 42) {
+        match(x) {
+            NumberEnum::One => 1,
+            _ => 2,
+        }
+    } else {
+        match(x) {
+            NumberEnum::Five => 3,
+            NumberEnum::Four => {
+                if (z > 17) {
+                    match(y) {
+                        ColorEnum::Red => 4,
+                        _ => 5,
+                    }
+                } else {
+                    match(y) {
+                        ColorEnum::Red => 6,
+                        _ => 7,
+                    }
+                }
+            },
+            _ => 8,
+        }
+    }
+}

@@ -116,6 +116,8 @@ mod enum_match {
 
         function matchNumberEnum(NumberEnum x) external returns (uint32);
         function matchNestedEnum(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
+        function matchWithConditional(NumberEnum x, uint32 y) external returns (uint32);
+        function nestedMatchWithConditional(NumberEnum x, ColorEnum y, uint32 z) external returns (uint32);
     }
 
     #[rstest]
@@ -151,6 +153,55 @@ mod enum_match {
         #[case] expected: u32,
     ) {
         let call_data = matchNestedEnumCall::new((number, color, yin_yang)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(result, 0);
+        assert_eq!(return_data, expected.abi_encode());
+    }
+
+    #[rstest]
+    #[case(NumberEnum::One, 43, 1)]
+    #[case(NumberEnum::Two, 44, 2)]
+    #[case(NumberEnum::Three, 45, 2)]
+    #[case(NumberEnum::Four, 123, 2)]
+    #[case(NumberEnum::Five, 321, 2)]
+    #[case(NumberEnum::Five, 10, 3)]
+    #[case(NumberEnum::Four, 30, 4)]
+    #[case(NumberEnum::Four, 10, 5)]
+    #[case(NumberEnum::One, 0, 6)]
+    #[case(NumberEnum::Two, 42, 6)]
+    #[case(NumberEnum::Three, 18, 6)]
+    fn test_match_with_conditional(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] number: NumberEnum,
+        #[case] y: u32,
+        #[case] expected: u32,
+    ) {
+        let call_data = matchWithConditionalCall::new((number, y)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(result, 0);
+        assert_eq!(return_data, expected.abi_encode());
+    }
+
+    #[rstest]
+    #[case(NumberEnum::One, ColorEnum::Red, 43, 1)]
+    #[case(NumberEnum::Two, ColorEnum::Red, 44, 2)]
+    #[case(NumberEnum::Three, ColorEnum::Red, 45, 2)]
+    #[case(NumberEnum::Four, ColorEnum::Red, 123, 2)]
+    #[case(NumberEnum::Five, ColorEnum::Red, 321, 2)]
+    #[case(NumberEnum::Five, ColorEnum::Red, 10, 3)]
+    #[case(NumberEnum::Four, ColorEnum::Red, 30, 4)]
+    #[case(NumberEnum::Four, ColorEnum::Blue, 30, 5)]
+    #[case(NumberEnum::Four, ColorEnum::Red, 10, 6)]
+    #[case(NumberEnum::Four, ColorEnum::Blue, 10, 7)]
+    #[case(NumberEnum::One, ColorEnum::Blue, 10, 8)]
+    fn test_nested_match_with_conditional(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] number: NumberEnum,
+        #[case] color: ColorEnum,
+        #[case] z: u32,
+        #[case] expected: u32,
+    ) {
+        let call_data = nestedMatchWithConditionalCall::new((number, color, z)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(result, 0);
         assert_eq!(return_data, expected.abi_encode());

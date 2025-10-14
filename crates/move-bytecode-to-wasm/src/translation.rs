@@ -118,9 +118,7 @@ struct TranslateFlowContext<'a> {
     function_locals: &'a Vec<LocalId>,
     uid_locals: &'a mut HashMap<u8, StorageIdParentInformation>,
     branch_targets: &'a mut BranchTargets,
-    jump_table_idx: &'a mut Option<usize>,
     match_subject: &'a mut Option<LocalId>,
-    case_label_to_switch_id: &'a mut HashMap<u16, InstrSeqId>,
     dynamic_fields_global_variables: &'a mut Vec<(GlobalId, IntermediateType)>,
 }
 
@@ -178,9 +176,7 @@ pub fn translate_function(
         uid_locals: &mut uid_locals,
         types_stack: &mut types_stack,
         branch_targets: &mut branch_targets,
-        jump_table_idx: &mut None, // Index of the current jump table being switched. This is populated when translating a VariantSwitch
-        match_subject: &mut None,  // The match subject (&IEnum)
-        case_label_to_switch_id: &mut HashMap::new(), // Associates simple block case labels with the corresponding switch block id
+        match_subject: &mut None, // The match subject (&IEnum)
         dynamic_fields_global_variables,
     };
 
@@ -208,7 +204,6 @@ fn translate_flow(
 ) {
     match flow {
         Flow::Simple {
-            label,
             instructions,
             stack,
             branches,
@@ -217,24 +212,34 @@ fn translate_flow(
             ..
         } => {
             let ty = InstrSeqType::new(&mut module.types, &[], stack);
+
             builder.block(ty, |block| {
+                // When 'immediate' is a switch or if-else flow and 'next' is a simple flow,
+                // that next simple flow serves as the merging point for the control flow branches.
+                // To support this, we map the label of the 'next' simple flow to the current block's id in the merged_branch map.
+                // As a result, when a Branch targeting that label occurs, control jumps to the end of the current block,
+                // effectively reaching the merge point after the switch or if-else.
+                // Note that the immediate flow is translated within this block!
+                if matches!(&**immediate, Flow::Switch { .. } | Flow::IfElse { .. }) {
+                    if let Flow::Simple { label, .. } = &**next {
+                        ctx.branch_targets
+                            .merged_branch
+                            .entry(*label)
+                            .or_insert(block.id());
+                    }
+                }
+
+                // Otherwise, check if this simple block contains branches that target a merged branch.
+                // For any such branch, ensure the merged_branch map includes an entry for the target label,
+                // inserting the current block id as the value if it's not already present.
                 for (target_label, branch_mode) in branches {
                     if let BranchMode::MergedBranch | BranchMode::MergedBranchIntoMulti =
                         branch_mode
                     {
-                        // Check if this simple block is a case of a switch
-                        // To do that we check if the block label is in the code_offset_to_switch_id map
-                        // If it is, we use that switch id instead of the current block id
-                        let target_id = ctx
-                            .case_label_to_switch_id
-                            .get(label)
-                            .copied()
-                            .unwrap_or(block.id());
-
                         ctx.branch_targets
                             .merged_branch
                             .entry(*target_label)
-                            .or_insert(target_id);
+                            .or_insert(block.id());
                     }
                 }
 
@@ -253,7 +258,6 @@ fn translate_flow(
                         ctx.uid_locals,
                         branches,
                         ctx.branch_targets,
-                        ctx.jump_table_idx,
                         ctx.match_subject,
                         ctx.dynamic_fields_global_variables,
                     )
@@ -298,7 +302,6 @@ fn translate_flow(
             // Translate the next flow outside the wrapping block.
             translate_flow(ctx, builder, module, next, functions_to_link);
         }
-        // TODO: add entries to the jump table hashmap here too! sometimes a switch can be an if_else
         Flow::IfElse {
             then_body,
             else_body,
@@ -393,27 +396,6 @@ fn translate_flow(
             let ty = InstrSeqType::new(&mut module.types, &[], stack);
 
             builder.block(ty, |switch| {
-                let switch_id = switch.id();
-
-                if let Some(jump_table_idx) = ctx.jump_table_idx {
-                    // Get the jump table from the function information
-                    let jump_table = ctx
-                        .function_information
-                        .jump_tables
-                        .get(*jump_table_idx)
-                        .unwrap();
-
-                    // Map the code offsets (simple block labels!) to the switch id
-                    for offset in &jump_table.offsets {
-                        ctx.case_label_to_switch_id.insert(*offset, switch_id);
-                    }
-
-                    // Pop the jump table index
-                    *ctx.jump_table_idx = None;
-                } else {
-                    panic!("Jump table index not found while translating Switch flow!");
-                }
-
                 // Open `default` target first; all case targets nest inside it.
                 switch.block(ty, |block| {
                     let default_id = block.id();
@@ -502,7 +484,6 @@ fn translate_instruction(
     uid_locals: &mut HashMap<u8, StorageIdParentInformation>,
     branches: &HashMap<u16, BranchMode>,
     branch_targets: &BranchTargets,
-    jump_table_idx: &mut Option<usize>,
     match_subject: &mut Option<LocalId>,
     dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
 ) -> Result<Vec<FunctionId>, TranslationError> {
@@ -2518,7 +2499,7 @@ fn translate_instruction(
             let tmp = module.locals.add(ValType::I32);
             builder.local_set(tmp);
         }
-        Bytecode::VariantSwitch(index) => {
+        Bytecode::VariantSwitch(_) => {
             // The match subject (&IEnum) is on top of the stack
             // The first load is to load the enum pointer from the reference
             // The second load is to load the variant index from the enum pointer
@@ -2543,7 +2524,6 @@ fn translate_instruction(
                 .local_set(match_subject_local);
 
             *match_subject = Some(match_subject_local);
-            *jump_table_idx = Some(index.0 as usize);
         }
         b => Err(TranslationError::UnsupportedOperation {
             operation: b.clone(),
