@@ -1,38 +1,38 @@
 module 0x01::bool;
 
-public fun deref_bool(x: bool): bool {
+entry fun deref_bool(x: bool): bool {
   let y = &x;
   *y
 }
 
-public fun deref_bool_ref(y: &bool): bool {
+entry fun deref_bool_ref(y: &bool): bool {
   *y
 }
 
-public fun identity_bool_ref(x: &bool): &bool {
+entry fun identity_bool_ref(x: &bool): &bool {
     x
 }
 
-public fun call_deref_bool_ref(x: bool): bool {
+entry fun call_deref_bool_ref(x: bool): bool {
   deref_bool_ref(&x)
 }
 
-public fun deref_nested_bool(x: bool): bool {
+entry fun deref_nested_bool(x: bool): bool {
     let y = &x;
     let z = &*y;
     *z
 }
 
-public fun deref_mut_arg(x: &mut bool ): bool {
+entry fun deref_mut_arg(x: &mut bool ): bool {
  *x
 }
 
-public fun write_mut_ref(x: &mut bool ): bool {
+entry fun write_mut_ref(x: &mut bool ): bool {
  *x = true;
  *x
 }
 
-public fun miscellaneous_0(): vector<bool> {
+entry fun miscellaneous_0(): vector<bool> {
  let mut x = true;
  let w = x;
  let y = &mut x;
@@ -40,7 +40,7 @@ public fun miscellaneous_0(): vector<bool> {
  vector[*y, w, x]
 }
 
-public fun miscellaneous_1(): vector<bool> {
+entry fun miscellaneous_1(): vector<bool> {
   let mut x = true;
   let y = x;
   x = false;
@@ -50,7 +50,7 @@ public fun miscellaneous_1(): vector<bool> {
   vector[y, *z, w]
 }
 
-public fun freeze_ref(y: bool): bool {
+entry fun freeze_ref(y: bool): bool {
     let mut x = true;
     let x_mut_ref: &mut bool = &mut x;
     *x_mut_ref = y;

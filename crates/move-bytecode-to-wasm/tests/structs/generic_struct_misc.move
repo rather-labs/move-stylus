@@ -30,7 +30,7 @@ public struct Baz<T: copy> has drop, copy {
     b: vector<u256>,
 }
 
-public fun create_foo<T: copy>(g: T): Foo<T, u64> {
+entry fun create_foo<T: copy>(g: T): Foo<T, u64> {
     Foo {
         g,
         q: @0xcafe000000000000000000000000000000007357,
@@ -48,11 +48,11 @@ public fun create_foo<T: copy>(g: T): Foo<T, u64> {
     }
 }
 
-public fun create_foo_u32(g: u32): Foo<u32, u64> {
+entry fun create_foo_u32(g: u32): Foo<u32, u64> {
     create_foo(g)
 }
 
-public fun create_foo_vec_u32(g: vector<u32>): Foo<vector<u32>, u64> {
+entry fun create_foo_vec_u32(g: vector<u32>): Foo<vector<u32>, u64> {
     create_foo(g)
 }
 
@@ -61,10 +61,10 @@ public struct Fu<T: copy> has drop, copy {
     b: vector<T>,
 }
 
-public fun create_fu<T: copy>(t: T): Fu<T> {
+entry fun create_fu<T: copy>(t: T): Fu<T> {
     Fu {a: t, b: vector[t, t, t]}
 }
 
-public fun create_fu_u32(t: u32): Fu<u32> {
+entry fun create_fu_u32(t: u32): Fu<u32> {
     create_fu(t)
 }

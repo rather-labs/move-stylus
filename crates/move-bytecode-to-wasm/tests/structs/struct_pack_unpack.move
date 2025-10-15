@@ -43,7 +43,7 @@ public struct Bazz has drop {
     b: vector<u256>,
 }
 
-public fun echo_foo_pack(
+entry fun echo_foo_pack(
     q: address,
     t: bool,
     u: u8,
@@ -57,7 +57,7 @@ public fun echo_foo_pack(
     Foo { q, t, u, v, w, x, y, z, baz }
 }
 
-public fun echo_bar_pack(
+entry fun echo_bar_pack(
     q: address,
     r: vector<u32>,
     s: vector<u128>,
@@ -74,23 +74,23 @@ public fun echo_bar_pack(
     Bar { q, r, s, t, u, v, w, x, y, z, bazz, baz }
 }
 
-public fun echo_foo_unpack(foo: Foo): (address, bool, u8, u16, u32, u64, u128, u256, Baz) {
+entry fun echo_foo_unpack(foo: Foo): (address, bool, u8, u16, u32, u64, u128, u256, Baz) {
     let Foo { q, t, u, v, w, x, y, z, baz } = foo;
     ( q, t, u, v, w, x, y, z, baz )
 }
 
-public fun echo_foo_unpack_ignore_fields(foo: Foo): (address, u8, u32, u128, Baz) {
+entry fun echo_foo_unpack_ignore_fields(foo: Foo): (address, u8, u32, u128, Baz) {
     let Foo { q, t: _, u, v: _, w, x: _, y, z: _, baz } = foo;
     ( q, u, w, y, baz )
 }
 
-public fun echo_bar_unpack(bar: Bar): (address, vector<u32>, vector<u128>, bool, u8, u16, u32, u64, u128, u256, Bazz, Baz) {
+entry fun echo_bar_unpack(bar: Bar): (address, vector<u32>, vector<u128>, bool, u8, u16, u32, u64, u128, u256, Bazz, Baz) {
     let Bar { q, r, s, t, u, v, w, x, y, z, bazz, baz } = bar;
     ( q, r, s, t, u, v, w, x, y, z, bazz, baz )
 }
 
 
-public fun echo_bar_unpack_ignore_fields(bar: Bar): (address, vector<u128>, u8, u32, u128, Bazz) {
+entry fun echo_bar_unpack_ignore_fields(bar: Bar): (address, vector<u128>, u8, u32, u128, Bazz) {
     let Bar { q, r: _, s, t: _, u, v: _, w, x: _, y, z: _, bazz, baz: _ } = bar;
     ( q, s, u, w, y, bazz )
 }

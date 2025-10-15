@@ -27,10 +27,10 @@ fun init(otw: CONSTRUCTOR_WITH_OTW, ctx: &mut TxContext) {
   transfer::share_object(foo);
 }
 
-public fun read_value(foo: &Foo): u64 {
+entry fun read_value(foo: &Foo): u64 {
     foo.value
 }
 
-public fun set_value(foo: &mut Foo, value: u64) {
+entry fun set_value(foo: &mut Foo, value: u64) {
     foo.value = value;
 }

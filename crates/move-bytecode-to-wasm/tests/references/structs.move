@@ -27,37 +27,37 @@ public struct Baz has drop, copy {
     b: vector<u256>,
 }
 
-public fun deref_struct(x: Foo): Foo {
+entry fun deref_struct(x: Foo): Foo {
   let y = &x;
   *y
 }
 
-public fun deref_struct_ref(y: &Foo): Foo {
+entry fun deref_struct_ref(y: &Foo): Foo {
   *y
 }
 
-public fun identity_struct_ref(x: &Foo): &Foo {
+entry fun identity_struct_ref(x: &Foo): &Foo {
     x
 }
 
-public fun identity_static_struct_ref(x: &Bar): &Bar {
+entry fun identity_static_struct_ref(x: &Bar): &Bar {
     x
 }
-public fun call_deref_struct_ref(x: Foo): Foo {
+entry fun call_deref_struct_ref(x: Foo): Foo {
     deref_struct_ref(&x)
 }
 
-public fun deref_nested_struct(x: Foo): Foo {
+entry fun deref_nested_struct(x: Foo): Foo {
     let y = &x;
     let z = &*y;
     *z
 }
 
-public fun deref_mut_arg(x: &mut Foo): Foo {
+entry fun deref_mut_arg(x: &mut Foo): Foo {
     *x
 }
 
-public fun write_mut_ref(x: &mut Foo): Foo {
+entry fun write_mut_ref(x: &mut Foo): Foo {
     x.q = @0xdeadbeef;
     x.r = vector[0, 3, 0, 3, 4, 5, 6];
     x.s = vector[6, 5, 4, 3, 0, 3, 0];
@@ -76,7 +76,7 @@ public fun write_mut_ref(x: &mut Foo): Foo {
     *x
 }
 
-public fun write_mut_ref_2(x: &mut Foo): Foo {
+entry fun write_mut_ref_2(x: &mut Foo): Foo {
     *x = Foo {
         q: @0xdeadbeef,
         r : vector[0, 3, 0, 3, 4, 5, 6],
@@ -95,7 +95,7 @@ public fun write_mut_ref_2(x: &mut Foo): Foo {
     *x
 }
 
-public fun freeze_ref(y: Foo): Foo {
+entry fun freeze_ref(y: Foo): Foo {
     let mut x = Foo {
         q: @0xdeadbeef,
         r : vector[0, 3, 0, 3, 4, 5, 6],

@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use move_binary_format::file_format::{
-    CodeOffset, DatatypeHandleIndex, FunctionDefinition, JumpTableInner, Signature, SignatureToken,
-    Visibility,
+    DatatypeHandleIndex, FunctionDefinition, Signature, SignatureToken,
 };
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
@@ -93,8 +92,7 @@ impl MappedFunction {
             signature,
             locals,
             results,
-            // TODO: change to function_definition.is_entry
-            is_entry: function_definition.visibility == Visibility::Public,
+            is_entry: function_definition.is_entry,
             is_native: function_definition.is_native(),
             is_generic,
             jump_tables,

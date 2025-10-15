@@ -8,14 +8,14 @@ public struct LocalStruct<T: copy> has drop, copy {
     b: Foo<T>,
 }
 
-public fun structCopy(): (Foo<u16>, Foo<u16>) {
+entry fun structCopy(): (Foo<u16>, Foo<u16>) {
     let foo_1 = create_foo(314);
 
     let foo_2 = foo_1;
     (foo_1, foo_2)
 }
 
-public fun structCopy2(): (LocalStruct<u16>, LocalStruct<u16>) {
+entry fun structCopy2(): (LocalStruct<u16>, LocalStruct<u16>) {
     let ls_1 = LocalStruct {
         g: 314,
         a: 42,

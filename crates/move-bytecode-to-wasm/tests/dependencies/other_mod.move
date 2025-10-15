@@ -7,7 +7,7 @@ public struct Test {
     t_field_2: AnotherTest
 }
 
-public fun get_values(self: &Test): (u8, u8) {
+public entry fun get_values(self: &Test): (u8, u8) {
     (self.t_field_1, self.t_field_2.get_value())
 }
 

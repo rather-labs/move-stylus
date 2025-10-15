@@ -85,7 +85,7 @@ public struct EpicVar has key {
 // FOO FUNCTIONS
 // ============================================================================
 
-public fun create_shared(ctx: &mut TxContext) {
+entry fun create_shared(ctx: &mut TxContext) {
     let foo = Foo {
         id: object::new(ctx),
         value: 101,
@@ -93,7 +93,7 @@ public fun create_shared(ctx: &mut TxContext) {
     transfer::share_object(foo);
 }
 
-public fun create_owned(recipient: address, ctx: &mut TxContext) {
+entry fun create_owned(recipient: address, ctx: &mut TxContext) {
     let foo = Foo {
         id: object::new(ctx),
         value: 101,
@@ -101,7 +101,7 @@ public fun create_owned(recipient: address, ctx: &mut TxContext) {
     transfer::transfer(foo, recipient);
 }
 
-public fun create_frozen(ctx: &mut TxContext) {
+entry fun create_frozen(ctx: &mut TxContext) {
     let foo = Foo {
         id: object::new(ctx),
         value: 101,
@@ -109,43 +109,43 @@ public fun create_frozen(ctx: &mut TxContext) {
     transfer::freeze_object(foo);
 }
 
-public fun read_value(foo: &Foo): u64 {
+entry fun read_value(foo: &Foo): u64 {
     foo.value
 }
 
-public fun set_value(foo: &mut Foo, value: u64) {
+entry fun set_value(foo: &mut Foo, value: u64) {
     foo.value = value;
 }
 
-public fun increment_value(foo: &mut Foo) {
+entry fun increment_value(foo: &mut Foo) {
     foo.value = foo.value + 1;
 }
 
-public fun get_foo(foo: &Foo): &Foo {
+entry fun get_foo(foo: &Foo): &Foo {
     foo
 }
 
-public fun delete_obj(foo: Foo) {
+entry fun delete_obj(foo: Foo) {
     let Foo { id, value: _ } = foo;
     id.delete();
 }
 
-public fun delete_obj_2(foo: Foo, foo2: Foo) {
+entry fun delete_obj_2(foo: Foo, foo2: Foo) {
     let Foo { id: id1, value: _ } = foo;
     let Foo { id: id2, value: _ } = foo2;
     id1.delete();
     id2.delete();
 }
 
-public fun freeze_obj(foo: Foo) {
+entry fun freeze_obj(foo: Foo) {
     transfer::freeze_object(foo);
 }
 
-public fun share_obj(foo: Foo) {
+entry fun share_obj(foo: Foo) {
     transfer::share_object(foo);
 }
 
-public fun transfer_obj(foo: Foo, recipient: address) {
+entry fun transfer_obj(foo: Foo, recipient: address) {
     transfer::transfer(foo, recipient);
 }
 
@@ -153,7 +153,7 @@ public fun transfer_obj(foo: Foo, recipient: address) {
 // BAR FUNCTIONS
 // ============================================================================
 
-public fun create_bar(ctx: &mut TxContext) {
+entry fun create_bar(ctx: &mut TxContext) {
     let bar = Bar {
         id: object::new(ctx),
         a: 101,
@@ -162,11 +162,11 @@ public fun create_bar(ctx: &mut TxContext) {
     transfer::share_object(bar);
 }
 
-public fun get_bar(bar: &Bar): &Bar {
+entry fun get_bar(bar: &Bar): &Bar {
     bar
 }
 
-public fun delete_bar(bar: Bar) {
+entry fun delete_bar(bar: Bar) {
     let Bar { id, a: _, c: _ } = bar;
     id.delete();
 }
@@ -175,7 +175,7 @@ public fun delete_bar(bar: Bar) {
 // BAZ FUNCTIONS
 // ============================================================================
 
-public fun create_baz(recipient: address, share: bool, ctx: &mut TxContext) {
+entry fun create_baz(recipient: address, share: bool, ctx: &mut TxContext) {
     let baz = Baz {
         id: object::new(ctx),
         a: 101,
@@ -189,11 +189,11 @@ public fun create_baz(recipient: address, share: bool, ctx: &mut TxContext) {
     }
 }
 
-public fun get_baz(baz: &Baz): &Baz {
+entry fun get_baz(baz: &Baz): &Baz {
     baz
 }
 
-public fun delete_baz(baz: Baz) {
+entry fun delete_baz(baz: Baz) {
     let Baz { id, a: _, c: _ } = baz;
     id.delete();
 }
@@ -202,7 +202,7 @@ public fun delete_baz(baz: Baz) {
 // BEZ FUNCTIONS
 // ============================================================================
 
-public fun create_bez(ctx: &mut TxContext) {
+entry fun create_bez(ctx: &mut TxContext) {
     let bez = Bez {
         id: object::new(ctx),
         a: 101,
@@ -222,11 +222,11 @@ public fun create_bez(ctx: &mut TxContext) {
     transfer::share_object(bez);
 }
 
-public fun get_bez(bez: &Bez): &Bez {
+entry fun get_bez(bez: &Bez): &Bez {
     bez
 }
 
-public fun delete_bez(bez: Bez) {
+entry fun delete_bez(bez: Bez) {
     let Bez { id, a: _, c: _, d: _, e: _ } = bez;
     id.delete();
 }
@@ -235,7 +235,7 @@ public fun delete_bez(bez: Bez) {
 // BIZ FUNCTIONS
 // ============================================================================
 
-public fun create_biz(ctx: &mut TxContext) {
+entry fun create_biz(ctx: &mut TxContext) {
     let biz = Biz<u64> {
         id: object::new(ctx),
         a: 101,
@@ -249,11 +249,11 @@ public fun create_biz(ctx: &mut TxContext) {
     transfer::share_object(biz);
 }
 
-public fun get_biz(biz: &Biz<u64>): &Biz<u64> {
+entry fun get_biz(biz: &Biz<u64>): &Biz<u64> {
     biz
 }
 
-public fun delete_biz(biz: Biz<u64>) {
+entry fun delete_biz(biz: Biz<u64>) {
     let Biz { id, a: _, b: _, c: _ } = biz;
     id.delete();
 }
@@ -262,7 +262,7 @@ public fun delete_biz(biz: Biz<u64>) {
 // VAR FUNCTIONS
 // ============================================================================
 
-public fun create_var(recipient: address, ctx: &mut TxContext) {
+entry fun create_var(recipient: address, ctx: &mut TxContext) {
     let var = Var {
         id: object::new(ctx),
         a: Bar { id: object::new(ctx), a: 42, c: vector[1, 2, 3] },
@@ -270,7 +270,7 @@ public fun create_var(recipient: address, ctx: &mut TxContext) {
     transfer::transfer(var, recipient);
 }
 
-public fun create_var_shared(ctx: &mut TxContext) {
+entry fun create_var_shared(ctx: &mut TxContext) {
     let var = Var {
         id: object::new(ctx),
         a: Bar { id: object::new(ctx), a: 42, c: vector[1, 2, 3] },
@@ -278,26 +278,26 @@ public fun create_var_shared(ctx: &mut TxContext) {
     transfer::share_object(var);
 }
 
-public fun share_var(var: Var) {
+entry fun share_var(var: Var) {
     transfer::share_object(var);
 }
 
-public fun freeze_var(var: Var) {
+entry fun freeze_var(var: Var) {
     transfer::freeze_object(var);
 }
 
-public fun get_var(var: &Var): &Var {
+entry fun get_var(var: &Var): &Var {
     var
 }
 
-public fun delete_var(var: Var) {
+entry fun delete_var(var: Var) {
     let Var { id, a: bar } = var;
     let Bar { id: bar_id, a: _, c: _ } = bar;
     bar_id.delete();
     id.delete();
 }
 
-public fun delete_var_and_transfer_bar(var: Var) {
+entry fun delete_var_and_transfer_bar(var: Var) {
     let Var { id, a: bar } = var;
     id.delete();
     transfer::share_object(bar);
@@ -307,7 +307,7 @@ public fun delete_var_and_transfer_bar(var: Var) {
 // VAZ FUNCTIONS
 // ============================================================================
 
-public fun create_vaz(ctx: &mut TxContext) {
+entry fun create_vaz(ctx: &mut TxContext) {
     let vaz = Vaz {
         id: object::new(ctx),
         a: 101,
@@ -318,11 +318,11 @@ public fun create_vaz(ctx: &mut TxContext) {
     transfer::share_object(vaz);
 }
 
-public fun get_vaz(vaz: &Vaz): &Vaz {
+entry fun get_vaz(vaz: &Vaz): &Vaz {
     vaz
 }
 
-public fun delete_vaz(vaz: Vaz) {
+entry fun delete_vaz(vaz: Vaz) {
     let Vaz { id, a: _, b: bar1, c: _ , d: bar2} = vaz;
     let Bar { id: bar_id1, a: _, c: _ } = bar1;
     let Bar { id: bar_id2, a: _, c: _ } = bar2;
@@ -335,7 +335,7 @@ public fun delete_vaz(vaz: Vaz) {
 // EPIC VAR FUNCTIONS
 // ============================================================================
 
-public fun create_epic_var(ctx: &mut TxContext) {
+entry fun create_epic_var(ctx: &mut TxContext) {
     let epic_var = EpicVar {
         id: object::new(ctx),
         a: 101,
@@ -346,11 +346,11 @@ public fun create_epic_var(ctx: &mut TxContext) {
     transfer::share_object(epic_var);
 }
 
-public fun get_epic_var(epic_var: &EpicVar): &EpicVar {
+entry fun get_epic_var(epic_var: &EpicVar): &EpicVar {
     epic_var
 }
 
-public fun delete_epic_var(epic_var: EpicVar) {
+entry fun delete_epic_var(epic_var: EpicVar) {
     let EpicVar { id, a: _, b: bar, c: _, d: mut vector_bar } = epic_var;
     id.delete();
     let Bar { id, a: _, c: _ } = bar;

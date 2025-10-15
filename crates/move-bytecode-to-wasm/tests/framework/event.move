@@ -64,39 +64,39 @@ public struct TestEvent9 has copy, drop {
     b: std::ascii::String,
 }
 
-public fun emit_test_event1(n: u32) {
+entry fun emit_test_event1(n: u32) {
     emit(TestEvent1 { n });
 }
 
-public fun emit_test_event2(a: u32, b: address, c: u128) {
+entry fun emit_test_event2(a: u32, b: address, c: u128) {
     emit(TestEvent2 { a, b, c });
 }
 
-public fun emit_test_event3(a: u32, b: address, c: u128, d: vector<u8>) {
+entry fun emit_test_event3(a: u32, b: address, c: u128, d: vector<u8>) {
     emit(TestEvent3 { a, b, c, d });
 }
 
-public fun emit_test_event4(a: u32, b: address, c: u128, d: vector<u8>, e: TestEvent2) {
+entry fun emit_test_event4(a: u32, b: address, c: u128, d: vector<u8>, e: TestEvent2) {
     emit(TestEvent4 { a, b, c, d, e });
 }
 
-public fun emit_test_event5(a: u32, b: address, c: vector<u8>) {
+entry fun emit_test_event5(a: u32, b: address, c: vector<u8>) {
     emit(TestEvent5 { a, b, c });
 }
 
-public fun emit_test_event6(a: u32, b: address, c: TestEvent2) {
+entry fun emit_test_event6(a: u32, b: address, c: TestEvent2) {
     emit(TestEvent6 { a, b, c });
 }
 
-public fun emit_test_event7(a: u32, b: vector<u8>, c: TestEvent2) {
+entry fun emit_test_event7(a: u32, b: vector<u8>, c: TestEvent2) {
     emit(TestEvent7 { a, b, c });
 }
 
-public fun emit_test_event8(a: u64, b: std::ascii::String) {
+entry fun emit_test_event8(a: u64, b: std::ascii::String) {
     emit(TestEvent8 { a, b });
 }
 
-public fun emit_test_event9(a: u64, b: std::ascii::String) {
+entry fun emit_test_event9(a: u64, b: std::ascii::String) {
     emit(TestEvent9 { a, b });
 }
 
@@ -183,47 +183,47 @@ public struct Anonymous2 has copy, drop {
     i: TestEvent2,
 }
 
-public fun emit_test_anon_event1(n: u32) {
+entry fun emit_test_anon_event1(n: u32) {
     emit(TestEvent1Anon { n });
 }
 
-public fun emit_test_anon_event2(a: u32, b: address, c: u128) {
+entry fun emit_test_anon_event2(a: u32, b: address, c: u128) {
     emit(TestEvent2Anon { a, b, c });
 }
 
-public fun emit_test_anon_event3(a: u32, b: address, c: u128, d: vector<u8>) {
+entry fun emit_test_anon_event3(a: u32, b: address, c: u128, d: vector<u8>) {
     emit(TestEvent3Anon { a, b, c, d });
 }
 
-public fun emit_test_anon_event4(a: u32, b: address, c: u128, d: vector<u8>, e: TestEvent2) {
+entry fun emit_test_anon_event4(a: u32, b: address, c: u128, d: vector<u8>, e: TestEvent2) {
     emit(TestEvent4Anon { a, b, c, d, e });
 }
 
-public fun emit_test_anon_event5(a: u32, b: address, c: vector<u8>) {
+entry fun emit_test_anon_event5(a: u32, b: address, c: vector<u8>) {
     emit(TestEvent5Anon { a, b, c });
 }
 
-public fun emit_test_anon_event6(a: u32, b: address, c: TestEvent2) {
+entry fun emit_test_anon_event6(a: u32, b: address, c: TestEvent2) {
     emit(TestEvent6Anon { a, b, c });
 }
 
-public fun emit_test_anon_event7(a: u32, b: vector<u8>, c: TestEvent2) {
+entry fun emit_test_anon_event7(a: u32, b: vector<u8>, c: TestEvent2) {
     emit(TestEvent7Anon { a, b, c });
 }
 
-public fun emit_test_anon_event8(a: u64, b: std::ascii::String) {
+entry fun emit_test_anon_event8(a: u64, b: std::ascii::String) {
     emit(TestEvent8Anon { a, b });
 }
 
-public fun emit_test_anon_event9(a: u64, b: std::ascii::String) {
+entry fun emit_test_anon_event9(a: u64, b: std::ascii::String) {
     emit(TestEvent9Anon { a, b });
 }
 
-public fun emit_test_anonymous(a: u32, b: u128, c: vector<u8>, d: TestEvent2) {
+entry fun emit_test_anonymous(a: u32, b: u128, c: vector<u8>, d: TestEvent2) {
     emit(Anonymous { a, b, c, d });
 }
 
-public fun emit_test_anonymous2(
+entry fun emit_test_anonymous2(
     a: u32,
     b: u128,
     c: vector<u8>,
