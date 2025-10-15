@@ -4,7 +4,7 @@ use crate::{
     compilation_context::ModuleId,
     data::{DATA_SLOT_DATA_PTR_OFFSET, DATA_ZERO_OFFSET},
     hostio::host_functions::{
-        block_number, block_timestamp, emit_log, native_keccak256, storage_cache_bytes32,
+        block_number, block_timestamp, native_keccak256, storage_cache_bytes32,
         storage_flush_cache, storage_load_bytes32,
     },
     runtime::RuntimeFunction,
@@ -123,7 +123,6 @@ pub fn add_native_fresh_id_fn(
     let (storage_load_fn, _) = storage_load_bytes32(module);
     let (storage_cache_fn, _) = storage_cache_bytes32(module);
     let (storage_flush_cache_fn, _) = storage_flush_cache(module);
-    let (emit_log_fn, _) = emit_log(module);
 
     let mut function = FunctionBuilder::new(&mut module.types, &[], &[ValType::I32]);
 
@@ -272,13 +271,6 @@ pub fn add_native_fresh_id_fn(
         .call(storage_cache_fn)
         .i32_const(1)
         .call(storage_flush_cache_fn);
-
-    // Emit log with the ID
-    builder
-        .local_get(id_ptr)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_fn);
 
     // Return the ID ptr
     builder.local_get(id_ptr);

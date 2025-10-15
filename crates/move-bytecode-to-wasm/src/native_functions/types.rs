@@ -1,8 +1,9 @@
 use walrus::{FunctionBuilder, FunctionId, Module, ValType};
 
 use crate::{
-    CompilationContext, compilation_context::ModuleId,
-    translation::intermediate_types::IntermediateType,
+    CompilationContext,
+    compilation_context::ModuleId,
+    translation::intermediate_types::{IntermediateType, structs::IStructType},
 };
 
 use super::NativeFunction;
@@ -41,7 +42,7 @@ pub fn add_is_one_time_witness_fn(
 
     let ptr = module.locals.add(ValType::I32);
 
-    if struct_.is_one_time_witness {
+    if struct_.type_ == IStructType::OneTimeWitness {
         builder.i32_const(1);
     } else {
         builder.i32_const(0);

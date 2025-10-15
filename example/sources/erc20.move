@@ -31,12 +31,14 @@ public struct Info has key {
     decimals: u8,
 }
 
+#[ext(event, indexes = 2)]
 public struct Transfer has copy, drop {
     from: address,
     to: address,
     value: u256
 }
 
+#[ext(event, indexes = 2)]
 public struct Approval has copy, drop {
     owner: address,
     spender: address,
@@ -51,7 +53,7 @@ public struct Allowance has key {
     id: NamedId<ALLOWANCE_>,
 }
 
-entry fun create() {
+fun init(_ctx: &mut TxContext) {
     transfer::freeze_object(Info {
         id: object::new_named_id<CONTRACT_INFO>(),
         name: ascii::string(b"Test Coin"),

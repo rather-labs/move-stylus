@@ -57,6 +57,13 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IStructType {
+    OneTimeWitness,
+    Event { indexes: u8, is_anonymous: bool },
+    Common,
+}
+
 #[derive(Debug, Clone)]
 pub struct IStruct {
     /// Struct identifier
@@ -86,7 +93,7 @@ pub struct IStruct {
 
     pub has_key: bool,
 
-    pub is_one_time_witness: bool,
+    pub type_: IStructType,
 }
 
 impl IStruct {
@@ -96,7 +103,7 @@ impl IStruct {
         fields: Vec<(Option<FieldHandleIndex>, IntermediateType)>,
         fields_types: HashMap<FieldHandleIndex, IntermediateType>,
         has_key: bool,
-        is_one_time_witness: bool,
+        type_: IStructType,
     ) -> Self {
         let mut heap_size = 0;
         let mut field_offsets = HashMap::new();
@@ -117,7 +124,7 @@ impl IStruct {
             fields_types,
             fields: ir_fields,
             has_key,
-            is_one_time_witness,
+            type_,
         }
     }
 

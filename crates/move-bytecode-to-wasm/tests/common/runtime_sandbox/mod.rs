@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex, mpsc},
 };
 
-use alloy_primitives::keccak256;
+use alloy_primitives::{FixedBytes, keccak256};
 use anyhow::Result;
 use constants::{
     BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, CHAIN_ID, GAS_PRICE,
@@ -27,11 +27,13 @@ pub struct ExecutionData {
     pub store: Store<ModuleData>,
 }
 
+type LogEventReceiver = Arc<Mutex<mpsc::Receiver<(u32, Vec<u8>)>>>;
+
 pub struct RuntimeSandbox {
     engine: Engine,
     linker: Linker<ModuleData>,
     module: WasmModule,
-    pub log_events: Arc<Mutex<mpsc::Receiver<Vec<u8>>>>,
+    pub log_events: LogEventReceiver,
     current_tx_origin: Arc<Mutex<[u8; 20]>>,
     current_msg_sender: Arc<Mutex<[u8; 20]>>,
     storage: Arc<Mutex<HashMap<[u8; 32], [u8; 32]>>>,
@@ -81,7 +83,7 @@ impl RuntimeSandbox {
         let current_tx_origin = Arc::new(Mutex::new(SIGNER_ADDRESS));
         let current_msg_sender = Arc::new(Mutex::new(MSG_SENDER_ADDRESS));
 
-        let (log_sender, log_receiver) = mpsc::channel::<Vec<u8>>();
+        let (log_sender, log_receiver) = mpsc::channel::<(u32, Vec<u8>)>();
         let mut linker = Linker::new(&engine);
 
         let mem_export = module.get_export_index("memory").unwrap();
@@ -172,13 +174,13 @@ impl RuntimeSandbox {
             .func_wrap(
                 "vm_hooks",
                 "emit_log",
-                move |mut caller: Caller<'_, ModuleData>, ptr: u32, len: u32, _topic: u32| {
+                move |mut caller: Caller<'_, ModuleData>, ptr: u32, len: u32, topic: u32| {
                     let mem = get_memory(&mut caller);
                     let mut buffer = vec![0; len as usize];
 
                     mem.read(&mut caller, ptr as usize, &mut buffer).unwrap();
 
-                    log_sender.send(buffer.to_vec()).unwrap();
+                    log_sender.send((topic, buffer.to_vec())).unwrap();
                 },
             )
             .unwrap();
@@ -319,7 +321,7 @@ impl RuntimeSandbox {
                             _ => panic!("failed to find host memory"),
                         };
 
-                        let mut result = [0; 256];
+                        let mut result = [0; 96];
                         memory.read(&caller, ptr as usize, &mut result).unwrap();
                         println!("Data {result:?}");
                         println!("--- --- ---\n");
@@ -429,6 +431,13 @@ impl RuntimeSandbox {
             .expect("Wasm module must export memory");
 
         Ok(memory.data(&store)[from..from + len].to_vec())
+    }
+
+    pub fn obtain_uid(&self) -> FixedBytes<32> {
+        let (topic, data) = self.log_events.lock().unwrap().recv().unwrap();
+        assert_eq!(2, topic);
+        assert_eq!(*keccak256(b"NewUID(address)").as_slice(), data[..32]);
+        FixedBytes::<32>::from_slice(&data[32..])
     }
 
     pub fn set_tx_origin(&self, new_address: [u8; 20]) {

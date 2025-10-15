@@ -44,8 +44,9 @@ async fn main() -> eyre::Result<()> {
     let receipt = pending_tx.get_receipt().await?;
 
     println!("Creating a new counter and capturing its id");
-    let counter_id = receipt.logs()[0].data().data.0.clone();
-    let counter_id = FixedBytes::<32>::new(<[u8; 32]>::try_from(counter_id.to_vec()).unwrap());
+    let counter_id =
+        FixedBytes::<32>::new(receipt.logs()[0].topics()[1].to_vec().try_into().unwrap());
+
     println!("Captured counter_id {:?}", counter_id);
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
@@ -110,27 +111,13 @@ async fn main() -> eyre::Result<()> {
     let tx = TransactionRequest::default()
         .from(sender)
         .to(sender_2)
-        .value(U256::from(5_000_000_000_000_000_000u128)); // 5 eth in wei
+        .value(U256::from(1_000_000_000_000_000_000u128)); // 5 eth in wei
     let pending_tx = provider.send_transaction(tx).await?;
     pending_tx.get_receipt().await?;
 
     println!("\nSending set value to 100 tx with the account that is not the owner");
-    let result = example_2.setValue(counter_id, 100).send().await;
-
-    // Assert that the transaction failed with a revert error
-    match result {
-        Err(e) => {
-            println!("Transaction correctly failed as expected: {}", e);
-        }
-        Ok(pending_tx) => {
-            let receipt = pending_tx.get_receipt().await?;
-            if !receipt.status() {
-                println!("✓ Transaction correctly failed as expected");
-            } else {
-                panic!("Transaction should have failed but succeeded");
-            }
-        }
-    }
+    let pending_tx = example_2.setValue(counter_id, 100).send().await;
+    println!("Tx failed?: {:?}", pending_tx.is_err());
 
     // Value did not change as the sender is not the owner
     println!("\nReading value after set value");

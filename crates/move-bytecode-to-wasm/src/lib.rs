@@ -92,10 +92,10 @@ pub fn translate_package(
 
         let module_name = root_compiled_module.unit.name.to_string();
         println!("compiling module {module_name}...");
-        let root_compiled_module = &root_compiled_module.unit.module;
+        let root_compiled_module_unit = &root_compiled_module.unit.module;
 
         let root_module_id = ModuleId {
-            address: root_compiled_module.address().into_bytes().into(),
+            address: root_compiled_module_unit.address().into_bytes().into(),
             module_name: module_name.clone(),
         };
 
@@ -113,7 +113,7 @@ pub fn translate_package(
             &mut modules_data,
             &package.deps_compiled_units,
             &root_compiled_units,
-            &root_compiled_module.immediate_dependencies(),
+            &root_compiled_module_unit.immediate_dependencies(),
             &mut function_definitions,
         );
 
@@ -237,9 +237,7 @@ pub fn process_dependency_tree<'move_package>(
             .map(|(_, module)| module)
             .unwrap_or_else(|| panic!("could not find dependency {}", dependency.name()));
 
-        let dependency_module = &dependency_module.unit.module;
-
-        let immediate_dependencies = &dependency_module.immediate_dependencies();
+        let immediate_dependencies = &dependency_module.unit.module.immediate_dependencies();
         // If the the dependency has dependency, we process them first
         if !immediate_dependencies.is_empty() {
             process_dependency_tree(

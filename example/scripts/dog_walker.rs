@@ -44,9 +44,8 @@ async fn main() -> eyre::Result<()> {
     let tx = example.create().into_transaction_request().from(sender);
     let pending_tx = provider.send_transaction(tx).await?;
     let receipt = pending_tx.get_receipt().await?;
-    let capability_id = receipt.logs()[0].data().data.0.clone();
     let capability_id =
-        FixedBytes::<32>::new(<[u8; 32]>::try_from(capability_id.to_vec()).unwrap());
+        FixedBytes::<32>::new(receipt.logs()[0].topics()[1].to_vec().try_into().unwrap());
     println!("Captured capability {:?}", capability_id);
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
@@ -57,7 +56,7 @@ async fn main() -> eyre::Result<()> {
     let pending_tx = example.walkTheDog(capability_id).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
+        let raw = log.data().topics()[0];
         println!("walking the dog logs: 0x{}", hex::encode(raw));
     }
 
@@ -69,7 +68,7 @@ async fn main() -> eyre::Result<()> {
     let tx = TransactionRequest::default()
         .from(sender)
         .to(sender_2)
-        .value(U256::from(5_000_000_000_000_000_000u128)); // 5 eth in wei
+        .value(U256::from(1_000_000_000_000_000_000u128)); // 5 eth in wei
     let pending_tx = provider.send_transaction(tx).await?;
     pending_tx.get_receipt().await?;
 

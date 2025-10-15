@@ -43,35 +43,24 @@ entry fun get_unique_id(ctx: &mut TxContext): UID {
 }
 
 // Events
-
+#[ext(event, indexes = 1)]
 public struct TestEvent1 has copy, drop {
     n: u32
 }
 
+#[ext(event, indexes = 2)]
 public struct TestEvent2 has copy, drop {
     a: u32,
     b: vector<u8>,
     c: u128,
 }
 
+#[ext(event, indexes = 2)]
 public struct TestEvent3 has copy, drop {
     a: TestEvent1,
     b: TestEvent2,
 }
 
-public struct TestGenericEvent<T, U, V> has copy, drop {
-    o: T,
-    p: U,
-    q: V,
-}
-
-public struct TestGenericEvent2<T, U, V> has copy, drop {
-    o: T,
-    p: U,
-    q: V,
-    r: vector<T>,
-    s: TestGenericEvent<T, U, V>,
-}
 
 entry fun emit_test_event1(n: u32) {
     emit(TestEvent1 { n });
@@ -84,16 +73,6 @@ entry fun emit_test_event2(a: u32, b: vector<u8>, c: u128) {
 entry fun emit_test_event3(a: TestEvent1, b: TestEvent2) {
     emit(TestEvent3 { a, b });
 }
-
-entry fun emit_test_event_generic_1(o: u32, p: bool, q: TestEvent1) {
-    emit(TestGenericEvent { o, p, q });
-}
-
-entry fun emit_test_event_generic_2(o: u32, p: bool, q: TestEvent1, r: vector<u32>) {
-    let s = TestGenericEvent {o, p, q};
-    emit(TestGenericEvent2 { o, p, q, r, s });
-}
-
 
 entry fun test_stack_1(): (Stack<u32>, u64) {
     let mut s = stack::new(vector[1, 2, 3]);

@@ -1,8 +1,8 @@
 use alloy::primitives::U256;
+use alloy::primitives::address;
 use alloy::providers::Provider;
 use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
-use alloy::{hex, primitives::address};
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
 use eyre::eyre;
@@ -13,7 +13,7 @@ sol!(
     #[sol(rpc)]
     #[allow(missing_docs)]
     contract Example {
-        function create() public view;
+        function constructor() public view;
         function mint(address to, uint256 amount) external view;
         function burn(address from, uint256 amount) external view;
         function balanceOf(address account) public view returns (uint256);
@@ -75,8 +75,7 @@ async fn main() -> eyre::Result<()> {
     println!("====================");
     println!("Creating a new erc20");
     println!("====================");
-    let pending_tx = example.create().send().await?;
-    let _receipt = pending_tx.get_receipt().await?;
+    let _pending_tx_ = example.constructor().send().await?;
     println!("Created!");
 
     println!("\n====================");
@@ -108,9 +107,8 @@ async fn main() -> eyre::Result<()> {
     let receipt = pending_tx.get_receipt().await?;
 
     println!("Mint events");
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("create tx 0x{}", hex::encode(&raw));
+    for (index, log) in receipt.logs().iter().enumerate() {
+        println!("Mint event log {} {:#?}", index + 1, log);
     }
     let res = example.totalSupply().call().await?;
     println!("Total Supply after mint = {}", res);
@@ -137,9 +135,8 @@ async fn main() -> eyre::Result<()> {
 
     let pending_tx = example.transfer(address_1, U256::from(1000)).send().await?;
     let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("create tx 0x{}", hex::encode(&raw));
+    for (index, log) in receipt.logs().iter().enumerate() {
+        println!("Transfer event log {} {:#?}", index + 1, log);
     }
 
     let res = example.balanceOf(sender).call().await?;
@@ -163,10 +160,10 @@ async fn main() -> eyre::Result<()> {
     let receipt = pending_tx.get_receipt().await?;
 
     println!("Burn events");
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("create tx 0x{}", hex::encode(&raw));
+    for (index, log) in receipt.logs().iter().enumerate() {
+        println!("Burn event log {} {:#?}", index + 1, log);
     }
+
     let res = example.totalSupply().call().await?;
     println!("Total Supply after burn= {}", res);
 
@@ -187,9 +184,8 @@ async fn main() -> eyre::Result<()> {
     let pending_tx = example_2.approve(sender, U256::from(100)).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     println!("Approval events");
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("approval 0x{}", hex::encode(&raw));
+    for (index, log) in receipt.logs().iter().enumerate() {
+        println!("Approval event log {} {:#?}", index + 1, log);
     }
 
     println!();
@@ -216,9 +212,8 @@ async fn main() -> eyre::Result<()> {
         .await?;
     let receipt = pending_tx.get_receipt().await?;
     println!("Transfer events");
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("transfer 0x{}", hex::encode(&raw));
+    for (index, log) in receipt.logs().iter().enumerate() {
+        println!("Transfer event log {} {:#?}", index + 1, log);
     }
 
     println!();
