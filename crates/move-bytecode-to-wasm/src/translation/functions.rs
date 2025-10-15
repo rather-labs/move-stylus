@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use move_binary_format::file_format::{
-    CodeOffset, DatatypeHandleIndex, FunctionDefinition, JumpTableInner, Signature, SignatureToken};
+    CodeOffset, DatatypeHandleIndex, FunctionDefinition, JumpTableInner, Signature, SignatureToken,
+};
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
     ir::{LoadKind, MemArg, StoreKind},
