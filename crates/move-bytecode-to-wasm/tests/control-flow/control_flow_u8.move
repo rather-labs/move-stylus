@@ -1,6 +1,6 @@
 module 0x01::control_flow_u8;
 
-public fun simple_loop(x: u8): u8 {
+entry fun simple_loop(x: u8): u8 {
     let mut i = 0;
     while (i < x) {
         i = i + 1;
@@ -8,7 +8,7 @@ public fun simple_loop(x: u8): u8 {
     i
 }
 
-public fun nested_loop(x: u8): u8 {
+entry fun nested_loop(x: u8): u8 {
     let mut i = 0;
     let mut acc = 0;
     while (i < x) {
@@ -22,7 +22,7 @@ public fun nested_loop(x: u8): u8 {
     acc
 }
 
-public fun loop_with_break(x: u8): u8 {
+entry fun loop_with_break(x: u8): u8 {
     let mut i = 0;
     let mut acc = 0;
     while (true) {
@@ -35,7 +35,7 @@ public fun loop_with_break(x: u8): u8 {
     acc
 }
 
-public fun misc_1(x: u8): u8 {
+entry fun misc_1(x: u8): u8 {
     let mut i = 0;
     while (i < x) {
         i = i + 1;
@@ -48,7 +48,7 @@ public fun misc_1(x: u8): u8 {
     }
 }
 
-public fun conditional_return(x: u8): u8 {
+entry fun conditional_return(x: u8): u8 {
     if (x > 100) {
         return 255
     } else {
@@ -60,7 +60,7 @@ public fun conditional_return(x: u8): u8 {
     }
 }
 
-public fun crazy_loop(mut i: u8): u8 {
+entry fun crazy_loop(mut i: u8): u8 {
     let mut acc = 0;
     while ( true ) {
         i = i + 1;
@@ -79,7 +79,7 @@ public fun crazy_loop(mut i: u8): u8 {
     acc
 }
 
-public fun test_match(x: u8): u8 {
+entry fun test_match(x: u8): u8 {
     match (x) {
         1 => 44,
         2 => 55,
@@ -88,7 +88,7 @@ public fun test_match(x: u8): u8 {
     }
 }
 
-public fun test_match_in_loop(): u8 {
+entry fun test_match_in_loop(): u8 {
     let mut i = 0;
     let mut acc = 0;
     loop {
@@ -108,7 +108,7 @@ public fun test_match_in_loop(): u8 {
     acc
 }
 
-public fun test_labeled_loops(x: u8): u8 {
+entry fun test_labeled_loops(x: u8): u8 {
     let mut outer_count = 1;
     let mut inner_count = 1;
 
@@ -137,7 +137,7 @@ public fun test_labeled_loops(x: u8): u8 {
 }
 
 
-public fun check_even(i: u8): u8 {
+entry fun check_even(i: u8): u8 {
     if (i % 2 == 0) {
         42
     } else {
@@ -145,7 +145,7 @@ public fun check_even(i: u8): u8 {
     }
 }
 
-public fun check_even_after_loop(x: u8): u8 {
+entry fun check_even_after_loop(x: u8): u8 {
     let mut i = 0;
     while (i < x) {
         i = i + 1;

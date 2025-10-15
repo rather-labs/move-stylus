@@ -186,7 +186,7 @@ public struct GenericWrapper<T> has key {
 // ============================================================================
 
 /// Save a StaticFields structure to storage
-public fun save_static_fields(
+entry fun save_static_fields(
     a: u256,
     b: u128,
     c: u64,
@@ -204,12 +204,12 @@ public fun save_static_fields(
 }
 
 /// Read a StaticFields structure from storage
-public fun read_static_fields(uid: u256): StaticFields {
+entry fun read_static_fields(uid: u256): StaticFields {
     read_slot<StaticFields>(0, uid)
 }
 
 /// Save a StaticFields2 structure to storage
-public fun save_static_fields_2(
+entry fun save_static_fields_2(
     a: u8,
     b: address,
     c: u64,
@@ -225,12 +225,12 @@ public fun save_static_fields_2(
 }
 
 /// Read a StaticFields2 structure from storage
-public fun read_static_fields_2(uid: u256): StaticFields2 {
+entry fun read_static_fields_2(uid: u256): StaticFields2 {
     read_slot<StaticFields2>(0, uid)
 }
 
 /// Save a StaticFields3 structure to storage
-public fun save_static_fields_3(
+entry fun save_static_fields_3(
     a: u8,
     b: address,
     c: u64,
@@ -245,12 +245,12 @@ public fun save_static_fields_3(
 }
 
 /// Read a StaticFields3 structure from storage
-public fun read_static_fields_3(uid: u256): StaticFields3 {
+entry fun read_static_fields_3(uid: u256): StaticFields3 {
     read_slot<StaticFields3>(0, uid)
 }
 
 /// Save a StaticNestedStruct structure to storage
-public fun save_static_nested_struct(
+entry fun save_static_nested_struct(
     a: u64,
     b: bool,
     d: u64,
@@ -268,7 +268,7 @@ public fun save_static_nested_struct(
 }
 
 /// Read a StaticNestedStruct structure from storage
-public fun read_static_nested_struct(uid: u256): StaticNestedStruct {
+entry fun read_static_nested_struct(uid: u256): StaticNestedStruct {
     read_slot<StaticNestedStruct>(0, uid)
 }
 
@@ -277,7 +277,7 @@ public fun read_static_nested_struct(uid: u256): StaticNestedStruct {
 // ============================================================================
 
 /// Save a DynamicStruct structure to storage
-public fun save_dynamic_struct(
+entry fun save_dynamic_struct(
     a: u32,
     b: bool,
     c: vector<u64>,
@@ -295,12 +295,12 @@ public fun save_dynamic_struct(
 }
 
 /// Read a DynamicStruct structure from storage
-public fun read_dynamic_struct(uid: u256): DynamicStruct {
+entry fun read_dynamic_struct(uid: u256): DynamicStruct {
     read_slot<DynamicStruct>(0, uid)
 }
 
 /// Save a DynamicStruct2 structure to storage
-public fun save_dynamic_struct_2(
+entry fun save_dynamic_struct_2(
     a: vector<bool>,
     b: vector<u8>,
     c: vector<u16>,
@@ -319,12 +319,12 @@ public fun save_dynamic_struct_2(
 }
 
 /// Read a DynamicStruct2 structure from storage
-public fun read_dynamic_struct_2(uid: u256): DynamicStruct2 {
+entry fun read_dynamic_struct_2(uid: u256): DynamicStruct2 {
     read_slot<DynamicStruct2>(0, uid)
 }
 
 /// Save a DynamicStruct3 structure to storage
-public fun save_dynamic_struct_3(
+entry fun save_dynamic_struct_3(
     a: vector<vector<u8>>,
     b: vector<vector<u32>>,
     c: vector<vector<u64>>,
@@ -339,12 +339,12 @@ public fun save_dynamic_struct_3(
 }
 
 /// Read a DynamicStruct3 structure from storage
-public fun read_dynamic_struct_3(uid: u256): DynamicStruct3 {
+entry fun read_dynamic_struct_3(uid: u256): DynamicStruct3 {
     read_slot<DynamicStruct3>(0, uid)
 }
 
 /// Save a DynamicStruct4 structure to storage
-public fun save_dynamic_struct_4(
+entry fun save_dynamic_struct_4(
     x: vector<u32>,
     y: u64,
     z: u128,
@@ -368,12 +368,12 @@ public fun save_dynamic_struct_4(
 }
 
 /// Read a DynamicStruct4 structure from storage
-public fun read_dynamic_struct_4(uid: u256): DynamicStruct4 {
+entry fun read_dynamic_struct_4(uid: u256): DynamicStruct4 {
     read_slot<DynamicStruct4>(0, uid)
 }
 
 /// Save a DynamicStruct5 structure to storage
-public fun save_dynamic_struct_5(
+entry fun save_dynamic_struct_5(
     x: u32,
     y: u64,
     z: u128,
@@ -411,12 +411,12 @@ public fun save_dynamic_struct_5(
 }
 
 /// Read a DynamicStruct5 structure from storage
-public fun read_dynamic_struct_5(uid: u256): DynamicStruct5 {
+entry fun read_dynamic_struct_5(uid: u256): DynamicStruct5 {
     read_slot<DynamicStruct5>(0, uid)
 }
 
 /// Save a GenericStruct<u32> structure to storage
-public fun save_generic_struct_32(
+entry fun save_generic_struct_32(
     x: u32,
     ctx: &mut TxContext,
 ) {
@@ -429,7 +429,7 @@ public fun save_generic_struct_32(
 }
 
 /// Read a GenericStruct<u32> structure from storage
-public fun read_generic_struct_32(uid: u256): GenericStruct<u32> {
+entry fun read_generic_struct_32(uid: u256): GenericStruct<u32> {
     read_slot<GenericStruct<u32>>(0, uid)
 }
 
@@ -438,7 +438,7 @@ public fun read_generic_struct_32(uid: u256): GenericStruct<u32> {
 // ============================================================================
 
 /// Save a Foo structure to storage
-public fun save_foo(ctx: &mut TxContext) {
+entry fun save_foo(ctx: &mut TxContext) {
     let bar = Bar {
         id: object::new(ctx),
         a: 42,
@@ -455,12 +455,12 @@ public fun save_foo(ctx: &mut TxContext) {
 }
 
 /// Read a Foo structure from storage
-public fun read_foo(uid: u256): Foo {
+entry fun read_foo(uid: u256): Foo {
     read_slot<Foo>(0, uid)
 }
 
 /// Save a MegaFoo structure to storage
-public fun save_mega_foo(ctx: &mut TxContext) {
+entry fun save_mega_foo(ctx: &mut TxContext) {
     let bar = Bar {
         id: object::new(ctx),
         a: 42,
@@ -484,12 +484,12 @@ public fun save_mega_foo(ctx: &mut TxContext) {
 }
 
 /// Read a MegaFoo structure from storage
-public fun read_mega_foo(uid: u256): MegaFoo {
+entry fun read_mega_foo(uid: u256): MegaFoo {
     read_slot<MegaFoo>(0, uid)
 }
 
 /// Save a Var structure to storage
-public fun save_var(ctx: &mut TxContext) {
+entry fun save_var(ctx: &mut TxContext) {
     let bar_1 = Bar {
         id: object::new(ctx),
         a: 41,
@@ -533,11 +533,11 @@ public fun save_var(ctx: &mut TxContext) {
 }
 
 /// Read a Var structure from storage
-public fun read_var(uid: u256): Var {
+entry fun read_var(uid: u256): Var {
     read_slot<Var>(0, uid)
 }
 
-public fun save_generic_wrapper_32(ctx: &mut TxContext) {
+entry fun save_generic_wrapper_32(ctx: &mut TxContext) {
     let wrapper = GenericWrapper<u32> {
         id: object::new(ctx),
         a: 101,
@@ -547,6 +547,6 @@ public fun save_generic_wrapper_32(ctx: &mut TxContext) {
     save_in_slot(wrapper, 0);
 }
 
-public fun read_generic_wrapper_32(uid: u256): GenericWrapper<u32> {
+entry fun read_generic_wrapper_32(uid: u256): GenericWrapper<u32> {
     read_slot<GenericWrapper<u32>>(0, uid)
 }

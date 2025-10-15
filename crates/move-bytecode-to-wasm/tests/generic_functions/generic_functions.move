@@ -16,71 +16,71 @@ public struct Foo has drop {
     h: u256,
 }
 
-public fun echo_struct(x: Foo): Foo {
+entry fun echo_struct(x: Foo): Foo {
     generic_1(x)
 }
 
-public fun echo_struct_ref(inner: bool, x: &Foo): &Foo {
+entry fun echo_struct_ref(inner: bool, x: &Foo): &Foo {
     generic_4(inner, x)
 }
 
-public fun echo_struct_mut_ref(inner: bool, x: &mut Foo): &mut Foo {
+entry fun echo_struct_mut_ref(inner: bool, x: &mut Foo): &mut Foo {
     generic_5(inner, x)
 }
 
-public fun echo_u8(x: u8): u8 {
+entry fun echo_u8(x: u8): u8 {
     generic_1(x)
 }
 
-public fun echo_u16(x: u16): u16 {
+entry fun echo_u16(x: u16): u16 {
     generic_1(x)
 }
 
-public fun echo_u32(x: u32): u32 {
+entry fun echo_u32(x: u32): u32 {
     generic_1(x)
 }
 
-public fun echo_u64(x: u64): u64 {
+entry fun echo_u64(x: u64): u64 {
     generic_1(x)
 }
 
-public fun echo_u128(x: u128): u128 {
+entry fun echo_u128(x: u128): u128 {
     generic_1(x)
 }
 
-public fun echo_u256(x: u256): u256 {
+entry fun echo_u256(x: u256): u256 {
     generic_1(x)
 }
 
-public fun echo_address(x: address): address {
+entry fun echo_address(x: address): address {
     generic_1(x)
 }
 
-public fun echo_vec_u32(x: vector<u32>): vector<u32> {
+entry fun echo_vec_u32(x: vector<u32>): vector<u32> {
     generic_1(x)
 }
 
-public fun echo_vec_u128(x: vector<u128>): vector<u128> {
+entry fun echo_vec_u128(x: vector<u128>): vector<u128> {
     generic_1(x)
 }
 
-public fun echo_vec_u128_ref(x: &vector<u128>): &vector<u128> {
+entry fun echo_vec_u128_ref(x: &vector<u128>): &vector<u128> {
     generic_4(false, x)
 }
 
-public fun echo_vec_u128_mut_ref(x: &mut vector<u128>): &mut vector<u128> {
+entry fun echo_vec_u128_mut_ref(x: &mut vector<u128>): &mut vector<u128> {
     generic_5(false, x)
 }
 
-public fun echo_u32_u128(x: u32, y: u128): (u32, u128) {
+entry fun echo_u32_u128(x: u32, y: u128): (u32, u128) {
     generic_3(x, y)
 }
 
-public fun echo_address_vec_u128(x: address, y: vector<u128>): (address, vector<u128>) {
+entry fun echo_address_vec_u128(x: address, y: vector<u128>): (address, vector<u128>) {
     generic_3(x, y)
 }
 
-public fun echo_struct_vec_u128(x: Foo, y: vector<u128>): (Foo, vector<u128>) {
+entry fun echo_struct_vec_u128(x: Foo, y: vector<u128>): (Foo, vector<u128>) {
     generic_3(x, y)
 }
 

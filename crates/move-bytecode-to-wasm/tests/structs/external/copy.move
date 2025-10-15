@@ -7,14 +7,14 @@ public struct LocalStruct has drop, copy {
     b: Foo,
 }
 
-public fun structCopy(): (Foo, Foo) {
+entry fun structCopy(): (Foo, Foo) {
     let foo_1 = create_foo();
 
     let foo_2 = foo_1;
     (foo_1, foo_2)
 }
 
-public fun structCopy2(): (LocalStruct, LocalStruct) {
+entry fun structCopy2(): (LocalStruct, LocalStruct) {
     let ls_1 = LocalStruct {
         a: 42,
         b: create_foo(),

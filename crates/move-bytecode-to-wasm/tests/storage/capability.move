@@ -9,12 +9,12 @@ use stylus::tx_context as tx_context;
 
 public struct AdminCap has key { id: UID }
 
-public fun create(ctx: &mut TxContext) {
+entry fun create(ctx: &mut TxContext) {
     transfer::transfer(
         AdminCap { id: object::new(ctx) },
         tx_context::sender(ctx)
     );
 }
 
-public fun admin_cap_fn(_: &AdminCap ) {}
+entry fun admin_cap_fn(_: &AdminCap ) {}
 

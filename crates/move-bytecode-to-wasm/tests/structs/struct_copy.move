@@ -27,7 +27,7 @@ public struct Baz has drop, copy {
     b: vector<u256>,
 }
 
-public fun structCopy(foo: Foo): (Foo, Foo) {
+entry fun structCopy(foo: Foo): (Foo, Foo) {
     let mut foo_2 = foo;
 
     foo_2.q = @0xdeadbeef;
@@ -48,7 +48,7 @@ public fun structCopy(foo: Foo): (Foo, Foo) {
     (foo, foo_2)
 }
 
-public fun structCopy2(): (Foo, Foo) {
+entry fun structCopy2(): (Foo, Foo) {
     let foo_1 = Foo {
         q: @0xdeadbeef,
         r : vector[0, 3, 0, 3, 4, 5, 6],

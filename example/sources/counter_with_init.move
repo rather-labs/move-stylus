@@ -28,16 +28,16 @@ fun init(otw: COUNTER_WITH_INIT, ctx: &mut TxContext) {
 }
 
 /// Increment a counter by 1.
-public fun increment(counter: &mut Counter) {
+entry fun increment(counter: &mut Counter) {
     counter.value = counter.value + 1;
 }
 
 /// Read counter.
-public fun read(counter: &Counter): u64 {
+entry fun read(counter: &Counter): u64 {
     counter.value
 }
 
 /// Set value
-public fun set_value(counter: &mut Counter, value: u64, ctx: &TxContext) {
+entry fun set_value(counter: &mut Counter, value: u64, ctx: &TxContext) {
     counter.value = value;
 }

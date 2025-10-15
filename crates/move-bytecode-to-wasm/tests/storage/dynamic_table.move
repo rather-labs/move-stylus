@@ -13,17 +13,17 @@ public struct Foo has key {
     id: object::UID,
 }
 
-public fun create_foo(ctx: &mut TxContext) {
+entry fun create_foo(ctx: &mut TxContext) {
     let foo = Foo { id: object::new(ctx) };
     transfer::share_object(foo);
 }
 
-public fun create_foo_owned(ctx: &mut TxContext) {
+entry fun create_foo_owned(ctx: &mut TxContext) {
     let foo = Foo { id: object::new(ctx) };
     transfer::transfer(foo, ctx.sender());
 }
 
-public fun attach_table(foo: &mut Foo, ctx: &mut TxContext) {
+entry fun attach_table(foo: &mut Foo, ctx: &mut TxContext) {
     field::add(
         &mut foo.id,
         ascii::string(b"table"),
@@ -31,7 +31,7 @@ public fun attach_table(foo: &mut Foo, ctx: &mut TxContext) {
     );
 }
 
-public fun read_table_entry_value(foo: &Foo, key: address): u64 {
+entry fun read_table_entry_value(foo: &Foo, key: address): u64 {
     let table = field::borrow<String, Table<address, u64>>(
         &foo.id,
         ascii::string(b"table")
@@ -39,7 +39,7 @@ public fun read_table_entry_value(foo: &Foo, key: address): u64 {
     *table.borrow(key)
 }
 
-public fun create_entry(foo: &mut Foo, key: address, value: u64) {
+entry fun create_entry(foo: &mut Foo, key: address, value: u64) {
     let table = field::borrow_mut<String, Table<address, u64>>(
         &mut foo.id,
         ascii::string(b"table")
@@ -47,7 +47,7 @@ public fun create_entry(foo: &mut Foo, key: address, value: u64) {
     table.add(key, value);
 }
 
-public fun contains_entry(foo: &Foo, key: address): bool {
+entry fun contains_entry(foo: &Foo, key: address): bool {
     let table = field::borrow<String, Table<address, u64>>(
         &foo.id,
         ascii::string(b"table")
@@ -55,7 +55,7 @@ public fun contains_entry(foo: &Foo, key: address): bool {
     table.contains(key)
 }
 
-public fun mutate_table_entry(foo: &mut Foo, key: address) {
+entry fun mutate_table_entry(foo: &mut Foo, key: address) {
     let table = field::borrow_mut<String, Table<address, u64>>(
         &mut foo.id,
         ascii::string(b"table")
@@ -64,7 +64,7 @@ public fun mutate_table_entry(foo: &mut Foo, key: address) {
     *val = *val + 1;
 }
 
-public fun mutate_two_entry_values(foo: &mut Foo, key: address, key_2: address) {
+entry fun mutate_two_entry_values(foo: &mut Foo, key: address, key_2: address) {
     let table = field::borrow_mut<String, Table<address, u64>>(
         &mut foo.id,
         ascii::string(b"table")
@@ -76,7 +76,7 @@ public fun mutate_two_entry_values(foo: &mut Foo, key: address, key_2: address) 
     *val_2 = *val_2 + 1;
 }
 
-public fun remove_entry(foo: &mut Foo, key: address): u64 {
+entry fun remove_entry(foo: &mut Foo, key: address): u64 {
     let table = field::borrow_mut<String, Table<address, u64>>(
         &mut foo.id,
         ascii::string(b"table")

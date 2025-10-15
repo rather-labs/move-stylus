@@ -1,5 +1,5 @@
 module 0x01::signer_type;
 
-public fun echo(_x: vector<signer>) {
+entry fun echo(_x: vector<signer>) {
     //
 }

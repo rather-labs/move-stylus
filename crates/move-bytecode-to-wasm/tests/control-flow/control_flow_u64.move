@@ -1,6 +1,6 @@
 module 0x01::control_flow_u64;
 
-public fun collatz(mut x: u64): u64 {
+entry fun collatz(mut x: u64): u64 {
     let mut count = 0;
     while (x != 1) {
         if (x % 2 == 0) {
@@ -14,7 +14,7 @@ public fun collatz(mut x: u64): u64 {
 }
 
 
-public fun fibonacci(n: u64): u64 {
+entry fun fibonacci(n: u64): u64 {
     if (n == 0) return 0;
     if (n == 1) return 1;
     let mut a = 0;
@@ -30,7 +30,7 @@ public fun fibonacci(n: u64): u64 {
 }
 
 
-public fun is_prime(i: u64): u64 {
+entry fun is_prime(i: u64): u64 {
     if (i > 1) {
         let mut j = 2;
         let mut is_prime = 1;
@@ -47,7 +47,7 @@ public fun is_prime(i: u64): u64 {
     }
 }
 
-public fun sum_special(n: u64): u64 {
+entry fun sum_special(n: u64): u64 {
     let mut total = 0;
     let mut i = 1;
 

@@ -5,23 +5,23 @@ module hello_world::stack;
 public struct Stack<T>(vector<T>) has copy, store, drop;
 
 /// Create a new instance by wrapping the value.
-public fun new<T>(value: vector<T>): Stack<T> {
+public entry fun new<T>(value: vector<T>): Stack<T> {
     Stack(value)
 }
 
 /// Push an element to the stack.
-public fun push_back<T>(v: &mut Stack<T>, el: T) {
+public entry fun push_back<T>(v: &mut Stack<T>, el: T) {
     v.0.push_back(el);
 }
 
 /// Pop an element from the stack. Unlike `vector`, this function won't
 /// fail if the stack is empty and will return `None` instead.
-public fun pop_back<T>(v: &mut Stack<T>): Option<T> {
+public entry fun pop_back<T>(v: &mut Stack<T>): Option<T> {
     if (v.0.length() == 0) option::none()
     else option::some(v.0.pop_back())
 }
 
 /// Get the size of the stack.
-public fun size<T>(v: &Stack<T>): u64 {
+public entry fun size<T>(v: &Stack<T>): u64 {
     v.0.length()
 }
