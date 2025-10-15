@@ -66,7 +66,7 @@ pub fn assert_empty_storage(
 }
 
 mod counter {
-    use alloy_primitives::{FixedBytes, address};
+    use alloy_primitives::address;
     use alloy_sol_types::{SolCall, sol};
 
     use super::*;
@@ -102,8 +102,7 @@ mod counter {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read initial value (should be 25)
         let call_data = readCall::new((object_id,)).abi_encode();
@@ -262,7 +261,7 @@ mod counter_named_id {
 }
 
 mod capability {
-    use alloy_primitives::{FixedBytes, address};
+    use alloy_primitives::address;
     use alloy_sol_types::{SolCall, sol};
 
     use crate::common::runtime_sandbox::constants::SIGNER_ADDRESS;
@@ -302,8 +301,7 @@ mod capability {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Set value to 111 with a sender that is not the owner
         let call_data = adminCapFnCall::new((object_id,)).abi_encode();
@@ -1250,8 +1248,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read value
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1270,8 +1267,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read initial value (should be 101)
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1370,8 +1366,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read initial value (should be 101)
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1447,8 +1442,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Compute the object slot using the owner and the object id
         let owner = runtime.get_tx_origin();
@@ -1507,8 +1501,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Compute the object slot using the owner and the object id
         let owner = runtime.get_tx_origin();
@@ -1575,8 +1568,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read initial value (should be 101)
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1602,8 +1594,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         runtime.set_tx_origin(address!("0x00000000000000000000000000000000abababab").0.0);
 
@@ -1622,8 +1613,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Freeze the object. Only possible if the object is owned by the signer!
         let call_data = freezeObjCall::new((object_id,)).abi_encode();
@@ -1642,8 +1632,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Freeze the object. Only possible if the object is owned by the signer!
         let call_data = freezeObjCall::new((object_id,)).abi_encode();
@@ -1668,8 +1657,7 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read value before delete
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1690,8 +1678,7 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read value before delete
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1718,8 +1705,7 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read value before delete
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1748,8 +1734,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Set value to 111 with a sender that is not the owner
         let call_data = getFooCall::new((object_id,)).abi_encode();
@@ -1772,8 +1757,7 @@ mod storage_transfer {
 
         let storage_before_delete = runtime.get_storage();
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getBarCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -1807,8 +1791,7 @@ mod storage_transfer {
 
         let storage_before_delete = runtime.get_storage();
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getBazCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -1844,8 +1827,7 @@ mod storage_transfer {
 
         let storage_before_delete = runtime.get_storage();
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getBezCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -1910,8 +1892,7 @@ mod storage_transfer {
 
         let storage_before_delete = runtime.get_storage();
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getBizCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -1977,15 +1958,13 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_1_id = FixedBytes::<32>::from_slice(&object_1_id);
+        let object_1_id = runtime.obtain_uid();
 
         let call_data = createSharedCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_2_id = FixedBytes::<32>::from_slice(&object_2_id);
+        let object_2_id = runtime.obtain_uid();
 
         let storage_before_delete = runtime.get_storage();
 
@@ -2005,8 +1984,7 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getVarCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -2059,8 +2037,7 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getVarCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -2334,8 +2311,7 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getVazCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -2402,8 +2378,7 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getEpicVarCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -3608,8 +3583,7 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let obj_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let obj_a_id = FixedBytes::<32>::from_slice(&obj_a_id);
+        let obj_a_id = runtime.obtain_uid();
 
         let obj_a_slot = derive_object_slot(&OWNER_A, &obj_a_id.0);
 
@@ -3631,8 +3605,7 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the swap request id emmited from the contract's events
-        let swap_request_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let swap_request_a_id = FixedBytes::<32>::from_slice(&swap_request_a_id);
+        let swap_request_a_id = runtime.obtain_uid();
         println!("Swap Request A ID: {:#x}", swap_request_a_id);
 
         // Assert that the slot is empty
@@ -3652,8 +3625,7 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let obj_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let obj_b_id = FixedBytes::<32>::from_slice(&obj_b_id);
+        let obj_b_id = runtime.obtain_uid();
 
         let obj_b_slot = derive_object_slot(&OWNER_B, &obj_b_id.0);
 
@@ -3674,8 +3646,7 @@ mod trusted_swap {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let swap_request_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let swap_request_b_id = FixedBytes::<32>::from_slice(&swap_request_b_id);
+        let swap_request_b_id = runtime.obtain_uid();
 
         // Assert that the slot is empty
         assert_eq!(
@@ -3739,8 +3710,7 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let obj_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let obj_a_id = FixedBytes::<32>::from_slice(&obj_a_id);
+        let obj_a_id = runtime.obtain_uid();
 
         // Request a swap with a fee too low
         let fee_a = 999;
@@ -3762,16 +3732,14 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let obj_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let obj_a_id = FixedBytes::<32>::from_slice(&obj_a_id);
+        let obj_a_id = runtime.obtain_uid();
 
         let call_data = requestSwapCall::new((obj_a_id, SERVICE.into(), fee_a)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
         // Read the swap request id emmited from the contract's events
-        let swap_request_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let swap_request_a_id = FixedBytes::<32>::from_slice(&swap_request_a_id);
+        let swap_request_a_id = runtime.obtain_uid();
 
         ////// Second owner requests a swap //////
         runtime.set_msg_sender(OWNER_B);
@@ -3783,15 +3751,13 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let obj_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let obj_b_id = FixedBytes::<32>::from_slice(&obj_b_id);
+        let obj_b_id = runtime.obtain_uid();
 
         let call_data = requestSwapCall::new((obj_b_id, SERVICE.into(), fee_b)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let swap_request_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let swap_request_b_id = FixedBytes::<32>::from_slice(&swap_request_b_id);
+        let swap_request_b_id = runtime.obtain_uid();
 
         ////// Execute the swap //////
         runtime.set_msg_sender(SERVICE);
@@ -3815,16 +3781,14 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let obj_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let obj_a_id = FixedBytes::<32>::from_slice(&obj_a_id);
+        let obj_a_id = runtime.obtain_uid();
 
         let call_data = requestSwapCall::new((obj_a_id, SERVICE.into(), fee_a)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
         // Read the swap request id emmited from the contract's events
-        let swap_request_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let swap_request_a_id = FixedBytes::<32>::from_slice(&swap_request_a_id);
+        let swap_request_a_id = runtime.obtain_uid();
 
         ////// Second owner requests a swap //////
         runtime.set_msg_sender(OWNER_B);
@@ -3836,15 +3800,13 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let obj_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let obj_b_id = FixedBytes::<32>::from_slice(&obj_b_id);
+        let obj_b_id = runtime.obtain_uid();
 
         let call_data = requestSwapCall::new((obj_b_id, SERVICE.into(), fee_b)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let swap_request_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let swap_request_b_id = FixedBytes::<32>::from_slice(&swap_request_b_id);
+        let swap_request_b_id = runtime.obtain_uid();
 
         ////// Execute the swap //////
         runtime.set_msg_sender(SERVICE);
@@ -3857,7 +3819,6 @@ mod trusted_swap {
 }
 mod wrapped_objects {
     use crate::common::runtime_sandbox::constants::MSG_SENDER_ADDRESS;
-    use alloy_primitives::FixedBytes;
     use alloy_sol_types::{SolCall, SolValue, sol};
 
     use super::*;
@@ -3981,16 +3942,14 @@ mod wrapped_objects {
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
+            let alpha_id = runtime.obtain_uid();
 
             // Create beta, passing alpha as argument to be wrapped in it
             let call_data = createBetaTtoCall::new((alpha_id,)).abi_encode();
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let beta_id = FixedBytes::<32>::from_slice(&beta_id);
+            let beta_id = runtime.obtain_uid();
 
             (alpha_id, beta_id)
         } else {
@@ -4000,11 +3959,8 @@ mod wrapped_objects {
             assert_eq!(0, result);
 
             // Get the object ids
-            let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
-
-            let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let beta_id = FixedBytes::<32>::from_slice(&beta_id);
+            let alpha_id = runtime.obtain_uid();
+            let beta_id = runtime.obtain_uid();
 
             (alpha_id, beta_id)
         };
@@ -4049,19 +4005,15 @@ mod wrapped_objects {
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
-
-            let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let beta_id = FixedBytes::<32>::from_slice(&beta_id);
+            let alpha_id = runtime.obtain_uid();
+            let beta_id = runtime.obtain_uid();
 
             // Create gamma, passing beta as argument to be wrapped in it
             let call_data = createGammaTtoCall::new((beta_id,)).abi_encode();
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let gamma_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let gamma_id = FixedBytes::<32>::from_slice(&gamma_id);
+            let gamma_id = runtime.obtain_uid();
 
             (alpha_id, beta_id, gamma_id)
         } else {
@@ -4071,14 +4023,9 @@ mod wrapped_objects {
             assert_eq!(0, result);
 
             // Get the object ids
-            let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
-
-            let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let beta_id = FixedBytes::<32>::from_slice(&beta_id);
-
-            let gamma_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let gamma_id = FixedBytes::<32>::from_slice(&gamma_id);
+            let alpha_id = runtime.obtain_uid();
+            let beta_id = runtime.obtain_uid();
+            let gamma_id = runtime.obtain_uid();
 
             (alpha_id, beta_id, gamma_id)
         };
@@ -4127,23 +4074,20 @@ mod wrapped_objects {
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+            let alpha_1_id = runtime.obtain_uid();
 
             let call_data = createAlphaCall::new((102,)).abi_encode();
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+            let alpha_2_id = runtime.obtain_uid();
 
             // Create delta using TTO method
             let call_data = createDeltaTtoCall::new((alpha_1_id, alpha_2_id)).abi_encode();
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let delta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let delta_id = FixedBytes::<32>::from_slice(&delta_id);
+            let delta_id = runtime.obtain_uid();
 
             (alpha_1_id, alpha_2_id, delta_id)
         } else {
@@ -4152,14 +4096,9 @@ mod wrapped_objects {
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
-
-            let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
-
-            let delta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let delta_id = FixedBytes::<32>::from_slice(&delta_id);
+            let alpha_1_id = runtime.obtain_uid();
+            let alpha_2_id = runtime.obtain_uid();
+            let delta_id = runtime.obtain_uid();
 
             (alpha_1_id, alpha_2_id, delta_id)
         };
@@ -4211,52 +4150,45 @@ mod wrapped_objects {
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+                let alpha_1_id = runtime.obtain_uid();
 
                 let call_data = createAlphaCall::new((102,)).abi_encode();
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+                let alpha_2_id = runtime.obtain_uid();
 
                 // Create deltas first for TTO method
                 let call_data = createDeltaTtoCall::new((alpha_1_id, alpha_2_id)).abi_encode();
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let delta_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let delta_1_id = FixedBytes::<32>::from_slice(&delta_1_id);
+                let delta_1_id = runtime.obtain_uid();
 
                 let call_data = createAlphaCall::new((103,)).abi_encode();
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let alpha_3_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_3_id = FixedBytes::<32>::from_slice(&alpha_3_id);
+                let alpha_3_id = runtime.obtain_uid();
 
                 let call_data = createAlphaCall::new((104,)).abi_encode();
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let alpha_4_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_4_id = FixedBytes::<32>::from_slice(&alpha_4_id);
+                let alpha_4_id = runtime.obtain_uid();
 
                 let call_data = createDeltaTtoCall::new((alpha_3_id, alpha_4_id)).abi_encode();
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let delta_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let delta_2_id = FixedBytes::<32>::from_slice(&delta_2_id);
+                let delta_2_id = runtime.obtain_uid();
 
                 // Create epsilon using TTO method
                 let call_data = createEpsilonTtoCall::new((delta_1_id, delta_2_id)).abi_encode();
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let epsilon_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let epsilon_id = FixedBytes::<32>::from_slice(&epsilon_id);
+                let epsilon_id = runtime.obtain_uid();
 
                 (
                     alpha_1_id, alpha_2_id, alpha_3_id, alpha_4_id, delta_1_id, delta_2_id,
@@ -4268,26 +4200,13 @@ mod wrapped_objects {
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let delta_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let delta_1_id = FixedBytes::<32>::from_slice(&delta_1_id);
-
-                let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
-
-                let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
-
-                let delta_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let delta_2_id = FixedBytes::<32>::from_slice(&delta_2_id);
-
-                let alpha_3_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_3_id = FixedBytes::<32>::from_slice(&alpha_3_id);
-
-                let alpha_4_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_4_id = FixedBytes::<32>::from_slice(&alpha_4_id);
-
-                let epsilon_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let epsilon_id = FixedBytes::<32>::from_slice(&epsilon_id);
+                let delta_1_id = runtime.obtain_uid();
+                let alpha_1_id = runtime.obtain_uid();
+                let alpha_2_id = runtime.obtain_uid();
+                let delta_2_id = runtime.obtain_uid();
+                let alpha_3_id = runtime.obtain_uid();
+                let alpha_4_id = runtime.obtain_uid();
+                let epsilon_id = runtime.obtain_uid();
 
                 (
                     alpha_1_id, alpha_2_id, alpha_3_id, alpha_4_id, delta_1_id, delta_2_id,
@@ -4367,11 +4286,9 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
+        let alpha_id = runtime.obtain_uid();
+        let beta_id = runtime.obtain_uid();
 
-        let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let beta_id = FixedBytes::<32>::from_slice(&beta_id);
         let beta_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &beta_id.0);
 
         // Transfer beta to the recipient
@@ -4417,14 +4334,10 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
+        let alpha_id = runtime.obtain_uid();
+        let beta_id = runtime.obtain_uid();
+        let gamma_id = runtime.obtain_uid();
 
-        let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let beta_id = FixedBytes::<32>::from_slice(&beta_id);
-
-        let gamma_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let gamma_id = FixedBytes::<32>::from_slice(&gamma_id);
         let gamma_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &gamma_id.0);
 
         // Transfer beta to the recipient
@@ -4475,14 +4388,10 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+        let alpha_1_id = runtime.obtain_uid();
+        let alpha_2_id = runtime.obtain_uid();
+        let delta_id = runtime.obtain_uid();
 
-        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
-
-        let delta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let delta_id = FixedBytes::<32>::from_slice(&delta_id);
         let delta_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &delta_id.0);
 
         let call_data = transferDeltaCall::new((delta_id, RECIPIENT_ADDRESS.into())).abi_encode();
@@ -4534,14 +4443,10 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
+        let alpha_id = runtime.obtain_uid();
+        let beta_id = runtime.obtain_uid();
+        let gamma_id = runtime.obtain_uid();
 
-        let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let beta_id = FixedBytes::<32>::from_slice(&beta_id);
-
-        let gamma_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let gamma_id = FixedBytes::<32>::from_slice(&gamma_id);
         let gamma_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &gamma_id.0);
 
         // Rebuild gamma
@@ -4549,8 +4454,7 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let new_gamma_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let new_gamma_id = FixedBytes::<32>::from_slice(&new_gamma_id);
+        let new_gamma_id = runtime.obtain_uid();
 
         // Read gamma from the recipient namespace in storage
         runtime.set_tx_origin(RECIPIENT_ADDRESS);
@@ -4597,14 +4501,9 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
-
-        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
-
-        let delta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let delta_id = FixedBytes::<32>::from_slice(&delta_id);
+        let alpha_1_id = runtime.obtain_uid();
+        let alpha_2_id = runtime.obtain_uid();
+        let delta_id = runtime.obtain_uid();
 
         let storage_before_destruct = runtime.get_storage();
 
@@ -4617,11 +4516,8 @@ mod wrapped_objects {
         // Delta is deleted and each alpha is wrapped in a new beta, hence all the original slots should be empty
         assert_empty_storage(&storage_before_destruct, &storage_after_destruct);
 
-        let beta_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let beta_1_id = FixedBytes::<32>::from_slice(&beta_1_id);
-
-        let beta_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let beta_2_id = FixedBytes::<32>::from_slice(&beta_2_id);
+        let beta_1_id = runtime.obtain_uid();
+        let beta_2_id = runtime.obtain_uid();
 
         // Read the betas and assert the returned data is correct
         let call_data = readBetaCall::new((beta_1_id,)).abi_encode();
@@ -4666,16 +4562,14 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let delta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let delta_id = FixedBytes::<32>::from_slice(&delta_id);
+        let delta_id = runtime.obtain_uid();
 
         // Create alpha
         let call_data = createAlphaCall::new((101,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+        let alpha_1_id = runtime.obtain_uid();
         let alpha_1_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_1_id.0);
 
         // Push alpha to delta
@@ -4713,8 +4607,7 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+        let alpha_2_id = runtime.obtain_uid();
         let alpha_2_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_2_id.0);
 
         // Push second alpha to delta
@@ -4837,8 +4730,7 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_3_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_3_id = FixedBytes::<32>::from_slice(&alpha_3_id);
+        let alpha_3_id = runtime.obtain_uid();
 
         // Push one more alpha to delta
         let call_data = pushAlphaToDeltaCall::new((delta_id, alpha_3_id)).abi_encode();
@@ -4873,34 +4765,21 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let delta_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let delta_1_id = FixedBytes::<32>::from_slice(&delta_1_id);
+        let delta_1_id = runtime.obtain_uid();
+        let alpha_1_id = runtime.obtain_uid();
+        let alpha_2_id = runtime.obtain_uid();
+        let delta_2_id = runtime.obtain_uid();
+        let alpha_3_id = runtime.obtain_uid();
+        let alpha_4_id = runtime.obtain_uid();
+        let epsilon_id = runtime.obtain_uid();
 
-        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
-
-        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
-
-        let delta_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let delta_2_id = FixedBytes::<32>::from_slice(&delta_2_id);
-
-        let alpha_3_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_3_id = FixedBytes::<32>::from_slice(&alpha_3_id);
-
-        let alpha_4_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_4_id = FixedBytes::<32>::from_slice(&alpha_4_id);
-
-        let epsilon_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let epsilon_id = FixedBytes::<32>::from_slice(&epsilon_id);
         let epsilon_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &epsilon_id.0);
 
         let call_data = createAlphaCall::new((105,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_5_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_5_id = FixedBytes::<32>::from_slice(&alpha_5_id);
+        let alpha_5_id = runtime.obtain_uid();
         let alpha_5_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_5_id.0);
 
         let call_data = destructEpsilonCall::new((epsilon_id, alpha_5_id)).abi_encode();
@@ -4953,8 +4832,7 @@ mod wrapped_objects {
         assert_eq!(Delta::abi_encode(&return_data), delta_expected);
         assert_eq!(0, result);
 
-        let new_epsilon_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let new_epsilon_id = FixedBytes::<32>::from_slice(&new_epsilon_id);
+        let new_epsilon_id = runtime.obtain_uid();
 
         // Read epsilon and assert the returned data
         let call_data = readEpsilonCall::new((new_epsilon_id,)).abi_encode();
@@ -4996,8 +4874,7 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let zeta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let zeta_id = FixedBytes::<32>::from_slice(&zeta_id);
+        let zeta_id = runtime.obtain_uid();
 
         let call_data = readZetaCall::new((zeta_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -5016,16 +4893,14 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+        let alpha_1_id = runtime.obtain_uid();
         let alpha_1_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_1_id.0);
 
         let call_data = createAlphaCall::new((102,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+        let alpha_2_id = runtime.obtain_uid();
         let alpha_2_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_2_id.0);
 
         // Pushback alpha 1 and alpha 2 to zeta
@@ -5132,8 +5007,7 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let zeta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let zeta_id = FixedBytes::<32>::from_slice(&zeta_id);
+        let zeta_id = runtime.obtain_uid();
 
         let call_data = readZetaCall::new((zeta_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -5152,8 +5026,7 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+        let alpha_1_id = runtime.obtain_uid();
         let alpha_1_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_1_id.0);
 
         let call_data = createAlphaCall::new((102,)).abi_encode();
@@ -5230,8 +5103,7 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let eta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let eta_id = FixedBytes::<32>::from_slice(&eta_id);
+        let eta_id = runtime.obtain_uid();
 
         let call_data = readEtaCall::new((eta_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -5318,7 +5190,7 @@ mod wrapped_objects {
 }
 
 mod dynamic_storage_fields {
-    use alloy_primitives::{FixedBytes, address};
+    use alloy_primitives::address;
     use alloy_sol_types::{SolCall, SolValue, sol};
 
     use super::*;
@@ -5370,8 +5242,7 @@ mod dynamic_storage_fields {
         }
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let field_name_1 = "test_key_1".to_owned();
         let field_name_2 = "test_key_2".to_owned();
@@ -5768,7 +5639,7 @@ mod dynamic_storage_fields_named_id {
 }
 
 mod dynamic_table {
-    use alloy_primitives::{FixedBytes, address};
+    use alloy_primitives::address;
     use alloy_sol_types::{SolCall, SolValue, sol};
 
     use super::*;
@@ -5822,8 +5693,7 @@ mod dynamic_table {
         }
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let key_1 = address!("0x1234567890abcdef1234567890abcdef12345678");
         let key_2 = address!("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
@@ -6134,7 +6004,6 @@ mod erc20 {
 mod simple_warrior {
     use super::*;
     use crate::common::runtime_sandbox::constants::SIGNER_ADDRESS;
-    use alloy_primitives::FixedBytes;
     use alloy_sol_types::{SolCall, SolValue, sol};
 
     #[fixture]
@@ -6206,8 +6075,7 @@ mod simple_warrior {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let warrior_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let warrior_id = FixedBytes::<32>::from_slice(&warrior_id);
+        let warrior_id = runtime.obtain_uid();
 
         // Inspect warrior and assert it has no sword or shield
         let call_data = inspectWarriorCall::new((warrior_id,)).abi_encode();
@@ -6228,8 +6096,7 @@ mod simple_warrior {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let sword_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let sword_id = FixedBytes::<32>::from_slice(&sword_id);
+        let sword_id = runtime.obtain_uid();
         let sword_slot = derive_object_slot(&SIGNER_ADDRESS, &sword_id.0);
 
         // Equip sword
@@ -6265,8 +6132,7 @@ mod simple_warrior {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let new_sword_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let new_sword_id = FixedBytes::<32>::from_slice(&new_sword_id);
+        let new_sword_id = runtime.obtain_uid();
         let new_sword_slot = derive_object_slot(&SIGNER_ADDRESS, &new_sword_id.0);
 
         // Equip new sword
@@ -6320,8 +6186,7 @@ mod simple_warrior {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let shield_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let shield_id = FixedBytes::<32>::from_slice(&shield_id);
+        let shield_id = runtime.obtain_uid();
         let shield_slot = derive_object_slot(&SIGNER_ADDRESS, &shield_id.0);
 
         let call_data = equipShieldCall::new((warrior_id, shield_id)).abi_encode();

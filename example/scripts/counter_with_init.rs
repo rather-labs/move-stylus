@@ -43,8 +43,8 @@ async fn main() -> eyre::Result<()> {
     let receipt = pending_tx.get_receipt().await?;
 
     println!("Creating a new counter and capturing its id");
-    let counter_id = receipt.logs()[0].data().data.0.clone();
-    let counter_id = FixedBytes::<32>::new(<[u8; 32]>::try_from(counter_id.to_vec()).unwrap());
+    let counter_id =
+        FixedBytes::<32>::new(receipt.logs()[0].topics()[1].to_vec().try_into().unwrap());
     println!("Captured counter_id {:?}", counter_id);
 
     for log in receipt.logs() {
