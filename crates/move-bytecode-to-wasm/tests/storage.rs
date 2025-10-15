@@ -66,7 +66,7 @@ pub fn assert_empty_storage(
 }
 
 mod counter {
-    use alloy_primitives::{FixedBytes, address};
+    use alloy_primitives::address;
     use alloy_sol_types::{SolCall, sol};
 
     use super::*;
@@ -102,8 +102,7 @@ mod counter {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read initial value (should be 25)
         let call_data = readCall::new((object_id,)).abi_encode();
@@ -262,7 +261,7 @@ mod counter_named_id {
 }
 
 mod capability {
-    use alloy_primitives::{FixedBytes, address};
+    use alloy_primitives::address;
     use alloy_sol_types::{SolCall, sol};
 
     use crate::common::runtime_sandbox::constants::SIGNER_ADDRESS;
@@ -302,8 +301,7 @@ mod capability {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Set value to 111 with a sender that is not the owner
         let call_data = adminCapFnCall::new((object_id,)).abi_encode();
@@ -1250,8 +1248,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read value
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1270,8 +1267,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read initial value (should be 101)
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1370,8 +1366,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read initial value (should be 101)
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1447,8 +1442,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Compute the object slot using the owner and the object id
         let owner = runtime.get_tx_origin();
@@ -1507,8 +1501,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Compute the object slot using the owner and the object id
         let owner = runtime.get_tx_origin();
@@ -1575,8 +1568,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read initial value (should be 101)
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1602,8 +1594,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         runtime.set_tx_origin(address!("0x00000000000000000000000000000000abababab").0.0);
 
@@ -1622,8 +1613,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Freeze the object. Only possible if the object is owned by the signer!
         let call_data = freezeObjCall::new((object_id,)).abi_encode();
@@ -1642,8 +1632,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Freeze the object. Only possible if the object is owned by the signer!
         let call_data = freezeObjCall::new((object_id,)).abi_encode();
@@ -1668,8 +1657,7 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read value before delete
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1690,8 +1678,7 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read value before delete
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1718,8 +1705,7 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read value before delete
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -1748,8 +1734,7 @@ mod storage_transfer {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Set value to 111 with a sender that is not the owner
         let call_data = getFooCall::new((object_id,)).abi_encode();
@@ -1772,8 +1757,7 @@ mod storage_transfer {
 
         let storage_before_delete = runtime.get_storage();
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getBarCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -1807,8 +1791,7 @@ mod storage_transfer {
 
         let storage_before_delete = runtime.get_storage();
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getBazCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -1844,8 +1827,7 @@ mod storage_transfer {
 
         let storage_before_delete = runtime.get_storage();
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getBezCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -1910,8 +1892,7 @@ mod storage_transfer {
 
         let storage_before_delete = runtime.get_storage();
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getBizCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -1977,15 +1958,13 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_1_id = FixedBytes::<32>::from_slice(&object_1_id);
+        let object_1_id = runtime.obtain_uid();
 
         let call_data = createSharedCall::new(()).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_2_id = FixedBytes::<32>::from_slice(&object_2_id);
+        let object_2_id = runtime.obtain_uid();
 
         let storage_before_delete = runtime.get_storage();
 
@@ -2005,8 +1984,7 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getVarCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -2059,8 +2037,7 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getVarCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -2334,8 +2311,7 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getVazCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -2402,8 +2378,7 @@ mod storage_transfer {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let call_data = getEpicVarCall::new((object_id,)).abi_encode();
         let (result, result_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -2567,7 +2542,7 @@ mod storage_encoding {
             uint8 f,
             address g
         ) public view;
-        function readStaticFields() public view returns (StaticFields);
+        function readStaticFields(uint256 id) public view returns (StaticFields);
 
         function saveStaticFields2(
             uint8 a,
@@ -2576,7 +2551,7 @@ mod storage_encoding {
             uint16 d,
             uint8 e
         ) public view;
-        function readStaticFields2() public view returns (StaticFields2);
+        function readStaticFields2(uint256 id) public view returns (StaticFields2);
 
         function saveStaticFields3(
             uint8 a,
@@ -2584,7 +2559,7 @@ mod storage_encoding {
             uint64 c,
             address d
         ) public view;
-        function readStaticFields3() public view returns (StaticFields3);
+        function readStaticFields3(uint256 id) public view returns (StaticFields3);
 
         function saveStaticNestedStruct(
             uint64 a,
@@ -2594,7 +2569,7 @@ mod storage_encoding {
             uint128 f,
             uint32 g
         ) public view;
-        function readStaticNestedStruct() public view returns (StaticNestedStruct);
+        function readStaticNestedStruct(uint256 id) public view returns (StaticNestedStruct);
 
         // Dynamic structs
         struct DynamicStruct {
@@ -2663,7 +2638,7 @@ mod storage_encoding {
             uint128 f,
             uint256 g,
         ) public view;
-        function readDynamicStruct() public view returns (DynamicStruct);
+        function readDynamicStruct(uint256 id) public view returns (DynamicStruct);
 
         function saveDynamicStruct2(
             bool[] a,
@@ -2675,7 +2650,7 @@ mod storage_encoding {
             uint256[] g,
             address[] h,
         ) public view;
-        function readDynamicStruct2() public view returns (DynamicStruct2);
+        function readDynamicStruct2(uint256 id) public view returns (DynamicStruct2);
 
         function saveDynamicStruct3(
             uint8[][] a,
@@ -2683,7 +2658,7 @@ mod storage_encoding {
             uint64[][] c,
             uint128[][] d,
         ) public view;
-        function readDynamicStruct3() public view returns (DynamicStruct3);
+        function readDynamicStruct3(uint256 id) public view returns (DynamicStruct3);
 
         function saveDynamicStruct4(
             uint32[] x,
@@ -2691,7 +2666,7 @@ mod storage_encoding {
             uint128 z,
             address w,
         ) public view;
-        function readDynamicStruct4() public view returns (DynamicStruct4);
+        function readDynamicStruct4(uint256 id) public view returns (DynamicStruct4);
 
         function saveDynamicStruct5(
             uint32 x,
@@ -2699,12 +2674,12 @@ mod storage_encoding {
             uint128 z,
             address w,
         ) public view;
-        function readDynamicStruct5() public view returns (DynamicStruct5);
+        function readDynamicStruct5(uint256 id) public view returns (DynamicStruct5);
 
         function saveGenericStruct32(
             uint32 x,
         ) public view;
-        function readGenericStruct32() public view returns (GenericStruct32);
+        function readGenericStruct32(uint256 id) public view returns (GenericStruct32);
 
         //// Wrapped objects ////
         struct Foo {
@@ -2719,7 +2694,7 @@ mod storage_encoding {
             uint64 a;
         }
         function saveFoo () public view;
-        function readFoo() public view returns (Foo);
+        function readFoo(uint256 id) public view returns (Foo);
 
         struct MegaFoo {
             UID id;
@@ -2728,7 +2703,7 @@ mod storage_encoding {
             uint32 c;
         }
         function saveMegaFoo() public view;
-        function readMegaFoo() public view returns (MegaFoo);
+        function readMegaFoo(uint256 id) public view returns (MegaFoo);
 
         struct Var {
             UID id;
@@ -2737,7 +2712,7 @@ mod storage_encoding {
             Bar[] c;
         }
         function saveVar() public view;
-        function readVar() public view returns (Var);
+        function readVar(uint256 id) public view returns (Var);
 
         struct GenericWrapper32 {
             UID id;
@@ -2746,7 +2721,7 @@ mod storage_encoding {
             uint32 c;
         }
         function saveGenericWrapper32() public view;
-        function readGenericWrapper32() public view returns (GenericWrapper32);
+        function readGenericWrapper32(uint256 id) public view returns (GenericWrapper32);
     );
 
     #[rstest]
@@ -2759,12 +2734,12 @@ mod storage_encoding {
         0xff,
         address!("0xcafecafecafecafecafecafecafecafecafecafe"),
     )), vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000000048c3f1c3917932d1", 16).unwrap().to_be_bytes(),
         [0xaa; 32],
         U256::from_str_radix("ffeeeeddddddddccccccccccccccccbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFieldsCall::new(()),
+        readStaticFieldsCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticFields {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: U256::from_str_radix("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 16).unwrap(),
@@ -2785,12 +2760,12 @@ mod storage_encoding {
         6,
         address!("0xcafecafecafecafecafecafecafecafecafecafe"),
     )), vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000000048c3f1c3917932d1", 16).unwrap().to_be_bytes(),
         U256::from(1).to_be_bytes(),
         U256::from_str_radix("06000500000004000000000000000300000000000000000000000000000002", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFieldsCall::new(()),
+        readStaticFieldsCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticFields {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: U256::from(1),
@@ -2809,10 +2784,10 @@ mod storage_encoding {
         0xeeee,
         0xff,
     )), vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("ffeeeecccccccccccccccccafecafecafecafecafecafecafecafecafecafeff", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafeffe9e2482e212d98f1", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000ffeeeecccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFields2Call::new(()),
+        readStaticFields2Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticFields2 {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: 0xff,
@@ -2829,10 +2804,10 @@ mod storage_encoding {
         3,
         4,
     )), vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0400030000000000000002cafecafecafecafecafecafecafecafecafecafe01", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafe01e9e2482e212d98f1", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000400030000000000000002", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFields2Call::new(()),
+        readStaticFields2Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticFields2 {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: 1,
@@ -2848,11 +2823,10 @@ mod storage_encoding {
         2,
         address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
     )), vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000002cafecafecafecafecafecafecafecafecafecafe01", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("000000000000000000000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeef", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafe0156e27099af020ce4", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeef0000000000000002", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFields3Call::new(()),
+        readStaticFields3Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticFields3 {
            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: 1,
@@ -2867,11 +2841,10 @@ mod storage_encoding {
         0xcccccccccccccccc,
         address!("0xbeefbeefbeefbeefbeefbeefbeefbeefbeefbeef"),
     )), vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("000000cccccccccccccccccafecafecafecafecafecafecafecafecafecafeff", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("000000000000000000000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeef", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000cafecafecafecafecafecafecafecafecafecafeff56e27099af020ce4", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000beefbeefbeefbeefbeefbeefbeefbeefbeefbeefcccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
-        readStaticFields3Call::new(()),
+        readStaticFields3Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticFields3 {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: 0xff,
@@ -2888,12 +2861,11 @@ mod storage_encoding {
         3,
         4
     )), vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000002010000000000000001", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000002010000000000000001c481f5cb4e57a4ff", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000400000000000000000000000000000003", 16).unwrap().to_be_bytes(),
     ],
-        readStaticNestedStructCall::new(()),
+        readStaticNestedStructCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticNestedStruct {
            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: 1,
@@ -2914,12 +2886,11 @@ mod storage_encoding {
         0xcccccccccccccccccccccccccccccccc,
         0xdddddddd,
     )), vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("000000000000000000000000000000bbbbbbbbbbbbbbbb01aaaaaaaaaaaaaaaa", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000bbbbbbbbbbbbbbbb01aaaaaaaaaaaaaaaac481f5cb4e57a4ff", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000ddddddddcccccccccccccccccccccccccccccccc", 16).unwrap().to_be_bytes(),
     ],
-        readStaticNestedStructCall::new(()),
+        readStaticNestedStructCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         StaticNestedStruct {
            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: 0xaaaaaaaaaaaaaaaa,
@@ -2969,31 +2940,32 @@ mod storage_encoding {
         U256::from(49),
     )),
     vec![
-        [0x00; 32], // 0x0
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // 0x01
+        [0x00; 32],
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // 0x01 (vector header)
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // 0x02 (vector header)
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // 0x03 u64 and u128 slot
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000004", 16).unwrap().to_be_bytes(), // 0x04 u64 and u128 slot
+
         U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace", 16).unwrap().to_be_bytes(), // vector elements first slot
         U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5acf", 16).unwrap().to_be_bytes(), // vector elements second slot
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // 0x02 (vector header)
-        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b", 16).unwrap().to_be_bytes(), // vector elements first slot
-        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85c", 16).unwrap().to_be_bytes(), // vector elements second slot
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000004", 16).unwrap().to_be_bytes(), // 0x04 u64 and u128 slot
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000005", 16).unwrap().to_be_bytes(), // 0x05 u256 slot
+
+        U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf6", 16).unwrap().to_be_bytes(), // vector elements first slot
+        U256::from_str_radix("b10e2d527612073b26eecdfd717e6a320cf44b4afac2b0732d9fcbe2b7fa0cf7", 16).unwrap().to_be_bytes(), // vector elements second slot
 
     ],
     vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000010000002e", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000010000002ed703a469deda2bde", 16).unwrap().to_be_bytes(), // type hash + u32 + bool
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000005", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000005000000000000000400000000000000030000000000000002", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000006", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000800000000000000000000000000000007", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000009", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("000000000000000000000000000000000000000000000030000000000000002f", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000031", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000800000000000000000000000000000007", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000009", 16).unwrap().to_be_bytes(),
+
+        U256::from_str_radix("0000000000000005000000000000000400000000000000030000000000000002", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000006", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicStructCall::new(()),
+        readDynamicStructCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         DynamicStruct {
            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: 46,
@@ -3016,25 +2988,23 @@ mod storage_encoding {
     )),
     vec![
         [0x00; 32], // 0x0
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // 0x01
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // 0x02 (first vector header)
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // 0x03 (second vector header)
-        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b", 16).unwrap().to_be_bytes(), // vector elements first slot
-        U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85c", 16).unwrap().to_be_bytes(), // vector elements second slot
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000004", 16).unwrap().to_be_bytes(), // u64 and u128 slot
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000005", 16).unwrap().to_be_bytes(), // u256 slot
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000004", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ace", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5acf", 16).unwrap().to_be_bytes(),
     ],
     vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("00000000000000000000000000000000000000000000000000000001ffffffff", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000001ffffffffd703a469deda2bde", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000800000000000000000000000000000007", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000009", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("00000000000000000000000000000000000000000000030ffffffffffffffff", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000031", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000800000000000000000000000000000007", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000009", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicStructCall::new(()),
+        readDynamicStructCall::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         DynamicStruct {
            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: u32::MAX,
@@ -3080,7 +3050,7 @@ mod storage_encoding {
         U256::from_str_radix("f3f7a9fe364faab93b216da50a3214154f22a0a2b415b23a84c8169e8b636ee4", 16).unwrap().to_be_bytes(), // address vec, elem slot #2
     ],
     vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000d9fb85866186b1bf", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000010001", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000005", 16).unwrap().to_be_bytes(),
@@ -3102,7 +3072,7 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000001111111111111111111111111111111111111111", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000002222222222222222222222222222222222222222", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicStruct2Call::new(()),
+        readDynamicStruct2Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         DynamicStruct2 {
         id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: vec![true, false, true],
@@ -3150,7 +3120,7 @@ mod storage_encoding {
         U256::from_str_radix("c167b0e3c82238f4f2d1a50a8b3a44f96311d77b148c30dc0ef863e1a060dcb7", 16).unwrap().to_be_bytes(), // u128[] elements slot #2
     ],
     vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000000027c61e2e651ea057", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // u32[][] len
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // first u8[] len
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000030201", 16).unwrap().to_be_bytes(), // first u8[] elements
@@ -3177,7 +3147,7 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000001200000000000000000000000000000011", 16).unwrap().to_be_bytes(), // u128[] elements #1
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000013", 16).unwrap().to_be_bytes(), // u128[] elements #2
     ],
-        readDynamicStruct3Call::new(()),
+        readDynamicStruct3Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         DynamicStruct3 {
            id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: vec![vec![1, 2, 3], vec![4, 5]],
@@ -3213,7 +3183,7 @@ mod storage_encoding {
         U256::from_str_radix("405787fa12a823e0f2b7631cc41b3ba8828b3321ca811111fa75cd3aa3bb5ad0", 16).unwrap().to_be_bytes(), // Third element
     ],
     vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000001de3e45a3dd236f7", 16).unwrap().to_be_bytes(),
         // Field a: DynamicNestedStructChild[]
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
         // First element
@@ -3230,7 +3200,7 @@ mod storage_encoding {
         U256::from_str_radix("0000000011111111111111111111111111111111111111110000000000000030", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000011111111111111111111111111111111111111110000000000000031", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicStruct4Call::new(()),
+        readDynamicStruct4Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         DynamicStruct4 {
         id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: vec![DynamicNestedStructChild { a: vec![1, 2, 3], b: 123 }, DynamicNestedStructChild { a: vec![1, 2, 3], b: 124 }],
@@ -3248,10 +3218,10 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // Header slot
     ],
     vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000588fded0496ea82d", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
     ],
-        readDynamicStruct5Call::new(()),
+        readDynamicStruct5Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         DynamicStruct5 {
         id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
            a: vec![
@@ -3290,12 +3260,12 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // uint32 b
     ],
     vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000d065a5d629744903", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // Header slot
         U256::from_str_radix("0000000000000000000000000000000000000000000000030000000200000001", 16).unwrap().to_be_bytes(), // First element
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // Second element
     ],
-        readGenericStruct32Call::new(()),
+        readGenericStruct32Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
         GenericStruct32 {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into() } },
             a: vec![1, 2, 3],
@@ -3335,19 +3305,17 @@ mod storage_encoding {
         [0x00; 32],
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+
         U256::from_str_radix("b3f87769e0f4505eb27364fe9b31c117ff789e8aa785586680a6c1cb0f592652", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("b3f87769e0f4505eb27364fe9b31c117ff789e8aa785586680a6c1cb0f592653", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
     ],
     vec![
-        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000065", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000659f5966d803a3b9c3", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002a", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
+
+        U256::from_str_radix("00000000000000000000000000000000000000000000002ab3b50e1768d8c8ca", 16).unwrap().to_be_bytes(),
     ],
-        readFooCall::new(()),
+        readFooCall::new((U256::from_le_bytes(hex!("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989")),)),
         Foo {
             id: UID { id: ID { bytes: U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().into()  } },
             a: 101,
@@ -3364,34 +3332,28 @@ mod storage_encoding {
         [0x00; 32],
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         // Foo
         U256::from_str_radix("3560195e435d1f629e64ba21b204d3190c17b5cf38d1e100e4939dff8e98638d", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("3560195e435d1f629e64ba21b204d3190c17b5cf38d1e100e4939dff8e98638e", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("3560195e435d1f629e64ba21b204d3190c17b5cf38d1e100e4939dff8e98638f", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("3560195e435d1f629e64ba21b204d3190c17b5cf38d1e100e4939dff8e986390", 16).unwrap().to_be_bytes(),
         //Bar
         U256::from_str_radix("b3f87769e0f4505eb27364fe9b31c117ff789e8aa785586680a6c1cb0f592652", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("b3f87769e0f4505eb27364fe9b31c117ff789e8aa785586680a6c1cb0f592653", 16).unwrap().to_be_bytes(),
     ],
     vec![
         // MegaFoo
-        U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000004d", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000004ddb2ab683e10642fe", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000058", 16).unwrap().to_be_bytes(),
         // Foo
-        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000065", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000659f5966d803a3b9c3", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
         // Bar
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002a", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000002ab3b50e1768d8c8ca", 16).unwrap().to_be_bytes(),
 
     ],
-        readMegaFooCall::new(()),
-        MegaFoo {
+        readMegaFooCall::new((U256::from_le_bytes(hex!("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255")),)),
+    MegaFoo {
             id: UID { id: ID { bytes: U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().into()  } },
             a: 77,
             b: Foo {
@@ -3415,64 +3377,51 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         //Bar
         U256::from_str_radix("918d490f3f5a5af006896b3a37d65a9b496b1db689b87334200c90ab4023c178", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("918d490f3f5a5af006896b3a37d65a9b496b1db689b87334200c90ab4023c179", 16).unwrap().to_be_bytes(),
         // Foo
         U256::from_str_radix("322a33ca5945c1c34a8261d3e947c675478f7d28fef6f722a010b01be97bd034", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("322a33ca5945c1c34a8261d3e947c675478f7d28fef6f722a010b01be97bd035", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("322a33ca5945c1c34a8261d3e947c675478f7d28fef6f722a010b01be97bd036", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("322a33ca5945c1c34a8261d3e947c675478f7d28fef6f722a010b01be97bd037", 16).unwrap().to_be_bytes(),
         //Bar in Foo
         U256::from_str_radix("751256a7a9ce5df532239c40b31940a9a4fe03b965b20192b8f02653745a9369", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("751256a7a9ce5df532239c40b31940a9a4fe03b965b20192b8f02653745a936a", 16).unwrap().to_be_bytes(),
         // Bar vector
         U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85c", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("c2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85d", 16).unwrap().to_be_bytes(),
 
         U256::from_str_radix("ae7e0571fa79d756545e084ec0d0c624cdbe4a05e898a1cf0e32a0821c5a6911", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("ae7e0571fa79d756545e084ec0d0c624cdbe4a05e898a1cf0e32a0821c5a6912", 16).unwrap().to_be_bytes(),
 
         U256::from_str_radix("26a28b6df88122dd5c0e1993dcda278372d63dbd74d0b08e3d76c6012a7da7f8", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("26a28b6df88122dd5c0e1993dcda278372d63dbd74d0b08e3d76c6012a7da7f9", 16).unwrap().to_be_bytes(),
 
         U256::from_str_radix("e41226abe04fb72908c78250de568834065f6d35bc75081a3368d6a693296f5a", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("e41226abe04fb72908c78250de568834065f6d35bc75081a3368d6a693296f5b", 16).unwrap().to_be_bytes(),
     ],
     vec![
         // Var
-        U256::from_str_radix("d51bb5edad7d1535fb0a47b2d03d08c0fe02560a3de80e55815fedb1ce1be09b", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000f0717c7026b21422", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("d929b3310243fae82a39e83032462fceb274b042b98732db8c6e9fbeab70c3c9", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         // Bar
-        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002a", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000002ab3b50e1768d8c8ca", 16).unwrap().to_be_bytes(),
         // Foo
-        U256::from_str_radix("d929b3310243fae82a39e83032462fceb274b042b98732db8c6e9fbeab70c3c9", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000065", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000659f5966d803a3b9c3", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
         // Bar in Foo
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000029", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000029b3b50e1768d8c8ca", 16).unwrap().to_be_bytes(),
         // Bar vector
         U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("60b770a33dfbcb5aaea4306257d155502df85b76449b216c476fcfcd437c152e", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("b067f9efb12a40ca24b641163e267b637301b8d1b528996becf893e3bee77255", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002b", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000002bb3b50e1768d8c8ca", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("1f0c5f0153ea5a939636c6a5f255f2fb613b03bef89fb34529e246fe1697a741", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002c", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000002cb3b50e1768d8c8ca", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("60b770a33dfbcb5aaea4306257d155502df85b76449b216c476fcfcd437c152e", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000002d", 16).unwrap().to_be_bytes(),
-
+        U256::from_str_radix("00000000000000000000000000000000000000000000002db3b50e1768d8c8ca", 16).unwrap().to_be_bytes(),
 
     ],
-        readVarCall::new(()),
-        Var {
+    readVarCall::new((U256::from_le_bytes(hex!("d51bb5edad7d1535fb0a47b2d03d08c0fe02560a3de80e55815fedb1ce1be09b")),)),
+            Var {
             id: UID { id: ID { bytes: U256::from_str_radix("d51bb5edad7d1535fb0a47b2d03d08c0fe02560a3de80e55815fedb1ce1be09b", 16).unwrap().into()  } },
             a: Bar {
                 id: UID { id: ID { bytes: U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().into()  } },
@@ -3508,25 +3457,26 @@ mod storage_encoding {
         [0x00; 32],
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
 
         U256::from_str_radix("398fdf7528e5068055009aa3b7c48e06f0127b5d8c57be483a07b5cd9100322e", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("398fdf7528e5068055009aa3b7c48e06f0127b5d8c57be483a07b5cd9100322f", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("580978fee9799ff96dcfcd540232ed2f7cd5bade678a1ccae6650e39d39559dd", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("398fdf7528e5068055009aa3b7c48e06f0127b5d8c57be483a07b5cd91003230", 16).unwrap().to_be_bytes(),
 
+        U256::from_str_radix("580978fee9799ff96dcfcd540232ed2f7cd5bade678a1ccae6650e39d39559dd", 16).unwrap().to_be_bytes(),
     ],
     vec![
-        U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000065", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000654fbbc9bca39c8cbb", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000d065a5d629744903", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
-        U256::from_str_radix("00000000000000000000000000000000000000000000000000000063000000580000004d", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00000000000000000000000000000000000000000000000000000000000004d2", 16).unwrap().to_be_bytes(),
+
+        U256::from_str_radix("000000000000000000000000000000000000000000000063000000580000004d", 16).unwrap().to_be_bytes(),
     ],
-        readGenericWrapper32Call::new(()),
-        GenericWrapper32 {
+    readGenericWrapper32Call::new((U256::from_le_bytes(hex!("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de")),)),
+    GenericWrapper32 {
             id: UID { id: ID { bytes: U256::from_str_radix("7ce17a84c7895f542411eb103f4973681391b4fb07cd0d099a6b2e70b25fa5de", 16).unwrap().into()  } },
             a: 101,
             b: GenericStruct32 {
@@ -3633,8 +3583,7 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let obj_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let obj_a_id = FixedBytes::<32>::from_slice(&obj_a_id);
+        let obj_a_id = runtime.obtain_uid();
 
         let obj_a_slot = derive_object_slot(&OWNER_A, &obj_a_id.0);
 
@@ -3656,18 +3605,12 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the swap request id emmited from the contract's events
-        let swap_request_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let swap_request_a_id = FixedBytes::<32>::from_slice(&swap_request_a_id);
+        let swap_request_a_id = runtime.obtain_uid();
         println!("Swap Request A ID: {:#x}", swap_request_a_id);
 
-        // Assert that both slots are empty
+        // Assert that the slot is empty
         assert_eq!(
             runtime.get_storage_at_slot(obj_a_slot.0),
-            [0u8; 32],
-            "Slot should be empty"
-        );
-        assert_eq!(
-            runtime.get_storage_at_slot(get_next_slot(&obj_a_slot.0)),
             [0u8; 32],
             "Slot should be empty"
         );
@@ -3682,8 +3625,7 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let obj_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let obj_b_id = FixedBytes::<32>::from_slice(&obj_b_id);
+        let obj_b_id = runtime.obtain_uid();
 
         let obj_b_slot = derive_object_slot(&OWNER_B, &obj_b_id.0);
 
@@ -3704,17 +3646,11 @@ mod trusted_swap {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let swap_request_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let swap_request_b_id = FixedBytes::<32>::from_slice(&swap_request_b_id);
+        let swap_request_b_id = runtime.obtain_uid();
 
-        // Assert that both slots are empty
+        // Assert that the slot is empty
         assert_eq!(
             runtime.get_storage_at_slot(obj_b_slot.0),
-            [0u8; 32],
-            "Slot should be empty"
-        );
-        assert_eq!(
-            runtime.get_storage_at_slot(get_next_slot(&obj_b_slot.0)),
             [0u8; 32],
             "Slot should be empty"
         );
@@ -3774,8 +3710,7 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let obj_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let obj_a_id = FixedBytes::<32>::from_slice(&obj_a_id);
+        let obj_a_id = runtime.obtain_uid();
 
         // Request a swap with a fee too low
         let fee_a = 999;
@@ -3797,16 +3732,14 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let obj_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let obj_a_id = FixedBytes::<32>::from_slice(&obj_a_id);
+        let obj_a_id = runtime.obtain_uid();
 
         let call_data = requestSwapCall::new((obj_a_id, SERVICE.into(), fee_a)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
         // Read the swap request id emmited from the contract's events
-        let swap_request_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let swap_request_a_id = FixedBytes::<32>::from_slice(&swap_request_a_id);
+        let swap_request_a_id = runtime.obtain_uid();
 
         ////// Second owner requests a swap //////
         runtime.set_msg_sender(OWNER_B);
@@ -3818,15 +3751,13 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let obj_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let obj_b_id = FixedBytes::<32>::from_slice(&obj_b_id);
+        let obj_b_id = runtime.obtain_uid();
 
         let call_data = requestSwapCall::new((obj_b_id, SERVICE.into(), fee_b)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let swap_request_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let swap_request_b_id = FixedBytes::<32>::from_slice(&swap_request_b_id);
+        let swap_request_b_id = runtime.obtain_uid();
 
         ////// Execute the swap //////
         runtime.set_msg_sender(SERVICE);
@@ -3850,16 +3781,14 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let obj_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let obj_a_id = FixedBytes::<32>::from_slice(&obj_a_id);
+        let obj_a_id = runtime.obtain_uid();
 
         let call_data = requestSwapCall::new((obj_a_id, SERVICE.into(), fee_a)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
         // Read the swap request id emmited from the contract's events
-        let swap_request_a_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let swap_request_a_id = FixedBytes::<32>::from_slice(&swap_request_a_id);
+        let swap_request_a_id = runtime.obtain_uid();
 
         ////// Second owner requests a swap //////
         runtime.set_msg_sender(OWNER_B);
@@ -3871,15 +3800,13 @@ mod trusted_swap {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let obj_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let obj_b_id = FixedBytes::<32>::from_slice(&obj_b_id);
+        let obj_b_id = runtime.obtain_uid();
 
         let call_data = requestSwapCall::new((obj_b_id, SERVICE.into(), fee_b)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let swap_request_b_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let swap_request_b_id = FixedBytes::<32>::from_slice(&swap_request_b_id);
+        let swap_request_b_id = runtime.obtain_uid();
 
         ////// Execute the swap //////
         runtime.set_msg_sender(SERVICE);
@@ -3892,7 +3819,6 @@ mod trusted_swap {
 }
 mod wrapped_objects {
     use crate::common::runtime_sandbox::constants::MSG_SENDER_ADDRESS;
-    use alloy_primitives::FixedBytes;
     use alloy_sol_types::{SolCall, SolValue, sol};
 
     use super::*;
@@ -4016,16 +3942,14 @@ mod wrapped_objects {
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
+            let alpha_id = runtime.obtain_uid();
 
             // Create beta, passing alpha as argument to be wrapped in it
             let call_data = createBetaTtoCall::new((alpha_id,)).abi_encode();
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let beta_id = FixedBytes::<32>::from_slice(&beta_id);
+            let beta_id = runtime.obtain_uid();
 
             (alpha_id, beta_id)
         } else {
@@ -4035,11 +3959,8 @@ mod wrapped_objects {
             assert_eq!(0, result);
 
             // Get the object ids
-            let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
-
-            let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let beta_id = FixedBytes::<32>::from_slice(&beta_id);
+            let alpha_id = runtime.obtain_uid();
+            let beta_id = runtime.obtain_uid();
 
             (alpha_id, beta_id)
         };
@@ -4084,19 +4005,15 @@ mod wrapped_objects {
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
-
-            let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let beta_id = FixedBytes::<32>::from_slice(&beta_id);
+            let alpha_id = runtime.obtain_uid();
+            let beta_id = runtime.obtain_uid();
 
             // Create gamma, passing beta as argument to be wrapped in it
             let call_data = createGammaTtoCall::new((beta_id,)).abi_encode();
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let gamma_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let gamma_id = FixedBytes::<32>::from_slice(&gamma_id);
+            let gamma_id = runtime.obtain_uid();
 
             (alpha_id, beta_id, gamma_id)
         } else {
@@ -4106,14 +4023,9 @@ mod wrapped_objects {
             assert_eq!(0, result);
 
             // Get the object ids
-            let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
-
-            let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let beta_id = FixedBytes::<32>::from_slice(&beta_id);
-
-            let gamma_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let gamma_id = FixedBytes::<32>::from_slice(&gamma_id);
+            let alpha_id = runtime.obtain_uid();
+            let beta_id = runtime.obtain_uid();
+            let gamma_id = runtime.obtain_uid();
 
             (alpha_id, beta_id, gamma_id)
         };
@@ -4162,23 +4074,20 @@ mod wrapped_objects {
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+            let alpha_1_id = runtime.obtain_uid();
 
             let call_data = createAlphaCall::new((102,)).abi_encode();
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+            let alpha_2_id = runtime.obtain_uid();
 
             // Create delta using TTO method
             let call_data = createDeltaTtoCall::new((alpha_1_id, alpha_2_id)).abi_encode();
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let delta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let delta_id = FixedBytes::<32>::from_slice(&delta_id);
+            let delta_id = runtime.obtain_uid();
 
             (alpha_1_id, alpha_2_id, delta_id)
         } else {
@@ -4187,14 +4096,9 @@ mod wrapped_objects {
             let (result, _) = runtime.call_entrypoint(call_data).unwrap();
             assert_eq!(0, result);
 
-            let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
-
-            let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
-
-            let delta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-            let delta_id = FixedBytes::<32>::from_slice(&delta_id);
+            let alpha_1_id = runtime.obtain_uid();
+            let alpha_2_id = runtime.obtain_uid();
+            let delta_id = runtime.obtain_uid();
 
             (alpha_1_id, alpha_2_id, delta_id)
         };
@@ -4246,52 +4150,45 @@ mod wrapped_objects {
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+                let alpha_1_id = runtime.obtain_uid();
 
                 let call_data = createAlphaCall::new((102,)).abi_encode();
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+                let alpha_2_id = runtime.obtain_uid();
 
                 // Create deltas first for TTO method
                 let call_data = createDeltaTtoCall::new((alpha_1_id, alpha_2_id)).abi_encode();
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let delta_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let delta_1_id = FixedBytes::<32>::from_slice(&delta_1_id);
+                let delta_1_id = runtime.obtain_uid();
 
                 let call_data = createAlphaCall::new((103,)).abi_encode();
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let alpha_3_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_3_id = FixedBytes::<32>::from_slice(&alpha_3_id);
+                let alpha_3_id = runtime.obtain_uid();
 
                 let call_data = createAlphaCall::new((104,)).abi_encode();
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let alpha_4_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_4_id = FixedBytes::<32>::from_slice(&alpha_4_id);
+                let alpha_4_id = runtime.obtain_uid();
 
                 let call_data = createDeltaTtoCall::new((alpha_3_id, alpha_4_id)).abi_encode();
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let delta_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let delta_2_id = FixedBytes::<32>::from_slice(&delta_2_id);
+                let delta_2_id = runtime.obtain_uid();
 
                 // Create epsilon using TTO method
                 let call_data = createEpsilonTtoCall::new((delta_1_id, delta_2_id)).abi_encode();
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let epsilon_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let epsilon_id = FixedBytes::<32>::from_slice(&epsilon_id);
+                let epsilon_id = runtime.obtain_uid();
 
                 (
                     alpha_1_id, alpha_2_id, alpha_3_id, alpha_4_id, delta_1_id, delta_2_id,
@@ -4303,26 +4200,13 @@ mod wrapped_objects {
                 let (result, _) = runtime.call_entrypoint(call_data).unwrap();
                 assert_eq!(0, result);
 
-                let delta_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let delta_1_id = FixedBytes::<32>::from_slice(&delta_1_id);
-
-                let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
-
-                let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
-
-                let delta_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let delta_2_id = FixedBytes::<32>::from_slice(&delta_2_id);
-
-                let alpha_3_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_3_id = FixedBytes::<32>::from_slice(&alpha_3_id);
-
-                let alpha_4_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let alpha_4_id = FixedBytes::<32>::from_slice(&alpha_4_id);
-
-                let epsilon_id = runtime.log_events.lock().unwrap().recv().unwrap();
-                let epsilon_id = FixedBytes::<32>::from_slice(&epsilon_id);
+                let delta_1_id = runtime.obtain_uid();
+                let alpha_1_id = runtime.obtain_uid();
+                let alpha_2_id = runtime.obtain_uid();
+                let delta_2_id = runtime.obtain_uid();
+                let alpha_3_id = runtime.obtain_uid();
+                let alpha_4_id = runtime.obtain_uid();
+                let epsilon_id = runtime.obtain_uid();
 
                 (
                     alpha_1_id, alpha_2_id, alpha_3_id, alpha_4_id, delta_1_id, delta_2_id,
@@ -4402,11 +4286,9 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
+        let alpha_id = runtime.obtain_uid();
+        let beta_id = runtime.obtain_uid();
 
-        let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let beta_id = FixedBytes::<32>::from_slice(&beta_id);
         let beta_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &beta_id.0);
 
         // Transfer beta to the recipient
@@ -4452,14 +4334,10 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
+        let alpha_id = runtime.obtain_uid();
+        let beta_id = runtime.obtain_uid();
+        let gamma_id = runtime.obtain_uid();
 
-        let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let beta_id = FixedBytes::<32>::from_slice(&beta_id);
-
-        let gamma_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let gamma_id = FixedBytes::<32>::from_slice(&gamma_id);
         let gamma_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &gamma_id.0);
 
         // Transfer beta to the recipient
@@ -4510,14 +4388,10 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+        let alpha_1_id = runtime.obtain_uid();
+        let alpha_2_id = runtime.obtain_uid();
+        let delta_id = runtime.obtain_uid();
 
-        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
-
-        let delta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let delta_id = FixedBytes::<32>::from_slice(&delta_id);
         let delta_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &delta_id.0);
 
         let call_data = transferDeltaCall::new((delta_id, RECIPIENT_ADDRESS.into())).abi_encode();
@@ -4569,14 +4443,10 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_id = FixedBytes::<32>::from_slice(&alpha_id);
+        let alpha_id = runtime.obtain_uid();
+        let beta_id = runtime.obtain_uid();
+        let gamma_id = runtime.obtain_uid();
 
-        let beta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let beta_id = FixedBytes::<32>::from_slice(&beta_id);
-
-        let gamma_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let gamma_id = FixedBytes::<32>::from_slice(&gamma_id);
         let gamma_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &gamma_id.0);
 
         // Rebuild gamma
@@ -4584,8 +4454,7 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let new_gamma_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let new_gamma_id = FixedBytes::<32>::from_slice(&new_gamma_id);
+        let new_gamma_id = runtime.obtain_uid();
 
         // Read gamma from the recipient namespace in storage
         runtime.set_tx_origin(RECIPIENT_ADDRESS);
@@ -4632,14 +4501,9 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
-
-        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
-
-        let delta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let delta_id = FixedBytes::<32>::from_slice(&delta_id);
+        let alpha_1_id = runtime.obtain_uid();
+        let alpha_2_id = runtime.obtain_uid();
+        let delta_id = runtime.obtain_uid();
 
         let storage_before_destruct = runtime.get_storage();
 
@@ -4652,11 +4516,8 @@ mod wrapped_objects {
         // Delta is deleted and each alpha is wrapped in a new beta, hence all the original slots should be empty
         assert_empty_storage(&storage_before_destruct, &storage_after_destruct);
 
-        let beta_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let beta_1_id = FixedBytes::<32>::from_slice(&beta_1_id);
-
-        let beta_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let beta_2_id = FixedBytes::<32>::from_slice(&beta_2_id);
+        let beta_1_id = runtime.obtain_uid();
+        let beta_2_id = runtime.obtain_uid();
 
         // Read the betas and assert the returned data is correct
         let call_data = readBetaCall::new((beta_1_id,)).abi_encode();
@@ -4701,16 +4562,14 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let delta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let delta_id = FixedBytes::<32>::from_slice(&delta_id);
+        let delta_id = runtime.obtain_uid();
 
         // Create alpha
         let call_data = createAlphaCall::new((101,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+        let alpha_1_id = runtime.obtain_uid();
         let alpha_1_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_1_id.0);
 
         // Push alpha to delta
@@ -4742,19 +4601,13 @@ mod wrapped_objects {
             [0u8; 32],
             "Slot should be empty"
         );
-        assert_eq!(
-            runtime.get_storage_at_slot(get_next_slot(&alpha_1_slot.0)),
-            [0u8; 32],
-            "Slot should be empty"
-        );
 
         // Create second alpha
         let call_data = createAlphaCall::new((102,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+        let alpha_2_id = runtime.obtain_uid();
         let alpha_2_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_2_id.0);
 
         // Push second alpha to delta
@@ -4794,11 +4647,6 @@ mod wrapped_objects {
             [0u8; 32],
             "Slot should be empty"
         );
-        assert_eq!(
-            runtime.get_storage_at_slot(get_next_slot(&alpha_2_slot.0)),
-            [0u8; 32],
-            "Slot should be empty"
-        );
 
         // Pop one alpha from delta and assert the returned data is correct
         let call_data = popAlphaFromDeltaCall::new((delta_id,)).abi_encode();
@@ -4809,8 +4657,11 @@ mod wrapped_objects {
         let alpha_2_shared_slot = derive_object_slot(&SHARED, &alpha_2_id.0);
         assert_eq!(
             runtime.get_storage_at_slot(alpha_2_shared_slot.0),
-            alpha_2_id.0,
-            "Slot should be the same as the original alpha"
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 102, 130, 191,
+                104, 81, 123, 64, 3, 163
+            ],
+            "Slot should not be empty"
         );
 
         // Read delta after the pop and assert the data is correct
@@ -4841,8 +4692,11 @@ mod wrapped_objects {
         let alpha_1_shared_slot = derive_object_slot(&SHARED, &alpha_1_id.0);
         assert_eq!(
             runtime.get_storage_at_slot(alpha_1_shared_slot.0),
-            alpha_1_id.0,
-            "Slot should be the same as the original alpha"
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 101, 130, 191,
+                104, 81, 123, 64, 3, 163
+            ],
+            "Slot should not be empty"
         );
 
         // Read the popped alpha and assert the returned data is correct
@@ -4876,8 +4730,7 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_3_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_3_id = FixedBytes::<32>::from_slice(&alpha_3_id);
+        let alpha_3_id = runtime.obtain_uid();
 
         // Push one more alpha to delta
         let call_data = pushAlphaToDeltaCall::new((delta_id, alpha_3_id)).abi_encode();
@@ -4912,34 +4765,21 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let delta_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let delta_1_id = FixedBytes::<32>::from_slice(&delta_1_id);
+        let delta_1_id = runtime.obtain_uid();
+        let alpha_1_id = runtime.obtain_uid();
+        let alpha_2_id = runtime.obtain_uid();
+        let delta_2_id = runtime.obtain_uid();
+        let alpha_3_id = runtime.obtain_uid();
+        let alpha_4_id = runtime.obtain_uid();
+        let epsilon_id = runtime.obtain_uid();
 
-        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
-
-        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
-
-        let delta_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let delta_2_id = FixedBytes::<32>::from_slice(&delta_2_id);
-
-        let alpha_3_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_3_id = FixedBytes::<32>::from_slice(&alpha_3_id);
-
-        let alpha_4_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_4_id = FixedBytes::<32>::from_slice(&alpha_4_id);
-
-        let epsilon_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let epsilon_id = FixedBytes::<32>::from_slice(&epsilon_id);
         let epsilon_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &epsilon_id.0);
 
         let call_data = createAlphaCall::new((105,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_5_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_5_id = FixedBytes::<32>::from_slice(&alpha_5_id);
+        let alpha_5_id = runtime.obtain_uid();
         let alpha_5_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_5_id.0);
 
         let call_data = destructEpsilonCall::new((epsilon_id, alpha_5_id)).abi_encode();
@@ -4992,8 +4832,7 @@ mod wrapped_objects {
         assert_eq!(Delta::abi_encode(&return_data), delta_expected);
         assert_eq!(0, result);
 
-        let new_epsilon_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let new_epsilon_id = FixedBytes::<32>::from_slice(&new_epsilon_id);
+        let new_epsilon_id = runtime.obtain_uid();
 
         // Read epsilon and assert the returned data
         let call_data = readEpsilonCall::new((new_epsilon_id,)).abi_encode();
@@ -5035,8 +4874,7 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let zeta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let zeta_id = FixedBytes::<32>::from_slice(&zeta_id);
+        let zeta_id = runtime.obtain_uid();
 
         let call_data = readZetaCall::new((zeta_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -5055,16 +4893,14 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+        let alpha_1_id = runtime.obtain_uid();
         let alpha_1_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_1_id.0);
 
         let call_data = createAlphaCall::new((102,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_2_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_2_id = FixedBytes::<32>::from_slice(&alpha_2_id);
+        let alpha_2_id = runtime.obtain_uid();
         let alpha_2_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_2_id.0);
 
         // Pushback alpha 1 and alpha 2 to zeta
@@ -5171,8 +5007,7 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let zeta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let zeta_id = FixedBytes::<32>::from_slice(&zeta_id);
+        let zeta_id = runtime.obtain_uid();
 
         let call_data = readZetaCall::new((zeta_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -5191,8 +5026,7 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let alpha_1_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let alpha_1_id = FixedBytes::<32>::from_slice(&alpha_1_id);
+        let alpha_1_id = runtime.obtain_uid();
         let alpha_1_slot = derive_object_slot(&MSG_SENDER_ADDRESS, &alpha_1_id.0);
 
         let call_data = createAlphaCall::new((102,)).abi_encode();
@@ -5269,8 +5103,7 @@ mod wrapped_objects {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let eta_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let eta_id = FixedBytes::<32>::from_slice(&eta_id);
+        let eta_id = runtime.obtain_uid();
 
         let call_data = readEtaCall::new((eta_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -5357,7 +5190,7 @@ mod wrapped_objects {
 }
 
 mod dynamic_storage_fields {
-    use alloy_primitives::{FixedBytes, address};
+    use alloy_primitives::address;
     use alloy_sol_types::{SolCall, SolValue, sol};
 
     use super::*;
@@ -5409,8 +5242,7 @@ mod dynamic_storage_fields {
         }
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let field_name_1 = "test_key_1".to_owned();
         let field_name_2 = "test_key_2".to_owned();
@@ -5807,7 +5639,7 @@ mod dynamic_storage_fields_named_id {
 }
 
 mod dynamic_table {
-    use alloy_primitives::{FixedBytes, address};
+    use alloy_primitives::address;
     use alloy_sol_types::{SolCall, SolValue, sol};
 
     use super::*;
@@ -5861,8 +5693,7 @@ mod dynamic_table {
         }
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         let key_1 = address!("0x1234567890abcdef1234567890abcdef12345678");
         let key_2 = address!("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd");
@@ -6173,7 +6004,6 @@ mod erc20 {
 mod simple_warrior {
     use super::*;
     use crate::common::runtime_sandbox::constants::SIGNER_ADDRESS;
-    use alloy_primitives::FixedBytes;
     use alloy_sol_types::{SolCall, SolValue, sol};
 
     #[fixture]
@@ -6245,8 +6075,7 @@ mod simple_warrior {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let warrior_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let warrior_id = FixedBytes::<32>::from_slice(&warrior_id);
+        let warrior_id = runtime.obtain_uid();
 
         // Inspect warrior and assert it has no sword or shield
         let call_data = inspectWarriorCall::new((warrior_id,)).abi_encode();
@@ -6267,8 +6096,7 @@ mod simple_warrior {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let sword_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let sword_id = FixedBytes::<32>::from_slice(&sword_id);
+        let sword_id = runtime.obtain_uid();
         let sword_slot = derive_object_slot(&SIGNER_ADDRESS, &sword_id.0);
 
         // Equip sword
@@ -6299,18 +6127,12 @@ mod simple_warrior {
 
         // Assert that the original sword slot (under the sender's address) is now empty
         assert_eq!(runtime.get_storage_at_slot(sword_slot.0), [0u8; 32]);
-        assert_eq!(
-            runtime.get_storage_at_slot(get_next_slot(&sword_slot.0)),
-            [0u8; 32]
-        );
-
         // Create new sword
         let call_data = createSwordCall::new((77,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let new_sword_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let new_sword_id = FixedBytes::<32>::from_slice(&new_sword_id);
+        let new_sword_id = runtime.obtain_uid();
         let new_sword_slot = derive_object_slot(&SIGNER_ADDRESS, &new_sword_id.0);
 
         // Equip new sword
@@ -6343,17 +6165,9 @@ mod simple_warrior {
 
         // Assert that the original new sword slot (under the sender's address) is now empty
         assert_eq!(runtime.get_storage_at_slot(new_sword_slot.0), [0u8; 32]);
-        assert_eq!(
-            runtime.get_storage_at_slot(get_next_slot(&new_sword_slot.0)),
-            [0u8; 32]
-        );
 
         // Assert that the original old sword slot (under the sender's address) holds the old sword now
         assert_ne!(runtime.get_storage_at_slot(sword_slot.0), [0u8; 32]);
-        assert_ne!(
-            runtime.get_storage_at_slot(get_next_slot(&sword_slot.0)),
-            [0u8; 32]
-        );
 
         let call_data = inspectSwordCall::new((sword_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -6372,8 +6186,7 @@ mod simple_warrior {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        let shield_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let shield_id = FixedBytes::<32>::from_slice(&shield_id);
+        let shield_id = runtime.obtain_uid();
         let shield_slot = derive_object_slot(&SIGNER_ADDRESS, &shield_id.0);
 
         let call_data = equipShieldCall::new((warrior_id, shield_id)).abi_encode();
@@ -6412,10 +6225,6 @@ mod simple_warrior {
 
         // Assert that the original shield slot (under the sender's address) is now empty
         assert_eq!(runtime.get_storage_at_slot(shield_slot.0), [0u8; 32]);
-        assert_eq!(
-            runtime.get_storage_at_slot(get_next_slot(&shield_slot.0)),
-            [0u8; 32]
-        );
 
         let storage_before_destroy = runtime.get_storage();
         // Destroy warrior

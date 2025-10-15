@@ -1,6 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod abi_generate;
 pub mod build;
 pub mod coverage;
 pub mod disassemble;

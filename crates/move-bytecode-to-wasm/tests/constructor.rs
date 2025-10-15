@@ -4,7 +4,6 @@ use common::{runtime_sandbox::RuntimeSandbox, translate_test_package_with_framew
 use rstest::{fixture, rstest};
 
 mod constructor {
-    use alloy_primitives::FixedBytes;
     use alloy_sol_types::{SolCall, sol};
 
     use super::*;
@@ -35,8 +34,7 @@ mod constructor {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read initial value (should be 101)
         let call_data = readValueCall::new((object_id,)).abi_encode();
@@ -65,7 +63,6 @@ mod constructor {
 }
 
 mod constructor_with_otw {
-    use alloy_primitives::FixedBytes;
     use alloy_sol_types::{SolCall, sol};
 
     use super::*;
@@ -96,8 +93,7 @@ mod constructor_with_otw {
         assert_eq!(0, result);
 
         // Read the object id emmited from the contract's events
-        let object_id = runtime.log_events.lock().unwrap().recv().unwrap();
-        let object_id = FixedBytes::<32>::from_slice(&object_id);
+        let object_id = runtime.obtain_uid();
 
         // Read initial value (should be 101)
         let call_data = readValueCall::new((object_id,)).abi_encode();

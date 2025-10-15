@@ -1,6 +1,7 @@
 module stylus::object;
 
 use stylus::tx_context::TxContext;
+use stylus::event::emit;
 
 /// Allows calling `.to_address` on a `UID` to get an `address`.
 public use fun uid_to_address as UID.to_address;
@@ -16,6 +17,11 @@ public struct UID has store {
     id: ID,
 }
 
+#[ext(event, indexes = 1)]
+public struct NewUID has copy, drop {
+    uid: address
+}
+
 /// Creates a new `UID`, which must be stored in an object's `id` field.
 /// This is the only way to create `UID`s.
 ///
@@ -23,7 +29,9 @@ public struct UID has store {
 /// This allows the transaction caller to capture and persist it for later
 /// reference to the object associated with that `UID`
 public fun new(ctx: &mut TxContext): UID {
-    UID { id: ID { bytes: ctx.fresh_object_address() } }
+    let res = UID { id: ID { bytes: ctx.fresh_object_address() } };
+    emit(NewUID { uid: res.to_address() });
+    res
 }
 
 /// Deletes the object from the storage.

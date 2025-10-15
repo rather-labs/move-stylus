@@ -12,7 +12,6 @@ exclude = ["example-rust"]
 [workspace.dependencies]
 anyhow = "1.0.52"
 clap = { version = "4", features = ["derive"] }
-
 move-binary-format = { git = "https://github.com/MystenLabs/sui" }
 move-bytecode-source-map = { git = "https://github.com/MystenLabs/sui" }
 move-bytecode-viewer = { git = "https://github.com/MystenLabs/sui" }
@@ -27,8 +26,8 @@ move-stdlib-natives = { git = "https://github.com/MystenLabs/sui" }
 move-vm-runtime = { git = "https://github.com/MystenLabs/sui" }
 move-vm-test-utils = { git = "https://github.com/MystenLabs/sui" }
 move-unit-test = { git = "https://github.com/MystenLabs/sui" }
-
 move-abstract-interpreter = { git = "https://github.com/MystenLabs/sui" }
-
 move-bytecode-to-wasm = { path = "crates/move-bytecode-to-wasm" }
 move-packages-build = { path = "crates/move-packages-build" }
+move-evm-abi-generator = { path = "crates/move-evm-abi-generator" }
+move-parse-special-attributes = { path = "crates/move-parse-special-attributes" }

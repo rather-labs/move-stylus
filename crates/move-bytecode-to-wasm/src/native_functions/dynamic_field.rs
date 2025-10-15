@@ -69,9 +69,7 @@ pub fn add_child_object_fn(
     builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
-        .local_tee(slot_ptr);
-
-    builder
+        .local_tee(slot_ptr)
         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
         .i32_const(32)
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
@@ -115,8 +113,8 @@ pub fn add_borrow_object_fn(
     };
 
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-    let decode_and_read_from_storage_fn =
-        RuntimeFunction::DecodeAndReadFromStorage.get_generic(module, compilation_ctx, &[itype]);
+    let read_and_decode_from_storage_fn =
+        RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype]);
 
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -162,10 +160,20 @@ pub fn add_borrow_object_fn(
 
     let result_struct = module.locals.add(ValType::I32);
 
+    let slot_ptr = module.locals.add(ValType::I32);
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_tee(slot_ptr)
+        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
     // Read from storage
     builder
-        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-        .call(decode_and_read_from_storage_fn)
+        .local_get(slot_ptr)
+        .local_get(child_id)
+        .call(read_and_decode_from_storage_fn)
         .local_set(result_struct);
 
     let result = module.locals.add(ValType::I32);

@@ -111,7 +111,7 @@ mod tx_context {
 }
 
 mod event {
-    use alloy_primitives::address;
+    use alloy_primitives::{address, keccak256};
 
     use crate::common::translate_test_package_with_framework;
 
@@ -130,76 +130,73 @@ mod event {
 
     sol!(
         #[allow(missing_docs)]
-
-        struct TestEvent1 {
-            uint32 n;
-        }
-
         struct TestEvent2 {
             uint32 a;
             address b;
             uint128 c;
         }
 
-        struct TestEvent3 {
-            uint32 a;
-            address b;
-            uint128 c;
-            uint8[] d;
-        }
-
-        struct TestEvent4 {
-            uint32 a;
-            address b;
-            uint128 c;
-            uint8[] d;
-            TestEvent2 e;
-        }
-
-        struct GenericEvent1 {
-            uint32[] n;
-            bool o;
-            address p;
-            uint128 q;
-        }
-
-        struct GenericEvent2 {
-            uint64 n;
-            bool o;
-            TestEvent1 p;
-            TestEvent2 q;
-        }
 
         function emitTestEvent1(uint32 n) external;
         function emitTestEvent2(uint32 a, address b, uint128 c) external;
         function emitTestEvent3(uint32 a, address b, uint128 c, uint8[] d) external;
         function emitTestEvent4(uint32 a, address b, uint128 c, uint8[] d, TestEvent2 e) external;
-        function emitGenericEvent1(uint32[] n, bool o, address p, uint128 q) external;
-        function emitGenericEvent2(uint64 n, bool o, TestEvent1 p, TestEvent2 q) external;
+        function emitTestEvent5(uint32 a, address b, uint8[] c) external;
+        function emitTestEvent6(uint32 a, address b, TestEvent2 c) external;
+        function emitTestEvent7(uint32 a, uint8[] b, TestEvent2 c) external;
+        function emitTestEvent8(uint64 a, string b) external;
+        function emitTestEvent9(uint64 a, string b) external;
+        function emitTestAnonEvent1(uint32 n) external;
+        function emitTestAnonEvent2(uint32 a, address b, uint128 c) external;
+        function emitTestAnonEvent3(uint32 a, address b, uint128 c, uint8[] d) external;
+        function emitTestAnonEvent4(uint32 a, address b, uint128 c, uint8[] d, TestEvent2 e) external;
+        function emitTestAnonEvent5(uint32 a, address b, uint8[] c) external;
+        function emitTestAnonEvent6(uint32 a, address b, TestEvent2 c) external;
+        function emitTestAnonEvent7(uint32 a, uint8[] b, TestEvent2 c) external;
+        function emitTestAnonEvent8(uint64 a, string b) external;
+        function emitTestAnonEvent9(uint64 a, string b) external;
+        function emitTestAnonymous(uint32 a, uint128 b, uint8[] c, TestEvent2 d) external;
+        function emitTestAnonymous2(
+            uint32 a,
+            uint128 b,
+            uint8[] c,
+            TestEvent2 d,
+            uint32 e,
+            address f,
+            uint128 g,
+            uint8[] h,
+            TestEvent2 i,
+        ) external;
     );
 
     #[rstest]
-    #[case(emitTestEvent1Call::new((42,)), TestEvent1 { n: 42 })]
+    #[case(emitTestEvent1Call::new((42,)), 2, [
+        keccak256(b"TestEvent1(uint32)").to_vec(),
+        42.abi_encode().to_vec()
+    ].concat())]
     #[case(emitTestEvent2Call::new((
         42,
         address!("0xcafe000000000000000000000000000000007357"),
         u128::MAX
-    )), TestEvent2 {
-        a: 42,
-        b: address!("0xcafe000000000000000000000000000000007357"),
-        c: u128::MAX,
-    })]
+    )), 4, [
+        keccak256(b"TestEvent2(uint32,address,uint128)").to_vec(),
+        42.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        u128::MAX.abi_encode().to_vec()
+    ].concat())]
     #[case(emitTestEvent3Call::new((
         42,
         address!("0xcafe000000000000000000000000000000007357"),
         u128::MAX,
         vec![1, 2, 3, 4, 5]
-    )), TestEvent3 {
-        a: 42,
-        b: address!("0xcafe000000000000000000000000000000007357"),
-        c: u128::MAX,
-        d: vec![1, 2, 3, 4, 5],
-    })]
+    )), 3,
+    [
+        keccak256(b"TestEvent3(uint32,address,uint128,uint8[])").to_vec(),
+        42.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        u128::MAX.abi_encode().to_vec(),
+        vec![1, 2, 3, 4, 5].abi_encode().to_vec()
+    ].concat())]
     #[case(emitTestEvent4Call::new((
         42,
         address!("0xcafe000000000000000000000000000000007357"),
@@ -210,44 +207,263 @@ mod event {
             b: address!("0xcafe000000000000000000000000000000007357"),
             c: u128::MAX,
         }
-    )), TestEvent4 {
-        a: 42,
-        b: address!("0xcafe000000000000000000000000000000007357"),
-        c: u128::MAX,
-        d: vec![1, 2, 3, 4, 5],
-        e: TestEvent2 {
+    )), 3,
+    [
+        keccak256(b"TestEvent4(uint32,address,uint128,uint8[],(uint32,address,uint128))").to_vec(),
+        42.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        u128::MAX.abi_encode().to_vec(),
+        vec![1, 2, 3, 4, 5].abi_encode().to_vec(),
+        TestEvent2 {
+            a: 42,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        }.abi_encode().to_vec()
+    ].concat())]
+    #[case(emitTestEvent5Call::new((
+        42,
+        address!("0xcafe000000000000000000000000000000007357"),
+        vec![1, 2, 3, 4, 5],
+    )), 4,
+    [
+        keccak256(b"TestEvent5(uint32,address,uint8[])").to_vec(),
+        42.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        keccak256(vec![1, 2, 3, 4, 5].abi_encode()).to_vec(),
+    ].concat())]
+    #[case(emitTestEvent6Call::new((
+        41,
+        address!("0xcafe000000000000000000000000000000007357"),
+        TestEvent2 {
+            a: 43,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        }
+    )), 4,
+    [
+        keccak256(b"TestEvent6(uint32,address,(uint32,address,uint128))").to_vec(),
+        41.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        keccak256(TestEvent2 {
+            a: 43,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        }.abi_encode()).to_vec()
+    ].concat())]
+    #[case(emitTestEvent7Call::new((
+        42,
+        vec![1, 2, 3, 4, 5],
+        TestEvent2 {
+            a: 43,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        }
+    )), 4,
+    [
+        keccak256(b"TestEvent7(uint32,uint8[],(uint32,address,uint128))").to_vec(),
+        42.abi_encode().to_vec(),
+        keccak256(vec![1, 2, 3, 4, 5].abi_encode()).to_vec(),
+        keccak256(TestEvent2 {
+            a: 43,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        }.abi_encode()).to_vec()
+    ].concat())]
+    #[case(emitTestEvent8Call::new((
+        42,
+        "test string".into(),
+    )), 2,
+    [
+        keccak256(b"TestEvent8(uint64,string)").to_vec(),
+        42.abi_encode().to_vec(),
+        "test string".abi_encode(),
+    ].concat())]
+    #[case(emitTestEvent9Call::new((
+        42,
+        "test string".into(),
+    )), 3,
+    [
+        keccak256(b"TestEvent9(uint64,string)").to_vec(),
+        42.abi_encode().to_vec(),
+        keccak256("test string".abi_encode()).to_vec(),
+    ].concat())]
+    #[case(emitTestAnonEvent1Call::new((42,)), 1, [42.abi_encode().to_vec()].concat())]
+    #[case(emitTestAnonEvent2Call::new((
+        42,
+        address!("0xcafe000000000000000000000000000000007357"),
+        u128::MAX
+    )), 3, [
+        42.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        u128::MAX.abi_encode().to_vec()
+    ].concat())]
+    #[case(emitTestAnonEvent3Call::new((
+        42,
+        address!("0xcafe000000000000000000000000000000007357"),
+        u128::MAX,
+        vec![1, 2, 3, 4, 5]
+    )), 2,
+    [
+        42.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        u128::MAX.abi_encode().to_vec(),
+        vec![1, 2, 3, 4, 5].abi_encode().to_vec()
+    ].concat())]
+    #[case(emitTestAnonEvent4Call::new((
+        42,
+        address!("0xcafe000000000000000000000000000000007357"),
+        u128::MAX,
+        vec![1, 2, 3, 4, 5],
+        TestEvent2 {
             a: 42,
             b: address!("0xcafe000000000000000000000000000000007357"),
             c: u128::MAX,
         }
-    })]
-    #[case(emitGenericEvent1Call::new((
-        vec![1, 2, 3, 4, 5], false, address!("0xcafe000000000000000000000000000000007357"), u128::MAX
-    )), GenericEvent1 {
-        n: vec![1, 2, 3, 4, 5],
-        o: false,
-        p: address!("0xcafe000000000000000000000000000000007357"),
-        q: u128::MAX
-    })]
-    #[case(emitGenericEvent2Call::new((
-        u64::MAX, true, TestEvent1 { n: 42 }, TestEvent2 { a: 42, b: address!("0xcafe000000000000000000000000000000007357"), c: u128::MAX }
-    )), GenericEvent2 {
-        n: u64::MAX,
-        o: true,
-        p: TestEvent1 { n: 42 },
-        q: TestEvent2 { a: 42, b: address!("0xcafe000000000000000000000000000000007357"), c: u128::MAX }
-    })]
-    fn test_emit_event<T: SolCall, V: SolValue>(
+    )), 2,
+    [
+        42.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        u128::MAX.abi_encode().to_vec(),
+        vec![1, 2, 3, 4, 5].abi_encode().to_vec(),
+        TestEvent2 {
+            a: 42,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        }.abi_encode().to_vec()
+    ].concat())]
+    #[case(emitTestAnonEvent5Call::new((
+        42,
+        address!("0xcafe000000000000000000000000000000007357"),
+        vec![1, 2, 3, 4, 5],
+    )), 3,
+    [
+        42.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        keccak256(vec![1, 2, 3, 4, 5].abi_encode()).to_vec(),
+    ].concat())]
+    #[case(emitTestAnonEvent6Call::new((
+        41,
+        address!("0xcafe000000000000000000000000000000007357"),
+        TestEvent2 {
+            a: 43,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        }
+    )), 3,
+    [
+        41.abi_encode().to_vec(),
+        address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
+        keccak256(TestEvent2 {
+            a: 43,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        }.abi_encode()).to_vec()
+    ].concat())]
+    #[case(emitTestAnonEvent7Call::new((
+        42,
+        vec![1, 2, 3, 4, 5],
+        TestEvent2 {
+            a: 43,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        }
+    )), 3,
+    [
+        42.abi_encode().to_vec(),
+        keccak256(vec![1, 2, 3, 4, 5].abi_encode()).to_vec(),
+        keccak256(TestEvent2 {
+            a: 43,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        }.abi_encode()).to_vec()
+    ].concat())]
+    #[case(emitTestAnonEvent8Call::new((
+        42,
+        "test string".into(),
+    )), 1,
+    [
+        42.abi_encode().to_vec(),
+        "test string".abi_encode(),
+    ].concat())]
+    #[case(emitTestAnonEvent9Call::new((
+        42,
+        "test string".into(),
+    )), 2,
+    [
+        42.abi_encode().to_vec(),
+        keccak256("test string".abi_encode()).to_vec(),
+    ].concat())]
+    #[case(emitTestAnonymousCall::new((
+        42,
+        u128::MAX,
+        vec![1, 2, 3, 4, 5],
+        TestEvent2 {
+            a: 43,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        }
+    )), 4,
+    [
+        42.abi_encode().to_vec(),
+        u128::MAX.abi_encode(),
+        keccak256(vec![1, 2, 3, 4, 5].abi_encode()).to_vec(),
+        keccak256(TestEvent2 {
+            a: 43,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        }.abi_encode()).to_vec()
+    ].concat())]
+    #[case(emitTestAnonymous2Call::new((
+        42,
+        u128::MAX,
+        vec![1, 2, 3, 4, 5],
+        TestEvent2 {
+            a: 43,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        },
+        84,
+        address!("0xcafecafecafe0000000000000000000073577357"),
+        u64::MAX as u128,
+        vec![9, 8, 7, 6, 5],
+        TestEvent2 {
+            a: 85,
+            b: address!("0xbeefbeef00000000000000000000000000007357"),
+            c: u128::MAX,
+        }
+    )), 4,
+    [
+        42.abi_encode().to_vec(),
+        u128::MAX.abi_encode(),
+        keccak256(vec![1, 2, 3, 4, 5].abi_encode()).to_vec(),
+        keccak256(TestEvent2 {
+            a: 43,
+            b: address!("0xcafe000000000000000000000000000000007357"),
+            c: u128::MAX,
+        }.abi_encode()).to_vec(),
+        84.abi_encode().to_vec(),
+        address!("0xcafecafecafe0000000000000000000073577357").abi_encode().to_vec(),
+        (u64::MAX as u128).abi_encode().to_vec(),
+        vec![9, 8, 7, 6, 5].abi_encode().to_vec(),
+        TestEvent2 {
+            a: 85,
+            b: address!("0xbeefbeef00000000000000000000000000007357"),
+            c: u128::MAX,
+        }.abi_encode().to_vec()
+    ].concat())]
+    fn test_emit_event<T: SolCall>(
         runtime: RuntimeSandbox,
         #[case] call_data: T,
-        #[case] expected_result: V,
-    ) where
-        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
-    {
+        #[case] expected_topic: u32,
+        #[case] expected_data: Vec<u8>,
+    ) {
         let (result, _) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
         assert_eq!(result, 0, "Function returned non-zero exit code: {result}");
 
-        let event = runtime.log_events.lock().unwrap().recv().unwrap();
-        assert_eq!(event, expected_result.abi_encode());
+        let (topic, data) = runtime.log_events.lock().unwrap().recv().unwrap();
+        println!("Topic {topic}");
+        println!("Data {data:?}");
+        assert_eq!(expected_topic, topic);
+        assert_eq!(expected_data, data.as_slice());
     }
 }
