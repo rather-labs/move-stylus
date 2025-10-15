@@ -80,6 +80,49 @@ mod enum_abi_packing_unpacking {
     }
 }
 
+mod enum_with_fields {
+    use super::*;
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "enum_with_fields";
+        const SOURCE_PATH: &str = "tests/enums/enum_with_fields.move";
+
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    use alloy_sol_types::SolValue; // for .abi_encode()
+    use alloy_sol_types::sol; // runtime bytes
+
+    sol! {
+        function packUnpackPlanet(uint8 index) external returns (uint64, uint64);
+    }
+
+    #[rstest]
+    #[case(packUnpackPlanetCall::new((0,)), (6371, 5972))]
+    #[case(packUnpackPlanetCall::new((1,)), (69911, 1898000))]
+    #[case(packUnpackPlanetCall::new((2,)), (3389, 641))]
+    #[case(packUnpackPlanetCall::new((3,)), (6051, 4868))]
+    #[case(packUnpackPlanetCall::new((4,)), (58232, 56800))]
+    fn test_pack_unpack_planet<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode(),
+        )
+        .unwrap();
+    }
+}
+
 mod enum_match {
     use super::*;
 

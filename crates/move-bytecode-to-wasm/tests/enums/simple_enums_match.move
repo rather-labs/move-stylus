@@ -22,7 +22,7 @@ public enum YinYangEnum has drop {
     Yang,
 }
 
-public fun match_number_enum(x: NumberEnum): u32 {
+entry fun match_number_enum(x: NumberEnum): u32 {
     match (x) {
         NumberEnum::One => 11,
         NumberEnum::Two => 22,
@@ -31,7 +31,7 @@ public fun match_number_enum(x: NumberEnum): u32 {
     }
 }
 
-public fun match_nested_enum(x: NumberEnum, y: ColorEnum, z: YinYangEnum): u32 {
+entry fun match_nested_enum(x: NumberEnum, y: ColorEnum, z: YinYangEnum): u32 {
     match (x) {
         NumberEnum::One => 11,
         NumberEnum::Two => {
@@ -50,7 +50,7 @@ public fun match_nested_enum(x: NumberEnum, y: ColorEnum, z: YinYangEnum): u32 {
     }
 }
 
-public fun match_with_conditional(x: NumberEnum, y: u32): u32 {
+entry fun match_with_conditional(x: NumberEnum, y: u32): u32 {
     if (y > 42) {
         match(x) {
             NumberEnum::One => 1,
@@ -71,7 +71,7 @@ public fun match_with_conditional(x: NumberEnum, y: u32): u32 {
     }
 }
 
-public fun nested_match_with_conditional(x: NumberEnum, y: ColorEnum, z: u32): u32 {
+entry fun nested_match_with_conditional(x: NumberEnum, y: ColorEnum, z: u32): u32 {
     if (z > 42) {
         match(x) {
             NumberEnum::One => 1,
