@@ -3,10 +3,11 @@ pub mod function_modifiers;
 
 pub use event::Event;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct SpecialAttributes {
     pub events: HashMap<String, Event>,
     pub functions: Vec<Function>,
+    pub external_calls: HashMap<String, Function>,
 }
 
 use function_modifiers::{Function, FunctionModifier};
@@ -16,7 +17,7 @@ use move_compiler::{
     shared::NumericalAddress,
 };
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, VecDeque},
     path::Path,
 };
 
@@ -41,16 +42,27 @@ pub fn process_special_attributes(path: &Path) -> SpecialAttributes {
                 match module_member {
                     ModuleMember::Function(f) => {
                         if let Some(attributes) = f.attributes.first() {
-                            let modifiers = attributes
+                            println!("processing {} {attributes:?}", f.name);
+                            let mut modifiers = attributes
                                 .value
                                 .iter()
                                 .flat_map(|s| FunctionModifier::parse_modifiers(&s.value))
-                                .collect::<Vec<FunctionModifier>>();
+                                .collect::<VecDeque<FunctionModifier>>();
 
-                            result.functions.push(Function {
-                                name: f.name.to_owned().to_string(),
-                                modifiers,
-                            });
+                            if let Some(FunctionModifier::ExternalCall) = modifiers.pop_front() {
+                                result.external_calls.insert(
+                                    f.name.to_owned().to_string(),
+                                    Function {
+                                        name: f.name.to_owned().to_string(),
+                                        modifiers: modifiers.into_iter().collect(),
+                                    },
+                                );
+                            } else {
+                                result.functions.push(Function {
+                                    name: f.name.to_owned().to_string(),
+                                    modifiers: modifiers.into_iter().collect(),
+                                });
+                            }
                         }
                     }
                     ModuleMember::Struct(ref s) => {

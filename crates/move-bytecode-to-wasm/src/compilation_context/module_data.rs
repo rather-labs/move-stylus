@@ -140,6 +140,9 @@ pub struct ModuleData {
     /// types. The datatype handles are used interally by move to look for user defined data
     /// types
     pub datatype_handles_map: HashMap<DatatypeHandleIndex, UserDefinedType>,
+
+    /// Function and struct special attributes for EVM contexts
+    pub special_attributes: SpecialAttributes,
 }
 
 impl ModuleData {
@@ -218,6 +221,7 @@ impl ModuleData {
             enums,
             signatures,
             datatype_handles_map,
+            special_attributes,
         }
     }
 

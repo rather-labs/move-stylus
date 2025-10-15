@@ -171,7 +171,20 @@ impl NativeFunction {
                 (Self::NATIVE_GET_LAST_MEMORY_POSITION, _, _) => {
                     tests::add_get_last_memory_position_fn(module, compilation_ctx)
                 }
-                _ => panic!("native function {module_id}::{name} not supported yet"),
+                _ => {
+                    let module_data = compilation_ctx
+                        .get_module_data_by_id(&module_id)
+                        .unwrap_or_else(|_| {
+                            panic!("native function {module_id}::{name} not supported yet")
+                        });
+                    if let Some(special_attributes) =
+                        module_data.special_attributes.external_calls.get(name)
+                    {
+                        todo!("{module_id}::{name}")
+                    } else {
+                        panic!("native function {module_id}::{name} not supported yet")
+                    }
+                }
             }
         }
     }
