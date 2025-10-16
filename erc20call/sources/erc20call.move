@@ -1,6 +1,6 @@
 module erc20call::erc20call;
 
-use stylus::contract_calls::{ContractCall, ContractCallResult};
+use stylus::contract_calls::ContractCallResult;
 
 #[ext(external_call)]
 public struct ERC20Call has drop {

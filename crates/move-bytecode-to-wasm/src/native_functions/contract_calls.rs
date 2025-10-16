@@ -1,5 +1,3 @@
-use std::u64;
-
 use move_parse_special_attributes::function_modifiers::FunctionModifier;
 use walrus::{
     FunctionBuilder, FunctionId, LocalId, Module, ValType,
@@ -8,13 +6,11 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    abi_types::packing::{Packable, build_pack_instructions},
+    abi_types::{packing::Packable, unpacking::Unpackable},
     compilation_context::ModuleId,
     hostio::host_functions::{call_contract, read_return_data},
-    translation::{
-        functions::{MappedFunction, add_unpack_function_return_values_instructions},
-        intermediate_types::IntermediateType,
-    },
+    translation::{functions::MappedFunction, intermediate_types::IntermediateType},
+    vm_handled_types::{VmHandledType, contract_call_result::ContractCallResult},
 };
 
 pub fn add_external_contract_call_fn(
@@ -170,6 +166,7 @@ pub fn add_external_contract_call_fn(
 
     let call_result = module.locals.add(ValType::I32);
     let call_result_code_ptr = module.locals.add(ValType::I32);
+    let call_result_value_ptr = module.locals.add(ValType::I32);
 
     // Recreate the CallResult<T>
 
@@ -225,17 +222,76 @@ pub fn add_external_contract_call_fn(
         block
             .i32_const(0)
             .local_get(return_data_len)
-            .call(read_return_data);
+            .call(read_return_data)
+            .drop();
 
-        /*
-        // Unpack function return values
-        add_unpack_function_return_values_instructions(
-            block,
-            module,
-            &.signature.returns,
-            compilation_ctx.memory_id,
+        assert_eq!(
+            1,
+            function_information.signature.returns.len(),
+            "invalid contract call function, it can only return one value"
         );
-        */
+
+        if let IntermediateType::IGenericStructInstance {
+            module_id,
+            index,
+            types,
+            ..
+        } = &function_information.signature.returns[0]
+        {
+            if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx) {
+                println!("----- {types:?}");
+                let calldata_reader_pointer = module.locals.add(ValType::I32);
+
+                block
+                    .local_get(return_data_abi_encoded_ptr)
+                    .local_set(calldata_reader_pointer);
+
+                // Unpack the value
+                types[0].add_unpack_instructions(
+                    block,
+                    module,
+                    return_data_abi_encoded_ptr,
+                    calldata_reader_pointer,
+                    compilation_ctx,
+                );
+
+                let abi_decoded_call_result = module.locals.add(ValType::I32);
+                block.local_set(abi_decoded_call_result);
+
+                // Save the result in the first field of CallResult<>
+                // TODO: Check what happens with stack types
+                block
+                    .i32_const(4)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(call_result_value_ptr)
+                    .local_get(abi_decoded_call_result)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            offset: 0,
+                            align: 0,
+                        },
+                    );
+
+                block
+                    .local_get(call_result)
+                    .local_get(call_result_value_ptr)
+                    .store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            offset: 0,
+                            align: 0,
+                        },
+                    );
+            } else {
+                panic!(
+                    "invalid ContractCallResult type found in function {}",
+                    function_information.function_id
+                );
+            }
+        }
     });
 
     // After the call we read the data
