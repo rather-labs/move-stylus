@@ -29,23 +29,12 @@ pub enum Flow {
     Switch {
         stack: Vec<ValType>,
         cases: Vec<Flow>,
-        default: Box<Flow>,
+        yielding_case: Box<Flow>,
     },
     Empty,
 }
 
 impl Flow {
-    // TODO: revise how we are adding up the stack
-    pub fn get_stack(&self) -> Vec<ValType> {
-        match self {
-            Flow::Simple { stack, next, .. } => [stack.clone(), next.get_stack()].concat(),
-            Flow::Loop { stack, next, .. } => [stack.clone(), next.get_stack()].concat(),
-            Flow::IfElse { stack, .. } => stack.clone(),
-            Flow::Switch { stack, .. } => stack.clone(),
-            Flow::Empty => vec![],
-        }
-    }
-
     pub fn new(code_unit: &CodeUnit, function_information: &MappedFunction) -> Flow {
         // Create the control flow graph from the code unit
         let cfg = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
@@ -243,33 +232,70 @@ impl Flow {
                         }
                     }
                     _ => {
-                        // Get the cases for the switch flow, each being a block from the MultipleBlock.
-                        let cases: Vec<Flow> = multiple_block
+                        // Build all arms
+                        let mut cases: Vec<Flow> = multiple_block
                             .handled
                             .iter()
                             .map(|b| Self::build(&b.inner, blocks_ctx))
                             .collect();
 
-                        let stack = cases
+                        // Assumption 1: all cases are Simple.
+                        // If this is not the case, panic.
+                        // This is useful because we can get the label of the case and use it later on to translate the case.
+                        assert!(
+                            cases.iter().all(|c| matches!(c, Flow::Simple { .. })),
+                            "All cases must be Simple in a Switch flow"
+                        );
+
+                        // Assumption 2: only one or none of the cases pushes something to the stack.
+                        // Why not more than one? If multiple cases push values to the stack,
+                        // Move creates a merge block where those cases converge and where the actual value is pushed to the stack.
+                        let mut yielding = cases
                             .iter()
-                            .find_map(|case| {
-                                let case_stack = case.get_stack();
-                                if case_stack.is_empty() {
-                                    None
-                                } else {
-                                    Some(case_stack)
-                                }
-                            })
-                            .unwrap_or_else(Vec::new); // return empty stack if all cases are empty
+                            .enumerate()
+                            .filter_map(|(i, c)| (!c.get_stack().is_empty()).then_some(i));
+
+                        let yielding_idx = yielding.next();
+                        assert!(
+                            yielding.next().is_none(),
+                            "At most one case may push to the stack in a Switch flow"
+                        );
+
+                        // Separate the single value-producing arm (if any); keep order of the rest
+                        let (yielding_case, stack) = match yielding_idx {
+                            Some(i) => {
+                                let arm = cases.remove(i); // preserves order for remaining cases
+                                let stack = arm.get_stack();
+                                (Box::new(arm), stack)
+                            }
+                            None => (Box::new(Flow::Empty), Vec::new()),
+                        };
 
                         Flow::Switch {
-                            stack,
-                            cases,
-                            default: Box::new(Flow::Empty),
+                            stack,         // overall result stack for the switch
+                            cases,         // non-producing arms
+                            yielding_case, // the single producing arm (if present)
                         }
                     }
                 }
             }
+        }
+    }
+
+    pub fn get_stack(&self) -> Vec<ValType> {
+        match self {
+            Flow::Simple { stack, next, .. } => [stack.clone(), next.get_stack()].concat(),
+            Flow::Loop { stack, next, .. } => [stack.clone(), next.get_stack()].concat(),
+            Flow::IfElse { stack, .. } => stack.clone(),
+            Flow::Switch { stack, .. } => stack.clone(),
+            Flow::Empty => vec![],
+        }
+    }
+
+    pub fn get_label(&self) -> u16 {
+        match self {
+            Flow::Simple { label, .. } => *label,
+            _ => panic!("Only Simple flow has label"),
         }
     }
 }

@@ -156,7 +156,6 @@ pub fn unpack_variant(
     compilation_ctx: &CompilationContext,
     types_stack: &mut TypesStack,
 ) -> Result<(), TranslationError> {
-
     // Here we should unpack the variant fields. On top of the stack we should have the pointer to the variant.
     let pointer = module.locals.add(ValType::I32);
     builder.local_set(pointer);
