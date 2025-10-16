@@ -6,3 +6,6 @@ edition = "2024.beta"
 
 [addresses]
 erc20call = "0x0"
+
+[dependencies]
+StylusFramework = { local = "../stylus-framework/" }

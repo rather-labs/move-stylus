@@ -3,7 +3,7 @@ use std::u64;
 use move_parse_special_attributes::function_modifiers::FunctionModifier;
 use walrus::{
     FunctionBuilder, FunctionId, LocalId, Module, ValType,
-    ir::{LoadKind, MemArg},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use crate::{
@@ -11,7 +11,10 @@ use crate::{
     abi_types::packing::{Packable, build_pack_instructions},
     compilation_context::ModuleId,
     hostio::host_functions::{call_contract, read_return_data},
-    translation::{functions::MappedFunction, intermediate_types::IntermediateType},
+    translation::{
+        functions::{MappedFunction, add_unpack_function_return_values_instructions},
+        intermediate_types::IntermediateType,
+    },
 };
 
 pub fn add_external_contract_call_fn(
@@ -125,6 +128,7 @@ pub fn add_external_contract_call_fn(
     let writer_pointer = module.locals.add(ValType::I32);
     let calldata_reference_pointer = module.locals.add(ValType::I32);
     let calldata_len = module.locals.add(ValType::I32);
+    let call_contract_result = module.locals.add(ValType::I32);
 
     builder
         .i32_const(32)
@@ -161,7 +165,81 @@ pub fn add_external_contract_call_fn(
         .local_get(value)
         .local_get(gas)
         .local_get(return_data_len)
-        .call(call_contract);
+        .call(call_contract)
+        .local_set(call_contract_result);
+
+    let call_result = module.locals.add(ValType::I32);
+    let call_result_code_ptr = module.locals.add(ValType::I32);
+
+    // Recreate the CallResult<T>
+
+    builder
+        .i32_const(8)
+        .call(compilation_ctx.allocator)
+        .local_set(call_result);
+
+    // Save the result in the first field of CallResult<>
+    builder
+        .i32_const(4)
+        .call(compilation_ctx.allocator)
+        .local_tee(call_result_code_ptr)
+        .local_get(call_contract_result)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                offset: 0,
+                align: 0,
+            },
+        );
+
+    builder
+        .local_get(call_result)
+        .local_get(call_result_code_ptr)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                offset: 0,
+                align: 0,
+            },
+        );
+
+    // If the call succeded, we proceed to decode the result
+    builder.block(None, |block| {
+        let block_id = block.id();
+
+        block
+            .local_get(call_contract_result)
+            .i32_const(0)
+            .binop(BinaryOp::I32Ne)
+            .br_if(block_id);
+
+        let return_data_abi_encoded_ptr = module.locals.add(ValType::I32);
+
+        block
+            .local_get(return_data_len)
+            .call(compilation_ctx.allocator)
+            .local_tee(return_data_abi_encoded_ptr);
+
+        block
+            .i32_const(0)
+            .local_get(return_data_len)
+            .call(read_return_data);
+
+        /*
+        // Unpack function return values
+        add_unpack_function_return_values_instructions(
+            block,
+            module,
+            &.signature.returns,
+            compilation_ctx.memory_id,
+        );
+        */
+    });
+
+    // After the call we read the data
+    builder.local_get(call_result);
 
     function.finish(function_args, &mut module.funcs)
 }
