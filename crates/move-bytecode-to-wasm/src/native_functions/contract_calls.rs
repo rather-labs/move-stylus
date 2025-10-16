@@ -239,7 +239,6 @@ pub fn add_external_contract_call_fn(
         } = &function_information.signature.returns[0]
         {
             if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx) {
-                println!("----- {types:?}");
                 let calldata_reader_pointer = module.locals.add(ValType::I32);
 
                 block
@@ -281,7 +280,7 @@ pub fn add_external_contract_call_fn(
                         compilation_ctx.memory_id,
                         StoreKind::I32 { atomic: false },
                         MemArg {
-                            offset: 0,
+                            offset: 4,
                             align: 0,
                         },
                     );
