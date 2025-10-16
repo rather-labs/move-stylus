@@ -27,7 +27,7 @@ use walrus::{
 use relooper::BranchMode;
 
 use move_binary_format::{
-    file_format::{Bytecode, CodeOffset, CodeUnit},
+    file_format::{Bytecode, CodeUnit},
     internals::ModuleIndex,
 };
 
@@ -47,7 +47,6 @@ use crate::{
     runtime::RuntimeFunction,
     vm_handled_types::{self, VmHandledType, named_id::NamedId, uid::Uid},
     wasm_builder_extensions::WasmBuilderExtension,
-    // declare_host_debug_functions,
 };
 
 use flow::Flow;
@@ -66,6 +65,7 @@ use intermediate_types::{
 
 use table::{FunctionId, FunctionTable, TableEntry};
 
+use functions::JumpTableData;
 use types_stack::TypesStack;
 /// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs.
 /// It is used to translate the branching instructions: Branch, BrFalse, BrTrue
@@ -119,8 +119,7 @@ struct TranslateFlowContext<'a> {
     function_locals: &'a Vec<LocalId>,
     uid_locals: &'a mut HashMap<u8, StorageIdParentInformation>,
     branch_targets: &'a mut BranchTargets,
-    match_subject: &'a mut Option<LocalId>,
-    jump_table: &'a mut Option<Vec<CodeOffset>>,
+    jump_table: &'a mut Option<JumpTableData>,
     dynamic_fields_global_variables: &'a mut Vec<(GlobalId, IntermediateType)>,
 }
 
@@ -179,8 +178,7 @@ pub fn translate_function(
         uid_locals: &mut uid_locals,
         types_stack: &mut types_stack,
         branch_targets: &mut branch_targets,
-        match_subject: &mut None, // The match subject (&IEnum)
-        jump_table: &mut None,    // The current jump table we are translating
+        jump_table: &mut None, // The current jump table we are translating
         dynamic_fields_global_variables,
     };
 
@@ -262,7 +260,6 @@ fn translate_flow(
                         ctx.uid_locals,
                         branches,
                         ctx.branch_targets,
-                        ctx.match_subject,
                         ctx.jump_table,
                         ctx.dynamic_fields_global_variables,
                     )
@@ -315,29 +312,34 @@ fn translate_flow(
             let then_stack = then_body.get_stack();
             let else_stack = else_body.get_stack();
 
-            // In cases where the if/else flow corresponds to a two-arm match on an enum, the match subject must be pushed onto the stack first.
-            if let Some(match_subject) = ctx.match_subject {
-                builder.local_get(*match_subject);
-
-                // Get the jump table to order the cases properly.
-                let jump_table = ctx
-                    .jump_table
-                    .take()
-                    .expect("Jump table not found while translating IfElse flow!");
+            // When the if/else flow stems from a two-branch match on an enum, the jump_table will be Some.
+            if ctx.jump_table.is_some() {
+                let offsets = &ctx.jump_table.as_ref().unwrap().offsets;
+                let enum_index = ctx.jump_table.as_ref().unwrap().enum_index;
+                let enum_data = ctx
+                    .module_data
+                    .enums
+                    .get_enum_by_index(enum_index as u16)
+                    .unwrap();
 
                 // The jump_table should have exactly 2 entries in this case.
                 assert_eq!(
-                    jump_table.len(),
+                    offsets.len(),
                     2,
                     "Jump table for IfElse flow should contain exactly 2 elements"
                 );
 
-                // Depending on how the blocks are relooped, we might need to flip the matching condition to account for the order of the cases in the jump table.
-                // This is similar to what we are doing in the Switch flow, but simplified.
-                if jump_table[0] <= jump_table[1] {
-                    builder.unop(UnaryOp::I32Eqz);
-                }
-                *ctx.match_subject = None;
+                // If offset[0] < offset[1], it means the `consequent` block corresponds to the first variant
+                // and the `alternative` block corresponds to the second variant.
+                // In that case the first variant index should match the value on the stack.
+                if offsets[0] <= offsets[1] {
+                    builder.i32_const(enum_data.variants[0].index as i32);
+                } else {
+                    builder.i32_const(enum_data.variants[1].index as i32);
+                };
+                builder.binop(BinaryOp::I32Eq);
+
+                *ctx.jump_table = None;
             }
 
             if then_stack == else_stack {
@@ -430,6 +432,7 @@ fn translate_flow(
                 label_to_block: &mut HashMap<u16, InstrSeqId>,
                 case_index: usize,
             ) {
+                let ty = InstrSeqType::new(&mut module.types, &[ValType::I32], &[]);
                 // All targets created → emit selector and br_table, then return.
                 if case_index == cases.len() {
                     // The jump table is a vector of case labels (i.e. code offsets) in the order they were generated by the Move compiler.
@@ -440,8 +443,8 @@ fn translate_flow(
                         .expect("Jump table not found while translating Switch flow!");
 
                     // Build targets in exact jump-table order
-                    let mut targets = Vec::with_capacity(jump_table.len());
-                    for &label in &jump_table {
+                    let mut targets = Vec::with_capacity(jump_table.offsets.len());
+                    for &label in &jump_table.offsets {
                         let id = *label_to_block
                             .get(&label)
                             .expect("Missing block id for jump-table label");
@@ -450,14 +453,7 @@ fn translate_flow(
                     }
 
                     // Open a block to trap out of range cases
-                    builder.block(None, |trap_block| {
-                        // Push match subject
-                        let match_subject = ctx
-                            .match_subject
-                            .take()
-                            .expect("Match subject not found while translating Switch flow!");
-                        trap_block.local_get(match_subject);
-
+                    builder.block(ty, |trap_block| {
                         // Out-of-range cases go to the trap block
                         trap_block.br_table(targets.into_boxed_slice(), trap_block.id());
                     });
@@ -469,7 +465,7 @@ fn translate_flow(
                 }
 
                 // Open wrapping block for case `i`
-                builder.block(None, |case_block| {
+                builder.block(ty, |case_block| {
                     label_to_block.insert(cases[case_index].get_label(), case_block.id());
 
                     // Keep nesting until all case targets exist
@@ -489,10 +485,11 @@ fn translate_flow(
             }
 
             // Outer join for the switch expression results
-            let switch_stack = InstrSeqType::new(&mut module.types, &[], stack);
+            let switch_stack = InstrSeqType::new(&mut module.types, &[ValType::I32], stack);
             builder.block(switch_stack, |switch| {
+                let case_ty = InstrSeqType::new(&mut module.types, &[ValType::I32], &[]);
                 // Open a block for the yielding case.
-                switch.block(None, |yielding_block| {
+                switch.block(case_ty, |yielding_block| {
                     // Create targets deepest-first by iterating cases in reverse
                     let cases_rev: Vec<&Flow> = cases.iter().rev().collect();
 
@@ -536,8 +533,7 @@ fn translate_instruction(
     uid_locals: &mut HashMap<u8, StorageIdParentInformation>,
     branches: &HashMap<u16, BranchMode>,
     branch_targets: &BranchTargets,
-    match_subject: &mut Option<LocalId>,
-    jump_table: &mut Option<Vec<CodeOffset>>,
+    jump_table: &mut Option<JumpTableData>,
     dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
 ) -> Result<Vec<FunctionId>, TranslationError> {
     let mut functions_calls_to_link = Vec::new();
@@ -2577,7 +2573,6 @@ fn translate_instruction(
             // The match subject (&IEnum) is on top of the stack
             // The first load is to load the enum pointer from the reference
             // The second load is to load the variant index from the enum pointer
-            let match_subject_local = module.locals.add(ValType::I32);
             builder
                 .load(
                     compilation_ctx.memory_id,
@@ -2594,18 +2589,10 @@ fn translate_instruction(
                         align: 0,
                         offset: 0,
                     },
-                )
-                .local_set(match_subject_local);
-
-            // Set the match subject for the current VariantSwitch
-            *match_subject = Some(match_subject_local);
+                );
 
             // Set the jump table for the current VariantSwitch
-            *jump_table = Some(
-                mapped_function.jump_tables[jump_table_index.0 as usize]
-                    .offsets
-                    .clone(),
-            );
+            *jump_table = Some(mapped_function.jump_tables[jump_table_index.0 as usize].clone());
         }
         b => Err(TranslationError::UnsupportedOperation {
             operation: b.clone(),

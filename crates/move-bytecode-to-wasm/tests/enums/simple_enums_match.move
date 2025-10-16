@@ -97,3 +97,86 @@ entry fun nested_match_with_conditional(x: NumberEnum, y: ColorEnum, z: u32): u3
         }
     }
 }
+
+
+// Testing more rare control flow cases
+entry fun control_flow_1(x: NumberEnum, y: ColorEnum): u32 {
+    match (x) {
+        NumberEnum::One => abort(0),
+        NumberEnum::Two => {
+            match (y) {
+                ColorEnum::Red => abort(1),
+                ColorEnum::Green => 33,
+                ColorEnum::Blue => abort(1),
+            }
+        },
+        NumberEnum::Four => 44,
+        _ => {
+            abort(0)
+        },
+    }
+}
+
+// Same as above but all branches abort except one
+entry fun control_flow_1_bis(x: NumberEnum, y: ColorEnum): u32 {
+    match (x) {
+        NumberEnum::One => abort(0),
+        NumberEnum::Two => {
+            match (y) {
+                ColorEnum::Red => abort(1),
+                ColorEnum::Green => 33,
+                ColorEnum::Blue => abort(1),
+            }
+        },
+        NumberEnum::Four => abort(1),
+        _ => {
+            abort(0)
+        },
+    }
+}
+
+entry fun control_flow_2(x: NumberEnum, y: ColorEnum, z: YinYangEnum): u32 {
+    let a = match (x) {
+        NumberEnum::One => abort(0),
+        NumberEnum::Two => {
+            match (y) {
+                ColorEnum::Red => abort(1),
+                ColorEnum::Green => 33,
+                ColorEnum::Blue => abort(1),
+            }
+        },
+        NumberEnum::Four => 44,
+        _ => {
+            abort(0)
+        },
+    };
+    let b = match (z) {
+        YinYangEnum::Yin => 55,
+        YinYangEnum::Yang => 66,
+    };
+    return a + b
+}
+
+entry fun control_flow_2_bis(x: NumberEnum, y: ColorEnum, z: YinYangEnum): u32 {
+    let a = match (x) {
+        NumberEnum::One => abort(0),
+        NumberEnum::Two => {
+            match (y) {
+                ColorEnum::Red => abort(1),
+                ColorEnum::Green => 33,
+                ColorEnum::Blue => abort(1),
+            }
+        },
+        NumberEnum::Four => abort(0),
+        _ => {
+            abort(0)
+        },
+    };
+
+    let b = match (z) {
+        YinYangEnum::Yin => 55,
+        YinYangEnum::Yang => 66,
+    };
+
+    return a + b
+}
