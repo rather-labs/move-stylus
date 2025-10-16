@@ -6,7 +6,7 @@ pub struct Function {
     pub modifiers: Vec<FunctionModifier>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum FunctionModifier {
     External,
     Pure,

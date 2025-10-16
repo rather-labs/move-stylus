@@ -23,3 +23,11 @@ pub struct FunctionData {
     /// The init function of the module.
     pub init: Option<FunctionId>,
 }
+
+impl FunctionData {
+    pub fn get_information_by_identifier(&self, identifier: &str) -> Option<&MappedFunction> {
+        self.information
+            .iter()
+            .find(|f| f.function_id.identifier == identifier)
+    }
+}

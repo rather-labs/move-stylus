@@ -2,6 +2,7 @@
 //!
 //! Native functions in Move are functions directly implemented inside the Move VM. To emulate that
 //! mechanism, we direcly implement them in WASM and limk them into the file.
+mod contract_calls;
 mod dynamic_field;
 mod event;
 pub mod object;
@@ -173,14 +174,29 @@ impl NativeFunction {
                 }
                 _ => {
                     let module_data = compilation_ctx
-                        .get_module_data_by_id(&module_id)
+                        .get_module_data_by_id(module_id)
                         .unwrap_or_else(|_| {
                             panic!("native function {module_id}::{name} not supported yet")
                         });
+
+                    let function_information = module_data
+                        .functions
+                        .get_information_by_identifier(name)
+                        .unwrap_or_else(|| {
+                            panic!("could not find function information for {module_id}::{name}")
+                        });
+
                     if let Some(special_attributes) =
                         module_data.special_attributes.external_calls.get(name)
                     {
-                        todo!("{module_id}::{name}")
+                        contract_calls::add_external_contract_call_fn(
+                            module,
+                            compilation_ctx,
+                            module_id,
+                            function_information,
+                            &special_attributes.modifiers,
+                            false,
+                        )
                     } else {
                         panic!("native function {module_id}::{name} not supported yet")
                     }
