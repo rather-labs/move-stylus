@@ -27,7 +27,7 @@ use walrus::{
 use relooper::BranchMode;
 
 use move_binary_format::{
-    file_format::{Bytecode, CodeUnit},
+    file_format::{Bytecode, CodeOffset, CodeUnit},
     internals::ModuleIndex,
 };
 
@@ -47,6 +47,7 @@ use crate::{
     runtime::RuntimeFunction,
     vm_handled_types::{self, VmHandledType, named_id::NamedId, uid::Uid},
     wasm_builder_extensions::WasmBuilderExtension,
+    // declare_host_debug_functions,
 };
 
 use flow::Flow;
@@ -119,6 +120,7 @@ struct TranslateFlowContext<'a> {
     uid_locals: &'a mut HashMap<u8, StorageIdParentInformation>,
     branch_targets: &'a mut BranchTargets,
     match_subject: &'a mut Option<LocalId>,
+    jump_table: &'a mut Option<Vec<CodeOffset>>,
     dynamic_fields_global_variables: &'a mut Vec<(GlobalId, IntermediateType)>,
 }
 
@@ -161,6 +163,7 @@ pub fn translate_function(
     );
 
     let flow = Flow::new(move_bytecode, function_information);
+    // println!("flow: {:#?}", flow);
 
     let mut branch_targets = BranchTargets::new();
     let mut types_stack = TypesStack::new();
@@ -177,6 +180,7 @@ pub fn translate_function(
         types_stack: &mut types_stack,
         branch_targets: &mut branch_targets,
         match_subject: &mut None, // The match subject (&IEnum)
+        jump_table: &mut None,    // The current jump table we are translating
         dynamic_fields_global_variables,
     };
 
@@ -259,6 +263,7 @@ fn translate_flow(
                         branches,
                         ctx.branch_targets,
                         ctx.match_subject,
+                        ctx.jump_table,
                         ctx.dynamic_fields_global_variables,
                     )
                     .unwrap_or_else(|e| {
@@ -313,7 +318,25 @@ fn translate_flow(
             // In cases where the if/else flow corresponds to a two-arm match on an enum, the match subject must be pushed onto the stack first.
             if let Some(match_subject) = ctx.match_subject {
                 builder.local_get(*match_subject);
-                builder.unop(UnaryOp::I32Eqz); // Flip the match subject to match the order of the cases in the if/else block
+
+                // Get the jump table to order the cases properly.
+                let jump_table = ctx
+                    .jump_table
+                    .take()
+                    .expect("Jump table not found while translating IfElse flow!");
+                
+                // The jump_table should have exactly 2 entries in this case.
+                assert_eq!(
+                    jump_table.len(),
+                    2,
+                    "Jump table for IfElse flow should contain exactly 2 elements"
+                );
+
+                // Depending on how the blocks are relooped, we might need to flip the matching condition to account for the order of the cases in the jump table.
+                // This is similar to what we are doing in the Switch flow, but simplified.
+                if jump_table[0] <= jump_table[1] {
+                    builder.unop(UnaryOp::I32Eqz);
+                }
                 *ctx.match_subject = None;
             }
 
@@ -394,6 +417,7 @@ fn translate_flow(
             cases,
             default,
         } => {
+            // There a special case when only one
             let ty = InstrSeqType::new(&mut module.types, &[], stack);
 
             builder.block(ty, |switch| {
@@ -434,12 +458,30 @@ fn translate_flow(
                                     );
                                     b.local_get(match_subject_local);
 
+                                    // Get the jump table to order the cases properly.
+                                    // In some scenarios, the cases might not be in the same order as they are defined in the enum.
+                                    // This can occur for example when all cases abort except for one.
+                                    let jump_table = ctx.jump_table.take().expect(
+                                        "Jump table not found while translating Switch flow!",
+                                    );
+
                                     // We collected case_ids in nesting order; reverse to match case index order.
                                     case_ids.reverse();
 
+                                    // Create a mapping from jump table order to case index order
+                                    let mut sorted_indices: Vec<usize> =
+                                        (0..case_ids.len()).collect();
+                                    sorted_indices.sort_by_key(|&i| jump_table[i]);
+
+                                    // Reorder case_ids according to the sorted jump table indices
+                                    let mut permuted = Vec::with_capacity(case_ids.len());
+                                    for &idx in &sorted_indices {
+                                        permuted.push(case_ids[idx].clone());
+                                    }
+
                                     // Branch by index to case targets, or to `default_id` if out of range.
                                     b.br_table(
-                                        case_ids.clone().into_boxed_slice(),
+                                        permuted.into_boxed_slice(), // here we should use the jump table order of the cases!
                                         self.default_id,
                                     );
                                     return;
@@ -501,6 +543,7 @@ fn translate_instruction(
     branches: &HashMap<u16, BranchMode>,
     branch_targets: &BranchTargets,
     match_subject: &mut Option<LocalId>,
+    jump_table: &mut Option<Vec<CodeOffset>>,
     dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
 ) -> Result<Vec<FunctionId>, TranslationError> {
     let mut functions_calls_to_link = Vec::new();
@@ -2475,13 +2518,13 @@ fn translate_instruction(
         //**
         Bytecode::PackVariant(index) => {
             let enum_ = module_data.enums.get_enum_by_variant_handle_idx(index)?;
-            let index_inside_enum = module_data
+            let variant_index = module_data
                 .enums
                 .get_variant_position_by_variant_handle_idx(index)?;
 
             bytecodes::enums::pack_variant(
                 enum_,
-                index_inside_enum,
+                variant_index,
                 module,
                 builder,
                 compilation_ctx,
@@ -2492,30 +2535,51 @@ fn translate_instruction(
         }
         Bytecode::UnpackVariant(index) => {
             let enum_ = module_data.enums.get_enum_by_variant_handle_idx(index)?;
-            types_stack.pop_expecting(&IntermediateType::IEnum(enum_.index))?;
-
-            let index_inside_enum = module_data
+            let variant_index = module_data
                 .enums
                 .get_variant_position_by_variant_handle_idx(index)?;
-            let variant = &enum_.variants[index_inside_enum as usize];
 
-            bytecodes::enums::unpack_variant(variant, module, builder, compilation_ctx)?;
+            types_stack.pop_expecting(&IntermediateType::IEnum(enum_.index))?;
 
-            // Push the variant fields to the types stack
-            for field in &variant.fields {
-                types_stack.push(field.clone());
-            }
+            bytecodes::enums::unpack_variant(
+                enum_,
+                variant_index,
+                module,
+                builder,
+                compilation_ctx,
+                types_stack,
+            )?;
         }
         Bytecode::UnpackVariantImmRef(index) => {
             let enum_ = module_data.enums.get_enum_by_variant_handle_idx(index)?;
+            let variant_index = module_data
+                .enums
+                .get_variant_position_by_variant_handle_idx(index)?;
+
             types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
                 IntermediateType::IEnum(enum_.index),
             )))?;
 
-            let tmp = module.locals.add(ValType::I32);
-            builder.local_set(tmp);
+            // Load the reference to the enum variant and then add unpack_variant instructions
+            builder.load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+
+            bytecodes::enums::unpack_variant(
+                enum_,
+                variant_index,
+                module,
+                builder,
+                compilation_ctx,
+                types_stack,
+            )?;
         }
-        Bytecode::VariantSwitch(_) => {
+        Bytecode::VariantSwitch(jump_table_index) => {
             // The match subject (&IEnum) is on top of the stack
             // The first load is to load the enum pointer from the reference
             // The second load is to load the variant index from the enum pointer
@@ -2539,7 +2603,15 @@ fn translate_instruction(
                 )
                 .local_set(match_subject_local);
 
+            // Set the match subject for the current VariantSwitch
             *match_subject = Some(match_subject_local);
+
+            // Set the jump table for the current VariantSwitch
+            *jump_table = Some(
+                mapped_function.jump_tables[jump_table_index.0 as usize]
+                    .offsets
+                    .clone(),
+            );
         }
         b => Err(TranslationError::UnsupportedOperation {
             operation: b.clone(),
