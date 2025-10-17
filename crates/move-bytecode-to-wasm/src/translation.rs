@@ -18,10 +18,7 @@ use anyhow::Result;
 use walrus::{
     FunctionBuilder, FunctionId as WasmFunctionId, GlobalId, InstrSeqBuilder, LocalId, Module,
     TableId, ValType,
-    ir::{
-        BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, StoreKind, UnaryOp,
-        Value,
-    },
+    ir::{BinaryOp, InstrSeqId, InstrSeqType, LoadKind, MemArg, StoreKind, UnaryOp, Value},
 };
 
 use relooper::BranchMode;
@@ -334,9 +331,6 @@ fn translate_flow(
             else_body,
             ..
         } => {
-            let then_stack = then_body.get_stack();
-            let else_stack = else_body.get_stack();
-
             // When the if/else flow stems from a two-branch match on an enum, the jump_table will be Some.
             if ctx.jump_table.is_some() {
                 let offsets = &ctx.jump_table.as_ref().unwrap().offsets;
@@ -367,75 +361,60 @@ fn translate_flow(
                 *ctx.jump_table = None;
             }
 
-            if then_stack == else_stack {
-                let ty = InstrSeqType::new(&mut module.types, &[], &then_stack);
-                let then_id = {
-                    let mut then_seq = builder.dangling_instr_seq(ty);
-                    translate_flow(ctx, &mut then_seq, module, then_body, functions_to_link);
-                    then_seq.id()
-                };
+            let condition = module.locals.add(ValType::I32);
+            builder.local_set(condition);
 
-                let else_id = {
-                    let mut else_seq = builder.dangling_instr_seq(ty);
-                    translate_flow(ctx, &mut else_seq, module, else_body, functions_to_link);
-                    else_seq.id()
-                };
+            let then_ty = then_body.get_stack(); // node result types (not including `next`)
+            let else_ty = else_body.get_stack();
 
-                builder.if_else(
-                    ty,
-                    |then| {
-                        then.instr(Block { seq: then_id });
-                    },
-                    |else_| {
-                        else_.instr(Block { seq: else_id });
-                    },
-                );
-            } else if then_stack.is_empty() {
-                // If the `then` arm leaves nothing on the stack but the `else` arm does,
-                // we place the `else` arm after the if/else block.
-                // This situation typically occurs when the arm leaving values on the stack
-                // represents a function return, while the other arm simply reloops.
-                // The else arm can be safely placed outside the if/else block because it must always be reached,
-                // otherwise the block wouldnt have a defined result.
-                let phantom_seq = builder.dangling_instr_seq(None);
-                let phantom_seq_id = phantom_seq.id();
+            if then_ty == else_ty {
+                // CASE 1: both arms have the same result type (often empty)
+                let join_ty = InstrSeqType::new(&mut module.types, &[], &then_ty);
 
-                let then_id = {
-                    let mut then_seq = builder.dangling_instr_seq(None);
-                    translate_flow(ctx, &mut then_seq, module, then_body, functions_to_link);
-                    then_seq.id()
-                };
-
-                builder.instr(IfElse {
-                    consequent: then_id,
-                    alternative: phantom_seq_id,
+                builder.block(join_ty, |join| {
+                    let join_id = join.id();
+                    join.block(None::<ValType>, |guard| {
+                        guard.local_get(condition);
+                        guard.br_if(guard.id()); // true => leave guard => THEN outside
+                        // ELSE (inside guard)
+                        translate_flow(ctx, guard, module, else_body, functions_to_link);
+                        guard.br(join_id); // reconverge
+                    });
+                    // THEN (after guard)
+                    translate_flow(ctx, join, module, then_body, functions_to_link);
                 });
+            } else if !then_ty.is_empty() && else_ty.is_empty() {
+                // CASE 2: ONLY THEN yields values; ELSE is empty
+                let join_ty = InstrSeqType::new(&mut module.types, &[], &then_ty);
 
-                translate_flow(ctx, builder, module, else_body, functions_to_link);
-            } else if else_stack.is_empty() {
-                // Similar to the above scenario.
-                let phantom_seq = builder.dangling_instr_seq(None);
-                let phantom_seq_id = phantom_seq.id();
-
-                let else_id = {
-                    let mut else_seq = builder.dangling_instr_seq(None);
-                    translate_flow(ctx, &mut else_seq, module, else_body, functions_to_link);
-                    else_seq.id()
-                };
-
-                builder.unop(UnaryOp::I32Eqz);
-                builder.instr(IfElse {
-                    consequent: else_id,
-                    alternative: phantom_seq_id,
+                builder.block(join_ty, |join| {
+                    join.block(None::<ValType>, |guard| {
+                        guard.local_get(condition);
+                        guard.br_if(guard.id()); // true => THEN after guard
+                        // ELSE (no result) inside guard
+                        translate_flow(ctx, guard, module, else_body, functions_to_link);
+                    });
+                    // THEN (produces join result) after guard
+                    translate_flow(ctx, join, module, then_body, functions_to_link);
                 });
+            } else if then_ty.is_empty() && !else_ty.is_empty() {
+                // CASE 3: ONLY ELSE yields values; THEN is empty
+                let join_ty = InstrSeqType::new(&mut module.types, &[], &else_ty);
 
-                translate_flow(ctx, builder, module, then_body, functions_to_link);
+                builder.block(join_ty, |join| {
+                    join.block(None::<ValType>, |guard| {
+                        guard.local_get(condition);
+                        guard.unop(UnaryOp::I32Eqz); // flip so true => ELSE
+                        guard.br_if(guard.id()); // cond==false => leave guard => ELSE after
+                        // THEN (no result) inside guard
+                        translate_flow(ctx, guard, module, then_body, functions_to_link);
+                    });
+                    // ELSE (produces join result) after guard
+                    translate_flow(ctx, join, module, else_body, functions_to_link);
+                });
             } else {
-                // If both arms leave values on the stack but with different types, we panic.
-                // In this scenario, the block wouldnt have a well-defined result type.
-                panic!(
-                    "Error: Mismatched types on the stack from Then and Else branches, and neither is empty."
-                );
+                // Both arms yield but with different types → no valid Wasm join
+                panic!("IfElse result mismatch: then={then_ty:?}, else={else_ty:?}");
             }
         }
         Flow::Switch {

@@ -138,68 +138,7 @@ impl Flow {
                 // Based on observations, these multiple blocks typically have 1 or 2 handled blocks (branches).
                 // For instance, a Move function with a multi-branch match statement is transformed into nested multiple blocks.
                 // Alternatively, multiple blocks with a single branch can occur when there is no else condition --> while (true) { if (condition) { break } }
-
                 // Enums add complexity, introducing multiple blocks with more than two branches, typically due to match statements.
-                //
-                // Take the following example:
-                //
-                // public enum SimpleEnum has drop {
-                //     One,
-                //     Two,
-                //     Three,
-                // }
-                //
-                // public fun unpack_simple_enum(x: SimpleEnum) {
-                //     match (x) {
-                //         SimpleEnum::One => {
-                //             // Handle the One variant here
-                //         },
-                //         SimpleEnum::Two => {
-                //             // Handle the Two variant here
-                //         },
-                //         SimpleEnum::Three => {
-                //             // Handle the Three variant here
-                //         }
-                //     };
-                // }
-                //
-                // Generates this MultipleBlock after being relooped:
-                //
-                // MultipleBlock {
-                //     handled: [
-                //         HandledBlock {
-                //             labels: [6],
-                //             inner: Simple(SimpleBlock {
-                //                 label: 6,
-                //                 immediate: None,
-                //                 branches: {20: MergedBranch},
-                //                 next: None
-                //             }),
-                //             break_after: true
-                //         },
-                //         HandledBlock {
-                //             labels: [11],
-                //             inner: Simple(SimpleBlock {
-                //                 label: 11,
-                //                 immediate: None,
-                //                 branches: {20: MergedBranch},
-                //                 next: None
-                //             }),
-                //             break_after: true
-                //         },
-                //         HandledBlock {
-                //             labels: [16],
-                //             inner: Simple(SimpleBlock {
-                //                 label: 16,
-                //                 immediate: None,
-                //                 branches: {20: MergedBranch},
-                //                 next: None
-                //             }),
-                //             break_after: true
-                //         }
-                //     ]
-                // }
-
                 match multiple_block.handled.len() {
                     // If there is a single branch, then instead of creating an if/else flow with an empty arm, we just build the flow from the only handled block.
                     1 => Self::build(&multiple_block.handled[0].inner, blocks_ctx),
