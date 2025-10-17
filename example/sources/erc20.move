@@ -230,7 +230,6 @@ entry fun allowance(
         );
 
         *owner_allowance.borrow(spender)
-
     } else {
         0
     }

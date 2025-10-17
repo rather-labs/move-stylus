@@ -72,17 +72,20 @@ async fn main() -> eyre::Result<()> {
     let pending_tx = provider.send_transaction(tx).await?;
     pending_tx.get_receipt().await?;
 
+
     println!("====================");
     println!("Creating a new erc20");
     println!("====================");
     let _pending_tx_ = example.constructor().send().await?;
     println!("Created!");
 
+    let res = example.allowance(sender, address!("0x2990cc9bf7ff7ebb9dd107bf253256f339379f0c")).call().await?;
+    println!("  Current allowance = {}", res);
+
     println!("\n====================");
     println!("  Contract Info");
     println!("====================");
 
-    println!("AAAAAAAAAA {:?}", example.totalSupply().calldata());
     let res = example.totalSupply().call().await?;
     println!("Total Supply = {}", res);
 
@@ -99,7 +102,6 @@ async fn main() -> eyre::Result<()> {
     println!("  Mint");
     println!("====================");
 
-    println!("AAAAAAAAAA {:?}", example.balanceOf(sender).calldata());
     let res = example.balanceOf(sender).call().await?;
     println!("Balance of target address = {}", res);
 

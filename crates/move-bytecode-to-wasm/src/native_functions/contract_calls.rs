@@ -31,9 +31,7 @@ pub fn add_external_contract_call_fn(
         function_information.function_id.identifier
     );
 
-    let (emit_log_function, _) = crate::hostio::host_functions::emit_log(module);
-    println!("Processing {name}");
-
+    // let (emit_log_function, _) = crate::hostio::host_functions::emit_log(module);
     if let Some(function_id) = module.funcs.by_name(&name) {
         return function_id;
     }
@@ -186,12 +184,6 @@ pub fn add_external_contract_call_fn(
         .binop(BinaryOp::I32Sub)
         .local_set(calldata_len);
 
-    builder
-        .local_get(calldata_start)
-        .local_get(calldata_len)
-        .i32_const(0)
-        .call(emit_log_function);
-
     let call_contract_result = module.locals.add(ValType::I32);
     let return_data_len = module.locals.add(ValType::I32);
     builder
@@ -222,24 +214,10 @@ pub fn add_external_contract_call_fn(
             .local_set(call_contract_result);
     }
 
-    builder
-        .local_get(return_data_len)
-        .i32_const(4)
-        .i32_const(0)
-        .call(emit_log_function);
-
-    builder
-        .local_get(address_ptr)
-        .i32_const(20)
-        .i32_const(0)
-        .call(emit_log_function);
-
     let call_result = module.locals.add(ValType::I32);
     let call_result_code_ptr = module.locals.add(ValType::I32);
-    let call_result_value_ptr = module.locals.add(ValType::I32);
 
     // Recreate the CallResult<T>
-
     builder
         .i32_const(8)
         .call(compilation_ctx.allocator)
@@ -259,12 +237,6 @@ pub fn add_external_contract_call_fn(
                 align: 0,
             },
         );
-
-    builder
-        .local_get(call_result_code_ptr)
-        .i32_const(4)
-        .i32_const(0)
-        .call(emit_log_function);
 
     builder
         .local_get(call_result)
@@ -291,18 +263,6 @@ pub fn add_external_contract_call_fn(
 
         let return_data_abi_encoded_ptr = module.locals.add(ValType::I32);
 
-        block
-            .i32_const(0)
-            .i32_const(10)
-            .i32_const(0)
-            .call(emit_log_function);
-
-        block
-            .i32_const(0)
-            .i32_const(10)
-            .i32_const(0)
-            .call(emit_log_function);
-
         // Return data len is in big endian, we read it and change endianess
         block
             .local_get(return_data_len)
@@ -325,13 +285,7 @@ pub fn add_external_contract_call_fn(
             .i32_const(0)
             .local_get(return_data_len)
             .call(read_return_data)
-            .local_set(return_data_len); // TODO: Check this
-
-        block
-            .local_get(return_data_abi_encoded_ptr)
-            .local_get(return_data_len)
-            .i32_const(0)
-            .call(emit_log_function);
+            .local_set(return_data_len);
 
         assert_eq!(
             1,
@@ -353,8 +307,10 @@ pub fn add_external_contract_call_fn(
                     .local_get(return_data_abi_encoded_ptr)
                     .local_set(calldata_reader_pointer);
 
+                let result_type = &types[0];
+
                 // Unpack the value
-                types[0].add_unpack_instructions(
+                result_type.add_unpack_instructions(
                     block,
                     module,
                     return_data_abi_encoded_ptr,
@@ -362,43 +318,48 @@ pub fn add_external_contract_call_fn(
                     compilation_ctx,
                 );
 
-                let abi_decoded_call_result = module.locals.add(ValType::I32);
+                let abi_decoded_call_result = if result_type == &IntermediateType::IU64 {
+                    module.locals.add(ValType::I64)
+                } else {
+                    module.locals.add(ValType::I32)
+                };
+
                 block.local_set(abi_decoded_call_result);
 
-                block
-                    .local_get(abi_decoded_call_result)
-                    .i32_const(32)
-                    .i32_const(0)
-                    .call(emit_log_function);
+                // If the return type is a stack type, we need to create the intermediate pointer
+                // for the struct field, otherwise it is already a pointer, we write it directly
+                let data_ptr = if result_type.is_stack_type() {
+                    let call_result_value_ptr = module.locals.add(ValType::I32);
+                    block
+                        .i32_const(4)
+                        .call(compilation_ctx.allocator)
+                        .local_tee(call_result_value_ptr)
+                        .local_get(abi_decoded_call_result)
+                        .store(
+                            compilation_ctx.memory_id,
+                            if result_type == &IntermediateType::IU64 {
+                                StoreKind::I64 { atomic: false }
+                            } else {
+                                StoreKind::I32 { atomic: false }
+                            },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
+                        );
+                    call_result_value_ptr
+                } else {
+                    abi_decoded_call_result
+                };
 
-                // TODO: Check what happens with stack types
-                /*
-                block
-                    .i32_const(4)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(call_result_value_ptr)
-                    .local_get(abi_decoded_call_result)
-                    .store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-                */
-
-                block
-                    .local_get(call_result)
-                    .local_get(abi_decoded_call_result)
-                    .store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 4,
-                        },
-                    );
+                block.local_get(call_result).local_get(data_ptr).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 4,
+                    },
+                );
             } else {
                 panic!(
                     "invalid ContractCallResult type found in function {}",
@@ -407,26 +368,6 @@ pub fn add_external_contract_call_fn(
             }
         }
     });
-
-    builder
-        .local_get(call_result)
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_function);
-
-    builder
-        .local_get(call_result)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 4,
-            },
-        )
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_function);
 
     // After the call we read the data
     builder.local_get(call_result);
