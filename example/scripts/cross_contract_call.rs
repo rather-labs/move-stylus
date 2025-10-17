@@ -1,4 +1,4 @@
-use alloy::hex;
+use alloy::primitives::address;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
@@ -41,6 +41,8 @@ let contract_address_erc20 = Address::from_str(&contract_address_erc20)?;
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
+    let address_2 = address!("0xcafecafecafecafecafecafecafecafecafecafe");
+
     /*
     let res = example.balanceOfErc20(contract_address_erc20, sender).gas(1_000_000_000_000u64).estimate_gas().await;
     if let Err(err) = res {
@@ -58,6 +60,13 @@ let contract_address_erc20 = Address::from_str(&contract_address_erc20)?;
     let res = example.totalSupply(contract_address_erc20).call().await;
     println!("Total Supply = {res:?}");
 
+    let res = example.balanceOfErc20(contract_address_erc20, sender).call().await;
+    println!("Balance of {sender} = {res:?}");
+
+    let res = example.balanceOfErc20(contract_address_erc20, address_2).call().await;
+    println!("Balance of {address_2} = {res:?}");
+
+
 let pending_tx = example.totalSupply(contract_address_erc20)
         .send().await?;
     let receipt = pending_tx.get_receipt().await?;
@@ -66,7 +75,7 @@ let pending_tx = example.totalSupply(contract_address_erc20)
         println!("Log {:?}", raw.bytes());
         println!("Log 2 {:?}",  alloy::hex::encode(&raw));
     }
-    println!("{receipt:?}");
+    // println!("{receipt:?}");
 
     // println!("{:?}", example.balanceOfErc20(contract_address_erc20, sender));
     /*

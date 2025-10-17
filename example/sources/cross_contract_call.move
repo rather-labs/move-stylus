@@ -11,5 +11,7 @@ entry fun balance_of_erc20(erc20_address: address, balance_address: address): u2
 entry fun total_supply(erc20_address: address): u256 {
     let erc20 = new(erc20_address, false);
 
-    erc20.total_supply().get_result()
+    let res = erc20.total_supply().get_result();
+    res
+
 }

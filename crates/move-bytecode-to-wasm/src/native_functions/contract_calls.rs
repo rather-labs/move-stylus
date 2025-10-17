@@ -317,12 +317,6 @@ pub fn add_external_contract_call_fn(
             .local_set(return_data_len);
 
         block
-            .local_get(return_data_abi_encoded_ptr)
-            .local_get(return_data_len)
-            .i32_const(0)
-            .call(emit_log_function);
-
-        block
             .local_get(return_data_len)
             .call(compilation_ctx.allocator)
             .local_tee(return_data_abi_encoded_ptr);
@@ -332,6 +326,7 @@ pub fn add_external_contract_call_fn(
             .local_get(return_data_len)
             .call(read_return_data)
             .local_set(return_data_len); // TODO: Check this
+
         block
             .local_get(return_data_abi_encoded_ptr)
             .local_get(return_data_len)
@@ -370,8 +365,14 @@ pub fn add_external_contract_call_fn(
                 let abi_decoded_call_result = module.locals.add(ValType::I32);
                 block.local_set(abi_decoded_call_result);
 
-                // Save the result in the first field of CallResult<>
+                block
+                    .local_get(abi_decoded_call_result)
+                    .i32_const(32)
+                    .i32_const(0)
+                    .call(emit_log_function);
+
                 // TODO: Check what happens with stack types
+                /*
                 block
                     .i32_const(4)
                     .call(compilation_ctx.allocator)
@@ -381,20 +382,21 @@ pub fn add_external_contract_call_fn(
                         compilation_ctx.memory_id,
                         StoreKind::I32 { atomic: false },
                         MemArg {
-                            offset: 0,
                             align: 0,
+                            offset: 0,
                         },
                     );
+                */
 
                 block
                     .local_get(call_result)
-                    .local_get(call_result_value_ptr)
+                    .local_get(abi_decoded_call_result)
                     .store(
                         compilation_ctx.memory_id,
                         StoreKind::I32 { atomic: false },
                         MemArg {
-                            offset: 4,
                             align: 0,
+                            offset: 4,
                         },
                     );
             } else {
@@ -405,6 +407,26 @@ pub fn add_external_contract_call_fn(
             }
         }
     });
+
+    builder
+        .local_get(call_result)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_function);
+
+    builder
+        .local_get(call_result)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 4,
+            },
+        )
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_function);
 
     // After the call we read the data
     builder.local_get(call_result);
