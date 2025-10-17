@@ -163,34 +163,34 @@ mod enums_control_flow {
     }
 
     sol! {
-            enum NumberEnum {
-                One,
-                Two,
-                Three,
-                Four,
-                Five,
-            }
-
-            enum ColorEnum {
-                Red,
-                Green,
-                Blue,
-            }
-
-            enum YinYangEnum {
-                Yin,
-                Yang,
-            }
-
-            function matchNumberEnum(NumberEnum x) external returns (uint32);
-            function matchNestedEnum(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
-            function matchWithConditional(NumberEnum x, uint32 y) external returns (uint32);
-            function nestedMatchWithConditional(NumberEnum x, ColorEnum y, uint32 z) external returns (uint32);
-            function controlFlow1(NumberEnum x, ColorEnum y) external returns (uint32);
-            function controlFlow1Bis(NumberEnum x, ColorEnum y) external returns (uint32);
-            function controlFlow2(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
-            function controlFlow2Bis(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
+        enum NumberEnum {
+            One,
+            Two,
+            Three,
+            Four,
+            Five,
         }
+
+        enum ColorEnum {
+            Red,
+            Green,
+            Blue,
+        }
+
+        enum YinYangEnum {
+            Yin,
+            Yang,
+        }
+
+        function matchNumberEnum(NumberEnum x) external returns (uint32);
+        function matchNestedEnum(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
+        function matchWithConditional(NumberEnum x, uint32 y) external returns (uint32);
+        function nestedMatchWithConditional(NumberEnum x, ColorEnum y, uint32 z) external returns (uint32);
+        function controlFlow1(NumberEnum x, ColorEnum y) external returns (uint32);
+        function controlFlow1Bis(NumberEnum x, ColorEnum y) external returns (uint32);
+        function controlFlow2(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
+        function controlFlow2Bis(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
+    }
 
     #[rstest]
     #[case(NumberEnum::One, 11)]

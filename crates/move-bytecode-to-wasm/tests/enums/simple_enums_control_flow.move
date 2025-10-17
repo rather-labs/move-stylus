@@ -1,4 +1,4 @@
-module 0x00::simple_enums_match;
+module 0x00::simple_enums_control_flow;
 
 // This module defines simple enums without any fields and includes functions for matching on these enums.
 
@@ -145,7 +145,7 @@ entry fun control_flow_2(x: NumberEnum, y: ColorEnum, z: YinYangEnum): u32 {
                 ColorEnum::Blue => abort(1),
             }
         },
-        NumberEnum::Four => 44,
+        NumberEnum::Four => 22,
         _ => {
             abort(0)
         },
@@ -174,7 +174,7 @@ entry fun control_flow_2_bis(x: NumberEnum, y: ColorEnum, z: YinYangEnum): u32 {
     };
 
     let b = match (z) {
-        YinYangEnum::Yin => 55,
+        YinYangEnum::Yin => abort(1),
         YinYangEnum::Yang => 66,
     };
 

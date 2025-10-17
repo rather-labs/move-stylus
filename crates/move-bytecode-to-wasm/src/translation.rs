@@ -67,37 +67,89 @@ use table::{FunctionId, FunctionTable, TableEntry};
 
 use functions::JumpTableData;
 use types_stack::TypesStack;
-/// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs.
-/// It is used to translate the branching instructions: Branch, BrFalse, BrTrue
-struct BranchTargets {
-    loop_continue: HashMap<u16, InstrSeqId>,
-    loop_break: HashMap<u16, InstrSeqId>,
-    merged_branch: HashMap<u16, InstrSeqId>,
+
+#[derive(Copy, Clone)]
+struct SimpleScope {
+    simple_block_id: InstrSeqId,
+    next_label: Option<u16>, // next == Some(label) if next is Simple
 }
 
-impl BranchTargets {
-    fn new() -> Self {
+#[derive(Default)]
+pub struct ControlTargets {
+    // Loop control targets
+    loop_continue: HashMap<u16, InstrSeqId>,
+    loop_break: HashMap<u16, InstrSeqId>,
+    // Ancestor stack of enclosing Simples for MergedBranch resolution
+    simple_scopes: Vec<SimpleScope>,
+}
+
+impl ControlTargets {
+    pub fn new() -> Self {
         Self {
             loop_continue: HashMap::new(),
             loop_break: HashMap::new(),
-            merged_branch: HashMap::new(),
+            simple_scopes: Vec::new(),
         }
     }
 
-    fn get_target(&self, branch_mode: &BranchMode, code_offset: &u16) -> Option<&InstrSeqId> {
-        match branch_mode {
-            BranchMode::LoopContinue(id) | BranchMode::LoopContinueIntoMulti(id) => {
-                self.loop_continue.get(id)
+    /* ---------- Simple scopes (for MergedBranch) ---------- */
+
+    /// Call when you open the wrapping block of a `Flow::Simple`.
+    pub fn push_simple_scope(&mut self, simple_block_id: InstrSeqId, next_label: Option<u16>) {
+        self.simple_scopes.push(SimpleScope {
+            simple_block_id,
+            next_label,
+        });
+    }
+
+    /// Call right before you close that wrapping block.
+    pub fn pop_simple_scope(&mut self) {
+        self.simple_scopes.pop();
+    }
+
+    /// Implement the “walk up to nearest Simple whose next == label” rule.
+    fn resolve_merged(&self, target_label: u16) -> Option<InstrSeqId> {
+        for scope in self.simple_scopes.iter().rev() {
+            if scope.next_label == Some(target_label) {
+                return Some(scope.simple_block_id);
             }
-            BranchMode::LoopBreak(id) | BranchMode::LoopBreakIntoMulti(id) => {
-                self.loop_break.get(id)
-            }
+        }
+        None
+    }
+
+    /* ---------- Loop scopes ---------- */
+
+    /// Call when you open `block { loop { ... } }` for a given `loop_id`.
+    pub fn set_loop_targets(
+        &mut self,
+        loop_id: u16,
+        break_target: InstrSeqId,
+        continue_target: InstrSeqId,
+    ) {
+        self.loop_break.insert(loop_id, break_target);
+        self.loop_continue.insert(loop_id, continue_target);
+    }
+
+    /// Optional: call when leaving the loop scope (not strictly necessary if loop_ids are unique).
+    pub fn clear_loop_targets(&mut self, loop_id: u16) {
+        self.loop_break.remove(&loop_id);
+        self.loop_continue.remove(&loop_id);
+    }
+
+    /* ---------- Unified branch resolver ---------- */
+
+    pub fn resolve(&self, mode: BranchMode, label: u16) -> Option<InstrSeqId> {
+        match mode {
             BranchMode::MergedBranch | BranchMode::MergedBranchIntoMulti => {
-                self.merged_branch.get(code_offset)
+                self.resolve_merged(label)
             }
-            _ => {
-                panic!("Unsupported branch mode: {:?}", branch_mode);
+            BranchMode::LoopBreak(loop_id) | BranchMode::LoopBreakIntoMulti(loop_id) => {
+                self.loop_break.get(&loop_id).copied()
             }
+            BranchMode::LoopContinue(loop_id) | BranchMode::LoopContinueIntoMulti(loop_id) => {
+                self.loop_continue.get(&loop_id).copied()
+            }
+            _ => panic!("Unsupported branch mode: {mode:?}"),
         }
     }
 }
@@ -118,7 +170,7 @@ struct TranslateFlowContext<'a> {
     function_table: &'a mut FunctionTable,
     function_locals: &'a Vec<LocalId>,
     uid_locals: &'a mut HashMap<u8, StorageIdParentInformation>,
-    branch_targets: &'a mut BranchTargets,
+    control_targets: &'a mut ControlTargets,
     jump_table: &'a mut Option<JumpTableData>,
     dynamic_fields_global_variables: &'a mut Vec<(GlobalId, IntermediateType)>,
 }
@@ -162,11 +214,12 @@ pub fn translate_function(
     );
 
     let flow = Flow::new(move_bytecode, function_information);
+    println!("flow: {:#?}", flow);
 
-    let mut branch_targets = BranchTargets::new();
     let mut types_stack = TypesStack::new();
     let mut functions_to_link = HashSet::new();
     let mut uid_locals: HashMap<u8, StorageIdParentInformation> = HashMap::new();
+    let mut control_targets = ControlTargets::new();
 
     let mut ctx = TranslateFlowContext {
         compilation_ctx,
@@ -176,7 +229,7 @@ pub fn translate_function(
         function_locals: &function_locals,
         uid_locals: &mut uid_locals,
         types_stack: &mut types_stack,
-        branch_targets: &mut branch_targets,
+        control_targets: &mut control_targets,
         jump_table: &mut None, // The current jump table we are translating
         dynamic_fields_global_variables,
     };
@@ -215,52 +268,23 @@ fn translate_flow(
             let ty = InstrSeqType::new(&mut module.types, &[], stack);
 
             builder.block(ty, |block| {
-                // When 'immediate' is a switch or if-else flow and 'next' is a simple flow,
-                // that next simple flow serves as the merging point for the control flow branches.
-                // To support this, we map the label of the 'next' simple flow to the current block's id in the merged_branch map.
-                // As a result, when a Branch targeting that label occurs, control jumps to the end of the current block,
-                // effectively reaching the merge point after the switch or if-else.
-                // Note that the immediate flow is translated within this block!
-                if matches!(&**immediate, Flow::Switch { .. } | Flow::IfElse { .. }) {
-                    if let Flow::Simple { label, .. } = &**next {
-                        ctx.branch_targets
-                            .merged_branch
-                            .entry(*label)
-                            .or_insert(block.id());
-                    }
-                }
-
-                // Otherwise, check if this simple block contains branches that target a merged branch.
-                // For any such branch, ensure the merged_branch map includes an entry for the target label,
-                // inserting the current block id as the value if it's not already present.
-                for (target_label, branch_mode) in branches {
-                    if let BranchMode::MergedBranch | BranchMode::MergedBranchIntoMulti =
-                        branch_mode
-                    {
-                        ctx.branch_targets
-                            .merged_branch
-                            .entry(*target_label)
-                            .or_insert(block.id());
-                    }
-                }
+                // Add the simple scope to the control targets.
+                let next_label = if let Flow::Simple { label, .. } = &**next {
+                    Some(*label)
+                } else {
+                    None
+                };
+                ctx.control_targets
+                    .push_simple_scope(block.id(), next_label);
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
                     let mut fns_to_link = translate_instruction(
                         instruction,
-                        ctx.compilation_ctx,
-                        ctx.module_data,
+                        ctx,
                         block,
-                        ctx.function_information,
                         module,
-                        ctx.function_table,
-                        ctx.types_stack,
-                        ctx.function_locals,
-                        ctx.uid_locals,
                         branches,
-                        ctx.branch_targets,
-                        ctx.jump_table,
-                        ctx.dynamic_fields_global_variables,
                     )
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
@@ -270,6 +294,9 @@ fn translate_flow(
                 }
                 // Then translate instructions of the immediate block, inside the current block
                 translate_flow(ctx, block, module, immediate, functions_to_link);
+
+                // Done with this Simple's inner region. Pop the simple scope.
+                ctx.control_targets.pop_simple_scope();
             });
             // Then translate instructions of the next block, but outside the wrapping block
             translate_flow(ctx, builder, module, next, functions_to_link);
@@ -285,18 +312,17 @@ fn translate_flow(
             // We wrap the loop in a block so we have a "landing spot" if we need to break out of it
             // (in case we encounter a BranchMode::LoopBreak).
             builder.block(ty, |block| {
-                // Map the Relooper's loop id to the Walrus instruction sequence ID
-                // Walrus needs the specific InstrSeqId where to branch to.
-                ctx.branch_targets.loop_break.insert(*loop_id, block.id());
-
+                let block_id = block.id();
                 block.loop_(ty, |loop_| {
-                    // Map the loop_id to the actual loop instruction, so `continue` knows where to jump.
-                    ctx.branch_targets
-                        .loop_continue
-                        .insert(*loop_id, loop_.id());
+                    // Add the loop targets to the control targets.
+                    ctx.control_targets
+                        .set_loop_targets(*loop_id, block_id, loop_.id());
 
                     // Translate the loop body (inner) inside the loop block.
                     translate_flow(ctx, loop_, module, inner, functions_to_link);
+
+                    // Clear the loop targets after the loop body is translated.
+                    ctx.control_targets.clear_loop_targets(*loop_id);
                 });
             });
 
@@ -413,9 +439,9 @@ fn translate_flow(
             }
         }
         Flow::Switch {
-            stack,
             cases,
             yielding_case,
+            ..
         } => {
             // label -> enclosing block id that br_table should target
             let mut label_to_block: HashMap<u16, InstrSeqId> = HashMap::new();
@@ -483,35 +509,31 @@ fn translate_flow(
                 translate_flow(ctx, builder, module, cases[case_index], functions_to_link);
             }
 
-            // Outer join for the switch expression results
-            let switch_stack = InstrSeqType::new(&mut module.types, &[ValType::I32], stack);
-            builder.block(switch_stack, |switch| {
-                let case_ty = InstrSeqType::new(&mut module.types, &[ValType::I32], &[]);
-                // Open a block for the yielding case.
-                switch.block(case_ty, |yielding_block| {
-                    // Create targets deepest-first by iterating cases in reverse
-                    let cases_rev: Vec<&Flow> = cases.iter().rev().collect();
+            let case_ty = InstrSeqType::new(&mut module.types, &[ValType::I32], &[]);
+            // Open a block for the yielding case.
+            builder.block(case_ty, |yielding_block| {
+                // Create targets deepest-first by iterating cases in reverse
+                let cases_rev: Vec<&Flow> = cases.iter().rev().collect();
 
-                    // If the yielding case is not empty, map its label to the yielding block
-                    if !matches!(**yielding_case, Flow::Empty) {
-                        label_to_block.insert(yielding_case.get_label(), yielding_block.id());
-                    }
+                // If the yielding case is not empty, map its label to the yielding block
+                if !matches!(**yielding_case, Flow::Empty) {
+                    label_to_block.insert(yielding_case.get_label(), yielding_block.id());
+                }
 
-                    // Build target labels and emit br_table; each case body is emitted after its label
-                    open_cases(
-                        yielding_block,
-                        module,
-                        ctx,
-                        functions_to_link,
-                        &cases_rev,
-                        &mut label_to_block,
-                        0,
-                    );
-                });
-
-                // Emit default body
-                translate_flow(ctx, switch, module, yielding_case, functions_to_link);
+                // Build target labels and emit br_table; each case body is emitted after its label
+                open_cases(
+                    yielding_block,
+                    module,
+                    ctx,
+                    functions_to_link,
+                    &cases_rev,
+                    &mut label_to_block,
+                    0,
+                );
             });
+
+            // Emit yielding case body if any
+            translate_flow(ctx, builder, module, yielding_case, functions_to_link);
         }
 
         Flow::Empty => (),
@@ -521,21 +543,23 @@ fn translate_flow(
 #[allow(clippy::too_many_arguments)]
 fn translate_instruction(
     instruction: &Bytecode,
-    compilation_ctx: &CompilationContext,
-    module_data: &ModuleData,
+    translate_flow_ctx: &mut TranslateFlowContext,
     builder: &mut InstrSeqBuilder,
-    mapped_function: &MappedFunction,
     module: &mut Module,
-    function_table: &mut FunctionTable,
-    types_stack: &mut TypesStack,
-    function_locals: &[LocalId],
-    uid_locals: &mut HashMap<u8, StorageIdParentInformation>,
     branches: &HashMap<u16, BranchMode>,
-    branch_targets: &BranchTargets,
-    jump_table: &mut Option<JumpTableData>,
-    dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
 ) -> Result<Vec<FunctionId>, TranslationError> {
     let mut functions_calls_to_link = Vec::new();
+
+    let compilation_ctx = &translate_flow_ctx.compilation_ctx;
+    let module_data = &translate_flow_ctx.module_data;
+    let mapped_function = &translate_flow_ctx.function_information;
+    let function_table = &mut translate_flow_ctx.function_table;
+    let types_stack = &mut translate_flow_ctx.types_stack;
+    let function_locals = &translate_flow_ctx.function_locals;
+    let uid_locals = &mut translate_flow_ctx.uid_locals;
+    let control_targets = &translate_flow_ctx.control_targets;
+    let jump_table = &mut translate_flow_ctx.jump_table;
+    let dynamic_fields_global_variables = &mut translate_flow_ctx.dynamic_fields_global_variables;
 
     match instruction {
         // Load a fixed constant
@@ -2478,24 +2502,31 @@ fn translate_instruction(
             )?;
         }
         Bytecode::BrTrue(code_offset) => {
-            if let Some(branch_mode) = branches.get(code_offset) {
-                if let Some(&target) = branch_targets.get_target(branch_mode, code_offset) {
+            if let Some(mode) = branches.get(code_offset) {
+                if let Some(target) = control_targets.resolve(*mode, *code_offset) {
                     builder.br_if(target);
+                } else {
+                    panic!("BrTrue target not found for code offset: {code_offset}");
                 }
             }
         }
         Bytecode::BrFalse(code_offset) => {
-            if let Some(branch_mode) = branches.get(code_offset) {
-                if let Some(&target) = branch_targets.get_target(branch_mode, code_offset) {
+            if let Some(mode) = branches.get(code_offset) {
+                if let Some(target) = control_targets.resolve(*mode, *code_offset) {
+                    // flip the boolean (Move’s BrFalse consumes the bool)
                     builder.unop(UnaryOp::I32Eqz);
                     builder.br_if(target);
+                } else {
+                    panic!("BrFalse target not found for code offset: {code_offset}");
                 }
             }
         }
         Bytecode::Branch(code_offset) => {
-            if let Some(branch_mode) = branches.get(code_offset) {
-                if let Some(&target) = branch_targets.get_target(branch_mode, code_offset) {
+            if let Some(mode) = branches.get(code_offset) {
+                if let Some(target) = control_targets.resolve(*mode, *code_offset) {
                     builder.br(target);
+                } else {
+                    panic!("Branch target not found for code offset: {code_offset}");
                 }
             }
         }
@@ -2591,7 +2622,7 @@ fn translate_instruction(
                 );
 
             // Set the jump table for the current VariantSwitch
-            *jump_table = Some(mapped_function.jump_tables[jump_table_index.0 as usize].clone());
+            **jump_table = Some(mapped_function.jump_tables[jump_table_index.0 as usize].clone());
         }
         b => Err(TranslationError::UnsupportedOperation {
             operation: b.clone(),
