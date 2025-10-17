@@ -219,7 +219,42 @@ pub fn call_contract(module: &mut Module) -> (FunctionId, ImportId) {
             // Return data len
             ValType::I32,
         ],
-        // Result. Non-zero if succeded
+        // Result. Non-zero on failure
+        &[ValType::I32],
+    )
+}
+
+/// Static calls the contract at the given address, with the option to limit the amount of gas
+/// supplied. The return status indicates whether the call succeeded, and is nonzero on
+/// failure.
+///
+/// In both cases `return_data_len` will store the length of the result, the bytes of which can
+/// be read via the `read_return_data` hostio. The bytes are not returned directly so that the
+/// programmer can potentially save gas by choosing which subset of the return result they'd
+/// like to copy.
+///
+/// The semantics are equivalent to that of the EVM's [`STATIC_CALL`] opcode, including the
+/// 63/64 gas rule. This means that supplying `u64::MAX` gas can be used to send as much as
+/// possible.
+///
+/// [`STATIC_CALL`]: https://www.evm.codes/#FA
+pub fn static_call_contract(module: &mut Module) -> (FunctionId, ImportId) {
+    get_or_insert_import(
+        module,
+        "static_call_contract",
+        &[
+            // Contract address
+            ValType::I32,
+            // Calldata
+            ValType::I32,
+            // Calldata len
+            ValType::I32,
+            // Gas
+            ValType::I64,
+            // Return data len
+            ValType::I32,
+        ],
+        // Result. Non-zero on failure
         &[ValType::I32],
     )
 }

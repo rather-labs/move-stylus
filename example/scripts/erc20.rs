@@ -82,6 +82,7 @@ async fn main() -> eyre::Result<()> {
     println!("  Contract Info");
     println!("====================");
 
+    println!("AAAAAAAAAA {:?}", example.totalSupply().calldata());
     let res = example.totalSupply().call().await?;
     println!("Total Supply = {}", res);
 
@@ -98,6 +99,7 @@ async fn main() -> eyre::Result<()> {
     println!("  Mint");
     println!("====================");
 
+    println!("AAAAAAAAAA {:?}", example.balanceOf(sender).calldata());
     let res = example.balanceOf(sender).call().await?;
     println!("Balance of target address = {}", res);
 

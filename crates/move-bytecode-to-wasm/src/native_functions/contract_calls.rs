@@ -10,7 +10,7 @@ use crate::{
         function_encoding::move_signature_to_abi_selector, packing::Packable, unpacking::Unpackable,
     },
     compilation_context::ModuleId,
-    hostio::host_functions::{call_contract, read_return_data},
+    hostio::host_functions::{call_contract, read_return_data, static_call_contract},
     runtime::RuntimeFunction,
     translation::{functions::MappedFunction, intermediate_types::IntermediateType},
     vm_handled_types::{VmHandledType, contract_call_result::ContractCallResult},
@@ -40,6 +40,7 @@ pub fn add_external_contract_call_fn(
 
     let (read_return_data, _) = read_return_data(module);
     let (call_contract, _) = call_contract(module);
+    let (static_call_contract, _) = static_call_contract(module);
     let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None);
 
     let arguments = function_information.signature.get_argument_wasm_types();
@@ -87,6 +88,7 @@ pub fn add_external_contract_call_fn(
     } else {
         let gas = module.locals.add(ValType::I64);
         builder.i64_const(u64::MAX as i64).local_set(gas);
+        println!("max gas");
         gas
     };
 
@@ -150,30 +152,31 @@ pub fn add_external_contract_call_fn(
             },
         );
 
-    let writer_pointer = module.locals.add(ValType::I32);
-    let calldata_reference_pointer = module.locals.add(ValType::I32);
     let calldata_len = module.locals.add(ValType::I32);
-    let call_contract_result = module.locals.add(ValType::I32);
 
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_tee(writer_pointer)
-        .local_set(calldata_reference_pointer);
+    if !calldata_arguments.is_empty() {
+        let writer_pointer = module.locals.add(ValType::I32);
+        let calldata_reference_pointer = module.locals.add(ValType::I32);
 
-    for (argument, wasm_local) in calldata_arguments
-        .iter()
-        .zip(&function_args[arguments_from..])
-    {
-        println!("Packing {argument:?}");
-        argument.add_pack_instructions(
-            &mut builder,
-            module,
-            *wasm_local,
-            writer_pointer,
-            calldata_reference_pointer,
-            compilation_ctx,
-        );
+        builder
+            .i32_const(32)
+            .call(compilation_ctx.allocator)
+            .local_tee(writer_pointer)
+            .local_set(calldata_reference_pointer);
+
+        for (argument, wasm_local) in calldata_arguments
+            .iter()
+            .zip(&function_args[arguments_from..])
+        {
+            argument.add_pack_instructions(
+                &mut builder,
+                module,
+                *wasm_local,
+                writer_pointer,
+                calldata_reference_pointer,
+                compilation_ctx,
+            );
+        }
     }
 
     builder
@@ -189,31 +192,45 @@ pub fn add_external_contract_call_fn(
         .i32_const(0)
         .call(emit_log_function);
 
+    let call_contract_result = module.locals.add(ValType::I32);
     let return_data_len = module.locals.add(ValType::I32);
     builder
-        .i32_const(32)
+        .i32_const(4)
         .call(compilation_ctx.allocator)
         .local_set(return_data_len);
 
-    builder
-        .local_get(address_ptr)
-        .local_get(calldata_start)
-        .local_get(calldata_len)
-        .local_get(value)
-        .local_get(gas)
-        .local_get(return_data_len)
-        .call(call_contract)
-        .local_set(call_contract_result);
+    if function_modifiers.contains(&FunctionModifier::Pure)
+        || function_modifiers.contains(&FunctionModifier::View)
+    {
+        builder
+            .local_get(address_ptr)
+            .local_get(calldata_start)
+            .local_get(calldata_len)
+            .local_get(gas)
+            .local_get(return_data_len)
+            .call(static_call_contract)
+            .local_set(call_contract_result);
+    } else {
+        builder
+            .local_get(address_ptr)
+            .local_get(calldata_start)
+            .local_get(calldata_len)
+            .local_get(value)
+            .local_get(gas)
+            .local_get(return_data_len)
+            .call(call_contract)
+            .local_set(call_contract_result);
+    }
 
     builder
         .local_get(return_data_len)
-        .i32_const(32)
+        .i32_const(4)
         .i32_const(0)
         .call(emit_log_function);
 
     builder
         .local_get(address_ptr)
-        .i32_const(32)
+        .i32_const(20)
         .i32_const(0)
         .call(emit_log_function);
 
@@ -244,6 +261,12 @@ pub fn add_external_contract_call_fn(
         );
 
     builder
+        .local_get(call_result_code_ptr)
+        .i32_const(4)
+        .i32_const(0)
+        .call(emit_log_function);
+
+    builder
         .local_get(call_result)
         .local_get(call_result_code_ptr)
         .store(
@@ -255,17 +278,49 @@ pub fn add_external_contract_call_fn(
             },
         );
 
-    // If the call succeded, we proceed to decode the result
+    // If the call succeded (returned 0), we proceed to decode the result
     builder.block(None, |block| {
         let block_id = block.id();
 
+        // Exit the block if the status != 0
         block
             .local_get(call_contract_result)
             .i32_const(0)
-            .binop(BinaryOp::I32Eq)
+            .binop(BinaryOp::I32Ne)
             .br_if(block_id);
 
         let return_data_abi_encoded_ptr = module.locals.add(ValType::I32);
+
+        block
+            .i32_const(0)
+            .i32_const(10)
+            .i32_const(0)
+            .call(emit_log_function);
+
+        block
+            .i32_const(0)
+            .i32_const(10)
+            .i32_const(0)
+            .call(emit_log_function);
+
+        // Return data len is in big endian, we read it and change endianess
+        block
+            .local_get(return_data_len)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_set(return_data_len);
+
+        block
+            .local_get(return_data_abi_encoded_ptr)
+            .local_get(return_data_len)
+            .i32_const(0)
+            .call(emit_log_function);
 
         block
             .local_get(return_data_len)
@@ -277,7 +332,11 @@ pub fn add_external_contract_call_fn(
             .local_get(return_data_len)
             .call(read_return_data)
             .local_set(return_data_len); // TODO: Check this
-        //
+        block
+            .local_get(return_data_abi_encoded_ptr)
+            .local_get(return_data_len)
+            .i32_const(0)
+            .call(emit_log_function);
 
         assert_eq!(
             1,
