@@ -162,7 +162,6 @@ pub fn translate_function(
     );
 
     let flow = Flow::new(move_bytecode, function_information);
-    // println!("flow: {:#?}", flow);
 
     let mut branch_targets = BranchTargets::new();
     let mut types_stack = TypesStack::new();
