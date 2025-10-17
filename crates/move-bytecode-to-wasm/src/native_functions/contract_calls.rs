@@ -6,9 +6,12 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    abi_types::{packing::Packable, unpacking::Unpackable},
+    abi_types::{
+        function_encoding::move_signature_to_abi_selector, packing::Packable, unpacking::Unpackable,
+    },
     compilation_context::ModuleId,
     hostio::host_functions::{call_contract, read_return_data},
+    runtime::RuntimeFunction,
     translation::{functions::MappedFunction, intermediate_types::IntermediateType},
     vm_handled_types::{VmHandledType, contract_call_result::ContractCallResult},
 };
@@ -28,6 +31,7 @@ pub fn add_external_contract_call_fn(
         function_information.function_id.identifier
     );
 
+    let (emit_log_function, _) = crate::hostio::host_functions::emit_log(module);
     println!("Processing {name}");
 
     if let Some(function_id) = module.funcs.by_name(&name) {
@@ -36,6 +40,7 @@ pub fn add_external_contract_call_fn(
 
     let (read_return_data, _) = read_return_data(module);
     let (call_contract, _) = call_contract(module);
+    let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None);
 
     let arguments = function_information.signature.get_argument_wasm_types();
 
@@ -88,7 +93,7 @@ pub fn add_external_contract_call_fn(
     // Locals
     let address_ptr = module.locals.add(ValType::I32);
 
-    // The address to call is the first argument of self
+    // The address to call is the first argument of self (20 bytes)
     builder
         .local_get(*self_)
         .load(
@@ -99,27 +104,51 @@ pub fn add_external_contract_call_fn(
                 offset: 0,
             },
         )
+        .i32_const(12)
+        .binop(BinaryOp::I32Add)
         .local_set(address_ptr);
 
-    // Calculate the calldata
-    let arguments_signature: &Vec<(&IntermediateType, &LocalId)> = if gas_argument_present {
+    // Calculate the from where the arguments enter the calldata. Depending on how the call is
+    // configured we omit some parameters at the beggining that are not part of the callee
+    // signature
+    let arguments_from = if gas_argument_present {
         if function_modifiers.contains(&FunctionModifier::Payable) {
-            &function_information.signature.arguments[3..]
-                .iter()
-                .zip(&function_args[3..])
-                .collect()
+            3
         } else {
-            &function_information.signature.arguments[2..]
-                .iter()
-                .zip(&function_args[2..])
-                .collect()
+            2
         }
     } else {
-        &function_information.signature.arguments[1..]
-            .iter()
-            .zip(&function_args[1..])
-            .collect()
+        1
     };
+
+    let calldata_arguments = &function_information.signature.arguments[arguments_from..];
+
+    let calldata_start = module.locals.add(ValType::I32);
+
+    //  Create the function selector
+    let selector = move_signature_to_abi_selector(
+        &function_information.function_id.identifier,
+        calldata_arguments,
+        compilation_ctx,
+    );
+
+    //Save the function selector before the arguments
+    builder
+        .i32_const(4)
+        .call(compilation_ctx.allocator)
+        .local_tee(calldata_start);
+
+    builder
+        .i32_const(i32::from_be_bytes(selector))
+        .call(swap_i32)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
 
     let writer_pointer = module.locals.add(ValType::I32);
     let calldata_reference_pointer = module.locals.add(ValType::I32);
@@ -132,11 +161,15 @@ pub fn add_external_contract_call_fn(
         .local_tee(writer_pointer)
         .local_set(calldata_reference_pointer);
 
-    for (argument, wasm_local) in arguments_signature {
+    for (argument, wasm_local) in calldata_arguments
+        .iter()
+        .zip(&function_args[arguments_from..])
+    {
+        println!("Packing {argument:?}");
         argument.add_pack_instructions(
             &mut builder,
             module,
-            **wasm_local,
+            *wasm_local,
             writer_pointer,
             calldata_reference_pointer,
             compilation_ctx,
@@ -146,23 +179,43 @@ pub fn add_external_contract_call_fn(
     builder
         .i32_const(0)
         .call(compilation_ctx.allocator)
+        .local_get(calldata_start)
+        .binop(BinaryOp::I32Sub)
         .local_set(calldata_len);
+
+    builder
+        .local_get(calldata_start)
+        .local_get(calldata_len)
+        .i32_const(0)
+        .call(emit_log_function);
 
     let return_data_len = module.locals.add(ValType::I32);
     builder
-        .i32_const(8)
+        .i32_const(32)
         .call(compilation_ctx.allocator)
         .local_set(return_data_len);
 
     builder
         .local_get(address_ptr)
-        .local_get(calldata_reference_pointer)
+        .local_get(calldata_start)
         .local_get(calldata_len)
         .local_get(value)
         .local_get(gas)
         .local_get(return_data_len)
         .call(call_contract)
         .local_set(call_contract_result);
+
+    builder
+        .local_get(return_data_len)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_function);
+
+    builder
+        .local_get(address_ptr)
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_function);
 
     let call_result = module.locals.add(ValType::I32);
     let call_result_code_ptr = module.locals.add(ValType::I32);
@@ -209,7 +262,7 @@ pub fn add_external_contract_call_fn(
         block
             .local_get(call_contract_result)
             .i32_const(0)
-            .binop(BinaryOp::I32Ne)
+            .binop(BinaryOp::I32Eq)
             .br_if(block_id);
 
         let return_data_abi_encoded_ptr = module.locals.add(ValType::I32);
@@ -223,7 +276,8 @@ pub fn add_external_contract_call_fn(
             .i32_const(0)
             .local_get(return_data_len)
             .call(read_return_data)
-            .drop();
+            .local_set(return_data_len); // TODO: Check this
+        //
 
         assert_eq!(
             1,

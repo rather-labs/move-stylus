@@ -2,6 +2,7 @@ use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
 use eyre::eyre;
+use std::io::Read;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -38,11 +39,17 @@ let contract_address_erc20 = Address::from_str(&contract_address_erc20)?;
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
-    let res = example.balanceOfErc20(contract_address_erc20, sender).call().await?;
-    println!("Balance of {sender} = {res}");
+    //let res = example.balanceOfErc20(contract_address_erc20, sender).call().await?;
+    // println!("Balance of {sender} = {res}");
 
-    let res = example.balanceOfErc20(contract_address_erc20, sender).send().await?;
-    println!("Balance of {sender} = {res:?}");
+    let pending_tx = example.balanceOfErc20(contract_address_erc20, sender).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("Log {:?}", raw.bytes());
+        println!("Log 2 {:?}",  alloy::hex::encode(&raw));
+    }
+    // println!("Balance of {sender} = {res:?}");
 
 
     Ok(())
