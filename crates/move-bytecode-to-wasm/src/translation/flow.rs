@@ -1,4 +1,3 @@
-use crate::translation::functions::MappedFunction;
 use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlFlowGraph};
 use move_binary_format::file_format::{Bytecode, CodeUnit};
 use relooper::{BranchMode, ShapedBlock};
@@ -24,13 +23,12 @@ pub enum Flow {
     },
     Switch {
         cases: Vec<Flow>,
-        yielding_case: Box<Flow>,
     },
     Empty,
 }
 
 impl Flow {
-    pub fn new(code_unit: &CodeUnit, function_information: &MappedFunction) -> Flow {
+    pub fn new(code_unit: &CodeUnit) -> Flow {
         // Create the control flow graph from the code unit
         let cfg = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
 
@@ -59,14 +57,10 @@ impl Flow {
             })
             .collect();
 
-        Self::build(&relooped, &blocks_ctx, function_information)
+        Self::build(&relooped, &blocks_ctx)
     }
 
-    fn build(
-        shaped_block: &ShapedBlock<u16>,
-        blocks_ctx: &HashMap<u16, Vec<Bytecode>>,
-        fi: &MappedFunction,
-    ) -> Flow {
+    fn build(shaped_block: &ShapedBlock<u16>, blocks_ctx: &HashMap<u16, Vec<Bytecode>>) -> Flow {
         match shaped_block {
             ShapedBlock::Simple(simple_block) => {
                 let simple_block_ctx = blocks_ctx.get(&simple_block.label).unwrap();
@@ -75,14 +69,14 @@ impl Flow {
                 let immediate_flow = simple_block
                     .immediate
                     .as_ref()
-                    .map(|b| Self::build(b, blocks_ctx, fi))
+                    .map(|b| Self::build(b, blocks_ctx))
                     .unwrap_or(Flow::Empty);
 
                 // `Next` is the structured continuation after the current block, but not necessarily dominated by it.
                 let next_flow = simple_block
                     .next
                     .as_ref()
-                    .map(|b| Self::build(b, blocks_ctx, fi))
+                    .map(|b| Self::build(b, blocks_ctx))
                     .unwrap_or(Flow::Empty);
 
                 // `Branches` represent the control flow edges from the current block to other blocks.
@@ -106,12 +100,12 @@ impl Flow {
                 }
             }
             ShapedBlock::Loop(loop_block) => {
-                let inner_flow = Self::build(&loop_block.inner, blocks_ctx, fi);
+                let inner_flow = Self::build(&loop_block.inner, blocks_ctx);
 
                 let next_flow = loop_block
                     .next
                     .as_ref()
-                    .map(|b| Self::build(b, blocks_ctx, fi))
+                    .map(|b| Self::build(b, blocks_ctx))
                     .unwrap_or(Flow::Empty);
 
                 Flow::Loop {
@@ -128,13 +122,11 @@ impl Flow {
                 // Enums add complexity, introducing multiple blocks with more than two branches, typically due to match statements.
                 match multiple_block.handled.len() {
                     // If there is a single branch, then instead of creating an if/else flow with an empty arm, we just build the flow from the only handled block.
-                    1 => Self::build(&multiple_block.handled[0].inner, blocks_ctx, fi),
+                    1 => Self::build(&multiple_block.handled[0].inner, blocks_ctx),
                     // If there are two branches, we create an if/else flow with the two handled blocks.
                     2 => {
-                        let then_arm =
-                            Self::build(&multiple_block.handled[0].inner, blocks_ctx, fi);
-                        let else_arm =
-                            Self::build(&multiple_block.handled[1].inner, blocks_ctx, fi);
+                        let then_arm = Self::build(&multiple_block.handled[0].inner, blocks_ctx);
+                        let else_arm = Self::build(&multiple_block.handled[1].inner, blocks_ctx);
 
                         Flow::IfElse {
                             then_body: Box::new(then_arm),
@@ -143,13 +135,13 @@ impl Flow {
                     }
                     _ => {
                         // Build all arms
-                        let mut cases: Vec<Flow> = multiple_block
+                        let cases: Vec<Flow> = multiple_block
                             .handled
                             .iter()
-                            .map(|b| Self::build(&b.inner, blocks_ctx, fi))
+                            .map(|b| Self::build(&b.inner, blocks_ctx))
                             .collect();
 
-                        // Assumption 1: all cases are Simple.
+                        // Assumption: all cases are Simple.
                         // If this is not the case, panic.
                         // This is useful because we can get the label of the case and use it later on to translate the case.
                         assert!(
@@ -157,32 +149,7 @@ impl Flow {
                             "All cases must be Simple in a Switch flow"
                         );
 
-                        // Assumption 2: only one or none of the cases pushes something to the stack.
-                        // Why not more than one? If multiple cases push values to the stack,
-                        // Move creates a merge block where those cases converge and where the actual value is pushed to the stack.
-                        let mut yielding = cases.iter().enumerate().filter_map(|(i, c)| {
-                            (c.contains_ret_inside() && !fi.results.is_empty()).then_some(i)
-                        });
-
-                        let yielding_idx = yielding.next();
-                        assert!(
-                            yielding.next().is_none(),
-                            "At most one case may push to the stack in a Switch flow"
-                        );
-
-                        // Separate the single value-producing arm (if any); keep order of the rest
-                        let yielding_case = match yielding_idx {
-                            Some(i) => {
-                                let arm = cases.remove(i); // preserves order for remaining cases
-                                Box::new(arm)
-                            }
-                            None => Box::new(Flow::Empty),
-                        };
-
-                        Flow::Switch {
-                            cases,         // non-producing arms
-                            yielding_case, // the single producing arm (if present)
-                        }
+                        Flow::Switch { cases }
                     }
                 }
             }
@@ -198,7 +165,7 @@ impl Flow {
 
     /// Helper function to check if the flow contains a Ret instruction inside it.
     /// This is used to determine the result type of the block.
-    pub fn contains_ret_inside(&self) -> bool {
+    pub fn dominates_return(&self) -> bool {
         match self {
             Flow::Simple {
                 instructions,
@@ -208,25 +175,17 @@ impl Flow {
             } => {
                 instructions
                     .last()
-                    .map_or(false, |b| matches!(b, Bytecode::Ret))
-                    || immediate.contains_ret_inside()
-                    || next.contains_ret_inside()
+                    .is_some_and(|b| matches!(b, Bytecode::Ret))
+                    || immediate.dominates_return()
+                    || next.dominates_return()
             }
-            Flow::Loop { inner, next, .. } => {
-                inner.contains_ret_inside() || next.contains_ret_inside()
-            }
+            Flow::Loop { inner, next, .. } => inner.dominates_return() || next.dominates_return(),
             Flow::IfElse {
                 then_body,
                 else_body,
                 ..
-            } => then_body.contains_ret_inside() || else_body.contains_ret_inside(),
-            Flow::Switch {
-                cases,
-                yielding_case,
-                ..
-            } => {
-                cases.iter().any(|c| c.contains_ret_inside()) || yielding_case.contains_ret_inside()
-            }
+            } => then_body.dominates_return() || else_body.dominates_return(),
+            Flow::Switch { cases } => cases.iter().any(|c| c.dominates_return()),
             Flow::Empty => false,
         }
     }
