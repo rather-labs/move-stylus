@@ -255,23 +255,35 @@ fn translate_flow(
     match flow {
         Flow::Simple {
             instructions,
-            stack,
             branches,
             immediate,
             next,
             ..
         } => {
-            let ty = InstrSeqType::new(&mut module.types, &[], stack);
+            // If the immediate flow contains a Ret instruction, set the result type of the block to the function's return type.
+            let ty = InstrSeqType::new(
+                &mut module.types,
+                &[],
+                if instructions
+                    .last()
+                    .map_or(false, |b| matches!(b, Bytecode::Ret))
+                    || immediate.contains_ret_inside()
+                {
+                    &ctx.function_information.results
+                } else {
+                    &[]
+                },
+            );
 
             builder.block(ty, |block| {
                 // Add the simple scope to the control targets.
-                let next_label = if let Flow::Simple { label, .. } = &**next {
-                    Some(*label)
-                } else {
-                    None
-                };
-                ctx.control_targets
-                    .push_simple_scope(block.id(), next_label);
+                ctx.control_targets.push_simple_scope(
+                    block.id(),
+                    match &**next {
+                        Flow::Simple { label, .. } => Some(*label),
+                        _ => None,
+                    },
+                );
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in instructions {
@@ -288,23 +300,32 @@ fn translate_flow(
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
-                // Then translate instructions of the immediate block, inside the current block
+                // Translate the immediate flow within the current scope
                 translate_flow(ctx, block, module, immediate, functions_to_link);
 
                 // Done with this Simple's inner region. Pop the simple scope.
                 ctx.control_targets.pop_simple_scope();
             });
-            // Then translate instructions of the next block, but outside the wrapping block
+            // Translate the next flow outside the current scope
             translate_flow(ctx, builder, module, next, functions_to_link);
         }
         Flow::Loop {
-            stack,
             loop_id,
             inner,
             next,
             ..
         } => {
-            let ty = InstrSeqType::new(&mut module.types, &[], stack);
+            // If the inner flow contains a Ret instruction, set the result type of the block to the function's return type.
+            let ty = InstrSeqType::new(
+                &mut module.types,
+                &[],
+                if inner.contains_ret_inside() {
+                    &ctx.function_information.results
+                } else {
+                    &[]
+                },
+            );
+
             // We wrap the loop in a block so we have a "landing spot" if we need to break out of it
             // (in case we encounter a BranchMode::LoopBreak).
             builder.block(ty, |block| {
@@ -363,8 +384,17 @@ fn translate_flow(
             let condition = module.locals.add(ValType::I32);
             builder.local_set(condition);
 
-            let then_ty = then_body.get_stack(); // node result types (not including `next`)
-            let else_ty = else_body.get_stack();
+            let then_ty = if then_body.contains_ret_inside() {
+                ctx.function_information.results.clone()
+            } else {
+                vec![]
+            };
+
+            let else_ty = if else_body.contains_ret_inside() {
+                ctx.function_information.results.clone()
+            } else {
+                vec![]
+            };
 
             if then_ty == else_ty {
                 // CASE 1: both arms have the same result type (often empty)
@@ -374,7 +404,7 @@ fn translate_flow(
                     let join_id = join.id();
                     join.block(None::<ValType>, |guard| {
                         guard.local_get(condition);
-                        guard.br_if(guard.id()); // true => leave guard => THEN outside
+                        guard.br_if(guard.id());
                         // ELSE (inside guard)
                         translate_flow(ctx, guard, module, else_body, functions_to_link);
                         guard.br(join_id); // reconverge
@@ -389,7 +419,7 @@ fn translate_flow(
                 builder.block(join_ty, |join| {
                     join.block(None::<ValType>, |guard| {
                         guard.local_get(condition);
-                        guard.br_if(guard.id()); // true => THEN after guard
+                        guard.br_if(guard.id());
                         // ELSE (no result) inside guard
                         translate_flow(ctx, guard, module, else_body, functions_to_link);
                     });

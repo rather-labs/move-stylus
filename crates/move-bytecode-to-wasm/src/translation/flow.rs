@@ -3,13 +3,11 @@ use move_abstract_interpreter::control_flow_graph::{ControlFlowGraph, VMControlF
 use move_binary_format::file_format::{Bytecode, CodeUnit};
 use relooper::{BranchMode, ShapedBlock};
 use std::collections::{HashMap, HashSet};
-use walrus::ValType;
 
 #[derive(Debug, Clone)]
 pub enum Flow {
     Simple {
         label: u16,
-        stack: Vec<ValType>,
         instructions: Vec<Bytecode>,
         immediate: Box<Flow>,
         next: Box<Flow>,
@@ -17,17 +15,14 @@ pub enum Flow {
     },
     Loop {
         loop_id: u16,
-        stack: Vec<ValType>,
         inner: Box<Flow>,
         next: Box<Flow>,
     },
     IfElse {
-        stack: Vec<ValType>,
         then_body: Box<Flow>,
         else_body: Box<Flow>,
     },
     Switch {
-        stack: Vec<ValType>,
         cases: Vec<Flow>,
         yielding_case: Box<Flow>,
     },
@@ -52,8 +47,7 @@ impl Flow {
         };
 
         // Context for each block within the control flow graph
-        let blocks_ctx: HashMap<u16, (Vec<Bytecode>, Vec<ValType>)> = (&cfg
-            as &dyn ControlFlowGraph)
+        let blocks_ctx: HashMap<u16, Vec<Bytecode>> = (&cfg as &dyn ControlFlowGraph)
             .blocks()
             .into_iter()
             .map(|b| {
@@ -61,42 +55,37 @@ impl Flow {
                 let end = cfg.block_end(b) + 1;
                 let code = &code_unit.code[start as usize..end as usize];
 
-                let mut stack: Vec<ValType> = vec![];
-                // If the block contains a Ret instruction, then set the types stack of this block to the expected return type of the function.
-                // https://github.com/MystenLabs/sui/blob/5608296d101d51613605685e7445ca8e8aee8021/external-crates/move/move-execution/v2/crates/move-bytecode-verifier/README.md
-                if code.contains(&Bytecode::Ret) {
-                    stack = function_information.results.clone();
-                }
-
-                (start, (code.to_vec(), stack))
+                (start, code.to_vec())
             })
             .collect();
 
-        Self::build(&relooped, &blocks_ctx)
+        Self::build(&relooped, &blocks_ctx, function_information)
     }
 
     fn build(
         shaped_block: &ShapedBlock<u16>,
-        blocks_ctx: &HashMap<u16, (Vec<Bytecode>, Vec<ValType>)>,
+        blocks_ctx: &HashMap<u16, Vec<Bytecode>>,
+        fi: &MappedFunction,
     ) -> Flow {
         match shaped_block {
             ShapedBlock::Simple(simple_block) => {
-                let block_ctx = blocks_ctx.get(&simple_block.label).unwrap();
+                let simple_block_ctx = blocks_ctx.get(&simple_block.label).unwrap();
 
-                // This are blocks immediately dominated by the current block
+                // `Immediate` blocks are dominated by the current block
                 let immediate_flow = simple_block
                     .immediate
                     .as_ref()
-                    .map(|b| Self::build(b, blocks_ctx))
+                    .map(|b| Self::build(b, blocks_ctx, fi))
                     .unwrap_or(Flow::Empty);
 
-                // Next block follows the current one
+                // `Next` is the structured continuation after the current block, but not necessarily dominated by it.
                 let next_flow = simple_block
                     .next
                     .as_ref()
-                    .map(|b| Self::build(b, blocks_ctx))
+                    .map(|b| Self::build(b, blocks_ctx, fi))
                     .unwrap_or(Flow::Empty);
 
+                // `Branches` represent the control flow edges from the current block to other blocks.
                 let branches: HashMap<u16, BranchMode> = simple_block
                     .branches
                     .iter()
@@ -110,24 +99,22 @@ impl Flow {
 
                 Flow::Simple {
                     label: simple_block.label,
-                    stack: [block_ctx.1.clone(), immediate_flow.get_stack()].concat(),
-                    instructions: block_ctx.0.clone(),
+                    instructions: simple_block_ctx.clone(),
                     immediate: Box::new(immediate_flow),
                     next: Box::new(next_flow),
                     branches,
                 }
             }
             ShapedBlock::Loop(loop_block) => {
-                let inner_flow = Self::build(&loop_block.inner, blocks_ctx);
+                let inner_flow = Self::build(&loop_block.inner, blocks_ctx, fi);
 
                 let next_flow = loop_block
                     .next
                     .as_ref()
-                    .map(|b| Self::build(b, blocks_ctx))
+                    .map(|b| Self::build(b, blocks_ctx, fi))
                     .unwrap_or(Flow::Empty);
 
                 Flow::Loop {
-                    stack: inner_flow.get_stack(),
                     loop_id: loop_block.loop_id,
                     inner: Box::new(inner_flow),
                     next: Box::new(next_flow),
@@ -141,31 +128,15 @@ impl Flow {
                 // Enums add complexity, introducing multiple blocks with more than two branches, typically due to match statements.
                 match multiple_block.handled.len() {
                     // If there is a single branch, then instead of creating an if/else flow with an empty arm, we just build the flow from the only handled block.
-                    1 => Self::build(&multiple_block.handled[0].inner, blocks_ctx),
+                    1 => Self::build(&multiple_block.handled[0].inner, blocks_ctx, fi),
                     // If there are two branches, we create an if/else flow with the two handled blocks.
                     2 => {
-                        let then_arm = Self::build(&multiple_block.handled[0].inner, blocks_ctx);
-                        let else_arm = Self::build(&multiple_block.handled[1].inner, blocks_ctx);
-
-                        let then_stack = then_arm.get_stack();
-                        let else_stack = else_arm.get_stack();
-
-                        let stack = if !then_stack.is_empty()
-                            && !else_stack.is_empty()
-                            && then_stack != else_stack
-                        {
-                            panic!(
-                                "Type stack of if/else branches must be the same or one must be empty. If types: {:?}, Else types: {:?}",
-                                then_stack, else_stack
-                            );
-                        } else if !then_stack.is_empty() {
-                            then_stack
-                        } else {
-                            else_stack // if both are empty, this returns an empty TypesStack
-                        };
+                        let then_arm =
+                            Self::build(&multiple_block.handled[0].inner, blocks_ctx, fi);
+                        let else_arm =
+                            Self::build(&multiple_block.handled[1].inner, blocks_ctx, fi);
 
                         Flow::IfElse {
-                            stack,
                             then_body: Box::new(then_arm),
                             else_body: Box::new(else_arm),
                         }
@@ -175,7 +146,7 @@ impl Flow {
                         let mut cases: Vec<Flow> = multiple_block
                             .handled
                             .iter()
-                            .map(|b| Self::build(&b.inner, blocks_ctx))
+                            .map(|b| Self::build(&b.inner, blocks_ctx, fi))
                             .collect();
 
                         // Assumption 1: all cases are Simple.
@@ -189,10 +160,9 @@ impl Flow {
                         // Assumption 2: only one or none of the cases pushes something to the stack.
                         // Why not more than one? If multiple cases push values to the stack,
                         // Move creates a merge block where those cases converge and where the actual value is pushed to the stack.
-                        let mut yielding = cases
-                            .iter()
-                            .enumerate()
-                            .filter_map(|(i, c)| (!c.get_stack().is_empty()).then_some(i));
+                        let mut yielding = cases.iter().enumerate().filter_map(|(i, c)| {
+                            (c.contains_ret_inside() && !fi.results.is_empty()).then_some(i)
+                        });
 
                         let yielding_idx = yielding.next();
                         assert!(
@@ -201,17 +171,15 @@ impl Flow {
                         );
 
                         // Separate the single value-producing arm (if any); keep order of the rest
-                        let (yielding_case, stack) = match yielding_idx {
+                        let yielding_case = match yielding_idx {
                             Some(i) => {
                                 let arm = cases.remove(i); // preserves order for remaining cases
-                                let stack = arm.get_stack();
-                                (Box::new(arm), stack)
+                                Box::new(arm)
                             }
-                            None => (Box::new(Flow::Empty), Vec::new()),
+                            None => Box::new(Flow::Empty),
                         };
 
                         Flow::Switch {
-                            stack,         // overall result stack for the switch
                             cases,         // non-producing arms
                             yielding_case, // the single producing arm (if present)
                         }
@@ -221,20 +189,45 @@ impl Flow {
         }
     }
 
-    pub fn get_stack(&self) -> Vec<ValType> {
-        match self {
-            Flow::Simple { stack, next, .. } => [stack.clone(), next.get_stack()].concat(),
-            Flow::Loop { stack, next, .. } => [stack.clone(), next.get_stack()].concat(),
-            Flow::IfElse { stack, .. } => stack.clone(),
-            Flow::Switch { stack, .. } => stack.clone(),
-            Flow::Empty => vec![],
-        }
-    }
-
     pub fn get_label(&self) -> u16 {
         match self {
             Flow::Simple { label, .. } => *label,
             _ => panic!("Only Simple flow has label"),
+        }
+    }
+
+    /// Helper function to check if the flow contains a Ret instruction inside it.
+    /// This is used to determine the result type of the block.
+    pub fn contains_ret_inside(&self) -> bool {
+        match self {
+            Flow::Simple {
+                instructions,
+                immediate,
+                next,
+                ..
+            } => {
+                instructions
+                    .last()
+                    .map_or(false, |b| matches!(b, Bytecode::Ret))
+                    || immediate.contains_ret_inside()
+                    || next.contains_ret_inside()
+            }
+            Flow::Loop { inner, next, .. } => {
+                inner.contains_ret_inside() || next.contains_ret_inside()
+            }
+            Flow::IfElse {
+                then_body,
+                else_body,
+                ..
+            } => then_body.contains_ret_inside() || else_body.contains_ret_inside(),
+            Flow::Switch {
+                cases,
+                yielding_case,
+                ..
+            } => {
+                cases.iter().any(|c| c.contains_ret_inside()) || yielding_case.contains_ret_inside()
+            }
+            Flow::Empty => false,
         }
     }
 }
