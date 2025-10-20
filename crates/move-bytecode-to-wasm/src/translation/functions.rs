@@ -73,19 +73,17 @@ impl MappedFunction {
             || signature.returns.iter().any(type_contains_generics);
 
         // Process jump tables within the function
-        let jump_tables = if let Some(code) = &function_definition.code {
-            code.jump_tables
-                .iter()
-                .map(|variant_jump_table| JumpTableData {
-                    enum_index: variant_jump_table.head_enum.0 as usize,
-                    offsets: match &variant_jump_table.jump_table {
-                        JumpTableInner::Full(offsets) => offsets.clone(),
-                    },
-                })
-                .collect::<Vec<_>>()
-        } else {
-            vec![]
-        };
+        let jump_tables = function_definition
+            .code
+            .iter()
+            .flat_map(|c| &c.jump_tables)
+            .map(|variant_jump_table| JumpTableData {
+                enum_index: variant_jump_table.head_enum.0 as usize,
+                offsets: match &variant_jump_table.jump_table {
+                    JumpTableInner::Full(offsets) => offsets.clone(),
+                },
+            })
+            .collect::<Vec<_>>();
 
         Self {
             function_id,

@@ -42,22 +42,22 @@ entry fun pack_unpack_planet(planet_index: u8): (u64, u64) {
 
 // Enums to test packing of all possible integer types
 public enum IntergerEnum has drop {
-    StackInts { x: u8, y: u16, z: u32, w: u64},
-    HeapInts { x: u128, y: u256},
+    StackInts { x: u8, y: u16, z: u32, w: u64 },
+    HeapInts { x: u128, y: u256 },
 }
 
 public fun pack_stack_ints(x: u8, y: u16, z: u32, w: u64): IntergerEnum {
-    IntergerEnum::StackInts { x, y, z, w}
+    IntergerEnum::StackInts { x, y, z, w }
 }
 
 public fun pack_heap_ints(x: u128, y: u256): IntergerEnum {
-    IntergerEnum::HeapInts { x, y}
+    IntergerEnum::HeapInts { x, y }
 }
 
 entry fun pack_unpack_stack_ints(x: u8, y: u16, z: u32, w: u64): (u8, u16, u32, u64) {
     let integer_enum = pack_stack_ints(x, y, z, w);
     match (integer_enum) {
-        IntergerEnum::StackInts { x, y, z, w} => (x, y, z, w),
+        IntergerEnum::StackInts { x, y, z, w } => (x, y, z, w),
         _ => {             
             abort(1)
         },
@@ -67,7 +67,7 @@ entry fun pack_unpack_stack_ints(x: u8, y: u16, z: u32, w: u64): (u8, u16, u32, 
 entry fun pack_unpack_heap_ints(x: u128, y: u256): (u128, u256) {
     let integer_enum = pack_heap_ints(x, y);
     match (integer_enum) {
-        IntergerEnum::HeapInts { x, y} => (x, y),
+        IntergerEnum::HeapInts { x, y } => (x, y),
         _ => {
             abort(1)
         },
