@@ -3,6 +3,7 @@ mod external_call;
 pub mod function_modifiers;
 
 pub use event::Event;
+// TODO: Create error struct with LOC and error info
 
 #[derive(Default, Debug)]
 pub struct SpecialAttributes {

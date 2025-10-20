@@ -30,3 +30,10 @@ public native fun external_payable_function_wrong_value_type(
     value: u128,
     amount: u64
 ): u64;
+
+#[ext(external_call, payable)]
+public fun external_payable_function_not_native(
+    self: &ExternalCall,
+    value: u128,
+    amount: u64
+): u64 { 1 }
