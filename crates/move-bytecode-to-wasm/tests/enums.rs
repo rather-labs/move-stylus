@@ -102,6 +102,9 @@ mod enum_with_fields {
         function packUnpackPlanet(uint8 index) external returns (uint64, uint64);
         function packUnpackStackInts(uint8 x, uint16 y, uint32 z, uint64 w) external returns (uint8, uint16, uint32, uint64);
         function packUnpackHeapInts(uint128 x, uint256 y) external returns (uint128, uint256);
+        function packUnpackPositionalVector(uint8 a, uint16 b, uint32 c, uint64 d) external returns (uint8[], uint16[], uint32[], uint64[]);
+        function packUnpackNamedVectors(uint128 x, uint256 y) external returns (uint128[], uint256[]);
+        function packUnpackPositionalNestedVectors(uint32 x, uint64 y) external returns (uint32[][], uint64[][]);
     }
 
     #[rstest]
@@ -146,6 +149,65 @@ mod enum_with_fields {
         )
         .unwrap();
     }
+
+    #[rstest]
+    #[case(
+        packUnpackPositionalVectorCall::new((87u8, 42u16, 55u32, 71u64)),
+        (
+            vec![87, 88, 89],
+            vec![42u16, 43u16, 44u16],
+            vec![55u32, 56u32, 57u32],
+            vec![71u64, 72u64, 73u64],
+        )
+    )]
+    fn test_pack_unpack_positional_vectors<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode_sequence(),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(packUnpackNamedVectorsCall::new((0u128, U256::from(0u128))), (vec![0u128, 1u128, 2u128], vec![U256::from(0u128), U256::from(1u128), U256::from(2u128)]))]
+    fn test_pack_unpack_named_vectors<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode_sequence(),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(packUnpackPositionalNestedVectorsCall::new((0u32, 0u64)), (vec![vec![0u32, 1u32, 2u32], vec![3u32, 4u32, 5u32]], vec![vec![0u64, 1u64, 2u64], vec![3u64, 4u64, 5u64]]))]
+    fn test_pack_unpack_positional_nested_vectors<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode_sequence(),
+        )
+        .unwrap();
+    }
 }
 
 mod enums_control_flow {
@@ -183,6 +245,7 @@ mod enums_control_flow {
         }
 
         function matchNumberEnum(NumberEnum x) external returns (uint32);
+        function singleMatch(NumberEnum x) external returns (uint32);
         function matchNestedEnum(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
         function matchWithConditional(NumberEnum x, uint32 y) external returns (uint32);
         function nestedMatchWithConditional(NumberEnum x, ColorEnum y, uint32 z) external returns (uint32);
@@ -204,6 +267,25 @@ mod enums_control_flow {
         #[case] expected: u32,
     ) {
         let call_data = matchNumberEnumCall::new((input,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(result, 0);
+        assert_eq!(return_data, expected.abi_encode());
+    }
+
+    #[rstest]
+    #[case(NumberEnum::One, 42)]
+    #[should_panic]
+    #[case(NumberEnum::Two, 0)]
+    #[should_panic]
+    #[case(NumberEnum::Three, 0)]
+    #[should_panic]
+    #[case(NumberEnum::Four, 0)]
+    fn test_single_match(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] input: NumberEnum,
+        #[case] expected: u32,
+    ) {
+        let call_data = singleMatchCall::new((input,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(result, 0);
         assert_eq!(return_data, expected.abi_encode());
