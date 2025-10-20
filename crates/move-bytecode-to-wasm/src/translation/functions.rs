@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use move_binary_format::file_format::{
-    DatatypeHandleIndex, FunctionDefinition, Signature, SignatureToken,
+    CodeOffset, DatatypeHandleIndex, FunctionDefinition, JumpTableInner, Signature, SignatureToken,
 };
 use walrus::{
     InstrSeqBuilder, LocalId, MemoryId, Module, ValType,
@@ -18,6 +18,14 @@ use crate::{
 
 use super::{intermediate_types::IntermediateType, table::FunctionId};
 
+#[derive(Debug, Clone)]
+pub struct JumpTableData {
+    // The enum associated with this jump table
+    pub enum_index: usize,
+    // The target offsets for each variant of the enum
+    pub offsets: Vec<CodeOffset>,
+}
+
 #[derive(Debug)]
 pub struct MappedFunction {
     pub function_id: FunctionId,
@@ -33,6 +41,10 @@ pub struct MappedFunction {
 
     /// Flag that tells us if the function contains generic arguments or return values
     pub is_generic: bool,
+
+    /// Jump tables associated with the function
+    /// VariantJumpTableIndex(i) corresponds to the ith jump table within this vector
+    pub jump_tables: Vec<JumpTableData>,
 }
 
 impl MappedFunction {
@@ -60,6 +72,19 @@ impl MappedFunction {
         let is_generic = signature.arguments.iter().any(type_contains_generics)
             || signature.returns.iter().any(type_contains_generics);
 
+        // Process jump tables within the function
+        let jump_tables = function_definition
+            .code
+            .iter()
+            .flat_map(|c| &c.jump_tables)
+            .map(|variant_jump_table| JumpTableData {
+                enum_index: variant_jump_table.head_enum.0 as usize,
+                offsets: match &variant_jump_table.jump_table {
+                    JumpTableInner::Full(offsets) => offsets.clone(),
+                },
+            })
+            .collect::<Vec<_>>();
+
         Self {
             function_id,
             signature,
@@ -68,6 +93,7 @@ impl MappedFunction {
             is_entry: function_definition.is_entry,
             is_native: function_definition.is_native(),
             is_generic,
+            jump_tables,
         }
     }
 }
@@ -115,6 +141,7 @@ impl MappedFunction {
             results,
             locals,
             is_generic: false,
+            jump_tables: self.jump_tables.clone(),
             ..*self
         }
     }

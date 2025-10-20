@@ -9,6 +9,7 @@ use crate::{CompilationContext, translation::intermediate_types::enums::IEnum};
 use super::unpack_native_int::unpack_i32_type_instructions;
 
 impl IEnum {
+    // TODO: this only works for simple enums where the variant does not have fields
     pub fn add_unpack_instructions(
         enum_: &IEnum,
         block: &mut InstrSeqBuilder,
@@ -48,18 +49,15 @@ impl IEnum {
             .i32_const(4)
             .call(compilation_ctx.allocator)
             .local_tee(enum_ptr)
-            .local_get(variant_number);
-
-        // Read the variant number
-
-        block.store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
+            .local_get(variant_number)
+            .store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
 
         block.local_get(enum_ptr);
     }

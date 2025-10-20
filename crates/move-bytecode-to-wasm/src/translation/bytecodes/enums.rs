@@ -1,6 +1,6 @@
 use walrus::{
     InstrSeqBuilder, Module, ValType,
-    ir::{MemArg, StoreKind},
+    ir::{LoadKind, MemArg, StoreKind},
 };
 
 use crate::{
@@ -33,18 +33,20 @@ pub fn pack_variant(
     let val_32 = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
 
+    // This accounts for the variant that occupies most space in memory (plus the 4 bytes for the variant index)
     let heap_size = enum_
         .heap_size
         .ok_or(TranslationError::PackingGenericEnumVariant {
             enum_index: enum_.index,
         })?;
 
+    // Allocate memory for the enum variant
     builder
         .i32_const(heap_size as i32)
         .call(compilation_ctx.allocator)
         .local_set(pointer);
 
-    // Save the variant index
+    // Save the variant index in the first 4 bytes
     builder
         .local_get(pointer)
         .i32_const(variant_index as i32)
@@ -57,10 +59,13 @@ pub fn pack_variant(
             },
         );
 
-    let mut offset = heap_size;
+    let variant = &enum_.variants[variant_index as usize];
+    let variant_fields_count = variant.fields.len();
 
-    for pack_type in enum_.variants[variant_index as usize].fields.iter().rev() {
-        offset -= 4;
+    // Start packing the fields in reverse order to match the types stack order
+    let mut offset = variant_fields_count as u32 * 4;
+
+    for pack_type in variant.fields.iter().rev() {
         match types_stack.pop()? {
             t if &t == pack_type => {
                 match pack_type {
@@ -80,11 +85,20 @@ pub fn pack_variant(
                         // Save the actual value
                         builder.local_set(val);
 
+                        // Create a pointer for the value
+                        builder
+                            .i32_const(data_size as i32)
+                            .call(compilation_ctx.allocator)
+                            .local_tee(ptr_to_data);
+
                         // Store the actual value behind the middle_ptr
-                        builder.local_get(pointer).local_get(val).store(
+                        builder.local_get(val).store(
                             compilation_ctx.memory_id,
                             store_kind,
-                            MemArg { align: 0, offset },
+                            MemArg {
+                                align: 0,
+                                offset: 0,
+                            },
                         );
                     }
                     // Heap types: The stack data is a pointer to the value, store directly
@@ -97,13 +111,6 @@ pub fn pack_variant(
                     | IntermediateType::IStruct { .. }
                     | IntermediateType::IGenericStructInstance { .. } => {
                         builder.local_set(ptr_to_data);
-
-                        // Directly write the pointer to the data
-                        builder.local_get(pointer).local_get(ptr_to_data).store(
-                            compilation_ctx.memory_id,
-                            StoreKind::I32 { atomic: false },
-                            MemArg { align: 0, offset },
-                        );
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                         return Err(TranslationError::FoundReferenceInsideEnum {
@@ -118,7 +125,17 @@ pub fn pack_variant(
                     }
                     IntermediateType::IEnum(_) => todo!(),
                 };
+
+                // Store the ptr to the value in the enum variant memory
+                builder.local_get(pointer).local_get(ptr_to_data).store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg { align: 0, offset },
+                );
+
+                offset -= 4;
             }
+
             t => Err(TranslationError::TypeMismatch {
                 expected: pack_type.clone(),
                 found: t,
@@ -127,6 +144,80 @@ pub fn pack_variant(
     }
 
     builder.local_get(pointer);
+
+    Ok(())
+}
+
+pub fn unpack_variant(
+    enum_: &IEnum,
+    variant_index: u16,
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    types_stack: &mut TypesStack,
+) -> Result<(), TranslationError> {
+    // Here we should unpack the variant fields. On top of the stack we should have the pointer to the variant.
+    let pointer = module.locals.add(ValType::I32);
+    builder.local_set(pointer);
+
+    // Skip the first 4 bytes which is the variant index
+    let mut offset = 4;
+
+    for field in &enum_.variants[variant_index as usize].fields {
+        // Load the middle pointer
+        builder.local_get(pointer).load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg { align: 0, offset },
+        );
+
+        match field {
+            // Stack values: load in stack the actual value
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64 => {
+                builder.load(
+                    compilation_ctx.memory_id,
+                    if field.stack_data_size() == 8 {
+                        LoadKind::I64 { atomic: false }
+                    } else {
+                        LoadKind::I32 { atomic: false }
+                    },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+            // Heap types: The stack data is a pointer to the value is loaded at the beginning of
+            // the loop
+            IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress
+            | IntermediateType::ISigner
+            | IntermediateType::IVector(_)
+            | IntermediateType::IStruct { .. }
+            | IntermediateType::IGenericStructInstance { .. } => {}
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                return Err(TranslationError::FoundReferenceInsideEnum {
+                    enum_index: enum_.index,
+                });
+            }
+            IntermediateType::ITypeParameter(_) => {
+                return Err(TranslationError::FoundTypeParameterInsideEnumVariant {
+                    enum_index: enum_.index,
+                    variant_index,
+                });
+            }
+            IntermediateType::IEnum(_) => todo!(),
+        }
+
+        types_stack.push(field.clone());
+
+        offset += 4;
+    }
 
     Ok(())
 }
