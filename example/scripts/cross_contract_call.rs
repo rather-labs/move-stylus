@@ -1,3 +1,4 @@
+use alloy::hex;
 use alloy::primitives::{address, U256};
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
@@ -113,9 +114,14 @@ async fn main() -> eyre::Result<()> {
     println!("  Current allowance = {}", res);
 
     let pending_tx = example.transferFromErc20(
-        contract_address_erc20, sender, address_2, U256::from(1000)).send().await?;
-    let receipt = pending_tx.get_receipt().await;
-    println!("Approval succeded {}", receipt.is_ok());
+        contract_address_erc20, sender, address_2, U256::from(1000)).gas(1_000_000).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    println!("Transfer From succeded");
+    println!("receipt: {:?}", receipt);
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("constructor 0x{}", hex::encode(&raw));
+    }
 
     let res = example.balanceOfErc20(contract_address_erc20, sender).call().await?;
     println!("Balance of {sender} = {res:?}");

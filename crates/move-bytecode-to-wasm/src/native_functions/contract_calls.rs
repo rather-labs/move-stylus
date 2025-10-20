@@ -86,7 +86,6 @@ pub fn add_external_contract_call_fn(
     } else {
         let gas = module.locals.add(ValType::I64);
         builder.i64_const(u64::MAX as i64).local_set(gas);
-        println!("max gas");
         gas
     };
 
@@ -156,8 +155,21 @@ pub fn add_external_contract_call_fn(
         let writer_pointer = module.locals.add(ValType::I32);
         let calldata_reference_pointer = module.locals.add(ValType::I32);
 
+        let mut args_size = 0;
+        for signature_token in calldata_arguments {
+            // If the function returns multiple values, those values will be encoded as a tuple. By
+            // definition, a tuple T is dynamic (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k.
+            // The encode size for a dynamically encoded field inside a dynamically encoded tuple is
+            // just 32 bytes (the value is the offset to where the values are packed)
+            args_size += if signature_token.is_dynamic(compilation_ctx) {
+                32
+            } else {
+                signature_token.encoded_size(compilation_ctx)
+            };
+        }
+
         builder
-            .i32_const(32)
+            .i32_const(args_size as i32)
             .call(compilation_ctx.allocator)
             .local_tee(writer_pointer)
             .local_set(calldata_reference_pointer);
@@ -166,14 +178,37 @@ pub fn add_external_contract_call_fn(
             .iter()
             .zip(&function_args[arguments_from..])
         {
-            argument.add_pack_instructions(
-                &mut builder,
-                module,
-                *wasm_local,
-                writer_pointer,
-                calldata_reference_pointer,
-                compilation_ctx,
-            );
+            if argument.is_dynamic(compilation_ctx) {
+                argument.add_pack_instructions_dynamic(
+                    &mut builder,
+                    module,
+                    *wasm_local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    compilation_ctx,
+                );
+
+                builder
+                    .local_get(writer_pointer)
+                    .i32_const(32)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(writer_pointer);
+            } else {
+                argument.add_pack_instructions(
+                    &mut builder,
+                    module,
+                    *wasm_local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    compilation_ctx,
+                );
+
+                builder
+                    .local_get(writer_pointer)
+                    .i32_const(argument.encoded_size(compilation_ctx) as i32)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(writer_pointer);
+            }
         }
     }
 
