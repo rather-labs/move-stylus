@@ -153,7 +153,7 @@ impl ModuleData {
         root_compiled_units: &'move_package [CompiledUnitWithSource],
         function_definitions: &mut GlobalFunctionTable<'move_package>,
     ) -> Self {
-        let special_attributes = process_special_attributes(&move_module.source_path);
+        let special_attributes = process_special_attributes(&move_module.source_path).unwrap();
 
         let move_module_unit = &move_module.unit.module;
 
