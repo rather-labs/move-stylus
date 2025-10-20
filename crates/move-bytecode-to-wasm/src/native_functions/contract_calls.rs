@@ -13,9 +13,21 @@ use crate::{
     hostio::host_functions::{call_contract, read_return_data, static_call_contract},
     runtime::RuntimeFunction,
     translation::{functions::MappedFunction, intermediate_types::IntermediateType},
-    vm_handled_types::{VmHandledType, contract_call_result::ContractCallResult},
+    vm_handled_types::{
+        VmHandledType,
+        contract_call_result::{ContractCallEmptyResult, ContractCallResult},
+    },
 };
 
+/// Adds a function to perform an external contract call.
+///
+/// The functions are built using the signature contained in `function_information` and the
+/// modifiers declared by the user using the `#[ext(external_call, ..)]` attribute.
+///
+/// Depending if the declared function is payable or not, the generated function will expect
+/// the `value` argument as the first argument. Additionally, if the function is declared with the
+/// `gas` argument, it will be passed to the `call_contract` functions, otherwise, the maximum gas
+/// (u64::MAX) will be used.
 pub fn add_external_contract_call_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -31,7 +43,6 @@ pub fn add_external_contract_call_fn(
         function_information.function_id.identifier
     );
 
-    // let (emit_log_function, _) = crate::hostio::host_functions::emit_log(module);
     if let Some(function_id) = module.funcs.by_name(&name) {
         return function_id;
     }
@@ -131,7 +142,7 @@ pub fn add_external_contract_call_fn(
         compilation_ctx,
     );
 
-    //Save the function selector before the arguments
+    // Save the function selector before the arguments
     builder
         .i32_const(4)
         .call(compilation_ctx.allocator)
@@ -151,6 +162,7 @@ pub fn add_external_contract_call_fn(
 
     let calldata_len = module.locals.add(ValType::I32);
 
+    // Pack the arguments in the calldata
     if !calldata_arguments.is_empty() {
         let writer_pointer = module.locals.add(ValType::I32);
         let calldata_reference_pointer = module.locals.add(ValType::I32);
@@ -212,6 +224,7 @@ pub fn add_external_contract_call_fn(
         }
     }
 
+    // Get the calldata length
     builder
         .i32_const(0)
         .call(compilation_ctx.allocator)
@@ -226,6 +239,8 @@ pub fn add_external_contract_call_fn(
         .call(compilation_ctx.allocator)
         .local_set(return_data_len);
 
+    // If the function is pure or view, we use static_call_contract since no state modification is
+    // allowed
     if function_modifiers.contains(&FunctionModifier::Pure)
         || function_modifiers.contains(&FunctionModifier::View)
     {
@@ -252,11 +267,41 @@ pub fn add_external_contract_call_fn(
     let call_result = module.locals.add(ValType::I32);
     let call_result_code_ptr = module.locals.add(ValType::I32);
 
-    // Recreate the CallResult<T>
-    builder
-        .i32_const(8)
-        .call(compilation_ctx.allocator)
-        .local_set(call_result);
+    if function_information.signature.returns.len() > 1 {
+        panic!(
+            "external contract call function {} must return a ContractCallResult<T> or ContractCallEmptyResult with a single type parameter",
+            function_information.function_id
+        );
+    }
+
+    // Depending on the return type, we allocate the proper size for the call result (4 for empty,
+    // 8 for result)
+    match function_information.signature.returns.first() {
+        None => panic!(
+            "external contract call function {} must return a ContractCallResult<T> or ContractCallEmptyResult",
+            function_information.function_id
+        ),
+        Some(IntermediateType::IGenericStructInstance {
+            module_id, index, ..
+        }) if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx) => {
+            builder
+                .i32_const(8)
+                .call(compilation_ctx.allocator)
+                .local_set(call_result);
+        }
+        Some(IntermediateType::IStruct {
+            module_id, index, ..
+        }) if ContractCallEmptyResult::is_vm_type(module_id, *index, compilation_ctx) => {
+            builder
+                .i32_const(4)
+                .call(compilation_ctx.allocator)
+                .local_set(call_result);
+        }
+        _ => panic!(
+            "external contract call function {} must return a ContractCallResult<T> or ContractCallEmptyResult",
+            function_information.function_id
+        ),
+    }
 
     // Save the result in the first field of CallResult<>
     builder
@@ -286,123 +331,130 @@ pub fn add_external_contract_call_fn(
         );
 
     // If the call succeded (returned 0), we proceed to decode the result
-    builder.block(None, |block| {
-        let block_id = block.id();
+    if matches!(
+        function_information.signature.returns.first(),
+        Some(IntermediateType::IGenericStructInstance {
+            module_id, index, ..
+        }) if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx)
+    ) {
+        builder.block(None, |block| {
+            let block_id = block.id();
 
-        // Exit the block if the status != 0
-        block
-            .local_get(call_contract_result)
-            .i32_const(0)
-            .binop(BinaryOp::I32Ne)
-            .br_if(block_id);
+            // Exit the block if the status != 0
+            block
+                .local_get(call_contract_result)
+                .i32_const(0)
+                .binop(BinaryOp::I32Ne)
+                .br_if(block_id);
 
-        let return_data_abi_encoded_ptr = module.locals.add(ValType::I32);
+            let return_data_abi_encoded_ptr = module.locals.add(ValType::I32);
 
-        // Return data len is in big endian, we read it and change endianess
-        block
-            .local_get(return_data_len)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_set(return_data_len);
-
-        block
-            .local_get(return_data_len)
-            .call(compilation_ctx.allocator)
-            .local_tee(return_data_abi_encoded_ptr);
-
-        block
-            .i32_const(0)
-            .local_get(return_data_len)
-            .call(read_return_data)
-            .local_set(return_data_len);
-
-        assert_eq!(
-            1,
-            function_information.signature.returns.len(),
-            "invalid contract call function, it can only return one value"
-        );
-
-        if let IntermediateType::IGenericStructInstance {
-            module_id,
-            index,
-            types,
-            ..
-        } = &function_information.signature.returns[0]
-        {
-            if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx) {
-                let calldata_reader_pointer = module.locals.add(ValType::I32);
-
-                block
-                    .local_get(return_data_abi_encoded_ptr)
-                    .local_set(calldata_reader_pointer);
-
-                let result_type = &types[0];
-
-                // Unpack the value
-                result_type.add_unpack_instructions(
-                    block,
-                    module,
-                    return_data_abi_encoded_ptr,
-                    calldata_reader_pointer,
-                    compilation_ctx,
-                );
-
-                let abi_decoded_call_result = if result_type == &IntermediateType::IU64 {
-                    module.locals.add(ValType::I64)
-                } else {
-                    module.locals.add(ValType::I32)
-                };
-
-                block.local_set(abi_decoded_call_result);
-
-                // If the return type is a stack type, we need to create the intermediate pointer
-                // for the struct field, otherwise it is already a pointer, we write it directly
-                let data_ptr = if result_type.is_stack_type() {
-                    let call_result_value_ptr = module.locals.add(ValType::I32);
-                    block
-                        .i32_const(4)
-                        .call(compilation_ctx.allocator)
-                        .local_tee(call_result_value_ptr)
-                        .local_get(abi_decoded_call_result)
-                        .store(
-                            compilation_ctx.memory_id,
-                            if result_type == &IntermediateType::IU64 {
-                                StoreKind::I64 { atomic: false }
-                            } else {
-                                StoreKind::I32 { atomic: false }
-                            },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-                    call_result_value_ptr
-                } else {
-                    abi_decoded_call_result
-                };
-
-                block.local_get(call_result).local_get(data_ptr).store(
+            // Return data len is in big endian, we read it and change endianess
+            block
+                .local_get(return_data_len)
+                .load(
                     compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
+                    LoadKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
-                        offset: 4,
+                        offset: 0,
                     },
-                );
-            } else {
-                panic!(
-                    "invalid ContractCallResult type found in function {}",
-                    function_information.function_id
-                );
+                )
+                .local_set(return_data_len);
+
+            block
+                .local_get(return_data_len)
+                .call(compilation_ctx.allocator)
+                .local_tee(return_data_abi_encoded_ptr);
+
+            block
+                .i32_const(0)
+                .local_get(return_data_len)
+                .call(read_return_data)
+                .local_set(return_data_len);
+
+            assert_eq!(
+                1,
+                function_information.signature.returns.len(),
+                "invalid contract call function, it can only return one value"
+            );
+
+            if let IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+                ..
+            } = &function_information.signature.returns[0]
+            {
+                if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx) {
+                    let calldata_reader_pointer = module.locals.add(ValType::I32);
+
+                    block
+                        .local_get(return_data_abi_encoded_ptr)
+                        .local_set(calldata_reader_pointer);
+
+                    let result_type = &types[0];
+
+                    // Unpack the value
+                    result_type.add_unpack_instructions(
+                        block,
+                        module,
+                        return_data_abi_encoded_ptr,
+                        calldata_reader_pointer,
+                        compilation_ctx,
+                    );
+
+                    let abi_decoded_call_result = if result_type == &IntermediateType::IU64 {
+                        module.locals.add(ValType::I64)
+                    } else {
+                        module.locals.add(ValType::I32)
+                    };
+
+                    block.local_set(abi_decoded_call_result);
+
+                    // If the return type is a stack type, we need to create the intermediate pointer
+                    // for the struct field, otherwise it is already a pointer, we write it directly
+                    let data_ptr = if result_type.is_stack_type() {
+                        let call_result_value_ptr = module.locals.add(ValType::I32);
+                        block
+                            .i32_const(4)
+                            .call(compilation_ctx.allocator)
+                            .local_tee(call_result_value_ptr)
+                            .local_get(abi_decoded_call_result)
+                            .store(
+                                compilation_ctx.memory_id,
+                                if result_type == &IntermediateType::IU64 {
+                                    StoreKind::I64 { atomic: false }
+                                } else {
+                                    StoreKind::I32 { atomic: false }
+                                },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+                        call_result_value_ptr
+                    } else {
+                        abi_decoded_call_result
+                    };
+
+                    block.local_get(call_result).local_get(data_ptr).store(
+                        compilation_ctx.memory_id,
+                        StoreKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 4,
+                        },
+                    );
+                } else {
+                    panic!(
+                        "invalid ContractCallResult type found in function {}",
+                        function_information.function_id
+                    );
+                }
             }
-        }
-    });
+        });
+    }
 
     // After the call we read the data
     builder.local_get(call_result);
