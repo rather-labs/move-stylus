@@ -93,11 +93,10 @@ impl IEnum {
                             enum_index: variant.belongs_to,
                         });
                     }
-                    _ => field.stack_data_size(),
+                    _ => 4,
                 };
-
-                size = std::cmp::max(size, variant_size);
             }
+            size = std::cmp::max(size, variant_size);
         }
 
         Ok(Some(size + 4))

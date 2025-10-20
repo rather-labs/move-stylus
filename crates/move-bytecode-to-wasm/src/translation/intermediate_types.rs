@@ -562,7 +562,9 @@ impl IntermediateType {
             | IntermediateType::IAddress
             | IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. } => {
+            | IntermediateType::IGenericStructInstance { .. }
+            // TODO: check this for enums
+            | IntermediateType::IEnum(_) => {
                 builder.local_get(local);
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -571,7 +573,6 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot borrow a type parameter, expected a concrete type");
             }
-            IntermediateType::IEnum(_) => todo!(),
         }
     }
 

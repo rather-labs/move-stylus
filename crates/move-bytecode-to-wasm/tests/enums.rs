@@ -79,3 +79,312 @@ mod enum_abi_packing_unpacking {
         runtime.call_entrypoint(call_data).unwrap();
     }
 }
+
+mod enum_with_fields {
+    use super::*;
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "enum_with_fields";
+        const SOURCE_PATH: &str = "tests/enums/enum_with_fields.move";
+
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    use alloy_primitives::U256;
+    use alloy_sol_types::SolValue; // for .abi_encode()
+    use alloy_sol_types::sol; // runtime bytes
+
+    sol! {
+        function packUnpackPlanet(uint8 index) external returns (uint64, uint64);
+        function packUnpackStackInts(uint8 x, uint16 y, uint32 z, uint64 w) external returns (uint8, uint16, uint32, uint64);
+        function packUnpackHeapInts(uint128 x, uint256 y) external returns (uint128, uint256);
+    }
+
+    #[rstest]
+    #[case(packUnpackPlanetCall::new((0,)), (6371, 5972))]
+    #[case(packUnpackPlanetCall::new((1,)), (69911, 1898000))]
+    #[case(packUnpackPlanetCall::new((2,)), (3389, 641))]
+    #[case(packUnpackPlanetCall::new((3,)), (6051, 4868))]
+    #[case(packUnpackPlanetCall::new((4,)), (58232, 56800))]
+    fn test_pack_unpack_planet<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode(),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(packUnpackStackIntsCall::new((0, 0u16, 0u32, 0u64)), (0, 0u16, 0u32, 0u64))]
+    #[case(packUnpackStackIntsCall::new((1, 2u16, 3u32, 4u64)), (1, 2u16, 3u32, 4u64))]
+    #[case(packUnpackStackIntsCall::new((255, u16::MAX, u32::MAX, u64::MAX)), (255, u16::MAX, u32::MAX, u64::MAX))]
+    #[case(packUnpackHeapIntsCall::new((0u128, U256::from(0u128))), (0u128, U256::from(0u128)))]
+    #[case(packUnpackHeapIntsCall::new((1u128, U256::from(2u128))), (1u128, U256::from(2u128)))]
+    #[case(packUnpackHeapIntsCall::new((u128::MAX, U256::from(u128::MAX))), (u128::MAX, U256::from(u128::MAX)))]
+    fn test_pack_unpack_ints<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode(),
+        )
+        .unwrap();
+    }
+}
+
+mod enums_control_flow {
+    use super::*;
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "simple_enums_control_flow";
+        const SOURCE_PATH: &str = "tests/enums/simple_enums_control_flow.move";
+
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol! {
+        enum NumberEnum {
+            One,
+            Two,
+            Three,
+            Four,
+            Five,
+        }
+
+        enum ColorEnum {
+            Red,
+            Green,
+            Blue,
+        }
+
+        enum YinYangEnum {
+            Yin,
+            Yang,
+        }
+
+        function matchNumberEnum(NumberEnum x) external returns (uint32);
+        function matchNestedEnum(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
+        function matchWithConditional(NumberEnum x, uint32 y) external returns (uint32);
+        function nestedMatchWithConditional(NumberEnum x, ColorEnum y, uint32 z) external returns (uint32);
+        function controlFlow1(NumberEnum x, ColorEnum y) external returns (uint32);
+        function controlFlow1Bis(NumberEnum x, ColorEnum y) external returns (uint32);
+        function controlFlow2(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
+        function controlFlow2Bis(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
+    }
+
+    #[rstest]
+    #[case(NumberEnum::One, 11)]
+    #[case(NumberEnum::Two, 22)]
+    #[case(NumberEnum::Three, 33)]
+    #[case(NumberEnum::Four, 44)]
+    #[case(NumberEnum::Five, 44)]
+    fn test_basic_enum_match(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] input: NumberEnum,
+        #[case] expected: u32,
+    ) {
+        let call_data = matchNumberEnumCall::new((input,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(result, 0);
+        assert_eq!(return_data, expected.abi_encode());
+    }
+
+    #[rstest]
+    #[case(NumberEnum::One, ColorEnum::Red, YinYangEnum::Yin, 11)]
+    #[case(NumberEnum::Two, ColorEnum::Red, YinYangEnum::Yang, 22)]
+    #[case(NumberEnum::Two, ColorEnum::Green, YinYangEnum::Yin, 33)]
+    #[case(NumberEnum::Two, ColorEnum::Blue, YinYangEnum::Yang, 44)]
+    #[case(NumberEnum::Three, ColorEnum::Red, YinYangEnum::Yin, 55)]
+    #[case(NumberEnum::Four, ColorEnum::Blue, YinYangEnum::Yang, 66)]
+    #[case(NumberEnum::Five, ColorEnum::Green, YinYangEnum::Yang, 66)]
+    fn test_nested_enum_match(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] number: NumberEnum,
+        #[case] color: ColorEnum,
+        #[case] yin_yang: YinYangEnum,
+        #[case] expected: u32,
+    ) {
+        let call_data = matchNestedEnumCall::new((number, color, yin_yang)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(result, 0);
+        assert_eq!(return_data, expected.abi_encode());
+    }
+
+    #[rstest]
+    #[case(NumberEnum::One, 43, 1)]
+    #[case(NumberEnum::Two, 44, 2)]
+    #[case(NumberEnum::Three, 45, 2)]
+    #[case(NumberEnum::Four, 123, 2)]
+    #[case(NumberEnum::Five, 321, 2)]
+    #[case(NumberEnum::Five, 10, 3)]
+    #[case(NumberEnum::Four, 30, 4)]
+    #[case(NumberEnum::Four, 10, 5)]
+    #[case(NumberEnum::One, 0, 6)]
+    #[case(NumberEnum::Two, 42, 6)]
+    #[case(NumberEnum::Three, 18, 6)]
+    fn test_match_with_conditional(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] number: NumberEnum,
+        #[case] y: u32,
+        #[case] expected: u32,
+    ) {
+        let call_data = matchWithConditionalCall::new((number, y)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(result, 0);
+        assert_eq!(return_data, expected.abi_encode());
+    }
+
+    #[rstest]
+    #[case(NumberEnum::One, ColorEnum::Red, 43, 1)]
+    #[case(NumberEnum::Two, ColorEnum::Red, 44, 2)]
+    #[case(NumberEnum::Three, ColorEnum::Red, 45, 2)]
+    #[case(NumberEnum::Four, ColorEnum::Red, 123, 2)]
+    #[case(NumberEnum::Five, ColorEnum::Red, 321, 2)]
+    #[case(NumberEnum::Five, ColorEnum::Red, 10, 3)]
+    #[case(NumberEnum::Four, ColorEnum::Red, 30, 4)]
+    #[case(NumberEnum::Four, ColorEnum::Blue, 30, 5)]
+    #[case(NumberEnum::Four, ColorEnum::Red, 10, 6)]
+    #[case(NumberEnum::Four, ColorEnum::Blue, 10, 7)]
+    #[case(NumberEnum::One, ColorEnum::Blue, 10, 8)]
+    fn test_nested_match_with_conditional(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] number: NumberEnum,
+        #[case] color: ColorEnum,
+        #[case] z: u32,
+        #[case] expected: u32,
+    ) {
+        let call_data = nestedMatchWithConditionalCall::new((number, color, z)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(result, 0);
+        assert_eq!(return_data, expected.abi_encode());
+    }
+
+    #[rstest]
+    #[case(NumberEnum::One, ColorEnum::Red, true, 11)]
+    #[case(NumberEnum::Two, ColorEnum::Red, true, 44)]
+    #[case(NumberEnum::Two, ColorEnum::Green, false, 33)]
+    #[case(NumberEnum::Two, ColorEnum::Blue, true, 44)]
+    #[case(NumberEnum::Three, ColorEnum::Blue, true, 33)]
+    #[case(NumberEnum::Four, ColorEnum::Red, false, 44)]
+    #[case(NumberEnum::Four, ColorEnum::Green, false, 44)]
+    #[case(NumberEnum::Five, ColorEnum::Green, true, 55)]
+    fn test_control_flow_1(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] number: NumberEnum,
+        #[case] color: ColorEnum,
+        #[case] should_panic: bool,
+        #[case] expected: u32,
+    ) {
+        let call_data = controlFlow1Call::new((number, color)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        if should_panic {
+            assert_eq!(result, 1);
+        } else {
+            assert_eq!(result, 0);
+            assert_eq!(return_data, expected.abi_encode());
+        }
+    }
+
+    #[rstest]
+    #[case(NumberEnum::One, ColorEnum::Red, true, 11)]
+    #[case(NumberEnum::Two, ColorEnum::Red, true, 44)]
+    #[case(NumberEnum::Two, ColorEnum::Green, false, 33)]
+    #[case(NumberEnum::Two, ColorEnum::Blue, true, 44)]
+    #[case(NumberEnum::Three, ColorEnum::Blue, true, 33)]
+    #[case(NumberEnum::Four, ColorEnum::Red, true, 44)]
+    #[case(NumberEnum::Four, ColorEnum::Green, true, 44)]
+    #[case(NumberEnum::Five, ColorEnum::Green, true, 55)]
+    fn test_control_flow_1_bis(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] number: NumberEnum,
+        #[case] color: ColorEnum,
+        #[case] should_panic: bool,
+        #[case] expected: u32,
+    ) {
+        let call_data = controlFlow1BisCall::new((number, color)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        if should_panic {
+            assert_eq!(result, 1);
+        } else {
+            assert_eq!(result, 0);
+            assert_eq!(return_data, expected.abi_encode());
+        }
+    }
+
+    #[rstest]
+    #[case(NumberEnum::One, ColorEnum::Red, YinYangEnum::Yin, 11, true)]
+    #[case(NumberEnum::Two, ColorEnum::Red, YinYangEnum::Yang, 44, true)]
+    #[case(NumberEnum::Two, ColorEnum::Green, YinYangEnum::Yin, 88, false)]
+    #[case(NumberEnum::Two, ColorEnum::Green, YinYangEnum::Yang, 99, false)]
+    #[case(NumberEnum::Two, ColorEnum::Blue, YinYangEnum::Yang, 44, true)]
+    #[case(NumberEnum::Three, ColorEnum::Blue, YinYangEnum::Yang, 33, true)]
+    #[case(NumberEnum::Four, ColorEnum::Red, YinYangEnum::Yin, 77, false)]
+    #[case(NumberEnum::Four, ColorEnum::Green, YinYangEnum::Yin, 77, false)]
+    #[case(NumberEnum::Four, ColorEnum::Green, YinYangEnum::Yang, 88, false)]
+    #[case(NumberEnum::Five, ColorEnum::Green, YinYangEnum::Yang, 55, true)]
+    fn test_control_flow_2(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] number: NumberEnum,
+        #[case] color: ColorEnum,
+        #[case] yin_yang: YinYangEnum,
+        #[case] expected: u32,
+        #[case] should_panic: bool,
+    ) {
+        let call_data = controlFlow2Call::new((number, color, yin_yang)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        if should_panic {
+            assert_eq!(result, 1);
+        } else {
+            assert_eq!(result, 0);
+            assert_eq!(return_data, expected.abi_encode());
+        }
+    }
+
+    #[rstest]
+    #[case(NumberEnum::One, ColorEnum::Red, YinYangEnum::Yin, 11, true)]
+    #[case(NumberEnum::Two, ColorEnum::Red, YinYangEnum::Yang, 44, true)]
+    #[case(NumberEnum::Two, ColorEnum::Green, YinYangEnum::Yin, 33, true)]
+    #[case(NumberEnum::Two, ColorEnum::Green, YinYangEnum::Yang, 99, false)]
+    #[case(NumberEnum::Two, ColorEnum::Blue, YinYangEnum::Yang, 44, true)]
+    #[case(NumberEnum::Three, ColorEnum::Blue, YinYangEnum::Yang, 33, true)]
+    #[case(NumberEnum::Four, ColorEnum::Red, YinYangEnum::Yin, 44, true)]
+    #[case(NumberEnum::Four, ColorEnum::Green, YinYangEnum::Yin, 44, true)]
+    #[case(NumberEnum::Five, ColorEnum::Green, YinYangEnum::Yang, 55, true)]
+    fn test_control_flow_2_bis(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] number: NumberEnum,
+        #[case] color: ColorEnum,
+        #[case] yin_yang: YinYangEnum,
+        #[case] expected: u32,
+        #[case] should_panic: bool,
+    ) {
+        let call_data = controlFlow2BisCall::new((number, color, yin_yang)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        if should_panic {
+            assert_eq!(result, 1);
+        } else {
+            assert_eq!(result, 0);
+            assert_eq!(return_data, expected.abi_encode());
+        }
+    }
+}

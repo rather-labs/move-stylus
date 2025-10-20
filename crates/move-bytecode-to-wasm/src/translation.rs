@@ -11,6 +11,23 @@ pub mod functions;
 pub mod intermediate_types;
 pub mod table;
 
+use std::collections::{HashMap, HashSet};
+
+use anyhow::Result;
+
+use walrus::{
+    FunctionBuilder, FunctionId as WasmFunctionId, GlobalId, InstrSeqBuilder, LocalId, Module,
+    TableId, ValType,
+    ir::{BinaryOp, InstrSeqId, InstrSeqType, LoadKind, MemArg, StoreKind, UnaryOp, Value},
+};
+
+use relooper::BranchMode;
+
+use move_binary_format::{
+    file_format::{Bytecode, CodeUnit},
+    internals::ModuleIndex,
+};
+
 use crate::{
     CompilationContext,
     compilation_context::{
@@ -28,65 +45,108 @@ use crate::{
     vm_handled_types::{self, VmHandledType, named_id::NamedId, uid::Uid},
     wasm_builder_extensions::WasmBuilderExtension,
 };
-use anyhow::Result;
+
 use flow::Flow;
+
 use functions::{
     MappedFunction, add_unpack_function_return_values_instructions, prepare_function_arguments,
     prepare_function_return,
 };
+
 use intermediate_types::{
     IntermediateType, VmHandledStruct,
     heap_integers::{IU128, IU256},
     simple_integers::{IU8, IU16, IU32, IU64},
     vector::IVector,
 };
-use move_binary_format::{
-    file_format::{Bytecode, CodeUnit},
-    internals::ModuleIndex,
-};
-use relooper::BranchMode;
-use std::collections::{HashMap, HashSet};
+
 use table::{FunctionId, FunctionTable, TableEntry};
+
+use functions::JumpTableData;
 use types_stack::TypesStack;
-use walrus::{
-    FunctionBuilder, FunctionId as WasmFunctionId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{
-        BinaryOp, Block, IfElse, InstrSeqId, InstrSeqType, LoadKind, MemArg, StoreKind, UnaryOp,
-        Value,
-    },
-};
-use walrus::{GlobalId, TableId};
-/// This struct maps the relooper asigned labels to the actual walrus instruction sequence IDs.
-/// It is used to translate the branching instructions: Branch, BrFalse, BrTrue
-struct BranchTargets {
-    loop_continue: HashMap<u16, InstrSeqId>,
-    loop_break: HashMap<u16, InstrSeqId>,
-    merged_branch: HashMap<u16, InstrSeqId>,
+
+#[derive(Copy, Clone)]
+struct SimpleScope {
+    simple_block_id: InstrSeqId,
+    next_label: Option<u16>, // next == Some(label) if next is Simple
 }
 
-impl BranchTargets {
-    fn new() -> Self {
+#[derive(Default)]
+pub struct ControlTargets {
+    // Loop control targets
+    loop_continue: HashMap<u16, InstrSeqId>,
+    loop_break: HashMap<u16, InstrSeqId>,
+    // Ancestor stack of enclosing Simples for MergedBranch resolution
+    simple_scopes: Vec<SimpleScope>,
+}
+
+impl ControlTargets {
+    pub fn new() -> Self {
         Self {
             loop_continue: HashMap::new(),
             loop_break: HashMap::new(),
-            merged_branch: HashMap::new(),
+            simple_scopes: Vec::new(),
         }
     }
 
-    fn get_target(&self, branch_mode: &BranchMode, code_offset: &u16) -> Option<&InstrSeqId> {
-        match branch_mode {
-            BranchMode::LoopContinue(id) | BranchMode::LoopContinueIntoMulti(id) => {
-                self.loop_continue.get(id)
+    /* ---------- Simple scopes (for MergedBranch) ---------- */
+
+    /// Call when you open the wrapping block of a `Flow::Simple`.
+    pub fn push_simple_scope(&mut self, simple_block_id: InstrSeqId, next_label: Option<u16>) {
+        self.simple_scopes.push(SimpleScope {
+            simple_block_id,
+            next_label,
+        });
+    }
+
+    /// Call right before you close that wrapping block.
+    pub fn pop_simple_scope(&mut self) {
+        self.simple_scopes.pop();
+    }
+
+    /// Implement the “walk up to nearest Simple whose next == label” rule.
+    fn resolve_merged(&self, target_label: u16) -> Option<InstrSeqId> {
+        for scope in self.simple_scopes.iter().rev() {
+            if scope.next_label == Some(target_label) {
+                return Some(scope.simple_block_id);
             }
-            BranchMode::LoopBreak(id) | BranchMode::LoopBreakIntoMulti(id) => {
-                self.loop_break.get(id)
-            }
+        }
+        None
+    }
+
+    /* ---------- Loop scopes ---------- */
+
+    /// Call when you open `block { loop { ... } }` for a given `loop_id`.
+    pub fn set_loop_targets(
+        &mut self,
+        loop_id: u16,
+        break_target: InstrSeqId,
+        continue_target: InstrSeqId,
+    ) {
+        self.loop_break.insert(loop_id, break_target);
+        self.loop_continue.insert(loop_id, continue_target);
+    }
+
+    /// Optional: call when leaving the loop scope (not strictly necessary if loop_ids are unique).
+    pub fn clear_loop_targets(&mut self, loop_id: u16) {
+        self.loop_break.remove(&loop_id);
+        self.loop_continue.remove(&loop_id);
+    }
+
+    /* ---------- Unified branch resolver ---------- */
+
+    pub fn resolve(&self, mode: BranchMode, label: u16) -> Option<InstrSeqId> {
+        match mode {
             BranchMode::MergedBranch | BranchMode::MergedBranchIntoMulti => {
-                self.merged_branch.get(code_offset)
+                self.resolve_merged(label)
             }
-            _ => {
-                panic!("Unsupported branch mode: {:?}", branch_mode);
+            BranchMode::LoopBreak(loop_id) | BranchMode::LoopBreakIntoMulti(loop_id) => {
+                self.loop_break.get(&loop_id).copied()
             }
+            BranchMode::LoopContinue(loop_id) | BranchMode::LoopContinueIntoMulti(loop_id) => {
+                self.loop_continue.get(&loop_id).copied()
+            }
+            _ => panic!("Unsupported branch mode: {mode:?}"),
         }
     }
 }
@@ -107,7 +167,8 @@ struct TranslateFlowContext<'a> {
     function_table: &'a mut FunctionTable,
     function_locals: &'a Vec<LocalId>,
     uid_locals: &'a mut HashMap<u8, StorageIdParentInformation>,
-    branch_targets: &'a mut BranchTargets,
+    control_targets: &'a mut ControlTargets,
+    jump_table: &'a mut Option<JumpTableData>,
     dynamic_fields_global_variables: &'a mut Vec<(GlobalId, IntermediateType)>,
 }
 
@@ -125,11 +186,6 @@ pub fn translate_function(
     move_bytecode: &CodeUnit,
     dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
 ) -> Result<(WasmFunctionId, HashSet<FunctionId>)> {
-    anyhow::ensure!(
-        move_bytecode.jump_tables.is_empty(),
-        "Jump tables are not supported yet"
-    );
-
     let params = function_information.signature.get_argument_wasm_types();
     let results = function_information.signature.get_return_wasm_types();
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
@@ -154,12 +210,12 @@ pub fn translate_function(
         function_information,
     );
 
-    let flow = Flow::new(move_bytecode, function_information);
+    let flow = Flow::new(move_bytecode);
 
-    let mut branch_targets = BranchTargets::new();
     let mut types_stack = TypesStack::new();
     let mut functions_to_link = HashSet::new();
     let mut uid_locals: HashMap<u8, StorageIdParentInformation> = HashMap::new();
+    let mut control_targets = ControlTargets::new();
 
     let mut ctx = TranslateFlowContext {
         compilation_ctx,
@@ -169,7 +225,8 @@ pub fn translate_function(
         function_locals: &function_locals,
         uid_locals: &mut uid_locals,
         types_stack: &mut types_stack,
-        branch_targets: &mut branch_targets,
+        control_targets: &mut control_targets,
+        jump_table: &mut None, // The current jump table we are translating
         dynamic_fields_global_variables,
     };
 
@@ -182,6 +239,7 @@ pub fn translate_function(
     );
 
     let function_id = function.finish(arguments, &mut module.funcs);
+
     Ok((function_id, functions_to_link))
 }
 
@@ -197,43 +255,44 @@ fn translate_flow(
     match flow {
         Flow::Simple {
             instructions,
-            stack,
             branches,
             immediate,
             next,
             ..
         } => {
-            let ty = InstrSeqType::new(&mut module.types, &[], stack);
+            // If the immediate flow contains a Ret instruction, set the result type of the block to the function's return type.
+            let ty = InstrSeqType::new(
+                &mut module.types,
+                &[],
+                if instructions
+                    .last()
+                    .is_some_and(|b| matches!(b, Bytecode::Ret))
+                    || immediate.dominates_return()
+                {
+                    &ctx.function_information.results
+                } else {
+                    &[]
+                },
+            );
+
             builder.block(ty, |block| {
-                // When we encounter a MergedBranch target for the first time, we map it to the block's ID (block.id()) that wraps the current simple flow.
-                // This mapping determines where to jump when a branch instruction targets that code_offset.
-                // Essentially, it allows skipping the current simple block and continuing to the next one.
-                for (target_label, branch_mode) in branches {
-                    if let BranchMode::MergedBranch | BranchMode::MergedBranchIntoMulti =
-                        branch_mode
-                    {
-                        ctx.branch_targets
-                            .merged_branch
-                            .insert(*target_label, block.id());
-                    }
-                }
+                // Add the simple scope to the control targets.
+                ctx.control_targets.push_simple_scope(
+                    block.id(),
+                    match &**next {
+                        Flow::Simple { label, .. } => Some(*label),
+                        _ => None,
+                    },
+                );
 
                 // First translate the instuctions associated with the simple flow itself
-                for instruction in instructions {
+                for instruction in *instructions {
                     let mut fns_to_link = translate_instruction(
                         instruction,
-                        ctx.compilation_ctx,
-                        ctx.module_data,
+                        ctx,
                         block,
-                        ctx.function_information,
                         module,
-                        ctx.function_table,
-                        ctx.types_stack,
-                        ctx.function_locals,
-                        ctx.uid_locals,
                         branches,
-                        ctx.branch_targets,
-                        ctx.dynamic_fields_global_variables,
                     )
                     .unwrap_or_else(|e| {
                         panic!("there was an error translating instruction {instruction:?}.\n{e}")
@@ -241,35 +300,46 @@ fn translate_flow(
 
                     functions_to_link.extend(fns_to_link.drain(..));
                 }
-                // Then translate instructions of the immediate block, inside the current block
+                // Translate the immediate flow within the current scope
                 translate_flow(ctx, block, module, immediate, functions_to_link);
+
+                // Done with this Simple's inner region. Pop the simple scope.
+                ctx.control_targets.pop_simple_scope();
             });
-            // Then translate instructions of the next block, but outside the wrapping block
+            // Translate the next flow outside the current scope
             translate_flow(ctx, builder, module, next, functions_to_link);
         }
         Flow::Loop {
-            stack,
             loop_id,
             inner,
             next,
             ..
         } => {
-            let ty = InstrSeqType::new(&mut module.types, &[], stack);
+            // If the inner flow contains a Ret instruction, set the result type of the block to the function's return type.
+            let ty = InstrSeqType::new(
+                &mut module.types,
+                &[],
+                if inner.dominates_return() {
+                    &ctx.function_information.results
+                } else {
+                    &[]
+                },
+            );
+
             // We wrap the loop in a block so we have a "landing spot" if we need to break out of it
             // (in case we encounter a BranchMode::LoopBreak).
             builder.block(ty, |block| {
-                // Map the Relooper's loop id to the Walrus instruction sequence ID
-                // Walrus needs the specific InstrSeqId where to branch to.
-                ctx.branch_targets.loop_break.insert(*loop_id, block.id());
-
+                let block_id = block.id();
                 block.loop_(ty, |loop_| {
-                    // Map the loop_id to the actual loop instruction, so `continue` knows where to jump.
-                    ctx.branch_targets
-                        .loop_continue
-                        .insert(*loop_id, loop_.id());
+                    // Add the loop targets to the control targets.
+                    ctx.control_targets
+                        .set_loop_targets(*loop_id, block_id, loop_.id());
 
                     // Translate the loop body (inner) inside the loop block.
                     translate_flow(ctx, loop_, module, inner, functions_to_link);
+
+                    // Clear the loop targets after the loop body is translated.
+                    ctx.control_targets.clear_loop_targets(*loop_id);
                 });
             });
 
@@ -281,79 +351,213 @@ fn translate_flow(
             else_body,
             ..
         } => {
-            let then_stack = then_body.get_stack();
-            let else_stack = else_body.get_stack();
+            // When the if/else flow stems from a two-branch match on an enum, the jump_table will be Some.
+            if ctx.jump_table.is_some() {
+                let offsets = &ctx.jump_table.as_ref().unwrap().offsets;
+                let enum_index = ctx.jump_table.as_ref().unwrap().enum_index;
+                let enum_data = ctx
+                    .module_data
+                    .enums
+                    .get_enum_by_index(enum_index as u16)
+                    .unwrap();
 
-            if then_stack == else_stack {
-                let ty = InstrSeqType::new(&mut module.types, &[], &then_stack);
-                let then_id = {
-                    let mut then_seq = builder.dangling_instr_seq(ty);
-                    translate_flow(ctx, &mut then_seq, module, then_body, functions_to_link);
-                    then_seq.id()
-                };
-
-                let else_id = {
-                    let mut else_seq = builder.dangling_instr_seq(ty);
-                    translate_flow(ctx, &mut else_seq, module, else_body, functions_to_link);
-                    else_seq.id()
-                };
-
-                builder.if_else(
-                    ty,
-                    |then| {
-                        then.instr(Block { seq: then_id });
-                    },
-                    |else_| {
-                        else_.instr(Block { seq: else_id });
-                    },
+                // The jump_table should have exactly 2 entries in this case.
+                assert_eq!(
+                    offsets.len(),
+                    2,
+                    "Jump table for IfElse flow should contain exactly 2 elements"
                 );
-            } else if then_stack.is_empty() {
-                // If the `then` arm leaves nothing on the stack but the `else` arm does,
-                // we place the `else` arm after the if/else block.
-                // This situation typically occurs when the arm leaving values on the stack
-                // represents a function return, while the other arm simply reloops.
-                // The else arm can be safely placed outside the if/else block because it must always be reached,
-                // otherwise the block wouldnt have a defined result.
-                let phantom_seq = builder.dangling_instr_seq(None);
-                let phantom_seq_id = phantom_seq.id();
 
-                let then_id = {
-                    let mut then_seq = builder.dangling_instr_seq(None);
-                    translate_flow(ctx, &mut then_seq, module, then_body, functions_to_link);
-                    then_seq.id()
+                // If offset[0] < offset[1], it means the `consequent` block corresponds to the first variant
+                // and the `alternative` block corresponds to the second variant.
+                // In that case the first variant index should match the value on the stack.
+                if offsets[0] <= offsets[1] {
+                    builder.i32_const(enum_data.variants[0].index as i32);
+                } else {
+                    builder.i32_const(enum_data.variants[1].index as i32);
                 };
+                builder.binop(BinaryOp::I32Eq);
 
-                builder.instr(IfElse {
-                    consequent: then_id,
-                    alternative: phantom_seq_id,
-                });
-
-                translate_flow(ctx, builder, module, else_body, functions_to_link);
-            } else if else_stack.is_empty() {
-                // Similar to the above scenario.
-                let phantom_seq = builder.dangling_instr_seq(None);
-                let phantom_seq_id = phantom_seq.id();
-
-                let else_id = {
-                    let mut else_seq = builder.dangling_instr_seq(None);
-                    translate_flow(ctx, &mut else_seq, module, else_body, functions_to_link);
-                    else_seq.id()
-                };
-
-                builder.unop(UnaryOp::I32Eqz);
-                builder.instr(IfElse {
-                    consequent: else_id,
-                    alternative: phantom_seq_id,
-                });
-
-                translate_flow(ctx, builder, module, then_body, functions_to_link);
-            } else {
-                // If both arms leave values on the stack but with different types, we panic.
-                // In this scenario, the block wouldnt have a well-defined result type.
-                panic!(
-                    "Error: Mismatched types on the stack from Then and Else branches, and neither is empty."
-                );
+                *ctx.jump_table = None;
             }
+
+            let condition = module.locals.add(ValType::I32);
+            builder.local_set(condition);
+
+            let then_ty = if then_body.dominates_return() {
+                ctx.function_information.results.clone()
+            } else {
+                vec![]
+            };
+
+            let else_ty = if else_body.dominates_return() {
+                ctx.function_information.results.clone()
+            } else {
+                vec![]
+            };
+
+            if then_ty == else_ty {
+                // CASE 1: both arms have the same result type (often empty)
+                let join_ty = InstrSeqType::new(&mut module.types, &[], &then_ty);
+
+                builder.block(join_ty, |join| {
+                    let join_id = join.id();
+                    join.block(None::<ValType>, |guard| {
+                        guard.local_get(condition);
+                        guard.br_if(guard.id());
+                        // ELSE (inside guard)
+                        translate_flow(ctx, guard, module, else_body, functions_to_link);
+                        guard.br(join_id); // reconverge
+                    });
+                    // THEN (after guard)
+                    translate_flow(ctx, join, module, then_body, functions_to_link);
+                });
+            } else if !then_ty.is_empty() && else_ty.is_empty() {
+                // CASE 2: ONLY THEN yields values; ELSE is empty
+                let join_ty = InstrSeqType::new(&mut module.types, &[], &then_ty);
+
+                builder.block(join_ty, |join| {
+                    join.block(None::<ValType>, |guard| {
+                        guard.local_get(condition);
+                        guard.br_if(guard.id());
+                        // ELSE (no result) inside guard
+                        translate_flow(ctx, guard, module, else_body, functions_to_link);
+                    });
+                    // THEN (produces join result) after guard
+                    translate_flow(ctx, join, module, then_body, functions_to_link);
+                });
+            } else if then_ty.is_empty() && !else_ty.is_empty() {
+                // CASE 3: ONLY ELSE yields values; THEN is empty
+                let join_ty = InstrSeqType::new(&mut module.types, &[], &else_ty);
+
+                builder.block(join_ty, |join| {
+                    join.block(None::<ValType>, |guard| {
+                        guard.local_get(condition);
+                        guard.unop(UnaryOp::I32Eqz); // flip so true => ELSE
+                        guard.br_if(guard.id());
+                        // THEN (no result) inside guard
+                        translate_flow(ctx, guard, module, then_body, functions_to_link);
+                    });
+                    // ELSE (produces join result) after guard
+                    translate_flow(ctx, join, module, else_body, functions_to_link);
+                });
+            } else {
+                // Both arms yield but with different types → no valid Wasm join
+                panic!("IfElse result mismatch: then={then_ty:?}, else={else_ty:?}");
+            }
+        }
+        Flow::Switch { cases } => {
+            let mut cases = cases.clone();
+
+            // label -> enclosing block id map for br_table targets
+            let mut label_to_block: HashMap<u16, InstrSeqId> = HashMap::new();
+
+            // Helper: open nested case targets, emit br_table once all targets exist,
+            // then translate each case body *after* its label target.
+            fn open_cases(
+                builder: &mut InstrSeqBuilder,
+                module: &mut Module,
+                ctx: &mut TranslateFlowContext,
+                functions_to_link: &mut HashSet<FunctionId>,
+                cases: &[&Flow], // reverse nesting order
+                label_to_block: &mut HashMap<u16, InstrSeqId>,
+                case_index: usize,
+            ) {
+                let ty = InstrSeqType::new(&mut module.types, &[ValType::I32], &[]);
+                if case_index == cases.len() {
+                    // The jump table is a vector of case labels (i.e. code offsets) in the order they were generated by the Move compiler.
+                    // We must stick to this order to switch to the correct case.
+                    let jump_table = ctx
+                        .jump_table
+                        .take()
+                        .expect("Jump table not found while translating Switch flow!");
+
+                    // Build targets in exact jump-table order
+                    let mut targets = Vec::with_capacity(jump_table.offsets.len());
+                    for &label in &jump_table.offsets {
+                        let id = *label_to_block
+                            .get(&label)
+                            .expect("Missing block id for jump-table label");
+
+                        targets.push(id);
+                    }
+
+                    // Out-of-range → fall into a trap block
+                    builder.block(ty, |trap| {
+                        trap.br_table(targets.into_boxed_slice(), trap.id());
+                    });
+                    builder.unreachable();
+                    return;
+                }
+
+                builder.block(ty, |case_block| {
+                    label_to_block.insert(cases[case_index].get_label(), case_block.id());
+                    open_cases(
+                        case_block,
+                        module,
+                        ctx,
+                        functions_to_link,
+                        cases,
+                        label_to_block,
+                        case_index + 1,
+                    );
+                });
+
+                // Emit the body *after* its target
+                translate_flow(ctx, builder, module, cases[case_index], functions_to_link);
+            }
+
+            // Check out if any of the Switch cases returns a value (contains a `Ret` instruction).
+            // - If the function returns something, find the single yielding case.
+            // - If more than one case returns a value, panic (this should never happen, as Move creates a merge block
+            // where those cases converge and where the actual value is pushed to the stack).
+            // - If the function doesn't return anything, use Empty for yielding_case.
+            let yielding_case = if !ctx.function_information.results.is_empty() {
+                let mut found = None;
+                for (i, c) in cases.iter().enumerate() {
+                    if c.dominates_return() {
+                        if found.is_some() {
+                            panic!(
+                                "Switch: more than one case returns a value; Move should have merged them."
+                            );
+                        }
+                        found = Some(i);
+                    }
+                }
+                match found {
+                    Some(i) => Box::new(cases.remove(i)),
+                    None => Box::new(Flow::Empty),
+                }
+            } else {
+                Box::new(Flow::Empty)
+            };
+
+            let case_ty = InstrSeqType::new(&mut module.types, &[ValType::I32], &[]);
+
+            // Open a block for the yielding case.
+            builder.block(case_ty, |yielding_block| {
+                // Create targets deepest-first by iterating cases in reverse
+                let cases_rev: Vec<&Flow> = cases.iter().rev().collect();
+
+                // If the yielding case is not empty, map its label to the yielding block
+                if !matches!(*yielding_case, Flow::Empty) {
+                    label_to_block.insert(yielding_case.get_label(), yielding_block.id());
+                }
+
+                // Build target labels and emit br_table; each case body is emitted after its label
+                open_cases(
+                    yielding_block,
+                    module,
+                    ctx,
+                    functions_to_link,
+                    &cases_rev,
+                    &mut label_to_block,
+                    0,
+                );
+            });
+
+            // Emit yielding case body if any
+            translate_flow(ctx, builder, module, &yielding_case, functions_to_link);
         }
         Flow::Empty => (),
     }
@@ -362,20 +566,23 @@ fn translate_flow(
 #[allow(clippy::too_many_arguments)]
 fn translate_instruction(
     instruction: &Bytecode,
-    compilation_ctx: &CompilationContext,
-    module_data: &ModuleData,
+    translate_flow_ctx: &mut TranslateFlowContext,
     builder: &mut InstrSeqBuilder,
-    mapped_function: &MappedFunction,
     module: &mut Module,
-    function_table: &mut FunctionTable,
-    types_stack: &mut TypesStack,
-    function_locals: &[LocalId],
-    uid_locals: &mut HashMap<u8, StorageIdParentInformation>,
     branches: &HashMap<u16, BranchMode>,
-    branch_targets: &BranchTargets,
-    dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
 ) -> Result<Vec<FunctionId>, TranslationError> {
     let mut functions_calls_to_link = Vec::new();
+
+    let compilation_ctx = &translate_flow_ctx.compilation_ctx;
+    let module_data = &translate_flow_ctx.module_data;
+    let mapped_function = &translate_flow_ctx.function_information;
+    let function_table = &mut translate_flow_ctx.function_table;
+    let types_stack = &mut translate_flow_ctx.types_stack;
+    let function_locals = &translate_flow_ctx.function_locals;
+    let uid_locals = &mut translate_flow_ctx.uid_locals;
+    let control_targets = &translate_flow_ctx.control_targets;
+    let jump_table = &mut translate_flow_ctx.jump_table;
+    let dynamic_fields_global_variables = &mut translate_flow_ctx.dynamic_fields_global_variables;
 
     match instruction {
         // Load a fixed constant
@@ -2318,24 +2525,31 @@ fn translate_instruction(
             )?;
         }
         Bytecode::BrTrue(code_offset) => {
-            if let Some(branch_mode) = branches.get(code_offset) {
-                if let Some(&target) = branch_targets.get_target(branch_mode, code_offset) {
+            if let Some(mode) = branches.get(code_offset) {
+                if let Some(target) = control_targets.resolve(*mode, *code_offset) {
                     builder.br_if(target);
+                } else {
+                    panic!("BrTrue target not found for code offset: {code_offset}");
                 }
             }
         }
         Bytecode::BrFalse(code_offset) => {
-            if let Some(branch_mode) = branches.get(code_offset) {
-                if let Some(&target) = branch_targets.get_target(branch_mode, code_offset) {
+            if let Some(mode) = branches.get(code_offset) {
+                if let Some(target) = control_targets.resolve(*mode, *code_offset) {
+                    // flip the boolean (Move’s BrFalse consumes the bool)
                     builder.unop(UnaryOp::I32Eqz);
                     builder.br_if(target);
+                } else {
+                    panic!("BrFalse target not found for code offset: {code_offset}");
                 }
             }
         }
         Bytecode::Branch(code_offset) => {
-            if let Some(branch_mode) = branches.get(code_offset) {
-                if let Some(&target) = branch_targets.get_target(branch_mode, code_offset) {
+            if let Some(mode) = branches.get(code_offset) {
+                if let Some(target) = control_targets.resolve(*mode, *code_offset) {
                     builder.br(target);
+                } else {
+                    panic!("Branch target not found for code offset: {code_offset}");
                 }
             }
         }
@@ -2347,13 +2561,13 @@ fn translate_instruction(
         //**
         Bytecode::PackVariant(index) => {
             let enum_ = module_data.enums.get_enum_by_variant_handle_idx(index)?;
-            let index_inside_enum = module_data
+            let variant_index = module_data
                 .enums
                 .get_variant_position_by_variant_handle_idx(index)?;
 
             bytecodes::enums::pack_variant(
                 enum_,
-                index_inside_enum,
+                variant_index,
                 module,
                 builder,
                 compilation_ctx,
@@ -2361,6 +2575,77 @@ fn translate_instruction(
             )?;
 
             types_stack.push(IntermediateType::IEnum(enum_.index));
+        }
+        Bytecode::UnpackVariant(index) => {
+            let enum_ = module_data.enums.get_enum_by_variant_handle_idx(index)?;
+            let variant_index = module_data
+                .enums
+                .get_variant_position_by_variant_handle_idx(index)?;
+
+            types_stack.pop_expecting(&IntermediateType::IEnum(enum_.index))?;
+
+            bytecodes::enums::unpack_variant(
+                enum_,
+                variant_index,
+                module,
+                builder,
+                compilation_ctx,
+                types_stack,
+            )?;
+        }
+        Bytecode::UnpackVariantImmRef(index) => {
+            let enum_ = module_data.enums.get_enum_by_variant_handle_idx(index)?;
+            let variant_index = module_data
+                .enums
+                .get_variant_position_by_variant_handle_idx(index)?;
+
+            types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
+                IntermediateType::IEnum(enum_.index),
+            )))?;
+
+            // Load the reference to the enum variant and then add unpack_variant instructions
+            builder.load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+
+            bytecodes::enums::unpack_variant(
+                enum_,
+                variant_index,
+                module,
+                builder,
+                compilation_ctx,
+                types_stack,
+            )?;
+        }
+        Bytecode::VariantSwitch(jump_table_index) => {
+            // The match subject (&IEnum) is on top of the stack
+            // The first load is to load the enum pointer from the reference
+            // The second load is to load the variant index from the enum pointer
+            builder
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                )
+                .load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+            // Set the jump table for the current VariantSwitch
+            **jump_table = Some(mapped_function.jump_tables[jump_table_index.0 as usize].clone());
         }
         b => Err(TranslationError::UnsupportedOperation {
             operation: b.clone(),
