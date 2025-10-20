@@ -163,8 +163,8 @@ impl Flow {
         }
     }
 
-    /// Helper function to check if the flow contains a Ret instruction inside it.
-    /// This is used to determine the result type of the block.
+    /// Returns true if this flow dominates a subgraph that includes a return instruction.
+    /// Used to determine the block's result type.
     pub fn dominates_return(&self) -> bool {
         match self {
             Flow::Simple {
