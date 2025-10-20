@@ -434,7 +434,7 @@ fn translate_flow(
                     join.block(None::<ValType>, |guard| {
                         guard.local_get(condition);
                         guard.unop(UnaryOp::I32Eqz); // flip so true => ELSE
-                        guard.br_if(guard.id()); // cond==false => leave guard => ELSE after
+                        guard.br_if(guard.id());
                         // THEN (no result) inside guard
                         translate_flow(ctx, guard, module, then_body, functions_to_link);
                     });
@@ -448,31 +448,6 @@ fn translate_flow(
         }
         Flow::Switch { cases } => {
             let mut cases = cases.clone();
-
-            // Check out if any of the Switch cases returns a value (contains a `Ret` instruction).
-            // - If the function returns something, find the single yielding case.
-            // - If more than one case returns a value, panic (this should never happen, as Move creates a merge block
-            // where those cases converge and where the actual value is pushed to the stack).
-            // - If the function doesn't return anything, use Empty for yielding_case.
-            let yielding_case = if !ctx.function_information.results.is_empty() {
-                let mut found = None;
-                for (i, c) in cases.iter().enumerate() {
-                    if c.dominates_return() {
-                        if found.is_some() {
-                            panic!(
-                                "Switch: more than one case returns a value; Move should have merged them."
-                            );
-                        }
-                        found = Some(i);
-                    }
-                }
-                match found {
-                    Some(i) => Box::new(cases.remove(i)),
-                    None => Box::new(Flow::Empty),
-                }
-            } else {
-                Box::new(Flow::Empty)
-            };
 
             // label -> enclosing block id map for br_table targets
             let mut label_to_block: HashMap<u16, InstrSeqId> = HashMap::new();
@@ -532,7 +507,33 @@ fn translate_flow(
                 translate_flow(ctx, builder, module, cases[case_index], functions_to_link);
             }
 
+            // Check out if any of the Switch cases returns a value (contains a `Ret` instruction).
+            // - If the function returns something, find the single yielding case.
+            // - If more than one case returns a value, panic (this should never happen, as Move creates a merge block
+            // where those cases converge and where the actual value is pushed to the stack).
+            // - If the function doesn't return anything, use Empty for yielding_case.
+            let yielding_case = if !ctx.function_information.results.is_empty() {
+                let mut found = None;
+                for (i, c) in cases.iter().enumerate() {
+                    if c.dominates_return() {
+                        if found.is_some() {
+                            panic!(
+                                "Switch: more than one case returns a value; Move should have merged them."
+                            );
+                        }
+                        found = Some(i);
+                    }
+                }
+                match found {
+                    Some(i) => Box::new(cases.remove(i)),
+                    None => Box::new(Flow::Empty),
+                }
+            } else {
+                Box::new(Flow::Empty)
+            };
+
             let case_ty = InstrSeqType::new(&mut module.types, &[ValType::I32], &[]);
+
             // Open a block for the yielding case.
             builder.block(case_ty, |yielding_block| {
                 // Create targets deepest-first by iterating cases in reverse
@@ -558,7 +559,6 @@ fn translate_flow(
             // Emit yielding case body if any
             translate_flow(ctx, builder, module, &yielding_case, functions_to_link);
         }
-
         Flow::Empty => (),
     }
 }
