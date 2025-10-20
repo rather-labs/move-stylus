@@ -286,7 +286,7 @@ fn translate_flow(
                 );
 
                 // First translate the instuctions associated with the simple flow itself
-                for instruction in instructions {
+                for instruction in *instructions {
                     let mut fns_to_link = translate_instruction(
                         instruction,
                         ctx,

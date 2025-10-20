@@ -4,31 +4,31 @@ use relooper::{BranchMode, ShapedBlock};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
-pub enum Flow {
+pub enum Flow<'code_unit> {
     Simple {
         label: u16,
-        instructions: Vec<Bytecode>,
-        immediate: Box<Flow>,
-        next: Box<Flow>,
+        instructions: &'code_unit [Bytecode],
+        immediate: Box<Flow<'code_unit>>,
+        next: Box<Flow<'code_unit>>,
         branches: HashMap<u16, BranchMode>,
     },
     Loop {
         loop_id: u16,
-        inner: Box<Flow>,
-        next: Box<Flow>,
+        inner: Box<Flow<'code_unit>>,
+        next: Box<Flow<'code_unit>>,
     },
     IfElse {
-        then_body: Box<Flow>,
-        else_body: Box<Flow>,
+        then_body: Box<Flow<'code_unit>>,
+        else_body: Box<Flow<'code_unit>>,
     },
     Switch {
-        cases: Vec<Flow>,
+        cases: Vec<Flow<'code_unit>>,
     },
     Empty,
 }
 
-impl Flow {
-    pub fn new(code_unit: &CodeUnit) -> Flow {
+impl<'code_unit> Flow<'code_unit> {
+    pub fn new(code_unit: &'code_unit CodeUnit) -> Flow<'code_unit> {
         // Create the control flow graph from the code unit
         let cfg = VMControlFlowGraph::new(&code_unit.code, &code_unit.jump_tables);
 
@@ -45,7 +45,7 @@ impl Flow {
         };
 
         // Context for each block within the control flow graph
-        let blocks_ctx: HashMap<u16, Vec<Bytecode>> = (&cfg as &dyn ControlFlowGraph)
+        let blocks_ctx: HashMap<u16, &[Bytecode]> = (&cfg as &dyn ControlFlowGraph)
             .blocks()
             .into_iter()
             .map(|b| {
@@ -53,14 +53,17 @@ impl Flow {
                 let end = cfg.block_end(b) + 1;
                 let code = &code_unit.code[start as usize..end as usize];
 
-                (start, code.to_vec())
+                (start, code)
             })
             .collect();
 
         Self::build(&relooped, &blocks_ctx)
     }
 
-    fn build(shaped_block: &ShapedBlock<u16>, blocks_ctx: &HashMap<u16, Vec<Bytecode>>) -> Flow {
+    fn build(
+        shaped_block: &ShapedBlock<u16>,
+        blocks_ctx: &HashMap<u16, &'code_unit [Bytecode]>,
+    ) -> Flow<'code_unit> {
         match shaped_block {
             ShapedBlock::Simple(simple_block) => {
                 let simple_block_ctx = blocks_ctx.get(&simple_block.label).unwrap();
@@ -93,7 +96,7 @@ impl Flow {
 
                 Flow::Simple {
                     label: simple_block.label,
-                    instructions: simple_block_ctx.clone(),
+                    instructions: simple_block_ctx,
                     immediate: Box::new(immediate_flow),
                     next: Box::new(next_flow),
                     branches,
