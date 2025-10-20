@@ -105,6 +105,9 @@ mod enum_with_fields {
         function packUnpackPositionalVector(uint8 a, uint16 b, uint32 c, uint64 d) external returns (uint8[], uint16[], uint32[], uint64[]);
         function packUnpackNamedVectors(uint128 x, uint256 y) external returns (uint128[], uint256[]);
         function packUnpackPositionalNestedVectors(uint32 x, uint64 y) external returns (uint32[][], uint64[][]);
+        function packUnpackAlpha(uint8 a, uint16 b, uint32 c, uint64 d) external returns (uint8, uint16, uint32, uint64);
+        function packUnpackBeta(uint128 e, uint256 f) external returns (uint128, uint256);
+        function packUnpackGamma(uint32[] a, bool[] b, uint128 c, uint256 d) external returns (uint32[], bool[], uint128, uint256);
     }
 
     #[rstest]
@@ -195,6 +198,62 @@ mod enum_with_fields {
     #[rstest]
     #[case(packUnpackPositionalNestedVectorsCall::new((0u32, 0u64)), (vec![vec![0u32, 1u32, 2u32], vec![3u32, 4u32, 5u32]], vec![vec![0u64, 1u64, 2u64], vec![3u64, 4u64, 5u64]]))]
     fn test_pack_unpack_positional_nested_vectors<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode_sequence(),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(packUnpackAlphaCall::new((0, 0u16, 0u32, 0u64)), (0, 0u16, 0u32, 0u64))]
+    #[case(packUnpackAlphaCall::new((1, 2u16, 3u32, 4u64)), (1, 2u16, 3u32, 4u64))]
+    #[case(packUnpackAlphaCall::new((255, u16::MAX, u32::MAX, u64::MAX)), (255, u16::MAX, u32::MAX, u64::MAX))]
+    fn test_pack_unpack_alpha<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode(),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(packUnpackBetaCall::new((0u128, U256::from(0u128))), (0u128, U256::from(0u128)))]
+    #[case(packUnpackBetaCall::new((1u128, U256::from(2u128))), (1u128, U256::from(2u128)))]
+    #[case(packUnpackBetaCall::new((u128::MAX, U256::from(u128::MAX))), (u128::MAX, U256::from(u128::MAX)))]
+    fn test_pack_unpack_beta<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode(),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(packUnpackGammaCall::new((vec![0, 1, 2], vec![false, true, false], 33u128, U256::from(42))), (vec![0, 1, 2], vec![false, true, false], 33u128, U256::from(42)))]
+    #[case(packUnpackGammaCall::new((vec![42u32, 43u32, 44u32], vec![true, false, true], 123u128, U256::from(321))), (vec![42u32, 43u32, 44u32], vec![true, false, true], 123u128, U256::from(321)))]
+    fn test_pack_unpack_gamma<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,

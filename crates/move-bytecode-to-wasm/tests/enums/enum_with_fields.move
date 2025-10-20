@@ -133,3 +133,74 @@ entry fun pack_unpack_positional_nested_vectors(x: u32, y: u64): (vector<vector<
         },
     }
 }
+
+// Enum with structs as fields
+public struct Alpha has drop {
+    a: u8,
+    b: u16,
+    c: u32,
+    d: u64,
+}
+
+public struct Beta has store, drop {
+    e: u128,
+    f: u256,
+}
+
+public struct Gamma has drop {
+    a: vector<u32>,
+    b: vector<bool>,
+    c: Beta
+}
+
+public enum StructsEnum has drop {
+    Alpha(Alpha),
+    Beta { beta: Beta },
+    Gamma { gamma: Gamma },
+}
+
+fun pack_alpha(a: u8, b: u16, c: u32, d: u64): StructsEnum {
+    let alpha = Alpha { a, b, c, d };
+    StructsEnum::Alpha(alpha)
+}
+
+fun pack_beta(e: u128, f: u256): StructsEnum {
+    let beta = Beta { e, f };
+    StructsEnum::Beta { beta }
+}
+
+fun pack_gamma(a: vector<u32>, b: vector<bool>, c: u128, d: u256): StructsEnum {
+    let beta = Beta { e: c, f: d };
+    let gamma = Gamma { a, b, c: beta };
+    StructsEnum::Gamma { gamma }
+}
+
+entry fun pack_unpack_alpha(a: u8, b: u16, c: u32, d: u64): (u8, u16, u32, u64) {
+    let structs_enum = pack_alpha(a, b, c, d);
+    match (structs_enum) {
+        StructsEnum::Alpha(alpha) => (alpha.a, alpha.b, alpha.c, alpha.d),
+        _ => {
+            abort(1)
+        },
+    }
+}
+
+entry fun pack_unpack_beta(e: u128, f: u256): (u128, u256) {
+    let structs_enum = pack_beta(e, f);
+    match (structs_enum) {
+        StructsEnum::Beta { beta } => (beta.e, beta.f),
+        _ => {
+            abort(1)
+        },
+    }
+}
+
+entry fun pack_unpack_gamma(a: vector<u32>, b: vector<bool>, c: u128, d: u256): (vector<u32>, vector<bool>, u128, u256) {
+    let structs_enum = pack_gamma(a, b, c, d);
+    match (structs_enum) {
+        StructsEnum::Gamma { gamma } => (gamma.a, gamma.b, gamma.c.e, gamma.c.f),
+        _ => {
+            abort(1)
+        },
+    }
+}
