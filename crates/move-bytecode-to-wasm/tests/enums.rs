@@ -529,3 +529,99 @@ mod enums_control_flow {
         }
     }
 }
+
+mod enums_geometry {
+    use super::*;
+    use alloy_sol_types::sol;
+    use alloy_sol_types::{SolCall, SolValue}; // for .abi_encode() // runtime bytes
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "enums_geometry";
+        const SOURCE_PATH: &str = "tests/enums/geometry.move";
+
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol! {
+        function testSquare(uint64 side) external returns (uint64, uint64);
+        function testMutateSquare(uint64 side) external returns (uint64, uint64, uint64, uint64);
+        function testTriangle(uint64 base, uint64 height) external returns (uint64, uint64, uint64);
+        function testMutateTriangle(uint64 base, uint64 height) external returns (uint64, uint64, uint64, uint64, uint64, uint64);
+    }
+
+    #[rstest]
+    #[case(testSquareCall::new((4u64,)), (4u64, 16u64))]
+    #[case(testSquareCall::new((5u64,)), (5u64, 25u64))]
+    fn test_square<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode_sequence(),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(testMutateSquareCall::new((4u64,)), (4u64, 16u64, 5u64, 25u64))]
+    #[case(testMutateSquareCall::new((5u64,)), (5u64, 25u64, 6u64, 36u64))]
+    fn test_mutate_square<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode_sequence(),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(testTriangleCall::new((4u64, 5u64)), (4u64, 5u64, 10u64))]
+    #[case(testTriangleCall::new((5u64, 6u64)), (5u64, 6u64, 15u64))]
+    fn test_triangle<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode_sequence(),
+        )
+        .unwrap();
+    }
+
+    #[rstest]
+    #[case(testMutateTriangleCall::new((4u64, 5u64)), (4u64, 5u64, 10u64, 5u64, 6u64, 15u64))]
+    #[case(testMutateTriangleCall::new((5u64, 6u64)), (5u64, 6u64, 15u64, 6u64, 7u64, 21u64))]
+    fn test_mutate_triangle<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode_sequence(),
+        )
+        .unwrap();
+    }
+}

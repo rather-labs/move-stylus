@@ -2603,23 +2603,34 @@ fn translate_instruction(
                 IntermediateType::IEnum(enum_.index),
             )))?;
 
-            // Load the reference to the enum variant and then add unpack_variant instructions
-            builder.load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-
-            bytecodes::enums::unpack_variant(
+            bytecodes::enums::unpack_variant_ref(
                 enum_,
                 variant_index,
                 module,
                 builder,
                 compilation_ctx,
                 types_stack,
+                false,
+            )?;
+        }
+        Bytecode::UnpackVariantMutRef(index) => {
+            let enum_ = module_data.enums.get_enum_by_variant_handle_idx(index)?;
+            let variant_index = module_data
+                .enums
+                .get_variant_position_by_variant_handle_idx(index)?;
+
+            types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
+                IntermediateType::IEnum(enum_.index),
+            )))?;
+
+            bytecodes::enums::unpack_variant_ref(
+                enum_,
+                variant_index,
+                module,
+                builder,
+                compilation_ctx,
+                types_stack,
+                true,
             )?;
         }
         Bytecode::VariantSwitch(jump_table_index) => {

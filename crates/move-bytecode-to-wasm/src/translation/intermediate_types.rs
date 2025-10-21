@@ -449,7 +449,18 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot copy a type parameter, expected a concrete type");
             }
-            IntermediateType::IEnum(_) => todo!(),
+            IntermediateType::IEnum(index) => {
+                let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+                enum_.copy_local_instructions(module, builder, compilation_ctx, module_data);
+            }
         }
     }
 

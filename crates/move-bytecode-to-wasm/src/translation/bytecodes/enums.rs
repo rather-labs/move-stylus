@@ -1,6 +1,6 @@
 use walrus::{
     InstrSeqBuilder, Module, ValType,
-    ir::{LoadKind, MemArg, StoreKind},
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use crate::{
@@ -148,6 +148,9 @@ pub fn pack_variant(
     Ok(())
 }
 
+/// Unpacks an enum variant
+///
+/// It expects a pointer to the enum variant on top of the stack, and it pushes the unpacked variant fields to the stack.
 pub fn unpack_variant(
     enum_: &IEnum,
     variant_index: u16,
@@ -172,7 +175,7 @@ pub fn unpack_variant(
         );
 
         match field {
-            // Stack values: load in stack the actual value
+            // Stack values: load the actual value
             IntermediateType::IBool
             | IntermediateType::IU8
             | IntermediateType::IU16
@@ -215,6 +218,83 @@ pub fn unpack_variant(
         }
 
         types_stack.push(field.clone());
+
+        offset += 4;
+    }
+
+    Ok(())
+}
+
+/// Unpacks a variant reference
+///
+/// It expects a reference to the enum variant on top of the stack, and it pushes (mut or imm) references to the unpacked variant fields.
+pub fn unpack_variant_ref(
+    enum_: &IEnum,
+    variant_index: u16,
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    types_stack: &mut TypesStack,
+    is_mut_ref: bool,
+) -> Result<(), TranslationError> {
+    // Pointer to the enum variant
+    let pointer = module.locals.add(ValType::I32);
+
+    // Load the reference to the enum variant
+    builder
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(pointer);
+
+    // Skip the first 4 bytes which is the variant index
+    let mut offset = 4;
+
+    for field in &enum_.variants[variant_index as usize].fields {
+        match field {
+            IntermediateType::IBool
+            | IntermediateType::IU8
+            | IntermediateType::IU16
+            | IntermediateType::IU32
+            | IntermediateType::IU64
+            | IntermediateType::IU128
+            | IntermediateType::IU256
+            | IntermediateType::IAddress
+            | IntermediateType::ISigner
+            | IntermediateType::IVector(_)
+            | IntermediateType::IStruct { .. }
+            | IntermediateType::IGenericStructInstance { .. } => {
+                // Add the offset to the pointer
+                builder
+                    .local_get(pointer)
+                    .i32_const(offset)
+                    .binop(BinaryOp::I32Add);
+            }
+            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                return Err(TranslationError::FoundReferenceInsideEnum {
+                    enum_index: enum_.index,
+                });
+            }
+            IntermediateType::ITypeParameter(_) => {
+                return Err(TranslationError::FoundTypeParameterInsideEnumVariant {
+                    enum_index: enum_.index,
+                    variant_index,
+                });
+            }
+            IntermediateType::IEnum(_) => todo!(),
+        }
+
+        // Push the reference to the unpacked field
+        if is_mut_ref {
+            types_stack.push(IntermediateType::IMutRef(Box::new(field.clone())));
+        } else {
+            types_stack.push(IntermediateType::IRef(Box::new(field.clone())));
+        }
 
         offset += 4;
     }
