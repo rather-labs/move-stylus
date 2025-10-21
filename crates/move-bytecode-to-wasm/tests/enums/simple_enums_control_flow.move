@@ -186,3 +186,17 @@ entry fun control_flow_2_bis(x: NumberEnum, y: ColorEnum, z: YinYangEnum): u32 {
 
     return a + b
 }
+
+entry fun test_control_flow_with_while(x: ColorEnum): u64 {
+    match (x) {
+        ColorEnum::Red => {
+            let mut i = 0;
+            while (i < 5) {
+                i = i + 1;
+            };
+            i
+        },
+        ColorEnum::Green => 7,
+        ColorEnum::Blue => 11,
+    }
+}

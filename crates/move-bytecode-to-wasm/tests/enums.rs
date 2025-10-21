@@ -108,6 +108,7 @@ mod enum_with_fields {
         function packUnpackAlpha(uint8 a, uint16 b, uint32 c, uint64 d) external returns (uint8, uint16, uint32, uint64);
         function packUnpackBeta(uint128 e, uint256 f) external returns (uint128, uint256);
         function packUnpackGamma(uint32[] a, bool[] b, uint128 c, uint256 d) external returns (uint32[], bool[], uint128, uint256);
+        function getGammaVecSum(uint32[] a, bool[] b, uint128 c, uint256 d) external returns (uint32);
     }
 
     #[rstest]
@@ -163,41 +164,9 @@ mod enum_with_fields {
             vec![71u64, 72u64, 73u64],
         )
     )]
-    fn test_pack_unpack_positional_vectors<T: SolCall, V: SolValue>(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] call_data: T,
-        #[case] expected_result: V,
-    ) where
-        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
-    {
-        run_test(
-            runtime,
-            call_data.abi_encode(),
-            expected_result.abi_encode_sequence(),
-        )
-        .unwrap();
-    }
-
-    #[rstest]
     #[case(packUnpackNamedVectorsCall::new((0u128, U256::from(0u128))), (vec![0u128, 1u128, 2u128], vec![U256::from(0u128), U256::from(1u128), U256::from(2u128)]))]
-    fn test_pack_unpack_named_vectors<T: SolCall, V: SolValue>(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] call_data: T,
-        #[case] expected_result: V,
-    ) where
-        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
-    {
-        run_test(
-            runtime,
-            call_data.abi_encode(),
-            expected_result.abi_encode_sequence(),
-        )
-        .unwrap();
-    }
-
-    #[rstest]
     #[case(packUnpackPositionalNestedVectorsCall::new((0u32, 0u64)), (vec![vec![0u32, 1u32, 2u32], vec![3u32, 4u32, 5u32]], vec![vec![0u64, 1u64, 2u64], vec![3u64, 4u64, 5u64]]))]
-    fn test_pack_unpack_positional_nested_vectors<T: SolCall, V: SolValue>(
+    fn test_pack_unpack_enums_with_vectores<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
@@ -216,44 +185,13 @@ mod enum_with_fields {
     #[case(packUnpackAlphaCall::new((0, 0u16, 0u32, 0u64)), (0, 0u16, 0u32, 0u64))]
     #[case(packUnpackAlphaCall::new((1, 2u16, 3u32, 4u64)), (1, 2u16, 3u32, 4u64))]
     #[case(packUnpackAlphaCall::new((255, u16::MAX, u32::MAX, u64::MAX)), (255, u16::MAX, u32::MAX, u64::MAX))]
-    fn test_pack_unpack_alpha<T: SolCall, V: SolValue>(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] call_data: T,
-        #[case] expected_result: V,
-    ) where
-        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
-    {
-        run_test(
-            runtime,
-            call_data.abi_encode(),
-            expected_result.abi_encode(),
-        )
-        .unwrap();
-    }
-
-    #[rstest]
     #[case(packUnpackBetaCall::new((0u128, U256::from(0u128))), (0u128, U256::from(0u128)))]
     #[case(packUnpackBetaCall::new((1u128, U256::from(2u128))), (1u128, U256::from(2u128)))]
     #[case(packUnpackBetaCall::new((u128::MAX, U256::from(u128::MAX))), (u128::MAX, U256::from(u128::MAX)))]
-    fn test_pack_unpack_beta<T: SolCall, V: SolValue>(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] call_data: T,
-        #[case] expected_result: V,
-    ) where
-        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
-    {
-        run_test(
-            runtime,
-            call_data.abi_encode(),
-            expected_result.abi_encode(),
-        )
-        .unwrap();
-    }
-
-    #[rstest]
     #[case(packUnpackGammaCall::new((vec![0, 1, 2], vec![false, true, false], 33u128, U256::from(42))), (vec![0, 1, 2], vec![false, true, false], 33u128, U256::from(42)))]
     #[case(packUnpackGammaCall::new((vec![42u32, 43u32, 44u32], vec![true, false, true], 123u128, U256::from(321))), (vec![42u32, 43u32, 44u32], vec![true, false, true], 123u128, U256::from(321)))]
-    fn test_pack_unpack_gamma<T: SolCall, V: SolValue>(
+    #[case(getGammaVecSumCall::new((vec![42u32, 43u32, 44u32], vec![true, false, true], 123u128, U256::from(321))), (129u32,))]
+    fn test_pack_unpack_struct_enums<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
@@ -312,6 +250,7 @@ mod enums_control_flow {
         function controlFlow1Bis(NumberEnum x, ColorEnum y) external returns (uint32);
         function controlFlow2(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
         function controlFlow2Bis(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
+        function testControlFlowWithWhile(ColorEnum x) external returns (uint32);
     }
 
     #[rstest]
@@ -528,6 +467,21 @@ mod enums_control_flow {
             assert_eq!(return_data, expected.abi_encode());
         }
     }
+
+    #[rstest]
+    #[case(ColorEnum::Red, 5)]
+    #[case(ColorEnum::Green, 7)]
+    #[case(ColorEnum::Blue, 11)]
+    fn test_control_flow_with_while(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] color: ColorEnum,
+        #[case] expected: u64,
+    ) {
+        let call_data = testControlFlowWithWhileCall::new((color,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(result, 0);
+        assert_eq!(return_data, expected.abi_encode());
+    }
 }
 
 mod enums_geometry {
@@ -556,43 +510,13 @@ mod enums_geometry {
     #[rstest]
     #[case(testSquareCall::new((4u64,)), (4u64, 16u64))]
     #[case(testSquareCall::new((5u64,)), (5u64, 25u64))]
-    fn test_square<T: SolCall, V: SolValue>(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] call_data: T,
-        #[case] expected_result: V,
-    ) where
-        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
-    {
-        run_test(
-            runtime,
-            call_data.abi_encode(),
-            expected_result.abi_encode_sequence(),
-        )
-        .unwrap();
-    }
-
-    #[rstest]
     #[case(testMutateSquareCall::new((4u64,)), (4u64, 16u64, 5u64, 25u64))]
     #[case(testMutateSquareCall::new((5u64,)), (5u64, 25u64, 6u64, 36u64))]
-    fn test_mutate_square<T: SolCall, V: SolValue>(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] call_data: T,
-        #[case] expected_result: V,
-    ) where
-        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
-    {
-        run_test(
-            runtime,
-            call_data.abi_encode(),
-            expected_result.abi_encode_sequence(),
-        )
-        .unwrap();
-    }
-
-    #[rstest]
     #[case(testTriangleCall::new((4u64, 5u64)), (4u64, 5u64, 10u64))]
     #[case(testTriangleCall::new((5u64, 6u64)), (5u64, 6u64, 15u64))]
-    fn test_triangle<T: SolCall, V: SolValue>(
+    #[case(testMutateTriangleCall::new((4u64, 5u64)), (4u64, 5u64, 10u64, 5u64, 6u64, 15u64))]
+    #[case(testMutateTriangleCall::new((5u64, 6u64)), (5u64, 6u64, 15u64, 6u64, 7u64, 21u64))]
+    fn test_geometry<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
@@ -606,11 +530,38 @@ mod enums_geometry {
         )
         .unwrap();
     }
+}
+
+mod enums_magical_creatures {
+    use super::*;
+    use alloy_sol_types::sol;
+    use alloy_sol_types::{SolCall, SolValue};
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "enums_magical_creatures";
+        const SOURCE_PATH: &str = "tests/enums/magical_creatures.move";
+
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol! {
+        function testBeast(uint32 level, uint64 ferocity) external returns (uint32, uint64, uint32, uint64);
+        function testGolem(uint32 level, uint128 density, uint64[] shards) external returns (uint32, uint64, uint32, uint64);
+        function testSpirit(uint32 level, uint8[][] chants, uint64 age) external returns (uint32, uint64, uint32, uint64);
+    }
 
     #[rstest]
-    #[case(testMutateTriangleCall::new((4u64, 5u64)), (4u64, 5u64, 10u64, 5u64, 6u64, 15u64))]
-    #[case(testMutateTriangleCall::new((5u64, 6u64)), (5u64, 6u64, 15u64, 6u64, 7u64, 21u64))]
-    fn test_mutate_triangle<T: SolCall, V: SolValue>(
+    #[case(testBeastCall::new((1u32, 2u64)), (1u32, 2u64, 2u32, 4u64))]
+    #[case(testBeastCall::new((3u32, 5u64)), (3u32, 15u64, 4u32, 20u64))]
+    #[case(testGolemCall::new((1u32, 10u128, vec![5u64, 7u64])), (1u32, 23u64, 2u32, 39u64))]
+    #[case(testGolemCall::new((2u32, 20u128, vec![3u64, 4u64, 6u64])), (2u32, 35u64, 3u32, 51u64))]
+    #[case(testSpiritCall::new((1u32, vec![vec![2u8, 3u8, 4u8]], 4u64)), (1u32, 8u64, 2u32, 15u64))]
+    #[case(testSpiritCall::new((2u32, vec![vec![1u8, 2u8], vec![3u8, 4u8, 5u8]], 6u64)), (2u32, 13u64, 3u32, 20u64))]
+    fn test_magical_creatures<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,

@@ -204,3 +204,21 @@ entry fun pack_unpack_gamma(a: vector<u32>, b: vector<bool>, c: u128, d: u256): 
         },
     }
 }
+
+entry fun get_gamma_vec_sum(a: vector<u32>, b: vector<bool>, c: u128, d: u256): u32 {
+    let structs_enum = pack_gamma(a, b, c, d);
+    match (structs_enum) {
+        StructsEnum::Gamma { gamma } => { 
+            let mut vec_sum = 0u32;
+            let mut i = 0;
+            while (i < vector::length(&gamma.a)) {
+                vec_sum = vec_sum + *vector::borrow(&gamma.a, i);
+                i = i + 1;
+            };
+            vec_sum
+        },
+        _ => {
+            abort(1)
+        },
+    }
+}

@@ -140,9 +140,9 @@ impl ControlTargets {
             BranchMode::MergedBranch | BranchMode::MergedBranchIntoMulti => {
                 self.resolve_merged(label)
             }
-            BranchMode::LoopBreak(loop_id) | BranchMode::LoopBreakIntoMulti(loop_id) => {
-                self.loop_break.get(&loop_id).copied()
-            }
+            BranchMode::LoopBreak(loop_id) | BranchMode::LoopBreakIntoMulti(loop_id) => self
+                .resolve_merged(label)
+                .or_else(|| self.loop_break.get(&loop_id).copied()),
             BranchMode::LoopContinue(loop_id) | BranchMode::LoopContinueIntoMulti(loop_id) => {
                 self.loop_continue.get(&loop_id).copied()
             }
@@ -211,6 +211,7 @@ pub fn translate_function(
     );
 
     let flow = Flow::new(move_bytecode);
+    println!("flow: {flow:#?}");
 
     let mut types_stack = TypesStack::new();
     let mut functions_to_link = HashSet::new();
