@@ -97,6 +97,85 @@ impl RuntimeSandbox {
         linker
             .func_wrap(
                 "vm_hooks",
+                "read_return_data",
+                move |mut _caller: Caller<'_, ModuleData>,
+                      dest_ptr: u32,
+                      offset_ptr: u32,
+                      size: u32| {
+                    println!(
+                        "read_return_data called with dest_ptr: {}, offset_ptr: {}, size: {}",
+                        dest_ptr, offset_ptr, size
+                    );
+
+                    Ok(1)
+                },
+            )
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "delegate_call_contract",
+                move |mut _caller: Caller<'_, ModuleData>,
+                      address_ptr: u32,
+                      calldata_ptr: u32,
+                      calldata_len_ptr: u32,
+                      gas: u64,
+                      return_data_len_ptr: u32| {
+                          println!(
+                              "delegate_call_contract called with address_ptr: {}, calldata_ptr: {}, calldata_len_ptr: {}, gas: {}, return_data_len_ptr: {}",
+                              address_ptr, calldata_ptr, calldata_len_ptr, gas, return_data_len_ptr
+                          );
+
+                    Ok(0)
+                },
+            )
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "static_call_contract",
+                move |mut _caller: Caller<'_, ModuleData>,
+                      address_ptr: u32,
+                      calldata_ptr: u32,
+                      calldata_len_ptr: u32,
+                      gas: u64,
+                      return_data_len_ptr: u32| {
+                          println!(
+                              "delegate_call_contract called with address_ptr: {}, calldata_ptr: {}, calldata_len_ptr: {}, gas: {}, return_data_len_ptr: {}",
+                              address_ptr, calldata_ptr, calldata_len_ptr, gas, return_data_len_ptr
+                          );
+
+                    Ok(0)
+                },
+            )
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
+                "call_contract",
+                move |mut _caller: Caller<'_, ModuleData>,
+                      address_ptr: u32,
+                      calldata_ptr: u32,
+                      calldata_len_ptr: u32,
+                      value_ptr: u32,
+                      gas: u64,
+                      return_data_len_ptr: u32| {
+                            println!(
+                                "call_contract called with address_ptr: {}, calldata_ptr: {}, calldata_len_ptr: {}, value_ptr: {}, gas: {}, return_data_len_ptr: {}",
+                                address_ptr, calldata_ptr, calldata_len_ptr, value_ptr, gas, return_data_len_ptr
+                            );
+
+                    Ok(0)
+                },
+            )
+            .unwrap();
+
+        linker
+            .func_wrap(
+                "vm_hooks",
                 "read_args",
                 move |mut caller: Caller<'_, ModuleData>, args_ptr: u32| {
                     let mem = get_memory(&mut caller);

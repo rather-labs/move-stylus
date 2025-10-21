@@ -11,7 +11,7 @@ use crate::{
     },
     compilation_context::ModuleId,
     hostio::host_functions::{
-        call_contract, delegate_call_contract, read_return_data, static_call_contract,
+        call_contract, delegate_call_contract, emit_log, read_return_data, static_call_contract,
     },
     runtime::RuntimeFunction,
     translation::{functions::MappedFunction, intermediate_types::IntermediateType},
@@ -49,6 +49,7 @@ pub fn add_external_contract_call_fn(
         return function_id;
     }
 
+    let (emit_log_function, _) = emit_log(module);
     let (read_return_data, _) = read_return_data(module);
     let (call_contract, _) = call_contract(module);
     let (delegate_call_contract, _) = delegate_call_contract(module);
@@ -142,6 +143,22 @@ pub fn add_external_contract_call_fn(
         )
         .local_set(is_delegate_call);
 
+    /*
+    builder
+        .local_get(*self_)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 4,
+            },
+        )
+        .i32_const(32)
+        .i32_const(0)
+        .call(emit_log_function);
+    */
+
     // Calculate the from where the arguments enter the calldata. Depending on how the call is
     // configured we omit some parameters at the beggining that are not part of the callee
     // signature
@@ -230,6 +247,7 @@ pub fn add_external_contract_call_fn(
                     .binop(BinaryOp::I32Add)
                     .local_set(writer_pointer);
             } else {
+                println!("Packing static argument {:?}", argument);
                 argument.add_pack_instructions(
                     &mut builder,
                     module,

@@ -5,6 +5,7 @@ use stylus::event::emit;
 
 /// Allows calling `.to_address` on a `UID` to get an `address`.
 public use fun uid_to_address as UID.to_address;
+public use fun uid_to_inner as UID.to_inner;
 
 /// References a object ID
 public struct ID has copy, drop, store {
@@ -45,6 +46,11 @@ public(package) fun new_uid_from_hash(bytes: address): UID {
 /// Get the inner bytes of `id` as an address.
 public fun uid_to_address(uid: &UID): address {
     uid.id.bytes
+}
+
+/// Get the raw bytes of a `uid`'s inner `ID`
+public fun uid_to_inner(uid: &UID): ID {
+    uid.id
 }
 
 /// Named IDs are used know where the object will saved in storage, so we don't depend on the

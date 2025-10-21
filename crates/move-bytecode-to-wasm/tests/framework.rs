@@ -467,3 +467,99 @@ mod event {
         assert_eq!(expected_data, data.as_slice());
     }
 }
+
+mod delegated_counter {
+    use alloy_primitives::address;
+
+    use crate::common::translate_test_complete_package_with_framework;
+
+    use super::*;
+
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "delegated_counter";
+        const SOURCE_PATH: &str = "tests/framework";
+
+        let mut translated_packages = translate_test_complete_package_with_framework(SOURCE_PATH);
+        let translated_package = translated_packages.get_mut(MODULE_NAME).unwrap();
+        RuntimeSandbox::new(translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+        function create(address logic_address) public view;
+        function read(bytes32 id) public view returns (uint64);
+        function increment(bytes32 id) public view;
+        function setValue(bytes32 id, uint64 value) public view;
+    );
+
+    #[rstest]
+    fn test_delegated_counter(runtime: RuntimeSandbox) {
+        let logic_address_1 = address!("0xbeefbeef00000000000000000000000000007357");
+        // Create a new counter
+        let call_data = createCall::new((logic_address_1,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read the object id emmited from the contract's events
+        let object_id = runtime.obtain_uid();
+
+        // Read initial value (should be 25)
+        let call_data = readCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(25, return_data);
+        assert_eq!(0, result);
+
+        // Increment
+        let call_data = incrementCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read value
+        let call_data = readCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(26, return_data);
+        assert_eq!(0, result);
+
+        // Set value to 42
+        let call_data = setValueCall::new((object_id, 42)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read value
+        let call_data = readCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(42, return_data);
+        assert_eq!(0, result);
+
+        // Increment
+        let call_data = incrementCall::new((object_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Read value
+        let call_data = readCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(43, return_data);
+        assert_eq!(0, result);
+
+        // change the msg sender
+        runtime.set_msg_sender(address!("0x0000000000000000000000000000000abcabcabc").0.0);
+
+        // Set value to 111 with a sender that is not the owner
+        let call_data = setValueCall::new((object_id, 111)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(1, result);
+
+        // Assert that the value did not change
+        let call_data = readCall::new((object_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = readCall::abi_decode_returns(&return_data).unwrap();
+        assert_eq!(43, return_data);
+        assert_eq!(0, result);
+    }
+}
