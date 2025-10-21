@@ -5,6 +5,7 @@ pub mod function_modifiers;
 
 pub use error::SpecialAttributeError;
 pub use event::Event;
+pub use external_call::error::ExternalCallError;
 // TODO: Create error struct with LOC and error info
 
 #[derive(Default, Debug)]

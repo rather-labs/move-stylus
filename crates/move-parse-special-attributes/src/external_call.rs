@@ -12,41 +12,36 @@ use crate::{
 pub mod error;
 mod payable;
 
-fn check_return_value(
-    function: &Function,
-    modifiers: &[FunctionModifier],
-) -> Option<SpecialAttributeError> {
-    if modifiers.contains(&FunctionModifier::Payable) {
-        match &function.signature.return_type.value {
-            Type_::Apply(spanned) => match &spanned.value {
-                NameAccessChain_::Single(path_entry) => match path_entry.name.value.as_str() {
-                    "ContractCallResult" | "ContractCallEmptyResult" => {}
-                    other => {
-                        return Some(SpecialAttributeError {
-                            kind: SpecialAttributeErrorKind::ExternalCall(
-                                ExternalCallError::InvalidReturnType(other.to_string()),
-                            ),
-                            line_of_code: path_entry.name.loc,
-                        });
-                    }
-                },
-                NameAccessChain_::Path(path_entry) => {
+fn check_return_value(function: &Function) -> Option<SpecialAttributeError> {
+    match &function.signature.return_type.value {
+        Type_::Apply(spanned) => match &spanned.value {
+            NameAccessChain_::Single(path_entry) => match path_entry.name.value.as_str() {
+                "ContractCallResult" | "ContractCallEmptyResult" => {}
+                other => {
                     return Some(SpecialAttributeError {
                         kind: SpecialAttributeErrorKind::ExternalCall(
-                            ExternalCallError::InvalidReturnType(path_entry.to_string()),
+                            ExternalCallError::InvalidReturnType(other.to_string()),
                         ),
-                        line_of_code: spanned.loc,
+                        line_of_code: path_entry.name.loc,
                     });
                 }
             },
-            other => {
+            NameAccessChain_::Path(path_entry) => {
                 return Some(SpecialAttributeError {
                     kind: SpecialAttributeErrorKind::ExternalCall(
-                        ExternalCallError::InvalidReturnType(other.to_string()),
+                        ExternalCallError::InvalidReturnType(path_entry.to_string()),
                     ),
-                    line_of_code: function.signature.return_type.loc,
+                    line_of_code: spanned.loc,
                 });
             }
+        },
+        other => {
+            return Some(SpecialAttributeError {
+                kind: SpecialAttributeErrorKind::ExternalCall(
+                    ExternalCallError::InvalidReturnType(other.to_string()),
+                ),
+                line_of_code: function.signature.return_type.loc,
+            });
         }
     }
 
@@ -76,7 +71,7 @@ pub(crate) fn validate_external_call_function(
         }
     }
 
-    if let Some(e) = check_return_value(function, modifiers) {
+    if let Some(e) = check_return_value(function) {
         errors.push(e);
     }
 

@@ -16,7 +16,7 @@ pub fn check_payable_value_argument(
             if arg_name != "value" {
                 return Some(SpecialAttributeError {
                     kind: SpecialAttributeErrorKind::ExternalCall(
-                        ExternalCallError::InvalidValueArgumentType(argument.1.0.value.to_string()),
+                        ExternalCallError::InvalidValueArgumentName(argument.1.0.value.to_string()),
                     ),
                     line_of_code: argument.1.0.loc,
                 });

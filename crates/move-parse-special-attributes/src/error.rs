@@ -13,8 +13,9 @@ pub enum SpecialAttributeErrorKind {
 
 #[derive(thiserror::Error, Debug)]
 pub struct SpecialAttributeError {
-    pub(crate) kind: SpecialAttributeErrorKind,
-    pub(crate) line_of_code: Loc,
+    pub kind: SpecialAttributeErrorKind,
+    #[allow(dead_code)]
+    pub line_of_code: Loc,
 }
 
 impl Display for SpecialAttributeError {
