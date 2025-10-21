@@ -1,7 +1,9 @@
+pub mod error;
 pub mod event;
 mod external_call;
 pub mod function_modifiers;
 
+pub use error::SpecialAttributeError;
 pub use event::Event;
 // TODO: Create error struct with LOC and error info
 
@@ -24,7 +26,9 @@ use std::{
     path::Path,
 };
 
-pub fn process_special_attributes(path: &Path) -> Result<SpecialAttributes, Vec<String>> {
+pub fn process_special_attributes(
+    path: &Path,
+) -> Result<SpecialAttributes, Vec<SpecialAttributeError>> {
     let (_, program_res) = Compiler::from_files(
         None,
         vec![path.to_str().unwrap()],
