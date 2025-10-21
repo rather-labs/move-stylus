@@ -1,6 +1,9 @@
 test-move-bytecode-to-wasm:
 	cargo test -p move-bytecode-to-wasm
 
+test:
+	cargo test
+
 disassemble:
 	cargo run -p move-cli -- disassemble --name hello_world -p ./example --Xdebug
 

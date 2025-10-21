@@ -72,7 +72,6 @@ async fn main() -> eyre::Result<()> {
     let pending_tx = provider.send_transaction(tx).await?;
     pending_tx.get_receipt().await?;
 
-
     println!("====================");
     println!("Creating a new erc20");
     println!("====================");

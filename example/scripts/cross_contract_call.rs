@@ -1,4 +1,4 @@
-use alloy::primitives::{address, U256};
+use alloy::primitives::{U256, address};
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
@@ -64,7 +64,6 @@ async fn main() -> eyre::Result<()> {
     let address = Address::from_str(&contract_address)?;
     let example = Example::new(address, provider.clone());
 
-
     let contract_address_erc20 = Address::from_str(&contract_address_erc20)?;
     let erc20 = Erc20::new(contract_address_erc20, provider.clone());
 
@@ -76,10 +75,16 @@ async fn main() -> eyre::Result<()> {
     let res = example.totalSupply(contract_address_erc20).call().await?;
     println!("Total Supply = {res}");
 
-    let res = example.balanceOfErc20(contract_address_erc20, sender).call().await?;
+    let res = example
+        .balanceOfErc20(contract_address_erc20, sender)
+        .call()
+        .await?;
     println!("Balance of {sender} = {res:?}");
 
-    let res = example.balanceOfErc20(contract_address_erc20, address_2).call().await?;
+    let res = example
+        .balanceOfErc20(contract_address_erc20, address_2)
+        .call()
+        .await?;
     println!("Balance of {address_2} = {res:?}");
 
     println!("====================");
@@ -98,32 +103,44 @@ async fn main() -> eyre::Result<()> {
     let res = erc20.allowance(sender, address).call().await?;
     println!("  Current allowance = {}", res);
 
-
     println!("====================");
     println!("Using transferFrom function from this contract ({address})");
     println!("====================\n");
 
     println!("Balances and allowance BEFORE corss call to transferFrom:");
-    let res = example.balanceOfErc20(contract_address_erc20, sender).call().await?;
+    let res = example
+        .balanceOfErc20(contract_address_erc20, sender)
+        .call()
+        .await?;
     println!("\tBalance of {sender} = {res:?}");
 
-    let res = example.balanceOfErc20(contract_address_erc20, address_2).call().await?;
+    let res = example
+        .balanceOfErc20(contract_address_erc20, address_2)
+        .call()
+        .await?;
     println!("\tBalance of {address_2} = {res:?}");
 
     let res = erc20.allowance(sender, address).call().await?;
     println!("\tCurrent allowance = {}", res);
 
-    let pending_tx = example.transferFromErc20(
-        contract_address_erc20, sender, address_2, U256::from(1000)).send().await?;
+    let pending_tx = example
+        .transferFromErc20(contract_address_erc20, sender, address_2, U256::from(1000))
+        .send()
+        .await?;
     let _receipt = pending_tx.get_receipt().await?;
     println!("Transfer From succeded");
 
-
     println!("Balances and allowance AFTER corss call to transferFrom:");
-    let res = example.balanceOfErc20(contract_address_erc20, sender).call().await?;
+    let res = example
+        .balanceOfErc20(contract_address_erc20, sender)
+        .call()
+        .await?;
     println!("\tBalance of {sender} = {res:?}");
 
-    let res = example.balanceOfErc20(contract_address_erc20, address_2).call().await?;
+    let res = example
+        .balanceOfErc20(contract_address_erc20, address_2)
+        .call()
+        .await?;
     println!("\tBalance of {address_2} = {res:?}");
 
     let res = erc20.allowance(sender, address).call().await?;
