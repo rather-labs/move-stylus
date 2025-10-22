@@ -1,4 +1,4 @@
-module 0x00::structs_with_enums;
+module 0x00::stars;
 use std::ascii::String;
 use std::ascii as ascii;
 
@@ -72,4 +72,9 @@ entry fun get_core_properties(star: &Star): (u8, u8) {
         Core::Nitrogen => (7, 15),
         Core::Oxygen => (8, 16),
     }
+}
+
+public struct Galaxy has drop {
+    name: String,
+    stars: vector<Star>,
 }

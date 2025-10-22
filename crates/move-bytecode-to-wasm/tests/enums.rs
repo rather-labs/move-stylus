@@ -577,7 +577,7 @@ mod enums_magical_creatures {
     }
 }
 
-mod structs_with_enums {
+mod enums_stars {
     use super::*;
     use alloy_sol_types::sol;
     use alloy_sol_types::{SolCall, SolValue};
@@ -585,8 +585,8 @@ mod structs_with_enums {
     #[fixture]
     #[once]
     fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "structs_with_enums";
-        const SOURCE_PATH: &str = "tests/enums/structs_with_enums.move";
+        const MODULE_NAME: &str = "stars";
+        const SOURCE_PATH: &str = "tests/enums/stars.move";
 
         let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
 
