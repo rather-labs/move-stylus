@@ -187,6 +187,103 @@ pub fn native_keccak256(module: &mut Module) -> (FunctionId, ImportId) {
     )
 }
 
+/// Calls the contract at the given address with options for passing value and to limit the
+/// amount of gas supplied. The return status indicates whether the call succeeded, and is
+/// nonzero on failure.
+///
+/// In both cases `return_data_len` will store the length of the result, the bytes of which can
+/// be read via the `read_return_data` hostio. The bytes are not returned directly so that the
+/// programmer can potentially save gas by choosing which subset of the return result they'd
+/// like to copy.
+///
+/// The semantics are equivalent to that of the EVM's [`CALL`] opcode, including callvalue
+/// stipends and the 63/64 gas rule. This means that supplying the `u64::MAX` gas can be used
+/// to send as much as possible.
+///
+/// [`CALL`]: https://www.evm.codes/#f1
+pub fn call_contract(module: &mut Module) -> (FunctionId, ImportId) {
+    get_or_insert_import(
+        module,
+        "call_contract",
+        &[
+            // Contract address
+            ValType::I32,
+            // Calldata
+            ValType::I32,
+            // Calldata len
+            ValType::I32,
+            // Value
+            ValType::I32,
+            // Gas
+            ValType::I64,
+            // Return data len
+            ValType::I32,
+        ],
+        // Result. Non-zero on failure
+        &[ValType::I32],
+    )
+}
+
+/// Static calls the contract at the given address, with the option to limit the amount of gas
+/// supplied. The return status indicates whether the call succeeded, and is nonzero on
+/// failure.
+///
+/// In both cases `return_data_len` will store the length of the result, the bytes of which can
+/// be read via the `read_return_data` hostio. The bytes are not returned directly so that the
+/// programmer can potentially save gas by choosing which subset of the return result they'd
+/// like to copy.
+///
+/// The semantics are equivalent to that of the EVM's [`STATIC_CALL`] opcode, including the
+/// 63/64 gas rule. This means that supplying `u64::MAX` gas can be used to send as much as
+/// possible.
+///
+/// [`STATIC_CALL`]: https://www.evm.codes/#FA
+pub fn static_call_contract(module: &mut Module) -> (FunctionId, ImportId) {
+    get_or_insert_import(
+        module,
+        "static_call_contract",
+        &[
+            // Contract address
+            ValType::I32,
+            // Calldata
+            ValType::I32,
+            // Calldata len
+            ValType::I32,
+            // Gas
+            ValType::I64,
+            // Return data len
+            ValType::I32,
+        ],
+        // Result. Non-zero on failure
+        &[ValType::I32],
+    )
+}
+
+/// Copies the bytes of the last EVM call or deployment return result. Does not revert if out of
+/// bounds, but rather copies the overlapping portion. The semantics are otherwise equivalent
+/// to that of the EVM's [`RETURN_DATA_COPY`] opcode.
+///
+/// Returns the number of bytes written.
+///
+/// [`RETURN_DATA_COPY`]: https://www.evm.codes/#3e
+pub fn read_return_data(module: &mut Module) -> (FunctionId, ImportId) {
+    get_or_insert_import(
+        module,
+        "read_return_data",
+        &[
+            // Dest
+            ValType::I32,
+            // Offset
+            ValType::I32,
+            // Size
+            ValType::I32,
+        ],
+        // Number of bytes written
+        &[ValType::I32],
+    )
+}
+
+#[inline]
 fn get_or_insert_import(
     module: &mut walrus::Module,
     name: &str,

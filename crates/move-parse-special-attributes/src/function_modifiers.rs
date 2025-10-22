@@ -6,12 +6,13 @@ pub struct Function {
     pub modifiers: Vec<FunctionModifier>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum FunctionModifier {
     External,
     Pure,
     View,
     Payable,
+    ExternalCall,
 }
 
 impl FunctionModifier {
@@ -21,6 +22,7 @@ impl FunctionModifier {
             Self::Pure => "pure",
             Self::View => "view",
             Self::Payable => "payable",
+            Self::ExternalCall => "external_call",
         }
     }
 
@@ -36,6 +38,7 @@ impl FunctionModifier {
                 "pure" => vec![Self::Pure],
                 "view" => vec![Self::View],
                 "payable" => vec![Self::Payable],
+                "external_call" => vec![Self::ExternalCall],
                 _ => vec![],
             },
             _ => vec![],

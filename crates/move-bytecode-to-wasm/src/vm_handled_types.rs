@@ -1,7 +1,7 @@
 //! This module is in charge of injecting the datatypes that can only be created or are
 //! automatically injected by the VM, such as the primitive type Signer or the TxContext struct
 //! from the stylus framework.
-
+pub mod contract_call_result;
 pub mod dynamic_fields;
 pub mod named_id;
 pub mod signer;

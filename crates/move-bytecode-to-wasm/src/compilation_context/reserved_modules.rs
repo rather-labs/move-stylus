@@ -11,6 +11,7 @@ pub const STANDARD_LIB_ADDRESS: Address = Address::from_bytes([
 // Module names for stylus framework
 pub const SF_MODULE_NAME_TX_CONTEXT: &str = "tx_context";
 pub const SF_MODULE_NAME_DYNAMIC_FIELD: &str = "dynamic_field";
+pub const SF_MODULE_NAME_CONTRACT_CALLS: &str = "contract_calls";
 pub const SF_MODULE_NAME_DYNAMIC_FIELD_NAMED_ID: &str = "dynamic_field_named_id";
 pub const SF_MODULE_NAME_OBJECT: &str = "object";
 pub const SF_MODULE_NAME_TRANSFER: &str = "transfer";

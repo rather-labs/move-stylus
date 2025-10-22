@@ -1,0 +1,11 @@
+[package]
+name = "Erc20Call"
+version = "0.0.1"
+published-at = "0x2"
+edition = "2024.beta"
+
+[addresses]
+erc20call = "0x0"
+
+[dependencies]
+StylusFramework = { local = "../stylus-framework/" }
