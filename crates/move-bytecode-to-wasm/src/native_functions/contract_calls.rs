@@ -142,9 +142,7 @@ pub fn add_external_contract_call_fn(
         )
         .local_set(is_delegate_call);
 
-    // builder.local_get(is_delegate_call).call(print_i32);
-
-    // Calculate the from where the arguments enter the calldata. Depending on how the call is
+    // Calculate from where the arguments enter the calldata. Depending on how the call is
     // configured we omit some parameters at the beggining that are not part of the callee
     // signature
     let arguments_from = if gas_argument_present {
