@@ -190,7 +190,7 @@ pub fn translate_function(
     let results = function_information.signature.get_return_wasm_types();
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
 
-    #[cfg(debug_assertions)]
+    // #[cfg(debug_assertions)]
     function.name(function_information.function_id.identifier.clone());
 
     let mut builder = function.func_body();

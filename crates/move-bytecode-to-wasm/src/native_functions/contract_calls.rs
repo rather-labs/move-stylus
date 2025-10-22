@@ -240,8 +240,6 @@ pub fn add_external_contract_call_fn(
                     .binop(BinaryOp::I32Add)
                     .local_set(writer_pointer);
             } else {
-                println!("Packing static argument {:?}", argument);
-
                 argument.add_pack_instructions(
                     &mut builder,
                     module,
@@ -267,6 +265,12 @@ pub fn add_external_contract_call_fn(
         .local_get(calldata_start)
         .binop(BinaryOp::I32Sub)
         .local_set(calldata_len);
+
+    builder
+        .local_get(calldata_start)
+        .local_get(calldata_len)
+        .i32_const(0)
+        .call(emit_log_function);
 
     let call_contract_result = module.locals.add(ValType::I32);
     let return_data_len = module.locals.add(ValType::I32);

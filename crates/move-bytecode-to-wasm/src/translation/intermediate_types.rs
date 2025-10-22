@@ -1,11 +1,12 @@
 use std::{
     collections::HashMap,
-    hash::{DefaultHasher, Hash, Hasher},
+    hash::{Hash, Hasher},
 };
 
 use crate::{
     CompilationContext, UserDefinedType,
     compilation_context::{ModuleData, ModuleId},
+    hasher::get_hasher,
     runtime::RuntimeFunction,
     vm_handled_types::{VmHandledType, named_id, uid},
     wasm_builder_extensions::WasmBuilderExtension,
@@ -1134,7 +1135,7 @@ impl IntermediateType {
 
     // Returns the hash of the type
     pub fn get_hash(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
+        let mut hasher = get_hasher();
         self.hash(&mut hasher);
         hasher.finish()
     }

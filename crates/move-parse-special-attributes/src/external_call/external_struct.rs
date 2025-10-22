@@ -31,8 +31,8 @@ pub enum ExternalStructError {
     #[error("duplicated module_name attribute")]
     DuplicatedModuleNameAttribute,
 
-    #[error("expected string for module_name")]
-    ExpectedString,
+    #[error("expected byte string for module_name")]
+    ExpectedByteString,
 
     #[error("address attribute not defined")]
     AddressNotDefined,
@@ -148,7 +148,7 @@ impl TryFrom<&StructDefinition> for ExternalStruct {
                                         _ => {
                                             return Err(SpecialAttributeError {
                                                 kind: SpecialAttributeErrorKind::ExternalStruct(
-                                                    ExternalStructError::ExpectedString,
+                                                    ExternalStructError::ExpectedByteString,
                                                 ),
                                                 line_of_code: v.loc,
                                             });
@@ -158,7 +158,7 @@ impl TryFrom<&StructDefinition> for ExternalStruct {
                                 _ => {
                                     return Err(SpecialAttributeError {
                                         kind: SpecialAttributeErrorKind::ExternalStruct(
-                                            ExternalStructError::ExpectedAddress,
+                                            ExternalStructError::ExpectedByteString,
                                         ),
                                         line_of_code: spanned1.loc,
                                     });

@@ -1,9 +1,10 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::{Hash, Hasher};
 
 use walrus::{FunctionId, GlobalId, Module};
 
 use crate::{
     CompilationContext,
+    hasher::get_hasher,
     translation::intermediate_types::{
         IntermediateType,
         heap_integers::{IU128, IU256},
@@ -359,7 +360,7 @@ impl RuntimeFunction {
             panic!("generic_function_name called with no generics");
         }
 
-        let mut hasher = DefaultHasher::new();
+        let mut hasher = get_hasher();
         generics.iter().for_each(|t| t.hash(&mut hasher));
         let hash = format!("{:x}", hasher.finish());
 

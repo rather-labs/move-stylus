@@ -23,6 +23,7 @@ mod constructor;
 mod data;
 mod error_encoding;
 mod generics;
+mod hasher;
 mod hostio;
 mod memory;
 mod native_functions;
