@@ -10,6 +10,7 @@ use crate::{
 };
 
 pub mod error;
+pub mod external_struct;
 mod payable;
 
 fn check_return_value(function: &Function) -> Option<SpecialAttributeError> {
