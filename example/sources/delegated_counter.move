@@ -29,7 +29,6 @@ entry fun increment(counter: &mut Counter) {
     assert!(res.succeded(), 33);
 }
 
-
 /// Read counter.
 entry fun read(counter: &Counter): u64 {
     counter.value
@@ -38,6 +37,11 @@ entry fun read(counter: &Counter): u64 {
 /// Read counter.
 entry fun logic_address(counter: &Counter): address {
     counter.contract_address
+}
+
+/// Change the address where the delegated calls are made.
+entry fun change_logic(counter: &mut Counter, logic_address: address) {
+    counter.contract_address = logic_address;
 }
 
 /// Set value (only runnable by the Counter owner)
