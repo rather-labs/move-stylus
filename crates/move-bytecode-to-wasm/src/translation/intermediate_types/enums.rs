@@ -230,7 +230,8 @@ impl IEnum {
                         | IntermediateType::ISigner
                         | IntermediateType::IU128
                         | IntermediateType::IU256
-                        | IntermediateType::IVector(_) => {
+                        | IntermediateType::IVector(_)
+                        | IntermediateType::IEnum(_) => {
                             // Load intermediate pointer
                             block
                                 .local_get(src_ptr)
@@ -253,9 +254,6 @@ impl IEnum {
                             panic!(
                                 "Trying to copy a type parameter inside an enum, expected a concrete type"
                             );
-                        }
-                        IntermediateType::IEnum(_) => {
-                            todo!()
                         }
                     }
                     // Store the middle pointer at ptr + offset

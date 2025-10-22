@@ -576,3 +576,70 @@ mod enums_magical_creatures {
         .unwrap();
     }
 }
+
+mod structs_with_enums {
+    use super::*;
+    use alloy_sol_types::sol;
+    use alloy_sol_types::{SolCall, SolValue};
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "structs_with_enums";
+        const SOURCE_PATH: &str = "tests/enums/structs_with_enums.move";
+
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol! {
+        enum Core {
+            Hydrogen,
+            Helium,
+            Carbon,
+            Nitrogen,
+            Oxygen,
+        }
+
+        enum StarType {
+            RedDwarf,
+            YellowDwarf,
+            RedGiant,
+            BlueGiant,
+        }
+
+        struct Star {
+            string name;
+            StarType class;
+            uint64 distance;
+            Core core;
+            uint32 size;
+        }
+        function createStar(string name, StarType class, uint64 distance, Core core, uint32 size) external returns (Star);
+        function testStar(string name, StarType class, uint64 distance, Core core, uint32 size, StarType new_class, Core new_core) external returns (Star);
+    }
+
+    #[rstest]
+    #[case(createStarCall::new((String::from("Sun"), StarType::YellowDwarf, 42, Core::Hydrogen, 55)), Star { name: String::from("Sun"), class: StarType::YellowDwarf, distance: 42, core: Core::Hydrogen, size: 55 })]
+    #[case(createStarCall::new((String::from("Proxima Centauri"), StarType::RedDwarf, 4, Core::Helium, 1)), Star { name: String::from("Proxima Centauri"), class: StarType::RedDwarf, distance: 4, core: Core::Helium, size: 1 })]
+    #[case(createStarCall::new((String::from("Betelgeuse"), StarType::RedGiant, 642, Core::Carbon, 764)), Star { name: String::from("Betelgeuse"), class: StarType::RedGiant, distance: 642, core: Core::Carbon, size: 764 })]
+    #[case(createStarCall::new((String::from("Vega"), StarType::BlueGiant, 25, Core::Nitrogen, 2)), Star { name: String::from("Vega"), class: StarType::BlueGiant, distance: 25, core: Core::Nitrogen, size: 2 })]
+    #[case(createStarCall::new((String::from("Polaris"), StarType::YellowDwarf, 433, Core::Oxygen, 37)), Star { name: String::from("Polaris"), class: StarType::YellowDwarf, distance: 433, core: Core::Oxygen, size: 37 })]
+    #[case(testStarCall::new((String::from("Sun"), StarType::YellowDwarf, 42, Core::Hydrogen, 55, StarType::RedDwarf, Core::Helium)), Star { name: String::from("Sun"), class: StarType::RedDwarf, distance: 42, core: Core::Helium, size: 55 })]
+    #[case(testStarCall::new((String::from("Proxima Centauri"), StarType::RedDwarf, 4, Core::Helium, 1, StarType::YellowDwarf, Core::Hydrogen)), Star { name: String::from("Proxima Centauri"), class: StarType::YellowDwarf, distance: 4, core: Core::Hydrogen, size: 1 })]
+    fn test_star<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode(),
+        )
+        .unwrap();
+    }
+}

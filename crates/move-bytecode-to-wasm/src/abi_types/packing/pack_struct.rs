@@ -292,25 +292,23 @@ fn pack_child_struct(
     field: &IntermediateType,
 ) -> usize {
     if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
-        child_struct.add_pack_instructions(
+        field.add_pack_instructions_dynamic(
             block,
             module,
             field_local,
             data_ptr,
             inner_data_reference,
             compilation_ctx,
-            Some(inner_data_reference),
         );
         32
     } else {
-        child_struct.add_pack_instructions(
+        field.add_pack_instructions(
             block,
             module,
             field_local,
             data_ptr,
             inner_data_reference,
             compilation_ctx,
-            None,
         );
         field.encoded_size(compilation_ctx)
     }

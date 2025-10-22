@@ -142,8 +142,8 @@ entry fun test_spirit(level: u32, chants: vector<vector<u8>>, age: u64): (u32, u
     let spirit_power_0 = get_creature_power_rating(&spirit_variant);
     add_chant(&mut spirit_variant, vector[4, 4, 3, 1]);
     increase_level(&mut spirit_variant);
-    add_chant(&mut spirit_variant, vector[8, 95]); // Now we have 3 chants
+    add_chant(&mut spirit_variant, vector[8, 95]);
     let spirit_level_1 = get_creature_level(&spirit_variant);
-    let spirit_power_1 = get_creature_power_rating(&spirit_variant); // Original age * (level + 1) * (chants + 2)
+    let spirit_power_1 = get_creature_power_rating(&spirit_variant);
     (spirit_level_0, spirit_power_0, spirit_level_1, spirit_power_1)
 }

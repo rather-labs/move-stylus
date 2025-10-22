@@ -187,7 +187,8 @@ pub fn pack(
                     | IntermediateType::ISigner
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
-                    | IntermediateType::IGenericStructInstance { .. } => {
+                    | IntermediateType::IGenericStructInstance { .. }
+                    | IntermediateType::IEnum(_) => {
                         builder.local_set(ptr_to_data);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -201,7 +202,6 @@ pub fn pack(
                             type_parameter_index: *index,
                         });
                     }
-                    IntermediateType::IEnum(_) => todo!(),
                 };
 
                 builder.local_get(pointer).local_get(ptr_to_data).store(
@@ -276,7 +276,8 @@ pub fn unpack(
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. } => {}
+            | IntermediateType::IGenericStructInstance { .. }
+            | IntermediateType::IEnum(_) => {}
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 return Err(TranslationError::FoundReferenceInsideStruct {
                     struct_index: struct_.index(),
@@ -288,7 +289,6 @@ pub fn unpack(
                     type_parameter_index: *index,
                 });
             }
-            IntermediateType::IEnum(_) => todo!(),
         }
 
         // When unpacking an struct, at the moment of unpacking its UID or NamedId (if some found)

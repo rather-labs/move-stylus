@@ -17,7 +17,6 @@ use address::IAddress;
 use boolean::IBool;
 use heap_integers::{IU128, IU256};
 use simple_integers::{IU8, IU16, IU32, IU64};
-use structs::IStruct;
 use vector::IVector;
 
 use walrus::{
@@ -650,13 +649,7 @@ impl IntermediateType {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
                     .unwrap();
-                IStruct::copy_local_instructions(
-                    struct_,
-                    module,
-                    builder,
-                    compilation_ctx,
-                    module_data,
-                );
+                struct_.copy_local_instructions(module, builder, compilation_ctx, module_data);
             }
             IntermediateType::IGenericStructInstance {
                 module_id,
@@ -678,7 +671,10 @@ impl IntermediateType {
             IntermediateType::ISigner => {
                 // Signer type is read-only, we push the pointer only
             }
-            IntermediateType::IEnum(_) => todo!(),
+            IntermediateType::IEnum(index) => {
+                let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
+                enum_.copy_local_instructions(module, builder, compilation_ctx, module_data);
+            }
             _ => panic!("Unsupported ReadRef type: {:?}", self),
         }
     }
@@ -783,7 +779,8 @@ impl IntermediateType {
             // in memory
             IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. } => {
+            | IntermediateType::IGenericStructInstance { .. }
+            | IntermediateType::IEnum(_) => {
                 // Since the memory needed for vectors might differ, we don't overwrite it.
                 // We update the inner pointer to point to the location where the new vector is already allocated.
                 let src_ptr = module.locals.add(ValType::I32);
@@ -813,7 +810,6 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot write to a type parameter, expected a concrete type");
             }
-            IntermediateType::IEnum(_) => todo!(),
         }
     }
 
@@ -1083,13 +1079,13 @@ impl IntermediateType {
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. } => false,
+            | IntermediateType::IGenericStructInstance { .. }
+            | IntermediateType::IEnum(_) => false,
             IntermediateType::ITypeParameter(_) => {
                 panic!(
                     "cannot check if a type parameter is a stack type, expected a concrete type"
                 );
             }
-            IntermediateType::IEnum(_) => todo!(),
         }
     }
 

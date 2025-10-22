@@ -101,15 +101,15 @@ pub fn pack_variant(
                             },
                         );
                     }
-                    // Heap types: The stack data is a pointer to the value, store directly
-                    // that pointer in the struct
+                    // Heap types
                     IntermediateType::IU128
                     | IntermediateType::IU256
                     | IntermediateType::IAddress
                     | IntermediateType::ISigner
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
-                    | IntermediateType::IGenericStructInstance { .. } => {
+                    | IntermediateType::IGenericStructInstance { .. }
+                    | IntermediateType::IEnum(_) => {
                         builder.local_set(ptr_to_data);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -123,7 +123,6 @@ pub fn pack_variant(
                             variant_index,
                         });
                     }
-                    IntermediateType::IEnum(_) => todo!(),
                 };
 
                 // Store the ptr to the value in the enum variant memory
@@ -202,7 +201,8 @@ pub fn unpack_variant(
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. } => {}
+            | IntermediateType::IGenericStructInstance { .. }
+            | IntermediateType::IEnum(_) => {}
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 return Err(TranslationError::FoundReferenceInsideEnum {
                     enum_index: enum_.index,
@@ -214,7 +214,6 @@ pub fn unpack_variant(
                     variant_index,
                 });
             }
-            IntermediateType::IEnum(_) => todo!(),
         }
 
         types_stack.push(field.clone());
@@ -268,7 +267,8 @@ pub fn unpack_variant_ref(
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. } => {
+            | IntermediateType::IGenericStructInstance { .. }
+            | IntermediateType::IEnum(_) => {
                 // Add the offset to the pointer
                 builder
                     .local_get(pointer)
@@ -286,7 +286,6 @@ pub fn unpack_variant_ref(
                     variant_index,
                 });
             }
-            IntermediateType::IEnum(_) => todo!(),
         }
 
         // Push the reference to the unpacked field

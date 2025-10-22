@@ -45,7 +45,12 @@
 //! field management across all types.
 use std::collections::HashMap;
 
-use crate::{CompilationContext, abi_types::packing::Packable, compilation_context::ModuleData};
+use crate::{
+    CompilationContext,
+    abi_types::packing::Packable,
+    compilation_context::ModuleData,
+    vm_handled_types::{VmHandledType, string::String_},
+};
 
 use super::IntermediateType;
 use move_binary_format::{
@@ -304,7 +309,8 @@ impl IStruct {
                 | IntermediateType::ISigner
                 | IntermediateType::IU128
                 | IntermediateType::IU256
-                | IntermediateType::IVector(_) => {
+                | IntermediateType::IVector(_)
+                | IntermediateType::IEnum(_) => {
                     // Load intermediate pointer
                     builder
                         .local_get(original_struct_ptr)
@@ -330,7 +336,6 @@ impl IStruct {
                         "Trying to copy a type parameter inside a struct, expected a concrete type"
                     );
                 }
-                IntermediateType::IEnum(_) => todo!(),
             }
 
             // Store the middle pointer in the place of the struct field
@@ -375,8 +380,12 @@ impl IStruct {
                 | IntermediateType::IU64
                 | IntermediateType::IU128
                 | IntermediateType::IU256
-                | IntermediateType::IAddress => continue,
+                | IntermediateType::IAddress
+                | IntermediateType::IEnum(_) => continue,
                 IntermediateType::IVector(_) => return true,
+                IntermediateType::IStruct {
+                    module_id, index, ..
+                } if String_::is_vm_type(module_id, *index, compilation_ctx) => return true,
                 IntermediateType::IStruct {
                     module_id, index, ..
                 } => {
@@ -410,7 +419,6 @@ impl IStruct {
                 IntermediateType::ITypeParameter(_) => {
                     panic!("cannot know if a type parameter is dynamic, expected a concrete type");
                 }
-                IntermediateType::IEnum(_) => todo!(),
             }
         }
 
@@ -430,7 +438,8 @@ impl IStruct {
                 | IntermediateType::IU128
                 | IntermediateType::IU256
                 | IntermediateType::IAddress
-                | IntermediateType::IVector(_) => {
+                | IntermediateType::IVector(_)
+                | IntermediateType::IEnum(_) => {
                     size += (field as &dyn Packable).encoded_size(compilation_ctx);
                 }
                 IntermediateType::IGenericStructInstance {
@@ -470,7 +479,6 @@ impl IStruct {
                 IntermediateType::ITypeParameter(_) => {
                     panic!("cannot know a type parameter's size, expected a concrete type");
                 }
-                IntermediateType::IEnum(_) => todo!(),
             }
         }
 
