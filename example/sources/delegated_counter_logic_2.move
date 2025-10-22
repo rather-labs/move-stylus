@@ -3,6 +3,7 @@ module hello_world::delegated_counter_logic_2;
 use stylus::tx_context::TxContext;
 use stylus::object::UID;
 
+#[ext(external_struct, module_name = b"delegated_counter", address = @0x1)]
 public struct Counter has key {
     id: UID,
     owner: address,

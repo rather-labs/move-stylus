@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     CompilationContext, UserDefinedType,
-    compilation_context::{ModuleData, ModuleId},
+    compilation_context::{ModuleData, ModuleId, module_data::Address},
     hasher::get_hasher,
     runtime::RuntimeFunction,
     vm_handled_types::{VmHandledType, named_id, uid},
@@ -1134,10 +1134,72 @@ impl IntermediateType {
     }
 
     // Returns the hash of the type
-    pub fn get_hash(&self) -> u64 {
+    pub fn get_hash(&self, compilation_ctx: &CompilationContext) -> u64 {
         let mut hasher = get_hasher();
-        self.hash(&mut hasher);
+        self.process_hash(&mut hasher, compilation_ctx);
         hasher.finish()
+    }
+
+    pub fn process_hash(&self, mut hasher: &mut dyn Hasher, compilation_ctx: &CompilationContext) {
+        match self {
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } => {
+                let struct_ = compilation_ctx
+                    .get_struct_by_index(module_id, *index)
+                    .unwrap();
+                let module_data = compilation_ctx.get_module_data_by_id(module_id).unwrap();
+                if let Some(external_struct) = module_data
+                    .special_attributes
+                    .external_struct
+                    .get(struct_.identifier.as_str())
+                {
+                    let foreign_module = ModuleId {
+                        address: Address::from_bytes(external_struct.address),
+                        module_name: external_struct.module_name.clone(),
+                    };
+
+                    Hash::hash(&foreign_module, &mut hasher);
+                    struct_.identifier.hash(&mut hasher);
+                } else {
+                    Hash::hash(&module_id, &mut hasher);
+                    struct_.identifier.hash(&mut hasher);
+                }
+            }
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+                ..
+            } => {
+                let struct_ = compilation_ctx
+                    .get_struct_by_index(module_id, *index)
+                    .unwrap();
+                let module_data = compilation_ctx.get_module_data_by_id(module_id).unwrap();
+                if let Some(external_struct) = module_data
+                    .special_attributes
+                    .external_struct
+                    .get(struct_.identifier.as_str())
+                {
+                    let foreign_module = ModuleId {
+                        address: Address::from_bytes(external_struct.address),
+                        module_name: external_struct.module_name.clone(),
+                    };
+
+                    Hash::hash(&foreign_module, &mut hasher);
+                    types.iter().for_each(|t| {
+                        t.process_hash(&mut hasher, compilation_ctx);
+                    });
+                    struct_.identifier.hash(&mut hasher);
+                } else {
+                    Hash::hash(&module_id, &mut hasher);
+                    struct_.identifier.hash(&mut hasher);
+                }
+            }
+            _ => {
+                self.hash(&mut hasher);
+            }
+        }
     }
 
     /// Returns true if this `IntermediateType` represents a UID or NamedId struct
