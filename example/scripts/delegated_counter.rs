@@ -31,10 +31,20 @@ async fn main() -> eyre::Result<()> {
         .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_DELEGATED_COUNTER"))?;
 
     let contract_address_logic_1 = std::env::var("CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_1")
-        .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_1"))?;
+        .map_err(|_| {
+            eyre!(
+                "No {} env var set",
+                "CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_1"
+            )
+        })?;
 
     let contract_address_logic_2 = std::env::var("CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_2")
-        .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_2"))?;
+        .map_err(|_| {
+            eyre!(
+                "No {} env var set",
+                "CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_2"
+            )
+        })?;
 
     let signer = PrivateKeySigner::from_str(&priv_key)?;
     let sender = signer.address();
@@ -143,11 +153,13 @@ async fn main() -> eyre::Result<()> {
     let res = example_2.read(counter_id).call().await?;
     println!("counter = {}", res);
 
-
     println!("==============================================================================");
     println!(" Changing contract logic from {address_logic_1} to {address_logic_2}");
     println!("==============================================================================\n");
-    let pending_tx = example.changeLogic(counter_id, address_logic_2).send().await?;
+    let pending_tx = example
+        .changeLogic(counter_id, address_logic_2)
+        .send()
+        .await?;
     let _receipt = pending_tx.get_receipt().await?;
 
     println!("==============================================================================");

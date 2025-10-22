@@ -11,7 +11,7 @@ use crate::{
     },
     compilation_context::ModuleId,
     hostio::host_functions::{
-        call_contract, delegate_call_contract, emit_log, read_return_data, static_call_contract,
+        call_contract, delegate_call_contract, read_return_data, static_call_contract,
     },
     runtime::RuntimeFunction,
     translation::{functions::MappedFunction, intermediate_types::IntermediateType},
@@ -49,9 +49,6 @@ pub fn add_external_contract_call_fn(
         return function_id;
     }
 
-    // let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
-
-    let (emit_log_function, _) = emit_log(module);
     let (read_return_data, _) = read_return_data(module);
     let (call_contract, _) = call_contract(module);
     let (delegate_call_contract, _) = delegate_call_contract(module);
@@ -266,25 +263,12 @@ pub fn add_external_contract_call_fn(
         .binop(BinaryOp::I32Sub)
         .local_set(calldata_len);
 
-    builder
-        .local_get(calldata_start)
-        .local_get(calldata_len)
-        .i32_const(0)
-        .call(emit_log_function);
-
     let call_contract_result = module.locals.add(ValType::I32);
     let return_data_len = module.locals.add(ValType::I32);
     builder
         .i32_const(4)
         .call(compilation_ctx.allocator)
         .local_set(return_data_len);
-
-    //builder.local_get(calldata_start).call(print_m);
-    builder
-        .local_get(calldata_start)
-        .local_get(calldata_len)
-        .i32_const(0)
-        .call(emit_log_function);
 
     // If the function is pure or view, we use static_call_contract since no state modification is
     // allowed
