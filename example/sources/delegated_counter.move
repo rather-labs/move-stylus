@@ -25,13 +25,19 @@ entry fun create(contract_logic: address, ctx: &mut TxContext) {
 /// Increment a counter by 1.
 entry fun increment(counter: &mut Counter) {
     let delegated_counter = dci::new(counter.contract_address, true);
-    delegated_counter.increment(&mut counter.id);
+    let res = delegated_counter.increment(&mut counter.id);
+    assert!(res.succeded(), 33);
 }
 
 
 /// Read counter.
 entry fun read(counter: &Counter): u64 {
     counter.value
+}
+
+/// Read counter.
+entry fun logic_address(counter: &Counter): address {
+    counter.contract_address
 }
 
 /// Set value (only runnable by the Counter owner)

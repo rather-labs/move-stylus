@@ -6,7 +6,8 @@ use stylus::object::UID;
 public struct Counter has key {
     id: UID,
     owner: address,
-    value: u64
+    value: u64,
+    contract_address: address,
 }
 
 /// Increment a counter by 2.

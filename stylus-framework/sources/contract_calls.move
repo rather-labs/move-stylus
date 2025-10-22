@@ -23,6 +23,6 @@ public struct ContractCallEmptyResult has drop {
     code: u8,
 }
 
-public fun empty_result_succeded<T>(self: &ContractCallEmptyResult): bool {
+public fun empty_result_succeded(self: &ContractCallEmptyResult): bool {
     self.code == 0
 }

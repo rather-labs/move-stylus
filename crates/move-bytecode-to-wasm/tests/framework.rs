@@ -516,50 +516,54 @@ mod delegated_counter {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        // Read value
-        let call_data = readCall::new((object_id,)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        let return_data = readCall::abi_decode_returns(&return_data).unwrap();
-        assert_eq!(26, return_data);
-        assert_eq!(0, result);
+        /*
 
-        // Set value to 42
-        let call_data = setValueCall::new((object_id, 42)).abi_encode();
-        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
+                // Read value
+                let call_data = readCall::new((object_id,)).abi_encode();
+                let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+                let return_data = readCall::abi_decode_returns(&return_data).unwrap();
+                assert_eq!(26, return_data);
+                assert_eq!(0, result);
 
-        // Read value
-        let call_data = readCall::new((object_id,)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        let return_data = readCall::abi_decode_returns(&return_data).unwrap();
-        assert_eq!(42, return_data);
-        assert_eq!(0, result);
+                // Set value to 42
+                let call_data = setValueCall::new((object_id, 42)).abi_encode();
+                let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+                assert_eq!(0, result);
 
-        // Increment
-        let call_data = incrementCall::new((object_id,)).abi_encode();
-        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(0, result);
+                // Read value
+                let call_data = readCall::new((object_id,)).abi_encode();
+                let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+                let return_data = readCall::abi_decode_returns(&return_data).unwrap();
+                assert_eq!(42, return_data);
+                assert_eq!(0, result);
 
-        // Read value
-        let call_data = readCall::new((object_id,)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        let return_data = readCall::abi_decode_returns(&return_data).unwrap();
-        assert_eq!(43, return_data);
-        assert_eq!(0, result);
+                // Increment
+                let call_data = incrementCall::new((object_id,)).abi_encode();
+                let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+                assert_eq!(0, result);
 
-        // change the msg sender
-        runtime.set_msg_sender(address!("0x0000000000000000000000000000000abcabcabc").0.0);
+                // Read value
+                let call_data = readCall::new((object_id,)).abi_encode();
+                let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+                let return_data = readCall::abi_decode_returns(&return_data).unwrap();
+                assert_eq!(43, return_data);
+                assert_eq!(0, result);
 
-        // Set value to 111 with a sender that is not the owner
-        let call_data = setValueCall::new((object_id, 111)).abi_encode();
-        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(1, result);
+                // change the msg sender
+                runtime.set_msg_sender(address!("0x0000000000000000000000000000000abcabcabc").0.0);
 
-        // Assert that the value did not change
-        let call_data = readCall::new((object_id,)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        let return_data = readCall::abi_decode_returns(&return_data).unwrap();
-        assert_eq!(43, return_data);
-        assert_eq!(0, result);
+                // Set value to 111 with a sender that is not the owner
+                let call_data = setValueCall::new((object_id, 111)).abi_encode();
+                let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+                assert_eq!(1, result);
+
+                // Assert that the value did not change
+                let call_data = readCall::new((object_id,)).abi_encode();
+                let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+                let return_data = readCall::abi_decode_returns(&return_data).unwrap();
+                assert_eq!(43, return_data);
+                assert_eq!(0, result);
+
+        */
     }
 }

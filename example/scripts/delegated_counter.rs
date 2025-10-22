@@ -1,7 +1,5 @@
 use alloy::hex;
-use alloy::primitives::{FixedBytes, U256};
-use alloy::providers::Provider;
-use alloy::rpc::types::TransactionRequest;
+use alloy::primitives::FixedBytes;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
@@ -15,6 +13,7 @@ sol!(
     contract Example {
         function create(address contract_logic) public view;
         function read(bytes32 id) public view returns (uint64);
+        function logicAddress(bytes32 id) public view returns (address);
         function increment(bytes32 id) public view;
         function setValue(bytes32 id, uint64 value) public view;
     }
@@ -61,6 +60,10 @@ async fn main() -> eyre::Result<()> {
         println!("create tx 0x{}", hex::encode(&raw));
     }
 
+    println!("\nReading contract logic address");
+    let res = example.logicAddress(counter_id).call().await?;
+    println!("counter = {}", res);
+
     println!("\nReading value before increment");
     let res = example.read(counter_id).call().await?;
     println!("counter = {}", res);
@@ -77,6 +80,7 @@ async fn main() -> eyre::Result<()> {
     let res = example.read(counter_id).call().await?;
     println!("counter = {}", res);
 
+    /*
     println!("\nSetting counter to number 42");
     let pending_tx = example.setValue(counter_id, 42).send().await?;
     let receipt = pending_tx.get_receipt().await?;
@@ -132,5 +136,6 @@ async fn main() -> eyre::Result<()> {
     let res = example_2.read(counter_id).call().await?;
     println!("counter = {}", res);
 
+    */
     Ok(())
 }

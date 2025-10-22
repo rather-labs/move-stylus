@@ -49,6 +49,8 @@ pub fn add_external_contract_call_fn(
         return function_id;
     }
 
+    // let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
+
     let (emit_log_function, _) = emit_log(module);
     let (read_return_data, _) = read_return_data(module);
     let (call_contract, _) = call_contract(module);
@@ -143,21 +145,7 @@ pub fn add_external_contract_call_fn(
         )
         .local_set(is_delegate_call);
 
-    /*
-    builder
-        .local_get(*self_)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 4,
-            },
-        )
-        .i32_const(32)
-        .i32_const(0)
-        .call(emit_log_function);
-    */
+    // builder.local_get(is_delegate_call).call(print_i32);
 
     // Calculate the from where the arguments enter the calldata. Depending on how the call is
     // configured we omit some parameters at the beggining that are not part of the callee
@@ -231,6 +219,11 @@ pub fn add_external_contract_call_fn(
             .iter()
             .zip(&function_args[arguments_from..])
         {
+            let argument = match argument {
+                IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => &**inner,
+                _ => argument,
+            };
+
             if argument.is_dynamic(compilation_ctx) {
                 argument.add_pack_instructions_dynamic(
                     &mut builder,
@@ -248,6 +241,7 @@ pub fn add_external_contract_call_fn(
                     .local_set(writer_pointer);
             } else {
                 println!("Packing static argument {:?}", argument);
+
                 argument.add_pack_instructions(
                     &mut builder,
                     module,
@@ -280,6 +274,13 @@ pub fn add_external_contract_call_fn(
         .i32_const(4)
         .call(compilation_ctx.allocator)
         .local_set(return_data_len);
+
+    //builder.local_get(calldata_start).call(print_m);
+    builder
+        .local_get(calldata_start)
+        .local_get(calldata_len)
+        .i32_const(0)
+        .call(emit_log_function);
 
     // If the function is pure or view, we use static_call_contract since no state modification is
     // allowed
