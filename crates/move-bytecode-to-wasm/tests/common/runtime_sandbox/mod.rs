@@ -77,7 +77,7 @@ macro_rules! link_fn_write_constant {
     () => {};
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum CrossContractCallType {
     Call,
     StaticCall,
@@ -173,7 +173,7 @@ impl RuntimeSandbox {
                             let mem = get_memory(&mut caller);
 
                             let mut address = [0; 20];
-                            mem.read(&caller, address_ptr as usize + 12, &mut address).unwrap();
+                            mem.read(&caller, address_ptr as usize, &mut address).unwrap();
 
                             let mut calldata = vec![0; calldata_len_ptr as usize];
                             mem.read(&caller, calldata_ptr as usize, &mut calldata).unwrap();
@@ -219,7 +219,7 @@ impl RuntimeSandbox {
                             let mem = get_memory(&mut caller);
 
                             let mut address = [0; 20];
-                            mem.read(&caller, address_ptr as usize + 12, &mut address).unwrap();
+                            mem.read(&caller, address_ptr as usize, &mut address).unwrap();
 
                             let mut calldata = vec![0; calldata_len_ptr as usize];
                             mem.read(&caller, calldata_ptr as usize, &mut calldata).unwrap();
@@ -267,7 +267,7 @@ if cccs.load(std::sync::atomic::Ordering::Relaxed) {
                             let mem = get_memory(&mut caller);
 
                             let mut address = [0; 20];
-                            mem.read(&caller, address_ptr as usize + 12, &mut address).unwrap();
+                            mem.read(&caller, address_ptr as usize, &mut address).unwrap();
 
                             let mut calldata = vec![0; calldata_len_ptr as usize];
                             mem.read(&caller, calldata_ptr as usize, &mut calldata).unwrap();
@@ -284,7 +284,7 @@ if cccs.load(std::sync::atomic::Ordering::Relaxed) {
                                   gas,
                                   value: Some(value),
                                   return_datan_len: return_data_len_ptr,
-                                  call_type: CrossContractCallType::StaticCall,
+                                  call_type: CrossContractCallType::Call,
                               }).unwrap();
 
                             Ok(0)
@@ -665,6 +665,11 @@ if cccs.load(std::sync::atomic::Ordering::Relaxed) {
 
     pub fn get_storage(&self) -> HashMap<[u8; 32], [u8; 32]> {
         self.storage.lock().unwrap().clone()
+    }
+
+    pub fn set_cross_contract_call_success(&self, success: bool) {
+        self.cross_contract_call_succeed
+            .store(success, std::sync::atomic::Ordering::Relaxed);
     }
 
     pub fn print_storage(&self) {
