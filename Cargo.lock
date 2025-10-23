@@ -3471,6 +3471,7 @@ name = "move-parse-special-attributes"
 version = "0.1.0"
 dependencies = [
  "move-compiler",
+ "move-ir-types",
  "thiserror 2.0.17",
 ]
 

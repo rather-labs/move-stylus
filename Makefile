@@ -1,6 +1,9 @@
 test-move-bytecode-to-wasm:
 	cargo test -p move-bytecode-to-wasm
 
+test:
+	cargo test
+
 disassemble:
 	cargo run -p move-cli -- disassemble --name hello_world -p ./example --Xdebug
 
@@ -38,6 +41,9 @@ example-dog-walker:
 
 example-erc20:
 	cargo run -p move-hello-world-example --bin erc20
+
+example-cross-contract-call:
+	cargo run -p move-hello-world-example --bin cross_contract_call
 
 deploy-example:
 	cargo stylus deploy \
@@ -87,6 +93,12 @@ deploy-dog-walker:
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/wasm/dog_walker.wasm
+
+deploy-cross-contract-call:
+	cargo stylus deploy \
+		--endpoint='http://localhost:8547' \
+		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
+		--wasm-file=./example/build/wasm/cross_contract_call.wasm
 
 setup-stylus:
 	RUSTFLAGS="-C link-args=-rdynamic" cargo install --force cargo-stylus

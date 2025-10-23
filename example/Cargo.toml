@@ -24,6 +24,10 @@ name = "erc20"
 path = "scripts/erc20.rs"
 
 [[bin]]
+name = "cross_contract_call"
+path = "scripts/cross_contract_call.rs"
+
+[[bin]]
 name = "counter_named_id"
 path = "scripts/counter_named_id.rs"
 
