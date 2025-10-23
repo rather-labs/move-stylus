@@ -11,7 +11,7 @@ mod transaction;
 pub mod transfer;
 mod types;
 
-use std::hash::{Hash, Hasher};
+use std::hash::Hasher;
 
 use walrus::{FunctionId, Module};
 
@@ -404,6 +404,7 @@ impl NativeFunction {
 
     pub fn get_generic_function_name(
         name: &str,
+        compilation_ctx: &CompilationContext,
         generics: &[&IntermediateType],
         module_id: &ModuleId,
     ) -> String {
@@ -412,7 +413,9 @@ impl NativeFunction {
         }
 
         let mut hasher = get_hasher();
-        generics.iter().for_each(|t| t.hash(&mut hasher));
+        generics
+            .iter()
+            .for_each(|t| t.process_hash(&mut hasher, compilation_ctx));
         let hash = format!("{:x}", hasher.finish());
 
         format!("{name}_{hash}_{:x}", module_id.hash())

@@ -37,9 +37,11 @@ pub fn add_child_object_fn(
 ) -> FunctionId {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_ADD_CHILD_OBJECT,
+        compilation_ctx,
         &[itype],
         module_id,
     );
+    println!("Adding ADD FIELD object fn: {} - {itype:#?}", name);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -105,12 +107,14 @@ pub fn add_borrow_object_fn(
 ) -> FunctionId {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_BORROW_CHILD_OBJECT,
+        compilation_ctx,
         &[itype],
         module_id,
     );
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
+    println!("Adding borrow object fn: {} - {itype:?}", name);
 
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
     let read_and_decode_from_storage_fn =
@@ -204,6 +208,7 @@ pub fn add_remove_child_object_fn(
 ) -> FunctionId {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_REMOVE_CHILD_OBJECT,
+        compilation_ctx,
         &[&itype.clone()],
         module_id,
     );
@@ -325,6 +330,7 @@ pub fn add_hash_type_and_key_fn(
 ) -> FunctionId {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_HASH_TYPE_AND_KEY,
+        compilation_ctx,
         &[itype],
         module_id,
     );

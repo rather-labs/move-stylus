@@ -26,6 +26,7 @@ pub fn add_compute_named_id_fn(
 ) -> FunctionId {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_COMPUTE_NAMED_ID,
+        compilation_ctx,
         &[itype],
         module_id,
     );

@@ -1187,14 +1187,14 @@ impl IntermediateType {
                     };
 
                     Hash::hash(&foreign_module, &mut hasher);
-                    types.iter().for_each(|t| {
-                        t.process_hash(&mut hasher, compilation_ctx);
-                    });
-                    struct_.identifier.hash(&mut hasher);
                 } else {
                     Hash::hash(&module_id, &mut hasher);
-                    struct_.identifier.hash(&mut hasher);
                 }
+
+                types.iter().for_each(|t| {
+                    t.process_hash(&mut hasher, compilation_ctx);
+                });
+                struct_.identifier.hash(&mut hasher);
             }
             _ => {
                 self.hash(&mut hasher);
