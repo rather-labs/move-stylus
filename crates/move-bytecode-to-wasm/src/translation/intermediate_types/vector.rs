@@ -498,109 +498,38 @@ impl IVector {
                         | IntermediateType::IU8
                         | IntermediateType::IU16
                         | IntermediateType::IU32
-                        | IntermediateType::IU64 => {
+                        | IntermediateType::IU64
+                        | IntermediateType::IU128
+                        | IntermediateType::IU256
+                        | IntermediateType::IAddress => {
                             let equality_f =
                                 RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
 
-                            loop_.i32_const( inner.stack_data_size() as i32).call(equality_f);
-                        }
-                        IntermediateType::IU128
-                        | IntermediateType::IU256
-                        | IntermediateType::IAddress => {
-                                let equality_f =
-                                RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+                            let size = match *inner {
+                                IntermediateType::IU64 => 8,
+                                IntermediateType::IU128 => 16,
+                                IntermediateType::IU256 | IntermediateType::IAddress => 32,
+                                _ => 4,
+                            };
 
-                            loop_.i32_const(if *inner == IntermediateType::IU128 {
-                                    16
-                                } else {
-                                    32
-                                })
-                                .call(equality_f);
+                            loop_.i32_const(size).call(equality_f);
                         }
-                        IntermediateType::IStruct { module_id, index, .. } => {
+                        IntermediateType::IStruct { module_id, index, .. }
+                        | IntermediateType::IGenericStructInstance { module_id, index, .. } => {
                             let module_data = compilation_ctx
                                 .get_module_data_by_id(module_id)
                                 .unwrap();
                             let struct_ = compilation_ctx
                                 .get_struct_by_index(module_id, *index)
                                 .unwrap();
-                            struct_.equality(loop_, module, compilation_ctx, module_data);
-                        }
-                        IntermediateType::IGenericStructInstance { module_id, index, types, .. } => {
-                            let module_data = compilation_ctx
-                                .get_module_data_by_id(module_id)
-                                .unwrap();
-                            let struct_ = compilation_ctx.get_struct_by_index(module_id, *index).unwrap();
-                            let struct_instance = struct_.instantiate(types);
-
+                            let struct_instance = match inner {
+                                IntermediateType::IGenericStructInstance { types, .. } => struct_.instantiate(types),
+                                _ => struct_.clone(),
+                            };
                             struct_instance.equality(loop_, module, compilation_ctx, module_data);
                         }
                         IntermediateType::IVector(inner_v) => {
-                            let inner_v1_ptr = module.locals.add(ValType::I32);
-                            let inner_v2_ptr = module.locals.add(ValType::I32);
-                            loop_.local_set(inner_v1_ptr);
-                            loop_.local_set(inner_v2_ptr);
-
-                            // Load them lengths and compare them
-                            loop_.local_get(inner_v1_ptr).load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            )
-                            .local_get(inner_v2_ptr)
-                            .load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            )
-                            .binop(BinaryOp::I32Eq);
-
-                            // If lengths are not equal we set result to false and break the loop
-                            loop_.if_else(
-                                None,
-                                |_| {},
-                                |else_| {
-                                    else_.i32_const(0).local_set(result).br(then_id);
-                                },
-                            );
-
-                            loop_.block(None, |inner_block| {
-                                let inner_len = module.locals.add(ValType::I32);
-
-                                let j = module.locals.add(ValType::I32);
-                                inner_block.i32_const(0).local_set(j);
-                                inner_block.loop_(None, |inner_loop| {
-                                    let inner_loop_id = inner_loop.id();
-                                    // Compare the elements
-                                    inner_loop.local_get(inner_v1_ptr).local_get(inner_v2_ptr);
-
-                                    Self::equality(inner_loop, module, compilation_ctx, _module_data, inner_v);
-
-                                    // If they are equal we continue the loop
-                                    // Otherwise, we set result as false and break the loop
-                                    inner_loop.if_else(
-                                        None,
-                                        |then| {
-                                            // === index++ ===
-                                            then.local_get(j).i32_const(1).binop(BinaryOp::I32Add).local_tee(j);
-
-                                            // === Continue if index < len ===
-                                            then.local_get(inner_len).binop(BinaryOp::I32LtU).br_if(inner_loop_id);
-                                        },
-                                        |else_| {
-                                            else_.i32_const(0).local_set(result).br(then_id);
-                                        },
-                                    );
-                                });
-                            });
-
-                            loop_.local_get(result);
+                            Self::equality(loop_, module, compilation_ctx, _module_data, inner_v);
                         }
                         IntermediateType::IEnum(_) => todo!(),
                         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
