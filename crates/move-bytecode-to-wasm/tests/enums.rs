@@ -648,8 +648,7 @@ mod stars {
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
-    )
-    {
+    ) {
         run_test(
             runtime,
             call_data.abi_encode(),
