@@ -483,7 +483,8 @@ impl IntermediateType {
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
-            | IntermediateType::IMutRef(_) => {
+            | IntermediateType::IMutRef(_)
+            | IntermediateType::IEnum(_) => {
                 let local = module.locals.add(ValType::I32);
 
                 builder.local_get(pointer);
@@ -518,7 +519,6 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot load a type parameter, expected a concrete type");
             }
-            IntermediateType::IEnum(_) => todo!(),
         }
     }
 
@@ -1035,7 +1035,8 @@ impl IntermediateType {
                     | IntermediateType::ISigner
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
-                    | IntermediateType::IGenericStructInstance { .. } => {
+                    | IntermediateType::IGenericStructInstance { .. }
+                    | IntermediateType::IEnum(_) => {
                         builder.local_get(ptr1).local_get(ptr2);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -1044,7 +1045,6 @@ impl IntermediateType {
                     IntermediateType::ITypeParameter(_) => {
                         panic!("Cannot compare a type parameter, expected a concrete type");
                     }
-                    IntermediateType::IEnum(_) => todo!(),
                 }
 
                 inner.load_equality_instructions(module, builder, compilation_ctx, module_data)

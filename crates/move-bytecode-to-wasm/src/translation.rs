@@ -1532,7 +1532,8 @@ fn translate_instruction(
                 | IntermediateType::ISigner
                 | IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. }
-                | IntermediateType::IVector(_) => {
+                | IntermediateType::IVector(_)
+                | IntermediateType::IEnum(_) => {
                     let pop_back_f =
                         RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
                     builder.call(pop_back_f);
@@ -1550,7 +1551,6 @@ fn translate_instruction(
                         operand_type: *vec_inner,
                     });
                 }
-                IntermediateType::IEnum(_) => todo!(),
             }
 
             types_stack.push(*vec_inner);

@@ -171,3 +171,21 @@ entry fun run_experiments(): vector<u64> {
     };
     results
 }
+
+entry fun get_density_of_substances(): vector<u64> {
+    let mut substances = vector::empty();
+    vector::push_back(&mut substances, Substance::Pure(Element{symbol: Symbol::H, boil_point: 20, freezing_point: 14, density: 1000}));
+    vector::push_back(&mut substances, Substance::Pure(Element{symbol: Symbol::He, boil_point: 4, freezing_point: 1, density: 800}));
+    vector::push_back(&mut substances, Substance::Pure(Element{symbol: Symbol::C, boil_point: 3915, freezing_point: 3915, density: 2000}));
+    vector::push_back(&mut substances, Substance::Pure(Element{symbol: Symbol::N, boil_point: 77, freezing_point: 63, density: 1000}));
+    vector::push_back(&mut substances, Substance::Pure(Element{symbol: Symbol::O, boil_point: 90, freezing_point: 54, density: 1200}));
+    let mut densities = vector::empty();
+    let mut i = 0;
+    while (i < vector::length(&substances)) {
+        let substance = *vector::borrow(&substances, i);
+        let density = get_substance_density(substance);
+        vector::push_back(&mut densities, density);
+        i = i + 1;
+    };
+    densities
+}

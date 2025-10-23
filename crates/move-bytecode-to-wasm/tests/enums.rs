@@ -207,7 +207,7 @@ mod enum_with_fields {
     }
 }
 
-mod enums_control_flow {
+mod control_flow {
     use super::*;
 
     #[fixture]
@@ -484,7 +484,7 @@ mod enums_control_flow {
     }
 }
 
-mod enums_geometry {
+mod geometry {
     use super::*;
     use alloy_sol_types::sol;
     use alloy_sol_types::{SolCall, SolValue}; // for .abi_encode() // runtime bytes
@@ -505,6 +505,8 @@ mod enums_geometry {
         function testMutateSquare(uint64 side) external returns (uint64, uint64, uint64, uint64);
         function testTriangle(uint64 base, uint64 height) external returns (uint64, uint64, uint64);
         function testMutateTriangle(uint64 base, uint64 height) external returns (uint64, uint64, uint64, uint64, uint64, uint64);
+        function testVectorOfShapes1(uint64 a, uint64 b) external returns (uint64, uint64, uint64);
+        function testVectorOfShapes2(uint64 a, uint64 b) external returns (uint64, uint64, uint64);
     }
 
     #[rstest]
@@ -516,6 +518,8 @@ mod enums_geometry {
     #[case(testTriangleCall::new((5u64, 6u64)), (5u64, 6u64, 15u64))]
     #[case(testMutateTriangleCall::new((4u64, 5u64)), (4u64, 5u64, 10u64, 5u64, 6u64, 15u64))]
     #[case(testMutateTriangleCall::new((5u64, 6u64)), (5u64, 6u64, 15u64, 6u64, 7u64, 21u64))]
+    #[case(testVectorOfShapes1Call::new((2u64, 3u64)), (2u64, 4u64, 3u64))]
+    #[case(testVectorOfShapes2Call::new((2u64, 3u64)), (2u64, 3u64, 4u64))]
     fn test_geometry<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
@@ -532,7 +536,7 @@ mod enums_geometry {
     }
 }
 
-mod enums_magical_creatures {
+mod magical_creatures {
     use super::*;
     use alloy_sol_types::sol;
     use alloy_sol_types::{SolCall, SolValue};
@@ -577,7 +581,7 @@ mod enums_magical_creatures {
     }
 }
 
-mod enums_stars {
+mod stars {
     use super::*;
     use alloy_sol_types::sol;
     use alloy_sol_types::{SolCall, SolValue};
@@ -615,9 +619,11 @@ mod enums_stars {
             Core core;
             uint32 size;
         }
+
         function createStar(string name, StarType class, Core core, uint32 size) external returns (Star);
         function evolveStar(Star star) external returns (Star);
         function getCoreProperties(Star star) external returns (uint8, uint8);
+        function getMilkyWayMass() external returns (uint64);
     }
 
     #[rstest]
@@ -637,12 +643,12 @@ mod enums_stars {
     #[case(getCorePropertiesCall::new((Star { name: String::from("Betelgeuse"), class: StarType::RedGiant, core: Core::Carbon, size: 764 },)), (6, 14))]
     #[case(getCorePropertiesCall::new((Star { name: String::from("Vega"), class: StarType::BlueGiant, core: Core::Nitrogen, size: 2 },)), (7, 15))]
     #[case(getCorePropertiesCall::new((Star { name: String::from("Polaris"), class: StarType::YellowDwarf, core: Core::Oxygen, size: 37 },)), (8, 16))]
+    #[case(getMilkyWayMassCall::new(()), 11185u64)]
     fn test_star<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
         #[case] expected_result: V,
-    ) where
-        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    )
     {
         run_test(
             runtime,
@@ -653,7 +659,7 @@ mod enums_stars {
     }
 }
 
-mod enums_elements_experiment {
+mod lab_experiment {
     use super::*;
     use alloy_sol_types::sol;
     use alloy_sol_types::{SolCall, SolValue};
@@ -693,6 +699,7 @@ mod enums_elements_experiment {
         function getPureSubstanceDensity(Symbol symbol) external returns (uint64);
         function getMixtureSubstanceDensity(Symbol a, Symbol b, uint8 concentration) external returns (uint64);
         function runExperiments() external returns (uint64[]);
+        function getDensityOfSubstances() external returns (uint64[]);
     }
 
     #[rstest]
@@ -716,6 +723,7 @@ mod enums_elements_experiment {
     #[case(getMixtureSubstanceDensityCall::new((Symbol::He, Symbol::N, 30u8)), 929u64)]
     #[case(getMixtureSubstanceDensityCall::new((Symbol::C, Symbol::He, 90u8)), 2034017u64)]
     #[case(runExperimentsCall::new(()), vec![5000u64, 6000u64, 4000u64])]
+    #[case(getDensityOfSubstancesCall::new(()), vec![1000u64, 800u64, 2000u64, 1000u64, 1200u64])]
     fn test_elements_experiment<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

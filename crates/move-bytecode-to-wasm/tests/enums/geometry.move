@@ -96,3 +96,22 @@ entry fun test_mutate_triangle(base: u64, height: u64): (u64, u64, u64, u64, u64
     let (base1, height1) = get_triangle_size(&triangle);
     (base0, height0, a0, base1, height1, a1)
 }
+
+entry fun test_vector_of_shapes_1(a: u64, b: u64): (u64, u64, u64) {
+    let ve = vector[Shape::Square { side: a }, Shape::Triangle { base: a, height: b }];
+    let len = vector::length(&ve);
+    let a0 = get_area(ve[0]);
+    let a1 = get_area(ve[1]);
+    (len, a0, a1)
+}
+
+entry fun test_vector_of_shapes_2(a: u64, b: u64): (u64, u64, u64) {
+    let mut ve = vector[Shape::Square { side: a }, Shape::Triangle { base: 2, height: 3 }];
+    vector::pop_back(&mut ve);
+    vector::push_back(&mut ve, Shape::Triangle { base: a, height: b });
+    vector::swap(&mut ve, 0, 1);
+    let len = vector::length(&ve);
+    let a0 = get_area(ve[0]);
+    let a1 = get_area(ve[1]);
+    (len, a0, a1)
+}
