@@ -271,4 +271,138 @@ impl IEnum {
 
         builder.local_get(ptr);
     }
+
+    pub fn equality(
+        &self,
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        module_data: &ModuleData,
+    ) {
+        let e1_ptr = module.locals.add(ValType::I32);
+        let e2_ptr = module.locals.add(ValType::I32);
+        builder.local_set(e1_ptr).local_set(e2_ptr);
+
+        let result = module.locals.add(ValType::I32);
+        builder.i32_const(1).local_set(result);
+
+        let variant_index = module.locals.add(ValType::I32);
+
+        // Read the variant index from the first enum
+        builder
+            .local_get(e1_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_tee(variant_index);
+
+        // Read the variant index from the second enum
+        builder.local_get(e2_ptr).load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+        // Compare the variant indices
+        builder.binop(BinaryOp::I32Eq);
+
+        builder.if_else(
+            None,
+            |then| {
+                // Proceed to compare the fields of the variant
+                // Find the corresponding IEnumVariant for the variant index local
+                for variant in self.variants.iter() {
+                    then.block(None, |block| {
+                        let block_id = block.id();
+                        // If the variant index does not match, branch to the end of the block
+                        block
+                            .local_get(variant_index)
+                            .i32_const(variant.index as i32)
+                            .binop(BinaryOp::I32Ne)
+                            .br_if(block_id);
+
+                        let load_value_to_stack =
+                            |field: &IntermediateType, builder: &mut InstrSeqBuilder<'_>| {
+                                if field.stack_data_size() == 8 {
+                                    builder.load(
+                                        compilation_ctx.memory_id,
+                                        LoadKind::I64 { atomic: false },
+                                        MemArg {
+                                            align: 0,
+                                            offset: 0,
+                                        },
+                                    );
+                                } else {
+                                    builder.load(
+                                        compilation_ctx.memory_id,
+                                        LoadKind::I32 { atomic: false },
+                                        MemArg {
+                                            align: 0,
+                                            offset: 0,
+                                        },
+                                    );
+                                }
+                            };
+
+                        // Set offset past the index
+                        let mut offset: u32 = 4;
+                        // Iterate over the fields and compare them
+                        for field in &variant.fields {
+                            // Load the first enum field value
+                            block.local_get(e1_ptr).load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg { align: 0, offset },
+                            );
+
+                            if field.is_stack_type() {
+                                load_value_to_stack(field, block);
+                            }
+
+                            // Load the second enum field value
+                            block.local_get(e2_ptr).load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg { align: 0, offset },
+                            );
+
+                            if field.is_stack_type() {
+                                load_value_to_stack(field, block);
+                            }
+
+                            // Compare the field values
+                            field.load_equality_instructions(
+                                module,
+                                block,
+                                compilation_ctx,
+                                module_data,
+                            );
+                            block.if_else(
+                                None,
+                                |_| {},
+                                |else_| {
+                                    else_.i32_const(0).local_set(result).br(block_id);
+                                },
+                            );
+                            offset += 4;
+                        }
+                        block.i32_const(1).local_set(result);
+                    });
+                }
+            },
+            |else_| {
+                else_.i32_const(0).local_set(result);
+            },
+        );
+
+        builder.local_get(result);
+    }
 }

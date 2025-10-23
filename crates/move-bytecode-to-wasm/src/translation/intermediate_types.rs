@@ -961,7 +961,10 @@ impl IntermediateType {
                     .instantiate(types)
                     .equality(builder, module, compilation_ctx, module_data)
             }
-            Self::IEnum(_) => todo!(),
+            Self::IEnum(index) => {
+                let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
+                enum_.equality(builder, module, compilation_ctx, module_data);
+            }
             Self::IRef(inner) | Self::IMutRef(inner) => {
                 let ptr1 = module.locals.add(ValType::I32);
                 let ptr2 = module.locals.add(ValType::I32);
