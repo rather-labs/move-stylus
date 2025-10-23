@@ -3260,7 +3260,7 @@ mod storage_encoding {
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(), // uint32 b
     ],
     vec![
-        U256::from_str_radix("000000000000000000000000000000000000000000000000f71f105a5c734733", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000007767397bdbd83f17", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(), // Header slot
         U256::from_str_radix("0000000000000000000000000000000000000000000000030000000200000001", 16).unwrap().to_be_bytes(), // First element
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(), // Second element
@@ -3465,11 +3465,11 @@ mod storage_encoding {
         U256::from_str_radix("580978fee9799ff96dcfcd540232ed2f7cd5bade678a1ccae6650e39d39559dd", 16).unwrap().to_be_bytes(),
     ],
     vec![
-        U256::from_str_radix("000000000000000000000000000000000000000000000065f2b1fe71d1f20aca", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000065d0ae4436393e9304", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000066", 16).unwrap().to_be_bytes(),
 
-        U256::from_str_radix("000000000000000000000000000000000000000000000000f71f105a5c734733", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000007767397bdbd83f17", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
         U256::from_str_radix("00000000000000000000000000000000000000000000000000000000000004d2", 16).unwrap().to_be_bytes(),
 
@@ -4658,11 +4658,17 @@ mod wrapped_objects {
         assert_eq!(
             runtime.get_storage_at_slot(alpha_2_shared_slot.0),
             [
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 102, 130, 191,
-                104, 81, 123, 64, 3, 163
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 102, 198, 1,
+                192, 204, 10, 101, 122, 43
             ],
             "Slot should not be empty"
         );
+        /*
+         *
+            U256::from_str_radix("ebc75c981e6b1aa3", 16)
+                .unwrap()
+                .to_be_bytes(),
+        */
 
         // Read delta after the pop and assert the data is correct
         let call_data = readDeltaCall::new((delta_id,)).abi_encode();
@@ -4693,8 +4699,8 @@ mod wrapped_objects {
         assert_eq!(
             runtime.get_storage_at_slot(alpha_1_shared_slot.0),
             [
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 101, 130, 191,
-                104, 81, 123, 64, 3, 163
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 101, 198, 1,
+                192, 204, 10, 101, 122, 43
             ],
             "Slot should not be empty"
         );

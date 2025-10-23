@@ -1160,11 +1160,10 @@ impl IntermediateType {
                     };
 
                     Hash::hash(&foreign_module, &mut hasher);
-                    struct_.identifier.hash(&mut hasher);
                 } else {
                     Hash::hash(&module_id, &mut hasher);
-                    struct_.identifier.hash(&mut hasher);
                 }
+                struct_.identifier.hash(&mut hasher);
             }
             IntermediateType::IGenericStructInstance {
                 module_id,
