@@ -487,12 +487,37 @@ impl IVector {
             |then| {
                 let then_id = then.id();
 
-                let load_element =
-                    |elem_type: &IntermediateType, builder: &mut InstrSeqBuilder<'_>, v_ptr: LocalId, i: LocalId| {
-                        let data_size = elem_type.stack_data_size() as i32;
-                        builder.vec_elem_ptr(v_ptr, i, data_size);
-                        if !elem_type.is_stack_type() {
-                            builder.load(
+                let i = module.locals.add(ValType::I32);
+                then.i32_const(0).local_set(i);
+                match inner {
+                    IntermediateType::IBool
+                    | IntermediateType::IU8
+                    | IntermediateType::IU16
+                    | IntermediateType::IU32
+                    | IntermediateType::IU64 => {
+                        let equality_f =
+                            RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+
+                        // Call the generic equality function
+                        then.skip_vec_header(v1_ptr)
+                            .skip_vec_header(v2_ptr)
+                            .local_get(len)
+                            .i32_const(inner.stack_data_size() as i32)
+                            .binop(BinaryOp::I32Mul)
+                            .call(equality_f)
+                            .local_set(result);
+                    }
+                    IntermediateType::IU128
+                    | IntermediateType::IU256
+                    | IntermediateType::IAddress
+                    | IntermediateType::IStruct { .. }
+                    | IntermediateType::IGenericStructInstance { .. }
+                    | IntermediateType::IVector(_)
+                    | IntermediateType::IEnum(_) => {
+                        then.loop_(None, |loop_| {
+                            //  Get the i-th element of both vectors and compare them
+                            let data_size = inner.stack_data_size() as i32;
+                            loop_.vec_elem_ptr(v1_ptr, i, data_size).load(
                                 compilation_ctx.memory_id,
                                 LoadKind::I32 { atomic: false },
                                 MemArg {
@@ -500,84 +525,23 @@ impl IVector {
                                     offset: 0,
                                 },
                             );
-                        }
-                    };
-
-                let i = module.locals.add(ValType::I32);
-                then.i32_const(0).local_set(i);
-                then.loop_(None, |loop_| {
-                    //  Get the i-th element of both vectors and compare them
-                    load_element(inner, loop_, v1_ptr, i);
-                    load_element(inner, loop_, v2_ptr, i);
-                    match inner {
-                        IntermediateType::IBool
-                        | IntermediateType::IU8
-                        | IntermediateType::IU16
-                        | IntermediateType::IU32
-                        | IntermediateType::IU64 => {
-                            let equality_f =
-                                RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-
-                            loop_.i32_const( inner.stack_data_size() as i32).call(equality_f);
-                        }
-                        IntermediateType::IU128
-                        | IntermediateType::IU256
-                        | IntermediateType::IAddress => {
-                                let equality_f =
-                                RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-
-                            loop_.i32_const(if *inner == IntermediateType::IU128 {
-                                    16
-                                } else {
-                                    32
-                                })
-                                .call(equality_f);
-                        }
-                        IntermediateType::IStruct { module_id, index, .. } => {
-                            let module_data = compilation_ctx
-                                .get_module_data_by_id(module_id)
-                                .unwrap();
-                            let struct_ = compilation_ctx
-                                .get_struct_by_index(module_id, *index)
-                                .unwrap();
-                            struct_.equality(loop_, module, compilation_ctx, module_data);
-                        }
-                        IntermediateType::IGenericStructInstance { module_id, index, types, .. } => {
-                            let module_data = compilation_ctx
-                                .get_module_data_by_id(module_id)
-                                .unwrap();
-                            let struct_ = compilation_ctx.get_struct_by_index(module_id, *index).unwrap();
-                            let struct_instance = struct_.instantiate(types);
-
-                            struct_instance.equality(loop_, module, compilation_ctx, module_data);
-                        }
-                        IntermediateType::IVector(inner_v) => {
-                            let inner_v1_ptr = module.locals.add(ValType::I32);
-                            let inner_v2_ptr = module.locals.add(ValType::I32);
-                            loop_.local_set(inner_v1_ptr);
-                            loop_.local_set(inner_v2_ptr);
-
-                            // Load them lengths and compare them
-                            loop_.local_get(inner_v1_ptr).load(
+                            loop_.vec_elem_ptr(v2_ptr, i, data_size).load(
                                 compilation_ctx.memory_id,
                                 LoadKind::I32 { atomic: false },
                                 MemArg {
                                     align: 0,
                                     offset: 0,
                                 },
-                            )
-                            .local_get(inner_v2_ptr)
-                            .load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            )
-                            .binop(BinaryOp::I32Eq);
+                            );
 
-                            // If lengths are not equal we set result to false and break the loop
+                            inner.load_equality_instructions(
+                                module,
+                                loop_,
+                                compilation_ctx,
+                                module_data,
+                            );
+
+                            // If they are not equal we set result to false and break the loop
                             loop_.if_else(
                                 None,
                                 |_| {},
@@ -586,79 +550,29 @@ impl IVector {
                                 },
                             );
 
-                            loop_.block(None, |inner_block| {
-                                let inner_len = module.locals.add(ValType::I32);
+                            // === index++ ===
+                            loop_.local_get(i);
+                            loop_.i32_const(1);
+                            loop_.binop(BinaryOp::I32Add);
+                            loop_.local_tee(i);
 
-                                let j = module.locals.add(ValType::I32);
-                                inner_block.i32_const(0).local_set(j);
-                                inner_block.loop_(None, |inner_loop| {
-                                    let inner_loop_id = inner_loop.id();
-                                    // Compare the elements
-                                    inner_loop.local_get(inner_v1_ptr).local_get(inner_v2_ptr);
-
-                                    Self::equality(inner_loop, module, compilation_ctx, module_data, inner_v);
-
-                                    // If they are equal we continue the loop
-                                    // Otherwise, we set result as false and break the loop
-                                    inner_loop.if_else(
-                                        None,
-                                        |then| {
-                                            // === index++ ===
-                                            then.local_get(j).i32_const(1).binop(BinaryOp::I32Add).local_tee(j);
-
-                                            // === Continue if index < len ===
-                                            then.local_get(inner_len).binop(BinaryOp::I32LtU).br_if(inner_loop_id);
-                                        },
-                                        |else_| {
-                                            else_.i32_const(0).local_set(result).br(then_id);
-                                        },
-                                    );
-                                });
-                            });
-
-                            loop_.local_get(result);
-                        }
-                        IntermediateType::IEnum(index) => {
-                            let enum_ = module_data
-                                .enums
-                                .get_enum_by_index(*index)
-                                .unwrap();
-
-                            enum_.equality(loop_, module, compilation_ctx, module_data);
-                        }
-                        IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                            panic!("vector of rereferences found")
-                        }
-                        IntermediateType::ISigner => {
-                            panic!("should not be possible to have a vector of signers")
-                        }
-                        IntermediateType::ITypeParameter(_) => {
-                            panic!("cannot check the equality of a vector of type parameters, expected a concrete type");
-                        }
+                            // === Continue if index < len ===
+                            loop_.local_get(len);
+                            loop_.binop(BinaryOp::I32LtU);
+                            loop_.br_if(loop_.id());
+                        });
                     }
-
-                    // If they are not equal we set result to false and break the loop
-                    loop_.if_else(
-                        None,
-                        |_| {
-                        },
-                        |else_| {
-                            else_.i32_const(0).local_set(result).br(then_id);
-                        },
-                    );
-
-                    // === index++ ===
-                    loop_.local_get(i);
-                    loop_.i32_const(1);
-                    loop_.binop(BinaryOp::I32Add);
-                    loop_.local_tee(i);
-
-                    // === Continue if index < len ===
-                    loop_.local_get(len);
-                    loop_.binop(BinaryOp::I32LtU);
-                    loop_.br_if(loop_.id());
-                    });
-              },
+                    IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                        panic!("Found vector of rereferences")
+                    }
+                    IntermediateType::ISigner => {
+                        panic!("Found vector of signers")
+                    }
+                    IntermediateType::ITypeParameter(_) => {
+                        panic!("Found vector of type parameters, expected a concrete type");
+                    }
+                }
+            },
             |else_| {
                 else_.i32_const(0).local_set(result);
             },
