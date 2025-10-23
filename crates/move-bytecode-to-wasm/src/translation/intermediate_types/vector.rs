@@ -433,7 +433,7 @@ impl IVector {
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
         compilation_ctx: &CompilationContext,
-        _module_data: &ModuleData,
+        module_data: &ModuleData,
         inner: &IntermediateType,
     ) {
         let v1_ptr = module.locals.add(ValType::I32);
@@ -471,28 +471,32 @@ impl IVector {
             |then| {
                 let then_id = then.id();
 
-                let load_element =
-                    |elem_type: &IntermediateType, builder: &mut InstrSeqBuilder<'_>, v_ptr: LocalId, i: LocalId| {
-                        let data_size = elem_type.stack_data_size() as i32;
-                        builder.vec_elem_ptr(v_ptr, i, data_size);
-                        if !elem_type.is_stack_type() {
-                            builder.load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            );
-                        }
-                    };
-
                 let i = module.locals.add(ValType::I32);
                 then.i32_const(0).local_set(i);
                 then.loop_(None, |loop_| {
                     //  Get the i-th element of both vectors and compare them
-                    load_element(inner, loop_, v1_ptr, i);
-                    load_element(inner, loop_, v2_ptr, i);
+                    let data_size = inner.stack_data_size() as i32;
+                    let load_kind = if data_size == 4 {
+                        LoadKind::I32 { atomic: false }
+                    } else {
+                        LoadKind::I64 { atomic: false }
+                    };
+                    loop_.vec_elem_ptr(v1_ptr, i, data_size).load(
+                        compilation_ctx.memory_id,
+                        load_kind,
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                    loop_.vec_elem_ptr(v2_ptr, i, data_size).load(
+                        compilation_ctx.memory_id,
+                        load_kind,
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
                     match inner {
                         IntermediateType::IBool
                         | IntermediateType::IU8
@@ -501,53 +505,33 @@ impl IVector {
                         | IntermediateType::IU64
                         | IntermediateType::IU128
                         | IntermediateType::IU256
-                        | IntermediateType::IAddress => {
-                            let equality_f =
-                                RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-
-                            let size = match *inner {
-                                IntermediateType::IU64 => 8,
-                                IntermediateType::IU128 => 16,
-                                IntermediateType::IU256 | IntermediateType::IAddress => 32,
-                                _ => 4,
-                            };
-
-                            loop_.i32_const(size).call(equality_f);
+                        | IntermediateType::IAddress
+                        | IntermediateType::IStruct { .. }
+                        | IntermediateType::IGenericStructInstance { .. }
+                        | IntermediateType::IVector(_)
+                        | IntermediateType::IEnum(_) => {
+                            inner.load_equality_instructions(
+                                module,
+                                loop_,
+                                compilation_ctx,
+                                module_data,
+                            );
                         }
-                        IntermediateType::IStruct { module_id, index, .. }
-                        | IntermediateType::IGenericStructInstance { module_id, index, .. } => {
-                            let module_data = compilation_ctx
-                                .get_module_data_by_id(module_id)
-                                .unwrap();
-                            let struct_ = compilation_ctx
-                                .get_struct_by_index(module_id, *index)
-                                .unwrap();
-                            let struct_instance = match inner {
-                                IntermediateType::IGenericStructInstance { types, .. } => struct_.instantiate(types),
-                                _ => struct_.clone(),
-                            };
-                            struct_instance.equality(loop_, module, compilation_ctx, module_data);
-                        }
-                        IntermediateType::IVector(inner_v) => {
-                            Self::equality(loop_, module, compilation_ctx, _module_data, inner_v);
-                        }
-                        IntermediateType::IEnum(_) => todo!(),
                         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                            panic!("vector of rereferences found")
+                            panic!("Found vector of rereferences")
                         }
                         IntermediateType::ISigner => {
-                            panic!("should not be possible to have a vector of signers")
+                            panic!("Found vector of signers")
                         }
                         IntermediateType::ITypeParameter(_) => {
-                            panic!("cannot check the equality of a vector of type parameters, expected a concrete type");
+                            panic!("Found vector of type parameters, expected a concrete type");
                         }
                     }
 
                     // If they are not equal we set result to false and break the loop
                     loop_.if_else(
                         None,
-                        |_| {
-                        },
+                        |_| {},
                         |else_| {
                             else_.i32_const(0).local_set(result).br(then_id);
                         },
@@ -563,8 +547,8 @@ impl IVector {
                     loop_.local_get(len);
                     loop_.binop(BinaryOp::I32LtU);
                     loop_.br_if(loop_.id());
-                    });
-              },
+                });
+            },
             |else_| {
                 else_.i32_const(0).local_set(result);
             },
