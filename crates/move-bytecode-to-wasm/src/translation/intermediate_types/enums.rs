@@ -246,6 +246,8 @@ impl IEnum {
                                 module_data,
                                 ptr_to_data,
                             );
+
+                            block.local_set(ptr_to_data);
                         }
                         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                             panic!("references inside enums not allowed")

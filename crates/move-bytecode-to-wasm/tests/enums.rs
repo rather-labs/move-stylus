@@ -652,3 +652,80 @@ mod enums_stars {
         .unwrap();
     }
 }
+
+mod enums_elements_experiment {
+    use super::*;
+    use alloy_sol_types::sol;
+    use alloy_sol_types::{SolCall, SolValue};
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "elements_experiment";
+        const SOURCE_PATH: &str = "tests/enums/elements_experiment.move";
+
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol! {
+        enum State {
+            Solid,
+            Liquid,
+            Gas
+        }
+        enum Symbol  {
+            H,
+            He,
+            C,
+            N,
+            O,
+        }
+        struct Element {
+            Symbol symbol;
+            uint64 boil_point;
+            uint64 freezing_point;
+            uint64 density;
+        }
+
+        function getElementState(Symbol symbol, uint64 temperature) external returns (State);
+        function getPureSubstanceDensity(Symbol symbol) external returns (uint64);
+        function getMixtureSubstanceDensity(Symbol a, Symbol b, uint8 concentration) external returns (uint64);
+        function runExperiments() external returns (uint64[]);
+    }
+
+    #[rstest]
+    #[case(getElementStateCall::new((Symbol::H, 10u64)), State::Solid)]
+    #[case(getElementStateCall::new((Symbol::H, 30u64)), State::Gas)]
+    #[case(getElementStateCall::new((Symbol::He, 0u64)), State::Solid)]
+    #[case(getElementStateCall::new((Symbol::He, 2u64)), State::Liquid)]
+    #[case(getElementStateCall::new((Symbol::C, 2000u64)), State::Solid)]
+    #[case(getElementStateCall::new((Symbol::C, 4000u64)), State::Gas)]
+    #[case(getElementStateCall::new((Symbol::N, 50u64)), State::Solid)]
+    #[case(getElementStateCall::new((Symbol::N, 70u64)), State::Liquid)]
+    #[case(getElementStateCall::new((Symbol::O, 40u64)), State::Solid)]
+    #[case(getElementStateCall::new((Symbol::O, 70u64)), State::Liquid)]
+    #[case(getElementStateCall::new((Symbol::O, 100u64)), State::Gas)]
+    #[case(getPureSubstanceDensityCall::new((Symbol::H,)), 899u64)]
+    #[case(getPureSubstanceDensityCall::new((Symbol::C,)), 2260000u64)]
+    #[case(getPureSubstanceDensityCall::new((Symbol::O,)), 1429u64)]
+    #[case(getMixtureSubstanceDensityCall::new((Symbol::H, Symbol::He, 50u8)), 538u64)]
+    #[case(getMixtureSubstanceDensityCall::new((Symbol::O, Symbol::C, 10u8)), 2034142u64)]
+    #[case(getMixtureSubstanceDensityCall::new((Symbol::N, Symbol::O, 70u8)), 1304u64)]
+    #[case(getMixtureSubstanceDensityCall::new((Symbol::He, Symbol::N, 30u8)), 929u64)]
+    #[case(getMixtureSubstanceDensityCall::new((Symbol::C, Symbol::He, 90u8)), 2034017u64)]
+    #[case(runExperimentsCall::new(()), vec![5000u64, 6000u64, 4000u64])]
+    fn test_elements_experiment<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode(),
+        )
+        .unwrap();
+    }
+}
