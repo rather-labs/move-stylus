@@ -473,81 +473,89 @@ impl IVector {
 
                 let i = module.locals.add(ValType::I32);
                 then.i32_const(0).local_set(i);
-                then.loop_(None, |loop_| {
-                    //  Get the i-th element of both vectors and compare them
-                    let data_size = inner.stack_data_size() as i32;
-                    let load_kind = if data_size == 4 {
-                        LoadKind::I32 { atomic: false }
-                    } else {
-                        LoadKind::I64 { atomic: false }
-                    };
-                    loop_.vec_elem_ptr(v1_ptr, i, data_size).load(
-                        compilation_ctx.memory_id,
-                        load_kind,
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-                    loop_.vec_elem_ptr(v2_ptr, i, data_size).load(
-                        compilation_ctx.memory_id,
-                        load_kind,
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-                    match inner {
-                        IntermediateType::IBool
-                        | IntermediateType::IU8
-                        | IntermediateType::IU16
-                        | IntermediateType::IU32
-                        | IntermediateType::IU64
-                        | IntermediateType::IU128
-                        | IntermediateType::IU256
-                        | IntermediateType::IAddress
-                        | IntermediateType::IStruct { .. }
-                        | IntermediateType::IGenericStructInstance { .. }
-                        | IntermediateType::IVector(_)
-                        | IntermediateType::IEnum(_) => {
+                match inner {
+                    IntermediateType::IBool
+                    | IntermediateType::IU8
+                    | IntermediateType::IU16
+                    | IntermediateType::IU32
+                    | IntermediateType::IU64 => {
+                        let equality_f =
+                            RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+
+                        // Call the generic equality function
+                        then.skip_vec_header(v1_ptr)
+                            .skip_vec_header(v2_ptr)
+                            .local_get(len)
+                            .i32_const(inner.stack_data_size() as i32)
+                            .binop(BinaryOp::I32Mul)
+                            .call(equality_f)
+                            .local_set(result);
+                    }
+                    IntermediateType::IU128
+                    | IntermediateType::IU256
+                    | IntermediateType::IAddress
+                    | IntermediateType::IStruct { .. }
+                    | IntermediateType::IGenericStructInstance { .. }
+                    | IntermediateType::IVector(_)
+                    | IntermediateType::IEnum(_) => {
+                        then.loop_(None, |loop_| {
+                            //  Get the i-th element of both vectors and compare them
+                            let data_size = inner.stack_data_size() as i32;
+                            loop_.vec_elem_ptr(v1_ptr, i, data_size).load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+                            loop_.vec_elem_ptr(v2_ptr, i, data_size).load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+
                             inner.load_equality_instructions(
                                 module,
                                 loop_,
                                 compilation_ctx,
                                 module_data,
                             );
-                        }
-                        IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                            panic!("Found vector of rereferences")
-                        }
-                        IntermediateType::ISigner => {
-                            panic!("Found vector of signers")
-                        }
-                        IntermediateType::ITypeParameter(_) => {
-                            panic!("Found vector of type parameters, expected a concrete type");
-                        }
+
+                            // If they are not equal we set result to false and break the loop
+                            loop_.if_else(
+                                None,
+                                |_| {},
+                                |else_| {
+                                    else_.i32_const(0).local_set(result).br(then_id);
+                                },
+                            );
+
+                            // === index++ ===
+                            loop_.local_get(i);
+                            loop_.i32_const(1);
+                            loop_.binop(BinaryOp::I32Add);
+                            loop_.local_tee(i);
+
+                            // === Continue if index < len ===
+                            loop_.local_get(len);
+                            loop_.binop(BinaryOp::I32LtU);
+                            loop_.br_if(loop_.id());
+                        });
                     }
-
-                    // If they are not equal we set result to false and break the loop
-                    loop_.if_else(
-                        None,
-                        |_| {},
-                        |else_| {
-                            else_.i32_const(0).local_set(result).br(then_id);
-                        },
-                    );
-
-                    // === index++ ===
-                    loop_.local_get(i);
-                    loop_.i32_const(1);
-                    loop_.binop(BinaryOp::I32Add);
-                    loop_.local_tee(i);
-
-                    // === Continue if index < len ===
-                    loop_.local_get(len);
-                    loop_.binop(BinaryOp::I32LtU);
-                    loop_.br_if(loop_.id());
-                });
+                    IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                        panic!("Found vector of rereferences")
+                    }
+                    IntermediateType::ISigner => {
+                        panic!("Found vector of signers")
+                    }
+                    IntermediateType::ITypeParameter(_) => {
+                        panic!("Found vector of type parameters, expected a concrete type");
+                    }
+                }
             },
             |else_| {
                 else_.i32_const(0).local_set(result);

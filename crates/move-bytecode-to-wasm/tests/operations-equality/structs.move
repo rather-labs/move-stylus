@@ -722,3 +722,15 @@ entry fun neq_struct_struct(a: u32, b: u128, c: u32, d: u128): bool {
 
     foo != bar
 }
+
+entry fun eq_vec_bar(n1: u32, n2: u32, n3: u32, n4: u32): bool {
+    let v1 = vector[Bar { n: n1, o: 1u128 }, Bar { n: n2, o: 2u128 }];
+    let v2 = vector[Bar { n: n3, o: 1u128 }, Bar { n: n4, o: 2u128 }];
+    v1 == v2
+}
+
+entry fun eq_vec_foo(n1: u32, n2: u32, n3: u32, n4: u32): bool {
+    let v1 = vector[Foo { p: Bar { n: n1, o: 1u128 }, q: @0x7357, r: vector[1], s: vector[1], t: true, u: 1, v: 2, w: 3, x: 4, y: 5, z: 6 }, Foo { p: Bar { n: n2, o: 2u128 }, q: @0x7357, r: vector[1], s: vector[1], t: true, u: 1, v: 2, w: 3, x: 4, y: 5, z: 6 }];
+    let v2 = vector[Foo { p: Bar { n: n3, o: 1u128 }, q: @0x7357, r: vector[1], s: vector[1], t: true, u: 1, v: 2, w: 3, x: 4, y: 5, z: 6 }, Foo { p: Bar { n: n4, o: 2u128 }, q: @0x7357, r: vector[1], s: vector[1], t: true, u: 1, v: 2, w: 3, x: 4, y: 5, z: 6 }];
+    v1 == v2
+}

@@ -1077,6 +1077,8 @@ mod structs {
         function neqStructVecStackType(uint32[] a, uint32[] b) external returns (bool);
         function neqStructVecHeapType(uint128[] a, uint128[] b) external returns (bool);
         function neqStructStruct(uint32 a, uint128 b, uint32 c, uint128 d) external returns (bool);
+        function eqVecBar(uint32 n1, uint32 n2, uint32 n3, uint32 n4) external returns (bool);
+        function eqVecFoo(uint32 n1, uint32 n2, uint32 n3, uint32 n4) external returns (bool);
     );
 
     #[rstest]
@@ -1110,6 +1112,12 @@ mod structs {
     )]
     #[case(eqStructStructCall::new((u32::MAX, u128::MAX, u32::MAX, u128::MAX)), true)]
     #[case(eqStructStructCall::new((u32::MAX, u128::MAX, 1, u128::MAX)), false)]
+    #[case(eqVecBarCall::new((42, 43, 42, 43)), true)]
+    #[case(eqVecBarCall::new((42, 43, 42, 42)), false)]
+    #[case(eqVecBarCall::new((42, 43, 43, 43)), false)]
+    #[case(eqVecFooCall::new((42, 43, 42, 43)), true)]
+    #[case(eqVecFooCall::new((42, 43, 42, 42)), false)]
+    #[case(eqVecFooCall::new((42, 43, 43, 43)), false)]
     fn test_equality_struct<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
