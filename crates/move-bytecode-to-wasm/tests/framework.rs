@@ -532,12 +532,14 @@ mod delegated_counter {
         function ccCallEmptyRes2(address contract_address, uint64 v) external returns (bool);
         function ccCallEmptyRes3(address contract_address, Foo v) external returns (bool);
         function ccCallEmptyRes4(address contract_address, Bar v) external returns (bool);
+        function ccCallEmptyRes5(address contract_address, uint8[] v) external returns (bool);
 
         // The following functions are used to obtain their calldata and compare them
         function callEmptyRes1() external;
         function callEmptyRes2(uint64 v) external;
         function callEmptyRes3(Foo v) external;
         function callEmptyRes4(Bar v) external;
+        function callEmptyRes5(uint8[] v) external;
     );
 
     const ADDRESS: alloy_primitives::Address =
@@ -605,6 +607,13 @@ mod delegated_counter {
     #[case(
         ccCallEmptyRes4Call::new((ADDRESS, get_bar())),
         callEmptyRes4Call::new((get_bar(),)).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        u64::MAX
+    )]
+    #[case(
+        ccCallEmptyRes5Call::new((ADDRESS, vec![1,2,3,4,5])),
+        callEmptyRes5Call::new((vec![1,2,3,4,5],)).abi_encode(),
         true,
         CrossContractCallType::Call,
         u64::MAX

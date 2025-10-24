@@ -72,5 +72,8 @@ public native fun call_empty_res_3(self: &CrossContractCall, foo: Foo): Contract
 #[ext(external_call)]
 public native fun call_empty_res_4(self: &CrossContractCall, bar: Bar): ContractCallEmptyResult;
 
+#[ext(external_call)]
+public native fun call_empty_res_5(self: &CrossContractCall, vec_1: vector<u8>): ContractCallEmptyResult;
+
 #[ext(external_call, view)]
 public native fun call_view_1(self: &CrossContractCall): ContractCallResult<u64>;
