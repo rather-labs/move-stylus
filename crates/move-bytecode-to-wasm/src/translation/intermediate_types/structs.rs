@@ -276,14 +276,15 @@ impl IStruct {
                         },
                     );
                 }
-                IntermediateType::IStruct { .. }
-                | IntermediateType::IGenericStructInstance { .. }
+                IntermediateType::IU128
+                | IntermediateType::IU256
                 | IntermediateType::IAddress
                 | IntermediateType::ISigner
-                | IntermediateType::IU128
-                | IntermediateType::IU256
                 | IntermediateType::IVector(_)
-                | IntermediateType::IEnum(_) => {
+                | IntermediateType::IStruct { .. }
+                | IntermediateType::IGenericStructInstance { .. }
+                | IntermediateType::IEnum(_)
+                | IntermediateType::IGenericEnumInstance { .. } => {
                     // Load intermediate pointer
                     builder
                         .local_get(src_ptr)
@@ -432,7 +433,8 @@ impl IStruct {
                 | IntermediateType::IU128
                 | IntermediateType::IU256
                 | IntermediateType::IAddress
-                | IntermediateType::IEnum(_) => continue,
+                | IntermediateType::IEnum(_)
+                | IntermediateType::IGenericEnumInstance { .. } => continue,
                 IntermediateType::IVector(_) => return true,
                 IntermediateType::IStruct {
                     module_id, index, ..
@@ -530,6 +532,7 @@ impl IStruct {
                 IntermediateType::ITypeParameter(_) => {
                     panic!("cannot know a type parameter's size, expected a concrete type");
                 }
+                IntermediateType::IGenericEnumInstance { .. } => todo!(),
             }
         }
 

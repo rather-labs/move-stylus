@@ -510,10 +510,11 @@ impl IVector {
                     IntermediateType::IU128
                     | IntermediateType::IU256
                     | IntermediateType::IAddress
+                    | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
                     | IntermediateType::IGenericStructInstance { .. }
-                    | IntermediateType::IVector(_)
-                    | IntermediateType::IEnum(_) => {
+                    | IntermediateType::IEnum(_)
+                    | IntermediateType::IGenericEnumInstance { .. } => {
                         then.loop_(None, |loop_| {
                             //  Get the i-th element of both vectors and compare them
                             let data_size = inner.stack_data_size() as i32;
@@ -678,7 +679,8 @@ impl IVector {
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
                     | IntermediateType::IGenericStructInstance { .. }
-                    | IntermediateType::IEnum(_) => {
+                    | IntermediateType::IEnum(_)
+                    | IntermediateType::IGenericEnumInstance { .. } => {
                         loop_.vec_elem_ptr(vec_ptr, i, 4).load(
                             compilation_ctx.memory_id,
                             LoadKind::I32 { atomic: false },
@@ -751,7 +753,8 @@ impl IVector {
             | IntermediateType::IAddress
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_) => {
+            | IntermediateType::IEnum(_)
+            | IntermediateType::IGenericEnumInstance { .. } => {
                 builder.call(downcast_f);
                 builder.i32_const(1);
             }
@@ -1072,9 +1075,10 @@ mod tests {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IEnum(_) => {
+            | IntermediateType::IGenericStructInstance { .. }
+            | IntermediateType::IEnum(_)
+            | IntermediateType::IGenericEnumInstance { .. } => {
                 let swap_f =
                     RuntimeFunction::VecPopBack32.get(&mut raw_module, Some(&compilation_ctx));
                 builder.call(swap_f);

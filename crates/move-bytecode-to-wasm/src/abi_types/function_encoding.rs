@@ -101,6 +101,7 @@ fn solidity_name(
             }
         }
         IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => None,
+        IntermediateType::IGenericEnumInstance { .. } => todo!(),
     }
 }
 

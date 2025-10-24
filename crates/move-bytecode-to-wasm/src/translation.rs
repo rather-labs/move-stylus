@@ -1533,7 +1533,8 @@ fn translate_instruction(
                 | IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. }
                 | IntermediateType::IVector(_)
-                | IntermediateType::IEnum(_) => {
+                | IntermediateType::IEnum(_)
+                | IntermediateType::IGenericEnumInstance { .. } => {
                     let pop_back_f =
                         RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
                     builder.call(pop_back_f);

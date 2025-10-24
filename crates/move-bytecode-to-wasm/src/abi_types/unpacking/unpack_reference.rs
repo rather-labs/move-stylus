@@ -19,12 +19,13 @@ impl IRef {
     ) {
         match inner {
             // If inner is a heap type, forward the pointer
-            IntermediateType::IVector(_)
+            IntermediateType::IU128
+            | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::ISigner
-            | IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::IEnum(_) => {
+            | IntermediateType::IVector(_)
+            | IntermediateType::IEnum(_)
+            | IntermediateType::IGenericEnumInstance { .. } => {
                 inner.add_unpack_instructions(
                     builder,
                     module,
@@ -125,14 +126,15 @@ impl IMutRef {
     ) {
         match inner {
             // If inner is a heap type, forward the pointer
-            IntermediateType::IVector(_)
+            IntermediateType::IU128
+            | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::ISigner
-            | IntermediateType::IU128
-            | IntermediateType::IU256
+            | IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_) => {
+            | IntermediateType::IEnum(_)
+            | IntermediateType::IGenericEnumInstance { .. } => {
                 inner.add_unpack_instructions(
                     builder,
                     module,

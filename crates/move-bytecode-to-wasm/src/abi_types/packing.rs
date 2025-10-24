@@ -225,7 +225,8 @@ impl Packable for IntermediateType {
             | IntermediateType::IMutRef(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_) => {
+            | IntermediateType::IEnum(_)
+            | IntermediateType::IGenericEnumInstance { .. } => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -383,6 +384,7 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
             }
+            IntermediateType::IGenericEnumInstance { .. } => todo!(),
         }
     }
 
@@ -522,6 +524,7 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("can't know the size of a generic type parameter at compile time");
             }
+            IntermediateType::IGenericEnumInstance { .. } => todo!(),
         }
     }
 
@@ -565,6 +568,7 @@ impl Packable for IntermediateType {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
                 inner.is_dynamic(compilation_ctx)
             }
+            IntermediateType::IGenericEnumInstance { .. } => todo!(),
         }
     }
 }
