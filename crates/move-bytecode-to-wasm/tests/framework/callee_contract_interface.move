@@ -71,20 +71,5 @@ public native fun call_empty_res_4(self: &ExampleContract, bar: Bar): ContractCa
 #[ext(external_call)]
 public native fun call_empty_res_5(self: &ExampleContract, vec_1: vector<u8>): ContractCallEmptyResult;
 
-#[ext(external_call)]
-public native fun call_empty_res_1_w_gas(self: &ExampleContract): ContractCallEmptyResult;
-
-#[ext(external_call)]
-public native fun call_empty_res_2_w_gas(self: &ExampleContract, value: u64): ContractCallEmptyResult;
-
-#[ext(external_call)]
-public native fun call_empty_res_3_w_gas(self: &ExampleContract, foo: Foo): ContractCallEmptyResult;
-
-#[ext(external_call)]
-public native fun call_empty_res_4_w_gas(self: &ExampleContract, bar: Bar): ContractCallEmptyResult;
-
-#[ext(external_call)]
-public native fun call_empty_res_5_w_gas(self: &ExampleContract, vec_1: vector<u8>): ContractCallEmptyResult;
-
 #[ext(external_call, view)]
 public native fun call_view_1(self: &ExampleContract): ContractCallResult<u64>;

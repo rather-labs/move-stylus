@@ -28,3 +28,27 @@ entry fun cc_call_empty_res_5(contract_address: address, value: vector<u8>): boo
     let cross_call = cci::new(contract_calls::new(contract_address));
     cross_call.call_empty_res_5(value).succeded()
 }
+
+entry fun cc_call_empty_res_1_with_gas(contract_address: address, gas: u64): bool {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .gas(gas)
+    );
+    cross_call.call_empty_res_1().succeded()
+}
+
+entry fun cc_call_empty_res_2_with_gas(contract_address: address, gas: u64, value: u64): bool {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .gas(gas)
+    );
+    cross_call.call_empty_res_2(value).succeded()
+}
+
+entry fun cc_call_empty_res_3_with_gas(contract_address: address, gas: u64, foo: Foo): bool {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .gas(gas)
+    );
+    cross_call.call_empty_res_3(foo).succeded()
+}

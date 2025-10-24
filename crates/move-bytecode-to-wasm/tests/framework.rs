@@ -531,6 +531,9 @@ mod cross_contract_calls {
         function ccCallEmptyRes3(address contract_address, Foo v) external returns (bool);
         function ccCallEmptyRes4(address contract_address, Bar v) external returns (bool);
         function ccCallEmptyRes5(address contract_address, uint8[] v) external returns (bool);
+        function ccCallEmptyRes1WithGas(address contract_address, uint64 gas) external returns (bool);
+        function ccCallEmptyRes2WithGas(address contract_address, uint64 gas, uint64 v) external returns (bool);
+        function ccCallEmptyRes3WithGas(address contract_address, uint64 gas, Foo v) external returns (bool);
 
         // The following functions are used to obtain their calldata and compare them
         function callEmptyRes1() external;
@@ -586,49 +589,70 @@ mod cross_contract_calls {
         callEmptyRes1Call::new(()).abi_encode(),
         true,
         CrossContractCallType::Call,
-        u64::MAX
+        u64::MAX,
     )]
     #[case(
         ccCallEmptyRes2Call::new((ADDRESS, 42)),
         callEmptyRes2Call::new((42,)).abi_encode(),
         true,
         CrossContractCallType::Call,
-        u64::MAX
+        u64::MAX,
     )]
     #[case(
         ccCallEmptyRes3Call::new((ADDRESS, get_foo())),
         callEmptyRes3Call::new((get_foo(),)).abi_encode(),
         true,
         CrossContractCallType::Call,
-        u64::MAX
+        u64::MAX,
     )]
     #[case(
         ccCallEmptyRes4Call::new((ADDRESS, get_bar())),
         callEmptyRes4Call::new((get_bar(),)).abi_encode(),
         true,
         CrossContractCallType::Call,
-        u64::MAX
+        u64::MAX,
     )]
     #[case(
         ccCallEmptyRes5Call::new((ADDRESS, vec![1,2,3,4,5])),
         callEmptyRes5Call::new((vec![1,2,3,4,5],)).abi_encode(),
         true,
         CrossContractCallType::Call,
-        u64::MAX
+        u64::MAX,
+    )]
+    #[case(
+        ccCallEmptyRes1WithGasCall::new((ADDRESS, 1)),
+        callEmptyRes1Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        1,
+    )]
+    #[case(
+        ccCallEmptyRes2WithGasCall::new((ADDRESS, 2, 42)),
+        callEmptyRes2Call::new((42,)).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        2,
+    )]
+    #[case(
+        ccCallEmptyRes3WithGasCall::new((ADDRESS, 3, get_foo())),
+        callEmptyRes3Call::new((get_foo(),)).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        3,
     )]
     #[case(
         ccCallEmptyRes1Call::new((ADDRESS,)),
         callEmptyRes1Call::new(()).abi_encode(),
         false,
         CrossContractCallType::Call,
-        u64::MAX
+        u64::MAX,
     )]
     #[case(
         ccCallEmptyRes2Call::new((ADDRESS, 42)),
         callEmptyRes2Call::new((42,)).abi_encode(),
         false,
         CrossContractCallType::Call,
-        u64::MAX
+        u64::MAX,
     )]
     fn test_cross_contract_call_empty_calls<T: SolCall>(
         runtime: RuntimeSandbox,
