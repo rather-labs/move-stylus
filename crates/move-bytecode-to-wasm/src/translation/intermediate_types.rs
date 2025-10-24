@@ -228,7 +228,9 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("can't load a type parameter as a constant, expected a concrete type");
             }
-            IntermediateType::IEnum(_) => todo!(),
+            IntermediateType::IEnum(_) => {
+                panic!("Enum variants cannot be loaded as constants")
+            }
         }
     }
 
