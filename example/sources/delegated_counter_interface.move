@@ -1,19 +1,15 @@
 module hello_world::delegated_counter_interface;
 
-use stylus::contract_calls::ContractCallEmptyResult;
+use stylus::contract_calls::{ContractCallEmptyResult, CrossContractCall};
 use stylus::object::UID;
 
 #[ext(external_call)]
 public struct CounterCall has drop {
-    contract_address: address,
-    delegate: bool,
+    configuration: CrossContractCall,
 }
 
-public fun new(contract_address: address, delegate: bool): CounterCall {
-    CounterCall {
-        contract_address,
-        delegate,
-    }
+public fun new(configuration: CrossContractCall): CounterCall {
+    CounterCall { configuration }
 }
 
 #[ext(external_call)]

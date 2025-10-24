@@ -52,56 +52,65 @@ deploy-example:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/wasm/hello_world.wasm
+		--wasm-file=./example/build/wasm/hello_world.wasm \
+		| ./update_contract_env.sh CONTRACT_ADDRESS
 
 deploy-example-2:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/wasm/hello_world_2.wasm
+		--wasm-file=./example/build/wasm/hello_world_2.wasm \
+		| ./update_contract_env.sh CONTRACT_ADDRESS_2
 
 deploy-example-primitives:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/wasm/primitives_and_operations.wasm \
-		--no-verify
+		--no-verify \
+		| ./update_contract_env.sh CONTRACT_ADDRESS_PRIMITIVES
 
 deploy-erc20:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/wasm/erc20.wasm
+		--wasm-file=./example/build/wasm/erc20.wasm \
+		| ./update_contract_env.sh CONTRACT_ADDRESS_ERC20
 
 deploy-counter:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/wasm/counter.wasm
+		--wasm-file=./example/build/wasm/counter.wasm \
+		| ./update_contract_env.sh CONTRACT_ADDRESS_COUNTER
 
 deploy-counter-named-id:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/wasm/counter_named_id.wasm
+		--wasm-file=./example/build/wasm/counter_named_id.wasm \
+		| ./update_contract_env.sh CONTRACT_ADDRESS_COUNTER_NAMED_ID
 
 deploy-counter-with-init:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/wasm/counter_with_init.wasm
+		--wasm-file=./example/build/wasm/counter_with_init.wasm \
+		| ./update_contract_env.sh CONTRACT_ADDRESS_COUNTER_WITH_INIT
 
 deploy-dog-walker:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/wasm/dog_walker.wasm
+		--wasm-file=./example/build/wasm/dog_walker.wasm \
+		| ./update_contract_env.sh CONTRACT_ADDRESS_DOG_WALKER
 
 deploy-cross-contract-call:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
-		--wasm-file=./example/build/wasm/cross_contract_call.wasm
+		--wasm-file=./example/build/wasm/cross_contract_call.wasm \
+		| ./update_contract_env.sh CONTRACT_ADDRESS_CROSS_CALL
 
 deploy-delegated-counter:
 	cargo stylus deploy \

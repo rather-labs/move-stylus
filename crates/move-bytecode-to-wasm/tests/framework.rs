@@ -468,9 +468,7 @@ mod event {
     }
 }
 
-mod delegated_counter {
-    use std::io::Read;
-
+mod cross_contract_calls {
     use alloy_primitives::{Address, U256, address};
 
     use crate::common::{

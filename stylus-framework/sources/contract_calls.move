@@ -20,16 +20,19 @@ public fun new(contract_address: address): CrossContractCall {
     }
 }
 
-public fun gas(self: &mut CrossContractCall, gas: u64) {
+public fun gas(mut self: CrossContractCall, gas: u64): CrossContractCall {
     self.gas = gas;
+    self
 }
 
-public fun value(self: &mut CrossContractCall, value: u256) {
+public fun value(mut self: CrossContractCall, value: u256): CrossContractCall {
     self.value = value;
+    self
 }
 
-public fun delegate(self: &mut CrossContractCall) {
+public fun delegate(mut self: CrossContractCall): CrossContractCall {
     self.delegate = true;
+    self
 }
 
 public struct ContractCallResult<RESULT> has drop {
