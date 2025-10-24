@@ -18,6 +18,8 @@ use crate::{
     CompilationContext, compilation_context::module_data::ModuleData, translation::TranslationError,
 };
 
+use super::structs::IStruct;
+
 use walrus::{
     InstrSeqBuilder, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
@@ -109,6 +111,107 @@ impl IEnum {
         Ok(Some(size + 4))
     }
 
+    /// Compares two enums for equality
+    /// Ar
+    /// # Arguments
+    ///    - pointer to the first enum
+    ///    - pointer to the second enum
+    /// # Returns
+    ///    - true if the enums are equal, false otherwise
+    pub fn equality(
+        &self,
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        module_data: &ModuleData,
+    ) {
+        let e1_ptr = module.locals.add(ValType::I32);
+        let e2_ptr = module.locals.add(ValType::I32);
+        builder.local_set(e1_ptr).local_set(e2_ptr);
+
+        let variant_index = module.locals.add(ValType::I32);
+
+        // Read the variant index from the first enum
+        builder
+            .local_get(e1_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_tee(variant_index);
+
+        // Read the variant index from the second enum
+        builder.local_get(e2_ptr).load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+        // Compare the variant indices
+        builder.binop(BinaryOp::I32Eq);
+
+        builder.if_else(
+            ValType::I32,
+            |then| {
+                let result = module.locals.add(ValType::I32);
+                then.i32_const(0).local_set(result);
+                // Proceed to compare the fields of the variant
+                // Find the corresponding IEnumVariant for the variant index local
+                for variant in self.variants.iter() {
+                    then.block(None, |block| {
+                        let block_id = block.id();
+                        // If the variant index does not match, branch to the end of the block
+                        block
+                            .local_get(variant_index)
+                            .i32_const(variant.index as i32)
+                            .binop(BinaryOp::I32Ne)
+                            .br_if(block_id);
+
+                        block
+                            .local_get(e1_ptr)
+                            .i32_const(4)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(e1_ptr);
+                        block
+                            .local_get(e2_ptr)
+                            .i32_const(4)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(e2_ptr);
+
+                        // Use the same logic as structs to compare the fields
+                        IStruct::compare_fields(
+                            &variant.fields,
+                            block,
+                            module,
+                            compilation_ctx,
+                            module_data,
+                            e1_ptr,
+                            e2_ptr,
+                        );
+                        block.local_set(result);
+                    });
+                }
+                then.local_get(result);
+            },
+            |else_| {
+                else_.i32_const(0);
+            },
+        );
+    }
+
+    /// Copies the local instructions for an enum
+    ///
+    /// # Arguments
+    ///    - pointer to the source enum
+    /// # Returns
+    ///    - pointer to the new enum
     pub fn copy_local_instructions(
         &self,
         module: &mut Module,
@@ -118,10 +221,6 @@ impl IEnum {
     ) {
         let src_ptr = module.locals.add(ValType::I32);
         let ptr = module.locals.add(ValType::I32);
-
-        let val_32 = module.locals.add(ValType::I32);
-        let val_64 = module.locals.add(ValType::I64);
-        let ptr_to_data = module.locals.add(ValType::I32);
 
         builder.local_set(src_ptr);
 
@@ -166,243 +265,20 @@ impl IEnum {
                     .binop(BinaryOp::I32Ne)
                     .br_if(block_id);
 
-                // Set offset past the index
-                let mut offset: u32 = 4;
-                // Iterate over the fields and copy them
-                for field in &variant.fields {
-                    match field {
-                        IntermediateType::IBool
-                        | IntermediateType::IU8
-                        | IntermediateType::IU16
-                        | IntermediateType::IU32
-                        | IntermediateType::IU64 => {
-                            let data_size = field.stack_data_size();
-                            let (val, load_kind, store_kind) = if data_size == 8 {
-                                (
-                                    val_64,
-                                    LoadKind::I64 { atomic: false },
-                                    StoreKind::I64 { atomic: false },
-                                )
-                            } else {
-                                (
-                                    val_32,
-                                    LoadKind::I32 { atomic: false },
-                                    StoreKind::I32 { atomic: false },
-                                )
-                            };
-
-                            // Load intermediate pointer and value
-                            block.local_get(src_ptr).load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg {
-                                    align: 0,
-                                    offset,
-                                },
-                            ).load(
-                                compilation_ctx.memory_id,
-                                load_kind,
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            ).local_set(val);
-
-                            // Create a pointer for the value
-                            block
-                                .i32_const(data_size as i32)
-                                .call(compilation_ctx.allocator)
-                                .local_tee(ptr_to_data);
-
-                            // Store the actual value behind the middle_ptr
-                            block.local_get(val).store(
-                                compilation_ctx.memory_id,
-                                store_kind,
-                                MemArg {
-                                    align: 0,
-                                    offset: 0,
-                                },
-                            );
-                        }
-                        IntermediateType::IStruct { .. }
-                        | IntermediateType::IGenericStructInstance { .. }
-                        | IntermediateType::IAddress
-                        | IntermediateType::ISigner
-                        | IntermediateType::IU128
-                        | IntermediateType::IU256
-                        | IntermediateType::IVector(_)
-                        | IntermediateType::IEnum(_) => {
-                            // Load intermediate pointer
-                            block
-                                .local_get(src_ptr)
-                                .i32_const(offset as i32)
-                                .binop(BinaryOp::I32Add)
-                                .local_set(ptr_to_data);
-
-                            field.copy_local_instructions(
-                                module,
-                                block,
-                                compilation_ctx,
-                                module_data,
-                                ptr_to_data,
-                            );
-
-                            block.local_set(ptr_to_data);
-                        }
-                        IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                            panic!("references inside enums not allowed")
-                        }
-                        IntermediateType::ITypeParameter(_) => {
-                            panic!(
-                                "Trying to copy a type parameter inside an enum, expected a concrete type"
-                            );
-                        }
-                    }
-                    // Store the middle pointer at ptr + offset
-                    block.local_get(ptr).local_get(ptr_to_data).store(
-                        compilation_ctx.memory_id,
-                        StoreKind::I32 { atomic: false },
-                        MemArg { align: 0, offset },
-                    );
-                    offset += 4;
-                }
+                // Use the common field copying logic
+                IStruct::copy_fields(
+                    &variant.fields,
+                    block,
+                    module,
+                    compilation_ctx,
+                    module_data,
+                    src_ptr,
+                    ptr,
+                    4, // start_offset for enums is 4 because we already wrote the variant index
+                );
             });
         }
 
         builder.local_get(ptr);
-    }
-
-    pub fn equality(
-        &self,
-        builder: &mut InstrSeqBuilder,
-        module: &mut Module,
-        compilation_ctx: &CompilationContext,
-        module_data: &ModuleData,
-    ) {
-        let e1_ptr = module.locals.add(ValType::I32);
-        let e2_ptr = module.locals.add(ValType::I32);
-        builder.local_set(e1_ptr).local_set(e2_ptr);
-
-        let result = module.locals.add(ValType::I32);
-        builder.i32_const(1).local_set(result);
-
-        let variant_index = module.locals.add(ValType::I32);
-
-        // Read the variant index from the first enum
-        builder
-            .local_get(e1_ptr)
-            .load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            )
-            .local_tee(variant_index);
-
-        // Read the variant index from the second enum
-        builder.local_get(e2_ptr).load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
-
-        // Compare the variant indices
-        builder.binop(BinaryOp::I32Eq);
-
-        builder.if_else(
-            None,
-            |then| {
-                // Proceed to compare the fields of the variant
-                // Find the corresponding IEnumVariant for the variant index local
-                for variant in self.variants.iter() {
-                    then.block(None, |block| {
-                        let block_id = block.id();
-                        // If the variant index does not match, branch to the end of the block
-                        block
-                            .local_get(variant_index)
-                            .i32_const(variant.index as i32)
-                            .binop(BinaryOp::I32Ne)
-                            .br_if(block_id);
-
-                        let load_value_to_stack =
-                            |field: &IntermediateType, builder: &mut InstrSeqBuilder<'_>| {
-                                if field.stack_data_size() == 8 {
-                                    builder.load(
-                                        compilation_ctx.memory_id,
-                                        LoadKind::I64 { atomic: false },
-                                        MemArg {
-                                            align: 0,
-                                            offset: 0,
-                                        },
-                                    );
-                                } else {
-                                    builder.load(
-                                        compilation_ctx.memory_id,
-                                        LoadKind::I32 { atomic: false },
-                                        MemArg {
-                                            align: 0,
-                                            offset: 0,
-                                        },
-                                    );
-                                }
-                            };
-
-                        // Set offset past the index
-                        let mut offset: u32 = 4;
-                        // Iterate over the fields and compare them
-                        for field in &variant.fields {
-                            // Load the first enum field value
-                            block.local_get(e1_ptr).load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg { align: 0, offset },
-                            );
-
-                            if field.is_stack_type() {
-                                load_value_to_stack(field, block);
-                            }
-
-                            // Load the second enum field value
-                            block.local_get(e2_ptr).load(
-                                compilation_ctx.memory_id,
-                                LoadKind::I32 { atomic: false },
-                                MemArg { align: 0, offset },
-                            );
-
-                            if field.is_stack_type() {
-                                load_value_to_stack(field, block);
-                            }
-
-                            // Compare the field values
-                            field.load_equality_instructions(
-                                module,
-                                block,
-                                compilation_ctx,
-                                module_data,
-                            );
-                            block.if_else(
-                                None,
-                                |_| {},
-                                |else_| {
-                                    else_.i32_const(0).local_set(result).br(block_id);
-                                },
-                            );
-                            offset += 4;
-                        }
-                        block.i32_const(1).local_set(result);
-                    });
-                }
-            },
-            |else_| {
-                else_.i32_const(0).local_set(result);
-            },
-        );
-
-        builder.local_get(result);
     }
 }
