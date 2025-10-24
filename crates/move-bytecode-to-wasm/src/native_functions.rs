@@ -196,7 +196,6 @@ impl NativeFunction {
                             module_id,
                             function_information,
                             &special_attributes.modifiers,
-                            false,
                         )
                     } else {
                         panic!("native function {module_id}::{name} not supported yet")

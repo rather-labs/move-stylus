@@ -1,34 +1,31 @@
 module erc20call::erc20call;
 
-use stylus::contract_calls::ContractCallResult;
+use stylus::contract_calls::{ContractCallResult, CrossContractCall};
 
 #[ext(external_call)]
-public struct ERC20Call has drop {
-    contract_address: address,
-    delegate: bool,
+public struct ERC20 has drop {
+    configuration: CrossContractCall
 }
 
-public fun new(contract_address: address, delegate: bool): ERC20Call {
-    ERC20Call {
-        contract_address,
-        delegate,
-    }
+public fun new(configuration: CrossContractCall): ERC20 {
+    ERC20 { configuration }
 }
 
 #[ext(external_call, view)]
-public native fun total_supply(self: &ERC20Call): ContractCallResult<u256>;
+public native fun total_supply(self: &ERC20): ContractCallResult<u256>;
 
 #[ext(external_call, view)]
-public native fun balance_of(self: &ERC20Call, account: address): ContractCallResult<u256>;
+public native fun balance_of(self: &ERC20, account: address): ContractCallResult<u256>;
 
 #[ext(external_call)]
-public native fun transfer(self: &ERC20Call, account: address, amount: u256): ContractCallResult<bool>;
+public native fun transfer(self: &ERC20, account: address, amount: u256): ContractCallResult<bool>;
 
 #[ext(external_call, view)]
-public native fun allowance(self: &ERC20Call, owner: address, spender: address): ContractCallResult<u256>;
+public native fun allowance(self: &ERC20, owner: address, spender: address): ContractCallResult<u256>;
 
 #[ext(external_call)]
-public native fun approve(self: &ERC20Call, spender: address, amount: u256): ContractCallResult<bool>;
+public native fun approve(self: &ERC20, spender: address, amount: u256): ContractCallResult<bool>;
 
 #[ext(external_call)]
-public native fun transfer_from(self: &ERC20Call, sender: address, recipient: address, amount: u256): ContractCallResult<bool>;
+public native fun transfer_from(self: &ERC20, sender: address, recipient: address, amount: u256): ContractCallResult<bool>;
+

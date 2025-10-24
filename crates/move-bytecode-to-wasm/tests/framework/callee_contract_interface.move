@@ -1,18 +1,14 @@
 module test::callee_contract_interface;
 
-use stylus::contract_calls::{ContractCallEmptyResult, ContractCallResult};
+use stylus::contract_calls::{ContractCallEmptyResult, ContractCallResult, CrossContractCall};
 
 #[ext(external_call)]
-public struct CrossContractCall has drop {
-    contract_address: address,
-    delegate: bool,
+public struct ExampleContract has drop {
+    configuration: CrossContractCall,
 }
 
-public fun new(contract_address: address, delegate: bool): CrossContractCall {
-    CrossContractCall {
-        contract_address,
-        delegate,
-    }
+public fun new(configuration: CrossContractCall): ExampleContract {
+    ExampleContract { configuration }
 }
 
 // Static abi sub-struct
@@ -61,19 +57,34 @@ public struct Bar has drop {
 }
 
 #[ext(external_call)]
-public native fun call_empty_res_1(self: &CrossContractCall): ContractCallEmptyResult;
+public native fun call_empty_res_1(self: &ExampleContract): ContractCallEmptyResult;
 
 #[ext(external_call)]
-public native fun call_empty_res_2(self: &CrossContractCall, value: u64): ContractCallEmptyResult;
+public native fun call_empty_res_2(self: &ExampleContract, value: u64): ContractCallEmptyResult;
 
 #[ext(external_call)]
-public native fun call_empty_res_3(self: &CrossContractCall, foo: Foo): ContractCallEmptyResult;
+public native fun call_empty_res_3(self: &ExampleContract, foo: Foo): ContractCallEmptyResult;
 
 #[ext(external_call)]
-public native fun call_empty_res_4(self: &CrossContractCall, bar: Bar): ContractCallEmptyResult;
+public native fun call_empty_res_4(self: &ExampleContract, bar: Bar): ContractCallEmptyResult;
 
 #[ext(external_call)]
-public native fun call_empty_res_5(self: &CrossContractCall, vec_1: vector<u8>): ContractCallEmptyResult;
+public native fun call_empty_res_5(self: &ExampleContract, vec_1: vector<u8>): ContractCallEmptyResult;
+
+#[ext(external_call)]
+public native fun call_empty_res_1_w_gas(self: &ExampleContract): ContractCallEmptyResult;
+
+#[ext(external_call)]
+public native fun call_empty_res_2_w_gas(self: &ExampleContract, value: u64): ContractCallEmptyResult;
+
+#[ext(external_call)]
+public native fun call_empty_res_3_w_gas(self: &ExampleContract, foo: Foo): ContractCallEmptyResult;
+
+#[ext(external_call)]
+public native fun call_empty_res_4_w_gas(self: &ExampleContract, bar: Bar): ContractCallEmptyResult;
+
+#[ext(external_call)]
+public native fun call_empty_res_5_w_gas(self: &ExampleContract, vec_1: vector<u8>): ContractCallEmptyResult;
 
 #[ext(external_call, view)]
-public native fun call_view_1(self: &CrossContractCall): ContractCallResult<u64>;
+public native fun call_view_1(self: &ExampleContract): ContractCallResult<u64>;
