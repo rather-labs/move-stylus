@@ -160,6 +160,7 @@ mod vector {
         function neqVecNestedStackType(uint16[][], uint16[][]) external returns (bool);
         function neqVecNestedHeapType(uint128[][], uint128[][]) external returns (bool);
         function neqVecNestedHeapType2(address[][], address[][]) external returns (bool);
+        function eqVecBar(uint32 n1, uint32 n2, uint32 n3, uint32 n4) external returns (bool);
     );
 
     #[rstest]
@@ -412,6 +413,9 @@ mod vector {
         ])),
         false
     )]
+    #[case(eqVecBarCall::new((42, 43, 42, 43)), true)]
+    #[case(eqVecBarCall::new((42, 43, 42, 42)), false)]
+    #[case(eqVecBarCall::new((42, 43, 43, 43)), false)]
     fn test_equality_vector<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,
