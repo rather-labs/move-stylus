@@ -124,7 +124,8 @@ impl IMutRef {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. } => {
+            | IntermediateType::IGenericStructInstance { .. }
+            | IntermediateType::IEnum(_) => {
                 builder
                     .local_get(local)
                     .load(
@@ -192,7 +193,6 @@ impl IMutRef {
                     compilation_ctx,
                 );
             }
-            IntermediateType::IEnum(_) => todo!(),
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 panic!("Inner type cannot be a reference!");
             }

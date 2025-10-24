@@ -140,9 +140,9 @@ impl ControlTargets {
             BranchMode::MergedBranch | BranchMode::MergedBranchIntoMulti => {
                 self.resolve_merged(label)
             }
-            BranchMode::LoopBreak(loop_id) | BranchMode::LoopBreakIntoMulti(loop_id) => {
-                self.loop_break.get(&loop_id).copied()
-            }
+            BranchMode::LoopBreak(loop_id) | BranchMode::LoopBreakIntoMulti(loop_id) => self
+                .resolve_merged(label)
+                .or_else(|| self.loop_break.get(&loop_id).copied()),
             BranchMode::LoopContinue(loop_id) | BranchMode::LoopContinueIntoMulti(loop_id) => {
                 self.loop_continue.get(&loop_id).copied()
             }
@@ -1532,7 +1532,8 @@ fn translate_instruction(
                 | IntermediateType::ISigner
                 | IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. }
-                | IntermediateType::IVector(_) => {
+                | IntermediateType::IVector(_)
+                | IntermediateType::IEnum(_) => {
                     let pop_back_f =
                         RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
                     builder.call(pop_back_f);
@@ -1550,7 +1551,6 @@ fn translate_instruction(
                         operand_type: *vec_inner,
                     });
                 }
-                IntermediateType::IEnum(_) => todo!(),
             }
 
             types_stack.push(*vec_inner);
@@ -2603,23 +2603,34 @@ fn translate_instruction(
                 IntermediateType::IEnum(enum_.index),
             )))?;
 
-            // Load the reference to the enum variant and then add unpack_variant instructions
-            builder.load(
-                compilation_ctx.memory_id,
-                LoadKind::I32 { atomic: false },
-                MemArg {
-                    align: 0,
-                    offset: 0,
-                },
-            );
-
-            bytecodes::enums::unpack_variant(
+            bytecodes::enums::unpack_variant_ref(
                 enum_,
                 variant_index,
                 module,
                 builder,
                 compilation_ctx,
                 types_stack,
+                false,
+            )?;
+        }
+        Bytecode::UnpackVariantMutRef(index) => {
+            let enum_ = module_data.enums.get_enum_by_variant_handle_idx(index)?;
+            let variant_index = module_data
+                .enums
+                .get_variant_position_by_variant_handle_idx(index)?;
+
+            types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
+                IntermediateType::IEnum(enum_.index),
+            )))?;
+
+            bytecodes::enums::unpack_variant_ref(
+                enum_,
+                variant_index,
+                module,
+                builder,
+                compilation_ctx,
+                types_stack,
+                true,
             )?;
         }
         Bytecode::VariantSwitch(jump_table_index) => {

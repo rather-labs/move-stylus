@@ -31,6 +31,13 @@ entry fun match_number_enum(x: NumberEnum): u32 {
     }
 }
 
+entry fun single_match (a: NumberEnum): u32 {
+    match (a) {
+          NumberEnum::One => 42,
+        _ => abort(1)
+    }
+}
+
 entry fun match_nested_enum(x: NumberEnum, y: ColorEnum, z: YinYangEnum): u32 {
     match (x) {
         NumberEnum::One => 11,
@@ -97,7 +104,6 @@ entry fun nested_match_with_conditional(x: NumberEnum, y: ColorEnum, z: u32): u3
         }
     }
 }
-
 
 // Testing more rare control flow cases
 entry fun control_flow_1(x: NumberEnum, y: ColorEnum): u32 {
@@ -179,4 +185,18 @@ entry fun control_flow_2_bis(x: NumberEnum, y: ColorEnum, z: YinYangEnum): u32 {
     };
 
     return a + b
+}
+
+entry fun test_control_flow_with_while(x: ColorEnum): u64 {
+    match (x) {
+        ColorEnum::Red => {
+            let mut i = 0;
+            while (i < 5) {
+                i = i + 1;
+            };
+            i
+        },
+        ColorEnum::Green => 7,
+        ColorEnum::Blue => 11,
+    }
 }

@@ -84,3 +84,15 @@ entry fun vec_unpack(x: vector<u32>): vector<u32> {
     x.do!(|e| z.push_back(e));
     z
 }
+
+entry fun cumulative_sum(x: vector<u32>): u32 {
+    let mut sum = 0u32;
+    let mut i = 0;
+    while (i < vector::length(&x)) {
+      sum = sum + *vector::borrow(&x, i);
+      i = i + 1;
+    };
+    sum
+}
+
+ 

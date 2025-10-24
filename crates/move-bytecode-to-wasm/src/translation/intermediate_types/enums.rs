@@ -14,7 +14,16 @@
 //!
 //! For stack types the data is saved in-place, for heap-types we just save the pointer to the
 //! data.
-use crate::translation::TranslationError;
+use crate::{
+    CompilationContext, compilation_context::module_data::ModuleData, translation::TranslationError,
+};
+
+use super::structs::IStruct;
+
+use walrus::{
+    InstrSeqBuilder, Module, ValType,
+    ir::{BinaryOp, LoadKind, MemArg, StoreKind},
+};
 
 use super::IntermediateType;
 
@@ -100,5 +109,176 @@ impl IEnum {
         }
 
         Ok(Some(size + 4))
+    }
+
+    /// Compares two enums for equality
+    /// Ar
+    /// # Arguments
+    ///    - pointer to the first enum
+    ///    - pointer to the second enum
+    /// # Returns
+    ///    - true if the enums are equal, false otherwise
+    pub fn equality(
+        &self,
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        module_data: &ModuleData,
+    ) {
+        let e1_ptr = module.locals.add(ValType::I32);
+        let e2_ptr = module.locals.add(ValType::I32);
+        builder.local_set(e1_ptr).local_set(e2_ptr);
+
+        let variant_index = module.locals.add(ValType::I32);
+
+        // Read the variant index from the first enum
+        builder
+            .local_get(e1_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_tee(variant_index);
+
+        // Read the variant index from the second enum
+        builder.local_get(e2_ptr).load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+        // Compare the variant indices
+        builder.binop(BinaryOp::I32Eq);
+
+        builder.if_else(
+            ValType::I32,
+            |then| {
+                let result = module.locals.add(ValType::I32);
+                then.i32_const(0).local_set(result);
+                // Proceed to compare the fields of the variant
+                // Find the corresponding IEnumVariant for the variant index local
+                for variant in self.variants.iter() {
+                    then.block(None, |block| {
+                        let block_id = block.id();
+                        // If the variant index does not match, branch to the end of the block
+                        block
+                            .local_get(variant_index)
+                            .i32_const(variant.index as i32)
+                            .binop(BinaryOp::I32Ne)
+                            .br_if(block_id);
+
+                        block
+                            .local_get(e1_ptr)
+                            .i32_const(4)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(e1_ptr);
+                        block
+                            .local_get(e2_ptr)
+                            .i32_const(4)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(e2_ptr);
+
+                        // Use the same logic as structs to compare the fields
+                        IStruct::compare_fields(
+                            &variant.fields,
+                            block,
+                            module,
+                            compilation_ctx,
+                            module_data,
+                            e1_ptr,
+                            e2_ptr,
+                        );
+                        block.local_set(result);
+                    });
+                }
+                then.local_get(result);
+            },
+            |else_| {
+                else_.i32_const(0);
+            },
+        );
+    }
+
+    /// Copies the local instructions for an enum
+    ///
+    /// # Arguments
+    ///    - pointer to the source enum
+    /// # Returns
+    ///    - pointer to the new enum
+    pub fn copy_local_instructions(
+        &self,
+        module: &mut Module,
+        builder: &mut InstrSeqBuilder,
+        compilation_ctx: &CompilationContext,
+        module_data: &ModuleData,
+    ) {
+        let src_ptr = module.locals.add(ValType::I32);
+        let ptr = module.locals.add(ValType::I32);
+
+        builder.local_set(src_ptr);
+
+        // Allocate space for the new enum
+        builder
+            .i32_const(self.heap_size.unwrap() as i32)
+            .call(compilation_ctx.allocator)
+            .local_set(ptr);
+
+        // Read the variant index
+        let variant_index = module.locals.add(ValType::I32);
+        builder
+            .local_get(src_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .local_set(variant_index);
+
+        // Write the variant index to the new enum memory
+        builder.local_get(ptr).local_get(variant_index).store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+        // Find the corresponding IEnumVariant for the variant index local
+        for variant in self.variants.iter() {
+            builder.block(None, |block| {
+                let block_id = block.id();
+                // If the variant index does not match, branch to the end of the block
+                block
+                    .local_get(variant_index)
+                    .i32_const(variant.index as i32)
+                    .binop(BinaryOp::I32Ne)
+                    .br_if(block_id);
+
+                // Use the common field copying logic
+                IStruct::copy_fields(
+                    &variant.fields,
+                    block,
+                    module,
+                    compilation_ctx,
+                    module_data,
+                    src_ptr,
+                    ptr,
+                    4, // start_offset for enums is 4 because we already wrote the variant index
+                );
+            });
+        }
+
+        builder.local_get(ptr);
     }
 }

@@ -45,7 +45,12 @@
 //! field management across all types.
 use std::collections::HashMap;
 
-use crate::{CompilationContext, abi_types::packing::Packable, compilation_context::ModuleData};
+use crate::{
+    CompilationContext,
+    abi_types::packing::Packable,
+    compilation_context::ModuleData,
+    vm_handled_types::{VmHandledType, string::String_},
+};
 
 use super::IntermediateType;
 use move_binary_format::{
@@ -53,7 +58,7 @@ use move_binary_format::{
     internals::ModuleIndex,
 };
 use walrus::{
-    InstrSeqBuilder, Module, ValType,
+    InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
@@ -137,72 +142,18 @@ impl IStruct {
     ) {
         let s1_ptr = module.locals.add(ValType::I32);
         let s2_ptr = module.locals.add(ValType::I32);
-        let result = module.locals.add(ValType::I32);
 
         builder.local_set(s1_ptr).local_set(s2_ptr);
-        builder.i32_const(1).local_set(result);
 
-        let load_value_to_stack = |field: &IntermediateType, builder: &mut InstrSeqBuilder<'_>| {
-            if field.stack_data_size() == 8 {
-                builder.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I64 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            } else {
-                builder.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            }
-        };
-
-        builder.block(None, |block| {
-            let block_id = block.id();
-            for (index, field) in self.fields.iter().enumerate() {
-                // Offset of the field's pointer
-                let offset = index as u32 * 4;
-
-                block.local_get(s1_ptr).load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg { align: 0, offset },
-                );
-
-                if field.is_stack_type() {
-                    load_value_to_stack(field, block);
-                }
-
-                block.local_get(s2_ptr).load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg { align: 0, offset },
-                );
-
-                if field.is_stack_type() {
-                    load_value_to_stack(field, block);
-                }
-
-                field.load_equality_instructions(module, block, compilation_ctx, module_data);
-
-                block.if_else(
-                    None,
-                    |_| {},
-                    |else_| {
-                        else_.i32_const(0).local_set(result).br(block_id);
-                    },
-                );
-            }
-        });
-
-        builder.local_get(result);
+        Self::compare_fields(
+            &self.fields,
+            builder,
+            module,
+            compilation_ctx,
+            module_data,
+            s1_ptr,
+            s2_ptr,
+        );
     }
 
     pub fn copy_local_instructions(
@@ -212,14 +163,10 @@ impl IStruct {
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
     ) {
-        let original_struct_ptr = module.locals.add(ValType::I32);
+        let src_ptr = module.locals.add(ValType::I32);
         let ptr = module.locals.add(ValType::I32);
 
-        let val_32 = module.locals.add(ValType::I32);
-        let val_64 = module.locals.add(ValType::I64);
-        let ptr_to_data = module.locals.add(ValType::I32);
-
-        builder.local_set(original_struct_ptr);
+        builder.local_set(src_ptr);
 
         // If the struct has the key ability, we need to copy the owner id too,
         // which is prepended 32 bytes before the struct in memory.
@@ -227,7 +174,7 @@ impl IStruct {
             builder
                 .i32_const(32)
                 .call(compilation_ctx.allocator)
-                .local_get(original_struct_ptr)
+                .local_get(src_ptr)
                 .i32_const(32)
                 .binop(BinaryOp::I32Sub)
                 .i32_const(32)
@@ -240,8 +187,39 @@ impl IStruct {
             .call(compilation_ctx.allocator)
             .local_set(ptr);
 
-        let mut offset = 0;
-        for field in &self.fields {
+        Self::copy_fields(
+            &self.fields,
+            builder,
+            module,
+            compilation_ctx,
+            module_data,
+            src_ptr,
+            ptr,
+            0,
+        );
+
+        builder.local_get(ptr);
+    }
+
+    /// Common logic for copying fields from source to destination
+    /// This function handles copying field values using the appropriate copy instructions
+    #[allow(clippy::too_many_arguments)]
+    pub fn copy_fields(
+        fields: &[IntermediateType],
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        module_data: &ModuleData,
+        src_ptr: LocalId,
+        dst_ptr: LocalId,
+        start_offset: u32,
+    ) {
+        let val_32 = module.locals.add(ValType::I32);
+        let val_64 = module.locals.add(ValType::I64);
+        let ptr_to_data = module.locals.add(ValType::I32);
+
+        let mut offset = start_offset;
+        for field in fields {
             match field {
                 // Stack values: create a middle pointer to save the actual value
                 IntermediateType::IBool
@@ -266,7 +244,7 @@ impl IStruct {
 
                     // Load intermediate pointer and value
                     builder
-                        .local_get(original_struct_ptr)
+                        .local_get(src_ptr)
                         .load(
                             compilation_ctx.memory_id,
                             LoadKind::I32 { atomic: false },
@@ -304,10 +282,11 @@ impl IStruct {
                 | IntermediateType::ISigner
                 | IntermediateType::IU128
                 | IntermediateType::IU256
-                | IntermediateType::IVector(_) => {
+                | IntermediateType::IVector(_)
+                | IntermediateType::IEnum(_) => {
                     // Load intermediate pointer
                     builder
-                        .local_get(original_struct_ptr)
+                        .local_get(src_ptr)
                         .i32_const(offset as i32)
                         .binop(BinaryOp::I32Add)
                         .local_set(ptr_to_data);
@@ -323,18 +302,17 @@ impl IStruct {
                     builder.local_set(ptr_to_data);
                 }
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                    panic!("references inside structs not allowed")
+                    panic!("references inside objects not allowed")
                 }
                 IntermediateType::ITypeParameter(_) => {
                     panic!(
-                        "Trying to copy a type parameter inside a struct, expected a concrete type"
+                        "Trying to copy a type parameter inside an object, expected a concrete type"
                     );
                 }
-                IntermediateType::IEnum(_) => todo!(),
             }
 
-            // Store the middle pointer in the place of the struct field
-            builder.local_get(ptr).local_get(ptr_to_data).store(
+            // Store the middle pointer in the place of the object field
+            builder.local_get(dst_ptr).local_get(ptr_to_data).store(
                 compilation_ctx.memory_id,
                 StoreKind::I32 { atomic: false },
                 MemArg { align: 0, offset },
@@ -342,8 +320,86 @@ impl IStruct {
 
             offset += 4;
         }
+    }
 
-        builder.local_get(ptr);
+    /// Common logic for comparing fields of two objects (structs or enum variants)
+    /// This function handles loading field values and comparing them using the appropriate equality instructions
+    /// Returns the result of the comparison as a boolean
+    pub fn compare_fields(
+        fields: &[IntermediateType],
+        builder: &mut InstrSeqBuilder,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        module_data: &ModuleData,
+        ptr_1: LocalId,
+        ptr_2: LocalId,
+    ) {
+        let result = module.locals.add(ValType::I32);
+        builder.i32_const(1).local_set(result);
+
+        let load_value_to_stack = |field: &IntermediateType, builder: &mut InstrSeqBuilder<'_>| {
+            if field.stack_data_size() == 8 {
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            } else {
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+        };
+
+        builder.block(None, |block| {
+            let block_id = block.id();
+            let mut offset = 0;
+            for field in fields.iter() {
+                // Load the first struct field value
+                block.local_get(ptr_1).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg { align: 0, offset },
+                );
+
+                if field.is_stack_type() {
+                    load_value_to_stack(field, block);
+                }
+
+                // Load the second struct field value
+                block.local_get(ptr_2).load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg { align: 0, offset },
+                );
+
+                if field.is_stack_type() {
+                    load_value_to_stack(field, block);
+                }
+
+                // Compare the field values
+                field.load_equality_instructions(module, block, compilation_ctx, module_data);
+
+                block.if_else(
+                    None,
+                    |_| {},
+                    |else_| {
+                        else_.i32_const(0).local_set(result).br(block_id);
+                    },
+                );
+
+                offset += 4;
+            }
+        });
+        builder.local_get(result);
     }
 
     pub fn index(&self) -> u16 {
@@ -375,8 +431,12 @@ impl IStruct {
                 | IntermediateType::IU64
                 | IntermediateType::IU128
                 | IntermediateType::IU256
-                | IntermediateType::IAddress => continue,
+                | IntermediateType::IAddress
+                | IntermediateType::IEnum(_) => continue,
                 IntermediateType::IVector(_) => return true,
+                IntermediateType::IStruct {
+                    module_id, index, ..
+                } if String_::is_vm_type(module_id, *index, compilation_ctx) => return true,
                 IntermediateType::IStruct {
                     module_id, index, ..
                 } => {
@@ -410,7 +470,6 @@ impl IStruct {
                 IntermediateType::ITypeParameter(_) => {
                     panic!("cannot know if a type parameter is dynamic, expected a concrete type");
                 }
-                IntermediateType::IEnum(_) => todo!(),
             }
         }
 
@@ -430,7 +489,8 @@ impl IStruct {
                 | IntermediateType::IU128
                 | IntermediateType::IU256
                 | IntermediateType::IAddress
-                | IntermediateType::IVector(_) => {
+                | IntermediateType::IVector(_)
+                | IntermediateType::IEnum(_) => {
                     size += (field as &dyn Packable).encoded_size(compilation_ctx);
                 }
                 IntermediateType::IGenericStructInstance {
@@ -470,7 +530,6 @@ impl IStruct {
                 IntermediateType::ITypeParameter(_) => {
                     panic!("cannot know a type parameter's size, expected a concrete type");
                 }
-                IntermediateType::IEnum(_) => todo!(),
             }
         }
 
