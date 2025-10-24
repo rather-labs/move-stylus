@@ -539,6 +539,9 @@ mod cross_contract_calls {
         function ccCallEmptyRes3Payable(address contract_address, uint256 payable_value, Foo v) external returns (bool);
         function ccCallEmptyRes4Payable(address contract_address, uint256 payable_value, Bar v) external returns (bool);
         function ccCallEmptyRes5Payable(address contract_address, uint256 payable_value, uint8[] v) external returns (bool);
+        function ccCallEmptyRes1PayableGas(address contract_address, uint256 payable_value, uint64 gas) external returns (bool);
+        function ccCallEmptyRes2PayableGas(address contract_address, uint256 payable_value, uint64 gas, uint64 v) external returns (bool);
+        function ccCallEmptyRes3PayableGas(address contract_address, uint256 payable_value, uint64 gas, Foo v) external returns (bool);
 
         // The following functions are used to obtain their calldata and compare them
         function callEmptyRes1() external;
@@ -697,6 +700,30 @@ mod cross_contract_calls {
         CrossContractCallType::Call,
         U256::MAX,
         u64::MAX,
+    )]
+    #[case(
+        ccCallEmptyRes1PayableGasCall::new((ADDRESS, U256::from(u16::MAX), 1)),
+        callEmptyRes1PayableCall::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u16::MAX),
+        1,
+    )]
+    #[case(
+        ccCallEmptyRes2PayableGasCall::new((ADDRESS, U256::from(u32::MAX), 2, 42)),
+        callEmptyRes2PayableCall::new((42,)).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u32::MAX),
+        2,
+    )]
+    #[case(
+        ccCallEmptyRes3PayableGasCall::new((ADDRESS, U256::from(u64::MAX), 3, get_foo())),
+        callEmptyRes3PayableCall::new((get_foo(),)).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u64::MAX),
+        3,
     )]
     #[case(
         ccCallEmptyRes1Call::new((ADDRESS,)),

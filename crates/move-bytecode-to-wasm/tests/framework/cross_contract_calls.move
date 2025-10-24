@@ -92,3 +92,30 @@ entry fun cc_call_empty_res_5_payable(contract_address: address, payable_value: 
     );
     cross_call.call_empty_res_5_payable(value).succeded()
 }
+
+entry fun cc_call_empty_res_1_payable_gas(contract_address: address, payable_value: u256, gas: u64): bool {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .value(payable_value)
+            .gas(gas)
+    );
+    cross_call.call_empty_res_1_payable().succeded()
+}
+
+entry fun cc_call_empty_res_2_payable_gas(contract_address: address, payable_value: u256, gas: u64, value: u64): bool {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .value(payable_value)
+            .gas(gas)
+    );
+    cross_call.call_empty_res_2_payable(value).succeded()
+}
+
+entry fun cc_call_empty_res_3_payable_gas(contract_address: address, payable_value: u256, gas: u64, foo: Foo): bool {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .value(payable_value)
+            .gas(gas)
+    );
+    cross_call.call_empty_res_3_payable(foo).succeded()
+}
