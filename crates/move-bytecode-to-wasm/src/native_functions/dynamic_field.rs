@@ -41,7 +41,6 @@ pub fn add_child_object_fn(
         &[itype],
         module_id,
     );
-    println!("Adding ADD FIELD object fn: {} - {itype:#?}", name);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -114,8 +113,6 @@ pub fn add_borrow_object_fn(
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
-    println!("Adding borrow object fn: {} - {itype:?}", name);
-
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
     let read_and_decode_from_storage_fn =
         RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype]);

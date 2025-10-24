@@ -1156,12 +1156,12 @@ impl IntermediateType {
                     .external_struct
                     .get(struct_.identifier.as_str())
                 {
-                    let foreign_module = ModuleId {
+                    let foreign_module_id = ModuleId {
                         address: Address::from_bytes(external_struct.address),
                         module_name: external_struct.module_name.clone(),
                     };
 
-                    Hash::hash(&foreign_module, &mut hasher);
+                    Hash::hash(&foreign_module_id, &mut hasher);
                 } else {
                     Hash::hash(&module_id, &mut hasher);
                 }
@@ -1182,12 +1182,12 @@ impl IntermediateType {
                     .external_struct
                     .get(struct_.identifier.as_str())
                 {
-                    let foreign_module = ModuleId {
+                    let foreign_module_id = ModuleId {
                         address: Address::from_bytes(external_struct.address),
                         module_name: external_struct.module_name.clone(),
                     };
 
-                    Hash::hash(&foreign_module, &mut hasher);
+                    Hash::hash(&foreign_module_id, &mut hasher);
                 } else {
                     Hash::hash(&module_id, &mut hasher);
                 }
