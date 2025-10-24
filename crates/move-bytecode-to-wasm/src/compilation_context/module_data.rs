@@ -5,6 +5,7 @@ mod struct_data;
 use crate::{
     GlobalFunctionTable,
     compilation_context::reserved_modules::STYLUS_FRAMEWORK_ADDRESS,
+    hasher::get_hasher,
     translation::{
         functions::MappedFunction,
         intermediate_types::{
@@ -35,7 +36,7 @@ use move_parse_special_attributes::{SpecialAttributes, process_special_attribute
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
-    hash::{DefaultHasher, Hash, Hasher},
+    hash::{Hash, Hasher},
 };
 use struct_data::StructData;
 
@@ -94,7 +95,7 @@ pub struct ModuleId {
 
 impl ModuleId {
     pub fn hash(&self) -> u64 {
-        let mut hasher = DefaultHasher::new();
+        let mut hasher = get_hasher();
         Hash::hash(self, &mut hasher);
         hasher.finish()
     }

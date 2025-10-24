@@ -25,6 +25,7 @@ pub fn add_transfer_object_fn(
 ) -> FunctionId {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_TRANSFER_OBJECT,
+        compilation_ctx,
         &[itype],
         module_id,
     );
@@ -156,6 +157,7 @@ pub fn add_share_object_fn(
 ) -> FunctionId {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_SHARE_OBJECT,
+        compilation_ctx,
         &[itype],
         module_id,
     );
@@ -281,6 +283,7 @@ pub fn add_freeze_object_fn(
 ) -> FunctionId {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_FREEZE_OBJECT,
+        compilation_ctx,
         &[itype],
         module_id,
     );

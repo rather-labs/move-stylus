@@ -184,6 +184,21 @@ pub fn translate_test_complete_package(path: &str) -> HashMap<String, Module> {
 }
 
 #[allow(dead_code)]
+/// Translates a complete package. It outputs all the corresponding wasm modules
+pub fn translate_test_complete_package_with_framework(path: &str) -> HashMap<String, Module> {
+    let path = Path::new(path);
+
+    let rerooted_path = reroot_path(path);
+    create_move_toml_with_framework(&rerooted_path, "../../stylus-framework");
+
+    let package = get_build_confing()
+        .compile_package(&rerooted_path, &mut Vec::new())
+        .unwrap();
+
+    translate_package(package, None)
+}
+
+#[allow(dead_code)]
 /// Translates a single test module
 pub fn translate_test_package_with_framework(path: &str, module_name: &str) -> Module {
     let path = Path::new(path);

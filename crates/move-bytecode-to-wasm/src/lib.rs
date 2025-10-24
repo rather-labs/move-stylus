@@ -23,6 +23,7 @@ mod constructor;
 mod data;
 mod error_encoding;
 mod generics;
+mod hasher;
 mod hostio;
 mod memory;
 mod native_functions;
@@ -218,13 +219,11 @@ pub fn process_dependency_tree<'move_package>(
             module_name: dependency.name().to_string(),
             address: dependency.address().into_bytes().into(),
         };
-        print!("\tprocessing dependency {module_id}...",);
         // If the HashMap contains the key, we already processed that dependency
-        if dependencies_data.contains_key(&module_id) {
-            println!(" [cached]");
-            continue;
+        if !dependencies_data.contains_key(&module_id) {
+            println!("\tprocessing dependency {module_id}...");
         } else {
-            println!();
+            continue;
         }
 
         // Find the dependency inside Move's compiled package

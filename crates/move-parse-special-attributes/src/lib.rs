@@ -2,9 +2,12 @@ pub mod error;
 pub mod event;
 mod external_call;
 pub mod function_modifiers;
+pub mod struct_modifiers;
 
 pub use error::SpecialAttributeError;
+use error::SpecialAttributeErrorKind;
 pub use event::Event;
+use event::EventParseError;
 pub use external_call::error::ExternalCallError;
 // TODO: Create error struct with LOC and error info
 
@@ -13,9 +16,13 @@ pub struct SpecialAttributes {
     pub events: HashMap<String, Event>,
     pub functions: Vec<Function>,
     pub external_calls: HashMap<String, Function>,
+    pub external_struct: HashMap<String, ExternalStruct>,
 }
 
-use external_call::validate_external_call_function;
+use external_call::{
+    external_struct::{ExternalStruct, ExternalStructError},
+    validate_external_call_function,
+};
 use function_modifiers::{Function, FunctionModifier};
 use move_compiler::{
     Compiler, PASS_PARSER,
@@ -26,6 +33,7 @@ use std::{
     collections::{BTreeMap, HashMap, VecDeque},
     path::Path,
 };
+use struct_modifiers::StructModifier;
 
 pub fn process_special_attributes(
     path: &Path,
@@ -50,7 +58,7 @@ pub fn process_special_attributes(
         if let Definition::Module(module) = source.def {
             for module_member in module.members {
                 match module_member {
-                    ModuleMember::Function(f) => {
+                    ModuleMember::Function(ref f) => {
                         if let Some(attributes) = f.attributes.first() {
                             let mut modifiers = attributes
                                 .value
@@ -62,7 +70,7 @@ pub fn process_special_attributes(
                                 let modifiers: Vec<FunctionModifier> =
                                     modifiers.into_iter().collect();
 
-                                let errors = validate_external_call_function(&f, &modifiers);
+                                let errors = validate_external_call_function(f, &modifiers);
 
                                 if let Err(errors) = errors {
                                     found_error = true;
@@ -85,8 +93,51 @@ pub fn process_special_attributes(
                         }
                     }
                     ModuleMember::Struct(ref s) => {
-                        if let Ok(event) = Event::try_from(s) {
-                            result.events.insert(s.name.to_string(), event);
+                        if let Some(attributes) = s.attributes.first() {
+                            let first_modifier = attributes.value.first().and_then(|s| {
+                                let sm = StructModifier::parse_modifiers(&s.value);
+                                sm.first().cloned()
+                            });
+
+                            match first_modifier {
+                                Some(StructModifier::ExternalStruct) => {
+                                    match ExternalStruct::try_from(s) {
+                                        Ok(external_struct) => {
+                                            result
+                                                .external_struct
+                                                .insert(s.name.to_string(), external_struct);
+                                        }
+                                        Err(SpecialAttributeError {
+                                            kind:
+                                                SpecialAttributeErrorKind::ExternalStruct(
+                                                    ExternalStructError::NotAnExternalStruct,
+                                                ),
+                                            ..
+                                        }) => continue,
+                                        Err(e) => {
+                                            found_error = true;
+                                            module_errors.push(e);
+                                        }
+                                    }
+                                }
+                                Some(StructModifier::Event) => match Event::try_from(s) {
+                                    Ok(event) => {
+                                        result.events.insert(s.name.to_string(), event);
+                                    }
+                                    Err(SpecialAttributeError {
+                                        kind:
+                                            SpecialAttributeErrorKind::Event(
+                                                EventParseError::NotAnEvent,
+                                            ),
+                                        ..
+                                    }) => continue,
+                                    Err(e) => {
+                                        found_error = true;
+                                        module_errors.push(e);
+                                    }
+                                },
+                                None => continue,
+                            }
                         }
                     }
                     _ => continue,

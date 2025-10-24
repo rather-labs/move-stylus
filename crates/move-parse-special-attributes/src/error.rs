@@ -3,12 +3,21 @@ use std::fmt::{self, Display};
 use move_compiler::diagnostics::Diagnostic;
 use move_ir_types::location::Loc;
 
-use crate::external_call::error::ExternalCallError;
+use crate::{
+    event::EventParseError,
+    external_call::{error::ExternalCallError, external_struct::ExternalStructError},
+};
 
 #[derive(thiserror::Error, Debug)]
 pub enum SpecialAttributeErrorKind {
     #[error("External call error: {0}")]
     ExternalCall(#[from] ExternalCallError),
+
+    #[error("Event error: {0}")]
+    Event(#[from] EventParseError),
+
+    #[error("External struct error: {0}")]
+    ExternalStruct(#[from] ExternalStructError),
 }
 
 #[derive(thiserror::Error, Debug)]

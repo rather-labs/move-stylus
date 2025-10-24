@@ -1,4 +1,7 @@
 use move_compiler::parser::ast::{Attribute_, AttributeValue_, StructDefinition, Value_};
+
+use crate::{SpecialAttributeError, error::SpecialAttributeErrorKind};
+
 #[derive(Debug)]
 /// This struct represents the properties of a event struct.
 pub struct Event {
@@ -15,26 +18,31 @@ pub struct Event {
 
 #[derive(Debug, thiserror::Error)]
 pub enum EventParseError {
-    #[error(r#"invalid event attribute "{0}""#)]
-    InvalidAttribute(String),
+    #[error(r#"invalid event attribute"#)]
+    InvalidAttribute,
 
-    #[error(r#"invalid indexes attribute "{0:?}""#)]
-    InvalidIndexesAttribute(Box<AttributeValue_>),
+    #[error("expected number as index")]
+    IndexExpectedNumber,
 
-    #[error(r#"struct "{0}"  has too many indexed parameters (found {1}, max 3)"#)]
-    TooManyIndexedFields(String, u8),
+    #[error(r#"too many indexed parameters (found {0}, max 3)"#)]
+    TooManyIndexedFields(u8),
 
-    #[error(r#"anonymous struct "{0}"  has too many indexed parameters (found {1}, max 4)"#)]
-    AnonymousTooManyIndexedFields(String, u8),
+    #[error(r#"has an invalid index number"#)]
+    InvalidIndexNumber,
 
-    #[error(r#"struct "{0}" is not an event"#)]
-    NotAnEvent(String),
+    #[error(r#"too many indexed parameters (found {0}, max 4)"#)]
+    AnonymousTooManyIndexedFields(u8),
+
+    #[error(r#"not marked as an event"#)]
+    NotAnEvent,
 }
 
-impl Event {
-    pub fn try_from(struct_definition: &StructDefinition) -> Result<Self, EventParseError> {
+impl TryFrom<&StructDefinition> for Event {
+    type Error = SpecialAttributeError;
+
+    fn try_from(value: &StructDefinition) -> Result<Self, Self::Error> {
         // Find the attribute we neekd
-        for attribute in &struct_definition.attributes {
+        for attribute in &value.attributes {
             for att in &attribute.value {
                 let parametrized = match &att.value {
                     Attribute_::Parameterized(n, spanned) if n.value.as_str() == "ext" => {
@@ -43,18 +51,15 @@ impl Event {
                     _ => continue,
                 };
 
-                // To be an event, the first named parameter must be "event"
+                // To be an event, the first named parameter must be "event". If we dont find it,
+                // continue
                 let mut event = match parametrized.first() {
                     Some(p) if p.value.attribute_name().value.as_str() == "event" => Event {
-                        name: struct_definition.name.to_string(),
+                        name: value.name.to_string(),
                         is_anonymous: false,
                         indexes: 0,
                     },
-                    _ => {
-                        return Err(EventParseError::NotAnEvent(
-                            struct_definition.name.to_string(),
-                        ));
-                    }
+                    _ => continue,
                 };
 
                 for attribute in parametrized.iter().skip(1) {
@@ -67,46 +72,75 @@ impl Event {
                                 AttributeValue_::Value(v) if matches!(v.value, Value_::Num(_)) => {
                                     match v.value {
                                         Value_::Num(n) => {
-                                            let indexes = n.parse::<u8>().unwrap();
+                                            let indexes = n.parse::<u8>().map_err(|_| {
+                                                SpecialAttributeError {
+                                                    kind: SpecialAttributeErrorKind::Event(
+                                                        EventParseError::InvalidIndexNumber,
+                                                    ),
+                                                    line_of_code: v.loc,
+                                                }
+                                            })?;
                                             if indexes <= 4 {
                                                 event.indexes = indexes
                                             } else {
-                                                return Err(EventParseError::TooManyIndexedFields(
-                                                    event.name, indexes,
-                                                ));
+                                                return Err(SpecialAttributeError {
+                                                    kind: SpecialAttributeErrorKind::Event(
+                                                        EventParseError::TooManyIndexedFields(
+                                                            indexes,
+                                                        ),
+                                                    ),
+                                                    line_of_code: v.loc,
+                                                });
                                             }
                                         }
-                                        _ => todo!(),
+                                        _ => {
+                                            return Err(SpecialAttributeError {
+                                                kind: SpecialAttributeErrorKind::Event(
+                                                    EventParseError::IndexExpectedNumber,
+                                                ),
+                                                line_of_code: v.loc,
+                                            });
+                                        }
                                     }
                                 }
+
                                 _ => {
-                                    return Err(EventParseError::InvalidIndexesAttribute(
-                                        Box::new(spanned1.value.clone()),
-                                    ));
+                                    return Err(SpecialAttributeError {
+                                        kind: SpecialAttributeErrorKind::Event(
+                                            EventParseError::IndexExpectedNumber,
+                                        ),
+                                        line_of_code: spanned1.loc,
+                                    });
                                 }
                             }
                         }
                         _ => {
-                            return Err(EventParseError::InvalidAttribute(
-                                attribute.value.attribute_name().to_string(),
-                            ));
+                            return Err(SpecialAttributeError {
+                                kind: SpecialAttributeErrorKind::Event(
+                                    EventParseError::InvalidAttribute,
+                                ),
+                                line_of_code: attribute.loc,
+                            });
                         }
                     }
                 }
 
                 if !event.is_anonymous && event.indexes == 4 {
-                    return Err(EventParseError::AnonymousTooManyIndexedFields(
-                        event.name,
-                        event.indexes,
-                    ));
+                    return Err(SpecialAttributeError {
+                        kind: SpecialAttributeErrorKind::Event(
+                            EventParseError::AnonymousTooManyIndexedFields(event.indexes),
+                        ),
+                        line_of_code: attribute.loc,
+                    });
                 }
 
                 return Ok(event);
             }
         }
 
-        Err(EventParseError::NotAnEvent(
-            struct_definition.name.to_string(),
-        ))
+        Err(SpecialAttributeError {
+            kind: SpecialAttributeErrorKind::Event(EventParseError::NotAnEvent),
+            line_of_code: value.loc,
+        })
     }
 }

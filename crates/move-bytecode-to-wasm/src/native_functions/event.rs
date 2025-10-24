@@ -28,8 +28,12 @@ pub fn add_emit_log_fn(
     itype: &IntermediateType,
     module_id: &ModuleId,
 ) -> FunctionId {
-    let name =
-        NativeFunction::get_generic_function_name(NativeFunction::NATIVE_EMIT, &[itype], module_id);
+    let name = NativeFunction::get_generic_function_name(
+        NativeFunction::NATIVE_EMIT,
+        compilation_ctx,
+        &[itype],
+        module_id,
+    );
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
