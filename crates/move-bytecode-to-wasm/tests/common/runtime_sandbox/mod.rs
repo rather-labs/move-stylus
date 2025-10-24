@@ -6,7 +6,7 @@ use std::{
     sync::{Arc, Mutex, atomic::AtomicBool, mpsc},
 };
 
-use alloy_primitives::{FixedBytes, keccak256};
+use alloy_primitives::{FixedBytes, U256, keccak256};
 use anyhow::Result;
 use constants::{
     BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, CHAIN_ID, GAS_PRICE,
@@ -88,7 +88,7 @@ pub struct CrossContractExecutionData {
     pub calldata: Vec<u8>,
     pub address: [u8; 20],
     pub gas: u64,
-    pub value: Option<[u8; 32]>,
+    pub value: U256,
     pub return_datan_len: u32,
     pub call_type: CrossContractCallType,
 }
@@ -185,7 +185,7 @@ impl RuntimeSandbox {
                                   calldata,
                                   address,
                                   gas,
-                                  value: None,
+                                  value: U256::from(0),
                                   return_datan_len: return_data_len_ptr,
                                   call_type: CrossContractCallType::DelegateCall,
                               }).unwrap();
@@ -231,7 +231,7 @@ impl RuntimeSandbox {
                                   calldata,
                                   address,
                                   gas,
-                                  value: None,
+                                  value: U256::from(0),
                                   return_datan_len: return_data_len_ptr,
                                   call_type: CrossContractCallType::StaticCall,
                               }).unwrap();
@@ -274,6 +274,7 @@ if cccs.load(std::sync::atomic::Ordering::Relaxed) {
 
                             let mut value = [0; 32];
                             mem.read(&caller, value_ptr as usize, &mut value).unwrap();
+                            let value = U256::from_be_bytes(value);
 
                             let cross_contract_call_return_data_len  = cccrd.lock().unwrap().len().to_be_bytes();
                             mem.write(&mut caller, return_data_len_ptr as usize, &cross_contract_call_return_data_len).unwrap();
@@ -282,7 +283,7 @@ if cccs.load(std::sync::atomic::Ordering::Relaxed) {
                                   calldata,
                                   address,
                                   gas,
-                                  value: Some(value),
+                                  value,
                                   return_datan_len: return_data_len_ptr,
                                   call_type: CrossContractCallType::Call,
                               }).unwrap();

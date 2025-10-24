@@ -53,6 +53,7 @@ pub fn add_external_contract_call_fn(
     let (delegate_call_contract, _) = delegate_call_contract(module);
     let (static_call_contract, _) = static_call_contract(module);
     let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None);
+    let swap = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
 
     let arguments = function_information.signature.get_argument_wasm_types();
 
@@ -139,18 +140,27 @@ pub fn add_external_contract_call_fn(
         )
         .local_set(gas);
 
-    // Load value
-    builder
-        .local_get(*self_)
-        .load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 12,
-            },
-        )
-        .local_set(value);
+    // Load value (if the function is payable) otherwise we load zeroes
+    if function_modifiers.contains(&FunctionModifier::Payable) {
+        builder
+            .local_get(*self_)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 12,
+                },
+            )
+            .local_tee(value)
+            .local_get(value)
+            .call(swap);
+    } else {
+        builder
+            .i32_const(32)
+            .call(compilation_ctx.allocator)
+            .local_set(value);
+    }
 
     let calldata_arguments = &function_information.signature.arguments[1..];
 

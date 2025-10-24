@@ -71,5 +71,20 @@ public native fun call_empty_res_4(self: &ExampleContract, bar: Bar): ContractCa
 #[ext(external_call)]
 public native fun call_empty_res_5(self: &ExampleContract, vec_1: vector<u8>): ContractCallEmptyResult;
 
+#[ext(external_call, payable)]
+public native fun call_empty_res_1_payable(self: &ExampleContract): ContractCallEmptyResult;
+
+#[ext(external_call, payable)]
+public native fun call_empty_res_2_payable(self: &ExampleContract, value: u64): ContractCallEmptyResult;
+
+#[ext(external_call, payable)]
+public native fun call_empty_res_3_payable(self: &ExampleContract, foo: Foo): ContractCallEmptyResult;
+
+#[ext(external_call, payable)]
+public native fun call_empty_res_4_payable(self: &ExampleContract, bar: Bar): ContractCallEmptyResult;
+
+#[ext(external_call, payable)]
+public native fun call_empty_res_5_payable(self: &ExampleContract, vec_1: vector<u8>): ContractCallEmptyResult;
+
 #[ext(external_call, view)]
 public native fun call_view_1(self: &ExampleContract): ContractCallResult<u64>;

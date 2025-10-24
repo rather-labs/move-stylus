@@ -534,6 +534,11 @@ mod cross_contract_calls {
         function ccCallEmptyRes1WithGas(address contract_address, uint64 gas) external returns (bool);
         function ccCallEmptyRes2WithGas(address contract_address, uint64 gas, uint64 v) external returns (bool);
         function ccCallEmptyRes3WithGas(address contract_address, uint64 gas, Foo v) external returns (bool);
+        function ccCallEmptyRes1Payable(address contract_address, uint256 payable_value) external returns (bool);
+        function ccCallEmptyRes2Payable(address contract_address, uint256 payable_value, uint64 v) external returns (bool);
+        function ccCallEmptyRes3Payable(address contract_address, uint256 payable_value, Foo v) external returns (bool);
+        function ccCallEmptyRes4Payable(address contract_address, uint256 payable_value, Bar v) external returns (bool);
+        function ccCallEmptyRes5Payable(address contract_address, uint256 payable_value, uint8[] v) external returns (bool);
 
         // The following functions are used to obtain their calldata and compare them
         function callEmptyRes1() external;
@@ -541,6 +546,11 @@ mod cross_contract_calls {
         function callEmptyRes3(Foo v) external;
         function callEmptyRes4(Bar v) external;
         function callEmptyRes5(uint8[] v) external;
+        function callEmptyRes1Payable() external;
+        function callEmptyRes2Payable(uint64 v) external;
+        function callEmptyRes3Payable(Foo v) external;
+        function callEmptyRes4Payable(Bar v) external;
+        function callEmptyRes5Payable(uint8[] v) external;
     );
 
     const ADDRESS: alloy_primitives::Address =
@@ -589,6 +599,7 @@ mod cross_contract_calls {
         callEmptyRes1Call::new(()).abi_encode(),
         true,
         CrossContractCallType::Call,
+        U256::from(0),
         u64::MAX,
     )]
     #[case(
@@ -596,6 +607,7 @@ mod cross_contract_calls {
         callEmptyRes2Call::new((42,)).abi_encode(),
         true,
         CrossContractCallType::Call,
+        U256::from(0),
         u64::MAX,
     )]
     #[case(
@@ -603,6 +615,7 @@ mod cross_contract_calls {
         callEmptyRes3Call::new((get_foo(),)).abi_encode(),
         true,
         CrossContractCallType::Call,
+        U256::from(0),
         u64::MAX,
     )]
     #[case(
@@ -610,6 +623,7 @@ mod cross_contract_calls {
         callEmptyRes4Call::new((get_bar(),)).abi_encode(),
         true,
         CrossContractCallType::Call,
+        U256::from(0),
         u64::MAX,
     )]
     #[case(
@@ -617,6 +631,7 @@ mod cross_contract_calls {
         callEmptyRes5Call::new((vec![1,2,3,4,5],)).abi_encode(),
         true,
         CrossContractCallType::Call,
+        U256::from(0),
         u64::MAX,
     )]
     #[case(
@@ -624,6 +639,7 @@ mod cross_contract_calls {
         callEmptyRes1Call::new(()).abi_encode(),
         true,
         CrossContractCallType::Call,
+        U256::from(0),
         1,
     )]
     #[case(
@@ -631,6 +647,7 @@ mod cross_contract_calls {
         callEmptyRes2Call::new((42,)).abi_encode(),
         true,
         CrossContractCallType::Call,
+        U256::from(0),
         2,
     )]
     #[case(
@@ -638,13 +655,55 @@ mod cross_contract_calls {
         callEmptyRes3Call::new((get_foo(),)).abi_encode(),
         true,
         CrossContractCallType::Call,
+        U256::from(0),
         3,
+    )]
+    #[case(
+        ccCallEmptyRes1PayableCall::new((ADDRESS, U256::from(u16::MAX))),
+        callEmptyRes1PayableCall::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u16::MAX),
+        u64::MAX,
+    )]
+    #[case(
+        ccCallEmptyRes2PayableCall::new((ADDRESS, U256::from(u32::MAX), 42)),
+        callEmptyRes2PayableCall::new((42,)).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u32::MAX),
+        u64::MAX,
+    )]
+    #[case(
+        ccCallEmptyRes3PayableCall::new((ADDRESS, U256::from(u64::MAX), get_foo())),
+        callEmptyRes3PayableCall::new((get_foo(),)).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u64::MAX),
+        u64::MAX,
+    )]
+    #[case(
+        ccCallEmptyRes4PayableCall::new((ADDRESS, U256::from(u128::MAX), get_bar())),
+        callEmptyRes4PayableCall::new((get_bar(),)).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u128::MAX),
+        u64::MAX,
+    )]
+    #[case(
+        ccCallEmptyRes5PayableCall::new((ADDRESS, U256::MAX, vec![1,2,3,4,5])),
+        callEmptyRes5PayableCall::new((vec![1,2,3,4,5],)).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::MAX,
+        u64::MAX,
     )]
     #[case(
         ccCallEmptyRes1Call::new((ADDRESS,)),
         callEmptyRes1Call::new(()).abi_encode(),
         false,
         CrossContractCallType::Call,
+        U256::from(0),
         u64::MAX,
     )]
     #[case(
@@ -652,6 +711,7 @@ mod cross_contract_calls {
         callEmptyRes2Call::new((42,)).abi_encode(),
         false,
         CrossContractCallType::Call,
+        U256::from(0),
         u64::MAX,
     )]
     fn test_cross_contract_call_empty_calls<T: SolCall>(
@@ -660,6 +720,7 @@ mod cross_contract_calls {
         #[case] expected_cross_contract_calldata: Vec<u8>,
         #[case] success: bool,
         #[case] expected_call_type: CrossContractCallType,
+        #[case] expected_payable_value: U256,
         #[case] expected_gas: u64,
     ) {
         runtime.set_cross_contract_call_success(success);
@@ -675,6 +736,7 @@ mod cross_contract_calls {
             assert_eq!(ADDRESS, Address::from(result.address));
             assert_eq!(expected_gas, result.gas);
             assert_eq!(expected_cross_contract_calldata, result.calldata);
+            assert_eq!(expected_payable_value, result.value);
         } else {
             assert_eq!(false.abi_encode(), return_data);
         }

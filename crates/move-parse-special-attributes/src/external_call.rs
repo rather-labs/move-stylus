@@ -3,7 +3,6 @@
 
 use error::ExternalCallError;
 use move_compiler::parser::ast::{Function, FunctionBody_, NameAccessChain_, Type_};
-use payable::check_payable_value_argument;
 
 use crate::{
     SpecialAttributeError, error::SpecialAttributeErrorKind, function_modifiers::FunctionModifier,
@@ -11,7 +10,6 @@ use crate::{
 
 pub mod error;
 pub mod external_struct;
-mod payable;
 
 fn check_return_value(function: &Function) -> Option<SpecialAttributeError> {
     match &function.signature.return_type.value {
@@ -64,12 +62,6 @@ pub(crate) fn validate_external_call_function(
             kind: SpecialAttributeErrorKind::ExternalCall(ExternalCallError::FunctionIsNotNative),
             line_of_code: function.loc,
         })
-    }
-
-    if modifiers.contains(&FunctionModifier::Payable) {
-        if let Some(e) = check_payable_value_argument(function, modifiers) {
-            errors.push(e);
-        }
     }
 
     if let Some(e) = check_return_value(function) {
