@@ -542,6 +542,14 @@ mod cross_contract_calls {
         function ccCallEmptyRes1PayableGas(address contract_address, uint256 payable_value, uint64 gas) external returns (bool);
         function ccCallEmptyRes2PayableGas(address contract_address, uint256 payable_value, uint64 gas, uint64 v) external returns (bool);
         function ccCallEmptyRes3PayableGas(address contract_address, uint256 payable_value, uint64 gas, Foo v) external returns (bool);
+        function ccCallEmptyRes1Delegate(address contract_address) external returns (bool);
+        function ccCallEmptyRes2Delegate(address contract_address, uint64 v) external returns (bool);
+        function ccCallEmptyRes3Delegate(address contract_address, Foo v) external returns (bool);
+        function ccCallEmptyRes4Delegate(address contract_address, Bar v) external returns (bool);
+        function ccCallEmptyRes5Delegate(address contract_address, uint8[] v) external returns (bool);
+        function ccCallEmptyRes1WithGasDelegate(address contract_address, uint64 gas) external returns (bool);
+        function ccCallEmptyRes2WithGasDelegate(address contract_address, uint64 gas, uint64 v) external returns (bool);
+        function ccCallEmptyRes3WithGasDelegate(address contract_address, uint64 gas, Foo v) external returns (bool);
 
         // The following functions are used to obtain their calldata and compare them
         function callEmptyRes1() external;
@@ -725,6 +733,71 @@ mod cross_contract_calls {
         U256::from(u64::MAX),
         3,
     )]
+    #[case(
+        ccCallEmptyRes1DelegateCall::new((ADDRESS,)),
+        callEmptyRes1Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        u64::MAX,
+    )]
+    #[case(
+        ccCallEmptyRes2DelegateCall::new((ADDRESS, 42)),
+        callEmptyRes2Call::new((42,)).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        u64::MAX,
+    )]
+    #[case(
+        ccCallEmptyRes3DelegateCall::new((ADDRESS, get_foo())),
+        callEmptyRes3Call::new((get_foo(),)).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        u64::MAX,
+    )]
+    #[case(
+        ccCallEmptyRes4DelegateCall::new((ADDRESS, get_bar())),
+        callEmptyRes4Call::new((get_bar(),)).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        u64::MAX,
+    )]
+    #[case(
+        ccCallEmptyRes5DelegateCall::new((ADDRESS, vec![1,2,3,4,5])),
+        callEmptyRes5Call::new((vec![1,2,3,4,5],)).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        u64::MAX,
+    )]
+    #[case(
+        ccCallEmptyRes1WithGasDelegateCall::new((ADDRESS, 1)),
+        callEmptyRes1Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        1,
+    )]
+    #[case(
+        ccCallEmptyRes2WithGasDelegateCall::new((ADDRESS, 2, 42)),
+        callEmptyRes2Call::new((42,)).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        2,
+    )]
+    #[case(
+        ccCallEmptyRes3WithGasDelegateCall::new((ADDRESS, 3, get_foo())),
+        callEmptyRes3Call::new((get_foo(),)).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        3,
+    )]
+    // --
     #[case(
         ccCallEmptyRes1Call::new((ADDRESS,)),
         callEmptyRes1Call::new(()).abi_encode(),

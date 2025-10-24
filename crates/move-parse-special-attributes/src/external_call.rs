@@ -53,7 +53,7 @@ fn body_is_native(function: &Function) -> bool {
 
 pub(crate) fn validate_external_call_function(
     function: &Function,
-    modifiers: &[FunctionModifier],
+    _modifiers: &[FunctionModifier],
 ) -> Result<(), Vec<SpecialAttributeError>> {
     let mut errors = Vec::new();
 
@@ -63,6 +63,8 @@ pub(crate) fn validate_external_call_function(
             line_of_code: function.loc,
         })
     }
+
+    // TODO: Check for invalid modifiers
 
     if let Some(e) = check_return_value(function) {
         errors.push(e);
