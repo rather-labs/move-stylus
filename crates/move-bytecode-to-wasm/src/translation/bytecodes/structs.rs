@@ -235,11 +235,36 @@ pub fn unpack(
 ) -> Result<(), TranslationError> {
     // Pointer to the struct
     let pointer = module.locals.add(ValType::I32);
-    let mut offset = 0;
 
     builder.local_set(pointer);
 
-    for field in &struct_.fields {
+    // Use the common field unpacking logic
+    unpack_fields(
+        &struct_.fields,
+        builder,
+        compilation_ctx,
+        pointer,
+        itype,
+        types_stack,
+    )?;
+
+    Ok(())
+}
+
+/// Common logic for unpacking fields from memory
+/// This function handles loading field values and managing the types stack
+#[allow(clippy::too_many_arguments)]
+pub fn unpack_fields(
+    fields: &[IntermediateType],
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    pointer: walrus::LocalId,
+    parent_type: &IntermediateType,
+    types_stack: &mut TypesStack,
+) -> Result<(), crate::translation::TranslationError> {
+    let mut offset = 0;
+
+    for field in fields {
         // Load the middle pointer
         builder.local_get(pointer).load(
             compilation_ctx.memory_id,
@@ -279,19 +304,23 @@ pub fn unpack(
             | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::IEnum(_) => {}
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                return Err(TranslationError::FoundReferenceInsideStruct {
-                    struct_index: struct_.index(),
-                });
+                return Err(
+                    crate::translation::TranslationError::FoundReferenceInsideStruct {
+                        struct_index: 0, // This will be overridden by the caller
+                    },
+                );
             }
             IntermediateType::ITypeParameter(index) => {
-                return Err(TranslationError::FoundTypeParameterInsideStruct {
-                    struct_index: struct_.index(),
-                    type_parameter_index: *index,
-                });
+                return Err(
+                    crate::translation::TranslationError::FoundTypeParameterInsideStruct {
+                        struct_index: 0, // This will be overridden by the caller
+                        type_parameter_index: *index,
+                    },
+                );
             }
         }
 
-        // When unpacking an struct, at the moment of unpacking its UID or NamedId (if some found)
+        // When unpacking a struct, at the moment of unpacking its UID or NamedId (if some found)
         // we also push to the types stack the wrapping struct information.
         //
         // The wrapping struct information is needed for some UID operations such as delete.
@@ -299,7 +328,7 @@ pub fn unpack(
             IntermediateType::IStruct {
                 module_id, index, ..
             } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
-                let (instance_types, parent_module_id, parent_index) = match itype {
+                let (instance_types, parent_module_id, parent_index) = match parent_type {
                     IntermediateType::IStruct {
                         module_id: parent_module_id,
                         index: parent_index,
@@ -312,7 +341,9 @@ pub fn unpack(
                         ..
                     } => (Some(types.clone()), parent_module_id.clone(), *parent_index),
                     // TODO: Change to translation error
-                    _ => panic!("invalid intermediate type {itype:?} found in unpack function"),
+                    _ => {
+                        panic!("invalid intermediate type {parent_type:?} found in unpack function")
+                    }
                 };
 
                 types_stack.push(IntermediateType::IStruct {
@@ -332,7 +363,7 @@ pub fn unpack(
                 types,
                 ..
             } if NamedId::is_vm_type(module_id, *index, compilation_ctx) => {
-                let (instance_types, parent_module_id, parent_index) = match itype {
+                let (instance_types, parent_module_id, parent_index) = match parent_type {
                     IntermediateType::IStruct {
                         module_id: parent_module_id,
                         index: parent_index,
@@ -345,7 +376,9 @@ pub fn unpack(
                         ..
                     } => (Some(types.clone()), parent_module_id.clone(), *parent_index),
                     // TODO: Change to translation error
-                    _ => panic!("invalid intermediate type {itype:?} found in unpack function"),
+                    _ => {
+                        panic!("invalid intermediate type {parent_type:?} found in unpack function")
+                    }
                 };
 
                 types_stack.push(IntermediateType::IGenericStructInstance {
