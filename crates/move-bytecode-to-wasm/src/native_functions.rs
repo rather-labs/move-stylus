@@ -11,7 +11,7 @@ mod transaction;
 pub mod transfer;
 mod types;
 
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::Hasher;
 
 use walrus::{FunctionId, Module};
 
@@ -25,6 +25,7 @@ use crate::{
             STYLUS_FRAMEWORK_ADDRESS,
         },
     },
+    hasher::get_hasher,
     hostio,
     runtime::RuntimeFunction,
     translation::intermediate_types::IntermediateType,
@@ -403,6 +404,7 @@ impl NativeFunction {
 
     pub fn get_generic_function_name(
         name: &str,
+        compilation_ctx: &CompilationContext,
         generics: &[&IntermediateType],
         module_id: &ModuleId,
     ) -> String {
@@ -410,8 +412,10 @@ impl NativeFunction {
             panic!("generic_function_name called with no generics");
         }
 
-        let mut hasher = DefaultHasher::new();
-        generics.iter().for_each(|t| t.hash(&mut hasher));
+        let mut hasher = get_hasher();
+        generics
+            .iter()
+            .for_each(|t| t.process_hash(&mut hasher, compilation_ctx));
         let hash = format!("{:x}", hasher.finish());
 
         format!("{name}_{hash}_{:x}", module_id.hash())

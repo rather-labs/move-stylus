@@ -1,9 +1,10 @@
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::Hasher;
 
 use walrus::{FunctionId, GlobalId, Module};
 
 use crate::{
     CompilationContext,
+    hasher::get_hasher,
     translation::intermediate_types::{
         IntermediateType,
         heap_integers::{IU128, IU256},
@@ -354,13 +355,19 @@ impl RuntimeFunction {
         }
     }
 
-    pub fn get_generic_function_name(&self, generics: &[&IntermediateType]) -> String {
+    pub fn get_generic_function_name(
+        &self,
+        compilation_ctx: &CompilationContext,
+        generics: &[&IntermediateType],
+    ) -> String {
         if generics.is_empty() {
             panic!("generic_function_name called with no generics");
         }
 
-        let mut hasher = DefaultHasher::new();
-        generics.iter().for_each(|t| t.hash(&mut hasher));
+        let mut hasher = get_hasher();
+        generics
+            .iter()
+            .for_each(|t| t.process_hash(&mut hasher, compilation_ctx));
         let hash = format!("{:x}", hasher.finish());
 
         format!("runtime_{}_{hash}", self.name())

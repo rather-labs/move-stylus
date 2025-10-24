@@ -24,6 +24,7 @@ pub fn add_is_one_time_witness_fn(
     // TODO: should we check if itype is a reference to a struct here?
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_IS_ONE_TIME_WITNESS,
+        compilation_ctx,
         &[itype],
         module_id,
     );

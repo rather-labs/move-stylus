@@ -10,7 +10,9 @@ use crate::{
         function_encoding::move_signature_to_abi_selector, packing::Packable, unpacking::Unpackable,
     },
     compilation_context::ModuleId,
-    hostio::host_functions::{call_contract, read_return_data, static_call_contract},
+    hostio::host_functions::{
+        call_contract, delegate_call_contract, read_return_data, static_call_contract,
+    },
     runtime::RuntimeFunction,
     translation::{functions::MappedFunction, intermediate_types::IntermediateType},
     vm_handled_types::{
@@ -49,6 +51,7 @@ pub fn add_external_contract_call_fn(
 
     let (read_return_data, _) = read_return_data(module);
     let (call_contract, _) = call_contract(module);
+    let (delegate_call_contract, _) = delegate_call_contract(module);
     let (static_call_contract, _) = static_call_contract(module);
     let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None);
 
@@ -102,6 +105,7 @@ pub fn add_external_contract_call_fn(
 
     // Locals
     let address_ptr = module.locals.add(ValType::I32);
+    let is_delegate_call = module.locals.add(ValType::I32);
 
     // The address to call is the first argument of self (20 bytes)
     builder
@@ -118,7 +122,27 @@ pub fn add_external_contract_call_fn(
         .binop(BinaryOp::I32Add)
         .local_set(address_ptr);
 
-    // Calculate the from where the arguments enter the calldata. Depending on how the call is
+    builder
+        .local_get(*self_)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 4,
+            },
+        )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(is_delegate_call);
+
+    // Calculate from where the arguments enter the calldata. Depending on how the call is
     // configured we omit some parameters at the beggining that are not part of the callee
     // signature
     let arguments_from = if gas_argument_present {
@@ -190,6 +214,11 @@ pub fn add_external_contract_call_fn(
             .iter()
             .zip(&function_args[arguments_from..])
         {
+            let argument = match argument {
+                IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => &**inner,
+                _ => argument,
+            };
+
             if argument.is_dynamic(compilation_ctx) {
                 argument.add_pack_instructions_dynamic(
                     &mut builder,
@@ -253,15 +282,32 @@ pub fn add_external_contract_call_fn(
             .call(static_call_contract)
             .local_set(call_contract_result);
     } else {
-        builder
-            .local_get(address_ptr)
-            .local_get(calldata_start)
-            .local_get(calldata_len)
-            .local_get(value)
-            .local_get(gas)
-            .local_get(return_data_len)
-            .call(call_contract)
-            .local_set(call_contract_result);
+        builder.local_get(is_delegate_call).if_else(
+            None,
+            |then_| {
+                // Delegate call
+                then_
+                    .local_get(address_ptr)
+                    .local_get(calldata_start)
+                    .local_get(calldata_len)
+                    .local_get(gas)
+                    .local_get(return_data_len)
+                    .call(delegate_call_contract)
+                    .local_set(call_contract_result);
+            },
+            |else_| {
+                // Regular call
+                else_
+                    .local_get(address_ptr)
+                    .local_get(calldata_start)
+                    .local_get(calldata_len)
+                    .local_get(value)
+                    .local_get(gas)
+                    .local_get(return_data_len)
+                    .call(call_contract)
+                    .local_set(call_contract_result);
+            },
+        );
     }
 
     let call_result = module.locals.add(ValType::I32);

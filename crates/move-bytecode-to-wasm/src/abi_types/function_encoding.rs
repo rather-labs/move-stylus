@@ -67,6 +67,11 @@ fn solidity_name(
         }
         IntermediateType::IStruct {
             module_id, index, ..
+        } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+            Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
+        }
+        IntermediateType::IStruct {
+            module_id, index, ..
         } => {
             let struct_ = compilation_ctx
                 .get_struct_by_index(module_id, *index)

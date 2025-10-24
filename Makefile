@@ -45,6 +45,9 @@ example-erc20:
 example-cross-contract-call:
 	cargo run -p move-hello-world-example --bin cross_contract_call
 
+example-delegated-counter:
+	cargo run -p move-hello-world-example --bin delegated_counter
+
 deploy-example:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
@@ -99,6 +102,23 @@ deploy-cross-contract-call:
 		--endpoint='http://localhost:8547' \
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/wasm/cross_contract_call.wasm
+
+deploy-delegated-counter:
+	cargo stylus deploy \
+		--endpoint='http://localhost:8547' \
+		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
+		--wasm-file=./example/build/wasm/delegated_counter_logic_1.wasm \
+		| ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_1
+	cargo stylus deploy \
+		--endpoint='http://localhost:8547' \
+		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
+		--wasm-file=./example/build/wasm/delegated_counter_logic_2.wasm \
+		| ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_2
+	cargo stylus deploy \
+		--endpoint='http://localhost:8547' \
+		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
+		--wasm-file=./example/build/wasm/delegated_counter.wasm \
+		| ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER
 
 setup-stylus:
 	RUSTFLAGS="-C link-args=-rdynamic" cargo install --force cargo-stylus

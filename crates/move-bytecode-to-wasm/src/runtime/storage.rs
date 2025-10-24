@@ -556,7 +556,8 @@ pub fn add_encode_and_save_into_storage_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
-    let name = RuntimeFunction::EncodeAndSaveInStorage.get_generic_function_name(&[itype]);
+    let name = RuntimeFunction::EncodeAndSaveInStorage
+        .get_generic_function_name(compilation_ctx, &[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     }
@@ -606,7 +607,8 @@ pub fn add_read_and_decode_from_storage_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
-    let name = RuntimeFunction::ReadAndDecodeFromStorage.get_generic_function_name(&[itype]);
+    let name = RuntimeFunction::ReadAndDecodeFromStorage
+        .get_generic_function_name(compilation_ctx, &[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     }
@@ -666,7 +668,8 @@ pub fn add_delete_struct_from_storage_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
-    let name = RuntimeFunction::DeleteFromStorage.get_generic_function_name(&[itype]);
+    let name =
+        RuntimeFunction::DeleteFromStorage.get_generic_function_name(compilation_ctx, &[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -776,7 +779,8 @@ pub fn add_check_and_delete_struct_tto_fields_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
-    let name = RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic_function_name(&[itype]);
+    let name = RuntimeFunction::CheckAndDeleteStructTtoFields
+        .get_generic_function_name(compilation_ctx, &[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
@@ -957,7 +961,8 @@ pub fn add_delete_tto_object_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
-    let name = RuntimeFunction::DeleteTtoObject.get_generic_function_name(&[itype]);
+    let name =
+        RuntimeFunction::DeleteTtoObject.get_generic_function_name(compilation_ctx, &[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     };
