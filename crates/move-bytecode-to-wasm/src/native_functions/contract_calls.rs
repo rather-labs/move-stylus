@@ -36,7 +36,6 @@ pub fn add_external_contract_call_fn(
     module_id: &ModuleId,
     function_information: &MappedFunction,
     function_modifiers: &[FunctionModifier],
-    gas_argument_present: bool,
 ) -> FunctionId {
     let name = format!(
         "{}_{}_{}",
@@ -54,6 +53,7 @@ pub fn add_external_contract_call_fn(
     let (delegate_call_contract, _) = delegate_call_contract(module);
     let (static_call_contract, _) = static_call_contract(module);
     let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None);
+    let swap = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
 
     let arguments = function_information.signature.get_argument_wasm_types();
 
@@ -66,46 +66,23 @@ pub fn add_external_contract_call_fn(
         .first()
         .unwrap_or_else(|| panic!("contract call function has no arguments"));
 
-    let value = if function_modifiers.contains(&FunctionModifier::Payable) {
-        function_args.get(1)
-    } else {
-        None
-    };
-
-    // If value is not specified we allocate 32 bytes and pass that as the value (will be 0)
-    let value = if let Some(value) = value {
-        *value
-    } else {
-        let value = module.locals.add(ValType::I32);
-        builder
-            .i32_const(32)
-            .call(compilation_ctx.allocator)
-            .local_set(value);
-        value
-    };
-
-    // If gas is not present, we set it to the max possible
-    let gas = if gas_argument_present {
-        if function_modifiers.contains(&FunctionModifier::Payable) {
-            function_args.get(2)
-        } else {
-            function_args.get(1)
-        }
-    } else {
-        None
-    };
-
-    let gas = if let Some(gas) = gas {
-        *gas
-    } else {
-        let gas = module.locals.add(ValType::I64);
-        builder.i64_const(u64::MAX as i64).local_set(gas);
-        gas
-    };
-
     // Locals
     let address_ptr = module.locals.add(ValType::I32);
     let is_delegate_call = module.locals.add(ValType::I32);
+    let gas = module.locals.add(ValType::I64);
+    let value = module.locals.add(ValType::I32);
+
+    builder
+        .local_get(*self_)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(*self_);
 
     // The address to call is the first argument of self (20 bytes)
     builder
@@ -142,20 +119,50 @@ pub fn add_external_contract_call_fn(
         )
         .local_set(is_delegate_call);
 
-    // Calculate from where the arguments enter the calldata. Depending on how the call is
-    // configured we omit some parameters at the beggining that are not part of the callee
-    // signature
-    let arguments_from = if gas_argument_present {
-        if function_modifiers.contains(&FunctionModifier::Payable) {
-            3
-        } else {
-            2
-        }
-    } else {
-        1
-    };
+    // Load gas
+    builder
+        .local_get(*self_)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 8,
+            },
+        )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I64 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(gas);
 
-    let calldata_arguments = &function_information.signature.arguments[arguments_from..];
+    // Load value (if the function is payable) otherwise we load zeroes
+    if function_modifiers.contains(&FunctionModifier::Payable) {
+        builder
+            .local_get(*self_)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 12,
+                },
+            )
+            .local_tee(value)
+            .local_get(value)
+            .call(swap);
+    } else {
+        builder
+            .i32_const(32)
+            .call(compilation_ctx.allocator)
+            .local_set(value);
+    }
+
+    let calldata_arguments = &function_information.signature.arguments[1..];
 
     let calldata_start = module.locals.add(ValType::I32);
 
@@ -210,10 +217,7 @@ pub fn add_external_contract_call_fn(
             .local_tee(writer_pointer)
             .local_set(calldata_reference_pointer);
 
-        for (argument, wasm_local) in calldata_arguments
-            .iter()
-            .zip(&function_args[arguments_from..])
-        {
+        for (argument, wasm_local) in calldata_arguments.iter().zip(&function_args[1..]) {
             let argument = match argument {
                 IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => &**inner,
                 _ => argument,

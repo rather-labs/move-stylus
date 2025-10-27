@@ -4,6 +4,7 @@ use stylus::tx_context::TxContext;
 use stylus::object as object;
 use stylus::object::UID;
 use stylus::transfer as transfer;
+use stylus::contract_calls as contract_calls;
 use hello_world::delegated_counter_interface as dci;
 
 public struct Counter has key {
@@ -24,7 +25,10 @@ entry fun create(contract_logic: address, ctx: &mut TxContext) {
 
 /// Increment a counter by 1.
 entry fun increment(counter: &mut Counter) {
-    let delegated_counter = dci::new(counter.contract_address, true);
+    let delegated_counter = dci::new(
+        contract_calls::new(counter.contract_address)
+            .delegate()
+    );
     let res = delegated_counter.increment(&mut counter.id);
     assert!(res.succeded(), 33);
 }
@@ -47,6 +51,9 @@ entry fun change_logic(counter: &mut Counter, logic_address: address) {
 /// Set value (only runnable by the Counter owner)
 entry fun set_value(counter: &mut Counter, value: u64, ctx: &TxContext) {
     assert!(counter.owner == ctx.sender(), 0);
-    let delegated_counter = dci::new(counter.contract_address, true);
+    let delegated_counter = dci::new(
+        contract_calls::new(counter.contract_address)
+            .delegate()
+    );
     delegated_counter.set_value(&mut counter.id, value);
 }
