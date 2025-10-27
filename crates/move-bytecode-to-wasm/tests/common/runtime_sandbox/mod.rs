@@ -131,22 +131,13 @@ impl RuntimeSandbox {
 
                     let mem = get_memory(&mut caller);
 
-                    let mut test = [0; 32];
-                    mem.read(&caller, dest_ptr as usize, &mut test).unwrap();
-                    println!("1 ----> {test:?}");
-
                     let data = cccrd.lock().unwrap();
-                    println!("{offset} {data:?}");
                     mem.write(
                         &mut caller,
                         dest_ptr as usize + offset as usize,
                         data.as_slice(),
                     )
                     .unwrap();
-
-                    let mut test = [0; 32];
-                    mem.read(&caller, dest_ptr as usize, &mut test).unwrap();
-                    println!("2 ----> {test:?}");
 
                     Ok(1)
                 },
@@ -167,7 +158,7 @@ impl RuntimeSandbox {
                       gas: u64,
                       return_data_len_ptr: u32| {
                           println!(
-                              "delegate_call_contract called with address_ptr: {}, calldata_ptr: {}, calldata_len_ptr: {}, gas: {}, return_data_len_ptr: {}",
+                              "delegate_call_contract called with address_ptr: {}, calldata_ptr: {}, calldata_len: {}, gas: {}, return_data_len_ptr: {}",
                               address_ptr, calldata_ptr, calldata_len_ptr, gas, return_data_len_ptr
                           );
 
@@ -180,7 +171,7 @@ impl RuntimeSandbox {
                             let mut calldata = vec![0; calldata_len_ptr as usize];
                             mem.read(&caller, calldata_ptr as usize, &mut calldata).unwrap();
 
-                            let cross_contract_call_return_data_len  = &cccrd.lock().unwrap().len().to_be_bytes()[4..];
+                            let cross_contract_call_return_data_len  = &cccrd.lock().unwrap().len().to_le_bytes()[..4];
                             mem.write(&mut caller, return_data_len_ptr as usize, cross_contract_call_return_data_len).unwrap();
 
                               cces.send(CrossContractExecutionData {
@@ -228,7 +219,6 @@ impl RuntimeSandbox {
 
                             let cross_contract_call_return_data_len  = &cccrd.lock().unwrap().len().to_le_bytes()[..4];
                             mem.write(&mut caller, return_data_len_ptr as usize, cross_contract_call_return_data_len).unwrap();
-                            println!("len {cross_contract_call_return_data_len:?}");
 
                               cces.send(CrossContractExecutionData {
                                   calldata,
@@ -266,7 +256,7 @@ impl RuntimeSandbox {
                                 "call_contract called with address_ptr: {}, calldata_ptr: {}, calldata_len_ptr: {}, value_ptr: {}, gas: {}, return_data_len_ptr: {}",
                                 address_ptr, calldata_ptr, calldata_len_ptr, value_ptr, gas, return_data_len_ptr
                             );
-if cccs.load(std::sync::atomic::Ordering::Relaxed) {
+                            if cccs.load(std::sync::atomic::Ordering::Relaxed) {
                             let mem = get_memory(&mut caller);
 
                             let mut address = [0; 20];
@@ -279,8 +269,8 @@ if cccs.load(std::sync::atomic::Ordering::Relaxed) {
                             mem.read(&caller, value_ptr as usize, &mut value).unwrap();
                             let value = U256::from_be_bytes(value);
 
-                            let cross_contract_call_return_data_len  = cccrd.lock().unwrap().len().to_be_bytes();
-                            mem.write(&mut caller, return_data_len_ptr as usize, &cross_contract_call_return_data_len).unwrap();
+                            let cross_contract_call_return_data_len  = &cccrd.lock().unwrap().len().to_le_bytes()[..4];
+                            mem.write(&mut caller, return_data_len_ptr as usize, cross_contract_call_return_data_len).unwrap();
 
                               cces.send(CrossContractExecutionData {
                                   calldata,
@@ -295,7 +285,6 @@ if cccs.load(std::sync::atomic::Ordering::Relaxed) {
                         } else {
                             Ok(1)
                         }
-
 
                 },
             )

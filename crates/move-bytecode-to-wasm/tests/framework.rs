@@ -902,10 +902,32 @@ mod cross_contract_calls_result {
             Baz baz;
         }
 
-        function ccCallRes1(address contract_address) external returns (uint64);
+        function ccCallViewRes1(address contract_address) external returns (uint64);
+        function ccCallViewRes2(address contract_address) external returns (Foo);
+        function ccCallViewRes3(address contract_address) external returns (Bar);
+        function ccCallViewRes4(address contract_address) external returns (uint8[]);
+        function ccCallPureRes1(address contract_address) external returns (uint64);
+        function ccCallPureRes2(address contract_address) external returns (Foo);
+        function ccCallPureRes3(address contract_address) external returns (Bar);
+        function ccCallPureRes4(address contract_address) external returns (uint8[]);
+        function ccCallViewPureRes1(address contract_address) external returns (uint64);
+        function ccCallViewPureRes2(address contract_address) external returns (Foo);
+        function ccCallViewPureRes3(address contract_address) external returns (Bar);
+        function ccCallViewPureRes4(address contract_address) external returns (uint8[]);
 
         // The following functions are used to obtain their calldata and compare them
         function callView1() external;
+        function callView2() external;
+        function callView3() external;
+        function callView4() external;
+        function callPure1() external;
+        function callPure2() external;
+        function callPure3() external;
+        function callPure4() external;
+        function callViewPure1() external;
+        function callViewPure2() external;
+        function callViewPure3() external;
+        function callViewPure4() external;
     );
 
     const ADDRESS: alloy_primitives::Address =
@@ -950,13 +972,112 @@ mod cross_contract_calls_result {
 
     #[rstest]
     #[case(
-        ccCallRes1Call::new((ADDRESS,)),
+        ccCallViewRes1Call::new((ADDRESS,)),
         callView1Call::new(()).abi_encode(),
         true,
         CrossContractCallType::StaticCall,
         U256::from(0),
         u64::MAX,
         42_u64.abi_encode(),
+    )]
+    #[case(
+        ccCallViewRes2Call::new((ADDRESS,)),
+        callView2Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::StaticCall,
+        U256::from(0),
+        u64::MAX,
+        get_foo().abi_encode(),
+    )]
+    #[case(
+        ccCallViewRes3Call::new((ADDRESS,)),
+        callView3Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::StaticCall,
+        U256::from(0),
+        u64::MAX,
+        get_bar().abi_encode(),
+    )]
+    #[case(
+        ccCallViewRes4Call::new((ADDRESS,)),
+        callView4Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::StaticCall,
+        U256::from(0),
+        u64::MAX,
+        vec![3, 1, 4, 1, 5].abi_encode(),
+    )]
+    #[case(
+        ccCallPureRes1Call::new((ADDRESS,)),
+        callPure1Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::StaticCall,
+        U256::from(0),
+        u64::MAX,
+        42_u64.abi_encode(),
+    )]
+    #[case(
+        ccCallPureRes2Call::new((ADDRESS,)),
+        callPure2Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::StaticCall,
+        U256::from(0),
+        u64::MAX,
+        get_foo().abi_encode(),
+    )]
+    #[case(
+        ccCallPureRes3Call::new((ADDRESS,)),
+        callPure3Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::StaticCall,
+        U256::from(0),
+        u64::MAX,
+        get_bar().abi_encode(),
+    )]
+    #[case(
+        ccCallPureRes4Call::new((ADDRESS,)),
+        callPure4Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::StaticCall,
+        U256::from(0),
+        u64::MAX,
+        vec![3, 1, 4, 1, 5].abi_encode(),
+    )]
+    #[case(
+        ccCallViewPureRes1Call::new((ADDRESS,)),
+        callViewPure1Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::StaticCall,
+        U256::from(0),
+        u64::MAX,
+        42_u64.abi_encode(),
+    )]
+    #[case(
+        ccCallViewPureRes2Call::new((ADDRESS,)),
+        callViewPure2Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::StaticCall,
+        U256::from(0),
+        u64::MAX,
+        get_foo().abi_encode(),
+    )]
+    #[case(
+        ccCallViewPureRes3Call::new((ADDRESS,)),
+        callViewPure3Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::StaticCall,
+        U256::from(0),
+        u64::MAX,
+        get_bar().abi_encode(),
+    )]
+    #[case(
+        ccCallViewPureRes4Call::new((ADDRESS,)),
+        callViewPure4Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::StaticCall,
+        U256::from(0),
+        u64::MAX,
+        vec![3, 1, 4, 1, 5].abi_encode(),
     )]
     fn test_cross_contract_call_with_result_calls<T: SolCall>(
         runtime: RuntimeSandbox,
