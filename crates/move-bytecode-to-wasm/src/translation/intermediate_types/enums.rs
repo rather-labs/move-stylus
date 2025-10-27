@@ -15,7 +15,8 @@
 //! For stack types the data is saved in-place, for heap-types we just save the pointer to the
 //! data.
 use crate::{
-    CompilationContext, compilation_context::module_data::ModuleData, translation::TranslationError,
+    CompilationContext, compilation_context::module_data::ModuleData,
+    generics::replace_type_parameters, translation::TranslationError,
 };
 
 use super::structs::IStruct;
@@ -280,5 +281,33 @@ impl IEnum {
         }
 
         builder.local_get(ptr);
+    }
+
+    /// Replaces all type parameters in the enum with the provided types.
+    pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
+        let variants: Vec<IEnumVariant> = self
+            .variants
+            .iter()
+            .map(|v| {
+                IEnumVariant::new(
+                    v.index,
+                    v.belongs_to,
+                    v.fields
+                        .iter()
+                        .map(|f| replace_type_parameters(f, types))
+                        .collect(),
+                )
+            })
+            .collect();
+
+        // Recompute heap_size after instantiating the types
+        let heap_size = Self::compute_heap_size(&variants).unwrap_or(None);
+
+        Self {
+            index: self.index,
+            is_simple: self.is_simple,
+            variants,
+            heap_size,
+        }
     }
 }

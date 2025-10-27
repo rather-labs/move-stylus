@@ -71,6 +71,15 @@ pub fn replace_type_parameters(
         IntermediateType::IVector(inner) => {
             IntermediateType::IVector(Box::new(replace_type_parameters(inner, instance_types)))
         }
+        IntermediateType::IGenericEnumInstance { index, types } => {
+            IntermediateType::IGenericEnumInstance {
+                index: *index,
+                types: types
+                    .iter()
+                    .map(|t| replace_type_parameters(t, instance_types))
+                    .collect(),
+            }
+        }
         // Non-generic type: keep as is
         _ => itype.clone(),
     }

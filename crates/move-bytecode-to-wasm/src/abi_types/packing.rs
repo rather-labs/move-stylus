@@ -10,7 +10,6 @@ use crate::{
     translation::intermediate_types::{
         IntermediateType,
         address::IAddress,
-        enums::IEnum,
         heap_integers::{IU128, IU256},
         reference::{IMutRef, IRef},
         vector::IVector,
@@ -373,7 +372,7 @@ impl Packable for IntermediateType {
                         "cannot abi pack enum with index {enum_index}, it contains at least one variant with fields"
                     );
                 }
-                IEnum::add_pack_instructions(
+                enum_.add_pack_instructions(
                     builder,
                     module,
                     local,
@@ -384,7 +383,26 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
             }
-            IntermediateType::IGenericEnumInstance { .. } => todo!(),
+            IntermediateType::IGenericEnumInstance { index, types } => {
+                let enum_ = compilation_ctx
+                    .root_module_data
+                    .enums
+                    .get_enum_by_index(*index)
+                    .unwrap();
+                let enum_instance = enum_.instantiate(types);
+                if !enum_instance.is_simple {
+                    panic!(
+                        "cannot abi pack enum with index {index}, it contains at least one variant with fields"
+                    );
+                }
+                enum_instance.add_pack_instructions(
+                    builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    compilation_ctx,
+                )
+            }
         }
     }
 
@@ -524,7 +542,10 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("can't know the size of a generic type parameter at compile time");
             }
-            IntermediateType::IGenericEnumInstance { .. } => todo!(),
+            // TODO: check if this is correct
+            IntermediateType::IGenericEnumInstance { .. } => {
+                sol_data::Uint::<8>::ENCODED_SIZE.unwrap()
+            }
         }
     }
 
@@ -568,7 +589,8 @@ impl Packable for IntermediateType {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
                 inner.is_dynamic(compilation_ctx)
             }
-            IntermediateType::IGenericEnumInstance { .. } => todo!(),
+            // TODO: check if this is correct
+            IntermediateType::IGenericEnumInstance { .. } => false,
         }
     }
 }

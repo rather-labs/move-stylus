@@ -184,7 +184,10 @@ impl IntermediateType {
                                 vm_handled_struct: VmHandledStruct::None,
                             }
                         }
-                        UserDefinedType::Enum(_) => todo!(),
+                        UserDefinedType::Enum(index) => IntermediateType::IGenericEnumInstance {
+                            index: *index as u16,
+                            types: types.clone(),
+                        },
                     })
                 } else {
                     Err(anyhow::anyhow!(

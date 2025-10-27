@@ -16,15 +16,16 @@ use crate::{
         table::FunctionId,
     },
 };
-use enum_data::{EnumData, VariantData};
+use enum_data::{EnumData, VariantData, VariantInstantiationData};
 use function_data::FunctionData;
 use move_binary_format::{
     CompiledModule,
     file_format::{
-        Ability, AbilitySet, Constant, DatatypeHandleIndex, EnumDefinitionIndex, FieldHandleIndex,
-        FieldInstantiationIndex, FunctionDefinition, FunctionDefinitionIndex, Signature,
-        SignatureIndex, SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex,
-        VariantHandleIndex, Visibility,
+        Ability, AbilitySet, Constant, DatatypeHandleIndex, EnumDefInstantiationIndex,
+        EnumDefinitionIndex, FieldHandleIndex, FieldInstantiationIndex, FunctionDefinition,
+        FunctionDefinitionIndex, Signature, SignatureIndex, SignatureToken,
+        StructDefInstantiationIndex, StructDefinitionIndex, VariantHandleIndex,
+        VariantInstantiationHandleIndex, Visibility,
     },
     internals::ModuleIndex,
 };
@@ -190,9 +191,14 @@ impl ModuleData {
         let (module_enums, variants_to_enum_map) =
             Self::process_concrete_enums(move_module_unit, &datatype_handles_map);
 
+        let (module_generic_enums_instances, variants_instantiation_to_enum_map) =
+            Self::process_generic_enums(move_module_unit, &datatype_handles_map);
+
         let enums = EnumData {
             enums: module_enums,
             variants_to_enum: variants_to_enum_map,
+            generic_enums_instances: module_generic_enums_instances,
+            variants_instantiation_to_enum: variants_instantiation_to_enum_map,
         };
 
         let functions = Self::process_function_definitions(
@@ -561,6 +567,85 @@ impl ModuleData {
         }
 
         (module_enums, variants_to_enum_map)
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn process_generic_enums(
+        module: &CompiledModule,
+        datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
+    ) -> (
+        Vec<(EnumDefinitionIndex, Vec<IntermediateType>)>,
+        HashMap<VariantInstantiationHandleIndex, VariantInstantiationData>,
+    ) {
+        let mut module_generic_enums_instances = vec![];
+        let mut variants_instantiation_to_enum_map = HashMap::new();
+
+        for (index, enum_def_instantiation) in module.enum_instantiations().iter().enumerate() {
+            let enum_def_index = enum_def_instantiation.def;
+            let enum_definition = &module.enum_defs()[enum_def_index.0 as usize];
+
+            let enum_instantiation_types = module
+                .signature_at(enum_def_instantiation.type_parameters)
+                .0
+                .iter()
+                .map(|t| IntermediateType::try_from_signature_token(t, datatype_handles_map))
+                .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                .unwrap();
+
+            module_generic_enums_instances.push((enum_def_index, enum_instantiation_types.clone()));
+
+            // Process all variant instantiation handles for this enum instantiation
+            for (variant_instantiation_handle_index, variant_instantiation_handle) in module
+                .variant_instantiation_handles()
+                .iter()
+                .enumerate()
+                .filter(|(_idx, v)| {
+                    v.enum_def.0 == index as u16
+                })
+            {
+                let variant_index = variant_instantiation_handle.variant; // index inside the enum definition
+                let variant_definition = &enum_definition.variants[variant_index as usize];
+
+                // Get the types for this specific variant by resolving the variant's field types
+                // using the enum's type parameters
+                let variant_types = variant_definition
+                    .fields
+                    .iter()
+                    .map(|field| {
+                        // Resolve the field's type signature using the enum's type parameters
+                        match &field.signature.0 {
+                            SignatureToken::TypeParameter(param_idx) => {
+                                // This field uses one of the enum's type parameters
+                                enum_instantiation_types[*param_idx as usize].clone()
+                            }
+                            other_type => {
+                                // This field has a concrete type, resolve it normally
+                                IntermediateType::try_from_signature_token(
+                                    other_type,
+                                    datatype_handles_map,
+                                )
+                                .unwrap()
+                            }
+                        }
+                    })
+                    .collect();
+
+                variants_instantiation_to_enum_map.insert(
+                    VariantInstantiationHandleIndex::new(variant_instantiation_handle_index as u16),
+                    VariantInstantiationData {
+                        enum_index: enum_def_index.0 as usize,
+                        enum_def_instantiation_index: EnumDefInstantiationIndex::new(index as u16),
+                        index_inside_enum: variant_index as usize,
+                        types: variant_types,
+                    },
+                );
+            }
+        }
+
+        (
+            module_generic_enums_instances,
+            variants_instantiation_to_enum_map,
+        )
     }
 
     fn process_function_definitions<'move_package>(

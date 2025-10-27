@@ -736,3 +736,45 @@ mod lab_experiment {
         .unwrap();
     }
 }
+
+mod generic_enums {
+    use super::*;
+    use alloy_sol_types::sol;
+    use alloy_sol_types::{SolCall, SolValue};
+
+    #[fixture]
+    #[once]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "generic_enums";
+        const SOURCE_PATH: &str = "tests/enums/generic_enums.move";
+
+        let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol! {
+        function packUnpackGenericEnumU64U32(uint8 variant_index, uint64 value64, uint32 value32) external returns (uint64, uint32);
+        function packUnpackGenericEnumU128U16(uint8 variant_index, uint128 value128, uint16 value16) external returns (uint128, uint16);
+    }
+
+    #[rstest]
+    #[case(packUnpackGenericEnumU64U32Call::new((0u8, 42u64, 32u32)), (42u64, 32u32))]
+    #[case(packUnpackGenericEnumU64U32Call::new((1u8, u64::MAX, u32::MAX)), (u64::MAX, u32::MAX))]
+    #[case(packUnpackGenericEnumU64U32Call::new((2u8, 0u64, 0u32)), (0u64, 0u32))]
+    #[case(packUnpackGenericEnumU128U16Call::new((0u8, 42u128, 32u16)), (42u128, 32u16))]
+    #[case(packUnpackGenericEnumU128U16Call::new((1u8, 8u128, 16u16)), (8u128, 16u16))]
+    #[case(packUnpackGenericEnumU128U16Call::new((2u8, 0u128, 0u16)), (0u128, 0u16))]
+    fn test_generic_enums<T: SolCall, V: SolValue>(
+        #[by_ref] runtime: &RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode(),
+        )
+        .unwrap();
+    }
+}
