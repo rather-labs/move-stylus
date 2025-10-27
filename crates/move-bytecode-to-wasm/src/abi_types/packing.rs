@@ -372,13 +372,7 @@ impl Packable for IntermediateType {
                         "cannot abi pack enum with index {enum_index}, it contains at least one variant with fields"
                     );
                 }
-                enum_.add_pack_instructions(
-                    builder,
-                    module,
-                    local,
-                    writer_pointer,
-                    compilation_ctx,
-                )
+                enum_.add_pack_instructions(builder, module, local, writer_pointer, compilation_ctx)
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");

@@ -599,9 +599,7 @@ impl ModuleData {
                 .variant_instantiation_handles()
                 .iter()
                 .enumerate()
-                .filter(|(_idx, v)| {
-                    v.enum_def.0 == index as u16
-                })
+                .filter(|(_idx, v)| v.enum_def.0 == index as u16)
             {
                 let variant_index = variant_instantiation_handle.variant; // index inside the enum definition
                 let variant_definition = &enum_definition.variants[variant_index as usize];
