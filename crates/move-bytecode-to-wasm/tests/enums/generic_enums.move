@@ -82,3 +82,43 @@ entry fun create_wrapped_generic_enum_u32(variant_index: u8, x: u32): u32 {
         },
     }
 }
+
+public enum MiscGenericEnum<T, U> has drop {
+    GenericStruct {
+        a: T,
+        b: U,
+    },
+    Variant2(T, U),
+    Variant3{x: T, y: U},
+}
+
+fun create_misc_generic_enum<T: drop, U: drop>(variant_index: u8, v0: T, v1: U): MiscGenericEnum<T, U> {
+    match (variant_index) {
+        0 => MiscGenericEnum<T, U>::GenericStruct { a: v0, b: v1 },
+        1 => MiscGenericEnum<T, U>::Variant2(v0, v1),
+        2 => MiscGenericEnum<T, U>::Variant3{x: v0, y: v1},
+        _ => abort(1),
+    }
+}
+
+entry fun mutate_misc_generic_enum_u64_u32(variant_index: u8, v0: u64, v1: u32): (u64, u32) {
+    let enum_ = &mut create_misc_generic_enum(variant_index, v0, v1);
+    match (enum_) {
+        MiscGenericEnum<u64, u32>::GenericStruct { a, b } => {
+            *a = *a + 1;
+            *b = *b + 1;
+        },
+        MiscGenericEnum<u64, u32>::Variant2(a, b) => {*a = *a + 1; *b = *b + 1;},
+        MiscGenericEnum<u64, u32>::Variant3{x, y} => {
+            *x = *x + 1;
+            *y = *y + 1;
+        },
+    };
+    
+    // Extract and return the mutated values
+    match (enum_) {
+        MiscGenericEnum<u64, u32>::GenericStruct { a, b } => (*a, *b),
+        MiscGenericEnum<u64, u32>::Variant2(a, b) => (*a, *b),
+        MiscGenericEnum<u64, u32>::Variant3{x, y} => (*x, *y),
+    }
+}
