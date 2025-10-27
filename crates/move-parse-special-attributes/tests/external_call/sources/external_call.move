@@ -3,10 +3,8 @@ module test::external_call;
 use stylus::contract_calls::{ContractCallResult, ContractCallEmptyResult};
 
 #[ext(external_call)]
-public struct ExternalCall has drop {
-    contract_address: address,
-    delegate: bool,
-}
+public struct ExternalCall(CrossContractCall) has drop;
+
 
 #[ext(external_call)]
 public native fun external_function_ok_1(

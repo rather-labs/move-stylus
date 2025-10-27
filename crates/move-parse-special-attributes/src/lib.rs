@@ -17,6 +17,7 @@ pub struct SpecialAttributes {
     pub functions: Vec<Function>,
     pub external_calls: HashMap<String, Function>,
     pub external_struct: HashMap<String, ExternalStruct>,
+    pub external_call_structs: Vec<String>,
 }
 
 use external_call::{
@@ -54,45 +55,13 @@ pub fn process_special_attributes(
 
     let ast = program_res.unwrap().into_ast().1;
 
-    for source in ast.source_definitions {
-        if let Definition::Module(module) = source.def {
-            for module_member in module.members {
+    // First we need to process the structs, since there are functions (like the external call
+    // ones) that should have as first argument structs marked with a modifier.
+    for source in &ast.source_definitions {
+        if let Definition::Module(ref module) = source.def {
+            for module_member in &module.members {
                 match module_member {
-                    ModuleMember::Function(ref f) => {
-                        if let Some(attributes) = f.attributes.first() {
-                            let mut modifiers = attributes
-                                .value
-                                .iter()
-                                .flat_map(|s| FunctionModifier::parse_modifiers(&s.value))
-                                .collect::<VecDeque<FunctionModifier>>();
-
-                            if let Some(FunctionModifier::ExternalCall) = modifiers.pop_front() {
-                                let modifiers: Vec<FunctionModifier> =
-                                    modifiers.into_iter().collect();
-
-                                let errors = validate_external_call_function(f, &modifiers);
-
-                                if let Err(errors) = errors {
-                                    found_error = true;
-                                    module_errors.extend(errors);
-                                } else if !found_error {
-                                    result.external_calls.insert(
-                                        f.name.to_owned().to_string(),
-                                        Function {
-                                            name: f.name.to_owned().to_string(),
-                                            modifiers,
-                                        },
-                                    );
-                                }
-                            } else {
-                                result.functions.push(Function {
-                                    name: f.name.to_owned().to_string(),
-                                    modifiers: modifiers.into_iter().collect(),
-                                });
-                            }
-                        }
-                    }
-                    ModuleMember::Struct(ref s) => {
+                    ModuleMember::Struct(s) => {
                         if let Some(attributes) = s.attributes.first() {
                             let first_modifier = attributes.value.first().and_then(|s| {
                                 let sm = StructModifier::parse_modifiers(&s.value);
@@ -100,6 +69,9 @@ pub fn process_special_attributes(
                             });
 
                             match first_modifier {
+                                Some(StructModifier::ExternalCall) => {
+                                    println!("{s:?}");
+                                }
                                 Some(StructModifier::ExternalStruct) => {
                                     match ExternalStruct::try_from(s) {
                                         Ok(external_struct) => {
@@ -137,6 +109,52 @@ pub fn process_special_attributes(
                                     }
                                 },
                                 None => continue,
+                            }
+                        }
+                    }
+                    _ => continue,
+                }
+            }
+        } else {
+            continue;
+        };
+    }
+
+    for source in ast.source_definitions {
+        if let Definition::Module(module) = source.def {
+            for module_member in module.members {
+                match module_member {
+                    ModuleMember::Function(ref f) => {
+                        if let Some(attributes) = f.attributes.first() {
+                            let mut modifiers = attributes
+                                .value
+                                .iter()
+                                .flat_map(|s| FunctionModifier::parse_modifiers(&s.value))
+                                .collect::<VecDeque<FunctionModifier>>();
+
+                            if let Some(FunctionModifier::ExternalCall) = modifiers.pop_front() {
+                                let modifiers: Vec<FunctionModifier> =
+                                    modifiers.into_iter().collect();
+
+                                let errors = validate_external_call_function(f, &modifiers);
+
+                                if let Err(errors) = errors {
+                                    found_error = true;
+                                    module_errors.extend(errors);
+                                } else if !found_error {
+                                    result.external_calls.insert(
+                                        f.name.to_owned().to_string(),
+                                        Function {
+                                            name: f.name.to_owned().to_string(),
+                                            modifiers,
+                                        },
+                                    );
+                                }
+                            } else {
+                                result.functions.push(Function {
+                                    name: f.name.to_owned().to_string(),
+                                    modifiers: modifiers.into_iter().collect(),
+                                });
                             }
                         }
                     }
