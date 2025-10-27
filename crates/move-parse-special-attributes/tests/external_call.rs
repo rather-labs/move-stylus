@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use move_parse_special_attributes::{
-    ExternalCallError, error::SpecialAttributeErrorKind, process_special_attributes,
+    ExternalCallFunctionError, error::SpecialAttributeErrorKind, process_special_attributes,
 };
 
 #[test]
@@ -21,13 +21,15 @@ pub fn test_external_call_general() {
             .iter()
             .filter(|e| matches!(
                 &e.kind,
-                SpecialAttributeErrorKind::ExternalCall(ExternalCallError::FunctionIsNotNative)
+                SpecialAttributeErrorKind::ExternalCallFunction(
+                    ExternalCallFunctionError::FunctionIsNotNative
+                )
             ))
             .count()
     );
 
     assert_eq!(1, special_attributes_errors.iter().filter(|e| matches!(
         &e.kind,
-        SpecialAttributeErrorKind::ExternalCall(ExternalCallError::InvalidReturnType(t)) if t == "u64"
+        SpecialAttributeErrorKind::ExternalCallFunction(ExternalCallFunctionError::InvalidReturnType(t)) if t == "u64"
     )).count());
 }

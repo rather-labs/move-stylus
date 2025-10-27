@@ -2,13 +2,14 @@ pub mod error;
 pub mod event;
 mod external_call;
 pub mod function_modifiers;
+mod shared;
 pub mod struct_modifiers;
 
 pub use error::SpecialAttributeError;
 use error::SpecialAttributeErrorKind;
 pub use event::Event;
 use event::EventParseError;
-pub use external_call::error::ExternalCallError;
+pub use external_call::error::ExternalCallFunctionError;
 // TODO: Create error struct with LOC and error info
 
 #[derive(Default, Debug)]

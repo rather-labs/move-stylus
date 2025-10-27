@@ -1,6 +1,6 @@
 // TODO: Change string for symbols
 #[derive(thiserror::Error, Debug)]
-pub enum ExternalCallError {
+pub enum ExternalCallFunctionError {
     #[error(
         "An external call function must return either stylus::contract_calls::ContractCallResult<T> or stylus::contract_calls::ContractCallEmptyResult, found '{0}'"
     )]
@@ -21,4 +21,10 @@ pub enum ExternalCallError {
 
     #[error("A payable external call function must have a 'value' argument of type 'u256'")]
     ValueArgumentMissing,
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum ExternalCallStructError {
+    #[error("Should have the 'drop' ability")]
+    DropAbilityMissing,
 }

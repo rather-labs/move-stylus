@@ -1,7 +1,7 @@
 use move_compiler::parser::ast::{Function, FunctionBody_, NameAccessChain_, Type_};
 
 use crate::{
-    ExternalCallError, SpecialAttributeError, error::SpecialAttributeErrorKind,
+    ExternalCallFunctionError, SpecialAttributeError, error::SpecialAttributeErrorKind,
     function_modifiers::FunctionModifier,
 };
 
@@ -12,8 +12,8 @@ fn check_return_value(function: &Function) -> Option<SpecialAttributeError> {
                 "ContractCallResult" | "ContractCallEmptyResult" => {}
                 other => {
                     return Some(SpecialAttributeError {
-                        kind: SpecialAttributeErrorKind::ExternalCall(
-                            ExternalCallError::InvalidReturnType(other.to_string()),
+                        kind: SpecialAttributeErrorKind::ExternalCallFunction(
+                            ExternalCallFunctionError::InvalidReturnType(other.to_string()),
                         ),
                         line_of_code: path_entry.name.loc,
                     });
@@ -21,8 +21,8 @@ fn check_return_value(function: &Function) -> Option<SpecialAttributeError> {
             },
             NameAccessChain_::Path(path_entry) => {
                 return Some(SpecialAttributeError {
-                    kind: SpecialAttributeErrorKind::ExternalCall(
-                        ExternalCallError::InvalidReturnType(path_entry.to_string()),
+                    kind: SpecialAttributeErrorKind::ExternalCallFunction(
+                        ExternalCallFunctionError::InvalidReturnType(path_entry.to_string()),
                     ),
                     line_of_code: spanned.loc,
                 });
@@ -30,8 +30,8 @@ fn check_return_value(function: &Function) -> Option<SpecialAttributeError> {
         },
         other => {
             return Some(SpecialAttributeError {
-                kind: SpecialAttributeErrorKind::ExternalCall(
-                    ExternalCallError::InvalidReturnType(other.to_string()),
+                kind: SpecialAttributeErrorKind::ExternalCallFunction(
+                    ExternalCallFunctionError::InvalidReturnType(other.to_string()),
                 ),
                 line_of_code: function.signature.return_type.loc,
             });
@@ -53,7 +53,9 @@ pub(crate) fn validate_external_call_function(
 
     if !body_is_native(function) {
         errors.push(SpecialAttributeError {
-            kind: SpecialAttributeErrorKind::ExternalCall(ExternalCallError::FunctionIsNotNative),
+            kind: SpecialAttributeErrorKind::ExternalCallFunction(
+                ExternalCallFunctionError::FunctionIsNotNative,
+            ),
             line_of_code: function.loc,
         })
     }

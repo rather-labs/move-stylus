@@ -5,13 +5,19 @@ use move_ir_types::location::Loc;
 
 use crate::{
     event::EventParseError,
-    external_call::{error::ExternalCallError, external_struct::ExternalStructError},
+    external_call::{
+        error::{ExternalCallFunctionError, ExternalCallStructError},
+        external_struct::ExternalStructError,
+    },
 };
 
 #[derive(thiserror::Error, Debug)]
 pub enum SpecialAttributeErrorKind {
     #[error("External call error: {0}")]
-    ExternalCall(#[from] ExternalCallError),
+    ExternalCallFunction(#[from] ExternalCallFunctionError),
+
+    #[error("External call struct error: {0}")]
+    ExternalCallStruct(#[from] ExternalCallStructError),
 
     #[error("Event error: {0}")]
     Event(#[from] EventParseError),
