@@ -926,6 +926,18 @@ mod cross_contract_calls_result {
         function ccCall2WithGasDelegate(address contract_address, uint64 gas) external returns (Foo);
         function ccCall3WithGasDelegate(address contract_address, uint64 gas) external returns (Bar);
         function ccCall4WithGasDelegate(address contract_address, uint64 gas) external returns (uint8[]);
+        function ccCall1WithGasPayable(address contract_address, uint64 gas, uint256 value) external returns (uint64);
+        function ccCall2WithGasPayable(address contract_address, uint64 gas, uint256 value) external returns (Foo);
+        function ccCall3WithGasPayable(address contract_address, uint64 gas, uint256 value) external returns (Bar);
+        function ccCall4WithGasPayable(address contract_address, uint64 gas, uint256 value) external returns (uint8[]);
+        function ccCall1Payable(address contract_address, uint256 value) external returns (uint64);
+        function ccCall2Payable(address contract_address, uint256 value) external returns (Foo);
+        function ccCall3Payable(address contract_address, uint256 value) external returns (Bar);
+        function ccCall4Payable(address contract_address, uint256 value) external returns (uint8[]);
+        function ccCall1Delegate(address contract_address) external returns (uint64);
+        function ccCall2Delegate(address contract_address) external returns (Foo);
+        function ccCall3Delegate(address contract_address) external returns (Bar);
+        function ccCall4Delegate(address contract_address) external returns (uint8[]);
 
         // The following functions are used to obtain their calldata and compare them
         function callView1() external;
@@ -944,6 +956,10 @@ mod cross_contract_calls_result {
         function call2() external;
         function call3() external;
         function call4() external;
+        function call1Payable() external;
+        function call2Payable() external;
+        function call3Payable() external;
+        function call4Payable() external;
     );
 
     const ADDRESS: alloy_primitives::Address =
@@ -1132,6 +1148,42 @@ mod cross_contract_calls_result {
         vec![3, 1, 4, 1, 5].abi_encode(),
     )]
     #[case(
+        ccCall1DelegateCall::new((ADDRESS,)),
+        call1Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        u64::MAX,
+        42_u64.abi_encode(),
+    )]
+    #[case(
+        ccCall2DelegateCall::new((ADDRESS,)),
+        call2Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        u64::MAX,
+        get_foo().abi_encode(),
+    )]
+    #[case(
+        ccCall3DelegateCall::new((ADDRESS,)),
+        call3Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        u64::MAX,
+        get_bar().abi_encode(),
+    )]
+    #[case(
+        ccCall4DelegateCall::new((ADDRESS,)),
+        call4Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        u64::MAX,
+        vec![3, 1, 4, 1, 5].abi_encode(),
+    )]
+    #[case(
         ccCall1WithGasCall::new((ADDRESS, 1)),
         call1Call::new(()).abi_encode(),
         true,
@@ -1201,6 +1253,78 @@ mod cross_contract_calls_result {
         CrossContractCallType::DelegateCall,
         U256::from(0),
         4,
+        vec![3, 1, 4, 1, 5].abi_encode(),
+    )]
+    #[case(
+        ccCall1WithGasPayableCall::new((ADDRESS, 1, U256::from(u16::MAX))),
+        call1PayableCall::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u16::MAX),
+        1,
+        42_u64.abi_encode(),
+    )]
+    #[case(
+        ccCall2WithGasPayableCall::new((ADDRESS, 2, U256::from(u32::MAX))),
+        call2PayableCall::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u32::MAX),
+        2,
+        get_foo().abi_encode(),
+    )]
+    #[case(
+        ccCall3WithGasPayableCall::new((ADDRESS, 3, U256::from(u64::MAX))),
+        call3PayableCall::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u64::MAX),
+        3,
+        get_bar().abi_encode(),
+    )]
+    #[case(
+        ccCall4WithGasPayableCall::new((ADDRESS, 4, U256::from(u128::MAX))),
+        call4PayableCall::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u128::MAX),
+        4,
+        vec![3, 1, 4, 1, 5].abi_encode(),
+    )]
+    #[case(
+        ccCall1PayableCall::new((ADDRESS, U256::from(u16::MAX))),
+        call1PayableCall::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u16::MAX),
+        u64::MAX,
+        42_u64.abi_encode(),
+    )]
+    #[case(
+        ccCall2PayableCall::new((ADDRESS, U256::from(u32::MAX))),
+        call2PayableCall::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u32::MAX),
+        u64::MAX,
+        get_foo().abi_encode(),
+    )]
+    #[case(
+        ccCall3PayableCall::new((ADDRESS, U256::from(u64::MAX))),
+        call3PayableCall::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u64::MAX),
+        u64::MAX,
+        get_bar().abi_encode(),
+    )]
+    #[case(
+        ccCall4PayableCall::new((ADDRESS, U256::from(u128::MAX))),
+        call4PayableCall::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u128::MAX),
+        u64::MAX,
         vec![3, 1, 4, 1, 5].abi_encode(),
     )]
     fn test_cross_contract_call_with_result_calls<T: SolCall>(

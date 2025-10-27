@@ -95,6 +95,43 @@ entry fun cc_call_4(contract_address: address): vector<u8> {
 
 // ==============================================
 // Common cross contract calls with result
+// delegate
+// ==============================================
+
+entry fun cc_call_1_delegate(contract_address: address): u64 {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+           .delegate()
+    );
+    cross_call.call_1().get_result()
+}
+
+entry fun cc_call_2_delegate(contract_address: address): Foo {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+           .delegate()
+    );
+    cross_call.call_2().get_result()
+}
+
+entry fun cc_call_3_delegate(contract_address: address): Bar {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+           .delegate()
+    );
+    cross_call.call_3().get_result()
+}
+
+entry fun cc_call_4_delegate(contract_address: address): vector<u8> {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+           .delegate()
+    );
+    cross_call.call_4().get_result()
+}
+
+// ==============================================
+// Common cross contract calls with result
 // with gas
 // ==============================================
 
@@ -128,6 +165,85 @@ entry fun cc_call_4_with_gas(contract_address: address, gas: u64): vector<u8> {
             .gas(gas)
     );
     cross_call.call_4().get_result()
+}
+
+// ==============================================
+// Common cross contract calls with result
+// with gas
+// payable
+// ==============================================
+
+entry fun cc_call_1_with_gas_payable(contract_address: address, gas: u64, value: u256): u64 {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .gas(gas)
+            .value(value)
+    );
+    cross_call.call_1_payable().get_result()
+}
+
+entry fun cc_call_2_with_gas_payable(contract_address: address, gas: u64, value: u256): Foo {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .gas(gas)
+            .value(value)
+    );
+    cross_call.call_2_payable().get_result()
+}
+
+entry fun cc_call_3_with_gas_payable(contract_address: address, gas: u64, value: u256): Bar {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .gas(gas)
+            .value(value)
+    );
+    cross_call.call_3_payable().get_result()
+}
+
+entry fun cc_call_4_with_gas_payable(contract_address: address, gas: u64, value: u256): vector<u8> {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .gas(gas)
+            .value(value)
+    );
+    cross_call.call_4_payable().get_result()
+}
+
+// ==============================================
+// Common cross contract calls with result
+// payable
+// ==============================================
+
+entry fun cc_call_1_payable(contract_address: address, value: u256): u64 {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .value(value)
+    );
+    cross_call.call_1_payable().get_result()
+}
+
+entry fun cc_call_2_payable(contract_address: address, value: u256): Foo {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .value(value)
+    );
+    cross_call.call_2_payable().get_result()
+}
+
+entry fun cc_call_3_payable(contract_address: address, value: u256): Bar {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .value(value)
+    );
+    cross_call.call_3_payable().get_result()
+}
+
+entry fun cc_call_4_payable(contract_address: address, value: u256): vector<u8> {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .value(value)
+    );
+    cross_call.call_4_payable().get_result()
 }
 
 // ==============================================
