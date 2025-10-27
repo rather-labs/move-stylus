@@ -3,7 +3,6 @@
 
 use error::ExternalCallError;
 use move_compiler::parser::ast::{Function, FunctionBody_, NameAccessChain_, Type_};
-use payable::check_payable_value_argument;
 
 use crate::{
     SpecialAttributeError, error::SpecialAttributeErrorKind, function_modifiers::FunctionModifier,
@@ -11,7 +10,6 @@ use crate::{
 
 pub mod error;
 pub mod external_struct;
-mod payable;
 
 fn check_return_value(function: &Function) -> Option<SpecialAttributeError> {
     match &function.signature.return_type.value {
@@ -55,7 +53,7 @@ fn body_is_native(function: &Function) -> bool {
 
 pub(crate) fn validate_external_call_function(
     function: &Function,
-    modifiers: &[FunctionModifier],
+    _modifiers: &[FunctionModifier],
 ) -> Result<(), Vec<SpecialAttributeError>> {
     let mut errors = Vec::new();
 
@@ -66,11 +64,7 @@ pub(crate) fn validate_external_call_function(
         })
     }
 
-    if modifiers.contains(&FunctionModifier::Payable) {
-        if let Some(e) = check_payable_value_argument(function, modifiers) {
-            errors.push(e);
-        }
-    }
+    // TODO: Check for invalid modifiers
 
     if let Some(e) = check_return_value(function) {
         errors.push(e);

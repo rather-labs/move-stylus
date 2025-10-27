@@ -3,10 +3,10 @@ pub mod constants;
 
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex, mpsc},
+    sync::{Arc, Mutex, atomic::AtomicBool, mpsc},
 };
 
-use alloy_primitives::{FixedBytes, keccak256};
+use alloy_primitives::{FixedBytes, U256, keccak256};
 use anyhow::Result;
 use constants::{
     BLOCK_BASEFEE, BLOCK_GAS_LIMIT, BLOCK_NUMBER, BLOCK_TIMESTAMP, CHAIN_ID, GAS_PRICE,
@@ -28,15 +28,19 @@ pub struct ExecutionData {
 }
 
 type LogEventReceiver = Arc<Mutex<mpsc::Receiver<(u32, Vec<u8>)>>>;
+type CrossCrontractExecutionReceiver = Arc<Mutex<mpsc::Receiver<CrossContractExecutionData>>>;
 
 pub struct RuntimeSandbox {
     engine: Engine,
     linker: Linker<ModuleData>,
     module: WasmModule,
     pub log_events: LogEventReceiver,
+    pub cross_contract_calls: CrossCrontractExecutionReceiver,
     current_tx_origin: Arc<Mutex<[u8; 20]>>,
     current_msg_sender: Arc<Mutex<[u8; 20]>>,
     storage: Arc<Mutex<HashMap<[u8; 32], [u8; 32]>>>,
+    cross_contract_call_return_data: Arc<Mutex<Vec<u8>>>,
+    cross_contract_call_succeed: Arc<AtomicBool>,
 }
 
 macro_rules! link_fn_ret_constant {
@@ -73,6 +77,22 @@ macro_rules! link_fn_write_constant {
     () => {};
 }
 
+#[derive(PartialEq, Eq, Debug)]
+pub enum CrossContractCallType {
+    Call,
+    StaticCall,
+    DelegateCall,
+}
+
+pub struct CrossContractExecutionData {
+    pub calldata: Vec<u8>,
+    pub address: [u8; 20],
+    pub gas: u64,
+    pub value: U256,
+    pub return_datan_len: u32,
+    pub call_type: CrossContractCallType,
+}
+
 impl RuntimeSandbox {
     pub fn new(module: &mut Module) -> Self {
         let engine = Engine::default();
@@ -82,8 +102,12 @@ impl RuntimeSandbox {
         let storage: Arc<Mutex<HashMap<[u8; 32], [u8; 32]>>> = Arc::new(Mutex::new(HashMap::new()));
         let current_tx_origin = Arc::new(Mutex::new(SIGNER_ADDRESS));
         let current_msg_sender = Arc::new(Mutex::new(MSG_SENDER_ADDRESS));
+        let cross_contract_call_return_data = Arc::new(Mutex::new(vec![]));
+        let cross_contract_call_succeed = Arc::new(AtomicBool::new(true));
 
         let (log_sender, log_receiver) = mpsc::channel::<(u32, Vec<u8>)>();
+        let (cce_sender, cce_receiver) = mpsc::channel::<CrossContractExecutionData>();
+
         let mut linker = Linker::new(&engine);
 
         let mem_export = module.get_export_index("memory").unwrap();
@@ -94,11 +118,12 @@ impl RuntimeSandbox {
             _ => panic!("failed to find host memory"),
         };
 
+        let cccrd = cross_contract_call_return_data.clone();
         linker
             .func_wrap(
                 "vm_hooks",
                 "read_return_data",
-                move |mut _caller: Caller<'_, ModuleData>,
+                move |mut caller: Caller<'_, ModuleData>,
                       dest_ptr: u32,
                       offset_ptr: u32,
                       size: u32| {
@@ -107,16 +132,33 @@ impl RuntimeSandbox {
                         dest_ptr, offset_ptr, size
                     );
 
+                    let mem = get_memory(&mut caller);
+
+                    let mut offset = [0; 4];
+                    mem.read(&caller, dest_ptr as usize, &mut offset).unwrap();
+                    let offset = u32::from_le_bytes(offset);
+
+                    let data = cccrd.lock().unwrap();
+                    mem.write(
+                        &mut caller,
+                        dest_ptr as usize + offset as usize,
+                        data.as_slice(),
+                    )
+                    .unwrap();
+
                     Ok(1)
                 },
             )
             .unwrap();
 
+        let cccrd = cross_contract_call_return_data.clone();
+        let cccs = cross_contract_call_succeed.clone();
+        let cces = cce_sender.clone();
         linker
             .func_wrap(
                 "vm_hooks",
                 "delegate_call_contract",
-                move |mut _caller: Caller<'_, ModuleData>,
+                move |mut caller: Caller<'_, ModuleData>,
                       address_ptr: u32,
                       calldata_ptr: u32,
                       calldata_len_ptr: u32,
@@ -127,16 +169,43 @@ impl RuntimeSandbox {
                               address_ptr, calldata_ptr, calldata_len_ptr, gas, return_data_len_ptr
                           );
 
-                    Ok(0)
+                        if cccs.load(std::sync::atomic::Ordering::Relaxed) {
+                            let mem = get_memory(&mut caller);
+
+                            let mut address = [0; 20];
+                            mem.read(&caller, address_ptr as usize, &mut address).unwrap();
+
+                            let mut calldata = vec![0; calldata_len_ptr as usize];
+                            mem.read(&caller, calldata_ptr as usize, &mut calldata).unwrap();
+
+                            let cross_contract_call_return_data_len  = cccrd.lock().unwrap().len().to_be_bytes();
+                            mem.write(&mut caller, return_data_len_ptr as usize, &cross_contract_call_return_data_len).unwrap();
+
+                              cces.send(CrossContractExecutionData {
+                                  calldata,
+                                  address,
+                                  gas,
+                                  value: U256::from(0),
+                                  return_datan_len: return_data_len_ptr,
+                                  call_type: CrossContractCallType::DelegateCall,
+                              }).unwrap();
+
+                            Ok(0)
+                        } else {
+                            Ok(1)
+                        }
                 },
             )
             .unwrap();
 
+        let cccrd = cross_contract_call_return_data.clone();
+        let cccs = cross_contract_call_succeed.clone();
+        let cces = cce_sender.clone();
         linker
             .func_wrap(
                 "vm_hooks",
                 "static_call_contract",
-                move |mut _caller: Caller<'_, ModuleData>,
+                move |mut caller: Caller<'_, ModuleData>,
                       address_ptr: u32,
                       calldata_ptr: u32,
                       calldata_len_ptr: u32,
@@ -146,17 +215,44 @@ impl RuntimeSandbox {
                               "delegate_call_contract called with address_ptr: {}, calldata_ptr: {}, calldata_len_ptr: {}, gas: {}, return_data_len_ptr: {}",
                               address_ptr, calldata_ptr, calldata_len_ptr, gas, return_data_len_ptr
                           );
+                    if cccs.load(std::sync::atomic::Ordering::Relaxed) {
+                            let mem = get_memory(&mut caller);
 
-                    Ok(0)
+                            let mut address = [0; 20];
+                            mem.read(&caller, address_ptr as usize, &mut address).unwrap();
+
+                            let mut calldata = vec![0; calldata_len_ptr as usize];
+                            mem.read(&caller, calldata_ptr as usize, &mut calldata).unwrap();
+
+                            let cross_contract_call_return_data_len  = cccrd.lock().unwrap().len().to_be_bytes();
+                            mem.write(&mut caller, return_data_len_ptr as usize, &cross_contract_call_return_data_len).unwrap();
+
+                              cces.send(CrossContractExecutionData {
+                                  calldata,
+                                  address,
+                                  gas,
+                                  value: U256::from(0),
+                                  return_datan_len: return_data_len_ptr,
+                                  call_type: CrossContractCallType::StaticCall,
+                              }).unwrap();
+
+                            Ok(0)
+                        } else {
+                            Ok(1)
+                        }
+
                 },
             )
             .unwrap();
 
+        let cccrd = cross_contract_call_return_data.clone();
+        let cccs = cross_contract_call_succeed.clone();
+        let cces = cce_sender.clone();
         linker
             .func_wrap(
                 "vm_hooks",
                 "call_contract",
-                move |mut _caller: Caller<'_, ModuleData>,
+                move |mut caller: Caller<'_, ModuleData>,
                       address_ptr: u32,
                       calldata_ptr: u32,
                       calldata_len_ptr: u32,
@@ -167,8 +263,37 @@ impl RuntimeSandbox {
                                 "call_contract called with address_ptr: {}, calldata_ptr: {}, calldata_len_ptr: {}, value_ptr: {}, gas: {}, return_data_len_ptr: {}",
                                 address_ptr, calldata_ptr, calldata_len_ptr, value_ptr, gas, return_data_len_ptr
                             );
+if cccs.load(std::sync::atomic::Ordering::Relaxed) {
+                            let mem = get_memory(&mut caller);
 
-                    Ok(0)
+                            let mut address = [0; 20];
+                            mem.read(&caller, address_ptr as usize, &mut address).unwrap();
+
+                            let mut calldata = vec![0; calldata_len_ptr as usize];
+                            mem.read(&caller, calldata_ptr as usize, &mut calldata).unwrap();
+
+                            let mut value = [0; 32];
+                            mem.read(&caller, value_ptr as usize, &mut value).unwrap();
+                            let value = U256::from_be_bytes(value);
+
+                            let cross_contract_call_return_data_len  = cccrd.lock().unwrap().len().to_be_bytes();
+                            mem.write(&mut caller, return_data_len_ptr as usize, &cross_contract_call_return_data_len).unwrap();
+
+                              cces.send(CrossContractExecutionData {
+                                  calldata,
+                                  address,
+                                  gas,
+                                  value,
+                                  return_datan_len: return_data_len_ptr,
+                                  call_type: CrossContractCallType::Call,
+                              }).unwrap();
+
+                            Ok(0)
+                        } else {
+                            Ok(1)
+                        }
+
+
                 },
             )
             .unwrap();
@@ -440,9 +565,12 @@ impl RuntimeSandbox {
             linker,
             module,
             log_events: Arc::new(Mutex::new(log_receiver)),
+            cross_contract_calls: Arc::new(Mutex::new(cce_receiver)),
             current_tx_origin,
             current_msg_sender,
             storage,
+            cross_contract_call_return_data,
+            cross_contract_call_succeed,
         }
     }
 
@@ -538,6 +666,11 @@ impl RuntimeSandbox {
 
     pub fn get_storage(&self) -> HashMap<[u8; 32], [u8; 32]> {
         self.storage.lock().unwrap().clone()
+    }
+
+    pub fn set_cross_contract_call_success(&self, success: bool) {
+        self.cross_contract_call_succeed
+            .store(success, std::sync::atomic::Ordering::Relaxed);
     }
 
     pub fn print_storage(&self) {
