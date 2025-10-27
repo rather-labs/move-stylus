@@ -66,6 +66,7 @@ pub fn add_external_contract_call_fn(
         .first()
         .unwrap_or_else(|| panic!("contract call function has no arguments"));
 
+    let (print_i32, _, print_m, _, _, _) = crate::declare_host_debug_functions!(module);
     // Locals
     let address_ptr = module.locals.add(ValType::I32);
     let is_delegate_call = module.locals.add(ValType::I32);
@@ -399,7 +400,6 @@ pub fn add_external_contract_call_fn(
 
             let return_data_abi_encoded_ptr = module.locals.add(ValType::I32);
 
-            // Return data len is in big endian, we read it and change endianess
             block
                 .local_get(return_data_len)
                 .load(
@@ -422,6 +422,9 @@ pub fn add_external_contract_call_fn(
                 .local_get(return_data_len)
                 .call(read_return_data)
                 .local_set(return_data_len);
+
+            block.local_get(return_data_len).call(print_i32);
+            block.local_get(return_data_abi_encoded_ptr).call(print_m);
 
             assert_eq!(
                 1,
@@ -466,18 +469,19 @@ pub fn add_external_contract_call_fn(
                     // for the struct field, otherwise it is already a pointer, we write it directly
                     let data_ptr = if result_type.is_stack_type() {
                         let call_result_value_ptr = module.locals.add(ValType::I32);
+                        let (store_kind, store_len) = if result_type == &IntermediateType::IU64 {
+                            (StoreKind::I64 { atomic: false }, 8)
+                        } else {
+                            (StoreKind::I32 { atomic: false }, 4)
+                        };
                         block
-                            .i32_const(4)
+                            .i32_const(store_len)
                             .call(compilation_ctx.allocator)
                             .local_tee(call_result_value_ptr)
                             .local_get(abi_decoded_call_result)
                             .store(
                                 compilation_ctx.memory_id,
-                                if result_type == &IntermediateType::IU64 {
-                                    StoreKind::I64 { atomic: false }
-                                } else {
-                                    StoreKind::I32 { atomic: false }
-                                },
+                                store_kind,
                                 MemArg {
                                     align: 0,
                                     offset: 0,
@@ -508,6 +512,38 @@ pub fn add_external_contract_call_fn(
 
     // After the call we read the data
     builder.local_get(call_result);
+    builder.local_get(call_result).call(print_m);
+    builder
+        .local_get(call_result)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .call(print_i32);
+
+    builder
+        .local_get(call_result)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 4,
+            },
+        )
+        .call(print_m);
 
     function.finish(function_args, &mut module.funcs)
 }

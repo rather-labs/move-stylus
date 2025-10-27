@@ -842,3 +842,149 @@ mod cross_contract_calls {
         }
     }
 }
+
+mod cross_contract_calls_result {
+    #![allow(clippy::too_many_arguments)]
+    use alloy_primitives::{Address, U256, address};
+
+    use crate::common::{
+        runtime_sandbox::CrossContractCallType, translate_test_complete_package_with_framework,
+    };
+
+    use super::*;
+
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "cross_contract_calls_result";
+        const SOURCE_PATH: &str = "tests/framework";
+
+        let mut translated_packages = translate_test_complete_package_with_framework(SOURCE_PATH);
+        let translated_package = translated_packages.get_mut(MODULE_NAME).unwrap();
+        RuntimeSandbox::new(translated_package)
+    }
+
+    sol!(
+        #[allow(missing_docs)]
+        struct Baz {
+            uint16 a;
+            uint128 b;
+        }
+
+        struct Foo {
+            address q;
+            bool t;
+            uint8 u;
+            uint16 v;
+            uint32 w;
+            uint64 x;
+            uint128 y;
+            uint256 z;
+            Baz baz;
+        }
+
+        struct Bazz {
+            uint16 a;
+            uint256[] b;
+        }
+
+        struct Bar {
+            address q;
+            uint32[] r;
+            uint128[] s;
+            bool t;
+            uint8 u;
+            uint16 v;
+            uint32 w;
+            uint64 x;
+            uint128 y;
+            uint256 z;
+            Bazz bazz;
+            Baz baz;
+        }
+
+        function ccCallRes1(address contract_address) external returns (uint64);
+
+        // The following functions are used to obtain their calldata and compare them
+        function callView1() external;
+    );
+
+    const ADDRESS: alloy_primitives::Address =
+        address!("0xbeefbeef00000000000000000000000000007357");
+
+    fn get_foo() -> Foo {
+        Foo {
+            q: address!("0xcafe000000000000000000000000000000007357"),
+            t: true,
+            u: 255,
+            v: u16::MAX,
+            w: u32::MAX,
+            x: u64::MAX,
+            y: u128::MAX,
+            z: U256::MAX,
+            baz: Baz { a: 42, b: 4242 },
+        }
+    }
+
+    fn get_bar() -> Bar {
+        Bar {
+            q: address!("0xcafe000000000000000000000000000000007357"),
+            r: vec![1, 2, u32::MAX],
+            s: vec![1, 2, u128::MAX],
+            t: true,
+            u: 255,
+            v: u16::MAX,
+            w: u32::MAX,
+            x: u64::MAX,
+            y: u128::MAX,
+            z: U256::MAX,
+            bazz: Bazz {
+                a: 42,
+                b: vec![U256::MAX, U256::from(8), U256::from(7), U256::from(6)],
+            },
+            baz: Baz {
+                a: 111,
+                b: 1111111111,
+            },
+        }
+    }
+
+    #[rstest]
+    #[case(
+        ccCallRes1Call::new((ADDRESS,)),
+        callView1Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::StaticCall,
+        U256::from(0),
+        u64::MAX,
+        42_u64.abi_encode(),
+    )]
+    fn test_cross_contract_call_with_result_calls<T: SolCall>(
+        runtime: RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_cross_contract_calldata: Vec<u8>,
+        #[case] success: bool,
+        #[case] expected_call_type: CrossContractCallType,
+        #[case] expected_payable_value: U256,
+        #[case] expected_gas: u64,
+        #[case] expected_result: Vec<u8>,
+    ) {
+        runtime.set_cross_contract_call_success(success);
+        runtime.set_cross_contract_return_data(expected_result.clone());
+
+        let (result, return_data) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
+        assert_eq!(0, result);
+
+        if success {
+            assert_eq!(return_data, expected_result);
+
+            let result = runtime.cross_contract_calls.lock().unwrap().recv().unwrap();
+            assert_eq!(expected_call_type, result.call_type);
+            assert_eq!(ADDRESS, Address::from(result.address));
+            assert_eq!(expected_gas, result.gas);
+            assert_eq!(expected_cross_contract_calldata, result.calldata);
+            assert_eq!(expected_payable_value, result.value);
+        } else {
+            assert_eq!(false.abi_encode(), return_data);
+        }
+    }
+}
