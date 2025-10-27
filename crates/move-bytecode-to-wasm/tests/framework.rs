@@ -938,6 +938,10 @@ mod cross_contract_calls_result {
         function ccCall2Delegate(address contract_address) external returns (Foo);
         function ccCall3Delegate(address contract_address) external returns (Bar);
         function ccCall4Delegate(address contract_address) external returns (uint8[]);
+        function ccCall1WithArgs(address contract_address, uint64) external returns (uint64);
+        function ccCall2WithArgs(address contract_address, uint256 value, uint64, Foo) external returns (Foo);
+        function ccCall3WithArgs(address contract_address, uint64 gas, uint64, Foo, Bar) external returns (Bar);
+        function ccCall4WithArgs(address contract_address, uint64, Foo, Bar, uint8[]) external returns (uint8[]);
 
         // The following functions are used to obtain their calldata and compare them
         function callView1() external;
@@ -960,6 +964,10 @@ mod cross_contract_calls_result {
         function call2Payable() external;
         function call3Payable() external;
         function call4Payable() external;
+        function call1WithArgs(uint64) external;
+        function call2WithArgs(uint64,Foo) external;
+        function call3WithArgs(uint64,Foo,Bar) external;
+        function call4WithArgs(uint64,Foo,Bar,uint8[]) external;
     );
 
     const ADDRESS: alloy_primitives::Address =
@@ -1324,6 +1332,42 @@ mod cross_contract_calls_result {
         true,
         CrossContractCallType::Call,
         U256::from(u128::MAX),
+        u64::MAX,
+        vec![3, 1, 4, 1, 5].abi_encode(),
+    )]
+    #[case(
+        ccCall1WithArgsCall::new((ADDRESS, 84)),
+        call1WithArgsCall::new((84,)).abi_encode(),
+        true,
+        CrossContractCallType::StaticCall,
+        U256::from(0),
+        u64::MAX,
+        42_u64.abi_encode(),
+    )]
+    #[case(
+        ccCall2WithArgsCall::new((ADDRESS, U256::from(u32::MAX), 84, get_foo())),
+        call2WithArgsCall::new((84, get_foo())).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(u32::MAX),
+        u64::MAX,
+        get_foo().abi_encode(),
+    )]
+    #[case(
+        ccCall3WithArgsCall::new((ADDRESS, 3, 84, get_foo(), get_bar())),
+        call3WithArgsCall::new((84, get_foo(), get_bar())).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(0),
+        3,
+        get_bar().abi_encode(),
+    )]
+    #[case(
+        ccCall4WithArgsCall::new((ADDRESS, 84, get_foo(), get_bar(), vec![1, 2, 3, 4, 5])),
+        call4WithArgsCall::new((84, get_foo(), get_bar(), vec![1, 2, 3, 4, 5])).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
         u64::MAX,
         vec![3, 1, 4, 1, 5].abi_encode(),
     )]

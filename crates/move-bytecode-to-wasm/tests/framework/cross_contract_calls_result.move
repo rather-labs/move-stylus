@@ -287,3 +287,37 @@ entry fun cc_call_4_with_gas_delegate(contract_address: address, gas: u64): vect
     );
     cross_call.call_4().get_result()
 }
+
+// ==============================================
+// Common cross contract calls with result
+// mixed modifications
+// ==============================================
+
+entry fun cc_call_1_with_args(contract_address: address, arg1: u64): u64 {
+    let cross_call = cci::new(contract_calls::new(contract_address));
+    cross_call.call_1_with_args(arg1).get_result()
+}
+
+entry fun cc_call_2_with_args(contract_address: address, value: u256, arg1: u64, arg2: Foo): Foo {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .value(value)
+    );
+    cross_call.call_2_with_args(arg1, arg2).get_result()
+}
+
+entry fun cc_call_3_with_args(contract_address: address, gas: u64, arg1: u64, arg2: Foo, arg3: Bar): Bar {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .gas(gas)
+    );
+    cross_call.call_3_with_args(arg1, arg2, arg3).get_result()
+}
+
+entry fun cc_call_4_with_args(contract_address: address, arg1: u64, arg2: Foo, arg3: Bar, arg4: vector<u8>): vector<u8> {
+    let cross_call = cci::new(
+        contract_calls::new(contract_address)
+            .delegate()
+    );
+    cross_call.call_4_with_args(arg1, arg2, arg3, arg4).get_result()
+}

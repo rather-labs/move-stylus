@@ -145,3 +145,15 @@ public native fun call_3_payable(self: &ExampleContract): ContractCallResult<Bar
 
 #[ext(external_call, payable)]
 public native fun call_4_payable(self: &ExampleContract): ContractCallResult<vector<u8>>;
+
+#[ext(external_call, view)]
+public native fun call_1_with_args(self: &ExampleContract, arg1: u64): ContractCallResult<u64>;
+
+#[ext(external_call, payable)]
+public native fun call_2_with_args(self: &ExampleContract, arg1: u64, arg2: Foo): ContractCallResult<Foo>;
+
+#[ext(external_call)]
+public native fun call_3_with_args(self: &ExampleContract, arg1: u64, arg2: Foo, arg3: Bar): ContractCallResult<Bar>;
+
+#[ext(external_call)]
+public native fun call_4_with_args(self: &ExampleContract, arg1: u64, arg2: Foo, arg3: Bar, arg4: vector<u8>): ContractCallResult<vector<u8>>;
