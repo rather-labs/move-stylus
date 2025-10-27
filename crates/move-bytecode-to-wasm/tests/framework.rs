@@ -914,6 +914,18 @@ mod cross_contract_calls_result {
         function ccCallViewPureRes2(address contract_address) external returns (Foo);
         function ccCallViewPureRes3(address contract_address) external returns (Bar);
         function ccCallViewPureRes4(address contract_address) external returns (uint8[]);
+        function ccCall1(address contract_address) external returns (uint64);
+        function ccCall2(address contract_address) external returns (Foo);
+        function ccCall3(address contract_address) external returns (Bar);
+        function ccCall4(address contract_address) external returns (uint8[]);
+        function ccCall1WithGas(address contract_address, uint64 gas) external returns (uint64);
+        function ccCall2WithGas(address contract_address, uint64 gas) external returns (Foo);
+        function ccCall3WithGas(address contract_address, uint64 gas) external returns (Bar);
+        function ccCall4WithGas(address contract_address, uint64 gas) external returns (uint8[]);
+        function ccCall1WithGasDelegate(address contract_address, uint64 gas) external returns (uint64);
+        function ccCall2WithGasDelegate(address contract_address, uint64 gas) external returns (Foo);
+        function ccCall3WithGasDelegate(address contract_address, uint64 gas) external returns (Bar);
+        function ccCall4WithGasDelegate(address contract_address, uint64 gas) external returns (uint8[]);
 
         // The following functions are used to obtain their calldata and compare them
         function callView1() external;
@@ -928,6 +940,10 @@ mod cross_contract_calls_result {
         function callViewPure2() external;
         function callViewPure3() external;
         function callViewPure4() external;
+        function call1() external;
+        function call2() external;
+        function call3() external;
+        function call4() external;
     );
 
     const ADDRESS: alloy_primitives::Address =
@@ -1077,6 +1093,114 @@ mod cross_contract_calls_result {
         CrossContractCallType::StaticCall,
         U256::from(0),
         u64::MAX,
+        vec![3, 1, 4, 1, 5].abi_encode(),
+    )]
+    #[case(
+        ccCall1Call::new((ADDRESS,)),
+        call1Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(0),
+        u64::MAX,
+        42_u64.abi_encode(),
+    )]
+    #[case(
+        ccCall2Call::new((ADDRESS,)),
+        call2Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(0),
+        u64::MAX,
+        get_foo().abi_encode(),
+    )]
+    #[case(
+        ccCall3Call::new((ADDRESS,)),
+        call3Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(0),
+        u64::MAX,
+        get_bar().abi_encode(),
+    )]
+    #[case(
+        ccCall4Call::new((ADDRESS,)),
+        call4Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(0),
+        u64::MAX,
+        vec![3, 1, 4, 1, 5].abi_encode(),
+    )]
+    #[case(
+        ccCall1WithGasCall::new((ADDRESS, 1)),
+        call1Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(0),
+        1,
+        42_u64.abi_encode(),
+    )]
+    #[case(
+        ccCall2WithGasCall::new((ADDRESS, 2)),
+        call2Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(0),
+        2,
+        get_foo().abi_encode(),
+    )]
+    #[case(
+        ccCall3WithGasCall::new((ADDRESS, 3)),
+        call3Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(0),
+        3,
+        get_bar().abi_encode(),
+    )]
+    #[case(
+        ccCall4WithGasCall::new((ADDRESS, 4)),
+        call4Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::Call,
+        U256::from(0),
+        4,
+        vec![3, 1, 4, 1, 5].abi_encode(),
+    )]
+    #[case(
+        ccCall1WithGasDelegateCall::new((ADDRESS, 1)),
+        call1Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        1,
+        42_u64.abi_encode(),
+    )]
+    #[case(
+        ccCall2WithGasDelegateCall::new((ADDRESS, 2)),
+        call2Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        2,
+        get_foo().abi_encode(),
+    )]
+    #[case(
+        ccCall3WithGasDelegateCall::new((ADDRESS, 3)),
+        call3Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        3,
+        get_bar().abi_encode(),
+    )]
+    #[case(
+        ccCall4WithGasDelegateCall::new((ADDRESS, 4)),
+        call4Call::new(()).abi_encode(),
+        true,
+        CrossContractCallType::DelegateCall,
+        U256::from(0),
+        4,
         vec![3, 1, 4, 1, 5].abi_encode(),
     )]
     fn test_cross_contract_call_with_result_calls<T: SolCall>(

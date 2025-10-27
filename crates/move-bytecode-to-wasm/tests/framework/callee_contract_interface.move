@@ -121,3 +121,15 @@ public native fun call_view_pure_3(self: &ExampleContract): ContractCallResult<B
 
 #[ext(external_call, view, pure)]
 public native fun call_view_pure_4(self: &ExampleContract): ContractCallResult<vector<u8>>;
+
+#[ext(external_call)]
+public native fun call_1(self: &ExampleContract): ContractCallResult<u64>;
+
+#[ext(external_call)]
+public native fun call_2(self: &ExampleContract): ContractCallResult<Foo>;
+
+#[ext(external_call)]
+public native fun call_3(self: &ExampleContract): ContractCallResult<Bar>;
+
+#[ext(external_call)]
+public native fun call_4(self: &ExampleContract): ContractCallResult<vector<u8>>;
