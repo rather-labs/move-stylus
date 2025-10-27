@@ -139,7 +139,7 @@ impl RuntimeSandbox {
                     )
                     .unwrap();
 
-                    Ok(1)
+                    Ok(data.as_slice().len() as u32)
                 },
             )
             .unwrap();

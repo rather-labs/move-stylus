@@ -853,6 +853,9 @@ mod cross_contract_calls_result {
 
     use super::*;
 
+    const GET_RESULT_ERROR_CODE: &str = "101";
+    const DATA_ABORT_MESSAGE_PTR_OFFSET: usize = 256;
+
     #[fixture]
     fn runtime() -> RuntimeSandbox {
         const MODULE_NAME: &str = "cross_contract_calls_result";
@@ -1399,5 +1402,93 @@ mod cross_contract_calls_result {
         } else {
             assert_eq!(false.abi_encode(), return_data);
         }
+    }
+
+    #[rstest]
+    #[case(ccCallViewRes1Call::new((ADDRESS,)))]
+    #[case(ccCallViewRes2Call::new((ADDRESS,)))]
+    #[case(ccCallViewRes3Call::new((ADDRESS,)))]
+    #[case(ccCallViewRes4Call::new((ADDRESS,)))]
+    #[case(ccCallPureRes1Call::new((ADDRESS,)))]
+    #[case(ccCallPureRes2Call::new((ADDRESS,)))]
+    #[case(ccCallPureRes3Call::new((ADDRESS,)))]
+    #[case(ccCallPureRes4Call::new((ADDRESS,)))]
+    #[case(ccCallViewPureRes1Call::new((ADDRESS,)))]
+    #[case(ccCallViewPureRes2Call::new((ADDRESS,)))]
+    #[case(ccCallViewPureRes3Call::new((ADDRESS,)))]
+    #[case(ccCallViewPureRes4Call::new((ADDRESS,)))]
+    #[case(ccCall1Call::new((ADDRESS,)))]
+    #[case(ccCall2Call::new((ADDRESS,)))]
+    #[case(ccCall3Call::new((ADDRESS,)))]
+    #[case(ccCall4Call::new((ADDRESS,)))]
+    #[case(ccCall1DelegateCall::new((ADDRESS,)))]
+    #[case(ccCall2DelegateCall::new((ADDRESS,)))]
+    #[case(ccCall3DelegateCall::new((ADDRESS,)))]
+    #[case(ccCall4DelegateCall::new((ADDRESS,)))]
+    #[case(ccCall1WithGasCall::new((ADDRESS, 1)))]
+    #[case(ccCall2WithGasCall::new((ADDRESS, 2)))]
+    #[case(ccCall3WithGasCall::new((ADDRESS, 3)))]
+    #[case(ccCall4WithGasCall::new((ADDRESS, 4)))]
+    #[case(ccCall1WithGasDelegateCall::new((ADDRESS, 1)))]
+    #[case(ccCall2WithGasDelegateCall::new((ADDRESS, 2)))]
+    #[case(ccCall3WithGasDelegateCall::new((ADDRESS, 3)))]
+    #[case(ccCall4WithGasDelegateCall::new((ADDRESS, 4)))]
+    #[case(ccCall1WithGasPayableCall::new((ADDRESS, 1, U256::from(u16::MAX))))]
+    #[case(ccCall2WithGasPayableCall::new((ADDRESS, 2, U256::from(u32::MAX))))]
+    #[case(ccCall3WithGasPayableCall::new((ADDRESS, 3, U256::from(u64::MAX))))]
+    #[case(ccCall4WithGasPayableCall::new((ADDRESS, 4, U256::from(u128::MAX))))]
+    #[case(ccCall1PayableCall::new((ADDRESS, U256::from(u16::MAX))))]
+    #[case(ccCall2PayableCall::new((ADDRESS, U256::from(u32::MAX))))]
+    #[case(ccCall3PayableCall::new((ADDRESS, U256::from(u64::MAX))))]
+    #[case(ccCall4PayableCall::new((ADDRESS, U256::from(u128::MAX))))]
+    #[case(ccCall1WithArgsCall::new((ADDRESS, 84)))]
+    #[case(ccCall2WithArgsCall::new((ADDRESS, U256::from(u32::MAX), 84, get_foo())))]
+    #[case(ccCall3WithArgsCall::new((ADDRESS, 3, 84, get_foo(), get_bar())))]
+    #[case(ccCall4WithArgsCall::new((ADDRESS, 84, get_foo(), get_bar(), vec![1, 2, 3, 4, 5])))]
+    fn test_cross_contract_call_with_result_get_result_panic_if_fails<T: SolCall>(
+        runtime: RuntimeSandbox,
+        #[case] call_data: T,
+    ) {
+        use crate::common::runtime_sandbox::ExecutionData;
+
+        runtime.set_cross_contract_call_success(false);
+        let ExecutionData {
+            result: _,
+            return_data: _,
+            instance,
+            mut store,
+        } = runtime
+            .call_entrypoint_with_data(call_data.abi_encode())
+            .unwrap();
+
+        // Read where the encoded error is
+        let error_ptr = RuntimeSandbox::read_memory_from(
+            &instance,
+            &mut store,
+            DATA_ABORT_MESSAGE_PTR_OFFSET,
+            4,
+        )
+        .unwrap();
+        let error_ptr = u32::from_le_bytes(error_ptr.try_into().unwrap());
+
+        // Read the len
+        let error_len_ptr =
+            RuntimeSandbox::read_memory_from(&instance, &mut store, error_ptr as usize, 1).unwrap();
+        let error_len = usize::from(error_len_ptr[0]);
+
+        let error = String::abi_decode(
+            &RuntimeSandbox::read_memory_from(
+                &instance,
+                &mut store,
+                // raw error data (skip size -1 byte- and selector -4 bytes-)
+                error_ptr as usize + 5,
+                // Length minus selector
+                error_len - 4,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(GET_RESULT_ERROR_CODE, error);
     }
 }
