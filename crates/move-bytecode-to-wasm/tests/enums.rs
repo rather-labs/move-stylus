@@ -756,6 +756,7 @@ mod generic_enums {
     sol! {
         function packUnpackGenericEnumU64U32(uint8 variant_index, uint64 value64, uint32 value32) external returns (uint64, uint32);
         function packUnpackGenericEnumU128U16(uint8 variant_index, uint128 value128, uint16 value16) external returns (uint128, uint16);
+        function createWrappedGenericEnumU32(uint8 variant_index, uint32 value32) external returns (uint32);
     }
 
     #[rstest]
@@ -765,6 +766,9 @@ mod generic_enums {
     #[case(packUnpackGenericEnumU128U16Call::new((0u8, 42u128, 32u16)), (42u128, 32u16))]
     #[case(packUnpackGenericEnumU128U16Call::new((1u8, 8u128, 16u16)), (8u128, 16u16))]
     #[case(packUnpackGenericEnumU128U16Call::new((2u8, 0u128, 0u16)), (0u128, 0u16))]
+    #[case(createWrappedGenericEnumU32Call::new((0u8, 42u32)), 42u32)]
+    #[case(createWrappedGenericEnumU32Call::new((1u8, 8u32)), 24u32)]
+    #[case(createWrappedGenericEnumU32Call::new((2u8, 33u32)), 66u32)]
     fn test_generic_enums<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

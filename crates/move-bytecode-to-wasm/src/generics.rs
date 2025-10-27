@@ -9,7 +9,8 @@ pub fn type_contains_generics(itype: &IntermediateType) -> bool {
             type_contains_generics(intermediate_type.as_ref())
         }
         IntermediateType::ITypeParameter(_) => true,
-        IntermediateType::IGenericStructInstance { types, .. } => {
+        IntermediateType::IGenericStructInstance { types, .. }
+        | IntermediateType::IGenericEnumInstance { types, .. } => {
             types.iter().any(type_contains_generics)
         }
         IntermediateType::IVector(inner) => type_contains_generics(inner),
@@ -26,7 +27,8 @@ pub fn extract_generic_type_parameters(itype: &IntermediateType) -> Vec<Intermed
             extract_generic_type_parameters(intermediate_type.as_ref())
         }
         IntermediateType::ITypeParameter(_) => vec![itype.clone()],
-        IntermediateType::IGenericStructInstance { types, .. } => {
+        IntermediateType::IGenericStructInstance { types, .. }
+        | IntermediateType::IGenericEnumInstance { types, .. } => {
             types.iter().fold(vec![], |mut acc, t| {
                 acc.append(&mut extract_generic_type_parameters(t));
                 acc
@@ -68,9 +70,6 @@ pub fn replace_type_parameters(
                 .collect(),
             vm_handled_struct: vm_handled_struct.clone(),
         },
-        IntermediateType::IVector(inner) => {
-            IntermediateType::IVector(Box::new(replace_type_parameters(inner, instance_types)))
-        }
         IntermediateType::IGenericEnumInstance { index, types } => {
             IntermediateType::IGenericEnumInstance {
                 index: *index,
@@ -79,6 +78,9 @@ pub fn replace_type_parameters(
                     .map(|t| replace_type_parameters(t, instance_types))
                     .collect(),
             }
+        }
+        IntermediateType::IVector(inner) => {
+            IntermediateType::IVector(Box::new(replace_type_parameters(inner, instance_types)))
         }
         // Non-generic type: keep as is
         _ => itype.clone(),
@@ -89,14 +91,14 @@ pub fn replace_type_parameters(
 /// vector
 pub fn instantiate_vec_type_parameters(
     inner: &IntermediateType,
-    function_type_instaces: &[IntermediateType],
+    function_type_instances: &[IntermediateType],
 ) -> IntermediateType {
     let generic_types = extract_generic_type_parameters(inner);
     let concrete_types = generic_types
         .iter()
         .map(|g| {
             if let IntermediateType::ITypeParameter(i) = g {
-                function_type_instaces[*i as usize].clone()
+                function_type_instances[*i as usize].clone()
             } else {
                 g.clone()
             }
