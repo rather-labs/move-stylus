@@ -582,7 +582,7 @@ impl ModuleData {
 
         for (index, enum_def_instantiation) in module.enum_instantiations().iter().enumerate() {
             let enum_def_index = enum_def_instantiation.def;
-            let enum_definition = &module.enum_defs()[enum_def_index.0 as usize];
+            let enum_definition = &module.enum_defs()[enum_def_index.into_index()];
 
             let enum_instantiation_types = module
                 .signature_at(enum_def_instantiation.type_parameters)
@@ -599,7 +599,7 @@ impl ModuleData {
                 .variant_instantiation_handles()
                 .iter()
                 .enumerate()
-                .filter(|(_idx, v)| v.enum_def.0 == index as u16)
+                .filter(|(_idx, v)| v.enum_def.into_index() == index)
             {
                 let variant_index = variant_instantiation_handle.variant; // index inside the enum definition
                 let variant_definition = &enum_definition.variants[variant_index as usize];
@@ -631,7 +631,7 @@ impl ModuleData {
                 variants_instantiation_to_enum_map.insert(
                     VariantInstantiationHandleIndex::new(variant_instantiation_handle_index as u16),
                     VariantInstantiationData {
-                        enum_index: enum_def_index.0 as usize,
+                        enum_index: enum_def_index.into_index(),
                         enum_def_instantiation_index: EnumDefInstantiationIndex::new(index as u16),
                         index_inside_enum: variant_index as usize,
                         types: variant_types,

@@ -93,6 +93,11 @@ pub enum IntermediateType {
     /// The first u16 is the enum's index in the compilation context.
     IEnum(u16),
 
+    /// Intermediate generic enum instance representation
+    ///
+    /// The first u16 is the enum's index in the compilation context.
+    /// The Vec<IntermediateType> is the list of types we are going to instantiate the generic
+    /// enum with.
     IGenericEnumInstance {
         index: u16,
         types: Vec<IntermediateType>,

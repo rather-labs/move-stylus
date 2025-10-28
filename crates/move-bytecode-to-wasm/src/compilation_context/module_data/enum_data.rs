@@ -1,9 +1,12 @@
 use std::collections::HashMap;
 
 use super::Result;
-use move_binary_format::file_format::{
-    EnumDefInstantiationIndex, EnumDefinitionIndex, VariantHandleIndex,
-    VariantInstantiationHandleIndex,
+use move_binary_format::{
+    file_format::{
+        EnumDefInstantiationIndex, EnumDefinitionIndex, VariantHandleIndex,
+        VariantInstantiationHandleIndex,
+    },
+    internals::ModuleIndex,
 };
 
 use crate::{
@@ -110,8 +113,8 @@ impl EnumData {
 
         // We can index the generic_enums_intances vector with the enum_def_index because we created it in the same order as the enum_def_instantiations vector
         let (idx, types) =
-            &self.generic_enum_instantiations[enum_def_instantiation_index.0 as usize];
-        let generic_enum = &self.enums[idx.0 as usize];
+            &self.generic_enum_instantiations[enum_def_instantiation_index.into_index()];
+        let generic_enum = &self.enums[idx.into_index()];
 
         Ok(generic_enum.instantiate(types))
     }

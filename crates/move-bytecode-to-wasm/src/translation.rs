@@ -2604,14 +2604,14 @@ fn translate_instruction(
                 .enums
                 .get_variant_position_by_variant_instantiation_handle_idx(index)?;
 
-            let type_instantiations = module_data.enums.get_enum_instance_types(index)?.to_vec();
+            let type_instantiations = module_data.enums.get_enum_instance_types(index)?;
 
             let (enum_, types) = if type_instantiations.iter().any(type_contains_generics) {
                 if let Some(caller_type_instances) =
                     &mapped_function.function_id.type_instantiations
                 {
                     let mut instantiations = Vec::new();
-                    for field in &type_instantiations {
+                    for field in type_instantiations {
                         instantiations.push(replace_type_parameters(field, caller_type_instances));
                     }
 

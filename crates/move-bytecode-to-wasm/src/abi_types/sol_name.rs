@@ -42,7 +42,7 @@ impl SolName for IntermediateType {
                 None
             }
             IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => None,
-            IntermediateType::IGenericEnumInstance { .. } => todo!(),
+            IntermediateType::IGenericEnumInstance { .. } => None,
         }
     }
 }
