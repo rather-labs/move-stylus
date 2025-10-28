@@ -9,7 +9,7 @@ pub use error::SpecialAttributeError;
 use error::SpecialAttributeErrorKind;
 pub use event::Event;
 use event::EventParseError;
-pub use external_call::error::ExternalCallFunctionError;
+pub use external_call::error::{ExternalCallFunctionError, ExternalCallStructError};
 // TODO: Create error struct with LOC and error info
 
 #[derive(Default, Debug)]
