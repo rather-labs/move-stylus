@@ -1370,7 +1370,7 @@ fn translate_instruction(
                 if let Some(caller_type_instances) =
                     &mapped_function.function_id.type_instantiations
                 {
-                    replace_type_parameters(&inner, &caller_type_instances)
+                    replace_type_parameters(&inner, caller_type_instances)
                 } else {
                     panic!("could not compute concrete type")
                 }
@@ -1467,7 +1467,7 @@ fn translate_instruction(
                 if let Some(caller_type_instances) =
                     &mapped_function.function_id.type_instantiations
                 {
-                    replace_type_parameters(&inner, &caller_type_instances)
+                    replace_type_parameters(&inner, caller_type_instances)
                 } else {
                     panic!("could not compute concrete type")
                 }
@@ -1620,7 +1620,7 @@ fn translate_instruction(
                 if let Some(caller_type_instances) =
                     &mapped_function.function_id.type_instantiations
                 {
-                    replace_type_parameters(&expected_vec_inner, &caller_type_instances)
+                    replace_type_parameters(&expected_vec_inner, caller_type_instances)
                 } else {
                     panic!("could not compute concrete type")
                 }
@@ -2421,21 +2421,21 @@ fn translate_instruction(
                     for field in &type_instantiations {
                         instantiations.push(replace_type_parameters(field, caller_type_instances));
                     }
-                    
+
                     // The purpose of this block is to determine the concrete types with which to instantiate
                     // a generic struct, handling the potentially chained replacement of type parameters.
                     // If some instantiations are still type parameters after one pass, those are filtered out
                     // and the Vec is formed from these. Otherwise, just use the instantiations directly.
                     let type_parameters_instantiations = type_instantiations
-                                .iter()
-                                .enumerate()
-                                .filter_map(|(index, field)| match field {
-                                    IntermediateType::ITypeParameter(_) => {
-                                        Some(instantiations[index].clone())
-                                    }
-                                    _ => None,
-                                })
-                                .collect::<Vec<IntermediateType>>();
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(index, field)| match field {
+                            IntermediateType::ITypeParameter(_) => {
+                                Some(instantiations[index].clone())
+                            }
+                            _ => None,
+                        })
+                        .collect::<Vec<IntermediateType>>();
 
                     (
                         struct_.instantiate(&type_parameters_instantiations),
