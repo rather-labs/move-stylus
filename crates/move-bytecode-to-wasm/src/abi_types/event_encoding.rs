@@ -74,6 +74,7 @@ fn solidity_name(
             struct_fields_sol_name(&struct_instance, compilation_ctx)
         }
         IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => None,
+        IntermediateType::IGenericEnumInstance { .. } => todo!(),
     }
 }
 
