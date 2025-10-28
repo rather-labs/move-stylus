@@ -536,7 +536,6 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("can't know the size of a generic type parameter at compile time");
             }
-            // TODO: check if this is correct
             IntermediateType::IGenericEnumInstance { .. } => {
                 sol_data::Uint::<8>::ENCODED_SIZE.unwrap()
             }
@@ -583,7 +582,6 @@ impl Packable for IntermediateType {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
                 inner.is_dynamic(compilation_ctx)
             }
-            // TODO: check if this is correct
             IntermediateType::IGenericEnumInstance { .. } => false,
         }
     }

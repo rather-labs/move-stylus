@@ -2604,10 +2604,7 @@ fn translate_instruction(
                 .enums
                 .get_variant_position_by_variant_instantiation_handle_idx(index)?;
 
-            let type_instantiations = module_data
-                .enums
-                .get_generic_enum_types_instances(index)?
-                .to_vec();
+            let type_instantiations = module_data.enums.get_enum_instance_types(index)?.to_vec();
 
             let (enum_, types) = if type_instantiations.iter().any(type_contains_generics) {
                 if let Some(caller_type_instances) =
@@ -2618,17 +2615,28 @@ fn translate_instruction(
                         instantiations.push(replace_type_parameters(field, caller_type_instances));
                     }
 
-                    (&enum_.instantiate(&instantiations), instantiations)
+                    let type_parameters_instantiations = type_instantiations
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(index, field)| match field {
+                            IntermediateType::ITypeParameter(_) => {
+                                Some(instantiations[index].clone())
+                            }
+                            _ => None,
+                        })
+                        .collect::<Vec<IntermediateType>>();
+
+                    (
+                        &enum_.instantiate(&type_parameters_instantiations),
+                        instantiations,
+                    )
                 }
                 // This should never happen
                 else {
                     panic!("could not instantiate generic types");
                 }
             } else {
-                let types = module_data
-                    .enums
-                    .get_generic_enum_types_instances(index)?
-                    .to_vec();
+                let types = module_data.enums.get_enum_instance_types(index)?.to_vec();
 
                 (enum_, types)
             };
@@ -2671,13 +2679,30 @@ fn translate_instruction(
             let variant_index = module_data
                 .enums
                 .get_variant_position_by_variant_instantiation_handle_idx(index)?;
-            let type_instantiations = module_data
-                .enums
-                .get_generic_enum_types_instances(index)?
-                .to_vec();
+            let type_instantiations = module_data.enums.get_enum_instance_types(index)?.to_vec();
+
+            let (enum_, types) = if type_instantiations.iter().any(type_contains_generics) {
+                if let Some(caller_type_instances) =
+                    &mapped_function.function_id.type_instantiations
+                {
+                    let mut instantiations = Vec::new();
+                    for field in &type_instantiations {
+                        instantiations.push(replace_type_parameters(field, caller_type_instances));
+                    }
+
+                    (&enum_.instantiate(&instantiations), instantiations)
+                }
+                // This should never happen
+                else {
+                    panic!("could not instantiate generic types");
+                }
+            } else {
+                (enum_, type_instantiations.to_vec())
+            };
+
             types_stack.pop_expecting(&IntermediateType::IGenericEnumInstance {
                 index: enum_.index,
-                types: type_instantiations,
+                types,
             })?;
 
             bytecodes::enums::unpack_variant(
@@ -2689,15 +2714,19 @@ fn translate_instruction(
                 types_stack,
             )?;
         }
-        Bytecode::UnpackVariantImmRef(index) => {
+        Bytecode::UnpackVariantImmRef(index) | Bytecode::UnpackVariantMutRef(index) => {
             let enum_ = module_data.enums.get_enum_by_variant_handle_idx(index)?;
             let variant_index = module_data
                 .enums
                 .get_variant_position_by_variant_handle_idx(index)?;
 
-            types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
-                IntermediateType::IEnum(enum_.index),
-            )))?;
+            let is_mut_ref = matches!(instruction, Bytecode::UnpackVariantMutRef(_));
+            let expected_type = if is_mut_ref {
+                IntermediateType::IMutRef(Box::new(IntermediateType::IEnum(enum_.index)))
+            } else {
+                IntermediateType::IRef(Box::new(IntermediateType::IEnum(enum_.index)))
+            };
+            types_stack.pop_expecting(&expected_type)?;
 
             bytecodes::enums::unpack_variant_ref(
                 enum_,
@@ -2706,10 +2735,11 @@ fn translate_instruction(
                 builder,
                 compilation_ctx,
                 types_stack,
-                false,
+                is_mut_ref,
             )?;
         }
-        Bytecode::UnpackVariantGenericImmRef(index) => {
+        Bytecode::UnpackVariantGenericImmRef(index)
+        | Bytecode::UnpackVariantGenericMutRef(index) => {
             let enum_ = &module_data
                 .enums
                 .get_enum_instance_by_variant_instantiation_handle_idx(index)?;
@@ -2717,66 +2747,40 @@ fn translate_instruction(
                 .enums
                 .get_variant_position_by_variant_instantiation_handle_idx(index)?;
 
-            let type_instantiations = module_data
-                .enums
-                .get_generic_enum_types_instances(index)?
-                .to_vec();
-            types_stack.pop_expecting(&IntermediateType::IRef(Box::new(
-                IntermediateType::IGenericEnumInstance {
+            let type_instantiations = module_data.enums.get_enum_instance_types(index)?.to_vec();
+
+            let (enum_, types) = if type_instantiations.iter().any(type_contains_generics) {
+                if let Some(caller_type_instances) =
+                    &mapped_function.function_id.type_instantiations
+                {
+                    let mut instantiations = Vec::new();
+                    for field in &type_instantiations {
+                        instantiations.push(replace_type_parameters(field, caller_type_instances));
+                    }
+
+                    (&enum_.instantiate(&instantiations), instantiations)
+                }
+                // This should never happen
+                else {
+                    panic!("could not instantiate generic types");
+                }
+            } else {
+                (enum_, type_instantiations.to_vec())
+            };
+
+            let is_mut_ref = matches!(instruction, Bytecode::UnpackVariantGenericMutRef(_));
+            let expected_type = if is_mut_ref {
+                IntermediateType::IMutRef(Box::new(IntermediateType::IGenericEnumInstance {
                     index: enum_.index,
-                    types: type_instantiations,
-                },
-            )))?;
-
-            bytecodes::enums::unpack_variant_ref(
-                enum_,
-                variant_index,
-                module,
-                builder,
-                compilation_ctx,
-                types_stack,
-                false,
-            )?;
-        }
-        Bytecode::UnpackVariantMutRef(index) => {
-            let enum_ = module_data.enums.get_enum_by_variant_handle_idx(index)?;
-            let variant_index = module_data
-                .enums
-                .get_variant_position_by_variant_handle_idx(index)?;
-
-            types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
-                IntermediateType::IEnum(enum_.index),
-            )))?;
-
-            bytecodes::enums::unpack_variant_ref(
-                enum_,
-                variant_index,
-                module,
-                builder,
-                compilation_ctx,
-                types_stack,
-                true,
-            )?;
-        }
-        Bytecode::UnpackVariantGenericMutRef(index) => {
-            let enum_ = &module_data
-                .enums
-                .get_enum_instance_by_variant_instantiation_handle_idx(index)?;
-            let variant_index = module_data
-                .enums
-                .get_variant_position_by_variant_instantiation_handle_idx(index)?;
-
-            let type_instantiations = module_data
-                .enums
-                .get_generic_enum_types_instances(index)?
-                .to_vec();
-
-            types_stack.pop_expecting(&IntermediateType::IMutRef(Box::new(
-                IntermediateType::IGenericEnumInstance {
+                    types,
+                }))
+            } else {
+                IntermediateType::IRef(Box::new(IntermediateType::IGenericEnumInstance {
                     index: enum_.index,
-                    types: type_instantiations,
-                },
-            )))?;
+                    types,
+                }))
+            };
+            types_stack.pop_expecting(&expected_type)?;
 
             bytecodes::enums::unpack_variant_ref(
                 enum_,
@@ -2785,7 +2789,7 @@ fn translate_instruction(
                 builder,
                 compilation_ctx,
                 types_stack,
-                true,
+                is_mut_ref,
             )?;
         }
         Bytecode::VariantSwitch(jump_table_index) => {

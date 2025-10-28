@@ -94,12 +94,6 @@ impl EnumData {
         Ok(*index_inside_enum as u16)
     }
 
-    pub fn get_enum_by_index(&self, index: u16) -> Result<&IEnum> {
-        self.enums
-            .get(index as usize)
-            .ok_or(CompilationContextError::EnumNotFound(index))
-    }
-
     pub fn get_enum_instance_by_variant_instantiation_handle_idx(
         &self,
         variant_instantiation_handle_index: &VariantInstantiationHandleIndex,
@@ -122,7 +116,7 @@ impl EnumData {
         Ok(generic_enum.instantiate(types))
     }
 
-    pub fn get_generic_enum_types_instances(
+    pub fn get_enum_instance_types(
         &self,
         variant_instantiation_handle_index: &VariantInstantiationHandleIndex,
     ) -> Result<&[IntermediateType]> {
@@ -140,17 +134,9 @@ impl EnumData {
         Ok(types)
     }
 
-    pub fn get_generic_variant_types_instances(
-        &self,
-        variant_instantiation_handle_index: &VariantInstantiationHandleIndex,
-    ) -> Result<&[IntermediateType]> {
-        let VariantInstantiationData { types, .. } = self
-            .variants_instantiation_to_enum
-            .get(variant_instantiation_handle_index)
-            .ok_or(CompilationContextError::EnumWithVariantIdxNotFound(
-                variant_instantiation_handle_index.0,
-            ))?;
-
-        Ok(types)
+    pub fn get_enum_by_index(&self, index: u16) -> Result<&IEnum> {
+        self.enums
+            .get(index as usize)
+            .ok_or(CompilationContextError::EnumNotFound(index))
     }
 }

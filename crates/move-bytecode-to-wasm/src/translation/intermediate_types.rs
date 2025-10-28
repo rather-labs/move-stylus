@@ -691,6 +691,16 @@ impl IntermediateType {
                 let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
                 enum_.copy_local_instructions(module, builder, compilation_ctx, module_data);
             }
+            IntermediateType::IGenericEnumInstance { index, types } => {
+                let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
+                let enum_instance = enum_.instantiate(types);
+                enum_instance.copy_local_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    module_data,
+                );
+            }
             _ => panic!("Unsupported ReadRef type: {:?}", self),
         }
     }
