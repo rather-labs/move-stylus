@@ -17,26 +17,6 @@ pub fn type_contains_generics(itype: &IntermediateType) -> bool {
     }
 }
 
-/// Extracts the `ITypeParameters` contained in `itype`. The extracted `ITypeParameters` will then
-/// be replaced with concrete types
-pub fn extract_generic_type_parameters(itype: &IntermediateType) -> Vec<IntermediateType> {
-    match itype {
-        IntermediateType::IRef(intermediate_type)
-        | IntermediateType::IMutRef(intermediate_type) => {
-            extract_generic_type_parameters(intermediate_type.as_ref())
-        }
-        IntermediateType::ITypeParameter(_) => vec![itype.clone()],
-        IntermediateType::IGenericStructInstance { types, .. } => {
-            types.iter().fold(vec![], |mut acc, t| {
-                acc.append(&mut extract_generic_type_parameters(t));
-                acc
-            })
-        }
-        IntermediateType::IVector(inner) => extract_generic_type_parameters(inner),
-        _ => vec![],
-    }
-}
-
 /// Auxiliary functiion that recursively looks for not instantiated type parameters and
 /// replaces them
 pub fn replace_type_parameters(
@@ -74,25 +54,4 @@ pub fn replace_type_parameters(
         // Non-generic type: keep as is
         _ => itype.clone(),
     }
-}
-
-/// This function is used to instantiate generic types that may appear in the `inner` type of a
-/// vector
-pub fn instantiate_vec_type_parameters(
-    inner: &IntermediateType,
-    function_type_instaces: &[IntermediateType],
-) -> IntermediateType {
-    let generic_types = extract_generic_type_parameters(inner);
-    let concrete_types = generic_types
-        .iter()
-        .map(|g| {
-            if let IntermediateType::ITypeParameter(i) = g {
-                function_type_instaces[*i as usize].clone()
-            } else {
-                g.clone()
-            }
-        })
-        .collect::<Vec<IntermediateType>>();
-
-    replace_type_parameters(inner, &concrete_types)
 }
