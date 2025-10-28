@@ -290,6 +290,9 @@ impl Unpackable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot unpack generic type parameter");
             }
+            IntermediateType::IGenericEnumInstance { .. } => {
+                panic!("cannot unpack generic enum instance")
+            }
         }
     }
 }

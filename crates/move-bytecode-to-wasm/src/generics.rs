@@ -9,7 +9,8 @@ pub fn type_contains_generics(itype: &IntermediateType) -> bool {
             type_contains_generics(intermediate_type.as_ref())
         }
         IntermediateType::ITypeParameter(_) => true,
-        IntermediateType::IGenericStructInstance { types, .. } => {
+        IntermediateType::IGenericStructInstance { types, .. }
+        | IntermediateType::IGenericEnumInstance { types, .. } => {
             types.iter().any(type_contains_generics)
         }
         IntermediateType::IVector(inner) => type_contains_generics(inner),
@@ -48,6 +49,15 @@ pub fn replace_type_parameters(
                 .collect(),
             vm_handled_struct: vm_handled_struct.clone(),
         },
+        IntermediateType::IGenericEnumInstance { index, types } => {
+            IntermediateType::IGenericEnumInstance {
+                index: *index,
+                types: types
+                    .iter()
+                    .map(|t| replace_type_parameters(t, instance_types))
+                    .collect(),
+            }
+        }
         IntermediateType::IVector(inner) => {
             IntermediateType::IVector(Box::new(replace_type_parameters(inner, instance_types)))
         }

@@ -92,6 +92,16 @@ pub enum IntermediateType {
     ///
     /// The first u16 is the enum's index in the compilation context.
     IEnum(u16),
+
+    /// Intermediate generic enum instance representation
+    ///
+    /// The first u16 is the enum's index in the compilation context.
+    /// The Vec<IntermediateType> is the list of types we are going to instantiate the generic
+    /// enum with.
+    IGenericEnumInstance {
+        index: u16,
+        types: Vec<IntermediateType>,
+    },
 }
 
 impl IntermediateType {
@@ -111,8 +121,9 @@ impl IntermediateType {
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
             | IntermediateType::IStruct { .. }
+            | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::IEnum(_)
-            | IntermediateType::IGenericStructInstance { .. } => 4,
+            | IntermediateType::IGenericEnumInstance { .. } => 4,
             IntermediateType::ITypeParameter(_) => {
                 panic!("type parameter does not have a known stack data size at compile time")
             }
@@ -178,7 +189,10 @@ impl IntermediateType {
                                 vm_handled_struct: VmHandledStruct::None,
                             }
                         }
-                        UserDefinedType::Enum(_) => todo!(),
+                        UserDefinedType::Enum(index) => IntermediateType::IGenericEnumInstance {
+                            index: *index as u16,
+                            types: types.clone(),
+                        },
                     })
                 } else {
                     Err(anyhow::anyhow!(
@@ -229,7 +243,7 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("can't load a type parameter as a constant, expected a concrete type");
             }
-            IntermediateType::IEnum(_) => {
+            IntermediateType::IEnum(_) | IntermediateType::IGenericEnumInstance { .. } => {
                 panic!("Enum variants cannot be loaded as constants")
             }
         }
@@ -291,7 +305,8 @@ impl IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_) => {
+            | IntermediateType::IEnum(_)
+            | IntermediateType::IGenericEnumInstance { .. } => {
                 builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -463,6 +478,7 @@ impl IntermediateType {
                 );
                 enum_.copy_local_instructions(module, builder, compilation_ctx, module_data);
             }
+            IntermediateType::IGenericEnumInstance { .. } => todo!(),
         }
     }
 
@@ -481,13 +497,14 @@ impl IntermediateType {
             | IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
-            | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
-            | IntermediateType::IEnum(_) => {
+            | IntermediateType::IStruct { .. }
+            | IntermediateType::IGenericStructInstance { .. }
+            | IntermediateType::IEnum(_)
+            | IntermediateType::IGenericEnumInstance { .. } => {
                 let local = module.locals.add(ValType::I32);
 
                 builder.local_get(pointer);
@@ -545,8 +562,9 @@ impl IntermediateType {
             | IntermediateType::IRef(_)
             | IntermediateType::IMutRef(_)
             | IntermediateType::IStruct { .. }
+            | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::IEnum(_)
-            | IntermediateType::IGenericStructInstance { .. } => {
+            | IntermediateType::IGenericEnumInstance { .. } => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
                 local
@@ -576,8 +594,8 @@ impl IntermediateType {
             | IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            // TODO: check this for enums
-            | IntermediateType::IEnum(_) => {
+            | IntermediateType::IEnum(_)
+            | IntermediateType::IGenericEnumInstance { .. } => {
                 builder.local_get(local);
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -677,6 +695,16 @@ impl IntermediateType {
             IntermediateType::IEnum(index) => {
                 let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
                 enum_.copy_local_instructions(module, builder, compilation_ctx, module_data);
+            }
+            IntermediateType::IGenericEnumInstance { index, types } => {
+                let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
+                let enum_instance = enum_.instantiate(types);
+                enum_instance.copy_local_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    module_data,
+                );
             }
             _ => panic!("Unsupported ReadRef type: {:?}", self),
         }
@@ -783,7 +811,8 @@ impl IntermediateType {
             IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_) => {
+            | IntermediateType::IEnum(_)
+            | IntermediateType::IGenericEnumInstance { .. } => {
                 // Since the memory needed for vectors might differ, we don't overwrite it.
                 // We update the inner pointer to point to the location where the new vector is already allocated.
                 let src_ptr = module.locals.add(ValType::I32);
@@ -896,7 +925,8 @@ impl IntermediateType {
             | IntermediateType::IMutRef(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_) => {
+            | IntermediateType::IEnum(_)
+            | IntermediateType::IGenericEnumInstance { .. } => {
                 let ptr = module.locals.add(ValType::I32);
                 builder
                     .local_set(ptr)
@@ -1039,7 +1069,8 @@ impl IntermediateType {
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
                     | IntermediateType::IGenericStructInstance { .. }
-                    | IntermediateType::IEnum(_) => {
+                    | IntermediateType::IEnum(_)
+                    | IntermediateType::IGenericEnumInstance { .. } => {
                         builder.local_get(ptr1).local_get(ptr2);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -1056,6 +1087,7 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot compare a type parameter, expected a concrete type");
             }
+            IntermediateType::IGenericEnumInstance { .. } => todo!(),
         }
     }
 
@@ -1088,7 +1120,8 @@ impl IntermediateType {
             | IntermediateType::IMutRef(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_) => false,
+            | IntermediateType::IEnum(_)
+            | IntermediateType::IGenericEnumInstance { .. } => false,
             IntermediateType::ITypeParameter(_) => {
                 panic!(
                     "cannot check if a type parameter is a stack type, expected a concrete type"
@@ -1143,7 +1176,7 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot get the name of a type parameter, expected a concrete type",)
             }
-            IntermediateType::IEnum(_) => todo!(),
+            IntermediateType::IEnum(_) | IntermediateType::IGenericEnumInstance { .. } => todo!(),
         }
     }
 
@@ -1249,7 +1282,8 @@ impl From<&IntermediateType> for ValType {
             | IntermediateType::IMutRef(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_) => ValType::I32,
+            | IntermediateType::IEnum(_)
+            | IntermediateType::IGenericEnumInstance { .. } => ValType::I32,
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot convert a type parameter to a wasm type, expected a concrete type");
             }

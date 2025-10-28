@@ -94,6 +94,12 @@ fun inner_create_complex_generic_struct<T, U: copy>(a: u16, b: T, c: U): Complex
     ComplexGenericStruct {a, b: GenericStruct {a, b, c}, c: vector[c, c, c], d: vector[vector[c], vector[c, c]]}
 }
 
+fun inner_pack_unpack_generic_struct<T: drop, U: drop + copy>(a: u16, t: T, u: U) {
+    let s = ComplexGenericStruct {a, b: GenericStruct{a, b: t, c: u}, c: vector[u, u, u], d: vector[vector[u], vector[u, u]]};
+    let ComplexGenericStruct {a: _a_val, b: _b, c: _c, d: _d} = s;
+}
+
 entry fun create_complex_generic_struct(a: u16, b: u32, c: u64): ComplexGenericStruct<u16, u32, u64> {
+    inner_pack_unpack_generic_struct(a, b, c);
     inner_create_complex_generic_struct<u32, u64>(a, b, c)
 }

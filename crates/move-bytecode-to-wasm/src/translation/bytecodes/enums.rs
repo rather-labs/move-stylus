@@ -111,7 +111,8 @@ pub fn pack_variant(
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
                     | IntermediateType::IGenericStructInstance { .. }
-                    | IntermediateType::IEnum(_) => {
+                    | IntermediateType::IEnum(_)
+                    | IntermediateType::IGenericEnumInstance { .. } => {
                         builder.local_set(ptr_to_data);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -225,7 +226,8 @@ pub fn unpack_variant_ref(
             | IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_) => {
+            | IntermediateType::IEnum(_)
+            | IntermediateType::IGenericEnumInstance { .. } => {
                 // Add the offset to the pointer
                 builder
                     .local_get(pointer)

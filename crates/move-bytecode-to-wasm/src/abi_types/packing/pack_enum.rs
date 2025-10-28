@@ -9,6 +9,7 @@ use crate::{
 
 impl IEnum {
     pub fn add_pack_instructions(
+        &self,
         block: &mut InstrSeqBuilder,
         module: &mut Module,
         local: LocalId,

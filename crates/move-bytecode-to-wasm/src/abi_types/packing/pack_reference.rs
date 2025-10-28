@@ -26,7 +26,8 @@ impl IRef {
             | IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_) => {
+            | IntermediateType::IEnum(_)
+            | IntermediateType::IGenericEnumInstance { .. } => {
                 // Load the intermediate pointer and pack
                 builder
                     .local_get(local)
@@ -118,14 +119,15 @@ impl IMutRef {
         compilation_ctx: &CompilationContext,
     ) {
         match inner {
-            IntermediateType::IVector(_)
-            | IntermediateType::ISigner
-            | IntermediateType::IU128
+            IntermediateType::IU128
             | IntermediateType::IU256
             | IntermediateType::IAddress
+            | IntermediateType::IVector(_)
+            | IntermediateType::ISigner
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_) => {
+            | IntermediateType::IEnum(_)
+            | IntermediateType::IGenericEnumInstance { .. } => {
                 builder
                     .local_get(local)
                     .load(

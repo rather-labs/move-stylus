@@ -1528,5 +1528,6 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
         IntermediateType::ITypeParameter(_) => {
             panic!("cannot know the field size of a type parameter");
         }
+        IntermediateType::IGenericEnumInstance { .. } => todo!(),
     }
 }
