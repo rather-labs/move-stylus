@@ -399,7 +399,6 @@ pub fn add_external_contract_call_fn(
 
             let return_data_abi_encoded_ptr = module.locals.add(ValType::I32);
 
-            // Return data len is in big endian, we read it and change endianess
             block
                 .local_get(return_data_len)
                 .load(
@@ -466,18 +465,19 @@ pub fn add_external_contract_call_fn(
                     // for the struct field, otherwise it is already a pointer, we write it directly
                     let data_ptr = if result_type.is_stack_type() {
                         let call_result_value_ptr = module.locals.add(ValType::I32);
+                        let (store_kind, store_len) = if result_type == &IntermediateType::IU64 {
+                            (StoreKind::I64 { atomic: false }, 8)
+                        } else {
+                            (StoreKind::I32 { atomic: false }, 4)
+                        };
                         block
-                            .i32_const(4)
+                            .i32_const(store_len)
                             .call(compilation_ctx.allocator)
                             .local_tee(call_result_value_ptr)
                             .local_get(abi_decoded_call_result)
                             .store(
                                 compilation_ctx.memory_id,
-                                if result_type == &IntermediateType::IU64 {
-                                    StoreKind::I64 { atomic: false }
-                                } else {
-                                    StoreKind::I32 { atomic: false }
-                                },
+                                store_kind,
                                 MemArg {
                                     align: 0,
                                     offset: 0,

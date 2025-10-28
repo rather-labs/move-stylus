@@ -32,7 +32,7 @@ pub const DATA_FROZEN_OBJECTS_KEY_OFFSET: i32 = 192;
 pub const DATA_STORAGE_OBJECT_OWNER_OFFSET: i32 = 224;
 
 /// Used to store the pointer to the abort message when translating an Abort instruction.
-/// The memory layout is structured as: [length, data], where the first 4 bytes represent the length of the message.
+/// The memory layout is structured as: [length, data], where the first byte represent the length of the message.
 pub const DATA_ABORT_MESSAGE_PTR_OFFSET: i32 = 256;
 
 /// Amount of memory reserved starting from offset 0.

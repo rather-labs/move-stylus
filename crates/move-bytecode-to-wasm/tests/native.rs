@@ -380,7 +380,7 @@ mod hash_type_and_key {
             b"Baz<vector<u16>>".as_slice(),
         ])
     )]
-    // This checks that the data that will be hashed is correct by inspecting the memoery of what
+    // This checks that the data that will be hashed is correct by inspecting the memory of what
     // we are about to hash and comparing it to the expected result
     fn test_hash_type_and_key_hashing_data<T: SolCall>(
         #[by_ref] runtime: &RuntimeSandbox,
