@@ -18,6 +18,7 @@ sol!(
         function logicAddress(bytes32 id) public view returns (address);
         function changeLogic(bytes32 id, address logic_address) public view;
         function increment(bytes32 id) public view;
+        function incrementAndModify(bytes32 id) public view;
         function setValue(bytes32 id, uint64 value) public view;
     }
 );
@@ -95,6 +96,19 @@ async fn main() -> eyre::Result<()> {
     }
 
     println!("\nReading value after increment");
+    let res = example.read(counter_id).call().await?;
+    println!("counter = {}", res);
+
+    println!("\nSending increment and modify tx");
+
+    let pending_tx = example.incrementAndModify(counter_id).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("increment logs 0: 0x{}", hex::encode(raw));
+    }
+
+    println!("\nReading value after increment and modify");
     let res = example.read(counter_id).call().await?;
     println!("counter = {}", res);
 

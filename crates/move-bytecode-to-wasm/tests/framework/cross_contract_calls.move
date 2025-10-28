@@ -3,6 +3,33 @@ module test::cross_contract_calls;
 use test::callee_contract_interface as cci;
 use test::callee_contract_interface::{Foo, Bar};
 use stylus::contract_calls as contract_calls;
+use stylus::tx_context::TxContext;
+use stylus::object as object;
+use stylus::object::UID;
+use stylus::transfer as transfer;
+
+public struct StorageStruct has key {
+    id: UID,
+    value: u64,
+}
+
+entry fun create(ctx: &mut TxContext) {
+  transfer::share_object(StorageStruct {
+    id: object::new(ctx),
+    value: 1,
+  });
+}
+
+entry fun test(s: &mut StorageStruct) {
+    let cross_call = cci::new(
+        contract_calls::new(@0x123)
+            .delegate()
+    );
+    let result = cross_call.increment_value(&mut s.id);
+    assert!(result.succeded());
+    s.value = s.value * 2;
+}
+
 
 // ==============================================
 // Common cross contract calls with empty result

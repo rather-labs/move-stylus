@@ -1,6 +1,7 @@
 module test::callee_contract_interface;
 
 use stylus::contract_calls::{ContractCallEmptyResult, ContractCallResult, CrossContractCall};
+use stylus::object::UID;
 
 #[ext(external_call)]
 public struct ExampleContract(CrossContractCall) has drop;
@@ -53,6 +54,16 @@ public struct Bar has drop {
     bazz: Bazz,
     baz: Baz,
 }
+
+
+#[ext(external_struct, module_name = b"cross_contract_calls", address = @0x0)]
+public struct StorageStruct has key {
+    id: UID,
+    value: u64,
+}
+
+#[ext(external_call)]
+public native fun increment_value(self: &ExampleContract, s: &mut UID): ContractCallEmptyResult;
 
 #[ext(external_call)]
 public native fun call_empty_res_1(self: &ExampleContract): ContractCallEmptyResult;

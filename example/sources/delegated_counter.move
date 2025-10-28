@@ -33,6 +33,16 @@ entry fun increment(counter: &mut Counter) {
     assert!(res.succeded(), 33);
 }
 
+entry fun increment_and_modify(counter: &mut Counter) {
+    counter.value = counter.value * 4;
+    let delegated_counter = dci::new(
+        contract_calls::new(counter.contract_address)
+            .delegate()
+    );
+    let res = delegated_counter.increment(&mut counter.id);
+    assert!(res.succeded(), 33);
+}
+
 /// Read counter.
 entry fun read(counter: &Counter): u64 {
     counter.value
