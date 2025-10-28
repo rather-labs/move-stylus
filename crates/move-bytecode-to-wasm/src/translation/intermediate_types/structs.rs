@@ -49,8 +49,8 @@ use crate::{
     CompilationContext,
     abi_types::packing::Packable,
     compilation_context::ModuleData,
-    vm_handled_types::{VmHandledType, string::String_},
     generics::replace_type_parameters,
+    vm_handled_types::{VmHandledType, string::String_},
 };
 
 use super::IntermediateType;
