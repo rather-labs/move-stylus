@@ -52,7 +52,6 @@ fn check_first_parameter_is_external_struct(
     function: &Function,
     external_call_structs: &[String],
 ) -> bool {
-    println!("{external_call_structs:?}");
     if let Some((_, _, type_)) = function.signature.parameters.first() {
         if let Some(name) = get_single_type_name(&type_.value) {
             external_call_structs.contains(&name)
