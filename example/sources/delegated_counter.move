@@ -34,7 +34,6 @@ entry fun increment(counter: &mut Counter) {
 }
 
 entry fun increment_and_modify(counter: &mut Counter) {
-    counter.value = counter.value * 4;
     let delegated_counter = dci::new(
         contract_calls::new(counter.contract_address)
             .delegate()

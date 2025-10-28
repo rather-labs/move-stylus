@@ -27,7 +27,8 @@ entry fun test(s: &mut StorageStruct) {
     );
     let result = cross_call.increment_value(&mut s.id);
     assert!(result.succeded());
-    s.value = s.value * 2;
+    s.value = s.value + 2;
+    s.value = s.value + 2;
 }
 
 

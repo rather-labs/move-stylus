@@ -14,6 +14,7 @@ public struct Counter has key {
 /// Increment a counter by 2.
 entry fun increment(counter: &mut Counter) {
     counter.value = counter.value + 1;
+    // counter.value = counter.value + 1;
 }
 
 /// Set value (only runnable by the Counter owner)
