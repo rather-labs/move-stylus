@@ -49,6 +49,7 @@ use crate::{
     CompilationContext,
     abi_types::packing::Packable,
     compilation_context::ModuleData,
+    generics::replace_type_parameters,
     vm_handled_types::{VmHandledType, string::String_},
 };
 
@@ -536,41 +537,12 @@ impl IStruct {
         size
     }
 
-    /// Auxiliary functiion that recursively looks for not instantiated type parameters and
-    /// replaces them
-    fn replace_type_parameters(
-        f: &IntermediateType,
-        instance_types: &[IntermediateType],
-    ) -> IntermediateType {
-        match f {
-            IntermediateType::ITypeParameter(index) => instance_types[*index as usize].clone(),
-            IntermediateType::IGenericStructInstance {
-                module_id,
-                index,
-                types,
-                vm_handled_struct,
-            } => IntermediateType::IGenericStructInstance {
-                module_id: module_id.clone(),
-                index: *index,
-                types: types
-                    .iter()
-                    .map(|t| Self::replace_type_parameters(t, instance_types))
-                    .collect(),
-                vm_handled_struct: vm_handled_struct.clone(),
-            },
-            IntermediateType::IVector(inner) => IntermediateType::IVector(Box::new(
-                Self::replace_type_parameters(inner, instance_types),
-            )),
-            _ => f.clone(),
-        }
-    }
-
     /// Replaces all type parameters in the struct with the provided types.
     pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
         let fields = self
             .fields
             .iter()
-            .map(|itype| Self::replace_type_parameters(itype, types))
+            .map(|itype| replace_type_parameters(itype, types))
             .collect();
 
         let fields_types = self
@@ -578,7 +550,7 @@ impl IStruct {
             .iter()
             .map(|(k, v)| {
                 let key = FieldHandleIndex::new(k.into_index() as u16);
-                let value = Self::replace_type_parameters(v, types);
+                let value = replace_type_parameters(v, types);
                 (key, value)
             })
             .collect();
