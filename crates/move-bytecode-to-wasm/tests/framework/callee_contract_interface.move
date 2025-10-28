@@ -3,12 +3,10 @@ module test::callee_contract_interface;
 use stylus::contract_calls::{ContractCallEmptyResult, ContractCallResult, CrossContractCall};
 
 #[ext(external_call)]
-public struct ExampleContract has drop {
-    configuration: CrossContractCall,
-}
+public struct ExampleContract(CrossContractCall) has drop;
 
 public fun new(configuration: CrossContractCall): ExampleContract {
-    ExampleContract { configuration }
+    ExampleContract(configuration)
 }
 
 // Static abi sub-struct
