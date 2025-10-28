@@ -191,13 +191,13 @@ impl ModuleData {
         let (module_enums, variants_to_enum_map) =
             Self::process_concrete_enums(move_module_unit, &datatype_handles_map);
 
-        let (module_generic_enums_instances, variants_instantiation_to_enum_map) =
+        let (module_generic_enum_instantiations, variants_instantiation_to_enum_map) =
             Self::process_generic_enums(move_module_unit, &datatype_handles_map);
 
         let enums = EnumData {
             enums: module_enums,
             variants_to_enum: variants_to_enum_map,
-            generic_enums_instances: module_generic_enums_instances,
+            generic_enum_instantiations: module_generic_enum_instantiations,
             variants_instantiation_to_enum: variants_instantiation_to_enum_map,
         };
 

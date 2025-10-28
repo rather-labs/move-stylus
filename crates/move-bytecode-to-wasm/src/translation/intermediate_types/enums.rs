@@ -113,7 +113,6 @@ impl IEnum {
     }
 
     /// Compares two enums for equality
-    /// Ar
     /// # Arguments
     ///    - pointer to the first enum
     ///    - pointer to the second enum

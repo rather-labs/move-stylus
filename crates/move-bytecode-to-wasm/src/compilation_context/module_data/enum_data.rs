@@ -31,7 +31,7 @@ pub struct EnumData {
 
     /// Module's generic enums instances: contains all the user defined generic enums instances
     /// with its corresponding types
-    pub generic_enums_instances: Vec<(EnumDefinitionIndex, Vec<IntermediateType>)>,
+    pub generic_enum_instantiations: Vec<(EnumDefinitionIndex, Vec<IntermediateType>)>,
 
     /// Maps a enum's variant index to its corresponding enum and position inside the enum
     pub variants_to_enum: HashMap<VariantHandleIndex, VariantData>,
@@ -115,7 +115,8 @@ impl EnumData {
             ))?;
 
         // We can index the generic_enums_intances vector with the enum_def_index because we created it in the same order as the enum_def_instantiations vector
-        let (idx, types) = &self.generic_enums_instances[enum_def_instantiation_index.0 as usize];
+        let (idx, types) =
+            &self.generic_enum_instantiations[enum_def_instantiation_index.0 as usize];
         let generic_enum = &self.enums[idx.0 as usize];
 
         Ok(generic_enum.instantiate(types))
@@ -135,7 +136,7 @@ impl EnumData {
                 variant_instantiation_handle_index.0,
             ))?;
 
-        let (_, types) = &self.generic_enums_instances[enum_def_instantiation_index.0 as usize];
+        let (_, types) = &self.generic_enum_instantiations[enum_def_instantiation_index.0 as usize];
         Ok(types)
     }
 
