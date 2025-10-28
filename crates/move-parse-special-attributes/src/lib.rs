@@ -23,13 +23,13 @@ pub struct SpecialAttributes {
 
 use external_call::{
     external_struct::{ExternalStruct, ExternalStructError},
-    validate_external_call_function,
+    validate_external_call_function, validate_external_call_struct,
 };
 use function_modifiers::{Function, FunctionModifier};
 use move_compiler::{
     Compiler, PASS_PARSER,
     parser::ast::{Definition, ModuleMember},
-    shared::NumericalAddress,
+    shared::{Identifier, NumericalAddress},
 };
 use std::{
     collections::{BTreeMap, HashMap, VecDeque},
@@ -71,7 +71,15 @@ pub fn process_special_attributes(
 
                             match first_modifier {
                                 Some(StructModifier::ExternalCall) => {
-                                    println!("{s:?}");
+                                    match validate_external_call_struct(s) {
+                                        Ok(_) => result
+                                            .external_call_structs
+                                            .push(s.name.value().to_string()),
+                                        Err(e) => {
+                                            found_error = true;
+                                            module_errors.extend(e);
+                                        }
+                                    }
                                 }
                                 Some(StructModifier::ExternalStruct) => {
                                     match ExternalStruct::try_from(s) {
@@ -137,7 +145,11 @@ pub fn process_special_attributes(
                                 let modifiers: Vec<FunctionModifier> =
                                     modifiers.into_iter().collect();
 
-                                let errors = validate_external_call_function(f, &modifiers);
+                                let errors = validate_external_call_function(
+                                    f,
+                                    &modifiers,
+                                    &result.external_call_structs,
+                                );
 
                                 if let Err(errors) = errors {
                                     found_error = true;

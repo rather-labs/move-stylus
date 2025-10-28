@@ -7,3 +7,4 @@ mod function;
 mod structs;
 
 pub(crate) use function::validate_external_call_function;
+pub(crate) use structs::validate_external_call_struct;

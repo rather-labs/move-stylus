@@ -13,6 +13,8 @@ pub fn test_external_call_general() {
         panic!("Expected error due to invalid external_call functions");
     };
 
+    println!("{special_attributes_errors:#?}");
+
     assert_eq!(special_attributes_errors.len(), 2);
 
     assert_eq!(

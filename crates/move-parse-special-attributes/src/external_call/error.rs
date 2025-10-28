@@ -9,22 +9,27 @@ pub enum ExternalCallFunctionError {
     #[error("An external call function must be declared as 'native'")]
     FunctionIsNotNative,
 
-    #[error(
-        "The 'value' argument of a payable external call function must be of type 'u256', found '{0}'"
-    )]
-    InvalidValueArgumentType(String),
-
-    #[error(
-        "The second argument of a payable external call function must be named 'value', found '{0}'"
-    )]
-    InvalidValueArgumentName(String),
-
-    #[error("A payable external call function must have a 'value' argument of type 'u256'")]
-    ValueArgumentMissing,
+    #[error("An external call function have as first argument a reference to an external struct")]
+    InvalidFirstArgument,
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum ExternalCallStructError {
     #[error("Should have the 'drop' ability")]
-    DropAbilityMissing,
+    MissingAbilityDrop,
+
+    #[error(
+        "Should wrap the cross contract call configuration struct stylus::contract_calls::CrossContractCall"
+    )]
+    MissingConfiguration,
+
+    #[error(
+        "Too many fields, should contain only the cross contract call configuration struct stylus::contract_calls::CrossContractCall"
+    )]
+    TooManyFields,
+
+    #[error(
+        "Invalid configuration field, expectedc cross contract call configuration struct stylus::contract_calls::CrossContractCall"
+    )]
+    InvalidConfigurationField,
 }
