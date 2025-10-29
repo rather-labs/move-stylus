@@ -252,7 +252,7 @@ mod control_flow {
         function miscControlFlow2(Number n, Color c, Boolean b) external returns (uint32);
         function miscControlFlow3(Color c) external returns (uint64);
         function miscControlFlow4(Number n, Boolean b) external returns (uint64);
-        function miscControlFlow5(Number n, Color c, bool flag) external returns (uint64);
+        function miscControlFlow5(Number n) external returns (uint64);
     }
 
     #[rstest]
@@ -377,16 +377,11 @@ mod control_flow {
     #[case(miscControlFlow4Call::new((Number::Five, Boolean::True)), (30,))]
     #[case(miscControlFlow4Call::new((Number::One, Boolean::False)), (3,))]
     #[case(miscControlFlow4Call::new((Number::Two, Boolean::False)), (6,))]
-    #[case(miscControlFlow5Call::new((Number::One, Color::R, true)), (4,))]
-    #[case(miscControlFlow5Call::new((Number::Two, Color::R, true)), (8,))]
-    #[case(miscControlFlow5Call::new((Number::Three, Color::R, true)), (20,))]
-    #[case(miscControlFlow5Call::new((Number::Four, Color::R, true)), (24,))]
-    #[case(miscControlFlow5Call::new((Number::Five, Color::R, true)), (28,))]
-    #[case(miscControlFlow5Call::new((Number::One, Color::R, false)), (40,))]
-    #[case(miscControlFlow5Call::new((Number::Two, Color::G, false)), (80,))]
-    #[case(miscControlFlow5Call::new((Number::Three, Color::B, false)), (120,))]
-    #[case(miscControlFlow5Call::new((Number::Four, Color::R, false)), (40,))]
-    #[case(miscControlFlow5Call::new((Number::Five, Color::G, false)), (80,))]
+    #[case(miscControlFlow5Call::new((Number::One,)), (1,))]
+    #[case(miscControlFlow5Call::new((Number::Two,)), (2,))]
+    #[case(miscControlFlow5Call::new((Number::Three,)), (3,))]
+    #[case(miscControlFlow5Call::new((Number::Four,)), (4,))]
+    #[case(miscControlFlow5Call::new((Number::Five,)), (5,))]
     fn test_match_with_many_aborts<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
         #[case] call_data: T,

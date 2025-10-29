@@ -225,26 +225,18 @@ entry fun misc_control_flow_4(n: Number, b: Boolean): u64 {
     total
 }
 
-entry fun misc_control_flow_5(n: Number, c: Color, flag: bool): u64 {
-    let mut i = 0;
-    let mut acc = 0;
-    while (i < 4) {
-        if (flag) {
-            acc = acc + match (n) {
-                Number::One   => 1,
-                Number::Two   => match (c) { Color::R => 2, Color::G => 3, Color::B => 4 },
-                Number::Three => 5,
-                Number::Four  => 6,
-                Number::Five  => 7,
-            };
-        } else {
-            acc = acc + match (c) {
-                Color::R => 10,
-                Color::G => 20,
-                Color::B => 30,
-            };
+entry fun misc_control_flow_5(n: &mut Number): u64 {
+    let mut flag = true;
+    let mut acc = 6;
+    while (flag) {
+        flag = match (n) {
+            Number::One => {*n = Number::Two; true},
+            Number::Two => {*n = Number::Three; true},
+            Number::Three => {*n = Number::Four; true},
+            Number::Four => {*n = Number::Five; true},
+            Number::Five => false,
         };
-        i = i + 1;
+        acc = acc - 1;
     };
     acc
 }
