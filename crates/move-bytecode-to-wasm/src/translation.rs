@@ -40,6 +40,7 @@ use crate::{
     data::DATA_ABORT_MESSAGE_PTR_OFFSET,
     error_encoding::build_error_message,
     generics::{replace_type_parameters, type_contains_generics},
+    hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
     vm_handled_types::{self, VmHandledType, named_id::NamedId, uid::Uid},
@@ -1014,6 +1015,15 @@ fn translate_instruction(
 
                     if native_function_module.is_external_call(&function_id.identifier) {
                         println!("external call!");
+                        let (flush_cache_fn, _) = storage_flush_cache(module);
+                        add_cache_storage_object_instructions(
+                            module,
+                            builder,
+                            compilation_ctx,
+                            &mapped_function.signature.arguments,
+                            function_locals,
+                        );
+                        builder.i32_const(1).call(flush_cache_fn);
                     }
 
                     let native_function_id = NativeFunction::get(
@@ -1742,30 +1752,13 @@ fn translate_instruction(
             //
             // We expect that the owner address is just right before the pointer
             if mapped_function.is_entry {
-                for (arg_index, fn_arg) in mapped_function.signature.arguments.iter().enumerate() {
-                    let (itype, struct_) = match fn_arg {
-                        IntermediateType::IMutRef(inner) => (
-                            &**inner,
-                            compilation_ctx.get_struct_by_intermediate_type(inner),
-                        ),
-                        t => (fn_arg, compilation_ctx.get_struct_by_intermediate_type(t)),
-                    };
-
-                    if let Ok(struct_) = struct_ {
-                        if struct_.has_key {
-                            let cache_storage_object_changes_fn =
-                                RuntimeFunction::CacheStorageObjectChanges.get_generic(
-                                    module,
-                                    compilation_ctx,
-                                    &[itype],
-                                );
-
-                            builder
-                                .local_get(function_locals[arg_index])
-                                .call(cache_storage_object_changes_fn);
-                        }
-                    }
-                }
+                add_cache_storage_object_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    &mapped_function.signature.arguments,
+                    function_locals,
+                );
             }
 
             prepare_function_return(
@@ -2936,4 +2929,44 @@ pub fn add_field_borrow_mut_global_var_instructions(
     builder.local_get(field_value_ref_ptr);
 
     Ok(())
+}
+
+fn add_cache_storage_object_instructions(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    function_argumets: &[IntermediateType],
+    function_locals: &[LocalId],
+) {
+    let object_to_cache = function_argumets
+        .iter()
+        .enumerate()
+        .filter_map(|(arg_index, fn_arg)| {
+            let (itype, struct_) = match fn_arg {
+                IntermediateType::IMutRef(inner) => (
+                    &**inner,
+                    compilation_ctx.get_struct_by_intermediate_type(inner),
+                ),
+                t => (fn_arg, compilation_ctx.get_struct_by_intermediate_type(t)),
+            };
+
+            if let Ok(struct_) = struct_ {
+                if struct_.has_key {
+                    Some((itype, function_locals[arg_index]))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
+
+    for (itype, wasm_local_var) in object_to_cache {
+        let cache_storage_object_changes_fn = RuntimeFunction::CacheStorageObjectChanges
+            .get_generic(module, compilation_ctx, &[itype]);
+
+        builder
+            .local_get(wasm_local_var)
+            .call(cache_storage_object_changes_fn);
+    }
 }
