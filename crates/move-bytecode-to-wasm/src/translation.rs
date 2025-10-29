@@ -37,7 +37,7 @@ use crate::{
             STYLUS_FRAMEWORK_ADDRESS,
         },
     },
-    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET},
+    data::DATA_ABORT_MESSAGE_PTR_OFFSET,
     error_encoding::build_error_message,
     generics::{replace_type_parameters, type_contains_generics},
     native_functions::NativeFunction,
@@ -1006,6 +1006,16 @@ fn translate_instruction(
                 // and linking
                 // If the function IS native, we link it and call it directly
                 else if function_information.is_native {
+                    // If the function is a call to another contract, we save the state of the
+                    // storage objects before calling it
+
+                    let native_function_module = compilation_ctx
+                        .get_module_data_by_id(&function_information.function_id.module_id)?;
+
+                    if native_function_module.is_external_call(&function_id.identifier) {
+                        println!("external call!");
+                    }
+
                     let native_function_id = NativeFunction::get(
                         &function_id.identifier,
                         module,
@@ -1743,78 +1753,16 @@ fn translate_instruction(
 
                     if let Ok(struct_) = struct_ {
                         if struct_.has_key {
-                            let get_struct_owner_fn =
-                                RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
+                            let cache_storage_object_changes_fn =
+                                RuntimeFunction::CacheStorageObjectChanges.get_generic(
+                                    module,
+                                    compilation_ctx,
+                                    &[itype],
+                                );
 
-                            let locate_struct_fn = RuntimeFunction::LocateStructSlot
-                                .get(module, Some(compilation_ctx));
-
-                            let struct_ptr = module.locals.add(ValType::I32);
                             builder
                                 .local_get(function_locals[arg_index])
-                                .load(
-                                    compilation_ctx.memory_id,
-                                    LoadKind::I32 { atomic: false },
-                                    MemArg {
-                                        align: 0,
-                                        offset: 0,
-                                    },
-                                )
-                                .local_tee(struct_ptr);
-
-                            // Compute the slot where the struct will be saved
-                            builder.call(locate_struct_fn);
-
-                            // Check if the object owner is zero
-                            let is_zero_fn =
-                                RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
-                            builder
-                                .local_get(struct_ptr)
-                                .call(get_struct_owner_fn)
-                                .i32_const(32)
-                                .call(is_zero_fn);
-
-                            builder.if_else(
-                                None,
-                                |_| {
-                                    // If the object owner is zero, it means the object was deleted and we don't need to save it
-                                },
-                                |else_| {
-                                    let save_in_slot_fn = RuntimeFunction::EncodeAndSaveInStorage
-                                        .get_generic(module, compilation_ctx, &[itype]);
-
-                                    // Copy the slot number to a local to avoid overwriting it later
-                                    let slot_ptr = module.locals.add(ValType::I32);
-                                    else_
-                                        .i32_const(32)
-                                        .call(compilation_ctx.allocator)
-                                        .local_tee(slot_ptr)
-                                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                                        .i32_const(32)
-                                        .memory_copy(
-                                            compilation_ctx.memory_id,
-                                            compilation_ctx.memory_id,
-                                        );
-
-                                    // Call the function to delete any recently tto objects within the struct
-                                    // This needed when pushing objects with the key ability into a vector field of a struct
-                                    let check_and_delete_struct_tto_fields_fn =
-                                        RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic(
-                                            module,
-                                            compilation_ctx,
-                                            &[itype],
-                                        );
-                                    else_
-                                        .local_get(struct_ptr)
-                                        .call(check_and_delete_struct_tto_fields_fn);
-
-                                    // Save the struct in the slot
-                                    else_
-                                        .local_get(struct_ptr)
-                                        .local_get(slot_ptr)
-                                        .call(save_in_slot_fn);
-                                },
-                            );
+                                .call(cache_storage_object_changes_fn);
                         }
                     }
                 }
