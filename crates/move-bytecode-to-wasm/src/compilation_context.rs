@@ -107,4 +107,24 @@ impl CompilationContext<'_> {
             _ => Err(CompilationContextError::ExpectedStruct),
         }
     }
+
+    pub fn get_enum_by_intermediate_type(&self, itype: &IntermediateType) -> Result<Cow<IEnum>> {
+        match itype {
+            IntermediateType::IEnum { module_id, index } => {
+                let enum_ = self.get_enum_by_index(module_id, *index)?;
+                Ok(Cow::Borrowed(enum_))
+            }
+            IntermediateType::IGenericEnumInstance {
+                module_id,
+                index,
+                types,
+                ..
+            } => {
+                let enum_ = self.get_enum_by_index(module_id, *index)?;
+                let instance = enum_.instantiate(types);
+                Ok(Cow::Owned(instance))
+            }
+            _ => Err(CompilationContextError::ExpectedEnum),
+        }
+    }
 }
