@@ -10,14 +10,20 @@ use crate::{
         function_encoding::move_signature_to_abi_selector, packing::Packable, unpacking::Unpackable,
     },
     compilation_context::ModuleId,
+    data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     hostio::host_functions::{
         call_contract, delegate_call_contract, read_return_data, static_call_contract,
     },
     runtime::RuntimeFunction,
-    translation::{functions::MappedFunction, intermediate_types::IntermediateType},
+    storage,
+    translation::{
+        functions::MappedFunction,
+        intermediate_types::{IntermediateType, VmHandledStruct},
+    },
     vm_handled_types::{
         VmHandledType,
         contract_call_result::{ContractCallEmptyResult, ContractCallResult},
+        uid::Uid,
     },
 };
 
@@ -502,6 +508,134 @@ pub fn add_external_contract_call_fn(
                         function_information.function_id
                     );
                 }
+            }
+        });
+    }
+
+    // Before returning, if the call is a delegated call, we must load from storage the potentially
+    // modified storage objects
+    let mut storage_objects = function_information
+        .signature
+        .arguments
+        .iter()
+        .enumerate()
+        .filter_map(|(i, itype)| match itype {
+            IntermediateType::IStruct {
+                module_id,
+                index,
+                vm_handled_struct:
+                    VmHandledStruct::StorageId {
+                        parent_module_id,
+                        parent_index,
+                        instance_types,
+                    },
+            } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+                let (parent_struct_itype, parent_struct) =
+                    if let Some(instance_types) = instance_types {
+                        let itype = IntermediateType::IGenericStructInstance {
+                            module_id: parent_module_id.clone(),
+                            index: *parent_index,
+                            types: instance_types.clone(),
+                            vm_handled_struct: VmHandledStruct::None,
+                        };
+
+                        let struct_ = compilation_ctx
+                            .get_struct_by_index(module_id, *index)
+                            .unwrap();
+                        struct_.instantiate(&instance_types);
+
+                        (itype, struct_)
+                    } else {
+                        let itype = IntermediateType::IStruct {
+                            module_id: parent_module_id.clone(),
+                            index: *parent_index,
+                            vm_handled_struct: VmHandledStruct::None,
+                        };
+                        let struct_ = compilation_ctx
+                            .get_struct_by_index(module_id, *index)
+                            .unwrap();
+
+                        (itype, struct_)
+                    };
+
+                Some((function_args[i], parent_struct_itype, parent_struct))
+            }
+            _ => None,
+        })
+        .peekable();
+
+    if storage_objects.peek().is_some() {
+        let locate_storage_data_fn =
+            RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
+
+        builder.block(None, |block| {
+            let block_id = block.id();
+
+            let uid_ptr = module.locals.add(ValType::I32);
+            let original_struct_ptr = module.locals.add(ValType::I32);
+            let new_struct_ptr = module.locals.add(ValType::I32);
+
+            // Exit the block if it is not a delegate call
+            block
+                .local_get(is_delegate_call)
+                .i32_const(0)
+                .binop(BinaryOp::I32Eq)
+                .br_if(block_id);
+
+            for (storage_obj_uid, storage_obj_itype, storage_obj) in storage_objects {
+                block
+                    .local_get(storage_obj_uid)
+                    .i32_const(4)
+                    .binop(BinaryOp::I32Sub)
+                    .local_set(original_struct_ptr);
+
+                block
+                    .local_get(storage_obj_uid)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .local_tee(uid_ptr)
+                    .i32_const(0)
+                    .call(locate_storage_data_fn);
+
+                // The slot for this struct written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
+                // The owner of this struct written in DATA_STORAGE_OBJECT_OWNER_OFFSET
+                let read_and_decode_from_storage_fn = RuntimeFunction::ReadAndDecodeFromStorage
+                    .get_generic(module, compilation_ctx, &[&storage_obj_itype]);
+
+                block
+                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                    .local_get(uid_ptr)
+                    .call(read_and_decode_from_storage_fn)
+                    .local_set(new_struct_ptr);
+
+                // Once we return from the reading the allegedly modified object from storage, we
+                // replace the old pointer representation wiuth the new one returned by the
+                // function. We also replace 32 bytes before the pointer becouse the owner can
+                // change in the delegate call
+                // The function leaves in the stack the new struct ptr
+                block
+                    .local_get(original_struct_ptr)
+                    .i32_const(32)
+                    .binop(BinaryOp::I32Sub)
+                    .local_get(new_struct_ptr)
+                    .i32_const(32)
+                    .binop(BinaryOp::I32Sub)
+                    .i32_const(storage_obj.heap_size as i32 + 32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
             }
         });
     }
