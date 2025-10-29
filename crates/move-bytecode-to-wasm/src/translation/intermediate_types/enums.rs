@@ -22,13 +22,13 @@ use crate::{
 use super::structs::IStruct;
 
 use walrus::{
-    InstrSeqBuilder, Module, ValType,
+    InstrSeqBuilder, LocalId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
 use super::IntermediateType;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IEnumVariant {
     /// Index inside the enum
     pub index: u16,
@@ -40,7 +40,7 @@ pub struct IEnumVariant {
     pub fields: Vec<IntermediateType>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IEnum {
     pub index: u16,
 
@@ -154,6 +154,19 @@ impl IEnum {
             },
         );
 
+        // Set the pointers past the variant index
+        builder
+            .local_get(e1_ptr)
+            .i32_const(4)
+            .binop(BinaryOp::I32Add)
+            .local_set(e1_ptr);
+
+        builder
+            .local_get(e2_ptr)
+            .i32_const(4)
+            .binop(BinaryOp::I32Add)
+            .local_set(e2_ptr);
+
         // Compare the variant indices
         builder.binop(BinaryOp::I32Eq);
 
@@ -162,42 +175,21 @@ impl IEnum {
             |then| {
                 let result = module.locals.add(ValType::I32);
                 then.i32_const(0).local_set(result);
-                // Proceed to compare the fields of the variant
-                // Find the corresponding IEnumVariant for the variant index local
-                for variant in self.variants.iter() {
-                    then.block(None, |block| {
-                        let block_id = block.id();
-                        // If the variant index does not match, branch to the end of the block
-                        block
-                            .local_get(variant_index)
-                            .i32_const(variant.index as i32)
-                            .binop(BinaryOp::I32Ne)
-                            .br_if(block_id);
 
-                        block
-                            .local_get(e1_ptr)
-                            .i32_const(4)
-                            .binop(BinaryOp::I32Add)
-                            .local_set(e1_ptr);
-                        block
-                            .local_get(e2_ptr)
-                            .i32_const(4)
-                            .binop(BinaryOp::I32Add)
-                            .local_set(e2_ptr);
-
-                        // Use the same logic as structs to compare the fields
-                        IStruct::compare_fields(
-                            &variant.fields,
-                            block,
-                            module,
-                            compilation_ctx,
-                            module_data,
-                            e1_ptr,
-                            e2_ptr,
-                        );
-                        block.local_set(result);
-                    });
-                }
+                // Copy fields for the active arm, then jump to join
+                self.match_on_variant(then, variant_index, |variant, arm| {
+                    // Use the same logic as structs to compare the fields
+                    IStruct::compare_fields(
+                        &variant.fields,
+                        arm,
+                        module,
+                        compilation_ctx,
+                        module_data,
+                        e1_ptr,
+                        e2_ptr,
+                    );
+                    arm.local_set(result);
+                });
                 then.local_get(result);
             },
             |else_| {
@@ -254,30 +246,19 @@ impl IEnum {
             },
         );
 
-        // Find the corresponding IEnumVariant for the variant index local
-        for variant in self.variants.iter() {
-            builder.block(None, |block| {
-                let block_id = block.id();
-                // If the variant index does not match, branch to the end of the block
-                block
-                    .local_get(variant_index)
-                    .i32_const(variant.index as i32)
-                    .binop(BinaryOp::I32Ne)
-                    .br_if(block_id);
-
-                // Use the common field copying logic
-                IStruct::copy_fields(
-                    &variant.fields,
-                    block,
-                    module,
-                    compilation_ctx,
-                    module_data,
-                    src_ptr,
-                    ptr,
-                    4, // start_offset for enums is 4 because we already wrote the variant index
-                );
-            });
-        }
+        // Copy fields for the active arm, then jump to join
+        self.match_on_variant(builder, variant_index, |variant, arm| {
+            IStruct::copy_fields(
+                &variant.fields,
+                arm,
+                module,
+                compilation_ctx,
+                module_data,
+                src_ptr,
+                ptr,
+                4,
+            );
+        });
 
         builder.local_get(ptr);
     }
@@ -308,5 +289,46 @@ impl IEnum {
             variants,
             heap_size,
         }
+    }
+
+    /// Iterates all variants and runs `on_match` only for the active one
+    /// (selected by `variant_index`). Each arm is wrapped in its own block
+    /// with a guard (`br_if`) that skips non-matching arms.
+    ///
+    /// `on_match` receives:
+    ///   - &IEnumVariant: the matched variant
+    ///   - &mut InstrSeqBuilder: the builder for this arm
+    ///   - InstrSeqId: a `join_id` you can `br` to when you’re done
+    pub fn match_on_variant<F>(
+        &self,
+        builder: &mut InstrSeqBuilder,
+        variant_index: LocalId,
+        mut on_match: F,
+    ) where
+        F: FnMut(&IEnumVariant, &mut InstrSeqBuilder),
+    {
+        builder.block(None, |join| {
+            let join_id = join.id();
+
+            for variant in &self.variants {
+                join.block(None, |case| {
+                    let case_id = case.id();
+
+                    // Guard: skip if runtime index != this variant
+                    case.local_get(variant_index)
+                        .i32_const(variant.index as i32)
+                        .binop(BinaryOp::I32Ne)
+                        .br_if(case_id);
+
+                    // Matched: emit caller-provided body
+                    on_match(variant, case);
+
+                    case.br(join_id);
+                });
+            }
+
+            // Should be unreachable if the enum is well-formed
+            join.unreachable();
+        });
     }
 }
