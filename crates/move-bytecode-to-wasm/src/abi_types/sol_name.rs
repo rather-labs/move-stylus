@@ -24,7 +24,7 @@ impl SolName for IntermediateType {
             IntermediateType::IAddress => Some(sol_data::Address::SOL_NAME.to_string()),
             // According to the official documentation, enum types are encoded as uint8
             // TODO: check if the enum is simple
-            IntermediateType::IEnum(_) => Some(sol_data::Uint::<8>::SOL_NAME.to_string()),
+            IntermediateType::IEnum { .. } => Some(sol_data::Uint::<8>::SOL_NAME.to_string()),
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
                 inner.sol_name(compilation_ctx)
             }

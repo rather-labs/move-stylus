@@ -50,7 +50,7 @@ fn solidity_name(
         | IntermediateType::IU128
         | IntermediateType::IU256
         | IntermediateType::IAddress
-        | IntermediateType::IEnum(_) => argument.sol_name(compilation_ctx),
+        | IntermediateType::IEnum { .. } => argument.sol_name(compilation_ctx),
         IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
             solidity_name(inner, compilation_ctx)
         }

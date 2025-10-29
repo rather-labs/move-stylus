@@ -111,7 +111,7 @@ pub fn pack_variant(
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
                     | IntermediateType::IGenericStructInstance { .. }
-                    | IntermediateType::IEnum(_)
+                    | IntermediateType::IEnum { .. }
                     | IntermediateType::IGenericEnumInstance { .. } => {
                         builder.local_set(ptr_to_data);
                     }
@@ -160,6 +160,7 @@ pub fn unpack_variant(
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     types_stack: &mut TypesStack,
+    itype: &IntermediateType,
 ) -> Result<(), TranslationError> {
     let pointer = module.locals.add(ValType::I32);
 
@@ -175,7 +176,7 @@ pub fn unpack_variant(
         builder,
         compilation_ctx,
         pointer,
-        &IntermediateType::IEnum(enum_.index),
+        itype,
         types_stack,
     )?;
 
@@ -226,7 +227,7 @@ pub fn unpack_variant_ref(
             | IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_)
+            | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => {
                 // Add the offset to the pointer
                 builder

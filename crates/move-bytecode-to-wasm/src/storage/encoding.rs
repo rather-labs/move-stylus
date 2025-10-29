@@ -1191,6 +1191,17 @@ pub fn add_encode_intermediate_type_instructions(
 
             builder.i32_const(32).local_set(written_bytes_in_slot);
         }
+        IntermediateType::IEnum { module_id, index } => {
+            let enum_ = compilation_ctx
+                .get_enum_by_index(module_id, *index)
+                .expect("enum not found");
+            // let variant_index = compilation_ctx
+            //     .get_variant_position_by_index(index)
+            //     .expect("variant not found");
+            // builder
+            //     .local_get(val_32)
+            //     .call(enum_.get_variant_fn(variant_index));
+        }
 
         e => todo!("{e:?}"),
     };
@@ -1496,7 +1507,7 @@ pub fn add_decode_intermediate_type_instructions(
 /// Return the storage-encoded field size in bytes
 pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext) -> u32 {
     match field {
-        IntermediateType::IBool | IntermediateType::IU8 | IntermediateType::IEnum(_) => 1,
+        IntermediateType::IBool | IntermediateType::IU8 | IntermediateType::IEnum { .. } => 1,
         IntermediateType::IU16 => 2,
         IntermediateType::IU32 => 4,
         IntermediateType::IU64 => 8,

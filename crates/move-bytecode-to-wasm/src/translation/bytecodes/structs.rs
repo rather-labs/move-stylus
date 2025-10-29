@@ -188,7 +188,7 @@ pub fn pack(
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
                     | IntermediateType::IGenericStructInstance { .. }
-                    | IntermediateType::IEnum(_)
+                    | IntermediateType::IEnum { .. }
                     | IntermediateType::IGenericEnumInstance { .. } => {
                         builder.local_set(ptr_to_data);
                     }
@@ -303,7 +303,7 @@ pub fn unpack_fields(
             | IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_)
+            | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => {}
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 return Err(

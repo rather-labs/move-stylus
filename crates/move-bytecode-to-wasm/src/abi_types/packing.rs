@@ -224,7 +224,7 @@ impl Packable for IntermediateType {
             | IntermediateType::IMutRef(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_)
+            | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
@@ -361,15 +361,15 @@ impl Packable for IntermediateType {
                     None,
                 )
             }
-            IntermediateType::IEnum(enum_index) => {
+            IntermediateType::IEnum { index, .. } => {
                 let enum_ = compilation_ctx
                     .root_module_data
                     .enums
-                    .get_enum_by_index(*enum_index)
+                    .get_enum_by_index(*index)
                     .unwrap();
                 if !enum_.is_simple {
                     panic!(
-                        "cannot abi pack enum with index {enum_index}, it contains at least one variant with fields"
+                        "cannot abi pack enum with index {index}, it contains at least one variant with fields"
                     );
                 }
                 enum_.add_pack_instructions(builder, module, local, writer_pointer, compilation_ctx)
@@ -377,7 +377,7 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
             }
-            IntermediateType::IGenericEnumInstance { index, types } => {
+            IntermediateType::IGenericEnumInstance { index, types, .. } => {
                 let enum_ = compilation_ctx
                     .root_module_data
                     .enums
@@ -499,7 +499,9 @@ impl Packable for IntermediateType {
         match self {
             IntermediateType::IBool => sol_data::Bool::ENCODED_SIZE.unwrap(),
             // According to the official documentation, enum types are encoded as uint8
-            IntermediateType::IU8 | IntermediateType::IEnum(_) => {
+            IntermediateType::IU8
+            | IntermediateType::IEnum { .. }
+            | IntermediateType::IGenericEnumInstance { .. } => {
                 sol_data::Uint::<8>::ENCODED_SIZE.unwrap()
             }
             IntermediateType::IU16 => sol_data::Uint::<16>::ENCODED_SIZE.unwrap(),
@@ -536,9 +538,6 @@ impl Packable for IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("can't know the size of a generic type parameter at compile time");
             }
-            IntermediateType::IGenericEnumInstance { .. } => {
-                sol_data::Uint::<8>::ENCODED_SIZE.unwrap()
-            }
         }
     }
 
@@ -553,7 +552,8 @@ impl Packable for IntermediateType {
             | IntermediateType::IU256
             | IntermediateType::IAddress
             | IntermediateType::ISigner
-            | IntermediateType::IEnum(_) => false,
+            | IntermediateType::IEnum { .. }
+            | IntermediateType::IGenericEnumInstance { .. } => false,
             IntermediateType::IVector(_) => true,
             IntermediateType::IStruct {
                 module_id, index, ..
@@ -582,7 +582,6 @@ impl Packable for IntermediateType {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
                 inner.is_dynamic(compilation_ctx)
             }
-            IntermediateType::IGenericEnumInstance { .. } => false,
         }
     }
 }

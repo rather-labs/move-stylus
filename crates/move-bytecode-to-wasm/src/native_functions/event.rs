@@ -209,7 +209,7 @@ pub fn add_emit_log_fn(
                     abi_encoded_data_writer_pointer,
                 )));
             }
-            IntermediateType::IEnum(_) => todo!(),
+            IntermediateType::IEnum { .. } => todo!(),
             _ => panic!("invalid event field {field:?}"),
         }
     }
@@ -376,7 +376,7 @@ pub fn add_emit_log_fn(
                         .local_set(calldata_reference_pointer);
                 }
             }
-            IntermediateType::IEnum(_) => todo!(),
+            IntermediateType::IEnum { .. } => todo!(),
             _ => panic!("invalid event field {field:?}"),
         }
     }
