@@ -526,8 +526,6 @@ mod cross_contract_calls {
             Baz baz;
         }
 
-        function test(bytes32 id) external;
-        function create() external;
         function ccCallEmptyRes1(address contract_address) external returns (bool);
         function ccCallEmptyRes2(address contract_address, uint64 v) external returns (bool);
         function ccCallEmptyRes3(address contract_address, Foo v) external returns (bool);
@@ -843,24 +841,6 @@ mod cross_contract_calls {
             assert_eq!(false.abi_encode(), return_data);
         }
     }
-
-    #[rstest]
-    fn test_bug(runtime: RuntimeSandbox) {
-        runtime.set_cross_contract_call_success(true);
-
-        let (result, return_data) = runtime
-            .call_entrypoint(createCall::new(()).abi_encode())
-            .unwrap();
-        assert_eq!(0, result);
-
-        let uid = runtime.obtain_uid();
-        println!("UID: {uid:?}");
-
-        let (result, return_data) = runtime
-            .call_entrypoint(testCall::new((uid,)).abi_encode())
-            .unwrap();
-        assert_eq!(0, result);
-    }
 }
 
 mod cross_contract_calls_result {
@@ -924,7 +904,6 @@ mod cross_contract_calls_result {
             Bazz bazz;
             Baz baz;
         }
-
 
         function ccCallViewRes1(address contract_address) external returns (uint64);
         function ccCallViewRes2(address contract_address) external returns (Foo);

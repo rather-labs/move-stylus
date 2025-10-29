@@ -16,3 +16,8 @@ entry fun increment(counter: &mut Counter) {
     counter.value = counter.value + 1;
 }
 
+/// Set value (only runnable by the Counter owner)
+entry fun set_value(counter: &mut Counter, value: u64, ctx: &TxContext) {
+    assert!(counter.owner == ctx.sender(), 0);
+    counter.value = value;
+}

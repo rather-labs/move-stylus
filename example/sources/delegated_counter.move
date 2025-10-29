@@ -33,15 +33,6 @@ entry fun increment(counter: &mut Counter) {
     assert!(res.succeded(), 33);
 }
 
-entry fun increment_and_modify(counter: &mut Counter) {
-    let delegated_counter = dci::new(
-        contract_calls::new(counter.contract_address)
-            .delegate()
-    );
-    let res = delegated_counter.increment(&mut counter.id);
-    assert!(res.succeded(), 33);
-}
-
 /// Read counter.
 entry fun read(counter: &Counter): u64 {
     counter.value
@@ -55,4 +46,14 @@ entry fun logic_address(counter: &Counter): address {
 /// Change the address where the delegated calls are made.
 entry fun change_logic(counter: &mut Counter, logic_address: address) {
     counter.contract_address = logic_address;
+}
+
+/// Set value (only runnable by the Counter owner)
+entry fun set_value(counter: &mut Counter, value: u64, ctx: &TxContext) {
+    assert!(counter.owner == ctx.sender(), 0);
+    let delegated_counter = dci::new(
+        contract_calls::new(counter.contract_address)
+            .delegate()
+    );
+    delegated_counter.set_value(&mut counter.id, value);
 }

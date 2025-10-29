@@ -13,3 +13,5 @@ public fun new(configuration: CrossContractCall): CounterCall {
 #[ext(external_call)]
 public native fun increment(self: &CounterCall, counter: &mut UID): ContractCallEmptyResult;
 
+#[ext(external_call)]
+public native fun set_value(self: &CounterCall, counter: &mut UID, value: u64): ContractCallEmptyResult;
