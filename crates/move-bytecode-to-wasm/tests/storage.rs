@@ -6058,6 +6058,13 @@ mod simple_warrior {
             UID id;
             OptionSword sword;
             OptionShield shield;
+            Faction faction;
+        }
+
+        enum Faction {
+            Alliance,
+            Horde,
+            Rebel
         }
 
         function createWarrior() public view;
@@ -6070,6 +6077,7 @@ mod simple_warrior {
         function inspectShield(bytes32 id) public view returns (Shield);
         function destroyWarrior(bytes32 id) public;
         function destroySword(bytes32 id) public;
+        function changeFaction(bytes32 id, uint8 faction) public;
     );
 
     #[rstest]
@@ -6093,6 +6101,7 @@ mod simple_warrior {
             },
             sword: OptionSword { vec: vec![] },
             shield: OptionShield { vec: vec![] },
+            faction: Faction::Rebel,
         });
         assert_eq!(Warrior::abi_encode(&return_data), expected_return_data);
         assert_eq!(0, result);
@@ -6127,6 +6136,7 @@ mod simple_warrior {
                 }],
             },
             shield: OptionShield { vec: vec![] },
+            faction: Faction::Rebel,
         });
         assert_eq!(Warrior::abi_encode(&return_data), expected_return_data);
         assert_eq!(0, result);
@@ -6165,6 +6175,7 @@ mod simple_warrior {
                 }],
             },
             shield: OptionShield { vec: vec![] },
+            faction: Faction::Rebel,
         });
         assert_eq!(Warrior::abi_encode(&return_data), expected_return_data);
         assert_eq!(0, result);
@@ -6225,12 +6236,49 @@ mod simple_warrior {
                     armor: 42,
                 }],
             },
+            faction: Faction::Rebel,
         });
         assert_eq!(Warrior::abi_encode(&return_data), expected_return_data);
         assert_eq!(0, result);
 
         // Assert that the original shield slot (under the sender's address) is now empty
         assert_eq!(runtime.get_storage_at_slot(shield_slot.0), [0u8; 32]);
+
+        // Change faction
+        let call_data = changeFactionCall::new((warrior_id, 0)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        // Inspect warrior and assert it has the new faction
+        let call_data = inspectWarriorCall::new((warrior_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = inspectWarriorCall::abi_decode_returns(&return_data).unwrap();
+        let expected_return_data = Warrior::abi_encode(&Warrior {
+            id: UID {
+                id: ID { bytes: warrior_id },
+            },
+            sword: OptionSword {
+                vec: vec![Sword {
+                    id: UID {
+                        id: ID {
+                            bytes: new_sword_id,
+                        },
+                    },
+                    strength: 77,
+                }],
+            },
+            shield: OptionShield {
+                vec: vec![Shield {
+                    id: UID {
+                        id: ID { bytes: shield_id },
+                    },
+                    armor: 42,
+                }],
+            },
+            faction: Faction::Alliance,
+        });
+        assert_eq!(Warrior::abi_encode(&return_data), expected_return_data);
+        assert_eq!(0, result);
 
         let storage_before_destroy = runtime.get_storage();
         // Destroy warrior

@@ -40,4 +40,7 @@ pub enum CompilationContextError {
 
     #[error("expected struct")]
     ExpectedStruct,
+
+    #[error("expected enum")]
+    ExpectedEnum,
 }

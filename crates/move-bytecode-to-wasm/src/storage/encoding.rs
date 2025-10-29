@@ -166,6 +166,135 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
         .call(storage_cache);
 }
 
+#[allow(clippy::too_many_arguments)]
+pub fn add_encode_and_save_into_storage_enum_instructions(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    enum_ptr: LocalId,
+    slot_ptr: LocalId,
+    owner_ptr: LocalId,
+    itype: &IntermediateType,
+    written_bytes_in_slot: LocalId,
+) {
+    // Host functions
+    let (storage_cache, _) = storage_cache_bytes32(module);
+
+    // Runtime functions
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
+
+    // Get the IEnum representation
+    let enum_ = compilation_ctx
+        .get_enum_by_intermediate_type(itype)
+        .unwrap_or_else(|_| {
+            panic!("there wsas an error encoding an enum for storage, found {itype:?}")
+        });
+
+    let variant_index = module.locals.add(ValType::I32);
+    builder
+        .local_get(enum_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(variant_index);
+
+    // First write the variant index in the slot data.
+    // written_bytes_in_slot already accounts for the variant's 1 byte.
+    builder
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .i32_const(32)
+        .local_get(written_bytes_in_slot)
+        .binop(BinaryOp::I32Sub)
+        .binop(BinaryOp::I32Add)
+        .local_get(variant_index)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32_8 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    // Match on the variant and encode its fields.
+    enum_.match_on_variant(builder, variant_index, |variant, block| {
+        for (index, field) in variant.fields.iter().enumerate() {
+            let field_size = field_size(field, compilation_ctx);
+            block
+                .local_get(written_bytes_in_slot)
+                .i32_const(field_size as i32)
+                .binop(BinaryOp::I32Add)
+                .i32_const(32)
+                .binop(BinaryOp::I32GtS)
+                .if_else(
+                    None,
+                    |then| {
+                        // Save previous slot
+                        then.local_get(slot_ptr)
+                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                            .call(storage_cache);
+
+                        // Wipe the data so it can be filled with new data
+                        then.i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                            .i32_const(0)
+                            .i32_const(32)
+                            .memory_fill(compilation_ctx.memory_id);
+
+                        // Next slot
+                        then.local_get(slot_ptr)
+                            .call(next_slot_fn)
+                            .local_set(slot_ptr);
+
+                        // Set the written bytes in slot to the field size
+                        then.i32_const(field_size as i32)
+                            .local_set(written_bytes_in_slot);
+                    },
+                    |else_| {
+                        // Increment the written bytes in slot by the field size
+                        else_
+                            .local_get(written_bytes_in_slot)
+                            .i32_const(field_size as i32)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(written_bytes_in_slot);
+                    },
+                );
+
+            // Load field's intermediate pointer
+            block.local_get(enum_ptr).load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: index as u32 * 4,
+                },
+            );
+
+            // Encode the field
+            add_encode_intermediate_type_instructions(
+                module,
+                block,
+                compilation_ctx,
+                slot_ptr,
+                owner_ptr,
+                field,
+                written_bytes_in_slot,
+                true,
+            );
+        }
+
+        // Always save the last slot
+        block
+            .local_get(slot_ptr)
+            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .call(storage_cache);
+    });
+}
+
 /// Adds the instructions to read, decode from storage and build in memory a structure.
 ///
 /// # Arguments
@@ -389,6 +518,134 @@ pub fn add_read_and_decode_storage_struct_instructions(
     }
 
     struct_ptr
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn add_read_and_decode_storage_enum_instructions(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    slot_ptr: LocalId,
+    owner_ptr: LocalId,
+    itype: &IntermediateType,
+    read_bytes_in_slot: LocalId,
+) -> LocalId {
+    // Host functions
+    let (storage_load, _) = storage_load_bytes32(module);
+
+    // Runtime functions
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
+
+    // Get the IEnum representation
+    let enum_ = compilation_ctx
+        .get_enum_by_intermediate_type(itype)
+        .expect("enum not found");
+
+    let heap_size = enum_
+        .heap_size
+        .expect("cannot decode enum with unresolved generic heap size") as i32;
+
+    // Locals
+    let enum_ptr = module.locals.add(ValType::I32);
+    let field_ptr = module.locals.add(ValType::I32);
+    let variant_index = module.locals.add(ValType::I32);
+
+    // Allocate memory for the enum
+    builder
+        .i32_const(heap_size)
+        .call(compilation_ctx.allocator)
+        .local_set(enum_ptr);
+
+    // Read the variant index (first byte)
+    // The read_bytes_in_slot variable already accounts for the variant index byte.
+    builder
+        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+        .i32_const(32)
+        .local_get(read_bytes_in_slot)
+        .binop(BinaryOp::I32Sub)
+        .binop(BinaryOp::I32Add)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32_8 {
+                kind: ExtendedLoad::ZeroExtend,
+            },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_set(variant_index);
+
+    // Store the variant index in the first 4 bytes of the enum
+    builder.local_get(enum_ptr).local_get(variant_index).store(
+        compilation_ctx.memory_id,
+        StoreKind::I32 { atomic: false },
+        MemArg {
+            align: 0,
+            offset: 0,
+        },
+    );
+
+    // Decode fields for the active variant
+    enum_.match_on_variant(builder, variant_index, |variant, block| {
+        for (index, field) in variant.fields.iter().enumerate() {
+            let field_size = field_size(field, compilation_ctx) as i32;
+
+            // If the entire slot has been processed, move to the subsequent slot and retrieve its data
+            block
+                .local_get(read_bytes_in_slot)
+                .i32_const(field_size)
+                .binop(BinaryOp::I32Add)
+                .i32_const(32)
+                .binop(BinaryOp::I32GtU)
+                .if_else(
+                    None,
+                    |then| {
+                        then.local_get(slot_ptr)
+                            .call(next_slot_fn)
+                            .local_set(slot_ptr);
+
+                        // Load the slot data
+                        then.local_get(slot_ptr)
+                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                            .call(storage_load);
+
+                        then.i32_const(field_size).local_set(read_bytes_in_slot);
+                    },
+                    |else_| {
+                        else_
+                            .local_get(read_bytes_in_slot)
+                            .i32_const(field_size)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(read_bytes_in_slot);
+                    },
+                );
+
+            // Decode the field according to its type
+            add_decode_intermediate_type_instructions(
+                module,
+                block,
+                compilation_ctx,
+                field_ptr,
+                slot_ptr,
+                owner_ptr,
+                field,
+                read_bytes_in_slot,
+            );
+
+            // Store the field in the enum at offset index * 4 (after the 4-byte tag)
+            block.local_get(enum_ptr).local_get(field_ptr).store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 4 + 4 * index as u32,
+                },
+            );
+        }
+    });
+
+    enum_ptr
 }
 
 /// Adds the instructions to encode and save a vector (as a field in a struct) into storage.
@@ -1064,12 +1321,7 @@ pub fn add_encode_intermediate_type_instructions(
 
             builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         }
-        IntermediateType::IStruct {
-            module_id, index, ..
-        }
-        | IntermediateType::IGenericStructInstance {
-            module_id, index, ..
-        } => {
+        IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
             // This section handles encoding of nested structs within parent structs.
             // The behavior differs based on whether the child struct has the 'key' ability:
             // - If child has 'key': stored as separate object under the parent key
@@ -1080,16 +1332,8 @@ pub fn add_encode_intermediate_type_instructions(
 
             // Get child struct by (module_id, index)
             let child_struct = compilation_ctx
-                .get_struct_by_index(module_id, *index)
+                .get_struct_by_intermediate_type(itype)
                 .expect("struct not found");
-
-            // If it's a generic instance, instantiate; otherwise use as-is
-            let child_struct = if let IntermediateType::IGenericStructInstance { types, .. } = itype
-            {
-                child_struct.instantiate(types)
-            } else {
-                child_struct.clone()
-            };
 
             if child_struct.has_key {
                 // ====================================================================
@@ -1176,6 +1420,20 @@ pub fn add_encode_intermediate_type_instructions(
                 );
             }
         }
+        IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
+            builder.local_set(val_32);
+
+            add_encode_and_save_into_storage_enum_instructions(
+                module,
+                builder,
+                compilation_ctx,
+                val_32,
+                slot_ptr,
+                owner_ptr,
+                itype,
+                written_bytes_in_slot,
+            );
+        }
         IntermediateType::IVector(inner) => {
             builder.local_set(val_32);
 
@@ -1191,18 +1449,6 @@ pub fn add_encode_intermediate_type_instructions(
 
             builder.i32_const(32).local_set(written_bytes_in_slot);
         }
-        IntermediateType::IEnum { module_id, index } => {
-            let enum_ = compilation_ctx
-                .get_enum_by_index(module_id, *index)
-                .expect("enum not found");
-            // let variant_index = compilation_ctx
-            //     .get_variant_position_by_index(index)
-            //     .expect("variant not found");
-            // builder
-            //     .local_get(val_32)
-            //     .call(enum_.get_variant_fn(variant_index));
-        }
-
         e => todo!("{e:?}"),
     };
 }
@@ -1368,12 +1614,7 @@ pub fn add_decode_intermediate_type_instructions(
             // Copy the chunk of memory
             builder.memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
         }
-        IntermediateType::IStruct {
-            module_id, index, ..
-        }
-        | IntermediateType::IGenericStructInstance {
-            module_id, index, ..
-        } => {
+        IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
             // ========================================================================
             // Handle Nested Struct Decoding
             // ========================================================================
@@ -1383,17 +1624,9 @@ pub fn add_decode_intermediate_type_instructions(
             // - If child has no 'key': decode child directly from current slot (flattened)
 
             // Get base definition by (module_id, index)
-            let base_def = compilation_ctx
-                .get_struct_by_index(module_id, *index)
+            let child_struct = compilation_ctx
+                .get_struct_by_intermediate_type(itype)
                 .expect("struct not found");
-
-            // If it's a generic instance, instantiate; otherwise use as-is
-            let child_struct = if let IntermediateType::IGenericStructInstance { types, .. } = itype
-            {
-                base_def.instantiate(types)
-            } else {
-                base_def.clone()
-            };
 
             if child_struct.has_key {
                 // ====================================================================
@@ -1489,6 +1722,20 @@ pub fn add_decode_intermediate_type_instructions(
                 builder.local_get(child_struct_ptr).local_set(data_ptr);
             }
         }
+        IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
+            let enum_ptr = add_read_and_decode_storage_enum_instructions(
+                module,
+                builder,
+                compilation_ctx,
+                slot_ptr,
+                owner_ptr,
+                itype,
+                read_bytes_in_slot,
+            );
+
+            // Set the decoded enum as the result
+            builder.local_get(enum_ptr).local_set(data_ptr);
+        }
         IntermediateType::IVector(inner_) => {
             add_read_and_decode_storage_vector_instructions(
                 module,
@@ -1507,7 +1754,10 @@ pub fn add_decode_intermediate_type_instructions(
 /// Return the storage-encoded field size in bytes
 pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext) -> u32 {
     match field {
-        IntermediateType::IBool | IntermediateType::IU8 | IntermediateType::IEnum { .. } => 1,
+        IntermediateType::IBool
+        | IntermediateType::IU8
+        | IntermediateType::IEnum { .. }
+        | IntermediateType::IGenericEnumInstance { .. } => 1,
         IntermediateType::IU16 => 2,
         IntermediateType::IU32 => 4,
         IntermediateType::IU64 => 8,
@@ -1539,6 +1789,5 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
         IntermediateType::ITypeParameter(_) => {
             panic!("cannot know the field size of a type parameter");
         }
-        IntermediateType::IGenericEnumInstance { .. } => todo!(),
     }
 }
