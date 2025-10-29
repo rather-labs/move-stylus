@@ -213,8 +213,8 @@ mod control_flow {
     #[fixture]
     #[once]
     fn runtime() -> RuntimeSandbox {
-        const MODULE_NAME: &str = "simple_enums_control_flow";
-        const SOURCE_PATH: &str = "tests/enums/simple_enums_control_flow.move";
+        const MODULE_NAME: &str = "enums_control_flow";
+        const SOURCE_PATH: &str = "tests/enums/enums_control_flow.move";
 
         let mut translated_package = translate_test_package(SOURCE_PATH, MODULE_NAME);
 
@@ -222,7 +222,7 @@ mod control_flow {
     }
 
     sol! {
-        enum NumberEnum {
+        enum Number {
             One,
             Two,
             Three,
@@ -230,257 +230,176 @@ mod control_flow {
             Five,
         }
 
-        enum ColorEnum {
-            Red,
-            Green,
-            Blue,
+        enum Color {
+            R,
+            G,
+            B,
         }
 
-        enum YinYangEnum {
-            Yin,
-            Yang,
+        enum Boolean {
+            True,
+            False,
         }
 
-        function matchNumberEnum(NumberEnum x) external returns (uint32);
-        function singleMatch(NumberEnum x) external returns (uint32);
-        function matchNestedEnum(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
-        function matchWithConditional(NumberEnum x, uint32 y) external returns (uint32);
-        function nestedMatchWithConditional(NumberEnum x, ColorEnum y, uint32 z) external returns (uint32);
-        function controlFlow1(NumberEnum x, ColorEnum y) external returns (uint32);
-        function controlFlow1Bis(NumberEnum x, ColorEnum y) external returns (uint32);
-        function controlFlow2(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
-        function controlFlow2Bis(NumberEnum x, ColorEnum y, YinYangEnum z) external returns (uint32);
-        function testControlFlowWithWhile(ColorEnum x) external returns (uint32);
+        function simpleMatch(Number n) external returns (uint32);
+        function simpleMatchSingleCase(Number n) external returns (uint32);
+        function nestedMatch(Number n, Color c, Boolean b) external returns (uint32);
+        function matchWithConditional(Number n, bool a, bool b) external returns (uint32);
+        function nestedMatchWithConditional(Number n, Color c, bool a, bool b) external returns (uint32);
+        function matchWithManyAborts(Number n, Color c) external returns (uint32);
+        function matchWithSingleYieldingBranch(Number n, Color c) external returns (uint32);
+        function miscControlFlow(Number n, Color c, Boolean b) external returns (uint32, uint32);
+        function miscControlFlow2(Number n, Color c, Boolean b) external returns (uint32);
+        function miscControlFlow3(Color c) external returns (uint64);
+        function miscControlFlow4(Number n, Boolean b) external returns (uint64);
+        function miscControlFlow5(Number n, Color c, bool flag) external returns (uint64);
     }
 
     #[rstest]
-    #[case(NumberEnum::One, 11)]
-    #[case(NumberEnum::Two, 22)]
-    #[case(NumberEnum::Three, 33)]
-    #[case(NumberEnum::Four, 44)]
-    #[case(NumberEnum::Five, 44)]
-    fn test_basic_enum_match(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] input: NumberEnum,
-        #[case] expected: u32,
-    ) {
-        let call_data = matchNumberEnumCall::new((input,)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(result, 0);
-        assert_eq!(return_data, expected.abi_encode());
-    }
-
-    #[rstest]
-    #[case(NumberEnum::One, 42)]
+    #[case(simpleMatchCall::new((Number::One,)), (1,))]
+    #[case(simpleMatchCall::new((Number::Two,)), (2,))]
+    #[case(simpleMatchCall::new((Number::Three,)), (3,))]
+    #[case(simpleMatchCall::new((Number::Four,)), (4,))]
+    #[case(simpleMatchCall::new((Number::Five,)), (5,))]
+    #[case(simpleMatchSingleCaseCall::new((Number::One,)), (42,))]
     #[should_panic]
-    #[case(NumberEnum::Two, 0)]
+    #[case(simpleMatchSingleCaseCall::new((Number::Two,)), (0,))]
     #[should_panic]
-    #[case(NumberEnum::Three, 0)]
+    #[case(simpleMatchSingleCaseCall::new((Number::Three,)), (0,))]
     #[should_panic]
-    #[case(NumberEnum::Four, 0)]
-    fn test_single_match(
+    #[case(simpleMatchSingleCaseCall::new((Number::Four,)), (0,))]
+    #[case(nestedMatchCall::new((Number::One, Color::R, Boolean::True)), (1,))]
+    #[case(nestedMatchCall::new((Number::Two, Color::R, Boolean::True)), (2,))]
+    #[case(nestedMatchCall::new((Number::Two, Color::G, Boolean::False)), (3,))]
+    #[case(nestedMatchCall::new((Number::Two, Color::B, Boolean::True)), (4,))]
+    #[case(nestedMatchCall::new((Number::Three, Color::R, Boolean::True)), (5,))]
+    #[case(nestedMatchCall::new((Number::Four, Color::B, Boolean::False)), (6,))]
+    #[case(nestedMatchCall::new((Number::Five, Color::G, Boolean::False)), (6,))]
+    #[case(matchWithConditionalCall::new((Number::One, true, false)), (1,))]
+    #[case(matchWithConditionalCall::new((Number::One, false, true)), (6,))]
+    #[case(matchWithConditionalCall::new((Number::Two, true, true)), (2,))]
+    #[case(matchWithConditionalCall::new((Number::Two, false, false)), (6,))]
+    #[case(matchWithConditionalCall::new((Number::Three, true, true)), (2,))]
+    #[case(matchWithConditionalCall::new((Number::Three, false, false)), (6,))]
+    #[case(matchWithConditionalCall::new((Number::Four, true, false)), (2,))]
+    #[case(matchWithConditionalCall::new((Number::Four, false, true)), (4,))]
+    #[case(matchWithConditionalCall::new((Number::Four, false, false)), (5,))]
+    #[case(matchWithConditionalCall::new((Number::Five, true, false)), (2,))]
+    #[case(matchWithConditionalCall::new((Number::Five, false, true)), (3,))]
+    #[case(matchWithConditionalCall::new((Number::Five, false, false)), (3,))]
+    #[case(nestedMatchWithConditionalCall::new((Number::One, Color::R, true, false)), (1,))]
+    #[case(nestedMatchWithConditionalCall::new((Number::Two, Color::R, true, false)), (2,))]
+    #[case(nestedMatchWithConditionalCall::new((Number::Three, Color::R, true, false)), (2,))]
+    #[case(nestedMatchWithConditionalCall::new((Number::Four, Color::R, true, false)), (2,))]
+    #[case(nestedMatchWithConditionalCall::new((Number::Five, Color::R, true, false)), (2,))]
+    #[case(nestedMatchWithConditionalCall::new((Number::Five, Color::R, false, true)), (3,))]
+    #[case(nestedMatchWithConditionalCall::new((Number::Four, Color::R, false, true)), (4,))]
+    #[case(nestedMatchWithConditionalCall::new((Number::Four, Color::R, false, false)), (6,))]
+    #[case(nestedMatchWithConditionalCall::new((Number::Four, Color::B, false, false)), (7,))]
+    #[case(nestedMatchWithConditionalCall::new((Number::One, Color::B, false, true)), (8,))]
+    #[case(nestedMatchWithConditionalCall::new((Number::Two, Color::G, true, false)), (2,))]
+    #[case(nestedMatchWithConditionalCall::new((Number::Three, Color::G, true, false)), (2,))]
+    #[case(nestedMatchWithConditionalCall::new((Number::Four, Color::G, false, true)), (5,))]
+    #[case(nestedMatchWithConditionalCall::new((Number::Five, Color::G, false, true)), (3,))]
+    #[case(nestedMatchWithConditionalCall::new((Number::One, Color::G, false, false)), (8,))]
+    #[should_panic]
+    #[case(matchWithManyAbortsCall::new((Number::One, Color::R)), (1,))]
+    #[should_panic]
+    #[case(matchWithManyAbortsCall::new((Number::Two, Color::R)), (2,))]
+    #[case(matchWithManyAbortsCall::new((Number::Two, Color::G)), (1,))]
+    #[should_panic]
+    #[case(matchWithManyAbortsCall::new((Number::Two, Color::B)), (2,))]
+    #[should_panic]
+    #[case(matchWithManyAbortsCall::new((Number::Three, Color::R)), (1,))]
+    #[should_panic]
+    #[case(matchWithManyAbortsCall::new((Number::Three, Color::B)), (1,))]
+    #[case(matchWithManyAbortsCall::new((Number::Four, Color::R)), (2,))]
+    #[should_panic]
+    #[case(matchWithManyAbortsCall::new((Number::Five, Color::G)), (2,))]
+    #[should_panic]
+    #[case(matchWithSingleYieldingBranchCall::new((Number::One, Color::R)), (42,))]
+    #[should_panic]
+    #[case(matchWithSingleYieldingBranchCall::new((Number::Two, Color::R)), (42,))]
+    #[case(matchWithSingleYieldingBranchCall::new((Number::Two, Color::G)), (1,))]
+    #[should_panic]
+    #[case(matchWithSingleYieldingBranchCall::new((Number::Two, Color::B)), (42,))]
+    #[should_panic]
+    #[case(matchWithSingleYieldingBranchCall::new((Number::Three, Color::B)), (42,))]
+    #[should_panic]
+    #[case(matchWithSingleYieldingBranchCall::new((Number::Four, Color::R)), (42,))]
+    #[should_panic]
+    #[case(matchWithSingleYieldingBranchCall::new((Number::Four, Color::G)), (42,))]
+    #[should_panic]
+    #[case(matchWithSingleYieldingBranchCall::new((Number::Five, Color::G)), (42,))]
+    #[should_panic]
+    #[case(miscControlFlowCall::new((Number::One, Color::R, Boolean::True)), (42,))]
+    #[should_panic]
+    #[case(miscControlFlowCall::new((Number::Two, Color::R, Boolean::True)), (42,))]
+    #[case(miscControlFlowCall::new((Number::Two, Color::G, Boolean::False)), (5,))]
+    #[case(miscControlFlowCall::new((Number::Two, Color::G, Boolean::True)), (4,))]
+    #[should_panic]
+    #[case(miscControlFlowCall::new((Number::Two, Color::B, Boolean::True)), (42,))]
+    #[should_panic]
+    #[case(miscControlFlowCall::new((Number::Three, Color::B, Boolean::True)), (42,))]
+    #[case(miscControlFlowCall::new((Number::Four, Color::R, Boolean::False)), (6,))]
+    #[case(miscControlFlowCall::new((Number::Four, Color::G, Boolean::False)), (6,))]
+    #[case(miscControlFlowCall::new((Number::Four, Color::G, Boolean::True)), (5,))]
+    #[should_panic]
+    #[case(miscControlFlowCall::new((Number::Five, Color::G, Boolean::True)), (42,))]
+    #[case(miscControlFlow2Call::new((Number::Two, Color::G, Boolean::False)), (3,))]
+    #[should_panic]
+    #[case(miscControlFlow2Call::new((Number::One, Color::R, Boolean::True)), (42,))]
+    #[should_panic]
+    #[case(miscControlFlow2Call::new((Number::Two, Color::R, Boolean::True)), (42,))]
+    #[should_panic]
+    #[case(miscControlFlow2Call::new((Number::Two, Color::G, Boolean::True)), (42,))]
+    #[should_panic]
+    #[case(miscControlFlow2Call::new((Number::Two, Color::B, Boolean::True)), (42,))]
+    #[should_panic]
+    #[case(miscControlFlow2Call::new((Number::Three, Color::B, Boolean::True)), (42,))]
+    #[should_panic]
+    #[case(miscControlFlow2Call::new((Number::Four, Color::R, Boolean::False)), (42,))]
+    #[should_panic]
+    #[case(miscControlFlow2Call::new((Number::Four, Color::G, Boolean::False)), (42,))]
+    #[should_panic]
+    #[case(miscControlFlow2Call::new((Number::Five, Color::G, Boolean::True)), (42,))]
+    #[should_panic]
+    #[case(miscControlFlow2Call::new((Number::Two, Color::R, Boolean::False)), (42,))]
+    #[should_panic]
+    #[case(miscControlFlow2Call::new((Number::Two, Color::B, Boolean::False)), (42,))]
+    #[case(miscControlFlow3Call::new((Color::R,)), (5,))]
+    #[case(miscControlFlow3Call::new((Color::G,)), (7,))]
+    #[case(miscControlFlow3Call::new((Color::B,)), (11,))]
+    #[case(miscControlFlow4Call::new((Number::One, Boolean::True)), (2,))]
+    #[case(miscControlFlow4Call::new((Number::Two, Boolean::True)), (4,))]
+    #[case(miscControlFlow4Call::new((Number::Three, Boolean::True)), (30,))]
+    #[case(miscControlFlow4Call::new((Number::Four, Boolean::True)), (30,))]
+    #[case(miscControlFlow4Call::new((Number::Five, Boolean::True)), (30,))]
+    #[case(miscControlFlow4Call::new((Number::One, Boolean::False)), (3,))]
+    #[case(miscControlFlow4Call::new((Number::Two, Boolean::False)), (6,))]
+    #[case(miscControlFlow5Call::new((Number::One, Color::R, true)), (4,))]
+    #[case(miscControlFlow5Call::new((Number::Two, Color::R, true)), (8,))]
+    #[case(miscControlFlow5Call::new((Number::Three, Color::R, true)), (20,))]
+    #[case(miscControlFlow5Call::new((Number::Four, Color::R, true)), (24,))]
+    #[case(miscControlFlow5Call::new((Number::Five, Color::R, true)), (28,))]
+    #[case(miscControlFlow5Call::new((Number::One, Color::R, false)), (40,))]
+    #[case(miscControlFlow5Call::new((Number::Two, Color::G, false)), (80,))]
+    #[case(miscControlFlow5Call::new((Number::Three, Color::B, false)), (120,))]
+    #[case(miscControlFlow5Call::new((Number::Four, Color::R, false)), (40,))]
+    #[case(miscControlFlow5Call::new((Number::Five, Color::G, false)), (80,))]
+    fn test_match_with_many_aborts<T: SolCall, V: SolValue>(
         #[by_ref] runtime: &RuntimeSandbox,
-        #[case] input: NumberEnum,
-        #[case] expected: u32,
-    ) {
-        let call_data = singleMatchCall::new((input,)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(result, 0);
-        assert_eq!(return_data, expected.abi_encode());
-    }
-
-    #[rstest]
-    #[case(NumberEnum::One, ColorEnum::Red, YinYangEnum::Yin, 11)]
-    #[case(NumberEnum::Two, ColorEnum::Red, YinYangEnum::Yang, 22)]
-    #[case(NumberEnum::Two, ColorEnum::Green, YinYangEnum::Yin, 33)]
-    #[case(NumberEnum::Two, ColorEnum::Blue, YinYangEnum::Yang, 44)]
-    #[case(NumberEnum::Three, ColorEnum::Red, YinYangEnum::Yin, 55)]
-    #[case(NumberEnum::Four, ColorEnum::Blue, YinYangEnum::Yang, 66)]
-    #[case(NumberEnum::Five, ColorEnum::Green, YinYangEnum::Yang, 66)]
-    fn test_nested_enum_match(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] number: NumberEnum,
-        #[case] color: ColorEnum,
-        #[case] yin_yang: YinYangEnum,
-        #[case] expected: u32,
-    ) {
-        let call_data = matchNestedEnumCall::new((number, color, yin_yang)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(result, 0);
-        assert_eq!(return_data, expected.abi_encode());
-    }
-
-    #[rstest]
-    #[case(NumberEnum::One, 43, 1)]
-    #[case(NumberEnum::Two, 44, 2)]
-    #[case(NumberEnum::Three, 45, 2)]
-    #[case(NumberEnum::Four, 123, 2)]
-    #[case(NumberEnum::Five, 321, 2)]
-    #[case(NumberEnum::Five, 10, 3)]
-    #[case(NumberEnum::Four, 30, 4)]
-    #[case(NumberEnum::Four, 10, 5)]
-    #[case(NumberEnum::One, 0, 6)]
-    #[case(NumberEnum::Two, 42, 6)]
-    #[case(NumberEnum::Three, 18, 6)]
-    fn test_match_with_conditional(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] number: NumberEnum,
-        #[case] y: u32,
-        #[case] expected: u32,
-    ) {
-        let call_data = matchWithConditionalCall::new((number, y)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(result, 0);
-        assert_eq!(return_data, expected.abi_encode());
-    }
-
-    #[rstest]
-    #[case(NumberEnum::One, ColorEnum::Red, 43, 1)]
-    #[case(NumberEnum::Two, ColorEnum::Red, 44, 2)]
-    #[case(NumberEnum::Three, ColorEnum::Red, 45, 2)]
-    #[case(NumberEnum::Four, ColorEnum::Red, 123, 2)]
-    #[case(NumberEnum::Five, ColorEnum::Red, 321, 2)]
-    #[case(NumberEnum::Five, ColorEnum::Red, 10, 3)]
-    #[case(NumberEnum::Four, ColorEnum::Red, 30, 4)]
-    #[case(NumberEnum::Four, ColorEnum::Blue, 30, 5)]
-    #[case(NumberEnum::Four, ColorEnum::Red, 10, 6)]
-    #[case(NumberEnum::Four, ColorEnum::Blue, 10, 7)]
-    #[case(NumberEnum::One, ColorEnum::Blue, 10, 8)]
-    fn test_nested_match_with_conditional(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] number: NumberEnum,
-        #[case] color: ColorEnum,
-        #[case] z: u32,
-        #[case] expected: u32,
-    ) {
-        let call_data = nestedMatchWithConditionalCall::new((number, color, z)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(result, 0);
-        assert_eq!(return_data, expected.abi_encode());
-    }
-
-    #[rstest]
-    #[case(NumberEnum::One, ColorEnum::Red, true, 11)]
-    #[case(NumberEnum::Two, ColorEnum::Red, true, 44)]
-    #[case(NumberEnum::Two, ColorEnum::Green, false, 33)]
-    #[case(NumberEnum::Two, ColorEnum::Blue, true, 44)]
-    #[case(NumberEnum::Three, ColorEnum::Blue, true, 33)]
-    #[case(NumberEnum::Four, ColorEnum::Red, false, 44)]
-    #[case(NumberEnum::Four, ColorEnum::Green, false, 44)]
-    #[case(NumberEnum::Five, ColorEnum::Green, true, 55)]
-    fn test_control_flow_1(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] number: NumberEnum,
-        #[case] color: ColorEnum,
-        #[case] should_panic: bool,
-        #[case] expected: u32,
-    ) {
-        let call_data = controlFlow1Call::new((number, color)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        if should_panic {
-            assert_eq!(result, 1);
-        } else {
-            assert_eq!(result, 0);
-            assert_eq!(return_data, expected.abi_encode());
-        }
-    }
-
-    #[rstest]
-    #[case(NumberEnum::One, ColorEnum::Red, true, 11)]
-    #[case(NumberEnum::Two, ColorEnum::Red, true, 44)]
-    #[case(NumberEnum::Two, ColorEnum::Green, false, 33)]
-    #[case(NumberEnum::Two, ColorEnum::Blue, true, 44)]
-    #[case(NumberEnum::Three, ColorEnum::Blue, true, 33)]
-    #[case(NumberEnum::Four, ColorEnum::Red, true, 44)]
-    #[case(NumberEnum::Four, ColorEnum::Green, true, 44)]
-    #[case(NumberEnum::Five, ColorEnum::Green, true, 55)]
-    fn test_control_flow_1_bis(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] number: NumberEnum,
-        #[case] color: ColorEnum,
-        #[case] should_panic: bool,
-        #[case] expected: u32,
-    ) {
-        let call_data = controlFlow1BisCall::new((number, color)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        if should_panic {
-            assert_eq!(result, 1);
-        } else {
-            assert_eq!(result, 0);
-            assert_eq!(return_data, expected.abi_encode());
-        }
-    }
-
-    #[rstest]
-    #[case(NumberEnum::One, ColorEnum::Red, YinYangEnum::Yin, 11, true)]
-    #[case(NumberEnum::Two, ColorEnum::Red, YinYangEnum::Yang, 44, true)]
-    #[case(NumberEnum::Two, ColorEnum::Green, YinYangEnum::Yin, 88, false)]
-    #[case(NumberEnum::Two, ColorEnum::Green, YinYangEnum::Yang, 99, false)]
-    #[case(NumberEnum::Two, ColorEnum::Blue, YinYangEnum::Yang, 44, true)]
-    #[case(NumberEnum::Three, ColorEnum::Blue, YinYangEnum::Yang, 33, true)]
-    #[case(NumberEnum::Four, ColorEnum::Red, YinYangEnum::Yin, 77, false)]
-    #[case(NumberEnum::Four, ColorEnum::Green, YinYangEnum::Yin, 77, false)]
-    #[case(NumberEnum::Four, ColorEnum::Green, YinYangEnum::Yang, 88, false)]
-    #[case(NumberEnum::Five, ColorEnum::Green, YinYangEnum::Yang, 55, true)]
-    fn test_control_flow_2(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] number: NumberEnum,
-        #[case] color: ColorEnum,
-        #[case] yin_yang: YinYangEnum,
-        #[case] expected: u32,
-        #[case] should_panic: bool,
-    ) {
-        let call_data = controlFlow2Call::new((number, color, yin_yang)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        if should_panic {
-            assert_eq!(result, 1);
-        } else {
-            assert_eq!(result, 0);
-            assert_eq!(return_data, expected.abi_encode());
-        }
-    }
-
-    #[rstest]
-    #[case(NumberEnum::One, ColorEnum::Red, YinYangEnum::Yin, 11, true)]
-    #[case(NumberEnum::Two, ColorEnum::Red, YinYangEnum::Yang, 44, true)]
-    #[case(NumberEnum::Two, ColorEnum::Green, YinYangEnum::Yin, 33, true)]
-    #[case(NumberEnum::Two, ColorEnum::Green, YinYangEnum::Yang, 99, false)]
-    #[case(NumberEnum::Two, ColorEnum::Blue, YinYangEnum::Yang, 44, true)]
-    #[case(NumberEnum::Three, ColorEnum::Blue, YinYangEnum::Yang, 33, true)]
-    #[case(NumberEnum::Four, ColorEnum::Red, YinYangEnum::Yin, 44, true)]
-    #[case(NumberEnum::Four, ColorEnum::Green, YinYangEnum::Yin, 44, true)]
-    #[case(NumberEnum::Five, ColorEnum::Green, YinYangEnum::Yang, 55, true)]
-    fn test_control_flow_2_bis(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] number: NumberEnum,
-        #[case] color: ColorEnum,
-        #[case] yin_yang: YinYangEnum,
-        #[case] expected: u32,
-        #[case] should_panic: bool,
-    ) {
-        let call_data = controlFlow2BisCall::new((number, color, yin_yang)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        if should_panic {
-            assert_eq!(result, 1);
-        } else {
-            assert_eq!(result, 0);
-            assert_eq!(return_data, expected.abi_encode());
-        }
-    }
-
-    #[rstest]
-    #[case(ColorEnum::Red, 5)]
-    #[case(ColorEnum::Green, 7)]
-    #[case(ColorEnum::Blue, 11)]
-    fn test_control_flow_with_while(
-        #[by_ref] runtime: &RuntimeSandbox,
-        #[case] color: ColorEnum,
-        #[case] expected: u64,
-    ) {
-        let call_data = testControlFlowWithWhileCall::new((color,)).abi_encode();
-        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
-        assert_eq!(result, 0);
-        assert_eq!(return_data, expected.abi_encode());
+        #[case] call_data: T,
+        #[case] expected_result: V,
+    ) where
+        for<'a> <V::SolType as SolType>::Token<'a>: TokenSeq<'a>,
+    {
+        run_test(
+            runtime,
+            call_data.abi_encode(),
+            expected_result.abi_encode(),
+        )
+        .unwrap();
     }
 }
 
