@@ -983,7 +983,7 @@ fn translate_instruction(
 
                 builder.call(delete_fn);
             } else {
-                prepare_function_arguments(
+                let argument_types = prepare_function_arguments(
                     module,
                     builder,
                     arguments,
@@ -1007,31 +1007,41 @@ fn translate_instruction(
                 // and linking
                 // If the function IS native, we link it and call it directly
                 else if function_information.is_native {
-                    // If the function is a call to another contract, we save the state of the
-                    // storage objects before calling it
-
                     let native_function_module = compilation_ctx
                         .get_module_data_by_id(&function_information.function_id.module_id)?;
 
-                    if native_function_module.is_external_call(&function_id.identifier) {
-                        println!("external call!");
-                        let (flush_cache_fn, _) = storage_flush_cache(module);
-                        add_cache_storage_object_instructions(
-                            module,
-                            builder,
-                            compilation_ctx,
-                            &mapped_function.signature.arguments,
-                            function_locals,
-                        );
-                        builder.i32_const(1).call(flush_cache_fn);
-                    }
+                    // If the function is a call to another contract, we save the state of the
+                    // storage objects before calling it
+                    let native_function_id =
+                        if native_function_module.is_external_call(&function_id.identifier) {
+                            println!("external call!");
+                            println!("{:?}", uid_locals);
+                            let (flush_cache_fn, _) = storage_flush_cache(module);
+                            add_cache_storage_object_instructions(
+                                module,
+                                builder,
+                                compilation_ctx,
+                                &mapped_function.signature.arguments,
+                                function_locals,
+                            );
+                            builder.i32_const(1).call(flush_cache_fn);
 
-                    let native_function_id = NativeFunction::get(
-                        &function_id.identifier,
-                        module,
-                        compilation_ctx,
-                        &function_information.function_id.module_id,
-                    );
+                            NativeFunction::get_external_call(
+                                &function_id.identifier,
+                                module,
+                                compilation_ctx,
+                                &function_information.function_id.module_id,
+                                &argument_types,
+                            )
+                        } else {
+                            NativeFunction::get(
+                                &function_id.identifier,
+                                module,
+                                compilation_ctx,
+                                &function_information.function_id.module_id,
+                            )
+                        };
+
                     builder.call(native_function_id);
                 } else {
                     let table_id = function_table.get_table_id();
@@ -1200,6 +1210,7 @@ fn translate_instruction(
         Bytecode::CopyLoc(local_id) => {
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
+            println!("LOCAL TYPE {local_type:?}");
             local_type.copy_local_instructions(
                 module,
                 builder,
@@ -1246,6 +1257,28 @@ fn translate_instruction(
 
             let field_type =
                 bytecodes::structs::borrow_field(struct_, field_id, builder, compilation_ctx);
+
+            /*
+
+            println!("\n1 IMM BORROW FIELD: {field_type:?}");
+            if let IntermediateType::IStruct {
+                module_id: mid,
+                index: idx,
+                vm_handled_struct: VmHandledStruct::None,
+            } = &field_type
+            {
+                println!("found struct");
+                if Uid::is_vm_type(mid, *idx, compilation_ctx) {
+                    println!("ACAAAAA");
+                } else {
+                    println!("NOOOO");
+                }
+            }
+
+            //
+
+            println!("2 IMM BORROW FIELD: {field_type:?}");
+            */
             types_stack.push(IntermediateType::IRef(Box::new(field_type)));
         }
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
@@ -1326,6 +1359,34 @@ fn translate_instruction(
 
             let field_type =
                 bytecodes::structs::mut_borrow_field(struct_, field_id, builder, compilation_ctx);
+
+            let field_type = if let IntermediateType::IStruct {
+                module_id,
+                index,
+                vm_handled_struct: VmHandledStruct::None,
+            } = &field_type
+            {
+                println!("ACAAAAA");
+                if Uid::is_vm_type(module_id, *index, compilation_ctx) {
+                    IntermediateType::IStruct {
+                        module_id: module_id.clone(),
+                        index: *index,
+                        vm_handled_struct: VmHandledStruct::StorageId {
+                            parent_module_id: module_data.id.clone(),
+                            parent_index: struct_.index(),
+                            instance_types: None,
+                        },
+                    }
+                } else {
+                    field_type
+                }
+            } else {
+                field_type
+            };
+
+            //
+
+            println!("2 MUT BORROW FIELD: {field_type:?}");
             types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
         }
         Bytecode::MutBorrowFieldGeneric(field_id) => {

@@ -175,34 +175,47 @@ impl NativeFunction {
                 (Self::NATIVE_GET_LAST_MEMORY_POSITION, _, _) => {
                     tests::add_get_last_memory_position_fn(module, compilation_ctx)
                 }
-                _ => {
-                    let module_data = compilation_ctx
-                        .get_module_data_by_id(module_id)
-                        .unwrap_or_else(|_| {
-                            panic!("native function {module_id}::{name} not supported yet")
-                        });
+                _ => panic!("native function {module_id}::{name} not supported yet"),
+            }
+        }
+    }
 
-                    let function_information = module_data
-                        .functions
-                        .get_information_by_identifier(name)
-                        .unwrap_or_else(|| {
-                            panic!("could not find function information for {module_id}::{name}")
-                        });
+    pub fn get_external_call(
+        name: &str,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        module_id: &ModuleId,
+        arguments_types: &[IntermediateType],
+    ) -> FunctionId {
+        let native_fn_name = Self::get_function_name(name, module_id);
 
-                    if let Some(special_attributes) =
-                        module_data.special_attributes.external_calls.get(name)
-                    {
-                        contract_calls::add_external_contract_call_fn(
-                            module,
-                            compilation_ctx,
-                            module_id,
-                            function_information,
-                            &special_attributes.modifiers,
-                        )
-                    } else {
-                        panic!("native function {module_id}::{name} not supported yet")
-                    }
-                }
+        if let Some(function) = module.funcs.by_name(&native_fn_name) {
+            function
+        } else {
+            let module_data = compilation_ctx
+                .get_module_data_by_id(module_id)
+                .unwrap_or_else(|_| panic!("external call {module_id}::{name} not found"));
+
+            let function_information = module_data
+                .functions
+                .get_information_by_identifier(name)
+                .unwrap_or_else(|| {
+                    panic!("could not find function information for {module_id}::{name}")
+                });
+
+            if let Some(special_attributes) =
+                module_data.special_attributes.external_calls.get(name)
+            {
+                contract_calls::add_external_contract_call_fn(
+                    module,
+                    compilation_ctx,
+                    module_id,
+                    function_information,
+                    &special_attributes.modifiers,
+                    arguments_types,
+                )
+            } else {
+                panic!("missing special attributes for external call {module_id}::{name}")
             }
         }
     }

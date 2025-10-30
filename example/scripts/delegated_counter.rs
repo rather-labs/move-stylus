@@ -6,6 +6,7 @@ use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
 use eyre::eyre;
+use std::io::Read;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -18,6 +19,8 @@ sol!(
         function logicAddress(bytes32 id) public view returns (address);
         function changeLogic(bytes32 id, address logic_address) public view;
         function increment(bytes32 id) public view;
+        function increment2(bytes32 id) public view;
+        function incrementAndModify(bytes32 id) public view;
         function setValue(bytes32 id, uint64 value) public view;
     }
 );
@@ -85,12 +88,13 @@ async fn main() -> eyre::Result<()> {
     let res = example.read(counter_id).call().await?;
     println!("counter = {}", res);
 
-    println!("\nSending increment tx");
+println!("\nSending increment tx");
 
-    let pending_tx = example.increment(counter_id).send().await?;
+    let pending_tx = example.increment2(counter_id).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
+        println!("increment logs 0: {:?}", &raw.bytes());
         println!("increment logs 0: 0x{}", hex::encode(raw));
     }
 
@@ -98,77 +102,6 @@ async fn main() -> eyre::Result<()> {
     let res = example.read(counter_id).call().await?;
     println!("counter = {}", res);
 
-    println!("\nSetting counter to number 42");
-    let pending_tx = example.setValue(counter_id, 42).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
-
-    println!("\nReading counter after set");
-    let res = example.read(counter_id).call().await?;
-    println!("counter = {}", res);
-
-    println!("\nSending increment tx");
-    let pending_tx = example.increment(counter_id).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
-
-    println!("\nReading value after increment");
-    let res = example.read(counter_id).call().await?;
-    println!("counter = {}", res);
-
-    // Add a new sender and try to set the value
-    let priv_key_2 =
-        std::env::var("PRIV_KEY_2").map_err(|_| eyre!("No {} env var set", "PRIV_KEY_2"))?;
-    let signer_2 = PrivateKeySigner::from_str(&priv_key_2)?;
-    let sender_2 = signer_2.address();
-
-    let provider_2 = Arc::new(
-        ProviderBuilder::new()
-            .wallet(signer_2)
-            .with_chain_id(412346)
-            .connect_http(Url::from_str(&rpc_url).unwrap()),
-    );
-    let example_2 = Example::new(address, provider_2.clone());
-
-    println!("\nFunding {sender_2} with some ETH to pay for the gas");
-    let tx = TransactionRequest::default()
-        .from(sender)
-        .to(sender_2)
-        .value(U256::from(1_000_000_000_000_000_000u128)); // 5 eth in wei
-    let pending_tx = provider.send_transaction(tx).await?;
-    pending_tx.get_receipt().await?;
-
-    println!("\nSending set value to 100 tx with the account that is not the owner");
-    let pending_tx = example_2.setValue(counter_id, 100).send().await;
-    println!("Tx failed?: {:?}", pending_tx.is_err());
-
-    // Value did not change as the sender is not the owner
-    println!("\nReading value after set value");
-    let res = example_2.read(counter_id).call().await?;
-    println!("counter = {}", res);
-
-    println!("==============================================================================");
-    println!(" Changing contract logic from {address_logic_1} to {address_logic_2}");
-    println!("==============================================================================\n");
-    let pending_tx = example
-        .changeLogic(counter_id, address_logic_2)
-        .send()
-        .await?;
-    let _receipt = pending_tx.get_receipt().await?;
-
-    println!("==============================================================================");
-    println!("Executing increment and setValue on logic contract {address_logic_2}");
-    println!("==============================================================================");
-
-    println!("\nReading value before increment");
-    let res = example.read(counter_id).call().await?;
-    println!("counter = {}", res);
 
     println!("\nSending increment tx");
 
@@ -176,6 +109,7 @@ async fn main() -> eyre::Result<()> {
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
+        println!("increment logs 0: {:?}", &raw.bytes());
         println!("increment logs 0: 0x{}", hex::encode(raw));
     }
 
@@ -183,60 +117,21 @@ async fn main() -> eyre::Result<()> {
     let res = example.read(counter_id).call().await?;
     println!("counter = {}", res);
 
-    println!("\nSetting counter to number 42");
-    let pending_tx = example.setValue(counter_id, 42).send().await?;
+    /*
+
+    println!("\nSending increment and modify tx");
+
+    let pending_tx = example.incrementAndModify(counter_id).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
         println!("increment logs 0: 0x{}", hex::encode(raw));
     }
 
-    println!("\nReading counter after set");
+    println!("\nReading value after increment and modify");
     let res = example.read(counter_id).call().await?;
     println!("counter = {}", res);
-
-    println!("\nSending increment tx");
-    let pending_tx = example.increment(counter_id).send().await?;
-    let receipt = pending_tx.get_receipt().await?;
-    for log in receipt.logs() {
-        let raw = log.data().data.0.clone();
-        println!("increment logs 0: 0x{}", hex::encode(raw));
-    }
-
-    println!("\nReading value after increment");
-    let res = example.read(counter_id).call().await?;
-    println!("counter = {}", res);
-
-    // Add a new sender and try to set the value
-    let priv_key_2 =
-        std::env::var("PRIV_KEY_2").map_err(|_| eyre!("No {} env var set", "PRIV_KEY_2"))?;
-    let signer_2 = PrivateKeySigner::from_str(&priv_key_2)?;
-    let sender_2 = signer_2.address();
-
-    let provider_2 = Arc::new(
-        ProviderBuilder::new()
-            .wallet(signer_2)
-            .with_chain_id(412346)
-            .connect_http(Url::from_str(&rpc_url).unwrap()),
-    );
-    let example_2 = Example::new(address, provider_2.clone());
-
-    println!("\nFunding {sender_2} with some ETH to pay for the gas");
-    let tx = TransactionRequest::default()
-        .from(sender)
-        .to(sender_2)
-        .value(U256::from(1_000_000_000_000_000_000u128)); // 5 eth in wei
-    let pending_tx = provider.send_transaction(tx).await?;
-    pending_tx.get_receipt().await?;
-
-    println!("\nSending set value to 100 tx with the account that is not the owner");
-    let pending_tx = example_2.setValue(counter_id, 100).send().await;
-    println!("Tx failed?: {:?}", pending_tx.is_err());
-
-    // Value did not change as the sender is not the owner
-    println!("\nReading value after set value");
-    let res = example_2.read(counter_id).call().await?;
-    println!("counter = {}", res);
+    */
 
     Ok(())
 }

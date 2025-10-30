@@ -12,10 +12,9 @@ use crate::{
     compilation_context::ModuleId,
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     hostio::host_functions::{
-        call_contract, delegate_call_contract, read_return_data, static_call_contract,
+        call_contract, delegate_call_contract, emit_log, read_return_data, static_call_contract,
     },
     runtime::RuntimeFunction,
-    storage,
     translation::{
         functions::MappedFunction,
         intermediate_types::{IntermediateType, VmHandledStruct},
@@ -42,6 +41,7 @@ pub fn add_external_contract_call_fn(
     module_id: &ModuleId,
     function_information: &MappedFunction,
     function_modifiers: &[FunctionModifier],
+    arguments_types: &[IntermediateType],
 ) -> FunctionId {
     let name = format!(
         "{}_{}_{}",
@@ -514,59 +514,72 @@ pub fn add_external_contract_call_fn(
 
     // Before returning, if the call is a delegated call, we must load from storage the potentially
     // modified storage objects
-    let mut storage_objects = function_information
-        .signature
-        .arguments
+    println!("\n\n{arguments_types:?}\n\n");
+    let mut storage_objects = arguments_types
         .iter()
         .enumerate()
-        .filter_map(|(i, itype)| match itype {
-            IntermediateType::IStruct {
-                module_id,
-                index,
-                vm_handled_struct:
-                    VmHandledStruct::StorageId {
-                        parent_module_id,
-                        parent_index,
-                        instance_types,
-                    },
-            } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
-                let (parent_struct_itype, parent_struct) =
-                    if let Some(instance_types) = instance_types {
-                        let itype = IntermediateType::IGenericStructInstance {
-                            module_id: parent_module_id.clone(),
-                            index: *parent_index,
-                            types: instance_types.clone(),
-                            vm_handled_struct: VmHandledStruct::None,
+        .filter_map(|(i, itype)| {
+            let itype = if let IntermediateType::IMutRef(inner) = itype {
+                inner
+            } else if let IntermediateType::IRef(inner) = itype {
+                inner
+            } else {
+                itype
+            };
+
+            match itype {
+                IntermediateType::IStruct {
+                    module_id,
+                    index,
+                    vm_handled_struct:
+                        VmHandledStruct::StorageId {
+                            parent_module_id,
+                            parent_index,
+                            instance_types,
+                        },
+                } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+                    let (parent_struct_itype, parent_struct) =
+                        if let Some(instance_types) = instance_types {
+                            let itype = IntermediateType::IGenericStructInstance {
+                                module_id: parent_module_id.clone(),
+                                index: *parent_index,
+                                types: instance_types.clone(),
+                                vm_handled_struct: VmHandledStruct::None,
+                            };
+
+                            let struct_ = compilation_ctx
+                                .get_struct_by_index(parent_module_id, *parent_index)
+                                .unwrap();
+                            struct_.instantiate(instance_types);
+
+                            (itype, struct_)
+                        } else {
+                            let itype = IntermediateType::IStruct {
+                                module_id: parent_module_id.clone(),
+                                index: *parent_index,
+                                vm_handled_struct: VmHandledStruct::None,
+                            };
+                            let struct_ = compilation_ctx
+                                .get_struct_by_index(parent_module_id, *parent_index)
+                                .unwrap();
+
+                            (itype, struct_)
                         };
 
-                        let struct_ = compilation_ctx
-                            .get_struct_by_index(module_id, *index)
-                            .unwrap();
-                        struct_.instantiate(&instance_types);
+                    println!("AACCCC {parent_struct:?}");
 
-                        (itype, struct_)
-                    } else {
-                        let itype = IntermediateType::IStruct {
-                            module_id: parent_module_id.clone(),
-                            index: *parent_index,
-                            vm_handled_struct: VmHandledStruct::None,
-                        };
-                        let struct_ = compilation_ctx
-                            .get_struct_by_index(module_id, *index)
-                            .unwrap();
-
-                        (itype, struct_)
-                    };
-
-                Some((function_args[i], parent_struct_itype, parent_struct))
+                    // It is + 1 because the arguments_types does not contains self TODO: Check why
+                    Some((function_args[i + 1], parent_struct_itype, parent_struct))
+                }
+                _ => None,
             }
-            _ => None,
         })
         .peekable();
 
     if storage_objects.peek().is_some() {
         let locate_storage_data_fn =
             RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
+        let (emit_log, _) = emit_log(module);
 
         builder.block(None, |block| {
             let block_id = block.id();
@@ -588,6 +601,34 @@ pub fn add_external_contract_call_fn(
                     .i32_const(4)
                     .binop(BinaryOp::I32Sub)
                     .local_set(original_struct_ptr);
+
+                block
+                    .local_get(original_struct_ptr)
+                    .i32_const(32)
+                    .i32_const(0)
+                    .call(emit_log);
+
+                block
+                    .local_get(storage_obj_uid)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .i32_const(32)
+                    .i32_const(0)
+                    .call(emit_log);
 
                 block
                     .local_get(storage_obj_uid)
@@ -622,20 +663,36 @@ pub fn add_external_contract_call_fn(
                     .call(read_and_decode_from_storage_fn)
                     .local_set(new_struct_ptr);
 
+                println!("AAABBB {:#?} {}", storage_obj_itype, storage_obj.heap_size);
+
                 // Once we return from the reading the allegedly modified object from storage, we
                 // replace the old pointer representation wiuth the new one returned by the
-                // function. We also replace 32 bytes before the pointer becouse the owner can
-                // change in the delegate call
-                // The function leaves in the stack the new struct ptr
+                // function.
+                // If it happens that the owner changed in the delegated call, the object will NOT
+                // be located and it will throw an unrechable. That's ok, if the call changed the
+                // owner, we can't continue handling the object here
+                block
+                    .local_get(original_struct_ptr)
+                    // .i32_const(32)
+                    // .binop(BinaryOp::I32Sub)
+                    .local_get(new_struct_ptr)
+                    // .i32_const(32)
+                    //.binop(BinaryOp::I32Sub)
+                    // .i32_const(storage_obj.heap_size as i32 + 32)
+                    .i32_const(storage_obj.heap_size as i32)
+                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
                 block
                     .local_get(original_struct_ptr)
                     .i32_const(32)
-                    .binop(BinaryOp::I32Sub)
+                    .i32_const(0)
+                    .call(emit_log);
+
+                block
                     .local_get(new_struct_ptr)
                     .i32_const(32)
-                    .binop(BinaryOp::I32Sub)
-                    .i32_const(storage_obj.heap_size as i32 + 32)
-                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                    .i32_const(0)
+                    .call(emit_log);
             }
         });
     }
