@@ -180,6 +180,10 @@ impl NativeFunction {
         }
     }
 
+    /// Links a function marked as #[external_call] into themodule and returns its id. If the
+    /// function is already present it just returns the id.
+    ///
+    /// This function is idempotent.
     pub fn get_external_call(
         name: &str,
         module: &mut Module,

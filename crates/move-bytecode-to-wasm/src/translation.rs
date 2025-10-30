@@ -1015,7 +1015,6 @@ fn translate_instruction(
                     // storage objects before calling it
                     let native_function_id =
                         if native_function_module.is_external_call(&function_id.identifier) {
-                            let (flush_cache_fn, _) = storage_flush_cache(module);
                             add_cache_storage_object_instructions(
                                 module,
                                 builder,
@@ -1023,6 +1022,7 @@ fn translate_instruction(
                                 &mapped_function.signature.arguments,
                                 function_locals,
                             );
+                            let (flush_cache_fn, _) = storage_flush_cache(module);
                             builder.i32_const(1).call(flush_cache_fn);
 
                             NativeFunction::get_external_call(
@@ -2968,6 +2968,13 @@ pub fn add_field_borrow_mut_global_var_instructions(
     Ok(())
 }
 
+/// This function saves into the storage cache all the changes made to the storage objects of the
+/// executing function.
+/// This is used in two situations:
+/// - at the end of a an entry function.
+/// - right before a delegate call.
+///
+/// This function does not flush the cache. That must be done manually depending on the context.
 fn add_cache_storage_object_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,

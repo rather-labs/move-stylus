@@ -803,7 +803,7 @@ impl ModuleData {
             .ok_or(CompilationContextError::SignatureNotFound(index))
     }
 
-    /// Returns `true` if the functions is a function used for cross contract call
+    /// Returns `true` if the function is used as a cross contract call
     pub fn is_external_call(&self, function_identifier: &str) -> bool {
         self.special_attributes
             .external_calls

@@ -1136,6 +1136,10 @@ pub fn add_commit_changes_to_storage_fn(
     function.finish(vec![], &mut module.funcs)
 }
 
+/// Commits changes of storage objests into the storage cache.
+///
+/// # Arguments
+/// - struct_ptr_ref - pointer to a mutable reference of a storage struct
 pub fn cache_storage_object_changes(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
