@@ -40,7 +40,7 @@ use crate::{
     data::DATA_ABORT_MESSAGE_PTR_OFFSET,
     error_encoding::build_error_message,
     generics::{replace_type_parameters, type_contains_generics},
-    hostio::host_functions::{emit_log, storage_flush_cache},
+    hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
     vm_handled_types::{self, VmHandledType, named_id::NamedId, uid::Uid},
@@ -58,6 +58,7 @@ use intermediate_types::{
     IntermediateType, VmHandledStruct,
     heap_integers::{IU128, IU256},
     simple_integers::{IU8, IU16, IU32, IU64},
+    structs::IStruct,
     vector::IVector,
 };
 
@@ -1255,28 +1256,13 @@ fn translate_instruction(
 
             let field_type =
                 bytecodes::structs::borrow_field(struct_, field_id, builder, compilation_ctx);
+            let field_type = struct_field_borrow_add_storage_id_parent_information(
+                field_type,
+                compilation_ctx,
+                struct_,
+                module_data,
+            );
 
-            /*
-
-            println!("\n1 IMM BORROW FIELD: {field_type:?}");
-            if let IntermediateType::IStruct {
-                module_id: mid,
-                index: idx,
-                vm_handled_struct: VmHandledStruct::None,
-            } = &field_type
-            {
-                println!("found struct");
-                if Uid::is_vm_type(mid, *idx, compilation_ctx) {
-                    println!("ACAAAAA");
-                } else {
-                    println!("NOOOO");
-                }
-            }
-
-            //
-
-            println!("2 IMM BORROW FIELD: {field_type:?}");
-            */
             types_stack.push(IntermediateType::IRef(Box::new(field_type)));
         }
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
@@ -1341,6 +1327,13 @@ fn translate_instruction(
                 compilation_ctx,
             );
             let field_type = replace_type_parameters(&field_type, &instantiation_types);
+            let field_type = struct_field_borrow_add_storage_id_parent_information(
+                field_type,
+                compilation_ctx,
+                &struct_,
+                module_data,
+            );
+
             types_stack.push(IntermediateType::IRef(Box::new(field_type)));
         }
         Bytecode::MutBorrowField(field_id) => {
@@ -1357,34 +1350,13 @@ fn translate_instruction(
 
             let field_type =
                 bytecodes::structs::mut_borrow_field(struct_, field_id, builder, compilation_ctx);
+            let field_type = struct_field_borrow_add_storage_id_parent_information(
+                field_type,
+                compilation_ctx,
+                struct_,
+                module_data,
+            );
 
-            let field_type = if let IntermediateType::IStruct {
-                module_id,
-                index,
-                vm_handled_struct: VmHandledStruct::None,
-            } = &field_type
-            {
-                println!("ACAAAAA");
-                if Uid::is_vm_type(module_id, *index, compilation_ctx) {
-                    IntermediateType::IStruct {
-                        module_id: module_id.clone(),
-                        index: *index,
-                        vm_handled_struct: VmHandledStruct::StorageId {
-                            parent_module_id: module_data.id.clone(),
-                            parent_index: struct_.index(),
-                            instance_types: None,
-                        },
-                    }
-                } else {
-                    field_type
-                }
-            } else {
-                field_type
-            };
-
-            //
-
-            println!("2 MUT BORROW FIELD: {field_type:?}");
             types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
         }
         Bytecode::MutBorrowFieldGeneric(field_id) => {
@@ -1438,6 +1410,12 @@ fn translate_instruction(
             );
 
             let field_type = replace_type_parameters(&field_type, &instantiation_types);
+            let field_type = struct_field_borrow_add_storage_id_parent_information(
+                field_type,
+                compilation_ctx,
+                &struct_,
+                module_data,
+            );
 
             types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
         }
@@ -3027,5 +3005,52 @@ fn add_cache_storage_object_instructions(
         builder
             .local_get(wasm_local_var)
             .call(cache_storage_object_changes_fn);
+    }
+}
+
+/// This function checks if the field we are borrowing from struct is a UID or NamedId. If we are
+/// borrowing an ID, then we add the information about the parent struct that contains such ID.
+///
+/// This information is used in contexts where we only have the UID and we need to know from which
+/// struct is coming from
+fn struct_field_borrow_add_storage_id_parent_information(
+    field_type: IntermediateType,
+    compilation_ctx: &CompilationContext,
+    struct_: &IStruct,
+    module_data: &ModuleData,
+) -> IntermediateType {
+    // If we borrow a UID, we fill the typestack with the parent struct information
+    match &field_type {
+        IntermediateType::IStruct {
+            module_id,
+            index,
+            vm_handled_struct: VmHandledStruct::None,
+        } if Uid::is_vm_type(module_id, *index, compilation_ctx) => IntermediateType::IStruct {
+            module_id: module_id.clone(),
+            index: *index,
+            vm_handled_struct: VmHandledStruct::StorageId {
+                parent_module_id: module_data.id.clone(),
+                parent_index: struct_.index(),
+                instance_types: None,
+            },
+        },
+        IntermediateType::IGenericStructInstance {
+            module_id,
+            index,
+            types,
+            vm_handled_struct: VmHandledStruct::None,
+        } if NamedId::is_vm_type(module_id, *index, compilation_ctx) => {
+            IntermediateType::IGenericStructInstance {
+                module_id: module_id.clone(),
+                index: *index,
+                types: types.clone(),
+                vm_handled_struct: VmHandledStruct::StorageId {
+                    parent_module_id: module_data.id.clone(),
+                    parent_index: struct_.index(),
+                    instance_types: None,
+                },
+            }
+        }
+        _ => field_type,
     }
 }
