@@ -259,7 +259,7 @@ pub fn prepare_function_arguments(
     let mut has_ref = false;
     for arg in arguments.iter().rev() {
         let typestack_arg = types_stack.pop_expecting(arg)?;
-        result.push(typestack_arg);
+        result.insert(0, typestack_arg);
 
         has_ref = has_ref
             || matches!(

@@ -12,7 +12,7 @@ use crate::{
     compilation_context::ModuleId,
     data::DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     hostio::host_functions::{
-        call_contract, delegate_call_contract, emit_log, read_return_data, static_call_contract,
+        call_contract, delegate_call_contract, read_return_data, static_call_contract,
     },
     runtime::RuntimeFunction,
     translation::{
@@ -514,17 +514,14 @@ pub fn add_external_contract_call_fn(
 
     // Before returning, if the call is a delegated call, we must load from storage the potentially
     // modified storage objects
-    println!("\n\n{arguments_types:?}\n\n");
+    // We ignore the first argument since it is the #[external_call] object
     let mut storage_objects = arguments_types
         .iter()
         .enumerate()
         .filter_map(|(i, itype)| {
-            let mut is_ref = false;
             let itype = if let IntermediateType::IMutRef(inner) = itype {
-                is_ref = true;
                 inner
             } else if let IntermediateType::IRef(inner) = itype {
-                is_ref = true;
                 inner
             } else {
                 itype
@@ -569,15 +566,7 @@ pub fn add_external_contract_call_fn(
                             (itype, struct_)
                         };
 
-                    println!("AACCCC {parent_struct:?}");
-
-                    // It is + 1 because the arguments_types does not contains self TODO: Check why
-                    Some((
-                        function_args[i + 1],
-                        parent_struct_itype,
-                        parent_struct,
-                        is_ref,
-                    ))
+                    Some((function_args[i], parent_struct_itype, parent_struct))
                 }
                 _ => None,
             }
@@ -587,7 +576,6 @@ pub fn add_external_contract_call_fn(
     if storage_objects.peek().is_some() {
         let locate_storage_data_fn =
             RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
-        let (emit_log, _) = emit_log(module);
 
         builder.block(None, |block| {
             let block_id = block.id();
@@ -603,35 +591,12 @@ pub fn add_external_contract_call_fn(
                 .binop(BinaryOp::I32Eq)
                 .br_if(block_id);
 
-            for (storage_obj_uid, storage_obj_itype, storage_obj, is_ref) in storage_objects {
+            for (storage_obj_uid, storage_obj_itype, storage_obj) in storage_objects {
+                // Read the struct pointer located right before the UID field
                 block
                     .local_get(storage_obj_uid)
                     .i32_const(4)
-                    .binop(BinaryOp::I32Sub);
-
-                // TODO: If it is a ref we have the pointer to the pointer to the struct and not
-                // the struct, that is worng
-                if is_ref {
-                    block.load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    );
-                }
-
-                block.local_set(original_struct_ptr);
-
-                block
-                    .local_get(original_struct_ptr)
-                    .i32_const(32)
-                    .i32_const(0)
-                    .call(emit_log);
-
-                block
-                    .local_get(original_struct_ptr)
+                    .binop(BinaryOp::I32Sub)
                     .load(
                         compilation_ctx.memory_id,
                         LoadKind::I32 { atomic: false },
@@ -640,34 +605,9 @@ pub fn add_external_contract_call_fn(
                             offset: 0,
                         },
                     )
-                    .i32_const(8)
-                    .i32_const(0)
-                    .call(emit_log);
+                    .local_set(original_struct_ptr);
 
-                /*
-                block
-                    .local_get(storage_obj_uid)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 0,
-                        },
-                    )
-                    .i32_const(32)
-                    .i32_const(0)
-                    .call(emit_log);
-                */
-
+                // Read the UID value and locate the data in storage
                 block
                     .local_get(storage_obj_uid)
                     .load(
@@ -691,7 +631,6 @@ pub fn add_external_contract_call_fn(
                     .call(locate_storage_data_fn);
 
                 // The slot for this struct written in DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET
-                // The owner of this struct written in DATA_STORAGE_OBJECT_OWNER_OFFSET
                 let read_and_decode_from_storage_fn = RuntimeFunction::ReadAndDecodeFromStorage
                     .get_generic(module, compilation_ctx, &[&storage_obj_itype]);
 
@@ -701,47 +640,51 @@ pub fn add_external_contract_call_fn(
                     .call(read_and_decode_from_storage_fn)
                     .local_set(new_struct_ptr);
 
-                println!("AAABBB {:#?} {}", storage_obj_itype, storage_obj.heap_size);
-
                 // Once we return from the reading the allegedly modified object from storage, we
-                // replace the old pointer representation wiuth the new one returned by the
+                // replace the old pointer representation with the new one returned by the
                 // function.
                 // If it happens that the owner changed in the delegated call, the object will NOT
-                // be located and it will throw an unrechable. That's ok, if the call changed the
-                // owner, we can't continue handling the object here
+                // be located by locate_storage_data_fn and it will throw an unrechable.
+                // That's ok, if the delegate call changed the owner, we can't continue handling
+                // the object here
+                //
+                // By overwriting the struct, we update the data that could have change in the
+                // call. For example, if we have the struct
+                //
+                // publict structr Foo {
+                //      id: UID,
+                //      value: u64,
+                // }
+                //
+                // The underlying representation in memory will be:
+                //
+                // 0xX: [ptr_uid, ptr_value]
+                //
+                // located at address 0xX
+                //
+                // After the read_and_decode_from_storage_fn execution, we will have in a new
+                // memory location 0xY another representation of the struct with the possibly
+                // updated balues by the delegate call:
+                //
+                // 0xY: [ptr_uid_updated, ptr_value_updated]
+                //
+                // located at address 0xY
+                //
+                // (NOTE: The uid is not really updated, is just to reflect that those are new
+                // pointers)
+                //
+                // Since the struct located at 0xY contains the updated values by the delegated
+                // call but in our current execution, all the references of Foo are pointing to
+                // 0xX, we replace all the pointers in 0xX for the pointers of 0xY, since the ones
+                // in 0xY are pointing to the updated values. So at the end of the delegate call,
+                // the Foo located at 0xX will have the following representation in memory;
+                //
+                // 0xX: [ptr_uid_updated, ptr_value_updated]
                 block
                     .local_get(original_struct_ptr)
                     .local_get(new_struct_ptr)
                     .i32_const(storage_obj.heap_size as i32)
                     .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
-                block
-                    .local_get(original_struct_ptr)
-                    .i32_const(32)
-                    .i32_const(0)
-                    .call(emit_log);
-
-                block
-                    .local_get(original_struct_ptr)
-                    .load(
-                        compilation_ctx.memory_id,
-                        LoadKind::I32 { atomic: false },
-                        MemArg {
-                            align: 0,
-                            offset: 8,
-                        },
-                    )
-                    .i32_const(8)
-                    .i32_const(0)
-                    .call(emit_log);
-
-                /*
-                block
-                    .local_get(new_struct_ptr)
-                    .i32_const(32)
-                    .i32_const(0)
-                    .call(emit_log);
-                */
             }
         });
     }
