@@ -189,11 +189,13 @@ pub fn add_read_and_decode_storage_struct_instructions(
         } else {
             let field_size = field_size(field, compilation_ctx) as i32;
 
+            // Increase the read bytes counter by the size of the field.
+            // If the entire slot has been read, advance to the next slot and load its data.
             builder
                 .local_get(slot_ptr)
                 .local_get(read_bytes_in_slot)
                 .i32_const(field_size)
-                .i32_const(1)
+                .i32_const(1) // is_read flag set to true
                 .call(accumulate_or_advance_slot_fn)
                 .local_set(read_bytes_in_slot);
 
@@ -302,6 +304,8 @@ pub fn add_read_and_decode_storage_enum_instructions(
         for (index, field) in variant.fields.iter().enumerate() {
             let field_size = field_size(field, compilation_ctx) as i32;
 
+            // Increase the read bytes counter by the size of the field.
+            // If the entire slot has been read, advance to the next slot and load its data.
             block
                 .local_get(slot_ptr)
                 .local_get(read_bytes_in_slot)
@@ -454,6 +458,8 @@ pub fn add_read_and_decode_storage_vector_instructions(
             iblock.loop_(None, |loop_| {
                 let loop_id = loop_.id();
 
+                // Update the read bytes counter to reflect the field size.
+                // If the entire slot has been read, advance to the next slot and load its data.
                 loop_
                     .local_get(elem_slot_ptr)
                     .local_get(read_bytes_in_slot)

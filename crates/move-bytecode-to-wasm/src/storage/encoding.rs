@@ -103,7 +103,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             continue;
         }
         let field_size = field_size(field, compilation_ctx) as i32;
-
+        // Update the written bytes counter to include the field size.
+        // If we've filled the current slot, cache its data and move to the next slot.
         builder
             .local_get(slot_ptr)
             .local_get(written_bytes_in_slot)
@@ -213,6 +214,8 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
     enum_.match_on_variant(builder, variant_index, |variant, block| {
         for (index, field) in variant.fields.iter().enumerate() {
             let field_size = field_size(field, compilation_ctx) as i32;
+            // Update the written bytes counter to include the field size.
+            // If we've filled the current slot, cache its data and move to the next slot.
             block
                 .local_get(slot_ptr)
                 .local_get(written_bytes_in_slot)
@@ -452,7 +455,8 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
             inner_block.loop_(None, |loop_| {
                 let loop_id = loop_.id();
 
-                // If we have written the whole slot, save to storage and calculate the next slot
+                // Update the written bytes counter to include the field size.
+                // If we've filled the current slot, cache its data and move to the next slot.
                 loop_
                     .local_get(elem_slot_ptr)
                     .local_get(bytes_in_slot_offset)
