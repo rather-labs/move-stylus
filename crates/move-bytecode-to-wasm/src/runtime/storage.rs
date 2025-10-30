@@ -4,12 +4,12 @@ use crate::data::{
     DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
     DATA_STORAGE_OBJECT_OWNER_OFFSET,
 };
-use crate::hostio::host_functions::{self, storage_flush_cache, storage_load_bytes32, tx_origin};
-use crate::native_functions::object::add_delete_storage_struct_instructions;
-use crate::storage::encoding::{
-    add_encode_and_save_into_storage_struct_instructions,
-    add_read_and_decode_storage_struct_instructions,
+use crate::hostio::host_functions::{
+    self, storage_cache_bytes32, storage_flush_cache, storage_load_bytes32, tx_origin,
 };
+use crate::native_functions::object::add_delete_storage_struct_instructions;
+use crate::storage::decoding::add_read_and_decode_storage_struct_instructions;
+use crate::storage::encoding::add_encode_and_save_into_storage_struct_instructions;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::heap_integers::IU256;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
@@ -1134,6 +1134,103 @@ pub fn add_commit_changes_to_storage_fn(
     builder.i32_const(1).call(storage_flush_cache);
 
     function.finish(vec![], &mut module.funcs)
+}
+
+/// If the next field fits in the current 32-byte slot, increment the
+/// used-bytes counter by the field size. Otherwise, cache or load the slot's
+/// data and advance to the next slot, and set used bytes to the
+/// field size.
+/// Arguments:
+/// - slot_ptr: the pointer to the slot
+/// - used_bytes_in_slot: the number of bytes used in the slot
+/// - field_size: the size of the field
+/// - is_read: whether the slot is being read from or written to
+/// Returns:
+/// - the updated number of bytes used in the slot
+pub fn accumulate_or_advance_slot(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32, ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function
+        .name(RuntimeFunction::AccumulateOrAdvanceSlot.name().to_owned())
+        .func_body();
+
+    let (storage_cache_fn, _) = storage_cache_bytes32(module);
+    let (storage_load, _) = storage_load_bytes32(module);
+    let next_slot_fn = storage_next_slot_function(module, compilation_ctx);
+
+    let slot_ptr = module.locals.add(ValType::I32);
+    let used_bytes_in_slot = module.locals.add(ValType::I32);
+    let field_size = module.locals.add(ValType::I32);
+    let is_read = module.locals.add(ValType::I32);
+
+    builder
+        .local_get(used_bytes_in_slot)
+        .local_get(field_size)
+        .binop(BinaryOp::I32Add)
+        .i32_const(32)
+        .binop(BinaryOp::I32GtS)
+        .if_else(
+            None,
+            |then| {
+                then.local_get(is_read).if_else(
+                    None,
+                    |then| {
+                        then.local_get(slot_ptr)
+                            .call(next_slot_fn)
+                            .local_set(slot_ptr);
+
+                        // Load the slot data
+                        then.local_get(slot_ptr)
+                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                            .call(storage_load);
+                    },
+                    |else_| {
+                        // Save previous slot
+                        else_
+                            .local_get(slot_ptr)
+                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                            .call(storage_cache_fn);
+
+                        // Wipe the data so it can be filled with new data
+                        else_
+                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                            .i32_const(0)
+                            .i32_const(32)
+                            .memory_fill(compilation_ctx.memory_id);
+
+                        // Next slot
+                        else_
+                            .local_get(slot_ptr)
+                            .call(next_slot_fn)
+                            .local_set(slot_ptr);
+                    },
+                );
+
+                // Set the written bytes in slot to the field size
+                then.local_get(field_size).local_set(used_bytes_in_slot);
+            },
+            |else_| {
+                // Increment the written bytes in slot by the field size
+                else_
+                    .local_get(used_bytes_in_slot)
+                    .local_get(field_size)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(used_bytes_in_slot);
+            },
+        );
+
+    builder.local_get(used_bytes_in_slot);
+
+    function.finish(
+        vec![slot_ptr, used_bytes_in_slot, field_size, is_read],
+        &mut module.funcs,
+    )
 }
 
 // The expected slot values were calculated using Remix to ensure the tests are correct.

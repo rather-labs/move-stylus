@@ -73,6 +73,7 @@ pub enum RuntimeFunction {
     DeleteTtoObject,
     GetStructOwner,
     CommitChangesToStorage,
+    AccumulateOrAdvanceSlot,
     // ASCII conversion
     U64ToAsciiBase10,
 }
@@ -135,6 +136,7 @@ impl RuntimeFunction {
             Self::GetStructOwner => "get_struct_owner",
             Self::U64ToAsciiBase10 => "u64_to_ascii_base_10",
             Self::CommitChangesToStorage => "commit_changes_to_storage",
+            Self::AccumulateOrAdvanceSlot => "accumulate_or_advance_slot",
         }
     }
 
@@ -242,6 +244,9 @@ impl RuntimeFunction {
                 (Self::LocateStructSlot, Some(ctx)) => storage::locate_struct_slot(module, ctx),
                 (Self::GetIdBytesPtr, Some(ctx)) => storage::get_id_bytes_ptr(module, ctx),
                 (Self::GetStructOwner, Some(ctx)) => storage::get_struct_owner_fn(module, ctx),
+                (Self::AccumulateOrAdvanceSlot, Some(ctx)) => {
+                    storage::accumulate_or_advance_slot(module, ctx)
+                }
                 // ASCII conversion
                 (Self::U64ToAsciiBase10, Some(ctx)) => {
                     integers::ascii::u64_to_ascii_base_10(module, ctx)

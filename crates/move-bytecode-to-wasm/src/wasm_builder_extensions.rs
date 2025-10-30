@@ -1,5 +1,7 @@
 use walrus::{InstrSeqBuilder, LocalId, ir::BinaryOp};
 
+use crate::data::DATA_SLOT_DATA_PTR_OFFSET;
+
 pub trait WasmBuilderExtension {
     /// Negates the result of a boolean operation. User must be sure that the last value in the
     /// stack contains result of a boolean operation (0 or 1).
@@ -44,6 +46,9 @@ pub trait WasmBuilderExtension {
     ///
     /// [..., ptr] --> skip_vec_header() -> [..., ptr + 8]
     fn skip_vec_header(&mut self, ptr: LocalId) -> &mut Self;
+
+    /// Adds the instructions to compute: DATA_SLOT_DATA_PTR_OFFSET + (32 - used_bytes_in_slot).
+    fn add_slot_data_ptr_plus_offset(&mut self, used_bytes_in_slot: LocalId) -> &mut Self;
 }
 
 impl WasmBuilderExtension for InstrSeqBuilder<'_> {
@@ -80,5 +85,13 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
 
     fn skip_vec_header(&mut self, ptr: LocalId) -> &mut Self {
         self.local_get(ptr).i32_const(8).binop(BinaryOp::I32Add)
+    }
+
+    fn add_slot_data_ptr_plus_offset(&mut self, used_bytes_in_slot: LocalId) -> &mut Self {
+        self.i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+            .i32_const(32)
+            .local_get(used_bytes_in_slot)
+            .binop(BinaryOp::I32Sub)
+            .binop(BinaryOp::I32Add)
     }
 }
