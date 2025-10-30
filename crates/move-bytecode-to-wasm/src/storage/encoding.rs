@@ -230,7 +230,7 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
                 LoadKind::I32 { atomic: false },
                 MemArg {
                     align: 0,
-                    offset: index as u32 * 4,
+                    offset: 4 + 4 * index as u32,
                 },
             );
 

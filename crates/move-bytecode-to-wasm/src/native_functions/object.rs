@@ -520,7 +520,7 @@ pub fn add_delete_field_instructions(
         {
             // Get child struct by (module_id, index)
             let child_struct = compilation_ctx
-                .get_struct_by_index(module_id, *index)
+                .get_struct_by_intermediate_type(itype)
                 .expect("struct not found");
 
             // If it's a generic instance, instantiate; otherwise use as-is
