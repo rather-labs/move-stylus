@@ -519,9 +519,12 @@ pub fn add_external_contract_call_fn(
         .iter()
         .enumerate()
         .filter_map(|(i, itype)| {
+            let mut is_ref = false;
             let itype = if let IntermediateType::IMutRef(inner) = itype {
+                is_ref = true;
                 inner
             } else if let IntermediateType::IRef(inner) = itype {
+                is_ref = true;
                 inner
             } else {
                 itype
@@ -569,7 +572,12 @@ pub fn add_external_contract_call_fn(
                     println!("AACCCC {parent_struct:?}");
 
                     // It is + 1 because the arguments_types does not contains self TODO: Check why
-                    Some((function_args[i + 1], parent_struct_itype, parent_struct))
+                    Some((
+                        function_args[i + 1],
+                        parent_struct_itype,
+                        parent_struct,
+                        is_ref,
+                    ))
                 }
                 _ => None,
             }
@@ -595,12 +603,26 @@ pub fn add_external_contract_call_fn(
                 .binop(BinaryOp::I32Eq)
                 .br_if(block_id);
 
-            for (storage_obj_uid, storage_obj_itype, storage_obj) in storage_objects {
+            for (storage_obj_uid, storage_obj_itype, storage_obj, is_ref) in storage_objects {
                 block
                     .local_get(storage_obj_uid)
                     .i32_const(4)
-                    .binop(BinaryOp::I32Sub)
-                    .local_set(original_struct_ptr);
+                    .binop(BinaryOp::I32Sub);
+
+                // TODO: If it is a ref we have the pointer to the pointer to the struct and not
+                // the struct, that is worng
+                if is_ref {
+                    block.load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                }
+
+                block.local_set(original_struct_ptr);
 
                 block
                     .local_get(original_struct_ptr)
@@ -609,6 +631,21 @@ pub fn add_external_contract_call_fn(
                     .call(emit_log);
 
                 block
+                    .local_get(original_struct_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    )
+                    .i32_const(8)
+                    .i32_const(0)
+                    .call(emit_log);
+
+                /*
+                block
                     .local_get(storage_obj_uid)
                     .load(
                         compilation_ctx.memory_id,
@@ -629,6 +666,7 @@ pub fn add_external_contract_call_fn(
                     .i32_const(32)
                     .i32_const(0)
                     .call(emit_log);
+                */
 
                 block
                     .local_get(storage_obj_uid)
@@ -673,12 +711,7 @@ pub fn add_external_contract_call_fn(
                 // owner, we can't continue handling the object here
                 block
                     .local_get(original_struct_ptr)
-                    // .i32_const(32)
-                    // .binop(BinaryOp::I32Sub)
                     .local_get(new_struct_ptr)
-                    // .i32_const(32)
-                    //.binop(BinaryOp::I32Sub)
-                    // .i32_const(storage_obj.heap_size as i32 + 32)
                     .i32_const(storage_obj.heap_size as i32)
                     .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
@@ -689,10 +722,26 @@ pub fn add_external_contract_call_fn(
                     .call(emit_log);
 
                 block
+                    .local_get(original_struct_ptr)
+                    .load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 8,
+                        },
+                    )
+                    .i32_const(8)
+                    .i32_const(0)
+                    .call(emit_log);
+
+                /*
+                block
                     .local_get(new_struct_ptr)
                     .i32_const(32)
                     .i32_const(0)
                     .call(emit_log);
+                */
             }
         });
     }

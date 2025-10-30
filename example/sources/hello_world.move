@@ -1,4 +1,4 @@
-module hello_world::delegated_counter;
+module hello_world::hello_world;
 
 use stylus::tx_context::TxContext;
 use stylus::object as object;
@@ -14,6 +14,7 @@ public struct Counter has key {
     contract_address: address,
 }
 
+/*
 entry fun create(contract_logic: address, ctx: &mut TxContext) {
   transfer::share_object(Counter {
     id: object::new(ctx),
@@ -22,6 +23,7 @@ entry fun create(contract_logic: address, ctx: &mut TxContext) {
     contract_address: contract_logic,
   });
 }
+*/
 
 /// Increment a counter by 1.
 entry fun increment(counter: &mut Counter) {
@@ -33,21 +35,27 @@ entry fun increment(counter: &mut Counter) {
     assert!(res.succeded(), 33);
 }
 
+/*
 /// Increment a counter by 1.
 entry fun increment2(counter: &mut Counter) {
-    counter.value = counter.value + 1;
-}
-
-/// Increment a counter by 1.
-entry fun increment_and_modify(counter: &mut Counter) {
-    counter.value = counter.value + 2;
     let delegated_counter = dci::new(
         contract_calls::new(counter.contract_address)
             .delegate()
     );
     let res = delegated_counter.increment(&mut counter.id);
     assert!(res.succeded(), 33);
-    counter.value = counter.value - 15;
+}
+
+/// Increment a counter by 1.
+entry fun increment_and_modify(counter: &mut Counter) {
+    let delegated_counter = dci::new(
+        contract_calls::new(counter.contract_address)
+            .delegate()
+    );
+    let res = delegated_counter.increment(&mut counter.id);
+    assert!(res.succeded(), 33);
+    counter.value = counter.value + 2;
+
 }
 
 /// Read counter.
@@ -59,3 +67,4 @@ entry fun read(counter: &Counter): u64 {
 entry fun logic_address(counter: &Counter): address {
     counter.contract_address
 }
+*/

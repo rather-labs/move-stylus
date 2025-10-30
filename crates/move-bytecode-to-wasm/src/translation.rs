@@ -40,7 +40,7 @@ use crate::{
     data::DATA_ABORT_MESSAGE_PTR_OFFSET,
     error_encoding::build_error_message,
     generics::{replace_type_parameters, type_contains_generics},
-    hostio::host_functions::storage_flush_cache,
+    hostio::host_functions::{emit_log, storage_flush_cache},
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
     vm_handled_types::{self, VmHandledType, named_id::NamedId, uid::Uid},
@@ -1820,6 +1820,9 @@ fn translate_instruction(
                     &mapped_function.signature.arguments,
                     function_locals,
                 );
+
+                let (flush_cache_fn, _) = storage_flush_cache(module);
+                builder.i32_const(1).call(flush_cache_fn);
             }
 
             prepare_function_return(
@@ -3025,6 +3028,45 @@ fn add_cache_storage_object_instructions(
     for (itype, wasm_local_var) in object_to_cache {
         let cache_storage_object_changes_fn = RuntimeFunction::CacheStorageObjectChanges
             .get_generic(module, compilation_ctx, &[itype]);
+
+        let (emit_log_fn, _) = emit_log(module);
+        builder
+            .local_get(wasm_local_var)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .i32_const(32)
+            .i32_const(0)
+            .call(emit_log_fn);
+
+        /*
+        builder
+            .local_get(wasm_local_var)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            )
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 8,
+                },
+            )
+            .i32_const(8)
+            .i32_const(0)
+            .call(emit_log_fn);
+        */
 
         builder
             .local_get(wasm_local_var)

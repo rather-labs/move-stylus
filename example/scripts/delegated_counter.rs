@@ -88,7 +88,7 @@ async fn main() -> eyre::Result<()> {
     let res = example.read(counter_id).call().await?;
     println!("counter = {}", res);
 
-println!("\nSending increment tx");
+    println!("\nSending increment tx 2");
 
     let pending_tx = example.increment2(counter_id).send().await?;
     let receipt = pending_tx.get_receipt().await?;
@@ -117,21 +117,19 @@ println!("\nSending increment tx");
     let res = example.read(counter_id).call().await?;
     println!("counter = {}", res);
 
-    /*
-
     println!("\nSending increment and modify tx");
 
     let pending_tx = example.incrementAndModify(counter_id).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
+        println!("increment logs 0: {:?}", &raw.bytes());
         println!("increment logs 0: 0x{}", hex::encode(raw));
     }
 
     println!("\nReading value after increment and modify");
     let res = example.read(counter_id).call().await?;
     println!("counter = {}", res);
-    */
 
     Ok(())
 }
