@@ -81,8 +81,8 @@ async fn main() -> eyre::Result<()> {
     println!("counter = {}", res);
 
     println!("==============================================================================");
-    println!("Executing increment and setValue on logic contract:");
-    println!("{address_logic_1}");
+    println!(" Executing increment and setValue on logic contract:");
+    println!(" {address_logic_1}");
     println!("==============================================================================");
 
     println!("\nReading value before increment");

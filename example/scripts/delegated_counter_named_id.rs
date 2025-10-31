@@ -6,6 +6,7 @@ use alloy::signers::local::PrivateKeySigner;
 use alloy::{primitives::Address, providers::ProviderBuilder, sol, transports::http::reqwest::Url};
 use dotenv::dotenv;
 use eyre::eyre;
+use std::io::Read;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -30,19 +31,24 @@ async fn main() -> eyre::Result<()> {
     dotenv().ok();
     let priv_key = std::env::var("PRIV_KEY").map_err(|_| eyre!("No {} env var set", "PRIV_KEY"))?;
     let rpc_url = std::env::var("RPC_URL").map_err(|_| eyre!("No {} env var set", "RPC_URL"))?;
-    let contract_address = std::env::var("CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID")
-        .map_err(|_| eyre!("No {} env var set", "CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID"))?;
+    let contract_address =
+        std::env::var("CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID").map_err(|_| {
+            eyre!(
+                "No {} env var set",
+                "CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID"
+            )
+        })?;
 
-    let contract_address_logic_1 = std::env::var("CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID_LOGIC_1")
-        .map_err(|_| {
+    let contract_address_logic_1 =
+        std::env::var("CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID_LOGIC_1").map_err(|_| {
             eyre!(
                 "No {} env var set",
                 "CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID_LOGIC_1"
             )
         })?;
 
-    let contract_address_logic_2 = std::env::var("CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID_LOGIC_2")
-        .map_err(|_| {
+    let contract_address_logic_2 =
+        std::env::var("CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID_LOGIC_2").map_err(|_| {
             eyre!(
                 "No {} env var set",
                 "CONTRACT_ADDRESS_DELEGATED_COUNTER_LOGIC_2"
@@ -76,8 +82,8 @@ async fn main() -> eyre::Result<()> {
     println!("counter = {}", res);
 
     println!("==============================================================================");
-    println!("Executing increment and setValue on logic contract:");
-    println!("{address_logic_1}");
+    println!(" Executing increment and setValue on logic contract:");
+    println!(" {address_logic_1}");
     println!("==============================================================================");
 
     println!("\nReading value before increment");
@@ -90,6 +96,7 @@ async fn main() -> eyre::Result<()> {
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
+        println!("increment logs 0: {:?}", raw.bytes());
         println!("increment logs 0: 0x{}", hex::encode(raw));
     }
 
@@ -146,10 +153,7 @@ async fn main() -> eyre::Result<()> {
     println!("counter = {}", res);
 
     println!("\nSending increment BEFORE And AFTER tx (shuld increment by 10, 1, and 20)");
-    let pending_tx = example
-        .incrementModifyBeforeAfter()
-        .send()
-        .await?;
+    let pending_tx = example.incrementModifyBeforeAfter().send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
@@ -195,10 +199,7 @@ async fn main() -> eyre::Result<()> {
     println!(" Changing contract logic from {address_logic_1}");
     println!(" to {address_logic_2}");
     println!("==============================================================================\n");
-    let pending_tx = example
-        .changeLogic(address_logic_2)
-        .send()
-        .await?;
+    let pending_tx = example.changeLogic(address_logic_2).send().await?;
     let _receipt = pending_tx.get_receipt().await?;
 
     println!("==============================================================================");
@@ -272,10 +273,7 @@ async fn main() -> eyre::Result<()> {
     println!("counter = {}", res);
 
     println!("\nSending increment BEFORE And AFTER tx (shuld increment by 10, 2, and 20)");
-    let pending_tx = example
-        .incrementModifyBeforeAfter()
-        .send()
-        .await?;
+    let pending_tx = example.incrementModifyBeforeAfter().send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();

@@ -1055,8 +1055,28 @@ fn translate_instruction(
                             );
 
                             // Add as arguments the NamedIds
+                            // The first load derefences the IMutRef
+                            // The second load loads the NamedId<> struct (first field of the
+                            // function)
                             for nid_local in named_ids_locals {
-                                builder.local_get(nid_local);
+                                builder
+                                    .local_get(nid_local)
+                                    .load(
+                                        compilation_ctx.memory_id,
+                                        LoadKind::I32 { atomic: false },
+                                        MemArg {
+                                            align: 0,
+                                            offset: 0,
+                                        },
+                                    )
+                                    .load(
+                                        compilation_ctx.memory_id,
+                                        LoadKind::I32 { atomic: false },
+                                        MemArg {
+                                            align: 0,
+                                            offset: 0,
+                                        },
+                                    );
                             }
 
                             external_call_fn
