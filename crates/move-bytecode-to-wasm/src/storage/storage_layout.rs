@@ -25,7 +25,7 @@ pub fn compute_enum_storage_size(
     enum_: &IEnum,
     written_bytes_in_slot: LocalId,
     compilation_ctx: &CompilationContext,
-) -> Result<Option<LocalId>, TranslationError> {
+) -> Result<LocalId, TranslationError> {
     // Increment the used bytes by 1 to account for the variant index
     // Compute: written_bytes = (written_bytes + 1) % SLOT_SIZE
     let used_bytes_in_slot = module.locals.add(ValType::I32);
@@ -42,7 +42,7 @@ pub fn compute_enum_storage_size(
     builder.i32_const(0).local_set(enum_size);
 
     for variant in &enum_.variants {
-        match compute_fields_storage_size(
+        let variant_size = compute_fields_storage_size(
             module,
             builder,
             &variant.fields,
@@ -51,30 +51,29 @@ pub fn compute_enum_storage_size(
             || TranslationError::FoundReferenceInsideEnum {
                 enum_index: variant.belongs_to,
             },
-        )? {
-            // If the variant size is computable, compare it to the current enum size
-            Some(variant_size) => {
-                // If the variant size is greater than the current enum size, set the enum size to the variant size
-                builder
-                    .local_get(enum_size)
-                    .local_get(variant_size)
-                    .binop(BinaryOp::I32GeS)
-                    .if_else(
-                        None,
-                        |_| {
-                            // enum_size >= variant_size, do nothing
-                        },
-                        |else_| {
-                            // enum_size < variant_size, set enum_size to variant_size
-                            else_.local_get(variant_size).local_set(enum_size);
-                        },
-                    );
-            }
-            None => {
-                // Generic type encountered, can't compute size
-                return Ok(None);
-            }
-        }
+            || TranslationError::FoundTypeParameterInsideEnumVariant {
+                enum_index: enum_.index,
+                variant_index: variant.belongs_to,
+            },
+        )
+        .unwrap();
+
+        // If the variant size is computable, compare it to the current enum size
+        // If the variant size is greater than the current enum size, set the enum size to the variant size
+        builder
+            .local_get(enum_size)
+            .local_get(variant_size)
+            .binop(BinaryOp::I32GeS)
+            .if_else(
+                None,
+                |_| {
+                    // enum_size >= variant_size, do nothing
+                },
+                |else_| {
+                    // enum_size < variant_size, set enum_size to variant_size
+                    else_.local_get(variant_size).local_set(enum_size);
+                },
+            );
     }
 
     // Add 1 to account for the variant index
@@ -84,7 +83,7 @@ pub fn compute_enum_storage_size(
         .binop(BinaryOp::I32Add)
         .local_set(enum_size);
 
-    Ok(Some(enum_size))
+    Ok(enum_size)
 }
 
 /// Emits WASM instructions to compute the total storage size for a struct.
@@ -104,7 +103,7 @@ pub fn compute_struct_storage_size(
     struct_: &IStruct,
     written_bytes_in_slot: LocalId,
     compilation_ctx: &CompilationContext,
-) -> Result<Option<LocalId>, TranslationError> {
+) -> Result<LocalId, TranslationError> {
     // Filter out UIDs (not stored)
     let filtered_fields: Vec<IntermediateType> = struct_
         .fields
@@ -130,22 +129,28 @@ pub fn compute_struct_storage_size(
         || TranslationError::FoundReferenceInsideStruct {
             struct_index: struct_.index(),
         },
+        || TranslationError::FoundTypeParameterInsideStruct {
+            struct_index: struct_.index(),
+            type_parameter_index: 0,
+        },
     )
 }
 
 /// Internal helper to emit WASM instructions to compute total storage size for a sequence of fields.
 /// The `on_ref` closure defines the error to emit when a reference is found
 /// (differs for enums vs structs).
-fn compute_fields_storage_size<F>(
+fn compute_fields_storage_size<F, G>(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     fields: &[IntermediateType],
     used_bytes_in_slot: LocalId,
     compilation_ctx: &CompilationContext,
     on_ref: F,
-) -> Result<Option<LocalId>, TranslationError>
+    on_generic: G,
+) -> Result<LocalId, TranslationError>
 where
     F: Fn() -> TranslationError,
+    G: Fn() -> TranslationError,
 {
     let total_bytes = module.locals.add(ValType::I32);
     builder.i32_const(0).local_set(total_bytes);
@@ -156,7 +161,7 @@ where
     for field in fields {
         match field {
             IntermediateType::ITypeParameter(_) => {
-                return Ok(None);
+                return Err(on_generic());
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 return Err(on_ref());
@@ -197,26 +202,22 @@ where
                         used_bytes,
                         compilation_ctx,
                     )?;
-                    match struct_size {
-                        Some(size) => {
-                            // total_bytes += size
-                            builder
-                                .local_get(total_bytes)
-                                .local_get(size)
-                                .binop(BinaryOp::I32Add)
-                                .local_set(total_bytes);
 
-                            // used_bytes = (used_bytes + size) % SLOT_SIZE
-                            builder
-                                .local_get(used_bytes)
-                                .local_get(size)
-                                .binop(BinaryOp::I32Add)
-                                .i32_const(SLOT_SIZE as i32)
-                                .binop(BinaryOp::I32RemS)
-                                .local_set(used_bytes);
-                        }
-                        None => return Ok(None),
-                    }
+                    // total_bytes += size
+                    builder
+                        .local_get(total_bytes)
+                        .local_get(struct_size)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(total_bytes);
+
+                    // used_bytes = (used_bytes + size) % SLOT_SIZE
+                    builder
+                        .local_get(used_bytes)
+                        .local_get(struct_size)
+                        .binop(BinaryOp::I32Add)
+                        .i32_const(SLOT_SIZE as i32)
+                        .binop(BinaryOp::I32RemS)
+                        .local_set(used_bytes);
                 }
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
@@ -231,26 +232,22 @@ where
                     used_bytes,
                     compilation_ctx,
                 )?;
-                match enum_size {
-                    Some(size) => {
-                        // total_bytes += size
-                        builder
-                            .local_get(total_bytes)
-                            .local_get(size)
-                            .binop(BinaryOp::I32Add)
-                            .local_set(total_bytes);
 
-                        // used_bytes = (used_bytes + size) % SLOT_SIZE
-                        builder
-                            .local_get(used_bytes)
-                            .local_get(size)
-                            .binop(BinaryOp::I32Add)
-                            .i32_const(SLOT_SIZE as i32)
-                            .binop(BinaryOp::I32RemS)
-                            .local_set(used_bytes);
-                    }
-                    None => return Ok(None),
-                }
+                // total_bytes += size
+                builder
+                    .local_get(total_bytes)
+                    .local_get(enum_size)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(total_bytes);
+
+                // used_bytes = (used_bytes + size) % SLOT_SIZE
+                builder
+                    .local_get(used_bytes)
+                    .local_get(enum_size)
+                    .binop(BinaryOp::I32Add)
+                    .i32_const(SLOT_SIZE as i32)
+                    .binop(BinaryOp::I32RemS)
+                    .local_set(used_bytes);
             }
             _ => {
                 let field_size = field_size(field, compilation_ctx) as i32;
@@ -307,7 +304,7 @@ where
         }
     }
 
-    Ok(Some(total_bytes))
+    Ok(total_bytes)
 }
 
 /// Returns the storage-encoded size in bytes for a given intermediate type.
@@ -422,8 +419,11 @@ mod wasm_tests {
             used_bytes_local,
             compilation_ctx,
             || TranslationError::FoundReferenceInsideEnum { enum_index: 0 },
-        )?
-        .ok_or("Failed to compute fields size")?;
+            || TranslationError::FoundTypeParameterInsideEnumVariant {
+                enum_index: 0,
+                variant_index: 0,
+            },
+        )?;
 
         // Return the computed size
         builder.local_get(size_local);
@@ -481,7 +481,6 @@ mod wasm_tests {
                 written_bytes_local,
                 compilation_ctx,
             )?
-            .ok_or("Failed to compute enum size")?
         } else if let Some(struct_) = struct_ {
             compute_struct_storage_size(
                 module,
@@ -490,7 +489,6 @@ mod wasm_tests {
                 written_bytes_local,
                 compilation_ctx,
             )?
-            .ok_or("Failed to compute struct size")?
         } else {
             return Err("Either enum_ or struct_ must be provided".into());
         };
