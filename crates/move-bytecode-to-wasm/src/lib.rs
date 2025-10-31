@@ -52,6 +52,11 @@ pub fn translate_single_module(package: CompiledPackage, module_name: &str) -> M
     modules.remove(module_name).expect("Module not compiled")
 }
 
+pub enum CompilationError {
+    ICE,
+    CodeError,
+}
+
 pub fn translate_package(
     package: CompiledPackage,
     module_name: Option<String>,
@@ -92,7 +97,7 @@ pub fn translate_package(
         let mut dynamic_fields_global_variables: Vec<(GlobalId, IntermediateType)> = Vec::new();
 
         let module_name = root_compiled_module.unit.name.to_string();
-        println!("compiling module {module_name}...");
+        println!("\x1B[1m\x1B[32mCOMPILING\x1B[0m {module_name}");
         let root_compiled_module_unit = &root_compiled_module.unit.module;
 
         let root_module_id = ModuleId {
@@ -221,7 +226,7 @@ pub fn process_dependency_tree<'move_package>(
         };
         // If the HashMap contains the key, we already processed that dependency
         if !dependencies_data.contains_key(&module_id) {
-            println!("\tprocessing dependency {module_id}...");
+            println!("└ \x1B[1m\x1B[32mPROCESSING DEPENDENCY\x1B[0m {module_id}");
         } else {
             continue;
         }
