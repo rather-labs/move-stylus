@@ -1015,6 +1015,26 @@ fn translate_instruction(
                     // storage objects before calling it
                     let native_function_id =
                         if native_function_module.is_external_call(&function_id.identifier) {
+                            // Along with the argument types, we need to collect the NamedId's that
+                            // appear in this function, since in the external call's signature they
+                            // are not present, an we will not be able to update them if they
+                            // change.
+                            let (named_ids_types, named_ids_locals) =
+                                get_storage_structs_with_named_ids(
+                                    mapped_function,
+                                    compilation_ctx,
+                                    function_locals,
+                                )
+                                .into_iter()
+                                .fold(
+                                    (Vec::new(), Vec::new()),
+                                    |(mut itypes, mut locals), (itype, local)| {
+                                        itypes.push(itype);
+                                        locals.push(local);
+                                        (itypes, locals)
+                                    },
+                                );
+
                             add_cache_storage_object_instructions(
                                 module,
                                 builder,
@@ -1025,13 +1045,21 @@ fn translate_instruction(
                             let (flush_cache_fn, _) = storage_flush_cache(module);
                             builder.i32_const(1).call(flush_cache_fn);
 
-                            NativeFunction::get_external_call(
+                            let external_call_fn = NativeFunction::get_external_call(
                                 &function_id.identifier,
                                 module,
                                 compilation_ctx,
                                 &function_information.function_id.module_id,
                                 &argument_types,
-                            )
+                                &named_ids_types,
+                            );
+
+                            // Add as arguments the NamedIds
+                            for nid_local in named_ids_locals {
+                                builder.local_get(nid_local);
+                            }
+
+                            external_call_fn
                         } else {
                             NativeFunction::get(
                                 &function_id.identifier,
@@ -1209,7 +1237,6 @@ fn translate_instruction(
         Bytecode::CopyLoc(local_id) => {
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
-            println!("LOCAL TYPE {local_type:?}");
             local_type.copy_local_instructions(
                 module,
                 builder,
@@ -3054,10 +3081,79 @@ fn struct_field_borrow_add_storage_id_parent_information(
                 vm_handled_struct: VmHandledStruct::StorageId {
                     parent_module_id: module_data.id.clone(),
                     parent_index: struct_.index(),
-                    instance_types: None,
+                    instance_types: Some(types.clone()),
                 },
             }
         }
         _ => field_type,
     }
+}
+
+// Along with the argument types, we need to collect the NamedId's that
+// appear in this function, since in the external call's signature they
+// are not present, an we will not be able to update them if they
+// change.
+fn get_storage_structs_with_named_ids(
+    mapped_function: &MappedFunction,
+    compilation_ctx: &CompilationContext,
+    function_locals: &[LocalId],
+) -> Vec<(IntermediateType, LocalId)> {
+    mapped_function
+        .signature
+        .arguments
+        .iter()
+        .enumerate()
+        .filter_map(|(arg_index, fn_arg)| {
+            let (itype, struct_) = match fn_arg {
+                IntermediateType::IMutRef(inner) => (
+                    &**inner,
+                    compilation_ctx.get_struct_by_intermediate_type(inner),
+                ),
+                t => (fn_arg, compilation_ctx.get_struct_by_intermediate_type(t)),
+            };
+
+            let instance_types =
+                if let IntermediateType::IGenericStructInstance { types, .. } = itype {
+                    Some(types.clone())
+                } else {
+                    None
+                };
+
+            let parent_module_id = match itype {
+                IntermediateType::IStruct { module_id, .. } => Some(module_id),
+                IntermediateType::IGenericStructInstance { module_id, .. } => Some(module_id),
+                _ => None,
+            };
+
+            if let (Ok(struct_), Some(parent_module_id)) = (struct_, parent_module_id) {
+                if struct_.has_key {
+                    match struct_.fields.first() {
+                        Some(IntermediateType::IGenericStructInstance {
+                            module_id,
+                            index,
+                            types,
+                            ..
+                        }) if NamedId::is_vm_type(module_id, *index, compilation_ctx) => Some((
+                            IntermediateType::IGenericStructInstance {
+                                module_id: module_id.clone(),
+                                index: *index,
+                                types: types.clone(),
+                                vm_handled_struct: VmHandledStruct::StorageId {
+                                    parent_module_id: parent_module_id.clone(),
+                                    parent_index: struct_.index(),
+                                    instance_types,
+                                },
+                            },
+                            function_locals[arg_index],
+                        )),
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<(IntermediateType, LocalId)>>()
 }

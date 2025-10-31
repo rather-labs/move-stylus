@@ -42,6 +42,7 @@ pub fn add_external_contract_call_fn(
     function_information: &MappedFunction,
     function_modifiers: &[FunctionModifier],
     arguments_types: &[IntermediateType],
+    named_ids: &[IntermediateType],
 ) -> FunctionId {
     let name = format!(
         "{}_{}_{}",
@@ -61,7 +62,11 @@ pub fn add_external_contract_call_fn(
     let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None);
     let swap = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
 
-    let arguments = function_information.signature.get_argument_wasm_types();
+    let mut arguments = function_information.signature.get_argument_wasm_types();
+
+    // Add the named ids into the arguments
+    let named_id_args = named_ids.iter().map(|_| ValType::I32);
+    arguments.extend(named_id_args);
 
     let mut function = FunctionBuilder::new(&mut module.types, &arguments, &[ValType::I32]);
     let mut builder = function.name(name).func_body();
@@ -515,7 +520,7 @@ pub fn add_external_contract_call_fn(
     // Before returning, if the call is a delegated call, we must load from storage the potentially
     // modified storage objects
     // We ignore the first argument since it is the #[external_call] object
-    let mut storage_objects = arguments_types
+    let mut storage_objects: Vec<_> = arguments_types
         .iter()
         .enumerate()
         .filter_map(|(i, itype)| {
@@ -571,9 +576,64 @@ pub fn add_external_contract_call_fn(
                 _ => None,
             }
         })
-        .peekable();
+        .collect();
 
-    if storage_objects.peek().is_some() {
+    let named_ids_storage_objects = named_ids.iter().enumerate().map(|(i, named_id)| {
+        if let IntermediateType::IGenericStructInstance {
+            module_id: _,
+            index: _,
+            types: _,
+            vm_handled_struct:
+                VmHandledStruct::StorageId {
+                    parent_module_id,
+                    parent_index,
+                    instance_types,
+                },
+        } = named_id
+        {
+            let (parent_struct_itype, parent_struct) = if let Some(instance_types) = instance_types
+            {
+                let itype = IntermediateType::IGenericStructInstance {
+                    module_id: parent_module_id.clone(),
+                    index: *parent_index,
+                    types: instance_types.clone(),
+                    vm_handled_struct: VmHandledStruct::None,
+                };
+
+                let struct_ = compilation_ctx
+                    .get_struct_by_index(parent_module_id, *parent_index)
+                    .unwrap();
+                struct_.instantiate(instance_types);
+
+                (itype, struct_)
+            } else {
+                let itype = IntermediateType::IStruct {
+                    module_id: parent_module_id.clone(),
+                    index: *parent_index,
+                    vm_handled_struct: VmHandledStruct::None,
+                };
+
+                let struct_ = compilation_ctx
+                    .get_struct_by_index(parent_module_id, *parent_index)
+                    .unwrap();
+
+                (itype, struct_)
+            };
+
+            (
+                // The named id arguments are located after the common arguments of the function
+                function_args[i + function_information.signature.arguments.len()],
+                parent_struct_itype,
+                parent_struct,
+            )
+        } else {
+            panic!("found an struct ({named_id:?}) that is not a named id in named_ids array");
+        }
+    });
+
+    storage_objects.extend(named_ids_storage_objects);
+
+    if !storage_objects.is_empty() {
         let locate_storage_data_fn =
             RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
 
