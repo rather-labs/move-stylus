@@ -28,6 +28,7 @@ use external_call::{
 use function_modifiers::{Function, FunctionModifier};
 use move_compiler::{
     Compiler, PASS_PARSER,
+    diagnostics::{Diagnostic, Diagnostics, report_diagnostics},
     parser::ast::{Definition, ModuleMember},
     shared::{Identifier, NumericalAddress},
 };
@@ -40,7 +41,7 @@ use struct_modifiers::StructModifier;
 pub fn process_special_attributes(
     path: &Path,
 ) -> Result<SpecialAttributes, Vec<SpecialAttributeError>> {
-    let (_, program_res) = Compiler::from_files(
+    let (mapped_files, program_res) = Compiler::from_files(
         None,
         vec![path.to_str().unwrap()],
         Vec::new(),
@@ -55,7 +56,6 @@ pub fn process_special_attributes(
     let mut found_error = false;
 
     let ast = program_res.unwrap().into_ast().1;
-
     // First we need to process the structs, since there are functions (like the external call
     // ones) that should have as first argument structs marked with a modifier.
     for source in &ast.source_definitions {
@@ -180,6 +180,15 @@ pub fn process_special_attributes(
     }
 
     if found_error {
+        /*
+        let error_diagnostics: Vec<Diagnostic> =
+            module_errors.iter().map(Diagnostic::from).collect();
+        */
+        let mut diagnostics = Diagnostics::new();
+        for error in &module_errors {
+            diagnostics.add(error.into());
+        }
+        report_diagnostics(&mapped_files, diagnostics);
         Err(module_errors)
     } else {
         Ok(result)
