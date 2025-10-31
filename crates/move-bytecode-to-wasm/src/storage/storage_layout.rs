@@ -3,35 +3,72 @@ use crate::{
     translation::TranslationError,
     translation::intermediate_types::{IntermediateType, enums::IEnum, structs::IStruct},
 };
+use walrus::ir::BinaryOp;
+use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 const SLOT_SIZE: u32 = 32;
 
-/// Computes the total storage size for an enum (maximum of all variants).
+/// Emits WASM instructions to compute the total storage size for an enum (maximum of all variants).
 ///
 /// Arguments:
+/// - `module`: Walrus module being built
+/// - `builder`: Instruction sequence builder to append to
 /// - `enum_`: the enum whose size to compute
-/// - `used_bytes`: bytes already used in the storage slot (affects layout)
+/// - `written_bytes_in_slot`: LocalId containing bytes already used in the storage slot (affects layout)
 /// - `compilation_ctx`: context for type resolution
 ///
-/// Returns `Ok(Some(u32))` with the size if possible, `Ok(None)` if generic type encountered, or an error.
-pub fn compute_enum_storage_layout(
+/// Returns `Ok(Some(LocalId))` with a local containing the computed size, or `Ok(None)` if generic type encountered.
+/// The returned local will contain the computed size in bytes.
+pub fn compute_enum_storage_size(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
     enum_: &IEnum,
-    used_bytes: u32,
+    written_bytes_in_slot: LocalId,
     compilation_ctx: &CompilationContext,
-) -> Result<Option<u32>, TranslationError> {
+) -> Result<Option<LocalId>, TranslationError> {
     // Increment the used bytes by 1 to account for the variant index
-    let used_bytes = (used_bytes + 1) % SLOT_SIZE;
+    // Compute: written_bytes = (written_bytes + 1) % SLOT_SIZE
+    let used_bytes_in_slot = module.locals.add(ValType::I32);
+    builder
+        .local_get(written_bytes_in_slot)
+        .i32_const(1)
+        .binop(BinaryOp::I32Add)
+        .i32_const(SLOT_SIZE as i32)
+        .binop(BinaryOp::I32RemS)
+        .local_set(used_bytes_in_slot);
 
     // Compute the size of each variant and pick the largest one
-    let mut max_size: u32 = 0u32;
+    let enum_size = module.locals.add(ValType::I32);
+    builder.i32_const(0).local_set(enum_size);
+
     for variant in &enum_.variants {
-        match compute_fields_storage_size(&variant.fields, used_bytes, compilation_ctx, || {
-            TranslationError::FoundReferenceInsideEnum {
+        match compute_fields_storage_size(
+            module,
+            builder,
+            &variant.fields,
+            used_bytes_in_slot,
+            compilation_ctx,
+            || TranslationError::FoundReferenceInsideEnum {
                 enum_index: variant.belongs_to,
-            }
-        })? {
-            Some(size) => {
-                max_size = std::cmp::max(max_size, size);
+            },
+        )? {
+            // If the variant size is computable, compare it to the current enum size
+            Some(variant_size) => {
+                // If the variant size is greater than the current enum size, set the enum size to the variant size
+                builder
+                    .local_get(enum_size)
+                    .local_get(variant_size)
+                    .binop(BinaryOp::I32GeS)
+                    .if_else(
+                        None,
+                        |_| {
+                            // enum_size >= variant_size, do nothing
+                        },
+                        |else_| {
+                            // enum_size < variant_size, set enum_size to variant_size
+                            else_.local_get(variant_size).local_set(enum_size);
+                        },
+                    );
             }
             None => {
                 // Generic type encountered, can't compute size
@@ -40,23 +77,34 @@ pub fn compute_enum_storage_layout(
         }
     }
 
-    Ok(Some(max_size + 1)) // Add 1 to account for the variant index
+    // Add 1 to account for the variant index
+    builder
+        .local_get(enum_size)
+        .i32_const(1)
+        .binop(BinaryOp::I32Add)
+        .local_set(enum_size);
+
+    Ok(Some(enum_size))
 }
 
-/// Computes the total storage size for a struct.
+/// Emits WASM instructions to compute the total storage size for a struct.
 ///
 /// Arguments:
+/// - `module`: Walrus module being built
+/// - `builder`: Instruction sequence builder to append to
 /// - `struct_`: the struct whose storage size is being calculated
-/// - `used_bytes`: number of bytes already used in the current slot (affects alignment/layout)
+/// - `written_bytes_in_slot`: LocalId containing bytes already used in the current slot (affects layout)
 /// - `compilation_ctx`: context used to resolve types and perform lookups
 ///
 /// Filters out UID or NamedId fields (which are not stored) and computes the total size of the remaining fields.
-/// Returns `Ok(Some(u32))` with the computed size, `Ok(None)` if any field contains a generic type parameter, or an error if a reference is found.
-pub fn compute_struct_storage_layout(
+/// Returns `Ok(Some(LocalId))` with a local containing the computed size, or `Ok(None)` if any field contains a generic type parameter.
+pub fn compute_struct_storage_size(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
     struct_: &IStruct,
-    used_bytes: u32,
+    written_bytes_in_slot: LocalId,
     compilation_ctx: &CompilationContext,
-) -> Result<Option<u32>, TranslationError> {
+) -> Result<Option<LocalId>, TranslationError> {
     // Filter out UIDs (not stored)
     let filtered_fields: Vec<IntermediateType> = struct_
         .fields
@@ -65,28 +113,45 @@ pub fn compute_struct_storage_layout(
         .cloned()
         .collect();
 
-    let used_bytes = used_bytes % SLOT_SIZE;
-    compute_fields_storage_size(&filtered_fields, used_bytes, compilation_ctx, || {
-        TranslationError::FoundReferenceInsideStruct {
+    // Compute: written_bytes = written_bytes % SLOT_SIZE
+    let used_bytes_in_slot = module.locals.add(ValType::I32);
+    builder
+        .local_get(written_bytes_in_slot)
+        .i32_const(SLOT_SIZE as i32)
+        .binop(BinaryOp::I32RemS)
+        .local_set(used_bytes_in_slot);
+
+    compute_fields_storage_size(
+        module,
+        builder,
+        &filtered_fields,
+        used_bytes_in_slot,
+        compilation_ctx,
+        || TranslationError::FoundReferenceInsideStruct {
             struct_index: struct_.index(),
-        }
-    })
+        },
+    )
 }
 
-/// Internal helper to compute total storage size for a sequence of fields.
+/// Internal helper to emit WASM instructions to compute total storage size for a sequence of fields.
 /// The `on_ref` closure defines the error to emit when a reference is found
 /// (differs for enums vs structs).
 fn compute_fields_storage_size<F>(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
     fields: &[IntermediateType],
-    used_bytes: u32,
+    used_bytes_in_slot: LocalId,
     compilation_ctx: &CompilationContext,
     on_ref: F,
-) -> Result<Option<u32>, TranslationError>
+) -> Result<Option<LocalId>, TranslationError>
 where
     F: Fn() -> TranslationError,
 {
-    let mut total_bytes = 0u32;
-    let mut used_bytes = used_bytes;
+    let total_bytes = module.locals.add(ValType::I32);
+    builder.i32_const(0).local_set(total_bytes);
+
+    let used_bytes = module.locals.add(ValType::I32);
+    builder.local_get(used_bytes_in_slot).local_set(used_bytes);
 
     for field in fields {
         match field {
@@ -103,46 +168,141 @@ where
 
                 if struct_.has_key {
                     // Parent stores 32-byte UID when child has key
-                    total_bytes += SLOT_SIZE + (SLOT_SIZE - used_bytes) % SLOT_SIZE;
-                    used_bytes = SLOT_SIZE;
+                    // total_bytes += SLOT_SIZE + (SLOT_SIZE - used_bytes) % SLOT_SIZE
+
+                    // total_bytes += SLOT_SIZE
+                    builder
+                        .local_get(total_bytes)
+                        .i32_const(SLOT_SIZE as i32)
+                        .binop(BinaryOp::I32Add);
+
+                    // Padding
+                    builder
+                        .i32_const(SLOT_SIZE as i32)
+                        .local_get(used_bytes)
+                        .binop(BinaryOp::I32Sub)
+                        .i32_const(SLOT_SIZE as i32)
+                        .binop(BinaryOp::I32RemS);
+
+                    // total_bytes += padding
+                    builder.binop(BinaryOp::I32Add).local_set(total_bytes);
+
+                    // used_bytes = SLOT_SIZE
+                    builder.i32_const(SLOT_SIZE as i32).local_set(used_bytes);
                 } else {
-                    let struct_size =
-                        compute_struct_storage_layout(&struct_, used_bytes, compilation_ctx)?;
+                    let struct_size = compute_struct_storage_size(
+                        module,
+                        builder,
+                        &struct_,
+                        used_bytes,
+                        compilation_ctx,
+                    )?;
                     match struct_size {
                         Some(size) => {
-                            total_bytes += size;
-                            used_bytes = (used_bytes + size) % SLOT_SIZE;
+                            // total_bytes += size
+                            builder
+                                .local_get(total_bytes)
+                                .local_get(size)
+                                .binop(BinaryOp::I32Add)
+                                .local_set(total_bytes);
+
+                            // used_bytes = (used_bytes + size) % SLOT_SIZE
+                            builder
+                                .local_get(used_bytes)
+                                .local_get(size)
+                                .binop(BinaryOp::I32Add)
+                                .i32_const(SLOT_SIZE as i32)
+                                .binop(BinaryOp::I32RemS)
+                                .local_set(used_bytes);
                         }
                         None => return Ok(None),
                     }
                 }
             }
-            // Enums
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx
                     .get_enum_by_intermediate_type(field)
                     .expect("enum not found");
 
-                let enum_size = compute_enum_storage_layout(&enum_, used_bytes, compilation_ctx)?;
+                let enum_size = compute_enum_storage_size(
+                    module,
+                    builder,
+                    &enum_,
+                    used_bytes,
+                    compilation_ctx,
+                )?;
                 match enum_size {
                     Some(size) => {
-                        total_bytes += size;
-                        used_bytes = (used_bytes + size) % SLOT_SIZE;
+                        // total_bytes += size
+                        builder
+                            .local_get(total_bytes)
+                            .local_get(size)
+                            .binop(BinaryOp::I32Add)
+                            .local_set(total_bytes);
+
+                        // used_bytes = (used_bytes + size) % SLOT_SIZE
+                        builder
+                            .local_get(used_bytes)
+                            .local_get(size)
+                            .binop(BinaryOp::I32Add)
+                            .i32_const(SLOT_SIZE as i32)
+                            .binop(BinaryOp::I32RemS)
+                            .local_set(used_bytes);
                     }
                     None => return Ok(None),
                 }
             }
-            // All other types
             _ => {
-                let free_bytes = SLOT_SIZE - used_bytes;
-                let field_size_bytes = field_size(field, compilation_ctx);
-                if field_size_bytes > free_bytes {
-                    total_bytes += field_size_bytes + (free_bytes % SLOT_SIZE);
-                    used_bytes = field_size_bytes;
-                } else {
-                    total_bytes += field_size_bytes;
-                    used_bytes += field_size_bytes;
-                }
+                let field_size = field_size(field, compilation_ctx) as i32;
+
+                // free_bytes = SLOT_SIZE - used_bytes
+                let free_bytes = module.locals.add(ValType::I32);
+                builder
+                    .i32_const(SLOT_SIZE as i32)
+                    .local_get(used_bytes)
+                    .binop(BinaryOp::I32Sub)
+                    .local_set(free_bytes);
+
+                // if field_size_bytes > free_bytes
+                builder
+                    .i32_const(field_size)
+                    .local_get(free_bytes)
+                    .binop(BinaryOp::I32GtS)
+                    .if_else(
+                        None,
+                        |then| {
+                            // total_bytes += field_size_bytes
+                            then.local_get(total_bytes)
+                                .i32_const(field_size)
+                                .binop(BinaryOp::I32Add);
+
+                            // free_bytes % SLOT_SIZE);
+                            then.local_get(free_bytes)
+                                .i32_const(SLOT_SIZE as i32)
+                                .binop(BinaryOp::I32RemS);
+
+                            // total_bytes += (free_bytes % SLOT_SIZE);
+                            then.binop(BinaryOp::I32Add).local_set(total_bytes);
+
+                            // used_bytes = field_size
+                            then.i32_const(field_size).local_set(used_bytes);
+                        },
+                        |else_| {
+                            // total_bytes += field_size_bytes
+                            else_
+                                .local_get(total_bytes)
+                                .i32_const(field_size)
+                                .binop(BinaryOp::I32Add)
+                                .local_set(total_bytes);
+
+                            // used_bytes += field_size_bytes
+                            else_
+                                .local_get(used_bytes)
+                                .i32_const(field_size)
+                                .binop(BinaryOp::I32Add)
+                                .local_set(used_bytes);
+                        },
+                    );
             }
         }
     }
@@ -197,21 +357,24 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
 }
 
 #[cfg(test)]
-mod tests {
+mod wasm_tests {
     use super::*;
     use crate::compilation_context::{ModuleData, ModuleId};
+    use crate::test_tools::build_module;
     use crate::translation::intermediate_types::VmHandledStruct;
     use crate::translation::intermediate_types::enums::IEnumVariant;
     use crate::translation::intermediate_types::structs::IStructType;
     use move_binary_format::file_format::StructDefinitionIndex;
     use rstest::rstest;
     use std::collections::HashMap;
+    use walrus::{FunctionBuilder, ValType};
+    use wasmtime::{Engine, Linker, Module as WasmModule, Store};
 
-    // Helper to create a compilation context with registered structs and enums
-    fn create_test_ctx(
+    // Helper to create a compilation context with registered structs and enums for WASM tests
+    fn create_wasm_test_ctx(
         structs: Vec<IStruct>,
         enums: Vec<IEnum>,
-    ) -> &'static CompilationContext<'static> {
+    ) -> CompilationContext<'static> {
         use std::ptr::addr_of_mut;
 
         let memory_id: walrus::MemoryId = unsafe { std::mem::zeroed() };
@@ -222,9 +385,7 @@ mod tests {
         module_data.id = module_id;
 
         unsafe {
-            // Get a raw pointer to the structs Vec field inside StructData
             let structs_data_ptr = addr_of_mut!(module_data.structs) as *mut u8;
-            // The structs Vec<IStruct> is the first field in StructData (offset 0)
             let structs_vec_ptr = structs_data_ptr as *mut Vec<IStruct>;
             std::ptr::write(structs_vec_ptr, structs);
         }
@@ -232,31 +393,145 @@ mod tests {
 
         let root = Box::leak(Box::new(module_data));
         let deps = Box::leak(Box::new(HashMap::new()));
-        Box::leak(Box::new(CompilationContext::new(
-            root, deps, memory_id, allocator,
-        )))
-    }
-
-    // Minimal inert compilation context for tests (no derefs on primitive/vector paths)
-    fn dummy_ctx<'a>() -> CompilationContext<'a> {
-        let memory_id: walrus::MemoryId = unsafe { std::mem::zeroed() };
-        let allocator: walrus::FunctionId = unsafe { std::mem::zeroed() };
-        let root = Box::leak(Box::new(ModuleData::default()));
-        let deps = Box::leak(Box::new(HashMap::new()));
         CompilationContext::new(root, deps, memory_id, allocator)
     }
 
+    // Helper to execute a WASM function that computes storage size for a list of fields
+    // Creates a function that takes written_bytes_in_slot as parameter and returns the computed size
+    fn execute_compute_fields_storage_size(
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        fields: &[IntermediateType],
+        used_bytes_in_slot: u32,
+        export_suffix: u32,
+    ) -> Result<u32, Box<dyn std::error::Error>> {
+        let mut function = FunctionBuilder::new(
+            &mut module.types,
+            &[ValType::I32], // used_bytes_in_slot parameter
+            &[ValType::I32], // return computed size
+        );
+
+        let mut builder = function.func_body();
+        let used_bytes_local = module.locals.add(ValType::I32);
+
+        // Call compute_fields_storage_size
+        let size_local = compute_fields_storage_size(
+            module,
+            &mut builder,
+            fields,
+            used_bytes_local,
+            compilation_ctx,
+            || TranslationError::FoundReferenceInsideEnum { enum_index: 0 },
+        )?
+        .ok_or("Failed to compute fields size")?;
+
+        // Return the computed size
+        builder.local_get(size_local);
+
+        // The used_bytes_local is mapped to the function parameter
+        let test_func = function.finish(vec![used_bytes_local], &mut module.funcs);
+        let export_name = format!("test_fields_storage_size_{}", export_suffix);
+        module.exports.add(&export_name, test_func);
+
+        // Execute the WASM function
+        let linker = Linker::new(&Engine::default());
+        let engine = linker.engine();
+        let wasm_module = WasmModule::from_binary(engine, &module.emit_wasm())
+            .map_err(|e| format!("Failed to create WASM module: {e:?}"))?;
+        let mut store = Store::new(engine, ());
+        let instance = linker
+            .instantiate(&mut store, &wasm_module)
+            .map_err(|e| format!("Failed to instantiate WASM module: {e:?}"))?;
+
+        let entrypoint = instance
+            .get_typed_func::<i32, i32>(&mut store, &export_name)
+            .map_err(|e| format!("Failed to get entrypoint: {e:?}"))?;
+
+        let result = entrypoint
+            .call(&mut store, used_bytes_in_slot as i32)
+            .map_err(|e| format!("WASM execution error: {e:?}"))?;
+
+        Ok(result as u32)
+    }
+
+    // Helper to execute a WASM function that computes storage size
+    // Creates a function that takes written_bytes_in_slot as parameter and returns the computed size
+    fn execute_compute_storage_size(
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        enum_: Option<&IEnum>,
+        struct_: Option<&IStruct>,
+        written_bytes_in_slot: u32,
+    ) -> Result<u32, Box<dyn std::error::Error>> {
+        let mut function = FunctionBuilder::new(
+            &mut module.types,
+            &[ValType::I32], // written_bytes_in_slot parameter
+            &[ValType::I32], // return computed size
+        );
+
+        let mut builder = function.func_body();
+        let written_bytes_local = module.locals.add(ValType::I32);
+
+        // Call the appropriate compute function
+        let size_local = if let Some(enum_) = enum_ {
+            compute_enum_storage_size(
+                module,
+                &mut builder,
+                enum_,
+                written_bytes_local,
+                compilation_ctx,
+            )?
+            .ok_or("Failed to compute enum size")?
+        } else if let Some(struct_) = struct_ {
+            compute_struct_storage_size(
+                module,
+                &mut builder,
+                struct_,
+                written_bytes_local,
+                compilation_ctx,
+            )?
+            .ok_or("Failed to compute struct size")?
+        } else {
+            return Err("Either enum_ or struct_ must be provided".into());
+        };
+
+        // Return the computed size
+        builder.local_get(size_local);
+
+        // The written_bytes_local is mapped to the function parameter
+        let test_func = function.finish(vec![written_bytes_local], &mut module.funcs);
+        module.exports.add("test_storage_size", test_func);
+
+        // Execute the WASM function
+        let linker = Linker::new(&Engine::default());
+        let engine = linker.engine();
+        let wasm_module = WasmModule::from_binary(engine, &module.emit_wasm())
+            .map_err(|e| format!("Failed to create WASM module: {e:?}"))?;
+        let mut store = Store::new(engine, ());
+        let instance = linker
+            .instantiate(&mut store, &wasm_module)
+            .map_err(|e| format!("Failed to instantiate WASM module: {e:?}"))?;
+
+        let entrypoint = instance
+            .get_typed_func::<i32, i32>(&mut store, "test_storage_size")
+            .map_err(|e| format!("Failed to get entrypoint: {e:?}"))?;
+
+        let result = entrypoint
+            .call(&mut store, written_bytes_in_slot as i32)
+            .map_err(|e| format!("WASM execution error: {e:?}"))?;
+
+        Ok(result as u32)
+    }
+
     #[rstest]
-    #[case(0, vec![3, 12], 13)]
-    #[case(25, vec![3, 14], 15)]
-    #[case(28, vec![3, 15], 16)]
-    #[case(32, vec![3, 12], 13)]
-    fn enum_primitive_fields(
-        #[case] initial_used_bytes: u32,
-        #[case] expected_variant_sizes: Vec<u32>,
-        #[case] expected_total_size: u32,
-    ) {
-        let ctx = dummy_ctx();
+    #[case(0, 13)]
+    #[case(4, 13)]
+    #[case(10, 13)]
+    #[case(25, 15)]
+    #[case(28, 16)]
+    #[case(32, 13)]
+    fn enum_primitive_fields(#[case] written_bytes_in_slot: u32, #[case] expected_size: u32) {
+        let (mut module, _, _) = build_module(None);
         let enum_ = IEnum::new(
             0,
             vec![
@@ -266,33 +541,22 @@ mod tests {
         )
         .unwrap();
 
-        let used_bytes_plus_variant_index = (initial_used_bytes + 1) % SLOT_SIZE;
+        let ctx = create_wasm_test_ctx(vec![], vec![enum_.clone()]);
+        let compilation_ctx = &ctx;
 
-        // Test each variant size
-        for (j, variant) in enum_.variants.iter().enumerate() {
-            let variant_size = compute_fields_storage_size(
-                &variant.fields,
-                used_bytes_plus_variant_index,
-                &ctx,
-                || TranslationError::FoundReferenceInsideEnum { enum_index: 0 },
-            )
-            .unwrap()
-            .unwrap();
-            assert_eq!(
-                variant_size, expected_variant_sizes[j],
-                "variant{} size mismatch at initial_used_bytes={}: got {}, expected {}",
-                j, initial_used_bytes, variant_size, expected_variant_sizes[j]
-            );
-        }
+        let result = execute_compute_storage_size(
+            &mut module,
+            compilation_ctx,
+            Some(&enum_),
+            None,
+            written_bytes_in_slot,
+        )
+        .unwrap();
 
-        // Test enum picks the max
-        let total = compute_enum_storage_layout(&enum_, initial_used_bytes, &ctx)
-            .unwrap()
-            .unwrap();
         assert_eq!(
-            total, expected_total_size,
-            "enum max size mismatch at initial_used_bytes={}: got {}, expected {}",
-            initial_used_bytes, total, expected_total_size
+            result, expected_size,
+            "WASM enum storage size mismatch at written_bytes_in_slot={}: got {}, expected {}",
+            written_bytes_in_slot, result, expected_size
         );
     }
 
@@ -308,7 +572,7 @@ mod tests {
         #[case] expected_variant_sizes: Vec<u32>,
         #[case] expected_total_size: u32,
     ) {
-        let ctx = dummy_ctx();
+        let (mut module, _, _) = build_module(None);
         let enum_ = IEnum::new(
             0,
             vec![
@@ -334,17 +598,20 @@ mod tests {
         )
         .unwrap();
 
+        let ctx = create_wasm_test_ctx(vec![], vec![enum_.clone()]);
+        let compilation_ctx = &ctx;
+
         let used_bytes_plus_variant_index = (initial_used_bytes + 1) % SLOT_SIZE;
 
         // Test each variant size
         for (j, variant) in enum_.variants.iter().enumerate() {
-            let variant_size = compute_fields_storage_size(
+            let variant_size = execute_compute_fields_storage_size(
+                &mut module,
+                compilation_ctx,
                 &variant.fields,
                 used_bytes_plus_variant_index,
-                &ctx,
-                || TranslationError::FoundReferenceInsideEnum { enum_index: 0 },
+                j as u32,
             )
-            .unwrap()
             .unwrap();
             assert_eq!(
                 variant_size, expected_variant_sizes[j],
@@ -354,9 +621,14 @@ mod tests {
         }
 
         // Test enum picks the max
-        let total = compute_enum_storage_layout(&enum_, initial_used_bytes, &ctx)
-            .unwrap()
-            .unwrap();
+        let total = execute_compute_storage_size(
+            &mut module,
+            compilation_ctx,
+            Some(&enum_),
+            None,
+            initial_used_bytes,
+        )
+        .unwrap();
         assert_eq!(
             total, expected_total_size,
             "enum max size mismatch at initial_used_bytes={}: got {}, expected {}",
@@ -376,6 +648,7 @@ mod tests {
         #[case] expected_variant_sizes: Vec<u32>,
         #[case] expected_total_size: u32,
     ) {
+        let (mut module, _, _) = build_module(None);
         let module_id = ModuleId::default();
 
         // Create a simple enum (no fields)
@@ -415,8 +688,6 @@ mod tests {
         )
         .unwrap();
 
-        let ctx = create_test_ctx(vec![], vec![nested_enum_1.clone(), nested_enum_2.clone()]);
-
         // Create enum that contains the simple enum
         let enum_ = IEnum::new(
             2,
@@ -441,17 +712,23 @@ mod tests {
         )
         .unwrap();
 
+        let ctx = create_wasm_test_ctx(
+            vec![],
+            vec![nested_enum_1.clone(), nested_enum_2.clone(), enum_.clone()],
+        );
+        let compilation_ctx = &ctx;
+
         let used_bytes_plus_variant_index = (initial_used_bytes + 1) % SLOT_SIZE;
 
         // Test each variant size
         for (j, variant) in enum_.variants.iter().enumerate() {
-            let variant_size = compute_fields_storage_size(
+            let variant_size = execute_compute_fields_storage_size(
+                &mut module,
+                compilation_ctx,
                 &variant.fields,
                 used_bytes_plus_variant_index,
-                ctx,
-                || TranslationError::FoundReferenceInsideEnum { enum_index: 0 },
+                j as u32,
             )
-            .unwrap()
             .unwrap();
             assert_eq!(
                 variant_size, expected_variant_sizes[j],
@@ -461,9 +738,14 @@ mod tests {
         }
 
         // Test enum picks the max
-        let total = compute_enum_storage_layout(&enum_, initial_used_bytes, ctx)
-            .unwrap()
-            .unwrap();
+        let total = execute_compute_storage_size(
+            &mut module,
+            compilation_ctx,
+            Some(&enum_),
+            None,
+            initial_used_bytes,
+        )
+        .unwrap();
         assert_eq!(
             total, expected_total_size,
             "enum max size mismatch at initial_used_bytes={}: got {}, expected {}",
@@ -485,6 +767,7 @@ mod tests {
         #[case] expected_variant_sizes: Vec<u32>,
         #[case] expected_total_size: u32,
     ) {
+        let (mut module, _, _) = build_module(None);
         let module_id = ModuleId::default();
 
         // Create a struct without key
@@ -539,8 +822,6 @@ mod tests {
             IStructType::Common,
         );
 
-        let ctx = create_test_ctx(vec![child_struct_1, child_struct_2, child_struct_3], vec![]);
-
         let enum_ = IEnum::new(
             0,
             vec![
@@ -575,17 +856,23 @@ mod tests {
         )
         .unwrap();
 
+        let ctx = create_wasm_test_ctx(
+            vec![child_struct_1, child_struct_2, child_struct_3],
+            vec![enum_.clone()],
+        );
+        let compilation_ctx = &ctx;
+
         let used_bytes_plus_variant_index = (initial_used_bytes + 1) % SLOT_SIZE;
 
         // Test each variant size
         for (j, variant) in enum_.variants.iter().enumerate() {
-            let variant_size = compute_fields_storage_size(
+            let variant_size = execute_compute_fields_storage_size(
+                &mut module,
+                compilation_ctx,
                 &variant.fields,
                 used_bytes_plus_variant_index,
-                ctx,
-                || TranslationError::FoundReferenceInsideEnum { enum_index: 0 },
+                j as u32,
             )
-            .unwrap()
             .unwrap();
             assert_eq!(
                 variant_size, expected_variant_sizes[j],
@@ -595,9 +882,14 @@ mod tests {
         }
 
         // Test enum picks the max
-        let total = compute_enum_storage_layout(&enum_, initial_used_bytes, ctx)
-            .unwrap()
-            .unwrap();
+        let total = execute_compute_storage_size(
+            &mut module,
+            compilation_ctx,
+            Some(&enum_),
+            None,
+            initial_used_bytes,
+        )
+        .unwrap();
         assert_eq!(
             total, expected_total_size,
             "enum max size mismatch at initial_used_bytes={}: got {}, expected {}",
