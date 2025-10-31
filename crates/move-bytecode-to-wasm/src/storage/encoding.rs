@@ -14,9 +14,9 @@ use crate::{
     hostio::host_functions::{native_keccak256, storage_cache_bytes32, storage_load_bytes32},
     native_functions::object::add_delete_field_instructions,
     runtime::RuntimeFunction,
+    storage::storage_layout::field_size,
     translation::intermediate_types::IntermediateType,
     wasm_builder_extensions::WasmBuilderExtension,
-    // declare_host_debug_functions,
 };
 
 /// Emits WASM instructions that encode a struct and write it into storage.
@@ -813,50 +813,4 @@ pub fn add_encode_intermediate_type_instructions(
         }
         e => todo!("{e:?}"),
     };
-}
-
-/// Returns the storage-encoded size in bytes for a given intermediate type.
-///
-/// Note:
-/// - For structs without `key`, size is 0 because their inline size depends on fields;
-///   callers compute layout using field-by-field accumulation.
-/// - For structs with `key`, at least 32 bytes are used to store the UID reference.
-pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext) -> u32 {
-    match field {
-        IntermediateType::IBool
-        | IntermediateType::IU8
-        | IntermediateType::IEnum { .. }
-        | IntermediateType::IGenericEnumInstance { .. } => 1,
-        IntermediateType::IU16 => 2,
-        IntermediateType::IU32 => 4,
-        IntermediateType::IU64 => 8,
-        IntermediateType::IU128 => 16,
-        IntermediateType::IU256 => 32,
-        IntermediateType::IAddress | IntermediateType::ISigner => 20,
-        // Dynamic data occupies the whole slot, but the data is saved somewhere else
-        IntermediateType::IVector(_) => 32,
-        field if field.is_uid_or_named_id(compilation_ctx) => 32,
-
-        // Structs default to size 0 since their size depends on whether their fields are dynamic or static.
-        // The store function will handle this. If a struct has the 'key' ability, it at least occupies 32 bytes for the UID.
-        // The store function will manage the rest of the fields.
-        IntermediateType::IGenericStructInstance {
-            module_id, index, ..
-        }
-        | IntermediateType::IStruct {
-            module_id, index, ..
-        } => {
-            let s = compilation_ctx
-                .get_struct_by_index(module_id, *index)
-                .expect("struct not found");
-
-            if s.has_key { 32 } else { 0 }
-        }
-        IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-            panic!("found reference inside struct")
-        }
-        IntermediateType::ITypeParameter(_) => {
-            panic!("cannot know the field size of a type parameter");
-        }
-    }
 }

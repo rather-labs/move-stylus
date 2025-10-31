@@ -11,11 +11,10 @@ use crate::{
     data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
+    storage::storage_layout::field_size,
     translation::intermediate_types::{IntermediateType, vector::IVector},
     wasm_builder_extensions::WasmBuilderExtension,
 };
-
-use super::encoding::field_size;
 
 /// Emits WASM instructions that read a struct from storage and decode it into
 /// its in-memory representation.
