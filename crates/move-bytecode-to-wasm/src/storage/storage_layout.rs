@@ -1,9 +1,10 @@
 use crate::{
     CompilationContext,
+    runtime::RuntimeFunction,
     translation::TranslationError,
     translation::intermediate_types::{IntermediateType, enums::IEnum, structs::IStruct},
 };
-use walrus::ir::BinaryOp;
+use walrus::ir::{BinaryOp, MemArg, StoreKind};
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 const SLOT_SIZE: u32 = 32;
@@ -307,6 +308,139 @@ where
     Ok(total_bytes)
 }
 
+/// Computes the end slot and its written bytes for an enum after it's encoded and saved into storage.
+///
+/// This function calculates where the enum will end in storage:
+/// - The end slot is the last slot used by the enum
+/// - The end written bytes is how many bytes in that last slot are used
+///
+/// Arguments:
+/// - `module`: Walrus module being built
+/// - `builder`: Instruction sequence builder to append to
+/// - `enum_`: the enum being encoded
+/// - `slot_ptr`: LocalId pointing to the starting slot (32-byte u256)
+/// - `start_written_bytes_in_slot`: LocalId containing bytes already used in the starting slot
+/// - `compilation_ctx`: context for type resolution
+///
+/// Returns a tuple `(end_slot_ptr, end_written_bytes_in_slot)`:
+/// - `end_slot_ptr`: LocalId pointing to the last slot used (32-byte u256)
+/// - `end_written_bytes_in_slot`: LocalId containing bytes used in the last slot
+pub fn compute_enum_end_slot(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    enum_: &IEnum,
+    start_slot_ptr: LocalId,
+    start_written_bytes_in_slot: LocalId,
+    compilation_ctx: &CompilationContext,
+) -> Result<(LocalId, LocalId), TranslationError> {
+    // Compute the size of the enum in storage
+    let enum_size = compute_enum_storage_size(
+        module,
+        builder,
+        enum_,
+        start_written_bytes_in_slot,
+        compilation_ctx,
+    )?;
+
+    let end_slot_ptr = module.locals.add(ValType::I32);
+    // end_slot = slot (start by copying the starting slot)
+    builder
+        .i32_const(32)
+        .call(compilation_ctx.allocator)
+        .local_tee(end_slot_ptr)
+        .local_get(start_slot_ptr)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+    let end_written_bytes_in_slot = module.locals.add(ValType::I32);
+
+    // free_bytes = 32 - start_written_bytes_in_slot
+    let free_bytes = module.locals.add(ValType::I32);
+    builder
+        .i32_const(SLOT_SIZE as i32)
+        .local_get(start_written_bytes_in_slot)
+        .binop(BinaryOp::I32Sub)
+        .local_set(free_bytes);
+
+    builder
+        .local_get(enum_size)
+        .local_get(free_bytes)
+        .binop(BinaryOp::I32GeU)
+        .if_else(
+            None,
+            |then| {
+                // Case: enum_size >= free_bytes, so it will span multiple slots
+                // 1) end_slot = slot + (enum_size - free_bytes) / 32
+
+                // slot_offset_ptr = (enum_size - free_bytes) / 32 as u256 LE (how many slots to add to the current slot)
+                let slot_offset_ptr = module.locals.add(ValType::I32);
+                // Allocate 32 bytes for the slot offset
+                then.i32_const(32)
+                    .call(compilation_ctx.allocator)
+                    .local_tee(slot_offset_ptr);
+
+                // (enum_size - free_bytes) / 32 as u32
+                then.local_get(enum_size)
+                    .local_get(free_bytes)
+                    .binop(BinaryOp::I32Sub)
+                    .i32_const(SLOT_SIZE as i32)
+                    .binop(BinaryOp::I32DivS)
+                    .i32_const(1)
+                    .binop(BinaryOp::I32Add);
+
+                // Store the offset in the first 4 bytes to make it a u256 LE
+                then.store(
+                    compilation_ctx.memory_id,
+                    StoreKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+
+                // Swap the end slot from BE to LE for addition
+                let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
+                then.local_get(end_slot_ptr)
+                    .local_get(end_slot_ptr)
+                    .call(swap_256_fn);
+
+                // Add the offset to the end slot (right now equal to the current slot)
+                let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
+                then.local_get(slot_offset_ptr)
+                    .local_get(end_slot_ptr)
+                    .local_get(end_slot_ptr)
+                    .i32_const(32)
+                    .call(add_u256_fn)
+                    .local_set(end_slot_ptr); // Why do we need to set the end_slot_ptr again? TODO: check this
+
+                // Swap back to BE
+                then.local_get(end_slot_ptr)
+                    .local_get(end_slot_ptr)
+                    .call(swap_256_fn);
+
+                // 2) end_written_bytes_in_slot = (enum_size - free_bytes) % 32
+                then.local_get(enum_size)
+                    .local_get(free_bytes)
+                    .binop(BinaryOp::I32Sub)
+                    .i32_const(SLOT_SIZE as i32)
+                    .binop(BinaryOp::I32RemS)
+                    .local_set(end_written_bytes_in_slot);
+            },
+            |else_| {
+                // Case: enum_size < free_bytes, so it fits entirely in the current slot
+                // 1) end_slot = start_slot (already set by the copy above)
+                // 2) end_written_bytes_in_slot = start_written_bytes_in_slot + enum_size
+                else_
+                    .local_get(start_written_bytes_in_slot)
+                    .local_get(enum_size)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(end_written_bytes_in_slot);
+            },
+        );
+
+    Ok((end_slot_ptr, end_written_bytes_in_slot))
+}
+
 /// Returns the storage-encoded size in bytes for a given intermediate type.
 ///
 /// Note:
@@ -357,25 +491,24 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
 mod wasm_tests {
     use super::*;
     use crate::compilation_context::{ModuleData, ModuleId};
-    use crate::test_tools::build_module;
+    use crate::test_tools::{build_module, setup_wasmtime_module};
     use crate::translation::intermediate_types::VmHandledStruct;
     use crate::translation::intermediate_types::enums::IEnumVariant;
     use crate::translation::intermediate_types::structs::IStructType;
+    use alloy_primitives::U256;
     use move_binary_format::file_format::StructDefinitionIndex;
     use rstest::rstest;
     use std::collections::HashMap;
     use walrus::{FunctionBuilder, ValType};
-    use wasmtime::{Engine, Linker, Module as WasmModule, Store};
 
     // Helper to create a compilation context with registered structs and enums for WASM tests
     fn create_wasm_test_ctx(
         structs: Vec<IStruct>,
         enums: Vec<IEnum>,
+        memory_id: walrus::MemoryId,
+        allocator: walrus::FunctionId,
     ) -> CompilationContext<'static> {
         use std::ptr::addr_of_mut;
-
-        let memory_id: walrus::MemoryId = unsafe { std::mem::zeroed() };
-        let allocator: walrus::FunctionId = unsafe { std::mem::zeroed() };
 
         let module_id = ModuleId::default();
         let mut module_data = ModuleData::default();
@@ -433,19 +566,9 @@ mod wasm_tests {
         let export_name = format!("test_fields_storage_size_{}", export_suffix);
         module.exports.add(&export_name, test_func);
 
-        // Execute the WASM function
-        let linker = Linker::new(&Engine::default());
-        let engine = linker.engine();
-        let wasm_module = WasmModule::from_binary(engine, &module.emit_wasm())
-            .map_err(|e| format!("Failed to create WASM module: {e:?}"))?;
-        let mut store = Store::new(engine, ());
-        let instance = linker
-            .instantiate(&mut store, &wasm_module)
-            .map_err(|e| format!("Failed to instantiate WASM module: {e:?}"))?;
-
-        let entrypoint = instance
-            .get_typed_func::<i32, i32>(&mut store, &export_name)
-            .map_err(|e| format!("Failed to get entrypoint: {e:?}"))?;
+        // Execute the WASM function using test tools
+        let (_, _, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(module, vec![], &export_name, None);
 
         let result = entrypoint
             .call(&mut store, used_bytes_in_slot as i32)
@@ -463,11 +586,8 @@ mod wasm_tests {
         struct_: Option<&IStruct>,
         written_bytes_in_slot: u32,
     ) -> Result<u32, Box<dyn std::error::Error>> {
-        let mut function = FunctionBuilder::new(
-            &mut module.types,
-            &[ValType::I32], // written_bytes_in_slot parameter
-            &[ValType::I32], // return computed size
-        );
+        let mut function =
+            FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
 
         let mut builder = function.func_body();
         let written_bytes_local = module.locals.add(ValType::I32);
@@ -500,19 +620,9 @@ mod wasm_tests {
         let test_func = function.finish(vec![written_bytes_local], &mut module.funcs);
         module.exports.add("test_storage_size", test_func);
 
-        // Execute the WASM function
-        let linker = Linker::new(&Engine::default());
-        let engine = linker.engine();
-        let wasm_module = WasmModule::from_binary(engine, &module.emit_wasm())
-            .map_err(|e| format!("Failed to create WASM module: {e:?}"))?;
-        let mut store = Store::new(engine, ());
-        let instance = linker
-            .instantiate(&mut store, &wasm_module)
-            .map_err(|e| format!("Failed to instantiate WASM module: {e:?}"))?;
-
-        let entrypoint = instance
-            .get_typed_func::<i32, i32>(&mut store, "test_storage_size")
-            .map_err(|e| format!("Failed to get entrypoint: {e:?}"))?;
+        // Execute the WASM function using test tools
+        let (_, _, mut store, entrypoint) =
+            setup_wasmtime_module::<i32, i32>(module, vec![], "test_storage_size", None);
 
         let result = entrypoint
             .call(&mut store, written_bytes_in_slot as i32)
@@ -521,15 +631,119 @@ mod wasm_tests {
         Ok(result as u32)
     }
 
+    // Helper to execute compute_enum_end_slot and return the end slot and end written bytes
+    fn execute_compute_enum_end_slot(
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        enum_: &IEnum,
+        start_slot: [u8; 32],
+        start_written_bytes: u32,
+    ) -> Result<([u8; 32], u32), Box<dyn std::error::Error>> {
+        // Test function setup
+        let mut function = FunctionBuilder::new(
+            &mut module.types,
+            &[ValType::I32, ValType::I32],
+            &[ValType::I32, ValType::I32],
+        );
+
+        let mut builder = function.func_body();
+        let start_slot_ptr = module.locals.add(ValType::I32);
+        let start_written_bytes_in_slot = module.locals.add(ValType::I32);
+
+        // Call compute_enum_end_slot
+        let (end_slot_ptr, end_written_bytes_in_slot) = compute_enum_end_slot(
+            module,
+            &mut builder,
+            enum_,
+            start_slot_ptr,
+            start_written_bytes_in_slot,
+            compilation_ctx,
+        )?;
+
+        builder.local_get(end_slot_ptr);
+        builder.local_get(end_written_bytes_in_slot);
+
+        let test_func = function.finish(
+            vec![start_slot_ptr, start_written_bytes_in_slot],
+            &mut module.funcs,
+        );
+        module.exports.add("test_compute_enum_end_slot", test_func);
+
+        // Execute the WASM function - returns (end_slot_ptr, end_written_bytes)
+        let (_, instance, mut store, entrypoint) = setup_wasmtime_module::<(i32, i32), (i32, i32)>(
+            module,
+            start_slot.into(),
+            "test_compute_enum_end_slot",
+            None,
+        );
+
+        let (end_slot_ptr, end_written_bytes) = entrypoint
+            .call(&mut store, (0 as i32, start_written_bytes as i32))
+            .map_err(|e| format!("WASM execution error: {e:?}"))?;
+
+        // Read end_slot from the returned pointer
+        let memory = instance
+            .get_memory(&mut store, "memory")
+            .ok_or("Failed to get memory")?;
+        let mut end_slot = [0u8; 32];
+        memory
+            .read(&store, end_slot_ptr as usize, &mut end_slot)
+            .map_err(|e| format!("Failed to read end slot: {e:?}"))?;
+
+        Ok((end_slot, end_written_bytes as u32))
+    }
+
     #[rstest]
-    #[case(0, 13)]
-    #[case(4, 13)]
-    #[case(10, 13)]
-    #[case(25, 15)]
-    #[case(28, 16)]
-    #[case(32, 13)]
-    fn enum_primitive_fields(#[case] written_bytes_in_slot: u32, #[case] expected_size: u32) {
-        let (mut module, _, _) = build_module(None);
+    #[case(
+        0,
+        [0u8; 32],
+        13,
+        [0u8; 32],
+        13
+    )]
+    #[case(
+        4,
+        [0u8; 32],
+        13,
+        [0u8; 32],
+        17
+    )]
+    #[case(
+        10,
+        [0u8; 32],
+        13,
+        [0u8; 32],
+        23
+    )]
+    #[case(
+        25,
+        [0u8; 32],
+        15,
+        U256::from(1).to_be_bytes(),
+        8
+    )]
+    #[case(
+        28,
+        [0u8; 32],
+        16,
+        U256::from(1).to_be_bytes(),
+        12
+    )]
+    #[case(
+        32,
+        [0u8; 32],
+        13,
+        U256::from(1).to_be_bytes(),
+        13
+    )]
+    fn enum_primitive_fields(
+        #[case] start_written_bytes: u32,
+        #[case] start_slot: [u8; 32],
+        #[case] expected_size: u32,
+        #[case] expected_end_slot: [u8; 32],
+        #[case] expected_end_written_bytes: u32,
+    ) {
+        let (mut module, allocator, memory_id) = build_module(None);
         let enum_ = IEnum::new(
             0,
             vec![
@@ -539,7 +753,7 @@ mod wasm_tests {
         )
         .unwrap();
 
-        let ctx = create_wasm_test_ctx(vec![], vec![enum_.clone()]);
+        let ctx = create_wasm_test_ctx(vec![], vec![enum_.clone()], memory_id, allocator);
         let compilation_ctx = &ctx;
 
         let result = execute_compute_storage_size(
@@ -547,30 +761,97 @@ mod wasm_tests {
             compilation_ctx,
             Some(&enum_),
             None,
-            written_bytes_in_slot,
+            start_written_bytes,
         )
         .unwrap();
 
         assert_eq!(
             result, expected_size,
             "WASM enum storage size mismatch at written_bytes_in_slot={}: got {}, expected {}",
-            written_bytes_in_slot, result, expected_size
+            start_written_bytes, result, expected_size
+        );
+
+        // Test compute_enum_end_slot
+        let (end_slot_bytes, end_written_bytes) = execute_compute_enum_end_slot(
+            &mut module,
+            compilation_ctx,
+            &enum_,
+            start_slot,
+            start_written_bytes,
+        )
+        .unwrap();
+
+        assert_eq!(
+            end_slot_bytes, expected_end_slot,
+            "End slot mismatch at written_bytes_in_slot={}: got {:?}, expected {:?}",
+            start_written_bytes, end_slot_bytes, expected_end_slot
+        );
+
+        assert_eq!(
+            end_written_bytes, expected_end_written_bytes,
+            "End written bytes mismatch at written_bytes_in_slot={}: got {}, expected {}",
+            start_written_bytes, end_written_bytes, expected_end_written_bytes
         );
     }
 
     #[rstest]
-    #[case(0, vec![71, 91], 92)]
-    #[case(10, vec![61, 81], 82)]
-    #[case(20, vec![83, 71], 84)]
-    #[case(30, vec![73, 61], 74)]
-    #[case(31, vec![72, 60], 73)]
-    #[case(32, vec![71, 91], 92)]
+    #[case(
+        0,
+        vec![71, 91],
+        92,
+        [0u8; 32],
+        U256::from(2).to_be_bytes(),
+        28
+    )]
+    #[case(
+        10,
+        vec![61, 81],
+        82,
+        [0u8; 32],
+        U256::from(2).to_be_bytes(),
+        28
+    )]
+    #[case(
+        20,
+        vec![83, 71],
+        84,
+        [0u8; 32],
+        U256::from(3).to_be_bytes(),
+        8
+    )]
+    #[case(
+        30,
+        vec![73, 61],
+        74,
+        [0u8; 32],
+        U256::from(3).to_be_bytes(),
+        8
+    )]
+    #[case(
+        31,
+        vec![72, 60],
+        73,
+        U256::from(1000230001).to_be_bytes(),
+        U256::from(1000230004).to_be_bytes(),
+        8
+    )]
+    #[case(
+        32,
+        vec![71, 91],
+        92,
+        U256::from(12345).to_be_bytes(),
+        U256::from(12348).to_be_bytes(),
+        28
+    )]
     fn enum_with_vectors(
         #[case] initial_used_bytes: u32,
         #[case] expected_variant_sizes: Vec<u32>,
         #[case] expected_total_size: u32,
+        #[case] start_slot: [u8; 32],
+        #[case] expected_end_slot: [u8; 32],
+        #[case] expected_end_written_bytes: u32,
     ) {
-        let (mut module, _, _) = build_module(None);
+        let (mut module, allocator, memory_id) = build_module(None);
         let enum_ = IEnum::new(
             0,
             vec![
@@ -596,8 +877,7 @@ mod wasm_tests {
         )
         .unwrap();
 
-        let ctx = create_wasm_test_ctx(vec![], vec![enum_.clone()]);
-        let compilation_ctx = &ctx;
+        let ctx = create_wasm_test_ctx(vec![], vec![enum_.clone()], memory_id, allocator);
 
         let used_bytes_plus_variant_index = (initial_used_bytes + 1) % SLOT_SIZE;
 
@@ -605,7 +885,7 @@ mod wasm_tests {
         for (j, variant) in enum_.variants.iter().enumerate() {
             let variant_size = execute_compute_fields_storage_size(
                 &mut module,
-                compilation_ctx,
+                &ctx,
                 &variant.fields,
                 used_bytes_plus_variant_index,
                 j as u32,
@@ -619,34 +899,54 @@ mod wasm_tests {
         }
 
         // Test enum picks the max
-        let total = execute_compute_storage_size(
-            &mut module,
-            compilation_ctx,
-            Some(&enum_),
-            None,
-            initial_used_bytes,
-        )
-        .unwrap();
+        let total =
+            execute_compute_storage_size(&mut module, &ctx, Some(&enum_), None, initial_used_bytes)
+                .unwrap();
         assert_eq!(
             total, expected_total_size,
             "enum max size mismatch at initial_used_bytes={}: got {}, expected {}",
             initial_used_bytes, total, expected_total_size
         );
+
+        // Test compute_enum_end_slot
+        let (end_slot_bytes, end_written_bytes) = execute_compute_enum_end_slot(
+            &mut module,
+            &ctx,
+            &enum_,
+            start_slot,
+            initial_used_bytes,
+        )
+        .unwrap();
+
+        assert_eq!(
+            end_slot_bytes, expected_end_slot,
+            "End slot mismatch at initial_used_bytes={}: got {:?}, expected {:?}",
+            initial_used_bytes, end_slot_bytes, expected_end_slot
+        );
+
+        assert_eq!(
+            end_written_bytes, expected_end_written_bytes,
+            "End written bytes mismatch at initial_used_bytes={}: got {}, expected {}",
+            initial_used_bytes, end_written_bytes, expected_end_written_bytes
+        );
     }
 
     #[rstest]
-    #[case(0, vec![1, 91], 92)]
-    #[case(10, vec![1, 81], 82)]
-    #[case(20, vec![1, 83], 84)]
-    #[case(30, vec![1, 73], 74)]
-    #[case(31, vec![1, 92], 93)]
-    #[case(32, vec![1, 91], 92)]
+    #[case(0, vec![1, 91], 92, [0u8; 32], U256::from(2).to_be_bytes(), 28)]
+    #[case(10, vec![1, 81], 82, [0u8; 32], U256::from(2).to_be_bytes(), 28)]
+    #[case(20, vec![1, 83], 84, [0u8; 32], U256::from(3).to_be_bytes(), 8)]
+    #[case(30, vec![1, 73], 74, [0u8; 32], U256::from(3).to_be_bytes(), 8)]
+    #[case(31, vec![1, 92], 93, [0u8; 32], U256::from(3).to_be_bytes(), 28)]
+    #[case(32, vec![1, 91], 92, [0u8; 32], U256::from(3).to_be_bytes(), 28)]
     fn enum_with_nested_enum(
         #[case] initial_used_bytes: u32,
         #[case] expected_variant_sizes: Vec<u32>,
         #[case] expected_total_size: u32,
+        #[case] start_slot: [u8; 32],
+        #[case] expected_end_slot: [u8; 32],
+        #[case] expected_end_written_bytes: u32,
     ) {
-        let (mut module, _, _) = build_module(None);
+        let (mut module, allocator, memory_id) = build_module(None);
         let module_id = ModuleId::default();
 
         // Create a simple enum (no fields)
@@ -713,6 +1013,8 @@ mod wasm_tests {
         let ctx = create_wasm_test_ctx(
             vec![],
             vec![nested_enum_1.clone(), nested_enum_2.clone(), enum_.clone()],
+            memory_id,
+            allocator,
         );
         let compilation_ctx = &ctx;
 
@@ -749,23 +1051,48 @@ mod wasm_tests {
             "enum max size mismatch at initial_used_bytes={}: got {}, expected {}",
             initial_used_bytes, total, expected_total_size
         );
+
+        // Test compute_enum_end_slot
+        let (end_slot_bytes, end_written_bytes) = execute_compute_enum_end_slot(
+            &mut module,
+            compilation_ctx,
+            &enum_,
+            start_slot,
+            initial_used_bytes,
+        )
+        .unwrap();
+
+        assert_eq!(
+            end_slot_bytes, expected_end_slot,
+            "End slot mismatch at initial_used_bytes={}: got {:?}, expected {:?}",
+            initial_used_bytes, end_slot_bytes, expected_end_slot
+        );
+
+        assert_eq!(
+            end_written_bytes, expected_end_written_bytes,
+            "End written bytes mismatch at initial_used_bytes={}: got {}, expected {}",
+            initial_used_bytes, end_written_bytes, expected_end_written_bytes
+        );
     }
 
     #[rstest]
-    #[case(0, vec![63, 12, 63], 64)]
-    #[case(10, vec![53, 12, 53], 54)]
-    #[case(17, vec![46, 12, 46], 47)]
-    #[case(20, vec![75, 19, 43], 76)]
-    #[case(28, vec![67, 15, 35], 68)]
-    #[case(30, vec![65, 13, 33], 66)]
-    #[case(31, vec![64, 12, 32], 65)]
-    #[case(32, vec![63, 12, 63], 64)]
+    #[case(0, vec![63, 12, 63], 64, [0u8; 32], U256::from(2).to_be_bytes(), 0)]
+    #[case(10, vec![53, 12, 53], 54, [0u8; 32], U256::from(2).to_be_bytes(), 0)]
+    #[case(17, vec![46, 12, 46], 47, [0u8; 32], U256::from(2).to_be_bytes(), 0)]
+    #[case(20, vec![75, 19, 43], 76, [0u8; 32], U256::from(3).to_be_bytes(), 0)]
+    #[case(28, vec![67, 15, 35], 68, [0u8; 32], U256::from(3).to_be_bytes(), 0)]
+    #[case(30, vec![65, 13, 33], 66, [0u8; 32], U256::from(3).to_be_bytes(), 0)]
+    #[case(31, vec![64, 12, 32], 65, [0u8; 32], U256::from(3).to_be_bytes(), 0)]
+    #[case(32, vec![63, 12, 63], 64, [0u8; 32], U256::from(3).to_be_bytes(), 0)]
     fn enum_with_structs(
         #[case] initial_used_bytes: u32,
         #[case] expected_variant_sizes: Vec<u32>,
         #[case] expected_total_size: u32,
+        #[case] start_slot: [u8; 32],
+        #[case] expected_end_slot: [u8; 32],
+        #[case] expected_end_written_bytes: u32,
     ) {
-        let (mut module, _, _) = build_module(None);
+        let (mut module, allocator, memory_id) = build_module(None);
         let module_id = ModuleId::default();
 
         // Create a struct without key
@@ -857,6 +1184,8 @@ mod wasm_tests {
         let ctx = create_wasm_test_ctx(
             vec![child_struct_1, child_struct_2, child_struct_3],
             vec![enum_.clone()],
+            memory_id,
+            allocator,
         );
         let compilation_ctx = &ctx;
 
@@ -893,5 +1222,29 @@ mod wasm_tests {
             "enum max size mismatch at initial_used_bytes={}: got {}, expected {}",
             initial_used_bytes, total, expected_total_size
         );
+
+        // Test compute_enum_end_slot
+        let (end_slot_bytes, end_written_bytes) = execute_compute_enum_end_slot(
+            &mut module,
+            compilation_ctx,
+            &enum_,
+            start_slot,
+            initial_used_bytes,
+        )
+        .unwrap();
+
+        assert_eq!(
+            end_slot_bytes, expected_end_slot,
+            "End slot mismatch at initial_used_bytes={}: got {:?}, expected {:?}",
+            initial_used_bytes, end_slot_bytes, expected_end_slot
+        );
+
+        assert_eq!(
+            end_written_bytes, expected_end_written_bytes,
+            "End written bytes mismatch at initial_used_bytes={}: got {}, expected {}",
+            initial_used_bytes, end_written_bytes, expected_end_written_bytes
+        );
     }
+
+    
 }
