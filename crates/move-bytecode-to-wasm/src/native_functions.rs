@@ -100,6 +100,8 @@ impl NativeFunction {
             address,
             module_name,
         } = module_id;
+        let native_fn_name = Self::get_function_name(name, module_id);
+
         // Some functions are implemented by host functions directly. For those, we just import and
         // use them without wrapping them.
         if let Some(host_fn_name) = Self::host_fn_name(name) {
@@ -143,7 +145,7 @@ impl NativeFunction {
             }
         }
 
-        if let Some(function) = module.funcs.by_name(name) {
+        if let Some(function) = module.funcs.by_name(&native_fn_name) {
             function
         } else {
             match (name, *address, module_name.as_str()) {
@@ -398,7 +400,7 @@ impl NativeFunction {
     }
 
     pub fn get_function_name(name: &str, module_id: &ModuleId) -> String {
-        format!("{name}_{:x}", module_id.hash())
+        format!("___{name}_{:x}", module_id.hash())
     }
 
     pub fn get_generic_function_name(
@@ -417,6 +419,6 @@ impl NativeFunction {
             .for_each(|t| t.process_hash(&mut hasher, compilation_ctx));
         let hash = format!("{:x}", hasher.finish());
 
-        format!("{name}_{hash}_{:x}", module_id.hash())
+        format!("___{name}_{hash}_{:x}", module_id.hash())
     }
 }

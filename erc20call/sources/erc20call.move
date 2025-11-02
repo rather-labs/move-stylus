@@ -3,12 +3,10 @@ module erc20call::erc20call;
 use stylus::contract_calls::{ContractCallResult, CrossContractCall};
 
 #[ext(external_call)]
-public struct ERC20 has drop {
-    configuration: CrossContractCall
-}
+public struct ERC20(CrossContractCall) has drop;
 
 public fun new(configuration: CrossContractCall): ERC20 {
-    ERC20 { configuration }
+    ERC20(configuration)
 }
 
 #[ext(external_call, view)]

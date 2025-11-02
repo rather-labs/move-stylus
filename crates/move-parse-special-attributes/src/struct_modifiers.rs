@@ -3,6 +3,7 @@ use move_compiler::parser::ast::Attribute_;
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum StructModifier {
     ExternalStruct,
+    ExternalCall,
     Event,
 }
 
@@ -10,6 +11,7 @@ impl StructModifier {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::ExternalStruct => "external_struct",
+            Self::ExternalCall => "external_call",
             Self::Event => "event",
         }
     }
@@ -24,6 +26,7 @@ impl StructModifier {
 
             Attribute_::Name(name) => match name.value.as_str() {
                 "external_struct" => vec![Self::ExternalStruct],
+                "external_call" => vec![Self::ExternalCall],
                 "event" => vec![Self::Event],
                 _ => vec![],
             },

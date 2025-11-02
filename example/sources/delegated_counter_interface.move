@@ -4,12 +4,10 @@ use stylus::contract_calls::{ContractCallEmptyResult, CrossContractCall};
 use stylus::object::UID;
 
 #[ext(external_call)]
-public struct CounterCall has drop {
-    configuration: CrossContractCall,
-}
+public struct CounterCall(CrossContractCall) has drop;
 
 public fun new(configuration: CrossContractCall): CounterCall {
-    CounterCall { configuration }
+    CounterCall(configuration)
 }
 
 #[ext(external_call)]
