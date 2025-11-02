@@ -1,4 +1,7 @@
-use walrus::{InstrSeqBuilder, LocalId, ir::BinaryOp};
+use walrus::{
+    InstrSeqBuilder, LocalId,
+    ir::{BinaryOp, UnaryOp},
+};
 
 use crate::data::DATA_SLOT_DATA_PTR_OFFSET;
 
@@ -87,10 +90,31 @@ impl WasmBuilderExtension for InstrSeqBuilder<'_> {
         self.local_get(ptr).i32_const(8).binop(BinaryOp::I32Add)
     }
 
-    fn add_slot_data_ptr_plus_offset(&mut self, used_bytes_in_slot: LocalId) -> &mut Self {
+    fn add_slot_data_ptr_plus_offset(&mut self, slot_offset: LocalId) -> &mut Self {
+        // Check if 0 < offset <= 32
+        self.local_get(slot_offset).unop(UnaryOp::I32Eqz).if_else(
+            None,
+            |then| {
+                then.unreachable();
+            },
+            |else_| {
+                else_
+                    .local_get(slot_offset)
+                    .i32_const(32)
+                    .binop(BinaryOp::I32GtU)
+                    .if_else(
+                        None,
+                        |then| {
+                            then.unreachable();
+                        },
+                        |_| {},
+                    );
+            },
+        );
+
         self.i32_const(DATA_SLOT_DATA_PTR_OFFSET)
             .i32_const(32)
-            .local_get(used_bytes_in_slot)
+            .local_get(slot_offset)
             .binop(BinaryOp::I32Sub)
             .binop(BinaryOp::I32Add)
     }

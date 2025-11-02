@@ -8,8 +8,10 @@ use crate::{
         storage_flush_cache, storage_load_bytes32,
     },
     runtime::RuntimeFunction,
-    storage::encoding::field_size,
-    translation::intermediate_types::{IntermediateType, address::IAddress, structs::IStruct},
+    storage::storage_layout::{compute_enum_storage_tail_position, field_size},
+    translation::intermediate_types::{
+        IntermediateType, address::IAddress, enums::IEnum, structs::IStruct,
+    },
     utils::keccak_string_to_memory,
     vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
 };
@@ -287,15 +289,15 @@ pub fn add_native_fresh_id_fn(
 /// `builder` - instructions sequence builder
 /// `compilation_ctx` - compilation context containing type information
 /// `slot_ptr` - pointer to the storage slot where the struct is stored
+/// `slot_offset` - number of bytes already used in the current slot
 /// `struct_` - structural information of the struct to be deleted
-/// `used_bytes_in_slot` - number of bytes already used in the current slot
 pub fn add_delete_storage_struct_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     slot_ptr: LocalId,
+    slot_offset: LocalId,
     struct_: &IStruct,
-    used_bytes_in_slot: LocalId,
 ) {
     let (storage_cache, _) = storage_cache_bytes32(module);
 
@@ -311,9 +313,9 @@ pub fn add_delete_storage_struct_instructions(
             builder,
             compilation_ctx,
             slot_ptr,
+            slot_offset,
             field,
             field_size,
-            used_bytes_in_slot,
         );
     }
 
@@ -322,6 +324,60 @@ pub fn add_delete_storage_struct_instructions(
         .local_get(slot_ptr)
         .i32_const(DATA_ZERO_OFFSET)
         .call(storage_cache);
+}
+
+pub fn add_delete_storage_enum_instructions(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    slot_ptr: LocalId,
+    slot_offset: LocalId,
+    enum_: &IEnum,
+) {
+    let (storage_cache, _) = storage_cache_bytes32(module);
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+
+    // Compute the end slot
+    let (tail_slot_ptr, _) = compute_enum_storage_tail_position(
+        module,
+        builder,
+        enum_,
+        slot_ptr,
+        slot_offset,
+        compilation_ctx,
+    )
+    .unwrap();
+
+    builder.loop_(None, |loop_| {
+        let loop_id = loop_.id();
+
+        loop_
+            .local_get(slot_ptr)
+            .local_get(tail_slot_ptr)
+            .i32_const(32)
+            .call(equality_fn)
+            .if_else(
+                None,
+                |_| {
+                    // Fall-through: Exit the loop if the current slot is equal to the end slot
+                },
+                |else_| {
+                    // Delete the current slot
+                    else_
+                        .local_get(slot_ptr)
+                        .i32_const(DATA_ZERO_OFFSET)
+                        .call(storage_cache);
+
+                    // Advance to the next slot and continue
+                    else_
+                        .local_get(slot_ptr)
+                        .call(next_slot_fn)
+                        .local_set(slot_ptr)
+                        .br(loop_id);
+                },
+            );
+    });
 }
 
 /// This function adds instructions to recursively delete all storage slots
@@ -407,9 +463,9 @@ pub fn add_delete_storage_vector_instructions(
 
         // Set the aux locals to 0 to start the loop
         let i = module.locals.add(ValType::I32);
-        let used_bytes_in_slot = module.locals.add(ValType::I32);
+        let elem_slot_offset = module.locals.add(ValType::I32);
         block.i32_const(0).local_set(i);
-        block.i32_const(0).local_set(used_bytes_in_slot);
+        block.i32_const(0).local_set(elem_slot_offset);
 
         block.block(None, |inner_block| {
             let inner_block_id = inner_block.id();
@@ -421,9 +477,9 @@ pub fn add_delete_storage_vector_instructions(
                     loop_,
                     compilation_ctx,
                     elem_slot_ptr,
+                    elem_slot_offset,
                     inner,
                     elem_size,
-                    used_bytes_in_slot,
                 );
 
                 // If we reach the last element, we exit
@@ -462,52 +518,28 @@ pub fn add_delete_storage_vector_instructions(
 /// `slot_ptr` - pointer to the storage slot where the data is stored
 /// `itype` - intermediate type of the element to be deleted
 /// `size` - size of the itype in storage
-/// `used_bytes_in_slot` - number of bytes already used in the current slot
+/// `slot_offset` - number of bytes already used in the current slot
 pub fn add_delete_field_instructions(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     slot_ptr: LocalId,
+    slot_offset: LocalId,
     itype: &IntermediateType,
     size: i32,
-    used_bytes_in_slot: LocalId,
 ) {
-    let (storage_cache, _) = storage_cache_bytes32(module);
-    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
+    let accumulate_or_advance_slot_fn =
+        RuntimeFunction::AccumulateOrAdvanceSlot.get(module, Some(compilation_ctx));
 
+    // Use accumulate_or_advance_slot with mode=2 (delete) to handle slot advancement
+    // Mode 2 will wipe the slot to zero before advancing when needed
     builder
-        .local_get(used_bytes_in_slot)
+        .local_get(slot_ptr)
+        .local_get(slot_offset)
         .i32_const(size)
-        .binop(BinaryOp::I32Add)
-        .i32_const(32)
-        .binop(BinaryOp::I32GtU)
-        .if_else(
-            None,
-            // If used_bytes_in_slot + elem_size > 32, wipe the slot and advance the elem_slot_ptr
-            |then| {
-                // Wipe the slot
-                then.local_get(slot_ptr)
-                    .i32_const(DATA_ZERO_OFFSET)
-                    .call(storage_cache);
-
-                // Calculate next slot
-                then.local_get(slot_ptr)
-                    .call(next_slot_fn)
-                    .local_set(slot_ptr);
-
-                // Set used_bytes_in_slot to elem_size
-                then.i32_const(size).local_set(used_bytes_in_slot);
-            },
-            // If used_bytes_in_slot + elem_size <= 32, increment used_bytes_in_slot by elem_size
-            |else_| {
-                // Increment used_bytes_in_slot by elem_size
-                else_
-                    .local_get(used_bytes_in_slot)
-                    .i32_const(size)
-                    .binop(BinaryOp::I32Add)
-                    .local_set(used_bytes_in_slot);
-            },
-        );
+        .i32_const(2) // mode=2 for delete operation
+        .call(accumulate_or_advance_slot_fn)
+        .local_set(slot_offset);
 
     match itype {
         IntermediateType::IStruct {
@@ -523,14 +555,6 @@ pub fn add_delete_field_instructions(
                 .get_struct_by_intermediate_type(itype)
                 .expect("struct not found");
 
-            // If it's a generic instance, instantiate; otherwise use as-is
-            let child_struct = if let IntermediateType::IGenericStructInstance { types, .. } = itype
-            {
-                child_struct.instantiate(types)
-            } else {
-                child_struct.clone()
-            };
-
             if child_struct.has_key {
                 // Child struct has 'key' ability: it's stored as a separate object with its own UID.
                 // When deleting the parent, we only remove the reference to the child object,
@@ -544,10 +568,24 @@ pub fn add_delete_field_instructions(
                     builder,
                     compilation_ctx,
                     slot_ptr,
+                    slot_offset,
                     &child_struct,
-                    used_bytes_in_slot,
                 );
             }
+        }
+        IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
+            let enum_ = compilation_ctx
+                .get_enum_by_intermediate_type(itype)
+                .expect("enum not found");
+
+            add_delete_storage_enum_instructions(
+                module,
+                builder,
+                compilation_ctx,
+                slot_ptr,
+                slot_offset,
+                &enum_,
+            );
         }
         IntermediateType::IVector(inner_) => {
             // Delete the vector recursively

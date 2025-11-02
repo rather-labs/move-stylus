@@ -2,7 +2,7 @@ use super::RuntimeFunction;
 use crate::data::{
     DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
-    DATA_STORAGE_OBJECT_OWNER_OFFSET,
+    DATA_STORAGE_OBJECT_OWNER_OFFSET, DATA_ZERO_OFFSET,
 };
 use crate::hostio::host_functions::{
     self, storage_cache_bytes32, storage_flush_cache, storage_load_bytes32, tx_origin,
@@ -570,10 +570,8 @@ pub fn add_encode_and_save_into_storage_fn(
     let slot_ptr = module.locals.add(ValType::I32);
 
     // Locals
-    let written_bytes_in_slot = module.locals.add(ValType::I32);
-
-    // Set the written bytes in the slot to 0
-    builder.i32_const(0).local_set(written_bytes_in_slot);
+    let slot_offset = module.locals.add(ValType::I32);
+    builder.i32_const(0).local_set(slot_offset);
 
     add_encode_and_save_into_storage_struct_instructions(
         module,
@@ -581,9 +579,9 @@ pub fn add_encode_and_save_into_storage_fn(
         compilation_ctx,
         struct_ptr,
         slot_ptr,
+        slot_offset,
         None,
         itype,
-        written_bytes_in_slot,
     );
 
     function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs)
@@ -634,18 +632,18 @@ pub fn add_read_and_decode_from_storage_fn(
         .i32_const(32)
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-    let read_bytes_in_slot = module.locals.add(ValType::I32);
-    builder.i32_const(0).local_set(read_bytes_in_slot);
+    let slot_offset = module.locals.add(ValType::I32);
+    builder.i32_const(0).local_set(slot_offset);
 
     let struct_ptr = add_read_and_decode_storage_struct_instructions(
         module,
         &mut builder,
         compilation_ctx,
         slot_ptr,
-        Some(struct_id_ptr),
+        slot_offset,
         owner_ptr,
+        Some(struct_id_ptr),
         itype,
-        read_bytes_in_slot,
     );
 
     builder.local_get(struct_ptr);
@@ -721,8 +719,8 @@ pub fn add_delete_struct_from_storage_fn(
                 .local_set(slot_ptr);
 
             // Initialize the number of bytes used in the slot to 8, to reflect the 8-byte type hash
-            let used_bytes_in_slot = module.locals.add(ValType::I32);
-            else_.i32_const(8).local_set(used_bytes_in_slot);
+            let slot_offset = module.locals.add(ValType::I32);
+            else_.i32_const(8).local_set(slot_offset);
 
             // Delete the struct from storage
             add_delete_storage_struct_instructions(
@@ -730,8 +728,8 @@ pub fn add_delete_struct_from_storage_fn(
                 else_,
                 compilation_ctx,
                 slot_ptr,
+                slot_offset,
                 &struct_,
-                used_bytes_in_slot,
             );
         },
     );
@@ -1137,14 +1135,14 @@ pub fn add_commit_changes_to_storage_fn(
 }
 
 /// If the next field fits in the current 32-byte slot, increment the
-/// used-bytes counter by the field size. Otherwise, cache or load the slot's
-/// data and advance to the next slot, and set used bytes to the
+/// slot_offset by the field size. Otherwise, handle slot transition based on
+/// the operation mode and advance to the next slot, setting slot_offset to the
 /// field size.
 /// Arguments:
 /// - slot_ptr: the pointer to the slot
-/// - used_bytes_in_slot: the number of bytes used in the slot
+/// - slot_offset: the number of bytes used in the slot
 /// - field_size: the size of the field
-/// - is_read: whether the slot is being read from or written to
+/// - mode: operation mode (0=write, 1=read, 2=delete)
 /// Returns:
 /// - the updated number of bytes used in the slot
 pub fn accumulate_or_advance_slot(
@@ -1165,70 +1163,101 @@ pub fn accumulate_or_advance_slot(
     let next_slot_fn = storage_next_slot_function(module, compilation_ctx);
 
     let slot_ptr = module.locals.add(ValType::I32);
-    let used_bytes_in_slot = module.locals.add(ValType::I32);
+    let slot_offset = module.locals.add(ValType::I32);
     let field_size = module.locals.add(ValType::I32);
-    let is_read = module.locals.add(ValType::I32);
+    let mode = module.locals.add(ValType::I32);
 
     builder
-        .local_get(used_bytes_in_slot)
+        .local_get(slot_offset)
         .local_get(field_size)
         .binop(BinaryOp::I32Add)
         .i32_const(32)
-        .binop(BinaryOp::I32GtS)
+        .binop(BinaryOp::I32GtU)
         .if_else(
             None,
             |then| {
-                then.local_get(is_read).if_else(
-                    None,
-                    |then| {
-                        then.local_get(slot_ptr)
-                            .call(next_slot_fn)
-                            .local_set(slot_ptr);
+                // Check operation mode: 0=write, 1=read, 2=delete
+                then.local_get(mode)
+                    .i32_const(2)
+                    .binop(BinaryOp::I32Eq)
+                    .if_else(
+                        None,
+                        |delete_mode| {
+                            // Mode 2: Delete - wipe slot to zero, then advance
+                            delete_mode
+                                .local_get(slot_ptr)
+                                .i32_const(DATA_ZERO_OFFSET)
+                                .call(storage_cache_fn);
 
-                        // Load the slot data
-                        then.local_get(slot_ptr)
-                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                            .call(storage_load);
-                    },
-                    |else_| {
-                        // Save previous slot
-                        else_
-                            .local_get(slot_ptr)
-                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                            .call(storage_cache_fn);
+                            // Advance to next slot
+                            delete_mode
+                                .local_get(slot_ptr)
+                                .call(next_slot_fn)
+                                .local_set(slot_ptr);
+                        },
+                        |read_or_write| {
+                            // Mode 0 (write) or 1 (read)
+                            read_or_write
+                                .local_get(mode)
+                                .i32_const(1)
+                                .binop(BinaryOp::I32Eq)
+                                .if_else(
+                                    None,
+                                    |read_mode| {
+                                        // Mode 1: Read - load next slot data
+                                        read_mode
+                                            .local_get(slot_ptr)
+                                            .call(next_slot_fn)
+                                            .local_set(slot_ptr);
 
-                        // Wipe the data so it can be filled with new data
-                        else_
-                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                            .i32_const(0)
-                            .i32_const(32)
-                            .memory_fill(compilation_ctx.memory_id);
+                                        // Load the slot data
+                                        read_mode
+                                            .local_get(slot_ptr)
+                                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                                            .call(storage_load);
+                                    },
+                                    |write_mode| {
+                                        // Mode 0: Write - save previous slot, wipe buffer, advance
+                                        // Save previous slot
+                                        write_mode
+                                            .local_get(slot_ptr)
+                                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                                            .call(storage_cache_fn);
 
-                        // Next slot
-                        else_
-                            .local_get(slot_ptr)
-                            .call(next_slot_fn)
-                            .local_set(slot_ptr);
-                    },
-                );
+                                        // Wipe the data so it can be filled with new data
+                                        write_mode
+                                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                                            .i32_const(0)
+                                            .i32_const(32)
+                                            .memory_fill(compilation_ctx.memory_id);
 
-                // Set the written bytes in slot to the field size
-                then.local_get(field_size).local_set(used_bytes_in_slot);
+                                        // Next slot
+                                        write_mode
+                                            .local_get(slot_ptr)
+                                            .call(next_slot_fn)
+                                            .local_set(slot_ptr);
+                                    },
+                                );
+                        },
+                    );
+
+                // Set the slot_offset to the field size
+                then.local_get(field_size).local_set(slot_offset);
             },
             |else_| {
-                // Increment the written bytes in slot by the field size
+                // Increment the slot_offset by the field size
                 else_
-                    .local_get(used_bytes_in_slot)
+                    .local_get(slot_offset)
                     .local_get(field_size)
                     .binop(BinaryOp::I32Add)
-                    .local_set(used_bytes_in_slot);
+                    .local_set(slot_offset);
             },
         );
 
-    builder.local_get(used_bytes_in_slot);
+    builder.local_get(slot_offset);
 
     function.finish(
-        vec![slot_ptr, used_bytes_in_slot, field_size, is_read],
+        vec![slot_ptr, slot_offset, field_size, mode],
         &mut module.funcs,
     )
 }

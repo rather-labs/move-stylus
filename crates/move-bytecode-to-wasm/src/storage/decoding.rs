@@ -24,10 +24,10 @@ use crate::{
 /// - `builder`: Instruction sequence builder to append to.
 /// - `compilation_ctx`: Shared compilation context (types, memory, helpers).
 /// - `slot_ptr`: Local pointing to the base storage slot of the struct.
-/// - `struct_id_ptr`: Optional local to the struct UID (required if the struct has `key`).
+/// - `slot_offset`: Local used as a running counter of bytes already read in the current slot.
 /// - `owner_ptr`: Local pointing to the owner struct UID (used for nested keyed objects).
+/// - `struct_id_ptr`: Optional local to the struct UID (required if the struct has `key`).
 /// - `itype`: Intermediate type of the struct to decode.
-/// - `read_bytes_in_slot`: Local used as a running counter of bytes already read in the current slot.
 ///
 /// Returns:
 /// - LocalId to the heap pointer of the decoded struct in linear memory.
@@ -37,10 +37,10 @@ pub fn add_read_and_decode_storage_struct_instructions(
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     slot_ptr: LocalId,
-    struct_id_ptr: Option<LocalId>,
+    slot_offset: LocalId,
     owner_ptr: LocalId,
+    struct_id_ptr: Option<LocalId>,
     itype: &IntermediateType,
-    read_bytes_in_slot: LocalId,
 ) -> LocalId {
     // Host functions
     let (storage_load, _) = storage_load_bytes32(module);
@@ -95,8 +95,8 @@ pub fn add_read_and_decode_storage_struct_instructions(
             .if_else(
                 None,
                 |then| {
-                    // If they match, set the read bytes in slot to 8
-                    then.i32_const(8).local_set(read_bytes_in_slot);
+                    // If they match, set the slot_offset to 8 (for the 8-byte type hash)
+                    then.i32_const(8).local_set(slot_offset);
                 },
                 |else_| {
                     // If they don't match, trap
@@ -188,15 +188,15 @@ pub fn add_read_and_decode_storage_struct_instructions(
         } else {
             let field_size = field_size(field, compilation_ctx) as i32;
 
-            // Increase the read bytes counter by the size of the field.
+            // Increase the slot_offset by the size of the field.
             // If the entire slot has been read, advance to the next slot and load its data.
             builder
                 .local_get(slot_ptr)
-                .local_get(read_bytes_in_slot)
+                .local_get(slot_offset)
                 .i32_const(field_size)
-                .i32_const(1) // is_read flag set to true
+                .i32_const(1) // mode=1 for read operation
                 .call(accumulate_or_advance_slot_fn)
-                .local_set(read_bytes_in_slot);
+                .local_set(slot_offset);
 
             // Decode the field according to its type
             add_decode_intermediate_type_instructions(
@@ -205,9 +205,9 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 compilation_ctx,
                 field_ptr,
                 slot_ptr,
+                slot_offset,
                 field_owner_ptr,
                 field,
-                read_bytes_in_slot,
             );
         }
         // Store the field in the struct at offset index * 4
@@ -232,9 +232,9 @@ pub fn add_read_and_decode_storage_struct_instructions(
 /// - `builder`: Instruction sequence builder to append to.
 /// - `compilation_ctx`: Shared compilation context (types, memory, helpers).
 /// - `slot_ptr`: Local pointing to the base storage slot of the enum.
+/// - `slot_offset`: Local used as a running counter of bytes already read in the current slot.
 /// - `owner_ptr`: Local pointing to the owner struct UID (for nested keyed objects).
 /// - `itype`: Intermediate type of the enum to decode.
-/// - `read_bytes_in_slot`: Local used as a running counter of bytes already read in the current slot.
 ///
 /// Returns:
 /// - LocalId to the heap pointer of the decoded enum in linear memory.
@@ -244,9 +244,9 @@ pub fn add_read_and_decode_storage_enum_instructions(
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     slot_ptr: LocalId,
+    slot_offset: LocalId,
     owner_ptr: LocalId,
     itype: &IntermediateType,
-    read_bytes_in_slot: LocalId,
 ) -> LocalId {
     // Runtime functions
     let accumulate_or_advance_slot_fn =
@@ -272,10 +272,18 @@ pub fn add_read_and_decode_storage_enum_instructions(
         .call(compilation_ctx.allocator)
         .local_set(enum_ptr);
 
-    // Read the variant index (first byte)
-    // The read_bytes_in_slot variable already accounts for the variant index byte.
+    // Increase the slot_offset by 1 to account for the variant index.
     builder
-        .add_slot_data_ptr_plus_offset(read_bytes_in_slot)
+        .local_get(slot_ptr)
+        .local_get(slot_offset)
+        .i32_const(1)
+        .i32_const(1) // mode=1 for read operation
+        .call(accumulate_or_advance_slot_fn)
+        .local_set(slot_offset);
+
+    // Read the variant index
+    builder
+        .add_slot_data_ptr_plus_offset(slot_offset)
         .load(
             compilation_ctx.memory_id,
             LoadKind::I32_8 {
@@ -303,15 +311,15 @@ pub fn add_read_and_decode_storage_enum_instructions(
         for (index, field) in variant.fields.iter().enumerate() {
             let field_size = field_size(field, compilation_ctx) as i32;
 
-            // Increase the read bytes counter by the size of the field.
+            // Increase the slot_offset by the size of the field.
             // If the entire slot has been read, advance to the next slot and load its data.
             block
                 .local_get(slot_ptr)
-                .local_get(read_bytes_in_slot)
+                .local_get(slot_offset)
                 .i32_const(field_size)
-                .i32_const(1)
+                .i32_const(1) // mode=1 for read operation
                 .call(accumulate_or_advance_slot_fn)
-                .local_set(read_bytes_in_slot);
+                .local_set(slot_offset);
 
             // Decode the field according to its type
             add_decode_intermediate_type_instructions(
@@ -320,9 +328,9 @@ pub fn add_read_and_decode_storage_enum_instructions(
                 compilation_ctx,
                 field_ptr,
                 slot_ptr,
+                slot_offset,
                 owner_ptr,
                 field,
-                read_bytes_in_slot,
             );
 
             // Store the field in the enum at offset index * 4 (after the 4-byte tag)
@@ -449,23 +457,23 @@ pub fn add_read_and_decode_storage_vector_instructions(
             let iblock_id = iblock.id();
 
             let i = module.locals.add(ValType::I32);
-            let read_bytes_in_slot = module.locals.add(ValType::I32);
+            let slot_offset = module.locals.add(ValType::I32);
 
             // Set the aux locals to 0 to start the loop
             iblock.i32_const(0).local_set(i);
-            iblock.i32_const(0).local_set(read_bytes_in_slot);
+            iblock.i32_const(0).local_set(slot_offset);
             iblock.loop_(None, |loop_| {
                 let loop_id = loop_.id();
 
-                // Update the read bytes counter to reflect the field size.
+                // Update the slot_offset to reflect the field size.
                 // If the entire slot has been read, advance to the next slot and load its data.
                 loop_
                     .local_get(elem_slot_ptr)
-                    .local_get(read_bytes_in_slot)
+                    .local_get(slot_offset)
                     .i32_const(elem_size)
-                    .i32_const(1)
+                    .i32_const(1) // mode=1 for read operation
                     .call(accumulate_or_advance_slot_fn)
-                    .local_set(read_bytes_in_slot);
+                    .local_set(slot_offset);
 
                 // Decode the element and store it at elem_data_ptr
                 add_decode_intermediate_type_instructions(
@@ -474,9 +482,9 @@ pub fn add_read_and_decode_storage_vector_instructions(
                     compilation_ctx,
                     elem_data_ptr,
                     elem_slot_ptr,
+                    slot_offset,
                     owner_ptr,
                     inner,
-                    read_bytes_in_slot,
                 );
 
                 // Destination address of the element in memory
@@ -545,9 +553,9 @@ pub fn add_read_and_decode_storage_vector_instructions(
 /// - `compilation_ctx`: Shared compilation context (types, memory, helpers).
 /// - `data_ptr`: Local that will receive the heap pointer (or stack cell) with the decoded value.
 /// - `slot_ptr`: Local pointing to the base storage slot to read from.
+/// - `slot_offset`: Local used as a running counter of bytes already read in the current slot.
 /// - `owner_ptr`: Local pointing to the owner struct UID (relevant for keyed objects).
 /// - `itype`: Intermediate type to decode.
-/// - `read_bytes_in_slot`: Local used as a running counter of bytes already read in the current slot.
 ///
 /// Returns:
 /// - None. Writes the resulting pointer/value location into `data_ptr`.
@@ -558,9 +566,9 @@ pub fn add_decode_intermediate_type_instructions(
     compilation_ctx: &CompilationContext,
     data_ptr: LocalId,
     slot_ptr: LocalId,
+    slot_offset: LocalId,
     owner_ptr: LocalId,
     itype: &IntermediateType,
-    read_bytes_in_slot: LocalId,
 ) {
     // Stack and storage size of the type
     let stack_size = itype.stack_data_size() as i32;
@@ -610,7 +618,7 @@ pub fn add_decode_intermediate_type_instructions(
 
             // Load and swap the value
             builder
-                .add_slot_data_ptr_plus_offset(read_bytes_in_slot)
+                .add_slot_data_ptr_plus_offset(slot_offset)
                 .load(
                     compilation_ctx.memory_id,
                     load_kind,
@@ -644,7 +652,7 @@ pub fn add_decode_intermediate_type_instructions(
 
             // Copy 16 bytes from the slot data pointer (plus offset)
             builder
-                .add_slot_data_ptr_plus_offset(read_bytes_in_slot)
+                .add_slot_data_ptr_plus_offset(slot_offset)
                 .call(copy_fn)
                 .local_set(data_ptr);
 
@@ -660,7 +668,7 @@ pub fn add_decode_intermediate_type_instructions(
 
             // Copy 32 bytes from the slot data pointer
             builder
-                .add_slot_data_ptr_plus_offset(read_bytes_in_slot)
+                .add_slot_data_ptr_plus_offset(slot_offset)
                 .call(copy_fn)
                 .local_set(data_ptr);
 
@@ -680,7 +688,7 @@ pub fn add_decode_intermediate_type_instructions(
             // Add 12 to the offset to write the last 20 bytes of the address
             builder.i32_const(12).binop(BinaryOp::I32Add);
 
-            builder.add_slot_data_ptr_plus_offset(read_bytes_in_slot);
+            builder.add_slot_data_ptr_plus_offset(slot_offset);
 
             // Number of bytes to copy
             builder.i32_const(20);
@@ -730,8 +738,8 @@ pub fn add_decode_intermediate_type_instructions(
                     .i32_const(32)
                     .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-                // Reset read bytes counter for the child struct decoding
-                builder.i32_const(0).local_set(read_bytes_in_slot);
+                // Reset slot_offset for the child struct decoding
+                builder.i32_const(0).local_set(slot_offset);
 
                 // Recursively decode the child struct
                 // The calculated slot is used as the base slot
@@ -742,14 +750,14 @@ pub fn add_decode_intermediate_type_instructions(
                     builder,
                     compilation_ctx,
                     child_struct_slot_ptr,
-                    Some(child_struct_id_ptr),
+                    slot_offset,
                     owner_ptr,
+                    Some(child_struct_id_ptr),
                     itype,
-                    read_bytes_in_slot,
                 );
 
-                // Update read bytes counter to reflect the 32-byte UID we consumed
-                builder.i32_const(32).local_set(read_bytes_in_slot);
+                // Update slot_offset to reflect the 32-byte UID we consumed
+                builder.i32_const(32).local_set(slot_offset);
 
                 // Set the decoded child struct as the result
                 builder.local_get(child_struct_ptr).local_set(data_ptr);
@@ -761,10 +769,10 @@ pub fn add_decode_intermediate_type_instructions(
                     builder,
                     compilation_ctx,
                     slot_ptr,
-                    None,
+                    slot_offset,
                     owner_ptr,
+                    None,
                     itype,
-                    read_bytes_in_slot,
                 );
 
                 // Set the decoded child struct as the result
@@ -777,9 +785,9 @@ pub fn add_decode_intermediate_type_instructions(
                 builder,
                 compilation_ctx,
                 slot_ptr,
+                slot_offset,
                 owner_ptr,
                 itype,
-                read_bytes_in_slot,
             );
 
             // Set the decoded enum as the result

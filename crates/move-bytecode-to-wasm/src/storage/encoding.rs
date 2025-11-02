@@ -14,7 +14,7 @@ use crate::{
     hostio::host_functions::{native_keccak256, storage_cache_bytes32, storage_load_bytes32},
     native_functions::object::add_delete_field_instructions,
     runtime::RuntimeFunction,
-    storage::storage_layout::field_size,
+    storage::storage_layout::{compute_enum_storage_tail_position, field_size},
     translation::intermediate_types::IntermediateType,
     wasm_builder_extensions::WasmBuilderExtension,
 };
@@ -27,9 +27,9 @@ use crate::{
 /// - `compilation_ctx`: Shared compilation context (types, memory, helpers).
 /// - `struct_ptr`: Local holding the heap pointer to the struct in memory.
 /// - `slot_ptr`: Local pointing to the base storage slot where the struct is saved.
+/// - `slot_offset`: Local used as a running counter of bytes already written in the current slot.
 /// - `owner_ptr`: Optional local to the owner struct UID. If the struct has `key`, this will be `None`.
 /// - `itype`: Intermediate type of the struct to encode.
-/// - `written_bytes_in_slot`: Local used as a running counter of bytes already written in the current slot.
 ///
 /// Returns:
 /// - None. Writes encoded bytes to storage via the builder.
@@ -40,9 +40,9 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     compilation_ctx: &CompilationContext,
     struct_ptr: LocalId,
     slot_ptr: LocalId,
+    slot_offset: LocalId,
     owner_ptr: Option<LocalId>,
     itype: &IntermediateType,
-    written_bytes_in_slot: LocalId,
 ) {
     // Host functions
     let (storage_cache, _) = storage_cache_bytes32(module);
@@ -82,8 +82,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
                 },
             );
 
-        // Update written bytes counter to reflect the 8-byte type hash
-        builder.i32_const(8).local_set(written_bytes_in_slot);
+        // Update the slot_offset to reflect the 8-byte type hash
+        builder.i32_const(8).local_set(slot_offset);
 
         // If the current struct has the key ability, its struct id is used as the owner for wrapped objects.
         // Otherwise, use the owner passed as argument.
@@ -103,15 +103,15 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             continue;
         }
         let field_size = field_size(field, compilation_ctx) as i32;
-        // Update the written bytes counter to include the field size.
+        // Update the slot_offset to include the field size.
         // If we've filled the current slot, cache its data and move to the next slot.
         builder
             .local_get(slot_ptr)
-            .local_get(written_bytes_in_slot)
+            .local_get(slot_offset)
             .i32_const(field_size)
-            .i32_const(0)
+            .i32_const(0) // mode=0 for write operation
             .call(accumulate_or_advance_slot_fn)
-            .local_set(written_bytes_in_slot);
+            .local_set(slot_offset);
 
         // Load field's intermediate pointer
         builder.local_get(struct_ptr).load(
@@ -129,9 +129,9 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             builder,
             compilation_ctx,
             slot_ptr,
+            slot_offset,
             field_owner_ptr,
             field,
-            written_bytes_in_slot,
             true,
         );
     }
@@ -152,9 +152,9 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 /// - `compilation_ctx`: Shared compilation context (types, memory, helpers).
 /// - `enum_ptr`: Local holding the heap pointer to the enum in memory.
 /// - `slot_ptr`: Local pointing to the base storage slot where the enum is saved.
+/// - `slot_offset`: Local used as a running counter of bytes already written in the current slot.
 /// - `owner_ptr`: Local to the owner struct UID (for nested keyed objects).
 /// - `itype`: Intermediate type of the enum to encode.
-/// - `written_bytes_in_slot`: Local used as a running counter of bytes already written in the current slot.
 ///
 /// Returns:
 /// - None. Writes encoded bytes to storage via the builder.
@@ -165,9 +165,9 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
     compilation_ctx: &CompilationContext,
     enum_ptr: LocalId,
     slot_ptr: LocalId,
+    slot_offset: LocalId,
     owner_ptr: LocalId,
     itype: &IntermediateType,
-    written_bytes_in_slot: LocalId,
 ) {
     // Host functions
     let (storage_cache, _) = storage_cache_bytes32(module);
@@ -183,6 +183,17 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
             panic!("there was an error encoding an enum for storage, found {itype:?}")
         });
 
+    // Compute the tail slot and tail offset for the enum
+    let (tail_slot_ptr, tail_slot_offset) = compute_enum_storage_tail_position(
+        module,
+        builder,
+        &enum_,
+        slot_ptr,
+        slot_offset,
+        compilation_ctx,
+    )
+    .unwrap();
+
     let variant_index = module.locals.add(ValType::I32);
     builder
         .local_get(enum_ptr)
@@ -196,33 +207,41 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
         )
         .local_set(variant_index);
 
-    // First write the variant index in the slot data.
-    // written_bytes_in_slot already accounts for the variant's 1 byte.
-    builder
-        .add_slot_data_ptr_plus_offset(written_bytes_in_slot)
-        .local_get(variant_index)
-        .store(
-            compilation_ctx.memory_id,
-            StoreKind::I32_8 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
-
     // Match on the variant and encode its fields.
     enum_.match_on_variant(builder, variant_index, |variant, block| {
+        // Update the slot_offset to account for the variant index size.
+        block
+            .local_get(slot_ptr)
+            .local_get(slot_offset)
+            .i32_const(1)
+            .i32_const(0) // mode=0 for write operation
+            .call(accumulate_or_advance_slot_fn)
+            .local_set(slot_offset);
+
+        // Write the variant index in the slot data.
+        block
+            .add_slot_data_ptr_plus_offset(slot_offset)
+            .local_get(variant_index)
+            .store(
+                compilation_ctx.memory_id,
+                StoreKind::I32_8 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 0,
+                },
+            );
+
         for (index, field) in variant.fields.iter().enumerate() {
             let field_size = field_size(field, compilation_ctx) as i32;
-            // Update the written bytes counter to include the field size.
+            // Update the slot_offset to include the field size.
             // If we've filled the current slot, cache its data and move to the next slot.
             block
                 .local_get(slot_ptr)
-                .local_get(written_bytes_in_slot)
+                .local_get(slot_offset)
                 .i32_const(field_size)
-                .i32_const(0)
+                .i32_const(0) // mode=0 for write operation
                 .call(accumulate_or_advance_slot_fn)
-                .local_set(written_bytes_in_slot);
+                .local_set(slot_offset);
 
             // Load field's intermediate pointer
             block.local_get(enum_ptr).load(
@@ -240,9 +259,9 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
                 block,
                 compilation_ctx,
                 slot_ptr,
+                slot_offset,
                 owner_ptr,
                 field,
-                written_bytes_in_slot,
                 true,
             );
         }
@@ -253,6 +272,16 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
             .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
             .call(storage_cache);
     });
+
+    // *slot_ptr = *tail_slot_ptr
+    builder
+        .local_get(slot_ptr)
+        .local_get(tail_slot_ptr)
+        .i32_const(32)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+    // slot_offset = tail_slot_offset
+    builder.local_get(tail_slot_offset).local_set(slot_offset);
 }
 
 /// Emits WASM instructions to encode a vector and write it into storage,
@@ -353,7 +382,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
 
     // Set aux locals for looping
     let i = module.locals.add(ValType::I32);
-    let bytes_in_slot_offset = module.locals.add(ValType::I32);
+    let elem_slot_offset = module.locals.add(ValType::I32);
 
     // If the old length is greater than the new length, we need to delete those residual elements from the storage.
     builder.block(None, |outer_block| {
@@ -393,9 +422,9 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                     loop_,
                     compilation_ctx,
                     elem_slot_ptr,
+                    elem_slot_offset,
                     inner,
                     elem_size,
-                    bytes_in_slot_offset,
                 );
 
                 // Exit after processing all elements (from len to old_len)
@@ -429,7 +458,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     // Reset the aux locals for the next loop
     // This loop encodes and saves the vector in memory to the storage.
     builder.i32_const(0).local_set(i);
-    builder.i32_const(0).local_set(bytes_in_slot_offset);
+    builder.i32_const(0).local_set(elem_slot_offset);
 
     // Loop through the vector and encode and save the elements to the storage.
     builder.block(None, |outer_block| {
@@ -455,15 +484,15 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
             inner_block.loop_(None, |loop_| {
                 let loop_id = loop_.id();
 
-                // Update the written bytes counter to include the field size.
+                // Update the slot_offset to include the field size.
                 // If we've filled the current slot, cache its data and move to the next slot.
                 loop_
                     .local_get(elem_slot_ptr)
-                    .local_get(bytes_in_slot_offset)
+                    .local_get(elem_slot_offset)
                     .i32_const(elem_size)
-                    .i32_const(0)
+                    .i32_const(0) // mode=0 for write operation
                     .call(accumulate_or_advance_slot_fn)
-                    .local_set(bytes_in_slot_offset);
+                    .local_set(elem_slot_offset);
 
                 // Pointer to the element in memory
                 loop_.vec_elem_ptr(vector_ptr, i, stack_size).load(
@@ -485,9 +514,9 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                     loop_,
                     compilation_ctx,
                     elem_slot_ptr,
+                    elem_slot_offset,
                     owner_ptr,
                     inner,
-                    bytes_in_slot_offset,
                     false,
                 );
 
@@ -548,9 +577,9 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
 /// - `builder`: Instruction sequence builder to append to.
 /// - `compilation_ctx`: Shared compilation context (types, memory, helpers).
 /// - `slot_ptr`: Local pointing to the base storage slot to write to.
+/// - `slot_offset`: Local used as a running counter of bytes already written in the current slot.
 /// - `owner_ptr`: Local to the owner struct UID (relevant for keyed objects).
 /// - `itype`: Intermediate type to encode.
-/// - `written_bytes_in_slot`: Local used as a running counter of bytes already written in the current slot.
 /// - `is_field`: Whether the source value is a struct/enum field (affects extra loads for stack types).
 ///
 /// Stack expectations:
@@ -561,9 +590,9 @@ pub fn add_encode_intermediate_type_instructions(
     builder: &mut InstrSeqBuilder,
     compilation_ctx: &CompilationContext,
     slot_ptr: LocalId,
+    slot_offset: LocalId,
     owner_ptr: LocalId,
     itype: &IntermediateType,
-    written_bytes_in_slot: LocalId,
     is_field: bool,
 ) {
     // Locals
@@ -634,7 +663,7 @@ pub fn add_encode_intermediate_type_instructions(
 
             // Save the value in slot data
             builder
-                .add_slot_data_ptr_plus_offset(written_bytes_in_slot)
+                .add_slot_data_ptr_plus_offset(slot_offset)
                 .local_get(val)
                 .store(
                     compilation_ctx.memory_id,
@@ -649,7 +678,7 @@ pub fn add_encode_intermediate_type_instructions(
             let swap_fn = RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx));
 
             // Slot data plus offset as dest ptr
-            builder.add_slot_data_ptr_plus_offset(written_bytes_in_slot);
+            builder.add_slot_data_ptr_plus_offset(slot_offset);
 
             // Transform to BE
             builder.call(swap_fn);
@@ -659,7 +688,7 @@ pub fn add_encode_intermediate_type_instructions(
 
             // Slot data plus offset as dest ptr (offset should be zero because data is already
             // 32 bytes in size)
-            builder.add_slot_data_ptr_plus_offset(written_bytes_in_slot);
+            builder.add_slot_data_ptr_plus_offset(slot_offset);
 
             // Transform to BE
             builder.call(swap_fn);
@@ -670,7 +699,7 @@ pub fn add_encode_intermediate_type_instructions(
             builder.local_set(val_32);
 
             // Slot data plus offset as dest ptr
-            builder.add_slot_data_ptr_plus_offset(written_bytes_in_slot);
+            builder.add_slot_data_ptr_plus_offset(slot_offset);
 
             // Grab the last 20 bytes of the address
             builder
@@ -732,8 +761,8 @@ pub fn add_encode_intermediate_type_instructions(
                     .i32_const(32)
                     .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-                // Reset written bytes counter for the child struct encoding
-                builder.i32_const(0).local_set(written_bytes_in_slot);
+                // Reset slot_offset for the child struct encoding
+                builder.i32_const(0).local_set(slot_offset);
 
                 // Recursively encode and store the child struct
                 add_encode_and_save_into_storage_struct_instructions(
@@ -742,17 +771,17 @@ pub fn add_encode_intermediate_type_instructions(
                     compilation_ctx,
                     child_struct_ptr,
                     child_struct_slot_ptr,
+                    slot_offset,
                     None,
                     itype,
-                    written_bytes_in_slot,
                 );
 
                 // After encoding the child struct, we need to store its UID in the
                 // parent struct's data so the parent can reference the child.
                 // The UID takes exactly 32 bytes (one full slot).
 
-                // Update written bytes counter to reflect the 32-byte UID
-                builder.i32_const(32).local_set(written_bytes_in_slot);
+                // Update slot_offset to reflect the 32-byte UID
+                builder.i32_const(32).local_set(slot_offset);
 
                 // Copy the child struct UID to the parent's data section
                 // This creates the reference from parent to child struct
@@ -776,9 +805,9 @@ pub fn add_encode_intermediate_type_instructions(
                     compilation_ctx,
                     child_struct_ptr,
                     slot_ptr,
+                    slot_offset,
                     Some(owner_ptr),
                     itype,
-                    written_bytes_in_slot,
                 );
             }
         }
@@ -791,9 +820,9 @@ pub fn add_encode_intermediate_type_instructions(
                 compilation_ctx,
                 val_32,
                 slot_ptr,
+                slot_offset,
                 owner_ptr,
                 itype,
-                written_bytes_in_slot,
             );
         }
         IntermediateType::IVector(inner) => {
@@ -809,7 +838,7 @@ pub fn add_encode_intermediate_type_instructions(
                 inner,
             );
 
-            builder.i32_const(32).local_set(written_bytes_in_slot);
+            builder.i32_const(32).local_set(slot_offset);
         }
         e => todo!("{e:?}"),
     };

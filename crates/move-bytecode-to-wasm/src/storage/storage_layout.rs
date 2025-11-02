@@ -15,7 +15,7 @@ const SLOT_SIZE: u32 = 32;
 /// - `module`: Walrus module being built
 /// - `builder`: Instruction sequence builder to append to
 /// - `enum_`: the enum whose size to compute
-/// - `written_bytes_in_slot`: LocalId containing bytes already used in the storage slot (affects layout)
+/// - `slot_offset`: LocalId containing bytes already used in the storage slot (affects layout)
 /// - `compilation_ctx`: context for type resolution
 ///
 /// Returns `Ok(Some(LocalId))` with a local containing the computed size, or `Ok(None)` if generic type encountered.
@@ -24,19 +24,18 @@ pub fn compute_enum_storage_size(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     enum_: &IEnum,
-    written_bytes_in_slot: LocalId,
+    slot_offset: LocalId,
     compilation_ctx: &CompilationContext,
 ) -> Result<LocalId, TranslationError> {
-    // Increment the used bytes by 1 to account for the variant index
-    // Compute: written_bytes = (written_bytes + 1) % SLOT_SIZE
-    let used_bytes_in_slot = module.locals.add(ValType::I32);
+    // Increment the offset by 1 to account for the variant index
+    let offset = module.locals.add(ValType::I32);
     builder
-        .local_get(written_bytes_in_slot)
+        .local_get(slot_offset)
         .i32_const(1)
         .binop(BinaryOp::I32Add)
         .i32_const(SLOT_SIZE as i32)
         .binop(BinaryOp::I32RemS)
-        .local_set(used_bytes_in_slot);
+        .local_set(offset);
 
     // Compute the size of each variant and pick the largest one
     let enum_size = module.locals.add(ValType::I32);
@@ -47,7 +46,7 @@ pub fn compute_enum_storage_size(
             module,
             builder,
             &variant.fields,
-            used_bytes_in_slot,
+            offset,
             compilation_ctx,
             || TranslationError::FoundReferenceInsideEnum {
                 enum_index: variant.belongs_to,
@@ -93,7 +92,7 @@ pub fn compute_enum_storage_size(
 /// - `module`: Walrus module being built
 /// - `builder`: Instruction sequence builder to append to
 /// - `struct_`: the struct whose storage size is being calculated
-/// - `written_bytes_in_slot`: LocalId containing bytes already used in the current slot (affects layout)
+/// - `slot_offset`: LocalId containing bytes already used in the current slot (affects layout)
 /// - `compilation_ctx`: context used to resolve types and perform lookups
 ///
 /// Filters out UID or NamedId fields (which are not stored) and computes the total size of the remaining fields.
@@ -102,7 +101,7 @@ pub fn compute_struct_storage_size(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     struct_: &IStruct,
-    written_bytes_in_slot: LocalId,
+    slot_offset: LocalId,
     compilation_ctx: &CompilationContext,
 ) -> Result<LocalId, TranslationError> {
     // Filter out UIDs (not stored)
@@ -113,19 +112,19 @@ pub fn compute_struct_storage_size(
         .cloned()
         .collect();
 
-    // Compute: written_bytes = written_bytes % SLOT_SIZE
-    let used_bytes_in_slot = module.locals.add(ValType::I32);
+    // Compute: offset = offset % SLOT_SIZE
+    let offset = module.locals.add(ValType::I32);
     builder
-        .local_get(written_bytes_in_slot)
+        .local_get(slot_offset)
         .i32_const(SLOT_SIZE as i32)
         .binop(BinaryOp::I32RemS)
-        .local_set(used_bytes_in_slot);
+        .local_set(offset);
 
     compute_fields_storage_size(
         module,
         builder,
         &filtered_fields,
-        used_bytes_in_slot,
+        offset,
         compilation_ctx,
         || TranslationError::FoundReferenceInsideStruct {
             struct_index: struct_.index(),
@@ -144,7 +143,7 @@ fn compute_fields_storage_size<F, G>(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     fields: &[IntermediateType],
-    used_bytes_in_slot: LocalId,
+    slot_offset: LocalId,
     compilation_ctx: &CompilationContext,
     on_ref: F,
     on_generic: G,
@@ -156,8 +155,8 @@ where
     let total_bytes = module.locals.add(ValType::I32);
     builder.i32_const(0).local_set(total_bytes);
 
-    let used_bytes = module.locals.add(ValType::I32);
-    builder.local_get(used_bytes_in_slot).local_set(used_bytes);
+    let offset = module.locals.add(ValType::I32);
+    builder.local_get(slot_offset).local_set(offset);
 
     for field in fields {
         match field {
@@ -185,7 +184,7 @@ where
                     // Padding
                     builder
                         .i32_const(SLOT_SIZE as i32)
-                        .local_get(used_bytes)
+                        .local_get(offset)
                         .binop(BinaryOp::I32Sub)
                         .i32_const(SLOT_SIZE as i32)
                         .binop(BinaryOp::I32RemS);
@@ -193,14 +192,14 @@ where
                     // total_bytes += padding
                     builder.binop(BinaryOp::I32Add).local_set(total_bytes);
 
-                    // used_bytes = SLOT_SIZE
-                    builder.i32_const(SLOT_SIZE as i32).local_set(used_bytes);
+                    // offset = SLOT_SIZE
+                    builder.i32_const(SLOT_SIZE as i32).local_set(offset);
                 } else {
                     let struct_size = compute_struct_storage_size(
                         module,
                         builder,
                         &struct_,
-                        used_bytes,
+                        offset,
                         compilation_ctx,
                     )?;
 
@@ -211,14 +210,14 @@ where
                         .binop(BinaryOp::I32Add)
                         .local_set(total_bytes);
 
-                    // used_bytes = (used_bytes + size) % SLOT_SIZE
+                    // offset = (offset + size) % SLOT_SIZE
                     builder
-                        .local_get(used_bytes)
+                        .local_get(offset)
                         .local_get(struct_size)
                         .binop(BinaryOp::I32Add)
                         .i32_const(SLOT_SIZE as i32)
                         .binop(BinaryOp::I32RemS)
-                        .local_set(used_bytes);
+                        .local_set(offset);
                 }
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
@@ -226,13 +225,8 @@ where
                     .get_enum_by_intermediate_type(field)
                     .expect("enum not found");
 
-                let enum_size = compute_enum_storage_size(
-                    module,
-                    builder,
-                    &enum_,
-                    used_bytes,
-                    compilation_ctx,
-                )?;
+                let enum_size =
+                    compute_enum_storage_size(module, builder, &enum_, offset, compilation_ctx)?;
 
                 // total_bytes += size
                 builder
@@ -241,14 +235,14 @@ where
                     .binop(BinaryOp::I32Add)
                     .local_set(total_bytes);
 
-                // used_bytes = (used_bytes + size) % SLOT_SIZE
+                // offset = (offset + size) % SLOT_SIZE
                 builder
-                    .local_get(used_bytes)
+                    .local_get(offset)
                     .local_get(enum_size)
                     .binop(BinaryOp::I32Add)
                     .i32_const(SLOT_SIZE as i32)
                     .binop(BinaryOp::I32RemS)
-                    .local_set(used_bytes);
+                    .local_set(offset);
             }
             _ => {
                 let field_size = field_size(field, compilation_ctx) as i32;
@@ -257,7 +251,7 @@ where
                 let free_bytes = module.locals.add(ValType::I32);
                 builder
                     .i32_const(SLOT_SIZE as i32)
-                    .local_get(used_bytes)
+                    .local_get(offset)
                     .binop(BinaryOp::I32Sub)
                     .local_set(free_bytes);
 
@@ -282,8 +276,8 @@ where
                             // total_bytes += (free_bytes % SLOT_SIZE);
                             then.binop(BinaryOp::I32Add).local_set(total_bytes);
 
-                            // used_bytes = field_size
-                            then.i32_const(field_size).local_set(used_bytes);
+                            // offset = field_size
+                            then.i32_const(field_size).local_set(offset);
                         },
                         |else_| {
                             // total_bytes += field_size_bytes
@@ -293,12 +287,12 @@ where
                                 .binop(BinaryOp::I32Add)
                                 .local_set(total_bytes);
 
-                            // used_bytes += field_size_bytes
+                            // offset += field_size_bytes
                             else_
-                                .local_get(used_bytes)
+                                .local_get(offset)
                                 .i32_const(field_size)
                                 .binop(BinaryOp::I32Add)
-                                .local_set(used_bytes);
+                                .local_set(offset);
                         },
                     );
             }
@@ -319,46 +313,41 @@ where
 /// - `builder`: Instruction sequence builder to append to
 /// - `enum_`: the enum being encoded
 /// - `slot_ptr`: LocalId pointing to the starting slot (32-byte u256)
-/// - `start_written_bytes_in_slot`: LocalId containing bytes already used in the starting slot
+/// - `head_slot_offset`: LocalId containing bytes already used in the starting slot
 /// - `compilation_ctx`: context for type resolution
 ///
-/// Returns a tuple `(end_slot_ptr, end_written_bytes_in_slot)`:
-/// - `end_slot_ptr`: LocalId pointing to the last slot used (32-byte u256)
-/// - `end_written_bytes_in_slot`: LocalId containing bytes used in the last slot
-pub fn compute_enum_end_slot(
+/// Returns a tuple `(tail_slot_ptr, tail_slot_offset)`:
+/// - `tail_slot_ptr`: LocalId pointing to the last slot used (32-byte u256)
+/// - `tail_slot_offset`: LocalId containing bytes used in the last slot
+pub fn compute_enum_storage_tail_position(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     enum_: &IEnum,
-    start_slot_ptr: LocalId,
-    start_written_bytes_in_slot: LocalId,
+    head_slot_ptr: LocalId,
+    head_slot_offset: LocalId,
     compilation_ctx: &CompilationContext,
 ) -> Result<(LocalId, LocalId), TranslationError> {
     // Compute the size of the enum in storage
-    let enum_size = compute_enum_storage_size(
-        module,
-        builder,
-        enum_,
-        start_written_bytes_in_slot,
-        compilation_ctx,
-    )?;
+    let enum_size =
+        compute_enum_storage_size(module, builder, enum_, head_slot_offset, compilation_ctx)?;
 
-    let end_slot_ptr = module.locals.add(ValType::I32);
-    // end_slot = slot (start by copying the starting slot)
+    let tail_slot_offset = module.locals.add(ValType::I32);
+    let tail_slot_ptr = module.locals.add(ValType::I32);
+
+    // *tail_slot_ptr = *head_slot_ptr (start by copying the head slot)
     builder
         .i32_const(32)
         .call(compilation_ctx.allocator)
-        .local_tee(end_slot_ptr)
-        .local_get(start_slot_ptr)
+        .local_tee(tail_slot_ptr)
+        .local_get(head_slot_ptr)
         .i32_const(32)
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-    let end_written_bytes_in_slot = module.locals.add(ValType::I32);
-
-    // free_bytes = 32 - start_written_bytes_in_slot
+    // free_bytes = 32 - head_slot_offset
     let free_bytes = module.locals.add(ValType::I32);
     builder
         .i32_const(SLOT_SIZE as i32)
-        .local_get(start_written_bytes_in_slot)
+        .local_get(head_slot_offset)
         .binop(BinaryOp::I32Sub)
         .local_set(free_bytes);
 
@@ -370,14 +359,14 @@ pub fn compute_enum_end_slot(
             None,
             |then| {
                 // Case: enum_size >= free_bytes, so it will span multiple slots
-                // 1) end_slot = slot + (enum_size - free_bytes) / 32
+                // 1) *tail_slot_ptr = *head_slot_ptr + ((enum_size - free_bytes) / 32) as u256 LE
 
-                // slot_offset_ptr = (enum_size - free_bytes) / 32 as u256 LE (how many slots to add to the current slot)
-                let slot_offset_ptr = module.locals.add(ValType::I32);
+                // delta_slot_ptr = (enum_size - free_bytes) / 32 as u256 LE (how many slots to add to the current slot)
+                let delta_slot_ptr = module.locals.add(ValType::I32);
                 // Allocate 32 bytes for the slot offset
                 then.i32_const(32)
                     .call(compilation_ctx.allocator)
-                    .local_tee(slot_offset_ptr);
+                    .local_tee(delta_slot_ptr);
 
                 // (enum_size - free_bytes) / 32 as u32
                 then.local_get(enum_size)
@@ -400,45 +389,45 @@ pub fn compute_enum_end_slot(
 
                 // Swap the end slot from BE to LE for addition
                 let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
-                then.local_get(end_slot_ptr)
-                    .local_get(end_slot_ptr)
+                then.local_get(tail_slot_ptr)
+                    .local_get(tail_slot_ptr)
                     .call(swap_256_fn);
 
                 // Add the offset to the end slot (right now equal to the current slot)
                 let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
-                then.local_get(slot_offset_ptr)
-                    .local_get(end_slot_ptr)
-                    .local_get(end_slot_ptr)
+                then.local_get(delta_slot_ptr)
+                    .local_get(tail_slot_ptr)
+                    .local_get(tail_slot_ptr)
                     .i32_const(32)
                     .call(add_u256_fn)
-                    .local_set(end_slot_ptr); // Why do we need to set the end_slot_ptr again? TODO: check this
+                    .local_set(tail_slot_ptr); // Why do we need to set the end_slot_ptr again? TODO: check this
 
                 // Swap back to BE
-                then.local_get(end_slot_ptr)
-                    .local_get(end_slot_ptr)
+                then.local_get(tail_slot_ptr)
+                    .local_get(tail_slot_ptr)
                     .call(swap_256_fn);
 
-                // 2) end_written_bytes_in_slot = (enum_size - free_bytes) % 32
+                // 2) tail_slot_offset = (enum_size - free_bytes) % 32
                 then.local_get(enum_size)
                     .local_get(free_bytes)
                     .binop(BinaryOp::I32Sub)
                     .i32_const(SLOT_SIZE as i32)
                     .binop(BinaryOp::I32RemS)
-                    .local_set(end_written_bytes_in_slot);
+                    .local_set(tail_slot_offset);
             },
             |else_| {
                 // Case: enum_size < free_bytes, so it fits entirely in the current slot
                 // 1) end_slot = start_slot (already set by the copy above)
-                // 2) end_written_bytes_in_slot = start_written_bytes_in_slot + enum_size
+                // 2) tail_slot_offset = head_slot_offset + enum_size
                 else_
-                    .local_get(start_written_bytes_in_slot)
+                    .local_get(head_slot_offset)
                     .local_get(enum_size)
                     .binop(BinaryOp::I32Add)
-                    .local_set(end_written_bytes_in_slot);
+                    .local_set(tail_slot_offset);
             },
         );
 
-    Ok((end_slot_ptr, end_written_bytes_in_slot))
+    Ok((tail_slot_ptr, tail_slot_offset))
 }
 
 /// Returns the storage-encoded size in bytes for a given intermediate type.
@@ -449,10 +438,9 @@ pub fn compute_enum_end_slot(
 /// - For structs with `key`, at least 32 bytes are used to store the UID reference.
 pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext) -> u32 {
     match field {
-        IntermediateType::IBool
-        | IntermediateType::IU8
-        | IntermediateType::IEnum { .. }
-        | IntermediateType::IGenericEnumInstance { .. } => 1,
+        IntermediateType::IBool | IntermediateType::IU8 => 1,
+        // Enums have variable size depending on its fields. This is computed via compute_enum_storage_size
+        IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => 0,
         IntermediateType::IU16 => 2,
         IntermediateType::IU32 => 4,
         IntermediateType::IU64 => 8,
@@ -651,7 +639,7 @@ mod wasm_tests {
         let start_written_bytes_in_slot = module.locals.add(ValType::I32);
 
         // Call compute_enum_end_slot
-        let (end_slot_ptr, end_written_bytes_in_slot) = compute_enum_end_slot(
+        let (end_slot_ptr, end_written_bytes_in_slot) = compute_enum_storage_tail_position(
             module,
             &mut builder,
             enum_,
@@ -678,7 +666,7 @@ mod wasm_tests {
         );
 
         let (end_slot_ptr, end_written_bytes) = entrypoint
-            .call(&mut store, (0 as i32, start_written_bytes as i32))
+            .call(&mut store, (0_i32, start_written_bytes as i32))
             .map_err(|e| format!("WASM execution error: {e:?}"))?;
 
         // Read end_slot from the returned pointer
@@ -1245,6 +1233,4 @@ mod wasm_tests {
             initial_used_bytes, end_written_bytes, expected_end_written_bytes
         );
     }
-
-    
 }
