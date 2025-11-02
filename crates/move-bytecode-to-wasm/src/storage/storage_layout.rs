@@ -499,8 +499,10 @@ mod wasm_tests {
         use std::ptr::addr_of_mut;
 
         let module_id = ModuleId::default();
-        let mut module_data = ModuleData::default();
-        module_data.id = module_id;
+        let mut module_data = ModuleData {
+            id: module_id,
+            ..Default::default()
+        };
 
         unsafe {
             let structs_data_ptr = addr_of_mut!(module_data.structs) as *mut u8;

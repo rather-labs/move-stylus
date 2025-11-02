@@ -1143,6 +1143,7 @@ pub fn add_commit_changes_to_storage_fn(
 /// - slot_offset: the number of bytes used in the slot
 /// - field_size: the size of the field
 /// - mode: operation mode (0=write, 1=read, 2=delete)
+///
 /// Returns:
 /// - the updated number of bytes used in the slot
 pub fn accumulate_or_advance_slot(
