@@ -46,8 +46,8 @@ pub fn add_read_and_decode_storage_struct_instructions(
     let (storage_load, _) = storage_load_bytes32(module);
 
     // Runtime functions
-    let accumulate_or_advance_slot_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlot.get(module, Some(compilation_ctx));
+    let accumulate_or_advance_slot_read_fn =
+        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx));
 
     // Get the IStruct representation
     let struct_ = compilation_ctx
@@ -194,8 +194,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 .local_get(slot_ptr)
                 .local_get(slot_offset)
                 .i32_const(field_size)
-                .i32_const(1) // mode=1 for read operation
-                .call(accumulate_or_advance_slot_fn)
+                .call(accumulate_or_advance_slot_read_fn)
                 .local_set(slot_offset);
 
             // Decode the field according to its type
@@ -249,8 +248,8 @@ pub fn add_read_and_decode_storage_enum_instructions(
     itype: &IntermediateType,
 ) -> LocalId {
     // Runtime functions
-    let accumulate_or_advance_slot_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlot.get(module, Some(compilation_ctx));
+    let accumulate_or_advance_slot_read_fn =
+        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx));
 
     // Get the IEnum representation
     let enum_ = compilation_ctx
@@ -277,8 +276,7 @@ pub fn add_read_and_decode_storage_enum_instructions(
         .local_get(slot_ptr)
         .local_get(slot_offset)
         .i32_const(1)
-        .i32_const(1) // mode=1 for read operation
-        .call(accumulate_or_advance_slot_fn)
+        .call(accumulate_or_advance_slot_read_fn)
         .local_set(slot_offset);
 
     // Read the variant index
@@ -317,8 +315,7 @@ pub fn add_read_and_decode_storage_enum_instructions(
                 .local_get(slot_ptr)
                 .local_get(slot_offset)
                 .i32_const(field_size)
-                .i32_const(1) // mode=1 for read operation
-                .call(accumulate_or_advance_slot_fn)
+                .call(accumulate_or_advance_slot_read_fn)
                 .local_set(slot_offset);
 
             // Decode the field according to its type
@@ -378,8 +375,8 @@ pub fn add_read_and_decode_storage_vector_instructions(
 
     // Runtime functions
     let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None);
-    let accumulate_or_advance_slot_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlot.get(module, Some(compilation_ctx));
+    let accumulate_or_advance_slot_read_fn =
+        RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx));
 
     // Locals
     let len = module.locals.add(ValType::I32);
@@ -471,8 +468,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
                     .local_get(elem_slot_ptr)
                     .local_get(slot_offset)
                     .i32_const(elem_size)
-                    .i32_const(1) // mode=1 for read operation
-                    .call(accumulate_or_advance_slot_fn)
+                    .call(accumulate_or_advance_slot_read_fn)
                     .local_set(slot_offset);
 
                 // Decode the element and store it at elem_data_ptr

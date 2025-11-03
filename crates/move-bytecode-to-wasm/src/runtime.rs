@@ -73,7 +73,9 @@ pub enum RuntimeFunction {
     DeleteTtoObject,
     GetStructOwner,
     CommitChangesToStorage,
-    AccumulateOrAdvanceSlot,
+    AccumulateOrAdvanceSlotDelete,
+    AccumulateOrAdvanceSlotRead,
+    AccumulateOrAdvanceSlotWrite,
     // ASCII conversion
     U64ToAsciiBase10,
 }
@@ -136,7 +138,9 @@ impl RuntimeFunction {
             Self::GetStructOwner => "get_struct_owner",
             Self::U64ToAsciiBase10 => "u64_to_ascii_base_10",
             Self::CommitChangesToStorage => "commit_changes_to_storage",
-            Self::AccumulateOrAdvanceSlot => "accumulate_or_advance_slot",
+            Self::AccumulateOrAdvanceSlotDelete => "accumulate_or_advance_slot_delete",
+            Self::AccumulateOrAdvanceSlotRead => "accumulate_or_advance_slot_read",
+            Self::AccumulateOrAdvanceSlotWrite => "accumulate_or_advance_slot_write",
         }
     }
 
@@ -244,8 +248,14 @@ impl RuntimeFunction {
                 (Self::LocateStructSlot, Some(ctx)) => storage::locate_struct_slot(module, ctx),
                 (Self::GetIdBytesPtr, Some(ctx)) => storage::get_id_bytes_ptr(module, ctx),
                 (Self::GetStructOwner, Some(ctx)) => storage::get_struct_owner_fn(module, ctx),
-                (Self::AccumulateOrAdvanceSlot, Some(ctx)) => {
-                    storage::accumulate_or_advance_slot(module, ctx)
+                (Self::AccumulateOrAdvanceSlotDelete, Some(ctx)) => {
+                    storage::accumulate_or_advance_slot_delete(module, ctx)
+                }
+                (Self::AccumulateOrAdvanceSlotRead, Some(ctx)) => {
+                    storage::accumulate_or_advance_slot_read(module, ctx)
+                }
+                (Self::AccumulateOrAdvanceSlotWrite, Some(ctx)) => {
+                    storage::accumulate_or_advance_slot_write(module, ctx)
                 }
                 // ASCII conversion
                 (Self::U64ToAsciiBase10, Some(ctx)) => {

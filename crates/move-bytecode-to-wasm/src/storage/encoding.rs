@@ -49,8 +49,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
 
     // Runtime functions
     let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
-    let accumulate_or_advance_slot_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlot.get(module, Some(compilation_ctx));
+    let accumulate_or_advance_slot_write_fn =
+        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx));
 
     // Get the IStruct representation
     let struct_ = compilation_ctx
@@ -109,8 +109,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             .local_get(slot_ptr)
             .local_get(slot_offset)
             .i32_const(field_size)
-            .i32_const(0) // mode=0 for write operation
-            .call(accumulate_or_advance_slot_fn)
+            .call(accumulate_or_advance_slot_write_fn)
             .local_set(slot_offset);
 
         // Load field's intermediate pointer
@@ -173,8 +172,8 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
     let (storage_cache, _) = storage_cache_bytes32(module);
 
     // Runtime functions
-    let accumulate_or_advance_slot_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlot.get(module, Some(compilation_ctx));
+    let accumulate_or_advance_slot_write_fn =
+        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx));
 
     // Get the IEnum representation
     let enum_ = compilation_ctx
@@ -214,8 +213,7 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
             .local_get(slot_ptr)
             .local_get(slot_offset)
             .i32_const(1)
-            .i32_const(0) // mode=0 for write operation
-            .call(accumulate_or_advance_slot_fn)
+            .call(accumulate_or_advance_slot_write_fn)
             .local_set(slot_offset);
 
         // Write the variant index in the slot data.
@@ -239,8 +237,7 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
                 .local_get(slot_ptr)
                 .local_get(slot_offset)
                 .i32_const(field_size)
-                .i32_const(0) // mode=0 for write operation
-                .call(accumulate_or_advance_slot_fn)
+                .call(accumulate_or_advance_slot_write_fn)
                 .local_set(slot_offset);
 
             // Load field's intermediate pointer
@@ -316,8 +313,8 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None);
     let derive_dyn_array_slot_fn =
         RuntimeFunction::DeriveDynArraySlot.get(module, Some(compilation_ctx));
-    let accumulate_or_advance_slot_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlot.get(module, Some(compilation_ctx));
+    let accumulate_or_advance_slot_write_fn =
+        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx));
 
     // Locals
     let elem_slot_ptr = module.locals.add(ValType::I32);
@@ -490,8 +487,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                     .local_get(elem_slot_ptr)
                     .local_get(elem_slot_offset)
                     .i32_const(elem_size)
-                    .i32_const(0) // mode=0 for write operation
-                    .call(accumulate_or_advance_slot_fn)
+                    .call(accumulate_or_advance_slot_write_fn)
                     .local_set(elem_slot_offset);
 
                 // Pointer to the element in memory

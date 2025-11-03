@@ -528,8 +528,8 @@ pub fn add_delete_field_instructions(
     itype: &IntermediateType,
     size: i32,
 ) {
-    let accumulate_or_advance_slot_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlot.get(module, Some(compilation_ctx));
+    let accumulate_or_advance_slot_delete_fn =
+        RuntimeFunction::AccumulateOrAdvanceSlotDelete.get(module, Some(compilation_ctx));
 
     // Use accumulate_or_advance_slot with mode=2 (delete) to handle slot advancement
     // Mode 2 will wipe the slot to zero before advancing when needed
@@ -537,8 +537,7 @@ pub fn add_delete_field_instructions(
         .local_get(slot_ptr)
         .local_get(slot_offset)
         .i32_const(size)
-        .i32_const(2) // mode=2 for delete operation
-        .call(accumulate_or_advance_slot_fn)
+        .call(accumulate_or_advance_slot_delete_fn)
         .local_set(slot_offset);
 
     match itype {

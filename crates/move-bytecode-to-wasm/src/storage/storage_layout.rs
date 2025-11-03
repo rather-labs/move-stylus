@@ -18,7 +18,7 @@ const SLOT_SIZE: u32 = 32;
 /// - `slot_offset`: LocalId containing bytes already used in the storage slot (affects layout)
 /// - `compilation_ctx`: context for type resolution
 ///
-/// Returns `Ok(Some(LocalId))` with a local containing the computed size, or `Ok(None)` if generic type encountered.
+/// Returns `Ok(LocalId)` with a local containing the computed size, or `Err(TranslationError)` if generic type encountered.
 /// The returned local will contain the computed size in bytes.
 pub fn compute_enum_storage_size(
     module: &mut Module,
@@ -99,7 +99,7 @@ pub fn compute_enum_storage_size(
 /// - `compilation_ctx`: context used to resolve types and perform lookups
 ///
 /// Filters out UID or NamedId fields (which are not stored) and computes the total size of the remaining fields.
-/// Returns `Ok(Some(LocalId))` with a local containing the computed size, or `Ok(None)` if any field contains a generic type parameter.
+/// Returns `Ok(LocalId)` with a local containing the computed size, or `Err(TranslationError)` if any field contains a generic type parameter.
 pub fn compute_struct_storage_size(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,

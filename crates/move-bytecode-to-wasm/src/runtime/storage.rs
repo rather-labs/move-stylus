@@ -1134,39 +1134,158 @@ pub fn add_commit_changes_to_storage_fn(
     function.finish(vec![], &mut module.funcs)
 }
 
-/// If the next field fits in the current 32-byte slot, increment the
-/// slot_offset by the field size. Otherwise, handle slot transition based on
-/// the operation mode and advance to the next slot, setting slot_offset to the
-/// field size.
+/// Emits a WASM function that maintains a 32-byte storage slot accumulator for DELETE flows.
+///
+/// Behavior:
+/// - If `slot_offset + field_size` exceeds 32, it performs the delete-specific transition:
+///   wipes the current slot data to zero and advances to the next slot.
+///   Then sets `slot_offset = field_size`.
+/// - Otherwise, it simply accumulates: `slot_offset += field_size`.
+///
 /// Arguments:
-/// - slot_ptr: the pointer to the slot
-/// - slot_offset: the number of bytes used in the slot
-/// - field_size: the size of the field
-/// - mode: operation mode (0=write, 1=read, 2=delete)
+/// - `slot_ptr: i32`: Pointer to the slot.
+/// - `slot_offset: i32`: Offset in the current slot.
+/// - `field_size: i32`: Size of the field in bytes.
 ///
 /// Returns:
-/// - the updated number of bytes used in the slot
-pub fn accumulate_or_advance_slot(
+/// - `i32`: The new slot offset after advancing or accumulating.
+pub fn accumulate_or_advance_slot_delete(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
 ) -> FunctionId {
-    let mut function = FunctionBuilder::new(
-        &mut module.types,
-        &[ValType::I32, ValType::I32, ValType::I32, ValType::I32],
-        &[ValType::I32],
-    );
-    let mut builder = function
-        .name(RuntimeFunction::AccumulateOrAdvanceSlot.name().to_owned())
-        .func_body();
-
     let (storage_cache_fn, _) = storage_cache_bytes32(module);
+    let next_slot_fn = storage_next_slot_function(module, compilation_ctx);
+
+    build_accumulate_or_advance_slot(
+        module,
+        "accumulate_or_advance_slot_delete",
+        move |then, slot_ptr| {
+            // Wipe the slot
+            then.local_get(slot_ptr)
+                .i32_const(DATA_ZERO_OFFSET)
+                .call(storage_cache_fn);
+
+            // Advance the slot pointer
+            then.local_get(slot_ptr)
+                .call(next_slot_fn)
+                .local_set(slot_ptr);
+        },
+    )
+}
+
+/// Emits a WASM function that maintains a 32-byte storage slot accumulator for READ flows.
+///
+/// Behavior:
+/// - If `slot_offset + field_size` exceeds 32, it advances to the next slot and loads the slot
+///   data from storage (into the standard data buffer), then sets `slot_offset = field_size`.
+/// - Otherwise, it accumulates: `slot_offset += field_size`.
+///
+/// Arguments:
+/// - `slot_ptr: i32`: Pointer to the slot.
+/// - `slot_offset: i32`: Offset in the current slot.
+/// - `field_size: i32`: Size of the field in bytes.
+///
+/// Returns:
+/// - `i32`: The new slot offset after advancing or accumulating.
+pub fn accumulate_or_advance_slot_read(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
     let (storage_load, _) = storage_load_bytes32(module);
     let next_slot_fn = storage_next_slot_function(module, compilation_ctx);
+
+    build_accumulate_or_advance_slot(
+        module,
+        "accumulate_or_advance_slot_read",
+        move |then, slot_ptr| {
+            // Advance the slot
+            then.local_get(slot_ptr)
+                .call(next_slot_fn)
+                .local_tee(slot_ptr);
+
+            // Load the slot data from storage
+            then.i32_const(DATA_SLOT_DATA_PTR_OFFSET).call(storage_load);
+        },
+    )
+}
+
+/// Emits a WASM function that maintains a 32-byte storage slot accumulator for WRITE flows.
+///
+/// Behavior:
+/// - If `slot_offset + field_size` exceeds 32, it caches the current slot to storage,
+///   clears the data buffer, advances to the next slot, and sets `slot_offset = field_size`.
+/// - Otherwise, it accumulates: `slot_offset += field_size`.
+///
+/// Arguments:
+/// - `slot_ptr: i32`: Pointer to the slot.
+/// - `slot_offset: i32`: Offset in the current slot.
+/// - `field_size: i32`: Size of the field in bytes.
+///
+/// Returns:
+/// - `i32`: The new slot offset after advancing or accumulating.
+pub fn accumulate_or_advance_slot_write(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let (storage_cache_fn, _) = storage_cache_bytes32(module);
+    let next_slot_fn = storage_next_slot_function(module, compilation_ctx);
+
+    build_accumulate_or_advance_slot(
+        module,
+        "accumulate_or_advance_slot_write",
+        move |then, slot_ptr| {
+            // Cache the slot data to storage
+            then.local_get(slot_ptr)
+                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                .call(storage_cache_fn);
+
+            // Wipe the slot data so we can write on it safely
+            then.i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                .i32_const(0)
+                .i32_const(32)
+                .memory_fill(compilation_ctx.memory_id);
+
+            // Advance the slot pointer
+            then.local_get(slot_ptr)
+                .call(next_slot_fn)
+                .local_set(slot_ptr);
+        },
+    )
+}
+
+/// Internal template used by the read/write/delete variants.
+///
+/// This helper encapsulates the common logic of deciding whether to accumulate within the current
+/// 32-byte slot or advance to the next slot. It accepts a small closure (`mode_builder`) that emits
+/// the mode-specific instructions executed when an advance is required (the "then" arm).
+///
+/// Template behavior:
+/// - If `slot_offset + field_size > 32`:
+///   - Executes the `mode_builder` closure to perform mode-specific actions (e.g., cache/clear/advance).
+///   - Sets `slot_offset = field_size`.
+/// - Else:
+///   - Sets `slot_offset = slot_offset + field_size`.
+///
+/// The generated function has signature:
+///   (slot_ptr: i32, slot_offset: i32, field_size: i32) -> i32 (new slot_offset)
+fn build_accumulate_or_advance_slot<F>(
+    module: &mut Module,
+    name: &str,
+    mode_builder: F,
+) -> FunctionId
+where
+    F: FnOnce(&mut walrus::InstrSeqBuilder, walrus::LocalId),
+{
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function.name(name.to_owned()).func_body();
 
     let slot_ptr = module.locals.add(ValType::I32);
     let slot_offset = module.locals.add(ValType::I32);
     let field_size = module.locals.add(ValType::I32);
-    let mode = module.locals.add(ValType::I32);
 
     builder
         .local_get(slot_offset)
@@ -1177,72 +1296,9 @@ pub fn accumulate_or_advance_slot(
         .if_else(
             None,
             |then| {
-                // Check operation mode: 0=write, 1=read, 2=delete
-                then.local_get(mode)
-                    .i32_const(2)
-                    .binop(BinaryOp::I32Eq)
-                    .if_else(
-                        None,
-                        |delete_mode| {
-                            // Mode 2: Delete - wipe slot to zero, then advance
-                            delete_mode
-                                .local_get(slot_ptr)
-                                .i32_const(DATA_ZERO_OFFSET)
-                                .call(storage_cache_fn);
+                // Delegate the mode-specific logic
+                mode_builder(then, slot_ptr);
 
-                            // Advance to next slot
-                            delete_mode
-                                .local_get(slot_ptr)
-                                .call(next_slot_fn)
-                                .local_set(slot_ptr);
-                        },
-                        |read_or_write| {
-                            // Mode 0 (write) or 1 (read)
-                            read_or_write
-                                .local_get(mode)
-                                .i32_const(1)
-                                .binop(BinaryOp::I32Eq)
-                                .if_else(
-                                    None,
-                                    |read_mode| {
-                                        // Mode 1: Read - load next slot data
-                                        read_mode
-                                            .local_get(slot_ptr)
-                                            .call(next_slot_fn)
-                                            .local_set(slot_ptr);
-
-                                        // Load the slot data
-                                        read_mode
-                                            .local_get(slot_ptr)
-                                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                                            .call(storage_load);
-                                    },
-                                    |write_mode| {
-                                        // Mode 0: Write - save previous slot, wipe buffer, advance
-                                        // Save previous slot
-                                        write_mode
-                                            .local_get(slot_ptr)
-                                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                                            .call(storage_cache_fn);
-
-                                        // Wipe the data so it can be filled with new data
-                                        write_mode
-                                            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-                                            .i32_const(0)
-                                            .i32_const(32)
-                                            .memory_fill(compilation_ctx.memory_id);
-
-                                        // Next slot
-                                        write_mode
-                                            .local_get(slot_ptr)
-                                            .call(next_slot_fn)
-                                            .local_set(slot_ptr);
-                                    },
-                                );
-                        },
-                    );
-
-                // Set the slot_offset to the field size
                 then.local_get(field_size).local_set(slot_offset);
             },
             |else_| {
@@ -1257,10 +1313,7 @@ pub fn accumulate_or_advance_slot(
 
     builder.local_get(slot_offset);
 
-    function.finish(
-        vec![slot_ptr, slot_offset, field_size, mode],
-        &mut module.funcs,
-    )
+    function.finish(vec![slot_ptr, slot_offset, field_size], &mut module.funcs)
 }
 
 // The expected slot values were calculated using Remix to ensure the tests are correct.
