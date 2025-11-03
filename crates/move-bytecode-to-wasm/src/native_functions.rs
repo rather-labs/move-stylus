@@ -190,6 +190,7 @@ impl NativeFunction {
         compilation_ctx: &CompilationContext,
         module_id: &ModuleId,
         arguments_types: &[IntermediateType],
+        named_ids: &[IntermediateType],
     ) -> FunctionId {
         let native_fn_name = Self::get_function_name(name, module_id);
 
@@ -217,6 +218,7 @@ impl NativeFunction {
                     function_information,
                     &special_attributes.modifiers,
                     arguments_types,
+                    named_ids,
                 )
             } else {
                 panic!("missing special attributes for external call {module_id}::{name}")
