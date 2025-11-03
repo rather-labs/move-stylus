@@ -244,18 +244,22 @@ pub fn prepare_function_return(
 ///
 /// It processes each argument type, checking if it is an immutable (`IRef`) or mutable (`IMutRef`) reference.
 /// If a reference is detected, the function ensures that the pointer to the referenced data is loaded.
+///
+/// Returns the types extracted from the stack
 pub fn prepare_function_arguments(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     arguments: &[IntermediateType],
     compilation_ctx: &CompilationContext,
     types_stack: &mut TypesStack,
-) -> Result<(), TypesStackError> {
+) -> Result<Vec<IntermediateType>, TypesStackError> {
+    let mut result = Vec::new();
     // Verify that the types currently on the types stack correspond to the expected argument types.
     // Additionally, determine if any of these arguments are references.
     let mut has_ref = false;
     for arg in arguments.iter().rev() {
-        types_stack.pop_expecting(arg)?;
+        let typestack_arg = types_stack.pop_expecting(arg)?;
+        result.insert(0, typestack_arg);
 
         has_ref = has_ref
             || matches!(
@@ -293,5 +297,5 @@ pub fn prepare_function_arguments(
         }
     };
 
-    Ok(())
+    Ok(result)
 }

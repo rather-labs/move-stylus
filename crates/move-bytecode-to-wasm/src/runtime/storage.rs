@@ -1136,6 +1136,99 @@ pub fn add_commit_changes_to_storage_fn(
     function.finish(vec![], &mut module.funcs)
 }
 
+/// Commits changes of storage objests into the storage cache.
+///
+/// # Arguments
+/// - struct_ptr_ref - pointer to a mutable reference of a storage struct
+pub fn cache_storage_object_changes(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    itype: &IntermediateType,
+) -> FunctionId {
+    let name = RuntimeFunction::CacheStorageObjectChanges
+        .get_generic_function_name(compilation_ctx, &[itype]);
+    if let Some(function) = module.funcs.by_name(&name) {
+        return function;
+    }
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
+    let mut builder = function.name(name).func_body();
+    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
+    let locate_struct_fn = RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx));
+
+    // Arguments
+    let struct_ptr_ref = module.locals.add(ValType::I32);
+
+    // Locals
+    let struct_ptr = module.locals.add(ValType::I32);
+    builder
+        .local_get(struct_ptr_ref)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        )
+        .local_tee(struct_ptr);
+
+    // Compute the slot where the struct will be saved
+    builder.call(locate_struct_fn);
+
+    // Check if the object owner is zero
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
+    builder
+        .local_get(struct_ptr)
+        .call(get_struct_owner_fn)
+        .i32_const(32)
+        .call(is_zero_fn);
+
+    builder.if_else(
+        None,
+        |_| {
+            // If the object owner is zero, it means the object was deleted and we don't need to save it
+        },
+        |else_| {
+            let save_in_slot_fn = RuntimeFunction::EncodeAndSaveInStorage.get_generic(
+                module,
+                compilation_ctx,
+                &[itype],
+            );
+
+            // Copy the slot number to a local to avoid overwriting it later
+            let slot_ptr = module.locals.add(ValType::I32);
+            else_
+                .i32_const(32)
+                .call(compilation_ctx.allocator)
+                .local_tee(slot_ptr)
+                .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                .i32_const(32)
+                .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+            // Call the function to delete any recently tto objects within the struct
+            // This needed when pushing objects with the key ability into a vector field of a struct
+            let check_and_delete_struct_tto_fields_fn =
+                RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic(
+                    module,
+                    compilation_ctx,
+                    &[itype],
+                );
+            else_
+                .local_get(struct_ptr)
+                .call(check_and_delete_struct_tto_fields_fn);
+
+            // Save the struct in the slot
+            else_
+                .local_get(struct_ptr)
+                .local_get(slot_ptr)
+                .call(save_in_slot_fn);
+        },
+    );
+
+    function.finish(vec![struct_ptr_ref], &mut module.funcs)
+}
+
 // The expected slot values were calculated using Remix to ensure the tests are correct.
 #[cfg(test)]
 mod tests {
