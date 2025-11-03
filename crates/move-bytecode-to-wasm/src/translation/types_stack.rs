@@ -32,47 +32,33 @@ impl TypesStack {
             });
         };
 
-        // If we find an struct, we don't need to check here if it is a vm handled type or not.
-        // That information is useful for the instruction that will use the struct found in the
-        // types stack.
         match (&ty, expected_type) {
-            (
-                IntermediateType::IStruct {
-                    module_id: ty_module_id,
-                    index: ty_index,
-                    ..
-                },
-                IntermediateType::IStruct {
-                    module_id: ety_module_id,
-                    index: ety_index,
-                    ..
-                },
-            ) if ty_module_id == ety_module_id && ty_index == ety_index => Ok(ty),
-
-            (
-                IntermediateType::IGenericStructInstance {
-                    module_id: ty_module_id,
-                    index: ty_index,
-                    types: ty_types,
-                    ..
-                },
-                IntermediateType::IGenericStructInstance {
-                    module_id: ety_module_id,
-                    index: ety_index,
-                    types: ety_types,
-                    ..
-                },
-            ) if ty_module_id == ety_module_id
-                && ty_index == ety_index
-                && ty_types == ety_types =>
-            {
-                Ok(ty)
+            (IntermediateType::IMutRef(inner_ty), IntermediateType::IMutRef(expected_inner_ty)) => {
+                if Self::check_types_are_equal(inner_ty, expected_inner_ty) {
+                    Ok(ty)
+                } else {
+                    Err(TypesStackError::TypeMismatch {
+                        expected: expected_type.clone(),
+                        found: ty,
+                    })
+                }
             }
-
-            _ if ty != *expected_type => Err(TypesStackError::TypeMismatch {
-                expected: expected_type.clone(),
-                found: ty,
-            }),
+            (IntermediateType::IRef(inner_ty), IntermediateType::IRef(expected_inner_ty)) => {
+                if Self::check_types_are_equal(inner_ty, expected_inner_ty) {
+                    Ok(ty)
+                } else {
+                    Err(TypesStackError::TypeMismatch {
+                        expected: expected_type.clone(),
+                        found: ty,
+                    })
+                }
+            }
+            _ if !Self::check_types_are_equal(&ty, expected_type) => {
+                Err(TypesStackError::TypeMismatch {
+                    expected: expected_type.clone(),
+                    found: ty,
+                })
+            }
 
             _ => Ok(ty),
         }
@@ -91,6 +77,53 @@ impl TypesStack {
         }
 
         Ok(res)
+    }
+
+    /// If we find an struct, we don't need to check here if it is a vm handled type or not.
+    /// That information is useful for the instruction that will use the struct found in the
+    /// types stack.
+    fn check_types_are_equal(
+        actual_type: &IntermediateType,
+        expected_type: &IntermediateType,
+    ) -> bool {
+        match (actual_type, expected_type) {
+            (
+                IntermediateType::IStruct {
+                    module_id: ty_module_id,
+                    index: ty_index,
+                    ..
+                },
+                IntermediateType::IStruct {
+                    module_id: ety_module_id,
+                    index: ety_index,
+                    ..
+                },
+            ) if ty_module_id == ety_module_id && ty_index == ety_index => return true,
+
+            (
+                IntermediateType::IGenericStructInstance {
+                    module_id: ty_module_id,
+                    index: ty_index,
+                    types: ty_types,
+                    ..
+                },
+                IntermediateType::IGenericStructInstance {
+                    module_id: ety_module_id,
+                    index: ety_index,
+                    types: ety_types,
+                    ..
+                },
+            ) if ty_module_id == ety_module_id
+                && ty_index == ety_index
+                && ty_types == ety_types =>
+            {
+                return true;
+            }
+
+            _ => (),
+        }
+
+        actual_type == expected_type
     }
 }
 

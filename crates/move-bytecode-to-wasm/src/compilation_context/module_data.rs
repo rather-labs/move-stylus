@@ -803,6 +803,13 @@ impl ModuleData {
             .ok_or(CompilationContextError::SignatureNotFound(index))
     }
 
+    /// Returns `true` if the function is used as a cross contract call
+    pub fn is_external_call(&self, function_identifier: &str) -> bool {
+        self.special_attributes
+            .external_calls
+            .contains_key(function_identifier)
+    }
+
     // The init() function is a special function that is called once when the module is first deployed,
     // so it is a good place to put the code that initializes module's objects and sets up the environment and configuration.
     //
