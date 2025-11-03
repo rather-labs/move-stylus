@@ -28,7 +28,7 @@ use external_call::{
 use function_modifiers::{Function, FunctionModifier};
 use move_compiler::{
     Compiler, PASS_PARSER,
-    diagnostics::{Diagnostic, Diagnostics, report_diagnostics},
+    diagnostics::{Diagnostics, report_diagnostics},
     parser::ast::{Definition, ModuleMember},
     shared::{Identifier, NumericalAddress},
 };

@@ -1,18 +1,20 @@
 use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
-use compilation_context::{ModuleData, ModuleId};
+use compilation_context::{CompilationContextError, ModuleData, ModuleId};
 use constructor::inject_constructor;
 use move_binary_format::file_format::FunctionDefinition;
 use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
-    source_package::parsed_manifest::PackageName,
+    source_package::parsed_manifest::{Dependencies, PackageName},
 };
+use move_parse_special_attributes::{SpecialAttributeError, process_special_attributes};
 use std::{collections::HashMap, path::Path};
 use translation::{
     intermediate_types::IntermediateType,
     table::{FunctionId, FunctionTable},
     translate_function,
 };
+use vm_handled_types::VmHandledType;
 
 use walrus::{GlobalId, Module, RefType};
 use wasm_validation::validate_stylus_wasm;
@@ -40,27 +42,48 @@ mod wasm_validation;
 #[cfg(feature = "inject-host-debug-fns")]
 use walrus::ValType;
 
+#[derive(thiserror::Error, Debug)]
+pub enum CompilationError {
+    #[error(
+        "An internal compiler error has ocurred. If this keeps happening, please open an issue in\n<gh url>"
+    )]
+    ICE(#[from] ICEError),
+
+    #[error("an internal compiler error has ocurred")]
+    CodeError(Vec<CodeError>),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum CodeError {
+    #[error("an special attributes error ocured")]
+    SpecialAttributesError(#[from] SpecialAttributeError),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum ICEError {
+    #[error("an error ocurred processing the compilation context")]
+    CompilationContext(#[from] CompilationContextError),
+}
+
 #[cfg(test)]
 mod test_tools;
 
 pub type GlobalFunctionTable<'move_package> =
     HashMap<FunctionId, &'move_package FunctionDefinition>;
 
-pub fn translate_single_module(package: CompiledPackage, module_name: &str) -> Module {
-    let mut modules = translate_package(package, Some(module_name.to_string()));
+pub fn translate_single_module(
+    package: CompiledPackage,
+    module_name: &str,
+) -> Result<Module, CompilationError> {
+    let mut modules = translate_package(package, Some(module_name.to_string()))?;
 
-    modules.remove(module_name).expect("Module not compiled")
-}
-
-pub enum CompilationError {
-    ICE,
-    CodeError,
+    Ok(modules.remove(module_name).expect("Module not compiled"))
 }
 
 pub fn translate_package(
     package: CompiledPackage,
     module_name: Option<String>,
-) -> HashMap<String, Module> {
+) -> Result<HashMap<String, Module>, CompilationError> {
     let root_compiled_units: Vec<CompiledUnitWithSource> = if let Some(module_name) = module_name {
         package
             .root_compiled_units
@@ -84,6 +107,8 @@ pub fn translate_package(
     // Contains all a reference for all functions definitions in case we need to process them and
     // statically link them
     let mut function_definitions: GlobalFunctionTable = HashMap::new();
+
+    let mut errors = Vec::new();
 
     // TODO: a lot of clones, we must create a symbol pool
     for root_compiled_module in &root_compiled_units {
@@ -123,13 +148,24 @@ pub fn translate_package(
             &mut function_definitions,
         );
 
+        let special_attributes = match process_special_attributes(&root_compiled_module.source_path)
+        {
+            Ok(sa) => sa,
+            Err(e) => {
+                errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
+                continue;
+            }
+        };
+
         let root_module_data = ModuleData::build_module_data(
             root_module_id.clone(),
             root_compiled_module,
             &package.deps_compiled_units,
             &root_compiled_units,
             &mut function_definitions,
-        );
+            special_attributes,
+        )
+        .map_err(|e| CompilationError::ICE(e.into()))?;
 
         let compilation_ctx =
             CompilationContext::new(&root_module_data, &modules_data, memory_id, allocator_func);
@@ -185,15 +221,23 @@ pub fn translate_package(
         modules_data.insert(root_module_id.clone(), root_module_data);
     }
 
-    modules
+    if errors.is_empty() {
+        Ok(modules)
+    } else {
+        Err(CompilationError::CodeError(errors))
+    }
 }
 
-pub fn translate_package_cli(package: CompiledPackage, rerooted_path: &Path) {
+pub fn translate_package_cli(
+    package: CompiledPackage,
+    rerooted_path: &Path,
+) -> Result<(), CompilationError> {
     let build_directory = rerooted_path.join("build/wasm");
     // Create the build directory if it doesn't exist
     std::fs::create_dir_all(&build_directory).unwrap();
 
-    let mut modules = translate_package(package, None);
+    let mut modules = translate_package(package, None)?;
+
     for (module_name, module) in modules.iter_mut() {
         module
             .emit_wasm_file(build_directory.join(format!("{}.wasm", module_name)))
@@ -207,6 +251,8 @@ pub fn translate_package_cli(package: CompiledPackage, rerooted_path: &Path) {
         )
         .expect("Failed to write WAT file");
     }
+
+    Ok(())
 }
 
 /// This functions process the dependency tree for the root module.
@@ -218,7 +264,8 @@ pub fn process_dependency_tree<'move_package>(
     root_compiled_units: &'move_package [CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
     function_definitions: &mut GlobalFunctionTable<'move_package>,
-) {
+) -> Result<(), CompilationError> {
+    let mut errors = Vec::new();
     for dependency in dependencies {
         let module_id = ModuleId {
             module_name: dependency.name().to_string(),
@@ -243,15 +290,32 @@ pub fn process_dependency_tree<'move_package>(
 
         let immediate_dependencies = &dependency_module.unit.module.immediate_dependencies();
         // If the the dependency has dependency, we process them first
-        if !immediate_dependencies.is_empty() {
+        let dependencies_process_result = if !immediate_dependencies.is_empty() {
             process_dependency_tree(
                 dependencies_data,
                 deps_compiled_units,
                 root_compiled_units,
                 immediate_dependencies,
                 function_definitions,
-            );
+            )
+        } else {
+            Ok(())
+        };
+
+        if let Err(dependencies_errors) = dependencies_process_result {
+            match dependencies_errors {
+                CompilationError::ICE(ice_error) => return Err(CompilationError::ICE(ice_error)),
+                CompilationError::CodeError(code_errors) => errors.extend(code_errors),
+            }
         }
+
+        let special_attributes = match process_special_attributes(&dependency_module.source_path) {
+            Ok(sa) => sa,
+            Err(e) => {
+                errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
+                continue;
+            }
+        };
 
         let dependency_module_data = ModuleData::build_module_data(
             module_id.clone(),
@@ -259,7 +323,9 @@ pub fn process_dependency_tree<'move_package>(
             deps_compiled_units,
             root_compiled_units,
             function_definitions,
-        );
+            special_attributes,
+        )
+        .map_err(|e| CompilationError::ICE(e.into()))?;
 
         let processed_dependency = dependencies_data.insert(module_id, dependency_module_data);
 
@@ -267,6 +333,12 @@ pub fn process_dependency_tree<'move_package>(
             processed_dependency.is_none(),
             "processed the same dep twice in different contexts"
         );
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(CompilationError::CodeError(errors))
     }
 }
 

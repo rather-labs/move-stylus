@@ -33,7 +33,7 @@ use move_package::{
     compilation::compiled_package::CompiledUnitWithSource,
     source_package::parsed_manifest::PackageName,
 };
-use move_parse_special_attributes::{SpecialAttributes, process_special_attributes};
+use move_parse_special_attributes::SpecialAttributes;
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -154,9 +154,8 @@ impl ModuleData {
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
         root_compiled_units: &'move_package [CompiledUnitWithSource],
         function_definitions: &mut GlobalFunctionTable<'move_package>,
-    ) -> Self {
-        let special_attributes = process_special_attributes(&move_module.source_path).unwrap();
-
+        special_attributes: SpecialAttributes,
+    ) -> Result<Self> {
         let move_module_unit = &move_module.unit.module;
 
         let datatype_handles_map = Self::process_datatype_handles(
@@ -220,7 +219,7 @@ impl ModuleData {
             .collect::<std::result::Result<Vec<Vec<IntermediateType>>, _>>()
             .unwrap();
 
-        ModuleData {
+        Ok(ModuleData {
             id: module_id,
             constants: move_module_unit.constant_pool.clone(), // TODO: Clone
             functions,
@@ -229,7 +228,7 @@ impl ModuleData {
             signatures,
             datatype_handles_map,
             special_attributes,
-        }
+        })
     }
 
     fn process_datatype_handles(
