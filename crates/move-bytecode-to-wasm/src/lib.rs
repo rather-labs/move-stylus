@@ -270,8 +270,9 @@ pub fn process_dependency_tree<'move_package>(
         };
         // If the HashMap contains the key, we already processed that dependency
         if !dependencies_data.contains_key(&module_id) {
-            println!("└ \x1B[1m\x1B[32mPROCESSING DEPENDENCY\x1B[0m {module_id}");
+            // println!("  \x1B[1m\x1B[32mPROCESSING DEPENDENCY\x1B[0m {module_id}");
         } else {
+            // println!("  \x1B[1m\x1B[32mPROCESSING DEPENDENCY\x1B[0m {module_id} [cached]");
             continue;
         }
 
