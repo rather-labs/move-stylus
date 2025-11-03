@@ -816,6 +816,6 @@ pub fn add_decode_intermediate_type_instructions(
                 inner_,
             );
         }
-        _ => todo!(),
+        _ => panic!("Found unexpected IntermediateType in decoding: {itype:?}"),
     };
 }

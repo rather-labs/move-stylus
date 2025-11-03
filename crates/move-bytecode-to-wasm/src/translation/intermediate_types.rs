@@ -477,8 +477,8 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot copy a type parameter, expected a concrete type");
             }
-            IntermediateType::IEnum { index, .. } => {
-                let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
+            IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
+                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self).unwrap();
                 builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -489,7 +489,6 @@ impl IntermediateType {
                 );
                 enum_.copy_local_instructions(module, builder, compilation_ctx, module_data);
             }
-            IntermediateType::IGenericEnumInstance { .. } => todo!(),
         }
     }
 
@@ -1007,8 +1006,8 @@ impl IntermediateType {
                     .instantiate(types)
                     .equality(builder, module, compilation_ctx, module_data)
             }
-            Self::IEnum { index, .. } => {
-                let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
+            Self::IEnum { .. } | Self::IGenericEnumInstance { .. } => {
+                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self).unwrap();
                 enum_.equality(builder, module, compilation_ctx, module_data);
             }
             Self::IRef(inner) | Self::IMutRef(inner) => {
@@ -1098,7 +1097,6 @@ impl IntermediateType {
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot compare a type parameter, expected a concrete type");
             }
-            IntermediateType::IGenericEnumInstance { .. } => todo!(),
         }
     }
 
