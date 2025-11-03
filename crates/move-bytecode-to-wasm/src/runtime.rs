@@ -73,13 +73,10 @@ pub enum RuntimeFunction {
     DeleteTtoObject,
     GetStructOwner,
     CommitChangesToStorage,
-<<<<<<< HEAD
     AccumulateOrAdvanceSlotDelete,
     AccumulateOrAdvanceSlotRead,
     AccumulateOrAdvanceSlotWrite,
-=======
     CacheStorageObjectChanges,
->>>>>>> 38aaff4 (fix: persist storage changes between delegate calls (#180))
     // ASCII conversion
     U64ToAsciiBase10,
 }
@@ -142,13 +139,10 @@ impl RuntimeFunction {
             Self::GetStructOwner => "get_struct_owner",
             Self::U64ToAsciiBase10 => "u64_to_ascii_base_10",
             Self::CommitChangesToStorage => "commit_changes_to_storage",
-<<<<<<< HEAD
             Self::AccumulateOrAdvanceSlotDelete => "accumulate_or_advance_slot_delete",
             Self::AccumulateOrAdvanceSlotRead => "accumulate_or_advance_slot_read",
             Self::AccumulateOrAdvanceSlotWrite => "accumulate_or_advance_slot_write",
-=======
             Self::CacheStorageObjectChanges => "cache_storage_object_changes",
->>>>>>> 38aaff4 (fix: persist storage changes between delegate calls (#180))
         }
     }
 
