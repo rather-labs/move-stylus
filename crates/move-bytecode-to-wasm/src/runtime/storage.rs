@@ -1314,6 +1314,7 @@ where
     builder.local_get(slot_offset);
 
     function.finish(vec![slot_ptr, slot_offset, field_size], &mut module.funcs)
+}
 /// Commits changes of storage objests into the storage cache.
 ///
 /// # Arguments
