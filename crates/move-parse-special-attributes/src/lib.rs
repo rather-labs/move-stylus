@@ -28,7 +28,6 @@ use external_call::{
 use function_modifiers::{Function, FunctionModifier};
 use move_compiler::{
     Compiler, PASS_PARSER,
-    diagnostics::{Diagnostics, report_diagnostics},
     parser::ast::{Definition, ModuleMember},
     shared::{Identifier, NumericalAddress},
 };
@@ -41,7 +40,7 @@ use struct_modifiers::StructModifier;
 pub fn process_special_attributes(
     path: &Path,
 ) -> Result<SpecialAttributes, Vec<SpecialAttributeError>> {
-    let (mapped_files, program_res) = Compiler::from_files(
+    let (_mapped_files, program_res) = Compiler::from_files(
         None,
         vec![path.to_str().unwrap()],
         Vec::new(),
@@ -180,13 +179,6 @@ pub fn process_special_attributes(
     }
 
     if found_error {
-        /*
-        let mut diagnostics = Diagnostics::new();
-        for error in &module_errors {
-            diagnostics.add(error.into());
-        }
-        report_diagnostics(&mapped_files, diagnostics);
-        */
         Err(module_errors)
     } else {
         Ok(result)

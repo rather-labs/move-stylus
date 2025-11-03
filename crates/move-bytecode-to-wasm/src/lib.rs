@@ -132,7 +132,10 @@ pub fn translate_package(
                         kind: CompilationErrorKind::ICE(ice_error),
                     });
                 }
-                CompilationErrorKind::CodeError(code_errors) => errors.extend(code_errors),
+                CompilationErrorKind::CodeError(code_errors) => {
+                    errors.extend(code_errors);
+                    continue;
+                }
             }
         }
 
@@ -301,7 +304,10 @@ pub fn process_dependency_tree<'move_package>(
                 CompilationErrorKind::ICE(ice_error) => {
                     return Err(CompilationErrorKind::ICE(ice_error));
                 }
-                CompilationErrorKind::CodeError(code_errors) => errors.extend(code_errors),
+                CompilationErrorKind::CodeError(code_errors) => {
+                    errors.extend(code_errors);
+                    continue;
+                }
             }
         }
 
