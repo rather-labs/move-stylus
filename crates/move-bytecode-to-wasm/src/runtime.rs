@@ -73,9 +73,13 @@ pub enum RuntimeFunction {
     DeleteTtoObject,
     GetStructOwner,
     CommitChangesToStorage,
+<<<<<<< HEAD
     AccumulateOrAdvanceSlotDelete,
     AccumulateOrAdvanceSlotRead,
     AccumulateOrAdvanceSlotWrite,
+=======
+    CacheStorageObjectChanges,
+>>>>>>> 38aaff4 (fix: persist storage changes between delegate calls (#180))
     // ASCII conversion
     U64ToAsciiBase10,
 }
@@ -138,9 +142,13 @@ impl RuntimeFunction {
             Self::GetStructOwner => "get_struct_owner",
             Self::U64ToAsciiBase10 => "u64_to_ascii_base_10",
             Self::CommitChangesToStorage => "commit_changes_to_storage",
+<<<<<<< HEAD
             Self::AccumulateOrAdvanceSlotDelete => "accumulate_or_advance_slot_delete",
             Self::AccumulateOrAdvanceSlotRead => "accumulate_or_advance_slot_read",
             Self::AccumulateOrAdvanceSlotWrite => "accumulate_or_advance_slot_write",
+=======
+            Self::CacheStorageObjectChanges => "cache_storage_object_changes",
+>>>>>>> 38aaff4 (fix: persist storage changes between delegate calls (#180))
         }
     }
 
@@ -340,6 +348,17 @@ impl RuntimeFunction {
                 );
 
                 storage::add_delete_tto_object_fn(module, compilation_ctx, generics[0])
+            }
+            Self::CacheStorageObjectChanges => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {} expected 1 type parameter, found {}",
+                    self.name(),
+                    generics.len(),
+                );
+
+                storage::cache_storage_object_changes(module, compilation_ctx, generics[0])
             }
             _ => panic!(
                 r#"there was an error linking "{}" runtime function, is this function generic?"#,

@@ -17,6 +17,9 @@ sol!(
         function read(bytes32 id) public view returns (uint64);
         function logicAddress(bytes32 id) public view returns (address);
         function changeLogic(bytes32 id, address logic_address) public view;
+        function incrementModifyBefore(bytes32 id) public view;
+        function incrementModifyAfter(bytes32 id) public view;
+        function incrementModifyBeforeAfter(bytes32 id) public view;
         function increment(bytes32 id) public view;
         function setValue(bytes32 id, uint64 value) public view;
     }
@@ -78,7 +81,8 @@ async fn main() -> eyre::Result<()> {
     println!("counter = {}", res);
 
     println!("==============================================================================");
-    println!("Executing increment and setValue on logic contract {address_logic_1}");
+    println!("Executing increment and setValue on logic contract:");
+    println!("{address_logic_1}");
     println!("==============================================================================");
 
     println!("\nReading value before increment");
@@ -112,6 +116,45 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nSending increment tx");
     let pending_tx = example.increment(counter_id).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("increment logs 0: 0x{}", hex::encode(raw));
+    }
+
+    println!("\nReading value after increment");
+    let res = example.read(counter_id).call().await?;
+    println!("counter = {}", res);
+
+    println!("\nSending increment BEFORE tx (shuld increment by 10 and 1)");
+    let pending_tx = example.incrementModifyBefore(counter_id).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("increment logs 0: 0x{}", hex::encode(raw));
+    }
+
+    println!("\nReading value after increment");
+    let res = example.read(counter_id).call().await?;
+    println!("counter = {}", res);
+
+    println!("\nSending increment AFTER tx (shuld increment by 20 and 1)");
+    let pending_tx = example.incrementModifyAfter(counter_id).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("increment logs 0: 0x{}", hex::encode(raw));
+    }
+
+    println!("\nReading value after increment");
+    let res = example.read(counter_id).call().await?;
+    println!("counter = {}", res);
+
+    println!("\nSending increment BEFORE And AFTER tx (shuld increment by 10, 1, and 20)");
+    let pending_tx = example
+        .incrementModifyBeforeAfter(counter_id)
+        .send()
+        .await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
@@ -154,7 +197,8 @@ async fn main() -> eyre::Result<()> {
     println!("counter = {}", res);
 
     println!("==============================================================================");
-    println!(" Changing contract logic from {address_logic_1} to {address_logic_2}");
+    println!(" Changing contract logic from {address_logic_1}");
+    println!(" to {address_logic_2}");
     println!("==============================================================================\n");
     let pending_tx = example
         .changeLogic(counter_id, address_logic_2)
@@ -163,7 +207,8 @@ async fn main() -> eyre::Result<()> {
     let _receipt = pending_tx.get_receipt().await?;
 
     println!("==============================================================================");
-    println!("Executing increment and setValue on logic contract {address_logic_2}");
+    println!(" Executing increment and setValue on logic contract:");
+    println!(" {address_logic_2}");
     println!("==============================================================================");
 
     println!("\nReading value before increment");
@@ -183,7 +228,7 @@ async fn main() -> eyre::Result<()> {
     let res = example.read(counter_id).call().await?;
     println!("counter = {}", res);
 
-    println!("\nSetting counter to number 42");
+    println!("\nSetting counter to number 42 (should set 42*2)");
     let pending_tx = example.setValue(counter_id, 42).send().await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
@@ -197,6 +242,45 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nSending increment tx");
     let pending_tx = example.increment(counter_id).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("increment logs 0: 0x{}", hex::encode(raw));
+    }
+
+    println!("\nReading value after increment");
+    let res = example.read(counter_id).call().await?;
+    println!("counter = {}", res);
+
+    println!("\nSending increment BEFORE tx (shuld increment by 10 and 2)");
+    let pending_tx = example.incrementModifyBefore(counter_id).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("increment logs 0: 0x{}", hex::encode(raw));
+    }
+
+    println!("\nReading value after increment");
+    let res = example.read(counter_id).call().await?;
+    println!("counter = {}", res);
+
+    println!("\nSending increment AFTER tx (shuld increment by 20 and 2)");
+    let pending_tx = example.incrementModifyAfter(counter_id).send().await?;
+    let receipt = pending_tx.get_receipt().await?;
+    for log in receipt.logs() {
+        let raw = log.data().data.0.clone();
+        println!("increment logs 0: 0x{}", hex::encode(raw));
+    }
+
+    println!("\nReading value after increment");
+    let res = example.read(counter_id).call().await?;
+    println!("counter = {}", res);
+
+    println!("\nSending increment BEFORE And AFTER tx (shuld increment by 10, 2, and 20)");
+    let pending_tx = example
+        .incrementModifyBeforeAfter(counter_id)
+        .send()
+        .await?;
     let receipt = pending_tx.get_receipt().await?;
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();

@@ -33,6 +33,37 @@ entry fun increment(counter: &mut Counter) {
     assert!(res.succeded(), 33);
 }
 
+entry fun increment_modify_before(counter: &mut Counter) {
+    counter.value = counter.value + 10;
+    let delegated_counter = dci::new(
+        contract_calls::new(counter.contract_address)
+            .delegate()
+    );
+    let res = delegated_counter.increment(&mut counter.id);
+    assert!(res.succeded(), 33);
+}
+
+entry fun increment_modify_after(counter: &mut Counter) {
+    let delegated_counter = dci::new(
+        contract_calls::new(counter.contract_address)
+            .delegate()
+    );
+    let res = delegated_counter.increment(&mut counter.id);
+    assert!(res.succeded(), 33);
+    counter.value = counter.value + 20;
+}
+
+entry fun increment_modify_before_after(counter: &mut Counter) {
+    counter.value = counter.value + 10;
+    let delegated_counter = dci::new(
+        contract_calls::new(counter.contract_address)
+            .delegate()
+    );
+    let res = delegated_counter.increment(&mut counter.id);
+    assert!(res.succeded(), 33);
+    counter.value = counter.value + 20;
+}
+
 /// Read counter.
 entry fun read(counter: &Counter): u64 {
     counter.value

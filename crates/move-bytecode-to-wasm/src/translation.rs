@@ -37,9 +37,10 @@ use crate::{
             STYLUS_FRAMEWORK_ADDRESS,
         },
     },
-    data::{DATA_ABORT_MESSAGE_PTR_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET},
+    data::DATA_ABORT_MESSAGE_PTR_OFFSET,
     error_encoding::build_error_message,
     generics::{replace_type_parameters, type_contains_generics},
+    hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
     runtime::RuntimeFunction,
     vm_handled_types::{self, VmHandledType, named_id::NamedId, uid::Uid},
@@ -57,6 +58,7 @@ use intermediate_types::{
     IntermediateType, VmHandledStruct,
     heap_integers::{IU128, IU256},
     simple_integers::{IU8, IU16, IU32, IU64},
+    structs::IStruct,
     vector::IVector,
 };
 
@@ -982,7 +984,7 @@ fn translate_instruction(
 
                 builder.call(delete_fn);
             } else {
-                prepare_function_arguments(
+                let argument_types = prepare_function_arguments(
                     module,
                     builder,
                     arguments,
@@ -1006,12 +1008,39 @@ fn translate_instruction(
                 // and linking
                 // If the function IS native, we link it and call it directly
                 else if function_information.is_native {
-                    let native_function_id = NativeFunction::get(
-                        &function_id.identifier,
-                        module,
-                        compilation_ctx,
-                        &function_information.function_id.module_id,
-                    );
+                    let native_function_module = compilation_ctx
+                        .get_module_data_by_id(&function_information.function_id.module_id)?;
+
+                    // If the function is a call to another contract, we save the state of the
+                    // storage objects before calling it
+                    let native_function_id =
+                        if native_function_module.is_external_call(&function_id.identifier) {
+                            add_cache_storage_object_instructions(
+                                module,
+                                builder,
+                                compilation_ctx,
+                                &mapped_function.signature.arguments,
+                                function_locals,
+                            );
+                            let (flush_cache_fn, _) = storage_flush_cache(module);
+                            builder.i32_const(1).call(flush_cache_fn);
+
+                            NativeFunction::get_external_call(
+                                &function_id.identifier,
+                                module,
+                                compilation_ctx,
+                                &function_information.function_id.module_id,
+                                &argument_types,
+                            )
+                        } else {
+                            NativeFunction::get(
+                                &function_id.identifier,
+                                module,
+                                compilation_ctx,
+                                &function_information.function_id.module_id,
+                            )
+                        };
+
                     builder.call(native_function_id);
                 } else {
                     let table_id = function_table.get_table_id();
@@ -1180,6 +1209,7 @@ fn translate_instruction(
         Bytecode::CopyLoc(local_id) => {
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
+            println!("LOCAL TYPE {local_type:?}");
             local_type.copy_local_instructions(
                 module,
                 builder,
@@ -1226,6 +1256,13 @@ fn translate_instruction(
 
             let field_type =
                 bytecodes::structs::borrow_field(struct_, field_id, builder, compilation_ctx);
+            let field_type = struct_field_borrow_add_storage_id_parent_information(
+                field_type,
+                compilation_ctx,
+                struct_,
+                module_data,
+            );
+
             types_stack.push(IntermediateType::IRef(Box::new(field_type)));
         }
         Bytecode::ImmBorrowFieldGeneric(field_id) => {
@@ -1290,6 +1327,13 @@ fn translate_instruction(
                 compilation_ctx,
             );
             let field_type = replace_type_parameters(&field_type, &instantiation_types);
+            let field_type = struct_field_borrow_add_storage_id_parent_information(
+                field_type,
+                compilation_ctx,
+                &struct_,
+                module_data,
+            );
+
             types_stack.push(IntermediateType::IRef(Box::new(field_type)));
         }
         Bytecode::MutBorrowField(field_id) => {
@@ -1306,6 +1350,13 @@ fn translate_instruction(
 
             let field_type =
                 bytecodes::structs::mut_borrow_field(struct_, field_id, builder, compilation_ctx);
+            let field_type = struct_field_borrow_add_storage_id_parent_information(
+                field_type,
+                compilation_ctx,
+                struct_,
+                module_data,
+            );
+
             types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
         }
         Bytecode::MutBorrowFieldGeneric(field_id) => {
@@ -1359,6 +1410,12 @@ fn translate_instruction(
             );
 
             let field_type = replace_type_parameters(&field_type, &instantiation_types);
+            let field_type = struct_field_borrow_add_storage_id_parent_information(
+                field_type,
+                compilation_ctx,
+                &struct_,
+                module_data,
+            );
 
             types_stack.push(IntermediateType::IMutRef(Box::new(field_type)));
         }
@@ -1732,92 +1789,13 @@ fn translate_instruction(
             //
             // We expect that the owner address is just right before the pointer
             if mapped_function.is_entry {
-                for (arg_index, fn_arg) in mapped_function.signature.arguments.iter().enumerate() {
-                    let (itype, struct_) = match fn_arg {
-                        IntermediateType::IMutRef(inner) => (
-                            &**inner,
-                            compilation_ctx.get_struct_by_intermediate_type(inner),
-                        ),
-                        t => (fn_arg, compilation_ctx.get_struct_by_intermediate_type(t)),
-                    };
-
-                    if let Ok(struct_) = struct_ {
-                        if struct_.has_key {
-                            let get_struct_owner_fn =
-                                RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
-
-                            let locate_struct_fn = RuntimeFunction::LocateStructSlot
-                                .get(module, Some(compilation_ctx));
-
-                            let struct_ptr = module.locals.add(ValType::I32);
-                            builder
-                                .local_get(function_locals[arg_index])
-                                .load(
-                                    compilation_ctx.memory_id,
-                                    LoadKind::I32 { atomic: false },
-                                    MemArg {
-                                        align: 0,
-                                        offset: 0,
-                                    },
-                                )
-                                .local_tee(struct_ptr);
-
-                            // Compute the slot where the struct will be saved
-                            builder.call(locate_struct_fn);
-
-                            // Check if the object owner is zero
-                            let is_zero_fn =
-                                RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
-                            builder
-                                .local_get(struct_ptr)
-                                .call(get_struct_owner_fn)
-                                .i32_const(32)
-                                .call(is_zero_fn);
-
-                            builder.if_else(
-                                None,
-                                |_| {
-                                    // If the object owner is zero, it means the object was deleted and we don't need to save it
-                                },
-                                |else_| {
-                                    let save_in_slot_fn = RuntimeFunction::EncodeAndSaveInStorage
-                                        .get_generic(module, compilation_ctx, &[itype]);
-
-                                    // Copy the slot number to a local to avoid overwriting it later
-                                    let slot_ptr = module.locals.add(ValType::I32);
-                                    else_
-                                        .i32_const(32)
-                                        .call(compilation_ctx.allocator)
-                                        .local_tee(slot_ptr)
-                                        .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                                        .i32_const(32)
-                                        .memory_copy(
-                                            compilation_ctx.memory_id,
-                                            compilation_ctx.memory_id,
-                                        );
-
-                                    // Call the function to delete any recently tto objects within the struct
-                                    // This needed when pushing objects with the key ability into a vector field of a struct
-                                    let check_and_delete_struct_tto_fields_fn =
-                                        RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic(
-                                            module,
-                                            compilation_ctx,
-                                            &[itype],
-                                        );
-                                    else_
-                                        .local_get(struct_ptr)
-                                        .call(check_and_delete_struct_tto_fields_fn);
-
-                                    // Save the struct in the slot
-                                    else_
-                                        .local_get(struct_ptr)
-                                        .local_get(slot_ptr)
-                                        .call(save_in_slot_fn);
-                                },
-                            );
-                        }
-                    }
-                }
+                add_cache_storage_object_instructions(
+                    module,
+                    builder,
+                    compilation_ctx,
+                    &mapped_function.signature.arguments,
+                    function_locals,
+                );
             }
 
             prepare_function_return(
@@ -3001,4 +2979,98 @@ pub fn add_field_borrow_mut_global_var_instructions(
     builder.local_get(field_value_ref_ptr);
 
     Ok(())
+}
+
+/// This function saves into the storage cache all the changes made to the storage objects of the
+/// executing function.
+/// This is used in two situations:
+/// - at the end of a an entry function.
+/// - right before a delegate call.
+///
+/// This function does not flush the cache. That must be done manually depending on the context.
+fn add_cache_storage_object_instructions(
+    module: &mut Module,
+    builder: &mut InstrSeqBuilder,
+    compilation_ctx: &CompilationContext,
+    function_argumets: &[IntermediateType],
+    function_locals: &[LocalId],
+) {
+    let object_to_cache = function_argumets
+        .iter()
+        .enumerate()
+        .filter_map(|(arg_index, fn_arg)| {
+            let (itype, struct_) = match fn_arg {
+                IntermediateType::IMutRef(inner) => (
+                    &**inner,
+                    compilation_ctx.get_struct_by_intermediate_type(inner),
+                ),
+                t => (fn_arg, compilation_ctx.get_struct_by_intermediate_type(t)),
+            };
+
+            if let Ok(struct_) = struct_ {
+                if struct_.has_key {
+                    Some((itype, function_locals[arg_index]))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        });
+
+    for (itype, wasm_local_var) in object_to_cache {
+        let cache_storage_object_changes_fn = RuntimeFunction::CacheStorageObjectChanges
+            .get_generic(module, compilation_ctx, &[itype]);
+
+        builder
+            .local_get(wasm_local_var)
+            .call(cache_storage_object_changes_fn);
+    }
+}
+
+/// This function checks if the field we are borrowing from struct is a UID or NamedId. If we are
+/// borrowing an ID, then we add the information about the parent struct that contains such ID.
+///
+/// This information is used in contexts where we only have the UID and we need to know from which
+/// struct is coming from
+fn struct_field_borrow_add_storage_id_parent_information(
+    field_type: IntermediateType,
+    compilation_ctx: &CompilationContext,
+    struct_: &IStruct,
+    module_data: &ModuleData,
+) -> IntermediateType {
+    // If we borrow a UID, we fill the typestack with the parent struct information
+    match &field_type {
+        IntermediateType::IStruct {
+            module_id,
+            index,
+            vm_handled_struct: VmHandledStruct::None,
+        } if Uid::is_vm_type(module_id, *index, compilation_ctx) => IntermediateType::IStruct {
+            module_id: module_id.clone(),
+            index: *index,
+            vm_handled_struct: VmHandledStruct::StorageId {
+                parent_module_id: module_data.id.clone(),
+                parent_index: struct_.index(),
+                instance_types: None,
+            },
+        },
+        IntermediateType::IGenericStructInstance {
+            module_id,
+            index,
+            types,
+            vm_handled_struct: VmHandledStruct::None,
+        } if NamedId::is_vm_type(module_id, *index, compilation_ctx) => {
+            IntermediateType::IGenericStructInstance {
+                module_id: module_id.clone(),
+                index: *index,
+                types: types.clone(),
+                vm_handled_struct: VmHandledStruct::StorageId {
+                    parent_module_id: module_data.id.clone(),
+                    parent_index: struct_.index(),
+                    instance_types: None,
+                },
+            }
+        }
+        _ => field_type,
+    }
 }
