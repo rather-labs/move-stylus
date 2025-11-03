@@ -2,12 +2,19 @@ use crate::{
     CompilationContext,
     runtime::RuntimeFunction,
     translation::TranslationError,
-    translation::intermediate_types::{IntermediateType, enums::IEnum, structs::IStruct},
+    translation::intermediate_types::{IntermediateType, enums::IEnum},
 };
 use walrus::ir::{BinaryOp, MemArg, StoreKind};
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 const SLOT_SIZE: u32 = 32;
+
+/// Context for error reporting when computing storage size.
+/// Determines which error variant to construct when encountering references or type parameters.
+enum FieldsErrorContext {
+    Struct { struct_index: u16 },
+    Enum { enum_index: u16, variant_index: u16 },
+}
 
 /// Emits WASM instructions to compute the total storage size for an enum (maximum of all variants).
 ///
@@ -51,12 +58,9 @@ pub fn compute_enum_storage_size(
             &variant.fields,
             offset,
             compilation_ctx,
-            || TranslationError::FoundReferenceInsideEnum {
-                enum_index: variant.belongs_to,
-            },
-            || TranslationError::FoundTypeParameterInsideEnumVariant {
+            FieldsErrorContext::Enum {
                 enum_index: enum_.index,
-                variant_index: variant.belongs_to,
+                variant_index: variant.index,
             },
         )
         .unwrap();
@@ -89,72 +93,16 @@ pub fn compute_enum_storage_size(
     Ok(enum_size)
 }
 
-/// Emits WASM instructions to compute the total storage size for a struct.
-///
-/// Arguments:
-/// - `module`: Walrus module being built
-/// - `builder`: Instruction sequence builder to append to
-/// - `struct_`: the struct whose storage size is being calculated
-/// - `slot_offset`: LocalId containing bytes already used in the current slot (affects layout)
-/// - `compilation_ctx`: context used to resolve types and perform lookups
-///
-/// Filters out UID or NamedId fields (which are not stored) and computes the total size of the remaining fields.
-/// Returns `Ok(LocalId)` with a local containing the computed size, or `Err(TranslationError)` if any field contains a generic type parameter.
-pub fn compute_struct_storage_size(
-    module: &mut Module,
-    builder: &mut InstrSeqBuilder,
-    struct_: &IStruct,
-    slot_offset: LocalId,
-    compilation_ctx: &CompilationContext,
-) -> Result<LocalId, TranslationError> {
-    // Filter out UIDs (not stored)
-    let filtered_fields: Vec<IntermediateType> = struct_
-        .fields
-        .iter()
-        .filter(|f| !f.is_uid_or_named_id(compilation_ctx))
-        .cloned()
-        .collect();
-
-    // offset = offset % SLOT_SIZE
-    let offset = module.locals.add(ValType::I32);
-    builder
-        .local_get(slot_offset)
-        .i32_const(SLOT_SIZE as i32)
-        .binop(BinaryOp::I32RemS)
-        .local_set(offset);
-
-    compute_fields_storage_size(
-        module,
-        builder,
-        &filtered_fields,
-        offset,
-        compilation_ctx,
-        || TranslationError::FoundReferenceInsideStruct {
-            struct_index: struct_.index(),
-        },
-        || TranslationError::FoundTypeParameterInsideStruct {
-            struct_index: struct_.index(),
-            type_parameter_index: 0,
-        },
-    )
-}
-
 /// Internal helper to emit WASM instructions to compute total storage size for a sequence of fields.
-/// The `on_ref` closure defines the error to emit when a reference is found
-/// (differs for enums vs structs).
-fn compute_fields_storage_size<F, G>(
+/// Uses `error_context` to determine which error variant to construct when encountering references or type parameters.
+fn compute_fields_storage_size(
     module: &mut Module,
     builder: &mut InstrSeqBuilder,
     fields: &[IntermediateType],
     slot_offset: LocalId,
     compilation_ctx: &CompilationContext,
-    on_ref: F,
-    on_generic: G,
-) -> Result<LocalId, TranslationError>
-where
-    F: Fn() -> TranslationError,
-    G: Fn() -> TranslationError,
-{
+    error_context: FieldsErrorContext,
+) -> Result<LocalId, TranslationError> {
     let total_bytes = module.locals.add(ValType::I32);
     builder.i32_const(0).local_set(total_bytes);
 
@@ -163,11 +111,32 @@ where
 
     for field in fields {
         match field {
-            IntermediateType::ITypeParameter(_) => {
-                return Err(on_generic());
+            IntermediateType::ITypeParameter(type_parameter_index) => {
+                return Err(match error_context {
+                    FieldsErrorContext::Struct { struct_index } => {
+                        TranslationError::FoundTypeParameterInsideStruct {
+                            struct_index,
+                            type_parameter_index: *type_parameter_index,
+                        }
+                    }
+                    FieldsErrorContext::Enum {
+                        enum_index,
+                        variant_index,
+                    } => TranslationError::FoundTypeParameterInsideEnumVariant {
+                        enum_index,
+                        variant_index,
+                    },
+                });
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                return Err(on_ref());
+                return Err(match error_context {
+                    FieldsErrorContext::Struct { struct_index } => {
+                        TranslationError::FoundReferenceInsideStruct { struct_index }
+                    }
+                    FieldsErrorContext::Enum { enum_index, .. } => {
+                        TranslationError::FoundReferenceInsideEnum { enum_index }
+                    }
+                });
             }
             IntermediateType::IGenericStructInstance { .. } | IntermediateType::IStruct { .. } => {
                 let struct_ = compilation_ctx
@@ -198,12 +167,24 @@ where
                     // offset = SLOT_SIZE
                     builder.i32_const(SLOT_SIZE as i32).local_set(offset);
                 } else {
-                    let struct_size = compute_struct_storage_size(
+                    // Filter out UIDs (not stored)
+                    let filtered_fields: Vec<IntermediateType> = struct_
+                        .fields
+                        .iter()
+                        .filter(|f| !f.is_uid_or_named_id(compilation_ctx))
+                        .cloned()
+                        .collect();
+
+                    // Compute the size of the struct
+                    let struct_size = compute_fields_storage_size(
                         module,
                         builder,
-                        &struct_,
+                        &filtered_fields,
                         offset,
                         compilation_ctx,
+                        FieldsErrorContext::Struct {
+                            struct_index: struct_.index(),
+                        },
                     )?;
 
                     // total_bytes += size
@@ -481,16 +462,19 @@ pub fn field_size(field: &IntermediateType, compilation_ctx: &CompilationContext
 #[cfg(test)]
 mod wasm_tests {
     use super::*;
-    use crate::compilation_context::{ModuleData, ModuleId};
-    use crate::test_tools::{build_module, setup_wasmtime_module};
-    use crate::translation::intermediate_types::VmHandledStruct;
-    use crate::translation::intermediate_types::enums::IEnumVariant;
-    use crate::translation::intermediate_types::structs::IStructType;
     use alloy_primitives::U256;
     use move_binary_format::file_format::StructDefinitionIndex;
     use rstest::rstest;
     use std::collections::HashMap;
     use walrus::{FunctionBuilder, ValType};
+
+    use crate::compilation_context::{ModuleData, ModuleId};
+    use crate::test_tools::{build_module, setup_wasmtime_module};
+    use crate::translation::intermediate_types::{
+        VmHandledStruct,
+        enums::IEnumVariant,
+        structs::{IStruct, IStructType},
+    };
 
     // Helper to create a compilation context with registered structs and enums for WASM tests
     fn create_wasm_test_ctx(
@@ -544,8 +528,7 @@ mod wasm_tests {
             fields,
             used_bytes_local,
             compilation_ctx,
-            || TranslationError::FoundReferenceInsideEnum { enum_index: 0 },
-            || TranslationError::FoundTypeParameterInsideEnumVariant {
+            FieldsErrorContext::Enum {
                 enum_index: 0,
                 variant_index: 0,
             },
@@ -595,12 +578,23 @@ mod wasm_tests {
                 compilation_ctx,
             )?
         } else if let Some(struct_) = struct_ {
-            compute_struct_storage_size(
+            // Filter out UIDs (not stored)
+            let filtered_fields: Vec<IntermediateType> = struct_
+                .fields
+                .iter()
+                .filter(|f| !f.is_uid_or_named_id(compilation_ctx))
+                .cloned()
+                .collect();
+
+            compute_fields_storage_size(
                 module,
                 &mut builder,
-                struct_,
+                &filtered_fields,
                 written_bytes_local,
                 compilation_ctx,
+                FieldsErrorContext::Struct {
+                    struct_index: struct_.index(),
+                },
             )?
         } else {
             return Err("Either enum_ or struct_ must be provided".into());
