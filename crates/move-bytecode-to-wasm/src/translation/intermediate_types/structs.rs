@@ -284,7 +284,7 @@ impl IStruct {
                 | IntermediateType::IVector(_)
                 | IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. }
-                | IntermediateType::IEnum(_)
+                | IntermediateType::IEnum { .. }
                 | IntermediateType::IGenericEnumInstance { .. } => {
                     // Load intermediate pointer
                     builder
@@ -434,7 +434,7 @@ impl IStruct {
                 | IntermediateType::IU128
                 | IntermediateType::IU256
                 | IntermediateType::IAddress
-                | IntermediateType::IEnum(_)
+                | IntermediateType::IEnum { .. }
                 | IntermediateType::IGenericEnumInstance { .. } => continue,
                 IntermediateType::IVector(_) => return true,
                 IntermediateType::IStruct {
@@ -493,7 +493,8 @@ impl IStruct {
                 | IntermediateType::IU256
                 | IntermediateType::IAddress
                 | IntermediateType::IVector(_)
-                | IntermediateType::IEnum(_) => {
+                | IntermediateType::IEnum { .. }
+                | IntermediateType::IGenericEnumInstance { .. } => {
                     size += (field as &dyn Packable).encoded_size(compilation_ctx);
                 }
                 IntermediateType::IGenericStructInstance {
@@ -533,7 +534,6 @@ impl IStruct {
                 IntermediateType::ITypeParameter(_) => {
                     panic!("cannot know a type parameter's size, expected a concrete type");
                 }
-                IntermediateType::IGenericEnumInstance { .. } => todo!(),
             }
         }
 

@@ -2,7 +2,7 @@ mod error;
 pub mod module_data;
 pub mod reserved_modules;
 
-use crate::translation::intermediate_types::{IntermediateType, structs::IStruct};
+use crate::translation::intermediate_types::{IntermediateType, enums::IEnum, structs::IStruct};
 pub use error::CompilationContextError;
 pub use module_data::{ModuleData, ModuleId, UserDefinedType};
 use std::{borrow::Cow, collections::HashMap};
@@ -63,6 +63,16 @@ impl CompilationContext<'_> {
         module.structs.get_by_index(index)
     }
 
+    /// Looks for an enum with index `index` within the module with id `module_id`
+    pub fn get_enum_by_index(&self, module_id: &ModuleId, index: u16) -> Result<&IEnum> {
+        let module = self
+            .deps_data
+            .get(module_id)
+            .unwrap_or(self.root_module_data);
+
+        module.enums.get_enum_by_index(index)
+    }
+
     /// This function tries to get an struct from the `IntermediateType` enum. In the named enum we
     /// can have three variants of the struct:
     ///
@@ -95,6 +105,26 @@ impl CompilationContext<'_> {
                 Ok(Cow::Owned(instance))
             }
             _ => Err(CompilationContextError::ExpectedStruct),
+        }
+    }
+
+    pub fn get_enum_by_intermediate_type(&self, itype: &IntermediateType) -> Result<Cow<IEnum>> {
+        match itype {
+            IntermediateType::IEnum { module_id, index } => {
+                let enum_ = self.get_enum_by_index(module_id, *index)?;
+                Ok(Cow::Borrowed(enum_))
+            }
+            IntermediateType::IGenericEnumInstance {
+                module_id,
+                index,
+                types,
+                ..
+            } => {
+                let enum_ = self.get_enum_by_index(module_id, *index)?;
+                let instance = enum_.instantiate(types);
+                Ok(Cow::Owned(instance))
+            }
+            _ => Err(CompilationContextError::ExpectedEnum),
         }
     }
 }

@@ -1637,7 +1637,7 @@ fn translate_instruction(
                 | IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. }
                 | IntermediateType::IVector(_)
-                | IntermediateType::IEnum(_)
+                | IntermediateType::IEnum { .. }
                 | IntermediateType::IGenericEnumInstance { .. } => {
                     let pop_back_f =
                         RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
@@ -2618,7 +2618,10 @@ fn translate_instruction(
                 types_stack,
             )?;
 
-            types_stack.push(IntermediateType::IEnum(enum_.index));
+            types_stack.push(IntermediateType::IEnum {
+                module_id: module_data.id.clone(),
+                index: enum_.index,
+            });
         }
         Bytecode::PackVariantGeneric(index) => {
             let enum_ = &module_data
@@ -2676,6 +2679,7 @@ fn translate_instruction(
             )?;
 
             types_stack.push(IntermediateType::IGenericEnumInstance {
+                module_id: module_data.id.clone(),
                 index: enum_.index,
                 types,
             });
@@ -2686,7 +2690,10 @@ fn translate_instruction(
                 .enums
                 .get_variant_position_by_variant_handle_idx(index)?;
 
-            types_stack.pop_expecting(&IntermediateType::IEnum(enum_.index))?;
+            let itype = types_stack.pop_expecting(&IntermediateType::IEnum {
+                module_id: module_data.id.clone(),
+                index: enum_.index,
+            })?;
 
             bytecodes::enums::unpack_variant(
                 enum_,
@@ -2695,6 +2702,7 @@ fn translate_instruction(
                 builder,
                 compilation_ctx,
                 types_stack,
+                &itype,
             )?;
         }
         Bytecode::UnpackVariantGeneric(index) => {
@@ -2725,7 +2733,8 @@ fn translate_instruction(
                 (enum_, type_instantiations.to_vec())
             };
 
-            types_stack.pop_expecting(&IntermediateType::IGenericEnumInstance {
+            let itype = types_stack.pop_expecting(&IntermediateType::IGenericEnumInstance {
+                module_id: module_data.id.clone(),
                 index: enum_.index,
                 types,
             })?;
@@ -2737,6 +2746,7 @@ fn translate_instruction(
                 builder,
                 compilation_ctx,
                 types_stack,
+                &itype,
             )?;
         }
         Bytecode::UnpackVariantImmRef(index) | Bytecode::UnpackVariantMutRef(index) => {
@@ -2746,10 +2756,14 @@ fn translate_instruction(
                 .get_variant_position_by_variant_handle_idx(index)?;
 
             let is_mut_ref = matches!(instruction, Bytecode::UnpackVariantMutRef(_));
+            let enum_type = IntermediateType::IEnum {
+                module_id: module_data.id.clone(),
+                index: enum_.index,
+            };
             let expected_type = if is_mut_ref {
-                IntermediateType::IMutRef(Box::new(IntermediateType::IEnum(enum_.index)))
+                IntermediateType::IMutRef(Box::new(enum_type))
             } else {
-                IntermediateType::IRef(Box::new(IntermediateType::IEnum(enum_.index)))
+                IntermediateType::IRef(Box::new(enum_type))
             };
             types_stack.pop_expecting(&expected_type)?;
 
@@ -2794,16 +2808,15 @@ fn translate_instruction(
             };
 
             let is_mut_ref = matches!(instruction, Bytecode::UnpackVariantGenericMutRef(_));
+            let generic_enum_type = IntermediateType::IGenericEnumInstance {
+                module_id: module_data.id.clone(),
+                index: enum_.index,
+                types,
+            };
             let expected_type = if is_mut_ref {
-                IntermediateType::IMutRef(Box::new(IntermediateType::IGenericEnumInstance {
-                    index: enum_.index,
-                    types,
-                }))
+                IntermediateType::IMutRef(Box::new(generic_enum_type))
             } else {
-                IntermediateType::IRef(Box::new(IntermediateType::IGenericEnumInstance {
-                    index: enum_.index,
-                    types,
-                }))
+                IntermediateType::IRef(Box::new(generic_enum_type))
             };
             types_stack.pop_expecting(&expected_type)?;
 
