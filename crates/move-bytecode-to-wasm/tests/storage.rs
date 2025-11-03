@@ -6356,7 +6356,6 @@ mod enums {
         function destroyStructWithSimpleEnums(bytes32 id) public;
 
         function createFooStruct(address recipient) public view;
-        function testFooStruct(bytes32 id) public view;
         function setVariantA(bytes32 id, uint16 x, uint32 y) public;
         function setVariantB(bytes32 id, uint64 x, uint128 y, bool z) public;
         function setVariantC(bytes32 id, Numbers n, Colors c) public;
@@ -6394,19 +6393,16 @@ mod enums {
             expected_return_data
         );
         assert_eq!(0, result);
-        runtime.print_storage();
 
         let call_data =
             setNumberCall::new((struct_with_simple_enums_id, Numbers::Two)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-        runtime.print_storage();
 
         let call_data =
             setColorCall::new((struct_with_simple_enums_id, Colors::Green)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-        runtime.print_storage();
 
         let call_data = getNumberCall::new((struct_with_simple_enums_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -6443,8 +6439,6 @@ mod enums {
 
         let foo_struct_id = runtime.obtain_uid();
 
-        runtime.print_storage();
-
         let call_data = getVariantACall::new((foo_struct_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = getVariantACall::abi_decode_returns(&return_data).unwrap();
@@ -6455,8 +6449,6 @@ mod enums {
         let call_data = setVariantACall::new((foo_struct_id, 2, 3)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-
-        runtime.print_storage();
 
         let call_data = getVariantACall::new((foo_struct_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
@@ -6469,8 +6461,6 @@ mod enums {
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
-        runtime.print_storage();
-
         let call_data = getVariantBCall::new((foo_struct_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
         let return_data = getVariantBCall::abi_decode_returns(&return_data).unwrap();
@@ -6482,8 +6472,6 @@ mod enums {
             setVariantCCall::new((foo_struct_id, Numbers::Two, Colors::Blue)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
-
-        runtime.print_storage();
 
         let call_data = getVariantCCall::new((foo_struct_id,)).abi_encode();
         let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();

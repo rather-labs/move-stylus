@@ -32,7 +32,10 @@ pub fn compute_enum_storage_size(
     builder
         .local_get(slot_offset)
         .i32_const(1)
-        .binop(BinaryOp::I32Add)
+        .binop(BinaryOp::I32Add);
+
+    // offset = offset % SLOT_SIZE
+    builder
         .i32_const(SLOT_SIZE as i32)
         .binop(BinaryOp::I32RemS)
         .local_set(offset);
@@ -112,7 +115,7 @@ pub fn compute_struct_storage_size(
         .cloned()
         .collect();
 
-    // Compute: offset = offset % SLOT_SIZE
+    // offset = offset % SLOT_SIZE
     let offset = module.locals.add(ValType::I32);
     builder
         .local_get(slot_offset)
