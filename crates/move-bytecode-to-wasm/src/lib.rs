@@ -1,20 +1,20 @@
 use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
-use compilation_context::{CompilationContextError, ModuleData, ModuleId};
+use compilation_context::{ModuleData, ModuleId};
 use constructor::inject_constructor;
+use error::{CodeError, CompilationError, CompilationErrorKind};
 use move_binary_format::file_format::FunctionDefinition;
 use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
-    source_package::parsed_manifest::{Dependencies, PackageName},
+    source_package::parsed_manifest::PackageName,
 };
-use move_parse_special_attributes::{SpecialAttributeError, process_special_attributes};
+use move_parse_special_attributes::process_special_attributes;
 use std::{collections::HashMap, path::Path};
 use translation::{
     intermediate_types::IntermediateType,
     table::{FunctionId, FunctionTable},
     translate_function,
 };
-use vm_handled_types::VmHandledType;
 
 use walrus::{GlobalId, Module, RefType};
 use wasm_validation::validate_stylus_wasm;
@@ -23,6 +23,7 @@ pub(crate) mod abi_types;
 mod compilation_context;
 mod constructor;
 mod data;
+pub mod error;
 mod error_encoding;
 mod generics;
 mod hasher;
@@ -41,29 +42,6 @@ mod wasm_validation;
 
 #[cfg(feature = "inject-host-debug-fns")]
 use walrus::ValType;
-
-#[derive(thiserror::Error, Debug)]
-pub enum CompilationError {
-    #[error(
-        "An internal compiler error has ocurred. If this keeps happening, please open an issue in\n<gh url>"
-    )]
-    ICE(#[from] ICEError),
-
-    #[error("an internal compiler error has ocurred")]
-    CodeError(Vec<CodeError>),
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum CodeError {
-    #[error("an special attributes error ocured")]
-    SpecialAttributesError(#[from] SpecialAttributeError),
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum ICEError {
-    #[error("an error ocurred processing the compilation context")]
-    CompilationContext(#[from] CompilationContextError),
-}
 
 #[cfg(test)]
 mod test_tools;
@@ -140,13 +118,23 @@ pub fn translate_package(
         let mut function_table = FunctionTable::new(function_table_id);
 
         // Process the dependency tree
-        process_dependency_tree(
+        if let Err(dependencies_errors) = process_dependency_tree(
             &mut modules_data,
             &package.deps_compiled_units,
             &root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
             &mut function_definitions,
-        );
+        ) {
+            match dependencies_errors {
+                CompilationErrorKind::ICE(ice_error) => {
+                    return Err(CompilationError {
+                        files: package.file_map,
+                        kind: CompilationErrorKind::ICE(ice_error),
+                    });
+                }
+                CompilationErrorKind::CodeError(code_errors) => errors.extend(code_errors),
+            }
+        }
 
         let special_attributes = match process_special_attributes(&root_compiled_module.source_path)
         {
@@ -165,7 +153,10 @@ pub fn translate_package(
             &mut function_definitions,
             special_attributes,
         )
-        .map_err(|e| CompilationError::ICE(e.into()))?;
+        .map_err(|e| CompilationError {
+            files: package.file_map.clone(),
+            kind: CompilationErrorKind::ICE(e.into()),
+        })?;
 
         let compilation_ctx =
             CompilationContext::new(&root_module_data, &modules_data, memory_id, allocator_func);
@@ -224,7 +215,10 @@ pub fn translate_package(
     if errors.is_empty() {
         Ok(modules)
     } else {
-        Err(CompilationError::CodeError(errors))
+        Err(CompilationError {
+            files: package.file_map,
+            kind: CompilationErrorKind::CodeError(errors),
+        })
     }
 }
 
@@ -264,7 +258,7 @@ pub fn process_dependency_tree<'move_package>(
     root_compiled_units: &'move_package [CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
     function_definitions: &mut GlobalFunctionTable<'move_package>,
-) -> Result<(), CompilationError> {
+) -> Result<(), CompilationErrorKind> {
     let mut errors = Vec::new();
     for dependency in dependencies {
         let module_id = ModuleId {
@@ -304,8 +298,10 @@ pub fn process_dependency_tree<'move_package>(
 
         if let Err(dependencies_errors) = dependencies_process_result {
             match dependencies_errors {
-                CompilationError::ICE(ice_error) => return Err(CompilationError::ICE(ice_error)),
-                CompilationError::CodeError(code_errors) => errors.extend(code_errors),
+                CompilationErrorKind::ICE(ice_error) => {
+                    return Err(CompilationErrorKind::ICE(ice_error));
+                }
+                CompilationErrorKind::CodeError(code_errors) => errors.extend(code_errors),
             }
         }
 
@@ -325,7 +321,7 @@ pub fn process_dependency_tree<'move_package>(
             function_definitions,
             special_attributes,
         )
-        .map_err(|e| CompilationError::ICE(e.into()))?;
+        .map_err(|e| CompilationErrorKind::ICE(e.into()))?;
 
         let processed_dependency = dependencies_data.insert(module_id, dependency_module_data);
 
@@ -338,7 +334,7 @@ pub fn process_dependency_tree<'move_package>(
     if errors.is_empty() {
         Ok(())
     } else {
-        Err(CompilationError::CodeError(errors))
+        Err(CompilationErrorKind::CodeError(errors))
     }
 }
 
@@ -467,7 +463,7 @@ fn inject_debug_fns(module: &mut walrus::Module) {
 #[macro_export]
 macro_rules! declare_host_debug_functions {
     ($module: ident) => {
-        (
+        (CompilationError::ICE(ice_error)
             $module.imports.get_func("", "print_i32").unwrap(),
             $module.imports.get_func("", "print_i64").unwrap(),
             $module.imports.get_func("", "print_memory_from").unwrap(),

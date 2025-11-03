@@ -181,14 +181,12 @@ pub fn process_special_attributes(
 
     if found_error {
         /*
-        let error_diagnostics: Vec<Diagnostic> =
-            module_errors.iter().map(Diagnostic::from).collect();
-        */
         let mut diagnostics = Diagnostics::new();
         for error in &module_errors {
             diagnostics.add(error.into());
         }
         report_diagnostics(&mapped_files, diagnostics);
+        */
         Err(module_errors)
     } else {
         Ok(result)
