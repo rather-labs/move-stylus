@@ -324,11 +324,9 @@ impl Packable for IntermediateType {
                 compilation_ctx,
             ),
 
-            IntermediateType::IStruct {
-                module_id, index, ..
-            } => {
+            IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
+                    .get_struct_by_intermediate_type(self)
                     .unwrap();
 
                 struct_.add_pack_instructions(
@@ -341,32 +339,9 @@ impl Packable for IntermediateType {
                     None,
                 )
             }
-            IntermediateType::IGenericStructInstance {
-                module_id,
-                index,
-                types,
-                ..
-            } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
-                let struct_instance = struct_.instantiate(types);
-                struct_instance.add_pack_instructions(
-                    builder,
-                    module,
-                    local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                    None,
-                )
-            }
-            IntermediateType::IEnum { index, .. } => {
-                let enum_ = compilation_ctx
-                    .root_module_data
-                    .enums
-                    .get_enum_by_index(*index)
-                    .unwrap();
+            IntermediateType::IEnum { index, .. }
+            | IntermediateType::IGenericEnumInstance { index, .. } => {
+                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self).unwrap();
                 if !enum_.is_simple {
                     panic!(
                         "cannot abi pack enum with index {index}, it contains at least one variant with fields"
@@ -376,26 +351,6 @@ impl Packable for IntermediateType {
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot pack generic type parameter");
-            }
-            IntermediateType::IGenericEnumInstance { index, types, .. } => {
-                let enum_ = compilation_ctx
-                    .root_module_data
-                    .enums
-                    .get_enum_by_index(*index)
-                    .unwrap();
-                let enum_instance = enum_.instantiate(types);
-                if !enum_instance.is_simple {
-                    panic!(
-                        "cannot abi pack enum with index {index}, it contains at least one variant with fields"
-                    );
-                }
-                enum_instance.add_pack_instructions(
-                    builder,
-                    module,
-                    local,
-                    writer_pointer,
-                    compilation_ctx,
-                )
             }
         }
     }
@@ -446,11 +401,9 @@ impl Packable for IntermediateType {
                     compilation_ctx,
                 );
             }
-            IntermediateType::IStruct {
-                module_id, index, ..
-            } => {
+            IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
+                    .get_struct_by_intermediate_type(self)
                     .unwrap();
 
                 struct_.add_pack_instructions(
@@ -463,27 +416,6 @@ impl Packable for IntermediateType {
                     Some(calldata_reference_pointer),
                 );
             }
-            IntermediateType::IGenericStructInstance {
-                module_id,
-                index,
-                types,
-                ..
-            } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
-                let struct_instance = struct_.instantiate(types);
-                struct_instance.add_pack_instructions(
-                    builder,
-                    module,
-                    local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                    Some(calldata_reference_pointer),
-                );
-            }
-
             _ => self.add_pack_instructions(
                 builder,
                 module,
