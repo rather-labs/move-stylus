@@ -5,10 +5,6 @@ use stylus::object as object;
 use stylus::object::UID;
 use stylus::transfer as transfer;
 
-// ============================================================================
-// STRUCT DEFINITIONS
-// ============================================================================
-
 public enum Numbers has drop, store {
     One,
     Two,
@@ -21,6 +17,7 @@ public enum Colors has drop, store {
     Blue,
 }
 
+// Struct with simple enums
 public struct StructWithSimpleEnums has key, store {
     id: UID,
     n: Numbers,
@@ -67,6 +64,7 @@ public enum FooEnum has store, drop {
     C{n: Numbers, c: Colors}
 }
 
+// Struct with not-simple enum
 public struct FooStruct has key, store {
     id: UID,
     a: FooEnum,
@@ -117,38 +115,90 @@ entry fun get_variant_c(s: &FooStruct): (&Numbers, &Colors) {
     }
 }
 
-entry fun test_foo_struct(s: &mut FooStruct) {
-    set_variant(s, FooEnum::A { x: 5, y: 6 });
-    match (&s.a) {
-        FooEnum::A { x, y } => {
-            assert!(x == 5, 5);
-            assert!(y == 6, 6);
-        },
-        _ => abort(1),
-    };
-
-    set_variant(s, FooEnum::B(3, 4, true));
-    match (&s.a) {
-        FooEnum::B(x, y, z) => {
-            assert!(x == 3, 1);
-            assert!(y == 4, 2);
-            assert!(z == true, 3);
-        },
-        _ => abort(1),
-    };
-
-    set_variant(s, FooEnum::C{n: Numbers::Two, c: Colors::Green});
-    match (&s.a) {
-        FooEnum::C{n, c} => {
-            assert!(n == Numbers::Two, 3);
-            assert!(c == Colors::Green, 4);
-        },
-        _ => abort(1),
-    };
-}
-
 entry fun destroy_foo_struct(s: FooStruct) {
     let FooStruct { id, a: _ } = s;
     object::delete(id);
 }
 
+public struct BarStruct has key, store {
+    id: UID,
+    a: StructWithSimpleEnums,
+    b: bool,
+    c: u16,
+    d: u32,
+    e: u64,
+    f: FooEnum,
+    g: u128,
+    h: u256,
+    i: address,
+}
+
+entry fun create_bar_struct(recipient: address, ctx: &mut TxContext) {
+    let s = BarStruct {
+        id: object::new(ctx),
+        a: StructWithSimpleEnums {
+            id: object::new(ctx),
+            n: Numbers::Two,
+            c: Colors::Blue,
+        },
+        b: true,
+        c: 77,
+        d: 88,
+        e: 99,
+        f: FooEnum::B(42, 43, true),
+        g: 111,
+        h: 99999999999999999,
+        i: @0xffffffffffffffffffffffffffffffffffffffff,
+    };
+    transfer::transfer(s, recipient);
+}
+
+entry fun get_foo_enum_variant_a(s: &BarStruct): (&u16, &u32) {
+    match (&s.f) {
+        FooEnum::A { x, y } => {
+            (x, y)
+        },
+        _ => abort(1),
+    }
+}
+
+entry fun get_foo_enum_variant_b(s: &BarStruct): (&u64, &u128, &bool) {
+    match (&s.f) {
+        FooEnum::B(x, y, z) => {
+            (x, y, z)
+        },
+        _ => abort(1),
+    }
+}
+
+entry fun get_foo_enum_variant_c(s: &BarStruct): (&Numbers, &Colors) {
+    match (&s.f) {
+        FooEnum::C{n, c} => {
+            (n, c)
+        },
+        _ => abort(1),
+    }
+}
+
+entry fun set_foo_enum_variant_a(s: &mut BarStruct, x: u16, y: u32) {
+    s.f = FooEnum::A { x, y };
+}
+
+entry fun set_foo_enum_variant_b(s: &mut BarStruct, x: u64, y: u128, z: bool) {
+    s.f = FooEnum::B(x, y, z);
+}
+
+entry fun set_foo_enum_variant_c(s: &mut BarStruct, n: Numbers, c: Colors) {
+    s.f = FooEnum::C{n, c};
+}
+
+entry fun get_address(s: &BarStruct): &address {
+    &s.i
+}
+
+entry fun destroy_bar_struct(s: BarStruct) {
+    let BarStruct { id: bar_id, a, b: _, c: _, d: _, e: _, f: _, g: _, h: _, i: _ } = s;
+    let StructWithSimpleEnums { id: simple_id, n: _, c: _ } = a;
+    object::delete(simple_id);
+    object::delete(bar_id);
+}

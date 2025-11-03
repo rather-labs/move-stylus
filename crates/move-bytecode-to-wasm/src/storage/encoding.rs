@@ -174,6 +174,8 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
     // Runtime functions
     let accumulate_or_advance_slot_write_fn =
         RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx));
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
 
     // Get the IEnum representation
     let enum_ = compilation_ctx
@@ -263,19 +265,88 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
             );
         }
 
-        // Always save the last slot
+        // Handle leftover storage from large enum variants.
+        // Each enum reserves space for its largest variant, so writing a smaller variant
+        // may leave extra slots containing old data. We need to clear these slots
+        // to avoid storing stale bytes.
+        // If we're not at the tail slot (slot_ptr != tail_slot_ptr):
+        //   - Save the current slot data, wipe the slot data and advance to the next slot.
+        //   - If the next slot is not the tail slot, wipe it and advance to the next slot. Repeat.
         block
             .local_get(slot_ptr)
-            .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
-            .call(storage_cache);
-    });
+            .local_get(tail_slot_ptr)
+            .i32_const(32)
+            .call(equality_fn)
+            .if_else(
+                None,
+                |_| {
+                    // slot_ptr == tail_slot_ptr, do nothing
+                    // the slot data is going to be cached by the caller of this function
+                },
+                |else_| {
+                    // slot_ptr != tail_slot_ptr - first iteration
+                    // Cache the current slot's data at DATA_SLOT_DATA_PTR_OFFSET
+                    else_
+                        .local_get(slot_ptr)
+                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                        .call(storage_cache);
 
-    // *slot_ptr = *tail_slot_ptr
-    builder
-        .local_get(slot_ptr)
-        .local_get(tail_slot_ptr)
-        .i32_const(32)
-        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                    // Wipe DATA_SLOT_DATA_PTR_OFFSET (set to zero)
+                    else_
+                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                        .i32_const(DATA_ZERO_OFFSET)
+                        .i32_const(32)
+                        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+                    // Advance to the next slot
+                    else_
+                        .local_get(slot_ptr)
+                        .call(next_slot_fn)
+                        .local_set(slot_ptr);
+
+                    // Cache the now-empty (wiped) DATA_SLOT_DATA_PTR_OFFSET at the new slot_ptr
+                    else_
+                        .local_get(slot_ptr)
+                        .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                        .call(storage_cache);
+
+                    // Loop: continue advancing and caching zero data until slot_ptr == tail_slot_ptr
+                    else_.loop_(None, |loop_| {
+                        let loop_id = loop_.id();
+
+                        // Check if slot_ptr == tail_slot_ptr
+                        loop_
+                            .local_get(slot_ptr)
+                            .local_get(tail_slot_ptr)
+                            .i32_const(32)
+                            .call(equality_fn)
+                            .if_else(
+                                None,
+                                |_| {
+                                    // slot_ptr == tail_slot_ptr, exit the loop
+                                },
+                                |inner_else| {
+                                    // slot_ptr != tail_slot_ptr
+                                    // Advance to the next slot
+                                    inner_else
+                                        .local_get(slot_ptr)
+                                        .call(next_slot_fn)
+                                        .local_set(slot_ptr);
+
+                                    // Cache DATA_ZERO_OFFSET directly to the new slot_ptr
+                                    inner_else
+                                        .local_get(slot_ptr)
+                                        .i32_const(DATA_ZERO_OFFSET)
+                                        .call(storage_cache);
+
+                                    // Continue the loop
+                                    inner_else.br(loop_id);
+                                },
+                            );
+                    });
+                },
+            );
+    });
 
     // slot_offset = tail_slot_offset
     builder.local_get(tail_slot_offset).local_set(slot_offset);

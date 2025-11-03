@@ -339,7 +339,7 @@ pub fn add_delete_storage_enum_instructions(
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
 
     // Compute the end slot
-    let (tail_slot_ptr, _) = compute_enum_storage_tail_position(
+    let (tail_slot_ptr, tail_slot_offset) = compute_enum_storage_tail_position(
         module,
         builder,
         enum_,
@@ -378,6 +378,7 @@ pub fn add_delete_storage_enum_instructions(
                 },
             );
     });
+    builder.local_get(tail_slot_offset).local_set(slot_offset);
 }
 
 /// This function adds instructions to recursively delete all storage slots

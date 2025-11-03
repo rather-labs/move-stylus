@@ -6301,6 +6301,7 @@ mod simple_warrior {
 mod enums {
     use super::*;
     use crate::common::runtime_sandbox::constants::SIGNER_ADDRESS;
+    use alloy_primitives::address;
     use alloy_sol_types::{SolCall, SolValue, sol};
 
     #[fixture]
@@ -6347,6 +6348,7 @@ mod enums {
             Colors c;
         }
 
+        // StructWithSimpleEnums
         function createStructWithSimpleEnums(address recipient) public view;
         function getStructWithSimpleEnums(bytes32 id) public view returns (StructWithSimpleEnums);
         function setNumber(bytes32 id, Numbers n) public;
@@ -6355,6 +6357,7 @@ mod enums {
         function getColor(bytes32 id) public view returns (Colors);
         function destroyStructWithSimpleEnums(bytes32 id) public;
 
+        // FooStruct
         function createFooStruct(address recipient) public view;
         function setVariantA(bytes32 id, uint16 x, uint32 y) public;
         function setVariantB(bytes32 id, uint64 x, uint128 y, bool z) public;
@@ -6363,10 +6366,21 @@ mod enums {
         function getVariantB(bytes32 id) public view returns (uint64, uint128, bool);
         function getVariantC(bytes32 id) public view returns (Numbers, Colors);
         function destroyFooStruct(bytes32 id) public;
+
+        // BarStruct
+        function createBarStruct(address recipient) public view;
+        function getFooEnumVariantA(bytes32 id) public view returns (uint16, uint32);
+        function getFooEnumVariantB(bytes32 id) public view returns (uint64, uint128, bool);
+        function getFooEnumVariantC(bytes32 id) public view returns (Numbers, Colors);
+        function setFooEnumVariantA(bytes32 id, uint16 x, uint32 y) public;
+        function setFooEnumVariantB(bytes32 id, uint64 x, uint128 y, bool z) public;
+        function setFooEnumVariantC(bytes32 id, Numbers n, Colors c) public;
+        function getAddress(bytes32 id) public view returns (address);
+        function destroyBarStruct(bytes32 id) public;
     );
 
     #[rstest]
-    fn test_create_struct_with_simple_enums(runtime: RuntimeSandbox) {
+    fn test_struct_with_simple_enums(runtime: RuntimeSandbox) {
         runtime.set_msg_sender(SIGNER_ADDRESS);
 
         let call_data = createStructWithSimpleEnumsCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
@@ -6430,7 +6444,7 @@ mod enums {
     }
 
     #[rstest]
-    fn test_create_foo_struct(runtime: RuntimeSandbox) {
+    fn test_foo_struct(runtime: RuntimeSandbox) {
         runtime.set_msg_sender(SIGNER_ADDRESS);
 
         let call_data = createFooStructCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
@@ -6482,6 +6496,74 @@ mod enums {
 
         let storage_before_destroy = runtime.get_storage();
         let call_data = destroyFooStructCall::new((foo_struct_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        let storage_after_destroy = runtime.get_storage();
+
+        // Assert that the storage is empty
+        assert_empty_storage(&storage_before_destroy, &storage_after_destroy);
+    }
+
+    #[rstest]
+    fn test_bar_struct(runtime: RuntimeSandbox) {
+        runtime.set_msg_sender(SIGNER_ADDRESS);
+
+        let call_data = createBarStructCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let bar_struct_id = runtime.obtain_uid();
+
+        let call_data = getFooEnumVariantBCall::new((bar_struct_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = getFooEnumVariantBCall::abi_decode_returns(&return_data).unwrap();
+        let got = (return_data._0, return_data._1, return_data._2);
+        assert_eq!(got, (42u64, 43u128, true));
+        assert_eq!(0, result);
+
+        let call_data = setFooEnumVariantACall::new((bar_struct_id, 2, 3)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = getFooEnumVariantACall::new((bar_struct_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = getFooEnumVariantACall::abi_decode_returns(&return_data).unwrap();
+        let got = (return_data._0, return_data._1);
+        assert_eq!(got, (2u16, 3u32));
+        assert_eq!(0, result);
+
+        let call_data = setFooEnumVariantBCall::new((bar_struct_id, 4, 5, true)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = getFooEnumVariantBCall::new((bar_struct_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = getFooEnumVariantBCall::abi_decode_returns(&return_data).unwrap();
+        let got = (return_data._0, return_data._1, return_data._2);
+        assert_eq!(got, (4u64, 5u128, true));
+        assert_eq!(0, result);
+
+        let call_data =
+            setFooEnumVariantCCall::new((bar_struct_id, Numbers::Two, Colors::Blue)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = getFooEnumVariantCCall::new((bar_struct_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = getFooEnumVariantCCall::abi_decode_returns(&return_data).unwrap();
+        let got = (return_data._0, return_data._1);
+        assert_eq!(got, (Numbers::Two, Colors::Blue));
+        assert_eq!(0, result);
+
+        let call_data = getAddressCall::new((bar_struct_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = getAddressCall::abi_decode_returns(&return_data).unwrap();
+        let got = return_data;
+        assert_eq!(got, address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"));
+        assert_eq!(0, result);
+
+        let storage_before_destroy = runtime.get_storage();
+        let call_data = destroyBarStructCall::new((bar_struct_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
         let storage_after_destroy = runtime.get_storage();

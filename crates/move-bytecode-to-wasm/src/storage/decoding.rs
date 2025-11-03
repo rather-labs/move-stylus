@@ -11,7 +11,7 @@ use crate::{
     data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
-    storage::storage_layout::field_size,
+    storage::storage_layout::{compute_enum_storage_tail_position, field_size},
     translation::intermediate_types::{IntermediateType, vector::IVector},
     wasm_builder_extensions::WasmBuilderExtension,
 };
@@ -260,6 +260,17 @@ pub fn add_read_and_decode_storage_enum_instructions(
         .heap_size
         .expect("cannot decode enum with unresolved generic heap size") as i32;
 
+    // Compute the tail slot and tail offset for the enum
+    let (tail_slot_ptr, tail_slot_offset) = compute_enum_storage_tail_position(
+        module,
+        builder,
+        &enum_,
+        slot_ptr,
+        slot_offset,
+        compilation_ctx,
+    )
+    .unwrap();
+
     // Locals
     let enum_ptr = module.locals.add(ValType::I32);
     let field_ptr = module.locals.add(ValType::I32);
@@ -341,6 +352,11 @@ pub fn add_read_and_decode_storage_enum_instructions(
             );
         }
     });
+
+    // slot_offset = tail_slot_offset
+    builder.local_get(tail_slot_offset).local_set(slot_offset);
+    // *slot_ptr = *tail_slot_ptr
+    builder.local_get(tail_slot_ptr).local_set(slot_ptr);
 
     enum_ptr
 }
