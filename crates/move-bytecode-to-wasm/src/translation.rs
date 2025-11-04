@@ -2626,7 +2626,7 @@ fn translate_instruction(
         Bytecode::PackVariantGeneric(index) => {
             let enum_ = &module_data
                 .enums
-                .get_enum_instance_by_variant_instantiation_handle_idx(index)?;
+                .get_enum_instance_by_variant_instantiation_handle_idx(compilation_ctx, index)?;
 
             let variant_index = module_data
                 .enums
@@ -2655,7 +2655,9 @@ fn translate_instruction(
                         .collect::<Vec<IntermediateType>>();
 
                     (
-                        &enum_.instantiate(&type_parameters_instantiations),
+                        &enum_
+                            .instantiate(&type_parameters_instantiations, compilation_ctx)
+                            .unwrap(),
                         instantiations,
                     )
                 }
@@ -2708,7 +2710,7 @@ fn translate_instruction(
         Bytecode::UnpackVariantGeneric(index) => {
             let enum_ = &module_data
                 .enums
-                .get_enum_instance_by_variant_instantiation_handle_idx(index)?;
+                .get_enum_instance_by_variant_instantiation_handle_idx(compilation_ctx, index)?;
             let variant_index = module_data
                 .enums
                 .get_variant_position_by_variant_instantiation_handle_idx(index)?;
@@ -2723,7 +2725,10 @@ fn translate_instruction(
                         instantiations.push(replace_type_parameters(field, caller_type_instances));
                     }
 
-                    (&enum_.instantiate(&instantiations), instantiations)
+                    (
+                        &enum_.instantiate(&instantiations, compilation_ctx).unwrap(),
+                        instantiations,
+                    )
                 }
                 // This should never happen
                 else {
@@ -2781,7 +2786,7 @@ fn translate_instruction(
         | Bytecode::UnpackVariantGenericMutRef(index) => {
             let enum_ = &module_data
                 .enums
-                .get_enum_instance_by_variant_instantiation_handle_idx(index)?;
+                .get_enum_instance_by_variant_instantiation_handle_idx(compilation_ctx, index)?;
             let variant_index = module_data
                 .enums
                 .get_variant_position_by_variant_instantiation_handle_idx(index)?;
@@ -2797,7 +2802,10 @@ fn translate_instruction(
                         instantiations.push(replace_type_parameters(field, caller_type_instances));
                     }
 
-                    (&enum_.instantiate(&instantiations), instantiations)
+                    (
+                        &enum_.instantiate(&instantiations, compilation_ctx).unwrap(),
+                        instantiations,
+                    )
                 }
                 // This should never happen
                 else {

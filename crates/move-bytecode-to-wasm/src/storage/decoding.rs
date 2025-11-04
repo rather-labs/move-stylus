@@ -264,7 +264,7 @@ pub fn add_read_and_decode_storage_enum_instructions(
     let (tail_slot_ptr, tail_slot_offset) = compute_enum_storage_tail_position(
         module,
         builder,
-        &enum_,
+        itype,
         slot_ptr,
         slot_offset,
         compilation_ctx,

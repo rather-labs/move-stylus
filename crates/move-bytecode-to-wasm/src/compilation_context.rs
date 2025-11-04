@@ -112,7 +112,27 @@ impl CompilationContext<'_> {
         match itype {
             IntermediateType::IEnum { module_id, index } => {
                 let enum_ = self.get_enum_by_index(module_id, *index)?;
-                Ok(Cow::Borrowed(enum_))
+                if enum_.storage_size.is_none() {
+                    let storage_size = enum_.get_storage_size(self).map_err(|_| {
+                        CompilationContextError::Unknown(
+                            anyhow::anyhow!(
+                                "failed to compute storage size for concrete enum {}",
+                                enum_.index,
+                            )
+                            .to_string(),
+                        )
+                    })?;
+                    let enum_with_storage_size = IEnum {
+                        index: enum_.index,
+                        is_simple: enum_.is_simple,
+                        variants: enum_.variants.clone(),
+                        heap_size: enum_.heap_size,
+                        storage_size: Some(storage_size),
+                    };
+                    Ok(Cow::Owned(enum_with_storage_size))
+                } else {
+                    Ok(Cow::Borrowed(enum_))
+                }
             }
             IntermediateType::IGenericEnumInstance {
                 module_id,
@@ -121,7 +141,7 @@ impl CompilationContext<'_> {
                 ..
             } => {
                 let enum_ = self.get_enum_by_index(module_id, *index)?;
-                let instance = enum_.instantiate(types);
+                let instance = enum_.instantiate(types, self).unwrap();
                 Ok(Cow::Owned(instance))
             }
             _ => Err(CompilationContextError::ExpectedEnum),

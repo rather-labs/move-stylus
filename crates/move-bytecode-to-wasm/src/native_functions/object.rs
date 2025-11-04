@@ -9,9 +9,7 @@ use crate::{
     },
     runtime::RuntimeFunction,
     storage::storage_layout::{compute_enum_storage_tail_position, field_size},
-    translation::intermediate_types::{
-        IntermediateType, address::IAddress, enums::IEnum, structs::IStruct,
-    },
+    translation::intermediate_types::{IntermediateType, address::IAddress, structs::IStruct},
     utils::keccak_string_to_memory,
     vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
 };
@@ -332,7 +330,7 @@ pub fn add_delete_storage_enum_instructions(
     compilation_ctx: &CompilationContext,
     slot_ptr: LocalId,
     slot_offset: LocalId,
-    enum_: &IEnum,
+    itype: &IntermediateType,
 ) {
     let (storage_cache, _) = storage_cache_bytes32(module);
     let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
@@ -342,7 +340,7 @@ pub fn add_delete_storage_enum_instructions(
     let (tail_slot_ptr, tail_slot_offset) = compute_enum_storage_tail_position(
         module,
         builder,
-        enum_,
+        itype,
         slot_ptr,
         slot_offset,
         compilation_ctx,
@@ -574,17 +572,13 @@ pub fn add_delete_field_instructions(
             }
         }
         IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-            let enum_ = compilation_ctx
-                .get_enum_by_intermediate_type(itype)
-                .expect("enum not found");
-
             add_delete_storage_enum_instructions(
                 module,
                 builder,
                 compilation_ctx,
                 slot_ptr,
                 slot_offset,
-                &enum_,
+                itype,
             );
         }
         IntermediateType::IVector(inner_) => {

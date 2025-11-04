@@ -674,47 +674,18 @@ impl IntermediateType {
                     module_data,
                 );
             }
-            IntermediateType::IStruct {
-                module_id, index, ..
-            } => {
+            IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
+                    .get_struct_by_intermediate_type(self)
                     .unwrap();
                 struct_.copy_local_instructions(module, builder, compilation_ctx, module_data);
-            }
-            IntermediateType::IGenericStructInstance {
-                module_id,
-                index,
-                types,
-                ..
-            } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
-                let struct_instance = struct_.instantiate(types);
-                struct_instance.copy_local_instructions(
-                    module,
-                    builder,
-                    compilation_ctx,
-                    module_data,
-                );
             }
             IntermediateType::ISigner => {
                 // Signer type is read-only, we push the pointer only
             }
-            IntermediateType::IEnum { index, .. } => {
-                let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
+            IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
+                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self).unwrap();
                 enum_.copy_local_instructions(module, builder, compilation_ctx, module_data);
-            }
-            IntermediateType::IGenericEnumInstance { index, types, .. } => {
-                let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
-                let enum_instance = enum_.instantiate(types);
-                enum_instance.copy_local_instructions(
-                    module,
-                    builder,
-                    compilation_ctx,
-                    module_data,
-                );
             }
             _ => panic!("Unsupported ReadRef type: {:?}", self),
         }

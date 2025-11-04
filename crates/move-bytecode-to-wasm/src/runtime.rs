@@ -12,6 +12,7 @@ use crate::{
 };
 
 mod copy;
+mod enums;
 mod equality;
 mod integers;
 mod storage;
@@ -77,6 +78,8 @@ pub enum RuntimeFunction {
     AccumulateOrAdvanceSlotRead,
     AccumulateOrAdvanceSlotWrite,
     CacheStorageObjectChanges,
+    // Enums
+    MatchOnOffset,
     // ASCII conversion
     U64ToAsciiBase10,
 }
@@ -143,6 +146,8 @@ impl RuntimeFunction {
             Self::AccumulateOrAdvanceSlotRead => "accumulate_or_advance_slot_read",
             Self::AccumulateOrAdvanceSlotWrite => "accumulate_or_advance_slot_write",
             Self::CacheStorageObjectChanges => "cache_storage_object_changes",
+            // Enums
+            Self::MatchOnOffset => "match_on_offset",
         }
     }
 
@@ -353,6 +358,16 @@ impl RuntimeFunction {
                 );
 
                 storage::cache_storage_object_changes(module, compilation_ctx, generics[0])
+            }
+            Self::MatchOnOffset => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {} expected 1 type parameter, found {}",
+                    self.name(),
+                    generics.len(),
+                );
+                enums::match_on_offset(module, compilation_ctx, generics[0])
             }
             _ => panic!(
                 r#"there was an error linking "{}" runtime function, is this function generic?"#,

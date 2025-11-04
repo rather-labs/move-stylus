@@ -60,6 +60,12 @@ pub struct IEnum {
     /// If the enum contains a variant with a generic field, we can't know the heap size, first it
     /// must be instantiated.
     pub heap_size: Option<u32>,
+
+    /// Precomputed storage sizes for each possible slot offset (0-31).
+    /// Index corresponds to slot_offset, value is the maximum storage size across all variants in bytes.
+    /// This is computed at compile time to avoid runtime computation.
+    /// Empty vector means sizes haven't been precomputed yet.
+    pub storage_size: Option<Vec<u32>>,
 }
 
 impl IEnumVariant {
@@ -76,11 +82,13 @@ impl IEnum {
     pub fn new(index: u16, variants: Vec<IEnumVariant>) -> Result<Self, TranslationError> {
         let is_simple = variants.iter().all(|v| v.fields.is_empty());
         let heap_size = Self::compute_heap_size(&variants)?;
+
         Ok(Self {
             is_simple,
             variants,
             index,
             heap_size,
+            storage_size: None,
         })
     }
 
@@ -264,7 +272,11 @@ impl IEnum {
     }
 
     /// Replaces all type parameters in the enum with the provided types.
-    pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
+    pub fn instantiate(
+        &self,
+        types: &[IntermediateType],
+        compilation_ctx: &CompilationContext,
+    ) -> Result<Self, TranslationError> {
         let variants: Vec<IEnumVariant> = self
             .variants
             .iter()
@@ -280,14 +292,41 @@ impl IEnum {
             })
             .collect();
 
-        // Recompute heap_size after instantiating the types
+        // Recompute heap_size after instantiating the types.
         let heap_size = Self::compute_heap_size(&variants).unwrap_or(None);
 
-        Self {
+        let mut instantiated = Self {
             index: self.index,
             is_simple: self.is_simple,
             variants,
             heap_size,
+            storage_size: None,
+        };
+
+        // Compute enum storage sizes
+        instantiated.storage_size = instantiated.get_storage_size(compilation_ctx).ok();
+
+        Ok(instantiated)
+    }
+
+    /// Gets the storage size for an enum for all possible slot offsets, or computes it if it hasn't been computed yet.
+    pub fn get_storage_size(
+        &self,
+        compilation_ctx: &CompilationContext,
+    ) -> Result<Vec<u32>, TranslationError> {
+        if self.storage_size.is_none() {
+            let mut storage_size = Vec::with_capacity(32);
+            for offset in 0..32 {
+                let enum_size = crate::storage::storage_layout::compute_enum_storage_size(
+                    self,
+                    offset,
+                    compilation_ctx,
+                )?;
+                storage_size.push(enum_size);
+            }
+            Ok(storage_size)
+        } else {
+            Ok(self.storage_size.clone().unwrap())
         }
     }
 

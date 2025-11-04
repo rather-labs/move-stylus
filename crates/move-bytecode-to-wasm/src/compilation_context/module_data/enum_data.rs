@@ -10,7 +10,7 @@ use move_binary_format::{
 };
 
 use crate::{
-    compilation_context::CompilationContextError,
+    compilation_context::{CompilationContext, CompilationContextError},
     translation::intermediate_types::{IntermediateType, enums::IEnum},
 };
 
@@ -99,6 +99,7 @@ impl EnumData {
 
     pub fn get_enum_instance_by_variant_instantiation_handle_idx(
         &self,
+        compilation_ctx: &CompilationContext,
         variant_instantiation_handle_index: &VariantInstantiationHandleIndex,
     ) -> Result<IEnum> {
         let VariantInstantiationData {
@@ -116,7 +117,7 @@ impl EnumData {
             &self.generic_enum_instantiations[enum_def_instantiation_index.into_index()];
         let generic_enum = &self.enums[idx.into_index()];
 
-        Ok(generic_enum.instantiate(types))
+        Ok(generic_enum.instantiate(types, compilation_ctx).unwrap())
     }
 
     pub fn get_enum_instance_types(
