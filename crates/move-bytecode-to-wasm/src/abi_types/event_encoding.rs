@@ -35,8 +35,17 @@ fn solidity_name(
         | IntermediateType::IU64
         | IntermediateType::IU128
         | IntermediateType::IU256
-        | IntermediateType::IAddress
-        | IntermediateType::IEnum(_) => argument.sol_name(compilation_ctx),
+        | IntermediateType::IAddress => argument.sol_name(compilation_ctx),
+        IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
+            let enum_ = compilation_ctx
+                .get_enum_by_intermediate_type(argument)
+                .unwrap();
+            if enum_.is_simple {
+                argument.sol_name(compilation_ctx)
+            } else {
+                None
+            }
+        }
         IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
             solidity_name(inner, compilation_ctx)
         }
@@ -74,7 +83,6 @@ fn solidity_name(
             struct_fields_sol_name(&struct_instance, compilation_ctx)
         }
         IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => None,
-        IntermediateType::IGenericEnumInstance { .. } => todo!(),
     }
 }
 

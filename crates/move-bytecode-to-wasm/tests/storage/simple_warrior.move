@@ -13,6 +13,7 @@ public struct Warrior has key {
     id: UID,
     sword: Option<Sword>,
     shield: Option<Shield>,
+    faction: Faction,
 }
 
 public struct Sword has key, store {
@@ -25,11 +26,18 @@ public struct Shield has key, store {
     armor: u8,
 }
 
+public enum Faction has drop, store {
+    Alliance,
+    Horde,
+    Rebel
+}
+
 entry fun create_warrior(ctx: &mut TxContext) {
     let warrior = Warrior {
         id: object::new(ctx),
         sword: option::none(),
         shield: option::none(),
+        faction: Faction::Rebel,
     };
     transfer::transfer(warrior, ctx.sender())
 }
@@ -60,8 +68,12 @@ entry fun equip_shield(warrior: &mut Warrior, shield: Shield, ctx: &mut TxContex
     warrior.shield.fill(shield);
 }
 
+entry fun change_faction(warrior: &mut Warrior, faction: Faction, ctx: &mut TxContext) {
+    warrior.faction = faction;
+}
+
 entry fun destroy_warrior(warrior: Warrior) {
-    let Warrior { id, sword: mut sword, shield: mut shield } = warrior;
+    let Warrior { id, sword: mut sword, shield: mut shield, faction: _ } = warrior;
 
     // delete the Warrior UID first
     object::delete(id);

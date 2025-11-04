@@ -49,7 +49,7 @@ pub enum UserDefinedType {
     Struct { module_id: ModuleId, index: u16 },
 
     /// Enum defined in this module
-    Enum(usize),
+    Enum { module_id: ModuleId, index: u16 },
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
@@ -262,7 +262,13 @@ impl ModuleData {
                 } else if let Some(position) =
                     module.enum_defs().iter().position(|e| e.enum_handle == idx)
                 {
-                    datatype_handles_map.insert(idx, UserDefinedType::Enum(position));
+                    datatype_handles_map.insert(
+                        idx,
+                        UserDefinedType::Enum {
+                            module_id: module_id.clone(),
+                            index: position as u16,
+                        },
+                    );
                 } else {
                     panic!("datatype handle index {index} not found");
                 };
@@ -322,7 +328,13 @@ impl ModuleData {
                     .iter()
                     .position(|e| e.enum_handle == external_dth_idx)
                 {
-                    datatype_handles_map.insert(idx, UserDefinedType::Enum(position));
+                    datatype_handles_map.insert(
+                        idx,
+                        UserDefinedType::Enum {
+                            module_id: module_id.clone(),
+                            index: position as u16,
+                        },
+                    );
                 } else {
                     panic!("datatype handle index {index} not found");
                 };

@@ -2,14 +2,14 @@ use super::RuntimeFunction;
 use crate::data::{
     DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
-    DATA_STORAGE_OBJECT_OWNER_OFFSET,
+    DATA_STORAGE_OBJECT_OWNER_OFFSET, DATA_ZERO_OFFSET,
 };
-use crate::hostio::host_functions::{self, storage_flush_cache, storage_load_bytes32, tx_origin};
+use crate::hostio::host_functions::{
+    self, storage_cache_bytes32, storage_flush_cache, storage_load_bytes32, tx_origin,
+};
 use crate::native_functions::object::add_delete_storage_struct_instructions;
-use crate::storage::encoding::{
-    add_encode_and_save_into_storage_struct_instructions,
-    add_read_and_decode_storage_struct_instructions,
-};
+use crate::storage::decoding::add_read_and_decode_storage_struct_instructions;
+use crate::storage::encoding::add_encode_and_save_into_storage_struct_instructions;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::heap_integers::IU256;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
@@ -570,10 +570,8 @@ pub fn add_encode_and_save_into_storage_fn(
     let slot_ptr = module.locals.add(ValType::I32);
 
     // Locals
-    let written_bytes_in_slot = module.locals.add(ValType::I32);
-
-    // Set the written bytes in the slot to 0
-    builder.i32_const(0).local_set(written_bytes_in_slot);
+    let slot_offset = module.locals.add(ValType::I32);
+    builder.i32_const(0).local_set(slot_offset);
 
     add_encode_and_save_into_storage_struct_instructions(
         module,
@@ -581,9 +579,9 @@ pub fn add_encode_and_save_into_storage_fn(
         compilation_ctx,
         struct_ptr,
         slot_ptr,
+        slot_offset,
         None,
         itype,
-        written_bytes_in_slot,
     );
 
     function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs)
@@ -634,18 +632,18 @@ pub fn add_read_and_decode_from_storage_fn(
         .i32_const(32)
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-    let read_bytes_in_slot = module.locals.add(ValType::I32);
-    builder.i32_const(0).local_set(read_bytes_in_slot);
+    let slot_offset = module.locals.add(ValType::I32);
+    builder.i32_const(0).local_set(slot_offset);
 
     let struct_ptr = add_read_and_decode_storage_struct_instructions(
         module,
         &mut builder,
         compilation_ctx,
         slot_ptr,
-        Some(struct_id_ptr),
+        slot_offset,
         owner_ptr,
+        Some(struct_id_ptr),
         itype,
-        read_bytes_in_slot,
     );
 
     builder.local_get(struct_ptr);
@@ -721,8 +719,8 @@ pub fn add_delete_struct_from_storage_fn(
                 .local_set(slot_ptr);
 
             // Initialize the number of bytes used in the slot to 8, to reflect the 8-byte type hash
-            let used_bytes_in_slot = module.locals.add(ValType::I32);
-            else_.i32_const(8).local_set(used_bytes_in_slot);
+            let slot_offset = module.locals.add(ValType::I32);
+            else_.i32_const(8).local_set(slot_offset);
 
             // Delete the struct from storage
             add_delete_storage_struct_instructions(
@@ -730,8 +728,8 @@ pub fn add_delete_struct_from_storage_fn(
                 else_,
                 compilation_ctx,
                 slot_ptr,
+                slot_offset,
                 &struct_,
-                used_bytes_in_slot,
             );
         },
     );
@@ -1136,6 +1134,187 @@ pub fn add_commit_changes_to_storage_fn(
     function.finish(vec![], &mut module.funcs)
 }
 
+/// Emits a WASM function that maintains a 32-byte storage slot accumulator for DELETE flows.
+///
+/// Behavior:
+/// - If `slot_offset + field_size` exceeds 32, it performs the delete-specific transition:
+///   wipes the current slot data to zero and advances to the next slot.
+///   Then sets `slot_offset = field_size`.
+/// - Otherwise, it simply accumulates: `slot_offset += field_size`.
+///
+/// Arguments:
+/// - `slot_ptr: i32`: Pointer to the slot.
+/// - `slot_offset: i32`: Offset in the current slot.
+/// - `field_size: i32`: Size of the field in bytes.
+///
+/// Returns:
+/// - `i32`: The new slot offset after advancing or accumulating.
+pub fn accumulate_or_advance_slot_delete(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let (storage_cache_fn, _) = storage_cache_bytes32(module);
+    let next_slot_fn = storage_next_slot_function(module, compilation_ctx);
+
+    build_accumulate_or_advance_slot(
+        module,
+        "accumulate_or_advance_slot_delete",
+        move |then, slot_ptr| {
+            // Wipe the slot
+            then.local_get(slot_ptr)
+                .i32_const(DATA_ZERO_OFFSET)
+                .call(storage_cache_fn);
+
+            // Advance the slot pointer
+            then.local_get(slot_ptr)
+                .call(next_slot_fn)
+                .local_set(slot_ptr);
+        },
+    )
+}
+
+/// Emits a WASM function that maintains a 32-byte storage slot accumulator for READ flows.
+///
+/// Behavior:
+/// - If `slot_offset + field_size` exceeds 32, it advances to the next slot and loads the slot
+///   data from storage (into the standard data buffer), then sets `slot_offset = field_size`.
+/// - Otherwise, it accumulates: `slot_offset += field_size`.
+///
+/// Arguments:
+/// - `slot_ptr: i32`: Pointer to the slot.
+/// - `slot_offset: i32`: Offset in the current slot.
+/// - `field_size: i32`: Size of the field in bytes.
+///
+/// Returns:
+/// - `i32`: The new slot offset after advancing or accumulating.
+pub fn accumulate_or_advance_slot_read(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let (storage_load, _) = storage_load_bytes32(module);
+    let next_slot_fn = storage_next_slot_function(module, compilation_ctx);
+
+    build_accumulate_or_advance_slot(
+        module,
+        "accumulate_or_advance_slot_read",
+        move |then, slot_ptr| {
+            // Advance the slot
+            then.local_get(slot_ptr)
+                .call(next_slot_fn)
+                .local_tee(slot_ptr);
+
+            // Load the slot data from storage
+            then.i32_const(DATA_SLOT_DATA_PTR_OFFSET).call(storage_load);
+        },
+    )
+}
+
+/// Emits a WASM function that maintains a 32-byte storage slot accumulator for WRITE flows.
+///
+/// Behavior:
+/// - If `slot_offset + field_size` exceeds 32, it caches the current slot to storage,
+///   clears the data buffer, advances to the next slot, and sets `slot_offset = field_size`.
+/// - Otherwise, it accumulates: `slot_offset += field_size`.
+///
+/// Arguments:
+/// - `slot_ptr: i32`: Pointer to the slot.
+/// - `slot_offset: i32`: Offset in the current slot.
+/// - `field_size: i32`: Size of the field in bytes.
+///
+/// Returns:
+/// - `i32`: The new slot offset after advancing or accumulating.
+pub fn accumulate_or_advance_slot_write(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> FunctionId {
+    let (storage_cache_fn, _) = storage_cache_bytes32(module);
+    let next_slot_fn = storage_next_slot_function(module, compilation_ctx);
+
+    build_accumulate_or_advance_slot(
+        module,
+        "accumulate_or_advance_slot_write",
+        move |then, slot_ptr| {
+            // Cache the slot data to storage
+            then.local_get(slot_ptr)
+                .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                .call(storage_cache_fn);
+
+            // Wipe the slot data so we can write on it safely
+            then.i32_const(DATA_SLOT_DATA_PTR_OFFSET)
+                .i32_const(0)
+                .i32_const(32)
+                .memory_fill(compilation_ctx.memory_id);
+
+            // Advance the slot pointer
+            then.local_get(slot_ptr)
+                .call(next_slot_fn)
+                .local_set(slot_ptr);
+        },
+    )
+}
+
+/// Internal template used by the read/write/delete variants.
+///
+/// This helper encapsulates the common logic of deciding whether to accumulate within the current
+/// 32-byte slot or advance to the next slot. It accepts a small closure (`mode_builder`) that emits
+/// the mode-specific instructions executed when an advance is required (the "then" arm).
+///
+/// Template behavior:
+/// - If `slot_offset + field_size > 32`:
+///   - Executes the `mode_builder` closure to perform mode-specific actions (e.g., cache/clear/advance).
+///   - Sets `slot_offset = field_size`.
+/// - Else:
+///   - Sets `slot_offset = slot_offset + field_size`.
+///
+/// The generated function has signature:
+///   (slot_ptr: i32, slot_offset: i32, field_size: i32) -> i32 (new slot_offset)
+fn build_accumulate_or_advance_slot<F>(
+    module: &mut Module,
+    name: &str,
+    mode_builder: F,
+) -> FunctionId
+where
+    F: FnOnce(&mut walrus::InstrSeqBuilder, walrus::LocalId),
+{
+    let mut function = FunctionBuilder::new(
+        &mut module.types,
+        &[ValType::I32, ValType::I32, ValType::I32],
+        &[ValType::I32],
+    );
+    let mut builder = function.name(name.to_owned()).func_body();
+
+    let slot_ptr = module.locals.add(ValType::I32);
+    let slot_offset = module.locals.add(ValType::I32);
+    let field_size = module.locals.add(ValType::I32);
+
+    builder
+        .local_get(slot_offset)
+        .local_get(field_size)
+        .binop(BinaryOp::I32Add)
+        .i32_const(32)
+        .binop(BinaryOp::I32GtU)
+        .if_else(
+            None,
+            |then| {
+                // Delegate the mode-specific logic
+                mode_builder(then, slot_ptr);
+
+                then.local_get(field_size).local_set(slot_offset);
+            },
+            |else_| {
+                // Increment the slot_offset by the field size
+                else_
+                    .local_get(slot_offset)
+                    .local_get(field_size)
+                    .binop(BinaryOp::I32Add)
+                    .local_set(slot_offset);
+            },
+        );
+
+    builder.local_get(slot_offset);
+
+    function.finish(vec![slot_ptr, slot_offset, field_size], &mut module.funcs)
+}
 /// Commits changes of storage objests into the storage cache.
 ///
 /// # Arguments
