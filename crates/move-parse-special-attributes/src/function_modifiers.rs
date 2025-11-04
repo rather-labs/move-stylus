@@ -1,4 +1,5 @@
-use move_compiler::parser::ast::Attribute_;
+use crate::types::Type;
+use move_compiler::parser::ast::{Attribute_, FunctionSignature};
 
 #[derive(Debug)]
 pub struct Function {
@@ -6,6 +7,7 @@ pub struct Function {
     pub modifiers: Vec<FunctionModifier>,
     pub is_entry: bool,
     pub visibility: Visibility,
+    pub signature: Signature,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -23,6 +25,12 @@ impl From<&move_compiler::parser::ast::Visibility> for Visibility {
     }
 }
 
+#[derive(Debug)]
+pub struct Signature {
+    parameters: Vec<Type>,
+    return_type: Type,
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum FunctionModifier {
     Pure,
@@ -30,6 +38,23 @@ pub enum FunctionModifier {
     Payable,
     ExternalCall,
     Abi,
+}
+
+impl Function {
+    pub fn parse_signature(signature: &FunctionSignature) -> Signature {
+        let parameters = signature
+            .parameters
+            .iter()
+            .map(|(_, _, c)| Type::parse_type(&c.value))
+            .collect();
+
+        let return_type = Type::parse_type(&signature.return_type.value);
+
+        Signature {
+            parameters,
+            return_type,
+        }
+    }
 }
 
 impl FunctionModifier {

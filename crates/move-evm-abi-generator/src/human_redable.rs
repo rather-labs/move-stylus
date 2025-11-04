@@ -1,4 +1,3 @@
-use move_compiler::cfgir::visitor;
 use move_parse_special_attributes::function_modifiers::{Function, Visibility};
 
 /// Converts the input string to camel case.
@@ -53,6 +52,9 @@ pub(crate) fn process_functions<'special_attrs>(
         if function.visibility == Visibility::Public {
             modifiers.push("public")
         }
+
+        // All functions we process are entry
+        modifiers.push("external");
 
         contract_abi.push_str(&modifiers.join(" "));
 

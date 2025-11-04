@@ -4,6 +4,7 @@ mod external_call;
 pub mod function_modifiers;
 mod shared;
 pub mod struct_modifiers;
+pub mod types;
 
 pub use error::SpecialAttributeError;
 use error::SpecialAttributeErrorKind;
@@ -25,7 +26,7 @@ use external_call::{
     external_struct::{ExternalStruct, ExternalStructError},
     validate_external_call_function, validate_external_call_struct,
 };
-use function_modifiers::{Function, FunctionModifier, Visibility};
+use function_modifiers::{Function, FunctionModifier, Signature, Visibility};
 use move_compiler::{
     Compiler, PASS_PARSER,
     parser::ast::{Definition, ModuleMember},
@@ -135,15 +136,15 @@ pub fn process_special_attributes(
         };
     }
 
-    // println!("{:#?}", ast.source_definitions);
     for source in ast.source_definitions {
         if let Definition::Module(module) = source.def {
             for module_member in module.members {
                 match module_member {
                     ModuleMember::Function(ref f) => {
-                        // println!("{f:#?}");
+                        println!("{:#?}", f.signature);
                         let is_entry = f.entry.is_some();
                         let visibility: Visibility = (&f.visibility).into();
+                        let signature = Function::parse_signature(&f.signature);
 
                         if let Some(attributes) = f.attributes.first() {
                             let mut modifiers = attributes
@@ -174,12 +175,12 @@ pub fn process_special_attributes(
                                                 modifiers,
                                                 is_entry,
                                                 visibility,
+                                                signature,
                                             },
                                         );
                                     }
                                 }
                                 Some(FunctionModifier::Abi) => {
-                                    println!("ACA? {modifiers:?}");
                                     let modifiers: Vec<FunctionModifier> =
                                         modifiers.into_iter().collect();
 
@@ -188,6 +189,7 @@ pub fn process_special_attributes(
                                         modifiers,
                                         is_entry,
                                         visibility,
+                                        signature,
                                     });
                                 }
                                 _ => {}
@@ -198,6 +200,7 @@ pub fn process_special_attributes(
                                 modifiers: Vec::new(),
                                 is_entry,
                                 visibility,
+                                signature,
                             });
                         }
                     }
