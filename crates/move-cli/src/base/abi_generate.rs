@@ -1,4 +1,5 @@
 use clap::*;
+use move_compiler::diagnostics::{Diagnostics, report_diagnostics};
 use move_evm_abi_generator::generate_abi;
 use move_package::BuildConfig;
 use std::path::Path;
@@ -10,7 +11,14 @@ pub struct AbiGenerate;
 
 impl AbiGenerate {
     pub fn execute(self, path: Option<&Path>, _config: BuildConfig) -> anyhow::Result<()> {
-        generate_abi(path);
+        if let Err((mapped_files, errors)) = generate_abi(path.unwrap()) {
+            let mut diagnostics = Diagnostics::new();
+            for error in &errors {
+                diagnostics.add(error.into());
+            }
+
+            report_diagnostics(&mapped_files, diagnostics)
+        }
         Ok(())
     }
 }

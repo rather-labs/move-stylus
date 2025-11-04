@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use move_compiler::parser::ast::{Function, FunctionBody_, NameAccessChain_, Type_};
 
 use crate::{
@@ -50,7 +52,7 @@ fn body_is_native(function: &Function) -> bool {
 
 fn check_first_parameter_is_external_struct(
     function: &Function,
-    external_call_structs: &[String],
+    external_call_structs: &HashSet<String>,
 ) -> bool {
     if let Some((_, _, type_)) = function.signature.parameters.first() {
         if let Some(name) = get_single_type_name(&type_.value) {
@@ -66,7 +68,7 @@ fn check_first_parameter_is_external_struct(
 pub(crate) fn validate_external_call_function(
     function: &Function,
     _modifiers: &[FunctionModifier],
-    external_call_structs: &[String],
+    external_call_structs: &HashSet<String>,
 ) -> Result<(), Vec<SpecialAttributeError>> {
     let mut errors = Vec::new();
 

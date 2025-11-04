@@ -2,60 +2,27 @@
 //! Parses the AST of a package to extract the ABI
 //!
 //! NOTE: This is a POC and it is WIP
-mod function_modifiers;
+mod human_redable;
 
-use function_modifiers::FunctionModifier;
-use move_compiler::{
-    Compiler, PASS_PARSER,
-    parser::ast::{Definition, ModuleMember},
-    shared::NumericalAddress,
-};
-use std::{collections::BTreeMap, path::Path};
+use std::path::Path;
 
-#[derive(Debug)]
-struct Function {
-    name: String,
-    modifiers: Vec<FunctionModifier>,
-}
+use human_redable::process_functions;
+use move_compiler::shared::files::MappedFiles;
+use move_parse_special_attributes::{SpecialAttributeError, process_special_attributes};
 
-pub fn generate_abi(path: Option<&Path>) {
-    let sources_path = path.unwrap().join("sources");
+pub fn generate_abi(path: &Path) -> Result<(), (MappedFiles, Vec<SpecialAttributeError>)> {
+    let path = path.join("sources");
 
-    let (_, program_res) = Compiler::from_files(
-        None,
-        vec![sources_path.to_str().unwrap()],
-        Vec::new(),
-        BTreeMap::<String, NumericalAddress>::new(),
-    )
-    .run::<PASS_PARSER>()
-    .unwrap();
+    for file in path.read_dir().unwrap() {
+        println!("processing {:?}", &file.as_ref().unwrap().path());
+        let special_attributes = process_special_attributes(&file.unwrap().path())?;
 
-    let ast = program_res.unwrap().into_ast().1;
+        let mut result = String::new();
+        let entry_functions = special_attributes.functions.iter().filter(|f| f.is_entry);
+        process_functions(&mut result, entry_functions);
 
-    for source in ast.source_definitions {
-        if let Definition::Module(module) = source.def {
-            println!("{:#?}", module);
-            for module_member in module.members {
-                match module_member {
-                    ModuleMember::Function(f) => {
-                        let modifiers = f.attributes[0]
-                            .value
-                            .iter()
-                            .flat_map(|s| FunctionModifier::parse_modifiers(&s.value))
-                            .collect::<Vec<FunctionModifier>>();
-
-                        let function = Function {
-                            name: f.name.to_owned().to_string(),
-                            modifiers,
-                        };
-
-                        println!("{function:#?}");
-                    }
-                    _ => continue,
-                }
-            }
-        } else {
-            continue;
-        };
+        println!("{result}");
     }
+
+    Ok(())
 }

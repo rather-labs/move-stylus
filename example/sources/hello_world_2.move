@@ -10,11 +10,12 @@ use hello_world::stack;
 use hello_world::other_mod::{generic_identity, generic_identity_two_types};
 
 // Usage of generic functions
-entry fun echo_with_generic_function_u16(x: u16): u16 {
+public entry fun echo_with_generic_function_u16(x: u16): u16 {
     generic_identity(x)
 }
 
-entry fun echo_with_generic_function_vec32(x: vector<u32>): vector<u32> {
+#[ext(abi, view)]
+public entry fun echo_with_generic_function_vec32(x: vector<u32>): vector<u32> {
     generic_identity(x)
 }
 

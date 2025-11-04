@@ -142,7 +142,7 @@ pub fn translate_package(
         let special_attributes = match process_special_attributes(&root_compiled_module.source_path)
         {
             Ok(sa) => sa,
-            Err(e) => {
+            Err((_mf, e)) => {
                 errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
                 continue;
             }
@@ -314,7 +314,7 @@ pub fn process_dependency_tree<'move_package>(
 
         let special_attributes = match process_special_attributes(&dependency_module.source_path) {
             Ok(sa) => sa,
-            Err(e) => {
+            Err((_mf, e)) => {
                 errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
                 continue;
             }

@@ -3332,6 +3332,7 @@ name = "move-evm-abi-generator"
 version = "0.1.0"
 dependencies = [
  "move-compiler",
+ "move-parse-special-attributes",
 ]
 
 [[package]]
