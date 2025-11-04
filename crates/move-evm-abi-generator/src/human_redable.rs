@@ -1,5 +1,7 @@
 use move_parse_special_attributes::function_modifiers::{Function, Visibility};
 
+use crate::types::Type;
+
 /// Converts the input string to camel case.
 pub fn snake_to_camel(input: &str) -> String {
     let mut result = String::with_capacity(input.len());
@@ -39,11 +41,21 @@ pub(crate) fn process_functions<'special_attrs>(
         contract_abi.push_str("function ");
         contract_abi.push_str(&snake_to_camel(&function.name));
         contract_abi.push('(');
+
+        contract_abi.push_str(
+            &function
+                .signature
+                .parameters
+                .iter()
+                .map(|param| Type::from(param).name())
+                .collect::<Vec<String>>()
+                .join(","),
+        );
+
         contract_abi.push(')');
         contract_abi.push(' ');
 
         let mut modifiers: Vec<&str> = Vec::new();
-        println!("MODIFIERS: {modifiers:?}");
         function
             .modifiers
             .iter()
@@ -57,6 +69,18 @@ pub(crate) fn process_functions<'special_attrs>(
         modifiers.push("external");
 
         contract_abi.push_str(&modifiers.join(" "));
+
+        match Type::from(&function.signature.return_type) {
+            Type::Unit => (),
+            t @ Type::Tuple(_) => {
+                contract_abi.push(' ');
+                contract_abi.push_str(&t.name());
+            }
+            t => {
+                contract_abi.push(' ');
+                contract_abi.push_str(&format!("({})", t.name()));
+            }
+        }
 
         if let Some(' ') = contract_abi.chars().last() {
             contract_abi.pop();

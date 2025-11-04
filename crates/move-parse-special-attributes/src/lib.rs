@@ -141,10 +141,12 @@ pub fn process_special_attributes(
             for module_member in module.members {
                 match module_member {
                     ModuleMember::Function(ref f) => {
-                        println!("{:#?}", f.signature);
+                        // println!("{:#?}", f.signature);
                         let is_entry = f.entry.is_some();
                         let visibility: Visibility = (&f.visibility).into();
                         let signature = Function::parse_signature(&f.signature);
+
+                        println!("{:#?}", signature);
 
                         if let Some(attributes) = f.attributes.first() {
                             let mut modifiers = attributes

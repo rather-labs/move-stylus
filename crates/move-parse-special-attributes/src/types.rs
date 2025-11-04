@@ -15,6 +15,8 @@ pub enum Type {
     U64,
     U128,
     U256,
+    Unit,
+    Tuple(Vec<Type>),
 }
 
 impl Type {
@@ -37,29 +39,15 @@ impl Type {
             },
             Type_::Ref(_, spanned) => Self::parse_type(&spanned.value),
             Type_::Fun(spanneds, spanned) => todo!(),
-            Type_::Unit => todo!(),
-            Type_::Multiple(spanneds) => todo!(),
+            Type_::Unit => Self::Unit,
+            Type_::Multiple(spanneds) => {
+                let types = spanneds
+                    .iter()
+                    .map(|t| Self::parse_type(&t.value))
+                    .collect();
+                Self::Tuple(types)
+            }
             Type_::UnresolvedError => todo!(),
-            /*
-            Type_::Address => Self::Address,
-            ast::Type_::Signer => Self::Signer,
-            ast::Type_::U8 => Self::U8,
-            ast::Type_::U16 => Self::U16,
-            ast::Type_::U32 => Self::U32,
-            ast::Type_::U64 => Self::U64,
-            ast::Type_::U128 => Self::U128,
-            ast::Type_::U256 => Self::U256,
-            ast::Type_::Bool => Self::Bool,
-            ast::Type_::Vector(spanned) => {
-                let inner = Self::parse_type(&spanned.value);
-                Self::Vector(Rc::new(inner))
-            }
-            ast::Type_::Datatype(qualified_datatype_ident, _) => {
-                Self::UserDataType(qualified_datatype_ident.name.to_string())
-            }
-            ast::Type_::Reference(_, spanned) => Self::parse_type(&spanned.value),
-            ast::Type_::TypeParameter(_) => panic!("Found data type"), // TODO: Change this
-                                                                       */
         }
     }
 }

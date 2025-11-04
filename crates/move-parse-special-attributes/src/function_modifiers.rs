@@ -27,8 +27,8 @@ impl From<&move_compiler::parser::ast::Visibility> for Visibility {
 
 #[derive(Debug)]
 pub struct Signature {
-    parameters: Vec<Type>,
-    return_type: Type,
+    pub parameters: Vec<Type>,
+    pub return_type: Type,
 }
 
 #[derive(Debug, PartialEq, Eq)]

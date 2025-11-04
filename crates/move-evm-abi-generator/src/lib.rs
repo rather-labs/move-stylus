@@ -3,6 +3,7 @@
 //!
 //! NOTE: This is a POC and it is WIP
 mod human_redable;
+mod types;
 
 use std::path::Path;
 
