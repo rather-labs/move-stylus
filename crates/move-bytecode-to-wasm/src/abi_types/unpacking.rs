@@ -194,11 +194,9 @@ impl Unpackable for IntermediateType {
                     compilation_ctx,
                 );
             }
-            IntermediateType::IStruct {
-                module_id, index, ..
-            } => {
+            IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
+                    .get_struct_by_intermediate_type(self)
                     .unwrap();
 
                 if struct_.has_key {
@@ -208,7 +206,7 @@ impl Unpackable for IntermediateType {
                         reader_pointer,
                         calldata_reader_pointer,
                         compilation_ctx,
-                        struct_,
+                        &struct_,
                     );
 
                     add_unpack_from_storage_instructions(
@@ -231,56 +229,16 @@ impl Unpackable for IntermediateType {
                     );
                 }
             }
-            IntermediateType::IGenericStructInstance {
-                module_id,
-                index,
-                types,
-                ..
-            } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
-                let struct_instance = struct_.instantiate(types);
-                if struct_instance.has_key {
-                    load_struct_storage_id(
-                        function_builder,
-                        module,
-                        reader_pointer,
-                        calldata_reader_pointer,
-                        compilation_ctx,
-                        &struct_instance,
-                    );
-
-                    add_unpack_from_storage_instructions(
-                        function_builder,
-                        module,
-                        compilation_ctx,
-                        self,
-                        false,
-                    );
-                } else {
-                    struct_instance.add_unpack_instructions(
-                        function_builder,
-                        module,
-                        reader_pointer,
-                        calldata_reader_pointer,
-                        compilation_ctx,
-                    )
-                }
-            }
-            IntermediateType::IEnum(enum_index) => {
-                let enum_ = compilation_ctx
-                    .root_module_data
-                    .enums
-                    .get_enum_by_index(*enum_index)
-                    .unwrap();
+            IntermediateType::IEnum { index, .. }
+            | IntermediateType::IGenericEnumInstance { index, .. } => {
+                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self).unwrap();
                 if !enum_.is_simple {
                     panic!(
-                        "cannot abi unpack enum with index {enum_index}, it contains at least one variant with fields"
+                        "cannot abi unpack enum with index {index}, it contains at least one variant with fields"
                     );
                 }
                 IEnum::add_unpack_instructions(
-                    enum_,
+                    &enum_,
                     function_builder,
                     module,
                     reader_pointer,
@@ -289,9 +247,6 @@ impl Unpackable for IntermediateType {
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot unpack generic type parameter");
-            }
-            IntermediateType::IGenericEnumInstance { .. } => {
-                panic!("cannot unpack generic enum instance")
             }
         }
     }

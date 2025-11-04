@@ -48,6 +48,9 @@ example-cross-contract-call:
 example-delegated-counter:
 	cargo run -p move-hello-world-example --bin delegated_counter
 
+example-delegated-counter-named-id:
+	cargo run -p move-hello-world-example --bin delegated_counter_named_id
+
 deploy-example:
 	cargo stylus deploy \
 		--endpoint='http://localhost:8547' \
@@ -128,6 +131,24 @@ deploy-delegated-counter:
 		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
 		--wasm-file=./example/build/wasm/delegated_counter.wasm \
 		| ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER
+
+deploy-delegated-counter-named-id:
+	cargo stylus deploy \
+		--endpoint='http://localhost:8547' \
+		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
+		--wasm-file=./example/build/wasm/delegated_counter_named_id_logic_1.wasm \
+		| ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID_LOGIC_1
+	cargo stylus deploy \
+		--endpoint='http://localhost:8547' \
+		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
+		--wasm-file=./example/build/wasm/delegated_counter_named_id_logic_2.wasm \
+		| ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID_LOGIC_2
+	cargo stylus deploy \
+		--endpoint='http://localhost:8547' \
+		--private-key="0xb6b15c8cb491557369f3c7d2c287b053eb229daa9c22138887752191c9520659" \
+		--wasm-file=./example/build/wasm/delegated_counter_named_id.wasm \
+		| ./update_contract_env.sh CONTRACT_ADDRESS_DELEGATED_COUNTER_NAMED_ID
+
 
 setup-stylus:
 	RUSTFLAGS="-C link-args=-rdynamic" cargo install --force cargo-stylus

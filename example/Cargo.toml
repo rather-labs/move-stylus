@@ -43,6 +43,10 @@ path = "scripts/dog_walker.rs"
 name = "delegated_counter"
 path = "scripts/delegated_counter.rs"
 
+[[bin]]
+name = "delegated_counter_named_id"
+path = "scripts/delegated_counter_named_id.rs"
+
 [dependencies]
 dotenv = "0.15.0"
 eyre = "0.6.8"

@@ -100,6 +100,8 @@ impl NativeFunction {
             address,
             module_name,
         } = module_id;
+        let native_fn_name = Self::get_function_name(name, module_id);
+
         // Some functions are implemented by host functions directly. For those, we just import and
         // use them without wrapping them.
         if let Some(host_fn_name) = Self::host_fn_name(name) {
@@ -143,7 +145,7 @@ impl NativeFunction {
             }
         }
 
-        if let Some(function) = module.funcs.by_name(name) {
+        if let Some(function) = module.funcs.by_name(&native_fn_name) {
             function
         } else {
             match (name, *address, module_name.as_str()) {
@@ -173,34 +175,53 @@ impl NativeFunction {
                 (Self::NATIVE_GET_LAST_MEMORY_POSITION, _, _) => {
                     tests::add_get_last_memory_position_fn(module, compilation_ctx)
                 }
-                _ => {
-                    let module_data = compilation_ctx
-                        .get_module_data_by_id(module_id)
-                        .unwrap_or_else(|_| {
-                            panic!("native function {module_id}::{name} not supported yet")
-                        });
+                _ => panic!("native function {module_id}::{name} not supported yet"),
+            }
+        }
+    }
 
-                    let function_information = module_data
-                        .functions
-                        .get_information_by_identifier(name)
-                        .unwrap_or_else(|| {
-                            panic!("could not find function information for {module_id}::{name}")
-                        });
+    /// Links a function marked as #[external_call] into themodule and returns its id. If the
+    /// function is already present it just returns the id.
+    ///
+    /// This function is idempotent.
+    pub fn get_external_call(
+        name: &str,
+        module: &mut Module,
+        compilation_ctx: &CompilationContext,
+        module_id: &ModuleId,
+        arguments_types: &[IntermediateType],
+        named_ids: &[IntermediateType],
+    ) -> FunctionId {
+        let native_fn_name = Self::get_function_name(name, module_id);
 
-                    if let Some(special_attributes) =
-                        module_data.special_attributes.external_calls.get(name)
-                    {
-                        contract_calls::add_external_contract_call_fn(
-                            module,
-                            compilation_ctx,
-                            module_id,
-                            function_information,
-                            &special_attributes.modifiers,
-                        )
-                    } else {
-                        panic!("native function {module_id}::{name} not supported yet")
-                    }
-                }
+        if let Some(function) = module.funcs.by_name(&native_fn_name) {
+            function
+        } else {
+            let module_data = compilation_ctx
+                .get_module_data_by_id(module_id)
+                .unwrap_or_else(|_| panic!("external call {module_id}::{name} not found"));
+
+            let function_information = module_data
+                .functions
+                .get_information_by_identifier(name)
+                .unwrap_or_else(|| {
+                    panic!("could not find function information for {module_id}::{name}")
+                });
+
+            if let Some(special_attributes) =
+                module_data.special_attributes.external_calls.get(name)
+            {
+                contract_calls::add_external_contract_call_fn(
+                    module,
+                    compilation_ctx,
+                    module_id,
+                    function_information,
+                    &special_attributes.modifiers,
+                    arguments_types,
+                    named_ids,
+                )
+            } else {
+                panic!("missing special attributes for external call {module_id}::{name}")
             }
         }
     }
@@ -398,7 +419,7 @@ impl NativeFunction {
     }
 
     pub fn get_function_name(name: &str, module_id: &ModuleId) -> String {
-        format!("{name}_{:x}", module_id.hash())
+        format!("___{name}_{:x}", module_id.hash())
     }
 
     pub fn get_generic_function_name(
@@ -417,6 +438,6 @@ impl NativeFunction {
             .for_each(|t| t.process_hash(&mut hasher, compilation_ctx));
         let hash = format!("{:x}", hasher.finish());
 
-        format!("{name}_{hash}_{:x}", module_id.hash())
+        format!("___{name}_{hash}_{:x}", module_id.hash())
     }
 }

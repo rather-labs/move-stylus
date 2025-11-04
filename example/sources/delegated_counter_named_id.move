@@ -1,14 +1,16 @@
-module hello_world::delegated_counter;
+module hello_world::delegated_counter_named_id;
 
 use stylus::tx_context::TxContext;
 use stylus::object as object;
-use stylus::object::UID;
+use stylus::object::NamedId;
 use stylus::transfer as transfer;
 use stylus::contract_calls as contract_calls;
-use hello_world::delegated_counter_interface as dci;
+use hello_world::delegated_counter_named_id_interface as dci;
+
+public struct COUNTER_ has key {}
 
 public struct Counter has key {
-    id: UID,
+    id: NamedId<COUNTER_>,
     owner: address,
     value: u64,
     contract_address: address,
@@ -16,7 +18,7 @@ public struct Counter has key {
 
 entry fun create(contract_logic: address, ctx: &mut TxContext) {
   transfer::share_object(Counter {
-    id: object::new(ctx),
+    id: object::new_named_id<COUNTER_>(),
     owner: ctx.sender(),
     value: 25,
     contract_address: contract_logic,
@@ -29,7 +31,7 @@ entry fun increment(counter: &mut Counter) {
         contract_calls::new(counter.contract_address)
             .delegate()
     );
-    let res = delegated_counter.increment(&mut counter.id);
+    let res = delegated_counter.increment();
     assert!(res.succeded(), 33);
 }
 
@@ -39,7 +41,7 @@ entry fun increment_modify_before(counter: &mut Counter) {
         contract_calls::new(counter.contract_address)
             .delegate()
     );
-    let res = delegated_counter.increment(&mut counter.id);
+    let res = delegated_counter.increment();
     assert!(res.succeded(), 33);
 }
 
@@ -48,7 +50,7 @@ entry fun increment_modify_after(counter: &mut Counter) {
         contract_calls::new(counter.contract_address)
             .delegate()
     );
-    let res = delegated_counter.increment(&mut counter.id);
+    let res = delegated_counter.increment();
     assert!(res.succeded(), 33);
     counter.value = counter.value + 20;
 }
@@ -59,7 +61,7 @@ entry fun increment_modify_before_after(counter: &mut Counter) {
         contract_calls::new(counter.contract_address)
             .delegate()
     );
-    let res = delegated_counter.increment(&mut counter.id);
+    let res = delegated_counter.increment();
     assert!(res.succeded(), 33);
     counter.value = counter.value + 20;
 }
@@ -86,5 +88,5 @@ entry fun set_value(counter: &mut Counter, value: u64, ctx: &TxContext) {
         contract_calls::new(counter.contract_address)
             .delegate()
     );
-    delegated_counter.set_value(&mut counter.id, value);
+    delegated_counter.set_value(value);
 }

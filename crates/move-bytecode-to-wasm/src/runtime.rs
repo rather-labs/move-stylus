@@ -73,6 +73,10 @@ pub enum RuntimeFunction {
     DeleteTtoObject,
     GetStructOwner,
     CommitChangesToStorage,
+    AccumulateOrAdvanceSlotDelete,
+    AccumulateOrAdvanceSlotRead,
+    AccumulateOrAdvanceSlotWrite,
+    CacheStorageObjectChanges,
     // ASCII conversion
     U64ToAsciiBase10,
 }
@@ -135,6 +139,10 @@ impl RuntimeFunction {
             Self::GetStructOwner => "get_struct_owner",
             Self::U64ToAsciiBase10 => "u64_to_ascii_base_10",
             Self::CommitChangesToStorage => "commit_changes_to_storage",
+            Self::AccumulateOrAdvanceSlotDelete => "accumulate_or_advance_slot_delete",
+            Self::AccumulateOrAdvanceSlotRead => "accumulate_or_advance_slot_read",
+            Self::AccumulateOrAdvanceSlotWrite => "accumulate_or_advance_slot_write",
+            Self::CacheStorageObjectChanges => "cache_storage_object_changes",
         }
     }
 
@@ -242,6 +250,15 @@ impl RuntimeFunction {
                 (Self::LocateStructSlot, Some(ctx)) => storage::locate_struct_slot(module, ctx),
                 (Self::GetIdBytesPtr, Some(ctx)) => storage::get_id_bytes_ptr(module, ctx),
                 (Self::GetStructOwner, Some(ctx)) => storage::get_struct_owner_fn(module, ctx),
+                (Self::AccumulateOrAdvanceSlotDelete, Some(ctx)) => {
+                    storage::accumulate_or_advance_slot_delete(module, ctx)
+                }
+                (Self::AccumulateOrAdvanceSlotRead, Some(ctx)) => {
+                    storage::accumulate_or_advance_slot_read(module, ctx)
+                }
+                (Self::AccumulateOrAdvanceSlotWrite, Some(ctx)) => {
+                    storage::accumulate_or_advance_slot_write(module, ctx)
+                }
                 // ASCII conversion
                 (Self::U64ToAsciiBase10, Some(ctx)) => {
                     integers::ascii::u64_to_ascii_base_10(module, ctx)
@@ -325,6 +342,17 @@ impl RuntimeFunction {
                 );
 
                 storage::add_delete_tto_object_fn(module, compilation_ctx, generics[0])
+            }
+            Self::CacheStorageObjectChanges => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {} expected 1 type parameter, found {}",
+                    self.name(),
+                    generics.len(),
+                );
+
+                storage::cache_storage_object_changes(module, compilation_ctx, generics[0])
             }
             _ => panic!(
                 r#"there was an error linking "{}" runtime function, is this function generic?"#,

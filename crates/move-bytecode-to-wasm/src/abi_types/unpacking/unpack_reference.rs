@@ -24,7 +24,7 @@ impl IRef {
             | IntermediateType::IAddress
             | IntermediateType::ISigner
             | IntermediateType::IVector(_)
-            | IntermediateType::IEnum(_)
+            | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => {
                 inner.add_unpack_instructions(
                     builder,
@@ -133,7 +133,7 @@ impl IMutRef {
             | IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_)
+            | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => {
                 inner.add_unpack_instructions(
                     builder,

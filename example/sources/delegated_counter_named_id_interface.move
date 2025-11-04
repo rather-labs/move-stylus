@@ -1,7 +1,6 @@
-module hello_world::delegated_counter_interface;
+module hello_world::delegated_counter_named_id_interface;
 
 use stylus::contract_calls::{ContractCallEmptyResult, CrossContractCall};
-use stylus::object::UID;
 
 #[ext(external_call)]
 public struct CounterCall(CrossContractCall) has drop;
@@ -11,7 +10,7 @@ public fun new(configuration: CrossContractCall): CounterCall {
 }
 
 #[ext(external_call)]
-public native fun increment(self: &CounterCall, counter: &mut UID): ContractCallEmptyResult;
+public native fun increment(self: &CounterCall): ContractCallEmptyResult;
 
 #[ext(external_call)]
-public native fun set_value(self: &CounterCall, counter: &mut UID, value: u64): ContractCallEmptyResult;
+public native fun set_value(self: &CounterCall, value: u64): ContractCallEmptyResult;

@@ -394,7 +394,7 @@ impl IVector {
                             module_data,
                         );
                     }
-                    IntermediateType::IEnum(index) => {
+                    IntermediateType::IEnum { index, .. } => {
                         loop_block.load(
                             compilation_ctx.memory_id,
                             LoadKind::I32 { atomic: false },
@@ -513,7 +513,7 @@ impl IVector {
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
                     | IntermediateType::IGenericStructInstance { .. }
-                    | IntermediateType::IEnum(_)
+                    | IntermediateType::IEnum { .. }
                     | IntermediateType::IGenericEnumInstance { .. } => {
                         then.loop_(None, |loop_| {
                             //  Get the i-th element of both vectors and compare them
@@ -679,7 +679,7 @@ impl IVector {
                     | IntermediateType::IVector(_)
                     | IntermediateType::IStruct { .. }
                     | IntermediateType::IGenericStructInstance { .. }
-                    | IntermediateType::IEnum(_)
+                    | IntermediateType::IEnum { .. }
                     | IntermediateType::IGenericEnumInstance { .. } => {
                         loop_.vec_elem_ptr(vec_ptr, i, 4).load(
                             compilation_ctx.memory_id,
@@ -753,7 +753,7 @@ impl IVector {
             | IntermediateType::IAddress
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_)
+            | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => {
                 builder.call(downcast_f);
                 builder.i32_const(1);
@@ -1077,7 +1077,7 @@ mod tests {
             | IntermediateType::IVector(_)
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum(_)
+            | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => {
                 let swap_f =
                     RuntimeFunction::VecPopBack32.get(&mut raw_module, Some(&compilation_ctx));

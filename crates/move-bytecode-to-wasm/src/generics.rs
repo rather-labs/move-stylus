@@ -49,15 +49,18 @@ pub fn replace_type_parameters(
                 .collect(),
             vm_handled_struct: vm_handled_struct.clone(),
         },
-        IntermediateType::IGenericEnumInstance { index, types } => {
-            IntermediateType::IGenericEnumInstance {
-                index: *index,
-                types: types
-                    .iter()
-                    .map(|t| replace_type_parameters(t, instance_types))
-                    .collect(),
-            }
-        }
+        IntermediateType::IGenericEnumInstance {
+            module_id,
+            index,
+            types,
+        } => IntermediateType::IGenericEnumInstance {
+            module_id: module_id.clone(),
+            index: *index,
+            types: types
+                .iter()
+                .map(|t| replace_type_parameters(t, instance_types))
+                .collect(),
+        },
         IntermediateType::IVector(inner) => {
             IntermediateType::IVector(Box::new(replace_type_parameters(inner, instance_types)))
         }

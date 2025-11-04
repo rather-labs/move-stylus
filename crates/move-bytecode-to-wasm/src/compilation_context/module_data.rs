@@ -49,7 +49,7 @@ pub enum UserDefinedType {
     Struct { module_id: ModuleId, index: u16 },
 
     /// Enum defined in this module
-    Enum(usize),
+    Enum { module_id: ModuleId, index: u16 },
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
@@ -263,7 +263,13 @@ impl ModuleData {
                 } else if let Some(position) =
                     module.enum_defs().iter().position(|e| e.enum_handle == idx)
                 {
-                    datatype_handles_map.insert(idx, UserDefinedType::Enum(position));
+                    datatype_handles_map.insert(
+                        idx,
+                        UserDefinedType::Enum {
+                            module_id: module_id.clone(),
+                            index: position as u16,
+                        },
+                    );
                 } else {
                     panic!("datatype handle index {index} not found");
                 };
@@ -323,7 +329,13 @@ impl ModuleData {
                     .iter()
                     .position(|e| e.enum_handle == external_dth_idx)
                 {
-                    datatype_handles_map.insert(idx, UserDefinedType::Enum(position));
+                    datatype_handles_map.insert(
+                        idx,
+                        UserDefinedType::Enum {
+                            module_id: module_id.clone(),
+                            index: position as u16,
+                        },
+                    );
                 } else {
                     panic!("datatype handle index {index} not found");
                 };
@@ -801,6 +813,13 @@ impl ModuleData {
         self.signatures
             .get(index.into_index())
             .ok_or(CompilationContextError::SignatureNotFound(index))
+    }
+
+    /// Returns `true` if the function is used as a cross contract call
+    pub fn is_external_call(&self, function_identifier: &str) -> bool {
+        self.special_attributes
+            .external_calls
+            .contains_key(function_identifier)
     }
 
     // The init() function is a special function that is called once when the module is first deployed,
