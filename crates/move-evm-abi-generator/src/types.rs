@@ -1,5 +1,8 @@
 use std::rc::Rc;
 
+const TYPES_WITH_NO_SIGNATURE: &[&str] = &["TxContext"];
+
+#[derive(Eq, PartialEq)]
 pub enum Type {
     Address,
     Bool,
@@ -12,8 +15,10 @@ pub enum Type {
     Unit,
     Array(Rc<Type>),
     Bytes32,
-    UserDefined(String),
+    UserDefined(String, Option<Vec<Type>>),
     Tuple(Vec<Type>),
+    // This type represents a type that appears in Move but not in the ABI signature
+    None,
 }
 
 impl From<&move_parse_special_attributes::types::Type> for Type {
@@ -21,8 +26,22 @@ impl From<&move_parse_special_attributes::types::Type> for Type {
         match value {
             move_parse_special_attributes::types::Type::Address => Self::Address,
             move_parse_special_attributes::types::Type::Bool => Self::Bool,
-            move_parse_special_attributes::types::Type::UserDataType(d) => {
-                Self::UserDefined(d.clone())
+
+            move_parse_special_attributes::types::Type::UserDataType(name, None)
+                if TYPES_WITH_NO_SIGNATURE.contains(&name.as_str()) =>
+            {
+                Self::None
+            }
+            move_parse_special_attributes::types::Type::UserDataType(name, None)
+                if name == "UID" =>
+            {
+                Self::Bytes32
+            }
+            move_parse_special_attributes::types::Type::UserDataType(name, types) => {
+                Self::UserDefined(
+                    name.clone(),
+                    types.as_ref().map(|t| t.iter().map(Self::from).collect()),
+                )
             }
             move_parse_special_attributes::types::Type::Signer => Self::Address, // TODO: This is
             // not correct
@@ -54,10 +73,25 @@ impl Type {
             Type::Uint64 => "uint64".to_owned(),
             Type::Uint128 => "uint128".to_owned(),
             Type::Uint256 => "uint256".to_owned(),
-            Type::Unit => "".to_owned(),
+            Type::Unit | Type::None => "".to_owned(),
             Type::Array(inner) => format!("{}[]", inner.name()),
             Type::Bytes32 => "bytes32".to_owned(),
-            Type::UserDefined(name) => name.clone(),
+            Type::UserDefined(name, None) if TYPES_WITH_NO_SIGNATURE.contains(&name.as_str()) => {
+                "".to_owned()
+            }
+            Type::UserDefined(name, types) => {
+                if let Some(types) = types {
+                    let concrete_type_parameters_names = types
+                        .iter()
+                        .map(|t| t.name())
+                        .collect::<Vec<String>>()
+                        .join("_");
+
+                    format!("{}_{}", name, concrete_type_parameters_names)
+                } else {
+                    name.clone()
+                }
+            }
             Type::Tuple(items) => {
                 format!(
                     "({})",
@@ -65,7 +99,7 @@ impl Type {
                         .iter()
                         .map(|i| i.name())
                         .collect::<Vec<String>>()
-                        .join(",")
+                        .join(", ")
                 )
             }
         }

@@ -1,5 +1,8 @@
 use crate::types::Type;
-use move_compiler::parser::ast::{Attribute_, FunctionSignature};
+use move_compiler::{
+    parser::ast::{Attribute_, FunctionSignature},
+    shared::Identifier,
+};
 
 #[derive(Debug)]
 pub struct Function {
@@ -26,8 +29,14 @@ impl From<&move_compiler::parser::ast::Visibility> for Visibility {
 }
 
 #[derive(Debug)]
+pub struct Parameter {
+    pub name: String,
+    pub type_: Type,
+}
+
+#[derive(Debug)]
 pub struct Signature {
-    pub parameters: Vec<Type>,
+    pub parameters: Vec<Parameter>,
     pub return_type: Type,
 }
 
@@ -45,7 +54,10 @@ impl Function {
         let parameters = signature
             .parameters
             .iter()
-            .map(|(_, _, c)| Type::parse_type(&c.value))
+            .map(|(_, n, t)| Parameter {
+                name: n.value().as_str().to_string(),
+                type_: Type::parse_type(&t.value),
+            })
             .collect();
 
         let return_type = Type::parse_type(&signature.return_type.value);

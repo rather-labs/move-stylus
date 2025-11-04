@@ -47,9 +47,17 @@ pub(crate) fn process_functions<'special_attrs>(
                 .signature
                 .parameters
                 .iter()
-                .map(|param| Type::from(param).name())
+                .filter_map(|param| {
+                    let abi_type = Type::from(&param.type_);
+
+                    if abi_type == Type::None {
+                        None
+                    } else {
+                        Some(format!("{} {}", abi_type.name(), param.name))
+                    }
+                })
                 .collect::<Vec<String>>()
-                .join(","),
+                .join(", "),
         );
 
         contract_abi.push(')');

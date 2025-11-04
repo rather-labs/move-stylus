@@ -6,7 +6,7 @@ use move_compiler::parser::ast::{NameAccessChain_, Type_};
 pub enum Type {
     Address,
     Bool,
-    UserDataType(String),
+    UserDataType(String, Option<Vec<Type>>),
     Signer,
     Vector(Rc<Type>),
     U8,
@@ -33,12 +33,38 @@ impl Type {
                     "u64" => Self::U64,
                     "u128" => Self::U128,
                     "u256" => Self::U256,
-                    d => Self::UserDataType(d.to_string()),
+                    "vector" => {
+                        if let Some(ref ty) = path_entry.tyargs {
+                            assert_eq!(1, ty.value.len());
+                            let inner = Self::parse_type(
+                                &ty.value
+                                    .first()
+                                    .expect("expected a type for inner vector type")
+                                    .value,
+                            );
+                            Self::Vector(Rc::new(inner))
+                        } else {
+                            panic!("found a vector without inner type")
+                        }
+                    }
+                    datatype => {
+                        let types = if let Some(ref types) = path_entry.tyargs {
+                            let types = types
+                                .value
+                                .iter()
+                                .map(|t| Self::parse_type(&t.value))
+                                .collect::<Vec<Type>>();
+                            Some(types)
+                        } else {
+                            None
+                        };
+
+                        Self::UserDataType(datatype.to_string(), types)
+                    }
                 },
                 NameAccessChain_::Path(name_path) => todo!(),
             },
             Type_::Ref(_, spanned) => Self::parse_type(&spanned.value),
-            Type_::Fun(spanneds, spanned) => todo!(),
             Type_::Unit => Self::Unit,
             Type_::Multiple(spanneds) => {
                 let types = spanneds
@@ -47,6 +73,7 @@ impl Type {
                     .collect();
                 Self::Tuple(types)
             }
+            Type_::Fun(spanneds, spanned) => todo!(),
             Type_::UnresolvedError => todo!(),
         }
     }
