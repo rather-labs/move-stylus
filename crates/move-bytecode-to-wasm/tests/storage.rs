@@ -2722,6 +2722,15 @@ mod storage_encoding {
         }
         function saveGenericWrapper32() public view;
         function readGenericWrapper32(uint256 id) public view returns (GenericWrapper32);
+
+        // Enums encoding
+        function saveBarStruct() public view;
+        function saveFooAStructA() public view;
+        function saveFooAStructB() public view;
+        function saveFooAStructC() public view;
+        function saveFooBStructA() public view;
+        function saveFooBStructB() public view;
+        function saveFooBStructC() public view;
     );
 
     #[rstest]
@@ -3512,6 +3521,112 @@ mod storage_encoding {
             .unwrap();
         assert_eq!(0, result);
         assert_eq!(expected_decode.abi_encode(), result_data);
+    }
+
+    #[rstest]
+    #[case(saveBarStructCall::new(()),
+    vec![
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000003", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000004", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000005", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000006", 16).unwrap().to_be_bytes(),
+
+        U256::from_str_radix("398fdf7528e5068055009aa3b7c48e06f0127b5d8c57be483a07b5cd9100322e", 16).unwrap().to_be_bytes(),
+
+    ],
+    vec![
+        U256::from_str_radix("000000000000000000000000000000000000000000000000e44c0fd261f480c4", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("bde695b08375ca803d84b5f0699ca6dfd57eb08efbecbf4c397270aae24b9989", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000002a01000000000000006300000058004d01", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000010000000000000000000000000000002b", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000000000000000006f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000000000000000000000016345785d89ffff", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
+
+        U256::from_str_radix("000000000000000000000000000000000000000000000201c80310b81e98abde", 16).unwrap().to_be_bytes(),
+
+    ],)]
+    #[case(saveFooAStructACall::new(()),
+    vec![
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+    ],
+    vec![
+        U256::from_str_radix("00000000000000000000000000000000000000002b002a000f5c34f504c75160", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
+    ],)]
+    #[case(saveFooAStructBCall::new(()),
+    vec![
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+    ],
+    vec![
+        U256::from_str_radix("000000000000000000000000000000000000000000002a010f5c34f504c75160", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000000000010000000000000000000000000000002b", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
+    ],)]
+    #[case(saveFooAStructCCall::new(()),
+    vec![
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000002", 16).unwrap().to_be_bytes(),
+    ],
+    vec![
+        U256::from_str_radix("0000000000000000000000000000000000000000000201020f5c34f504c75160", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("000000000000000000000000cafecafecafecafecafecafecafecafecafecafe", 16).unwrap().to_be_bytes(),
+    ],)]
+    #[case(saveFooBStructACall::new(()),
+    vec![
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
+    ],
+    vec![
+        U256::from_str_radix("00002a00cafecafecafecafecafecafecafecafecafecafec753ec561841836f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("01002d0000002c0000000000000000000000000000000000000000000000002b", 16).unwrap().to_be_bytes(),
+    ],)]
+    #[case(saveFooBStructBCall::new(()),
+    vec![
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
+    ],
+    vec![
+        U256::from_str_radix("00000001cafecafecafecafecafecafecafecafecafecafec753ec561841836f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00002d0000002c010000000000000000000000000000002b000000000000002a", 16).unwrap().to_be_bytes(),
+    ],)]
+    #[case(saveFooBStructCCall::new(()),
+    vec![
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("0000000000000000000000000000000000000000000000000000000000000001", 16).unwrap().to_be_bytes(),
+    ],
+    vec![
+        U256::from_str_radix("00020102cafecafecafecafecafecafecafecafecafecafec753ec561841836f", 16).unwrap().to_be_bytes(),
+        U256::from_str_radix("00002d0000002c00000000000000000000000000000000000000000000000000", 16).unwrap().to_be_bytes(),
+    ],)]
+    fn test_structs_with_enums<T: SolCall>(
+        runtime: RuntimeSandbox,
+        #[case] call_data_encode: T,
+        #[case] expected_slots: Vec<[u8; 32]>,
+        #[case] expected_encode: Vec<[u8; 32]>,
+    ) {
+        let (result, _) = runtime
+            .call_entrypoint(call_data_encode.abi_encode())
+            .unwrap();
+        runtime.print_storage();
+
+        assert_eq!(0, result);
+
+        // Check if it is encoded correctly in storage
+        for (i, slot) in expected_slots.iter().enumerate() {
+            let storage = runtime.get_storage_at_slot(*slot);
+            assert_eq!(expected_encode[i], storage, "Mismatch at slot {}", i);
+        }
     }
 }
 
