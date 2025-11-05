@@ -202,3 +202,92 @@ entry fun destroy_bar_struct(s: BarStruct) {
     object::delete(simple_id);
     object::delete(bar_id);
 }
+
+public enum GenericFooEnum<T, U> has store, drop {
+    A { x: T, y: u32 },
+    B(u64, U, bool),
+    C{n: Numbers, c: Colors}
+}
+
+public struct GenericBarStruct<T, U> has key, store {
+    id: UID,
+    a: StructWithSimpleEnums,
+    b: bool,
+    c: T,
+    d: u32,
+    e: u64,
+    f: GenericFooEnum<T, U>,
+    g: U,
+    h: u256,
+    i: address,
+}
+
+entry fun create_generic_bar_struct(recipient: address, ctx: &mut TxContext) {
+    let s = GenericBarStruct<u16, u128> {
+        id: object::new(ctx),
+        a: StructWithSimpleEnums {
+            id: object::new(ctx),
+            n: Numbers::Two,
+            c: Colors::Blue,
+        },
+        b: true,
+        c: 77,
+        d: 88,
+        e: 99,
+        f: GenericFooEnum<u16, u128>::B(42, 43, true),
+        g: 111,
+        h: 99999999999999999,
+        i: @0xffffffffffffffffffffffffffffffffffffffff,
+    };
+    transfer::transfer(s, recipient);
+}
+
+entry fun get_generic_foo_enum_variant_a(s: &GenericBarStruct<u16, u128>): (&u16, &u32) {
+    match (&s.f) {
+        GenericFooEnum<u16, u128>::A { x, y } => {
+            (x, y)
+        },
+        _ => abort(1),
+    }
+}
+
+entry fun get_generic_foo_enum_variant_b(s: &GenericBarStruct<u16, u128>): (&u64, &u128, &bool) {
+    match (&s.f) {
+        GenericFooEnum<u16, u128>::B(x, y, z) => {
+            (x, y, z)
+        },
+        _ => abort(1),
+    }
+}
+
+entry fun get_generic_foo_enum_variant_c(s: &GenericBarStruct<u16, u128>): (&Numbers, &Colors) {
+    match (&s.f) {
+        GenericFooEnum<u16, u128>::C{n, c} => {
+            (n, c)
+        },
+        _ => abort(1),
+    }
+}
+
+entry fun set_generic_foo_enum_variant_a(s: &mut GenericBarStruct<u16, u128>, x: u16, y: u32) {
+    s.f = GenericFooEnum<u16, u128>::A { x, y };
+}
+
+entry fun set_generic_foo_enum_variant_b(s: &mut GenericBarStruct<u16, u128>, x: u64, y: u128, z: bool) {
+    s.f = GenericFooEnum<u16, u128>::B(x, y, z);
+}
+
+entry fun set_generic_foo_enum_variant_c(s: &mut GenericBarStruct<u16, u128>, n: Numbers, c: Colors) {
+    s.f = GenericFooEnum<u16, u128>::C{n, c};
+}
+
+entry fun get_generic_address(s: &GenericBarStruct<u16, u128>): &address {
+    &s.i
+}
+
+entry fun destroy_generic_bar_struct(s: GenericBarStruct<u16, u128>) {
+    let GenericBarStruct<u16, u128> { id: bar_id, a, b: _, c: _, d: _, e: _, f: _, g: _, h: _, i: _ } = s;
+    let StructWithSimpleEnums { id: simple_id, n: _, c: _ } = a;
+    object::delete(simple_id);
+    object::delete(bar_id);
+}

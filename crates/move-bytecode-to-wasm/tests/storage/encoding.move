@@ -550,3 +550,140 @@ entry fun save_generic_wrapper_32(ctx: &mut TxContext) {
 entry fun read_generic_wrapper_32(uid: u256): GenericWrapper<u32> {
     read_slot<GenericWrapper<u32>>(0, uid)
 }
+
+// Enums encoding
+public enum Numbers has drop, store {
+    One,
+    Two,
+    Three,
+}
+
+public enum Colors has drop, store {
+    Red,
+    Green,
+    Blue,
+}
+
+// Struct with simple enums
+public struct StructWithSimpleEnums has key, store {
+    id: UID,
+    n: Numbers,
+    c: Colors,
+}
+
+public enum FooEnum has store, drop {
+    A { x: u16, y: u32 },
+    B(u64, u128, bool), 
+    C{n: Numbers, c: Colors}
+}
+
+// Variants A and C fit in the first slot, but only the first field of variant B does.
+// The address ends up in the third slot because the u128 takes half of the second slot.
+public struct FooAStruct has key, store {
+    id: UID, // 8 bytes
+    a: FooEnum, // 1 + 16 +  32 - 8 = 41 bytes
+    b: address, // 20 bytes
+}
+
+public entry fun save_foo_a_struct_a(ctx: &mut TxContext) {
+    let struct_ = FooAStruct {
+        id: object::new(ctx),
+        a: FooEnum::A{x: 42, y: 43},
+        b: @0xcafecafecafecafecafecafecafecafecafecafe,
+    };
+    save_in_slot(struct_, 0);
+}
+
+public entry fun save_foo_a_struct_b(ctx: &mut TxContext) {
+    let struct_ = FooAStruct {
+        id: object::new(ctx),
+        a: FooEnum::B(42, 43, true),
+        b: @0xcafecafecafecafecafecafecafecafecafecafe,
+    };
+    save_in_slot(struct_, 0);
+}
+
+public entry fun save_foo_a_struct_c(ctx: &mut TxContext) {
+    let struct_ = FooAStruct {
+        id: object::new(ctx),
+        a: FooEnum::C{n: Numbers::Two, c: Colors::Blue},
+        b: @0xcafecafecafecafecafecafecafecafecafecafe,
+    };
+    save_in_slot(struct_, 0);
+}
+
+// In this case the variant B does not fit at all in the first slot.
+public struct FooBStruct has key, store {
+    id: UID, // 8 bytes
+    a: address, // 20 bytes
+    b: FooEnum, // 32 - 28 + 8 + 16 + 1 = 29
+    c: u32, // 4 bytes
+    d: u16, // 2 bytes
+    e: bool, // 1 byte
+}
+
+public entry fun save_foo_b_struct_a(ctx: &mut TxContext) {
+    let struct_ = FooBStruct {
+        id: object::new(ctx),
+        a: @0xcafecafecafecafecafecafecafecafecafecafe,
+        b: FooEnum::A{x: 42, y: 43},
+        c: 44,
+        d: 45,
+        e: true,
+    };
+    save_in_slot(struct_, 0);
+}
+
+public entry fun save_foo_b_struct_b(ctx: &mut TxContext) {
+    let struct_ = FooBStruct {
+        id: object::new(ctx),
+        a: @0xcafecafecafecafecafecafecafecafecafecafe,
+        b: FooEnum::B(42, 43, true),
+        c: 44,
+        d: 45,
+        e: false,
+    };
+    save_in_slot(struct_, 0);
+}
+
+public entry fun save_foo_b_struct_c(ctx: &mut TxContext) {
+    let struct_ = FooBStruct {
+        id: object::new(ctx),
+        a: @0xcafecafecafecafecafecafecafecafecafecafe,
+        b: FooEnum::C{n: Numbers::Two, c: Colors::Blue},
+        c: 44,
+        d: 45,
+        e: false,
+    };
+    save_in_slot(struct_, 0);
+}
+
+public struct BarStruct has key, store {
+    id: UID,
+    a: StructWithSimpleEnums,
+    b: bool,
+    c: u16,
+    d: u32,
+    e: u64,
+    f: FooEnum,
+    g: u128,
+    h: u256,
+    i: address,
+}
+
+public entry fun save_bar_struct(ctx: &mut TxContext) {
+    let struct_ = BarStruct {
+        id: object::new(ctx),
+        a: StructWithSimpleEnums { id: object::new(ctx), n: Numbers::Two, c: Colors::Blue },
+        b: true,
+        c: 77,
+        d: 88,
+        e: 99,
+        f: FooEnum::B(42, 43, true),
+        g: 111,
+        h: 99999999999999999,
+        i: @0xcafecafecafecafecafecafecafecafecafecafe,
+    };
+    save_in_slot(struct_, 0);
+}
+
