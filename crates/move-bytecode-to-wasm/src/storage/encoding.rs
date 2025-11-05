@@ -195,7 +195,7 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
         .local_get(slot_offset)
         .call(compute_enum_storage_tail_position_fn)
         .local_set(tail_slot_offset)
-        .local_set(tail_slot_offset);
+        .local_set(tail_slot_ptr);
 
     let variant_index = module.locals.add(ValType::I32);
     builder
