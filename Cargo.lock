@@ -3090,6 +3090,7 @@ dependencies = [
  "hashers",
  "move-abstract-interpreter",
  "move-binary-format",
+ "move-compiler",
  "move-core-types",
  "move-package",
  "move-packages-build",

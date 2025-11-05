@@ -1,6 +1,8 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::error::print_error_diagnostic;
+
 use super::reroot_path;
 use clap::*;
 use move_bytecode_source_map::utils::serialize_to_json_string;
@@ -86,7 +88,10 @@ impl Disassemble {
             }
         }
 
-        translate_package_cli(package, &rerooted_path);
+        if let Err(compilation_error) = translate_package_cli(package, &rerooted_path) {
+            print_error_diagnostic(compilation_error)
+        }
+
         Ok(())
     }
 }

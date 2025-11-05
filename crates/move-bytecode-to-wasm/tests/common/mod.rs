@@ -165,7 +165,7 @@ pub fn translate_test_package(path: &str, module_name: &str) -> Module {
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
 
-    translate_single_module(package, module_name)
+    translate_single_module(package, module_name).unwrap()
 }
 
 #[allow(dead_code)]
@@ -180,7 +180,7 @@ pub fn translate_test_complete_package(path: &str) -> HashMap<String, Module> {
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
 
-    translate_package(package, None)
+    translate_package(package, None).unwrap()
 }
 
 #[allow(dead_code)]
@@ -195,7 +195,7 @@ pub fn translate_test_complete_package_with_framework(path: &str) -> HashMap<Str
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
 
-    translate_package(package, None)
+    translate_package(package, None).unwrap()
 }
 
 #[allow(dead_code)]
@@ -209,5 +209,5 @@ pub fn translate_test_package_with_framework(path: &str, module_name: &str) -> M
         .compile_package(&rerooted_path, &mut Vec::new())
         .unwrap();
 
-    translate_single_module(package, module_name)
+    translate_single_module(package, module_name).unwrap()
 }

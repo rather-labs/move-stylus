@@ -1,5 +1,6 @@
-use move_compiler::parser::ast::{
-    Attribute_, AttributeValue_, LeadingNameAccess_, StructDefinition, Value_,
+use move_compiler::{
+    diagnostics::codes::{DiagnosticInfo, Severity, custom},
+    parser::ast::{Attribute_, AttributeValue_, LeadingNameAccess_, StructDefinition, Value_},
 };
 
 use crate::{SpecialAttributeError, error::SpecialAttributeErrorKind};
@@ -39,6 +40,18 @@ pub enum ExternalStructError {
 
     #[error("module_name attribute not defined")]
     ModuleNameNotDefined,
+}
+
+impl From<&ExternalStructError> for DiagnosticInfo {
+    fn from(value: &ExternalStructError) -> Self {
+        custom(
+            "External struct error",
+            Severity::BlockingError,
+            4,
+            4,
+            Box::leak(value.to_string().into_boxed_str()),
+        )
+    }
 }
 
 impl TryFrom<&StructDefinition> for ExternalStruct {
