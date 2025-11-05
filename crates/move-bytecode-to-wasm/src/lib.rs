@@ -9,7 +9,10 @@ use move_package::{
     source_package::parsed_manifest::PackageName,
 };
 use move_parse_special_attributes::process_special_attributes;
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 use translation::{
     intermediate_types::IntermediateType,
     table::{FunctionId, FunctionTable},
@@ -20,7 +23,7 @@ use walrus::{GlobalId, Module, RefType};
 use wasm_validation::validate_stylus_wasm;
 
 pub(crate) mod abi_types;
-mod compilation_context;
+pub mod compilation_context;
 mod constructor;
 mod data;
 pub mod error;
@@ -39,6 +42,8 @@ mod vm_handled_types;
 mod wasm_builder_extensions;
 mod wasm_helpers;
 mod wasm_validation;
+
+pub use translation::functions::MappedFunction;
 
 #[cfg(feature = "inject-host-debug-fns")]
 use walrus::ValType;
@@ -217,6 +222,103 @@ pub fn translate_package(
 
     if errors.is_empty() {
         Ok(modules)
+    } else {
+        Err(CompilationError {
+            files: package.file_map,
+            kind: CompilationErrorKind::CodeError(errors),
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct PackageModuleData {
+    pub modules_paths: HashMap<PathBuf, ModuleId>,
+    pub modules_data: HashMap<ModuleId, ModuleData>,
+}
+
+pub fn package_module_data(
+    package: CompiledPackage,
+    module_name: Option<String>,
+) -> Result<PackageModuleData, CompilationError> {
+    let mut modules_data = HashMap::new();
+    let mut modules_paths = HashMap::new();
+    let mut errors = Vec::new();
+
+    // This is not used in this function but is used in the others
+    let mut function_definitions: GlobalFunctionTable = HashMap::new();
+
+    let root_compiled_units: Vec<CompiledUnitWithSource> = if let Some(module_name) = module_name {
+        package
+            .root_compiled_units
+            .into_iter()
+            .filter(move |unit| unit.unit.name.to_string() == module_name)
+            .collect()
+    } else {
+        package.root_compiled_units.into_iter().collect()
+    };
+
+    for root_compiled_module in &root_compiled_units {
+        let module_name = root_compiled_module.unit.name.to_string();
+        let root_compiled_module_unit = &root_compiled_module.unit.module;
+
+        let root_module_id = ModuleId {
+            address: root_compiled_module_unit.address().into_bytes().into(),
+            module_name: module_name.clone(),
+        };
+
+        // Process the dependency tree
+        if let Err(dependencies_errors) = process_dependency_tree(
+            &mut modules_data,
+            &package.deps_compiled_units,
+            &root_compiled_units,
+            &root_compiled_module_unit.immediate_dependencies(),
+            &mut function_definitions,
+        ) {
+            match dependencies_errors {
+                CompilationErrorKind::ICE(ice_error) => {
+                    return Err(CompilationError {
+                        files: package.file_map,
+                        kind: CompilationErrorKind::ICE(ice_error),
+                    });
+                }
+                CompilationErrorKind::CodeError(code_errors) => {
+                    errors.extend(code_errors);
+                    continue;
+                }
+            }
+        }
+
+        let special_attributes = match process_special_attributes(&root_compiled_module.source_path)
+        {
+            Ok(sa) => sa,
+            Err((_mf, e)) => {
+                errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
+                continue;
+            }
+        };
+
+        let root_module_data = ModuleData::build_module_data(
+            root_module_id.clone(),
+            root_compiled_module,
+            &package.deps_compiled_units,
+            &root_compiled_units,
+            &mut function_definitions,
+            special_attributes,
+        )
+        .map_err(|e| CompilationError {
+            files: package.file_map.clone(),
+            kind: CompilationErrorKind::ICE(e.into()),
+        })?;
+
+        modules_data.insert(root_module_id.clone(), root_module_data);
+        modules_paths.insert(root_compiled_module.source_path.clone(), root_module_id);
+    }
+
+    if errors.is_empty() {
+        Ok(PackageModuleData {
+            modules_data,
+            modules_paths,
+        })
     } else {
         Err(CompilationError {
             files: package.file_map,

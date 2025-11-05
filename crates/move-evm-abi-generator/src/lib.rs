@@ -9,6 +9,7 @@ mod types;
 use std::{collections::HashSet, path::Path};
 
 use human_redable::process_functions;
+use move_bytecode_to_wasm::PackageModuleData;
 use move_compiler::shared::files::MappedFiles;
 use move_parse_special_attributes::{SpecialAttributeError, process_special_attributes};
 
@@ -19,21 +20,32 @@ pub(crate) struct Abi {
     struct_to_process: HashSet<String>,
 }
 
-pub fn generate_abi(path: &Path) -> Result<(), (MappedFiles, Vec<SpecialAttributeError>)> {
+pub fn generate_abi(
+    path: &Path,
+    package_module_data: &PackageModuleData,
+) -> Result<(), (MappedFiles, Vec<SpecialAttributeError>)> {
     let path = path.join("sources");
 
     for file in path.read_dir().unwrap() {
-        println!("processing {:?}", &file.as_ref().unwrap().path());
-        let special_attributes = process_special_attributes(&file.unwrap().path())?;
+        let file = file.unwrap().path();
+        println!("processing {:?}", &file);
+        let module_id = package_module_data
+            .modules_paths
+            .get(&file)
+            .expect("error getting module id");
+
+        let module_data = package_module_data
+            .modules_data
+            .get(module_id)
+            .expect("error getting module data");
 
         let mut abi = Abi::default();
 
         let mut result = String::new();
-        let entry_functions = special_attributes.functions.iter().filter(|f| f.is_entry);
         process_functions(
             &mut result,
-            entry_functions,
-            &special_attributes.structs,
+            module_data,
+            &package_module_data.modules_data,
             &mut abi,
         );
 

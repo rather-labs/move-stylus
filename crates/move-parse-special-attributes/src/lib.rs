@@ -173,7 +173,7 @@ pub fn process_special_attributes(
             for module_member in module.members {
                 match module_member {
                     ModuleMember::Function(ref f) => {
-                        let is_entry = f.entry.is_some();
+                        // let is_entry = f.entry.is_some();
                         let visibility: Visibility = (&f.visibility).into();
                         let signature = Function::parse_signature(&f.signature);
 
@@ -206,9 +206,11 @@ pub fn process_special_attributes(
                                             Function {
                                                 name: f.name.to_owned().to_string(),
                                                 modifiers,
-                                                is_entry,
-                                                visibility,
                                                 signature,
+                                                visibility,
+                                                /*
+                                                is_entry,
+                                                */
                                             },
                                         );
                                     }
@@ -220,9 +222,11 @@ pub fn process_special_attributes(
                                     result.functions.push(Function {
                                         name: f.name.to_owned().to_string(),
                                         modifiers,
-                                        is_entry,
-                                        visibility,
                                         signature,
+                                        visibility,
+                                        /*
+                                        is_entry,
+                                                */
                                     });
                                 }
                                 _ => {}
@@ -231,9 +235,11 @@ pub fn process_special_attributes(
                             result.functions.push(Function {
                                 name: f.name.to_owned().to_string(),
                                 modifiers: Vec::new(),
-                                is_entry,
-                                visibility,
                                 signature,
+                                visibility,
+                                /*
+                                is_entry,
+                                                */
                             });
                         }
                     }

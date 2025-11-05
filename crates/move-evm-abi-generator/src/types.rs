@@ -60,6 +60,7 @@ impl From<&move_parse_special_attributes::types::Type> for Type {
             move_parse_special_attributes::types::Type::Tuple(items) => {
                 Self::Tuple(items.iter().map(Self::from).collect())
             }
+            move_parse_special_attributes::types::Type::Function(_, _) => Self::None,
         }
     }
 }

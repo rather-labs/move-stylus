@@ -1,5 +1,6 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
+use move_bytecode_to_wasm::compilation_context::{ModuleData, ModuleId};
 use move_parse_special_attributes::{
     Struct_,
     function_modifiers::{Function, Visibility},
@@ -8,24 +9,42 @@ use move_parse_special_attributes::{
 
 use crate::{Abi, common::snake_to_camel, types::Type};
 
-pub(crate) fn process_functions<'special_attrs>(
+pub(crate) fn process_functions(
     contract_abi: &mut String,
-    functions: impl Iterator<Item = &'special_attrs Function>,
-    structs: &'special_attrs [Struct_],
+    processing_module: &ModuleData,
+    modules_data: &HashMap<ModuleId, ModuleData>,
     abi: &mut Abi,
 ) {
-    println!("{structs:?}");
+    // First we filter the functions we are ging to process
+    let functions = processing_module
+        .functions
+        .information
+        .iter()
+        .filter(|f| f.is_entry);
+
+    let structs = &processing_module.special_attributes.structs;
+
+    // println!("{structs:?}");
     for function in functions {
+        let function_name = &function.function_id.identifier;
+        let parsed_function = processing_module
+            .special_attributes
+            .functions
+            .iter()
+            .find(|f| f.name == *function_name)
+            .expect("function not found");
+
         contract_abi.push_str("function ");
-        contract_abi.push_str(&snake_to_camel(&function.name));
+        contract_abi.push_str(&snake_to_camel(function_name));
         contract_abi.push('(');
 
         contract_abi.push_str(
-            &function
+            &parsed_function
                 .signature
                 .parameters
                 .iter()
-                .filter_map(|param| {
+                .zip(&function.signature.arguments)
+                .filter_map(|(param, itype)| {
                     let abi_type = Type::from(&param.type_);
 
                     match abi_type {
@@ -59,21 +78,26 @@ pub(crate) fn process_functions<'special_attrs>(
         contract_abi.push(')');
         contract_abi.push(' ');
 
-        let mut modifiers: Vec<&str> = Vec::new();
-        function
-            .modifiers
+        let mut modifiers: Vec<&str> = processing_module
+            .special_attributes
+            .functions
             .iter()
-            .for_each(|m| modifiers.push(m.as_str()));
+            .find(|f| f.name == *function_name)
+            .map(|f| f.modifiers.iter().map(|m| m.as_str()).collect())
+            .unwrap_or_default();
 
+        /*
         if function.visibility == Visibility::Public {
             modifiers.push("public")
         }
+        */
 
         // All functions we process are entry
         modifiers.push("external");
 
         contract_abi.push_str(&modifiers.join(" "));
 
+        /*
         match Type::from(&function.signature.return_type) {
             Type::Unit => (),
             ref t @ Type::Tuple(ref types) => {
@@ -99,6 +123,7 @@ pub(crate) fn process_functions<'special_attrs>(
         if let Some(' ') = contract_abi.chars().last() {
             contract_abi.pop();
         }
+        */
 
         contract_abi.push(';');
 

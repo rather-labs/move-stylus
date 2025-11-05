@@ -17,6 +17,7 @@ pub enum Type {
     U256,
     Unit,
     Tuple(Vec<Type>),
+    Function(Vec<Type>, Rc<Type>),
 }
 
 impl Type {
@@ -73,7 +74,14 @@ impl Type {
                     .collect();
                 Self::Tuple(types)
             }
-            Type_::Fun(spanneds, spanned) => todo!(),
+            Type_::Fun(spanneds, spanned) => {
+                let arguments = spanneds
+                    .iter()
+                    .map(|a| Self::parse_type(&a.value))
+                    .collect();
+                let return_type = Self::parse_type(&spanned.value);
+                Self::Function(arguments, Rc::new(return_type))
+            }
             Type_::UnresolvedError => todo!(),
         }
     }

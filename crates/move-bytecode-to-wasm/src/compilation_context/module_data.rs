@@ -1,6 +1,6 @@
-mod enum_data;
-mod function_data;
-mod struct_data;
+pub mod enum_data;
+pub mod function_data;
+pub mod struct_data;
 
 use crate::{
     GlobalFunctionTable,
