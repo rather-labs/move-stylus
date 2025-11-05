@@ -76,6 +76,7 @@ impl IEnum {
     pub fn new(index: u16, variants: Vec<IEnumVariant>) -> Result<Self, TranslationError> {
         let is_simple = variants.iter().all(|v| v.fields.is_empty());
         let heap_size = Self::compute_heap_size(&variants)?;
+
         Ok(Self {
             is_simple,
             variants,
@@ -264,7 +265,9 @@ impl IEnum {
     }
 
     /// Replaces all type parameters in the enum with the provided types.
-    pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
+    /// It also computes the enum heap and storage size, if possible.
+    /// If a type parameter is found, the sizes will be None.
+    pub fn instantiate(&self, types: &[IntermediateType]) -> Result<Self, TranslationError> {
         let variants: Vec<IEnumVariant> = self
             .variants
             .iter()
@@ -280,15 +283,34 @@ impl IEnum {
             })
             .collect();
 
-        // Recompute heap_size after instantiating the types
+        // Recompute heap_size after instantiating the types.
         let heap_size = Self::compute_heap_size(&variants).unwrap_or(None);
 
-        Self {
+        let instantiated = Self {
             index: self.index,
             is_simple: self.is_simple,
             variants,
             heap_size,
-        }
+        };
+
+        Ok(instantiated)
+    }
+
+    /// Returns the storage sizes of the enum for each possible slot offset
+    pub fn storage_size_by_offset(
+        &self,
+        compilation_ctx: &CompilationContext,
+    ) -> Result<Vec<u32>, TranslationError> {
+        // Compute the storage size for each possible slot offset (0-31)
+        (0..32)
+            .map(|offset| {
+                crate::storage::storage_layout::compute_enum_storage_size(
+                    self,
+                    offset,
+                    compilation_ctx,
+                )
+            })
+            .collect()
     }
 
     /// Iterates all variants and runs `on_match` only for the active one

@@ -116,7 +116,7 @@ impl EnumData {
             &self.generic_enum_instantiations[enum_def_instantiation_index.into_index()];
         let generic_enum = &self.enums[idx.into_index()];
 
-        Ok(generic_enum.instantiate(types))
+        Ok(generic_enum.instantiate(types).unwrap())
     }
 
     pub fn get_enum_instance_types(

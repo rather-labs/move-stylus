@@ -8,10 +8,8 @@ use crate::{
         storage_flush_cache, storage_load_bytes32,
     },
     runtime::RuntimeFunction,
-    storage::storage_layout::{compute_enum_storage_tail_position, field_size},
-    translation::intermediate_types::{
-        IntermediateType, address::IAddress, enums::IEnum, structs::IStruct,
-    },
+    storage::storage_layout::field_size,
+    translation::intermediate_types::{IntermediateType, address::IAddress, structs::IStruct},
     utils::keccak_string_to_memory,
     vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
 };
@@ -332,22 +330,22 @@ pub fn add_delete_storage_enum_instructions(
     compilation_ctx: &CompilationContext,
     slot_ptr: LocalId,
     slot_offset: LocalId,
-    enum_: &IEnum,
+    itype: &IntermediateType,
 ) {
     let (storage_cache, _) = storage_cache_bytes32(module);
     let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+    let compute_enum_storage_tail_position_fn = RuntimeFunction::ComputeEnumStorageTailPosition
+        .get_generic(module, compilation_ctx, &[itype]);
 
     // Compute the end slot
-    let (tail_slot_ptr, tail_slot_offset) = compute_enum_storage_tail_position(
-        module,
-        builder,
-        enum_,
-        slot_ptr,
-        slot_offset,
-        compilation_ctx,
-    )
-    .unwrap();
+    let tail_slot_ptr = module.locals.add(ValType::I32);
+
+    builder
+        .local_get(slot_ptr)
+        .local_get(slot_offset)
+        .call(compute_enum_storage_tail_position_fn)
+        .local_set(tail_slot_ptr);
 
     builder.loop_(None, |loop_| {
         let loop_id = loop_.id();
@@ -378,7 +376,19 @@ pub fn add_delete_storage_enum_instructions(
                 },
             );
     });
-    builder.local_get(tail_slot_offset).local_set(slot_offset);
+
+    // Load the tail offset from the last 4 bytes of the data pointer
+    builder
+        .local_get(tail_slot_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 32,
+            },
+        )
+        .local_set(slot_offset);
 }
 
 /// This function adds instructions to recursively delete all storage slots
@@ -574,17 +584,13 @@ pub fn add_delete_field_instructions(
             }
         }
         IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-            let enum_ = compilation_ctx
-                .get_enum_by_intermediate_type(itype)
-                .expect("enum not found");
-
             add_delete_storage_enum_instructions(
                 module,
                 builder,
                 compilation_ctx,
                 slot_ptr,
                 slot_offset,
-                &enum_,
+                itype,
             );
         }
         IntermediateType::IVector(inner_) => {

@@ -14,7 +14,7 @@ use crate::{
     hostio::host_functions::{native_keccak256, storage_cache_bytes32, storage_load_bytes32},
     native_functions::object::add_delete_field_instructions,
     runtime::RuntimeFunction,
-    storage::storage_layout::{compute_enum_storage_tail_position, field_size},
+    storage::storage_layout::field_size,
     translation::intermediate_types::IntermediateType,
     wasm_builder_extensions::WasmBuilderExtension,
 };
@@ -176,6 +176,8 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
         RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx));
     let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
     let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
+    let compute_enum_storage_tail_position_fn = RuntimeFunction::ComputeEnumStorageTailPosition
+        .get_generic(module, compilation_ctx, &[itype]);
 
     // Get the IEnum representation
     let enum_ = compilation_ctx
@@ -185,15 +187,14 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
         });
 
     // Compute the tail slot and tail offset for the enum
-    let (tail_slot_ptr, tail_slot_offset) = compute_enum_storage_tail_position(
-        module,
-        builder,
-        &enum_,
-        slot_ptr,
-        slot_offset,
-        compilation_ctx,
-    )
-    .unwrap();
+
+    let tail_slot_ptr = module.locals.add(ValType::I32);
+
+    builder
+        .local_get(slot_ptr)
+        .local_get(slot_offset)
+        .call(compute_enum_storage_tail_position_fn)
+        .local_set(tail_slot_ptr);
 
     let variant_index = module.locals.add(ValType::I32);
     builder
@@ -349,7 +350,17 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
     });
 
     // slot_offset = tail_slot_offset
-    builder.local_get(tail_slot_offset).local_set(slot_offset);
+    builder
+        .local_get(tail_slot_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 32,
+            },
+        )
+        .local_set(slot_offset);
 }
 
 /// Emits WASM instructions to encode a vector and write it into storage,
