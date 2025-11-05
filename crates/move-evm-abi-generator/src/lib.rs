@@ -2,6 +2,7 @@
 //! Parses the AST of a package to extract the ABI
 //!
 //! NOTE: This is a POC and it is WIP
+mod common;
 mod human_redable;
 mod types;
 

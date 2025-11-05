@@ -1,37 +1,6 @@
 use move_parse_special_attributes::function_modifiers::{Function, Visibility};
 
-use crate::types::Type;
-
-/// Converts the input string to camel case.
-pub fn snake_to_camel(input: &str) -> String {
-    let mut result = String::with_capacity(input.len());
-    // .len returns byte count but ok in this case!
-
-    #[derive(PartialEq)]
-    enum ChIs {
-        FirstOfStr,
-        NextOfSepMark,
-        Other,
-    }
-
-    let mut flag = ChIs::FirstOfStr;
-
-    for ch in input.chars() {
-        if flag == ChIs::FirstOfStr {
-            result.push(ch.to_ascii_lowercase());
-            flag = ChIs::Other;
-        } else if ch == '_' {
-            flag = ChIs::NextOfSepMark;
-        } else if flag == ChIs::NextOfSepMark {
-            result.push(ch.to_ascii_uppercase());
-            flag = ChIs::Other;
-        } else {
-            result.push(ch);
-        }
-    }
-
-    result
-}
+use crate::{common::snake_to_camel, types::Type};
 
 pub(crate) fn process_functions<'special_attrs>(
     contract_abi: &mut String,

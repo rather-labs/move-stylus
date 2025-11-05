@@ -1,5 +1,7 @@
 use std::rc::Rc;
 
+use crate::common::snake_to_upper_camel;
+
 const TYPES_WITH_NO_SIGNATURE: &[&str] = &["TxContext"];
 
 #[derive(Eq, PartialEq)]
@@ -87,7 +89,7 @@ impl Type {
                         .collect::<Vec<String>>()
                         .join("_");
 
-                    format!("{}_{}", name, concrete_type_parameters_names)
+                    snake_to_upper_camel(&format!("{}_{}", name, concrete_type_parameters_names))
                 } else {
                     name.clone()
                 }

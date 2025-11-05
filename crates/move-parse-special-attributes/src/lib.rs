@@ -26,7 +26,7 @@ use external_call::{
     external_struct::{ExternalStruct, ExternalStructError},
     validate_external_call_function, validate_external_call_struct,
 };
-use function_modifiers::{Function, FunctionModifier, Signature, Visibility};
+use function_modifiers::{Function, FunctionModifier, Visibility};
 use move_compiler::{
     Compiler, PASS_PARSER,
     parser::ast::{Definition, ModuleMember},
