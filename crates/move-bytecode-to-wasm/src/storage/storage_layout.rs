@@ -376,7 +376,6 @@ mod tests {
     };
 
     // Helper to create a compilation context for tests
-    // Returns both the context and the module so they share the same memory_id and allocator
     fn create_test_ctx(
         structs: Vec<IStruct>,
         enums: Vec<IEnum>,
@@ -404,28 +403,17 @@ mod tests {
         (ctx, module)
     }
 
+    // Wrapper to execute the compute_enum_storage_tail_position function
     fn execute_compute_enum_storage_tail_position(
         module: &mut Module,
         compilation_ctx: &CompilationContext,
         itype: &IntermediateType,
-        start_slot: [u8; 32],
-        start_written_bytes: u32,
+        head_slot_ptr_data: [u8; 32],
+        head_slot_offset_data: u32,
     ) -> Result<([u8; 32], u32), Box<dyn std::error::Error>> {
-        // Ensure the enum's storage_size is computed before creating runtime functions
-        let enum_ = compilation_ctx
-            .get_enum_by_intermediate_type(itype)
-            .map_err(|e| format!("Failed to get enum: {e:?}"))?;
-        // This will compute and cache the storage_size if needed
-        let _ = enum_
-            .get_storage_size(compilation_ctx)
-            .map_err(|e| format!("Failed to compute enum storage size: {e:?}"))?;
-
-        // Pre-create all runtime functions that will be needed by compute_enum_storage_tail_position
-        // This ensures they're properly registered in the module before we try to use them
+        // Get the runtime function that will be used by compute_enum_storage_tail_position
         let _match_on_offset_fn =
             RuntimeFunction::MatchOnOffset.get_generic(module, compilation_ctx, &[itype]);
-        let _swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
-        let _add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
 
         // Test function setup
         let mut function = walrus::FunctionBuilder::new(
@@ -435,52 +423,51 @@ mod tests {
         );
 
         let mut builder = function.func_body();
-        let start_slot_ptr = module.locals.add(ValType::I32);
-        let start_written_bytes_in_slot = module.locals.add(ValType::I32);
+        let head_slot_ptr = module.locals.add(ValType::I32);
+        let head_slot_offset = module.locals.add(ValType::I32);
 
         // Call compute_enum_end_slot
-        let (end_slot_ptr, end_written_bytes_in_slot) = compute_enum_storage_tail_position(
+        let (tail_slot_ptr, tail_slot_offset) = compute_enum_storage_tail_position(
             module,
             &mut builder,
             itype,
-            start_slot_ptr,
-            start_written_bytes_in_slot,
+            head_slot_ptr,
+            head_slot_offset,
             compilation_ctx,
         )?;
 
-        builder.local_get(end_slot_ptr);
-        builder.local_get(end_written_bytes_in_slot);
+        builder.local_get(tail_slot_ptr);
+        builder.local_get(tail_slot_offset);
 
         let test_func = function.finish(
-            vec![start_slot_ptr, start_written_bytes_in_slot],
+            vec![head_slot_ptr, head_slot_offset],
             &mut module.funcs,
         );
-        module.exports.add("test_compute_enum_end_slot", test_func);
+        module.exports.add("test_compute_enum_storage_tail_position", test_func);
 
         // Execute the WASM function - returns (end_slot_ptr, end_written_bytes)
         let (_, instance, mut store, entrypoint) =
             crate::test_tools::setup_wasmtime_module::<(i32, i32), (i32, i32)>(
                 module,
-                start_slot.into(),
-                "test_compute_enum_end_slot",
+                head_slot_ptr_data.into(),
+                "test_compute_enum_storage_tail_position",
                 None,
             );
 
-        // Wrap start_written_bytes to 0-31 range since head_slot_offset represents bytes within a slot
-        let (end_slot_ptr, end_written_bytes) = entrypoint
-            .call(&mut store, (0_i32, start_written_bytes as i32))
+        let (tail_slot_ptr, tail_slot_offset) = entrypoint
+            .call(&mut store, (0_i32, head_slot_offset_data as i32))
             .map_err(|e| format!("WASM execution error: {e:?}"))?;
 
         // Read end_slot from the returned pointer
         let memory = instance
             .get_memory(&mut store, "memory")
             .ok_or("Failed to get memory")?;
-        let mut end_slot = [0u8; 32];
+        let mut tail_slot = [0u8; 32];
         memory
-            .read(&store, end_slot_ptr as usize, &mut end_slot)
+            .read(&store, tail_slot_ptr as usize, &mut tail_slot)
             .map_err(|e| format!("Failed to read end slot: {e:?}"))?;
 
-        Ok((end_slot, end_written_bytes as u32))
+        Ok((tail_slot, tail_slot_offset as u32))
     }
 
     #[rstest]
