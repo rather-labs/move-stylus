@@ -27,34 +27,35 @@ pub fn get_storage_size_by_offset(
         return function;
     }
 
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
-    let mut builder = function.name(name).func_body();
     let enum_ = compilation_ctx
         .get_enum_by_intermediate_type(itype)
         .unwrap();
+
+    // Calculate the enum storage sizes for each offset
+    let storage_size = enum_.storage_size_by_offset(compilation_ctx).unwrap();
+
+    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
+    let mut builder = function.name(name).func_body();
 
     // Argument
     let slot_offset = module.locals.add(ValType::I32);
 
     // Write storage_size vector to memory at DATA_ENUM_STORAGE_SIZE_OFFSET
-    // Each value is stored as i32 at offset DATA_ENUM_STORAGE_SIZE_OFFSET + index * 4
-    if let Some(storage_size) = &enum_.storage_size {
-        for (index, &size) in storage_size.iter().enumerate() {
-            builder
-                .i32_const(DATA_ENUM_STORAGE_SIZE_OFFSET + (index as i32 * 4))
-                .i32_const(size as i32)
-                .store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-        }
+    for (index, &size) in storage_size.iter().enumerate() {
+        builder
+            .i32_const(DATA_ENUM_STORAGE_SIZE_OFFSET)
+            .i32_const(size as i32)
+            .store(
+                compilation_ctx.memory_id,
+                StoreKind::I32 { atomic: false },
+                MemArg {
+                    align: 0,
+                    offset: 4 * index as u32,
+                },
+            );
     }
 
-    // Load enum_size from memory using slot_offset as index
+    // Load the enum storage size for the given offset from memory
     builder
         .i32_const(DATA_ENUM_STORAGE_SIZE_OFFSET)
         .local_get(slot_offset)
