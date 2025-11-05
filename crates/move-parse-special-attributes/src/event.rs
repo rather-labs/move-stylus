@@ -1,4 +1,7 @@
-use move_compiler::parser::ast::{Attribute_, AttributeValue_, StructDefinition, Value_};
+use move_compiler::{
+    diagnostics::codes::{DiagnosticInfo, Severity, custom},
+    parser::ast::{Attribute_, AttributeValue_, StructDefinition, Value_},
+};
 
 use crate::{SpecialAttributeError, error::SpecialAttributeErrorKind};
 
@@ -35,6 +38,18 @@ pub enum EventParseError {
 
     #[error(r#"not marked as an event"#)]
     NotAnEvent,
+}
+
+impl From<&EventParseError> for DiagnosticInfo {
+    fn from(value: &EventParseError) -> Self {
+        custom(
+            "External call struct error",
+            Severity::BlockingError,
+            3,
+            3,
+            Box::leak(value.to_string().into_boxed_str()),
+        )
+    }
 }
 
 impl TryFrom<&StructDefinition> for Event {

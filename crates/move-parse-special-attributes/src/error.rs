@@ -1,6 +1,9 @@
 use std::fmt::{self, Display};
 
-use move_compiler::diagnostics::Diagnostic;
+use move_compiler::{
+    diag,
+    diagnostics::{Diagnostic, codes::DiagnosticInfo},
+};
 use move_ir_types::location::Loc;
 
 use crate::{
@@ -39,9 +42,15 @@ impl Display for SpecialAttributeError {
     }
 }
 
-// TODO: We need to implement this to report errors in the same format as the move compiler does
-impl From<SpecialAttributeError> for Diagnostic {
-    fn from(_value: SpecialAttributeError) -> Self {
-        todo!()
+impl From<&SpecialAttributeError> for Diagnostic {
+    fn from(value: &SpecialAttributeError) -> Self {
+        let diagnostic_info: DiagnosticInfo = match &value.kind {
+            SpecialAttributeErrorKind::ExternalCallFunction(e) => e.into(),
+            SpecialAttributeErrorKind::ExternalCallStruct(e) => e.into(),
+            SpecialAttributeErrorKind::Event(e) => e.into(),
+            SpecialAttributeErrorKind::ExternalStruct(e) => e.into(),
+        };
+
+        diag!(diagnostic_info, (value.line_of_code, "".to_string()))
     }
 }

@@ -40,7 +40,7 @@ use struct_modifiers::StructModifier;
 pub fn process_special_attributes(
     path: &Path,
 ) -> Result<SpecialAttributes, Vec<SpecialAttributeError>> {
-    let (_, program_res) = Compiler::from_files(
+    let (_mapped_files, program_res) = Compiler::from_files(
         None,
         vec![path.to_str().unwrap()],
         Vec::new(),
@@ -55,7 +55,6 @@ pub fn process_special_attributes(
     let mut found_error = false;
 
     let ast = program_res.unwrap().into_ast().1;
-
     // First we need to process the structs, since there are functions (like the external call
     // ones) that should have as first argument structs marked with a modifier.
     for source in &ast.source_definitions {

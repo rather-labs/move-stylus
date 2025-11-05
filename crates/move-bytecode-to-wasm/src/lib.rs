@@ -2,11 +2,13 @@ use abi_types::public_function::PublicFunction;
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use compilation_context::{ModuleData, ModuleId};
 use constructor::inject_constructor;
+use error::{CodeError, CompilationError, CompilationErrorKind};
 use move_binary_format::file_format::FunctionDefinition;
 use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
     source_package::parsed_manifest::PackageName,
 };
+use move_parse_special_attributes::process_special_attributes;
 use std::{collections::HashMap, path::Path};
 use translation::{
     intermediate_types::IntermediateType,
@@ -21,6 +23,7 @@ pub(crate) mod abi_types;
 mod compilation_context;
 mod constructor;
 mod data;
+pub mod error;
 mod error_encoding;
 mod generics;
 mod hasher;
@@ -46,16 +49,19 @@ mod test_tools;
 pub type GlobalFunctionTable<'move_package> =
     HashMap<FunctionId, &'move_package FunctionDefinition>;
 
-pub fn translate_single_module(package: CompiledPackage, module_name: &str) -> Module {
-    let mut modules = translate_package(package, Some(module_name.to_string()));
+pub fn translate_single_module(
+    package: CompiledPackage,
+    module_name: &str,
+) -> Result<Module, CompilationError> {
+    let mut modules = translate_package(package, Some(module_name.to_string()))?;
 
-    modules.remove(module_name).expect("Module not compiled")
+    Ok(modules.remove(module_name).expect("Module not compiled"))
 }
 
 pub fn translate_package(
     package: CompiledPackage,
     module_name: Option<String>,
-) -> HashMap<String, Module> {
+) -> Result<HashMap<String, Module>, CompilationError> {
     let root_compiled_units: Vec<CompiledUnitWithSource> = if let Some(module_name) = module_name {
         package
             .root_compiled_units
@@ -80,6 +86,8 @@ pub fn translate_package(
     // statically link them
     let mut function_definitions: GlobalFunctionTable = HashMap::new();
 
+    let mut errors = Vec::new();
+
     // TODO: a lot of clones, we must create a symbol pool
     for root_compiled_module in &root_compiled_units {
         // This is used to keep track of dynamic fields were retrieved from storage as mutable.
@@ -92,7 +100,7 @@ pub fn translate_package(
         let mut dynamic_fields_global_variables: Vec<(GlobalId, IntermediateType)> = Vec::new();
 
         let module_name = root_compiled_module.unit.name.to_string();
-        println!("compiling module {module_name}...");
+        println!("\x1B[1m\x1B[32mCOMPILING\x1B[0m {module_name}");
         let root_compiled_module_unit = &root_compiled_module.unit.module;
 
         let root_module_id = ModuleId {
@@ -110,13 +118,35 @@ pub fn translate_package(
         let mut function_table = FunctionTable::new(function_table_id);
 
         // Process the dependency tree
-        process_dependency_tree(
+        if let Err(dependencies_errors) = process_dependency_tree(
             &mut modules_data,
             &package.deps_compiled_units,
             &root_compiled_units,
             &root_compiled_module_unit.immediate_dependencies(),
             &mut function_definitions,
-        );
+        ) {
+            match dependencies_errors {
+                CompilationErrorKind::ICE(ice_error) => {
+                    return Err(CompilationError {
+                        files: package.file_map,
+                        kind: CompilationErrorKind::ICE(ice_error),
+                    });
+                }
+                CompilationErrorKind::CodeError(code_errors) => {
+                    errors.extend(code_errors);
+                    continue;
+                }
+            }
+        }
+
+        let special_attributes = match process_special_attributes(&root_compiled_module.source_path)
+        {
+            Ok(sa) => sa,
+            Err(e) => {
+                errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
+                continue;
+            }
+        };
 
         let root_module_data = ModuleData::build_module_data(
             root_module_id.clone(),
@@ -124,7 +154,12 @@ pub fn translate_package(
             &package.deps_compiled_units,
             &root_compiled_units,
             &mut function_definitions,
-        );
+            special_attributes,
+        )
+        .map_err(|e| CompilationError {
+            files: package.file_map.clone(),
+            kind: CompilationErrorKind::ICE(e.into()),
+        })?;
 
         let compilation_ctx =
             CompilationContext::new(&root_module_data, &modules_data, memory_id, allocator_func);
@@ -180,15 +215,26 @@ pub fn translate_package(
         modules_data.insert(root_module_id.clone(), root_module_data);
     }
 
-    modules
+    if errors.is_empty() {
+        Ok(modules)
+    } else {
+        Err(CompilationError {
+            files: package.file_map,
+            kind: CompilationErrorKind::CodeError(errors),
+        })
+    }
 }
 
-pub fn translate_package_cli(package: CompiledPackage, rerooted_path: &Path) {
+pub fn translate_package_cli(
+    package: CompiledPackage,
+    rerooted_path: &Path,
+) -> Result<(), CompilationError> {
     let build_directory = rerooted_path.join("build/wasm");
     // Create the build directory if it doesn't exist
     std::fs::create_dir_all(&build_directory).unwrap();
 
-    let mut modules = translate_package(package, None);
+    let mut modules = translate_package(package, None)?;
+
     for (module_name, module) in modules.iter_mut() {
         module
             .emit_wasm_file(build_directory.join(format!("{}.wasm", module_name)))
@@ -202,6 +248,8 @@ pub fn translate_package_cli(package: CompiledPackage, rerooted_path: &Path) {
         )
         .expect("Failed to write WAT file");
     }
+
+    Ok(())
 }
 
 /// This functions process the dependency tree for the root module.
@@ -213,7 +261,8 @@ pub fn process_dependency_tree<'move_package>(
     root_compiled_units: &'move_package [CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
     function_definitions: &mut GlobalFunctionTable<'move_package>,
-) {
+) -> Result<(), CompilationErrorKind> {
+    let mut errors = Vec::new();
     for dependency in dependencies {
         let module_id = ModuleId {
             module_name: dependency.name().to_string(),
@@ -221,8 +270,9 @@ pub fn process_dependency_tree<'move_package>(
         };
         // If the HashMap contains the key, we already processed that dependency
         if !dependencies_data.contains_key(&module_id) {
-            println!("\tprocessing dependency {module_id}...");
+            // println!("  \x1B[1m\x1B[32mPROCESSING DEPENDENCY\x1B[0m {module_id}");
         } else {
+            // println!("  \x1B[1m\x1B[32mPROCESSING DEPENDENCY\x1B[0m {module_id} [cached]");
             continue;
         }
 
@@ -238,15 +288,37 @@ pub fn process_dependency_tree<'move_package>(
 
         let immediate_dependencies = &dependency_module.unit.module.immediate_dependencies();
         // If the the dependency has dependency, we process them first
-        if !immediate_dependencies.is_empty() {
+        let dependencies_process_result = if !immediate_dependencies.is_empty() {
             process_dependency_tree(
                 dependencies_data,
                 deps_compiled_units,
                 root_compiled_units,
                 immediate_dependencies,
                 function_definitions,
-            );
+            )
+        } else {
+            Ok(())
+        };
+
+        if let Err(dependencies_errors) = dependencies_process_result {
+            match dependencies_errors {
+                CompilationErrorKind::ICE(ice_error) => {
+                    return Err(CompilationErrorKind::ICE(ice_error));
+                }
+                CompilationErrorKind::CodeError(code_errors) => {
+                    errors.extend(code_errors);
+                    continue;
+                }
+            }
         }
+
+        let special_attributes = match process_special_attributes(&dependency_module.source_path) {
+            Ok(sa) => sa,
+            Err(e) => {
+                errors.extend(e.into_iter().map(CodeError::SpecialAttributesError));
+                continue;
+            }
+        };
 
         let dependency_module_data = ModuleData::build_module_data(
             module_id.clone(),
@@ -254,7 +326,9 @@ pub fn process_dependency_tree<'move_package>(
             deps_compiled_units,
             root_compiled_units,
             function_definitions,
-        );
+            special_attributes,
+        )
+        .map_err(|e| CompilationErrorKind::ICE(e.into()))?;
 
         let processed_dependency = dependencies_data.insert(module_id, dependency_module_data);
 
@@ -262,6 +336,12 @@ pub fn process_dependency_tree<'move_package>(
             processed_dependency.is_none(),
             "processed the same dep twice in different contexts"
         );
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(CompilationErrorKind::CodeError(errors))
     }
 }
 
@@ -390,7 +470,7 @@ fn inject_debug_fns(module: &mut walrus::Module) {
 #[macro_export]
 macro_rules! declare_host_debug_functions {
     ($module: ident) => {
-        (
+        (CompilationError::ICE(ice_error)
             $module.imports.get_func("", "print_i32").unwrap(),
             $module.imports.get_func("", "print_i64").unwrap(),
             $module.imports.get_func("", "print_memory_from").unwrap(),
