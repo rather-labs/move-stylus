@@ -80,6 +80,7 @@ pub enum RuntimeFunction {
     CacheStorageObjectChanges,
     // Enums
     GetStorageSizeByOffset,
+    ComputeEnumStorageTailPosition,
     // ASCII conversion
     U64ToAsciiBase10,
 }
@@ -148,6 +149,7 @@ impl RuntimeFunction {
             Self::CacheStorageObjectChanges => "cache_storage_object_changes",
             // Enums
             Self::GetStorageSizeByOffset => "get_storage_size_by_offset",
+            Self::ComputeEnumStorageTailPosition => "compute_enum_storage_tail_position",
         }
     }
 
@@ -368,6 +370,16 @@ impl RuntimeFunction {
                     generics.len(),
                 );
                 enums::get_storage_size_by_offset(module, compilation_ctx, generics[0])
+            }
+            Self::ComputeEnumStorageTailPosition => {
+                assert_eq!(
+                    1,
+                    generics.len(),
+                    "there was an error linking {} expected 1 type parameter, found {}",
+                    self.name(),
+                    generics.len(),
+                );
+                enums::compute_enum_storage_tail_position(module, compilation_ctx, generics[0])
             }
             _ => panic!(
                 r#"there was an error linking "{}" runtime function, is this function generic?"#,

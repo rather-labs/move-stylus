@@ -1,11 +1,8 @@
 use crate::{
     CompilationContext,
-    runtime::RuntimeFunction,
     translation::TranslationError,
     translation::intermediate_types::{IntermediateType, enums::IEnum},
 };
-use walrus::ir::{BinaryOp, MemArg, StoreKind};
-use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 const SLOT_SIZE: u32 = 32;
 
@@ -187,133 +184,6 @@ fn compute_fields_storage_size(
     Ok(size)
 }
 
-/// Compute where an enum's storage ends as a tuple (tail_slot_ptr, tail_slot_offset)
-///
-/// - `head_slot_ptr`: start slot (LocalId, U256 big-endian)
-/// - `head_slot_offset`: start offset (LocalId, 0-31)
-/// - `itype`: enum type
-/// - `compilation_ctx`: context
-///
-/// Returns (tail_slot_ptr, tail_slot_offset):
-/// - If enum fits in current slot: (head_slot_ptr, head_slot_offset + enum_size)
-/// - If not: advances slots as needed so offset wraps to final position.
-pub fn compute_enum_storage_tail_position(
-    module: &mut Module,
-    builder: &mut InstrSeqBuilder,
-    itype: &IntermediateType,
-    head_slot_ptr: LocalId,
-    head_slot_offset: LocalId,
-    compilation_ctx: &CompilationContext,
-) -> Result<(LocalId, LocalId), TranslationError> {
-    let get_storage_size_by_offset_fn =
-        RuntimeFunction::GetStorageSizeByOffset.get_generic(module, compilation_ctx, &[itype]);
-
-    let enum_size = module.locals.add(ValType::I32);
-
-    builder
-        .local_get(head_slot_offset)
-        .call(get_storage_size_by_offset_fn)
-        .local_set(enum_size);
-
-    let tail_slot_offset = module.locals.add(ValType::I32);
-    let tail_slot_ptr = module.locals.add(ValType::I32);
-
-    // *tail_slot_ptr = *head_slot_ptr (start by copying the head slot)
-    builder
-        .i32_const(32)
-        .call(compilation_ctx.allocator)
-        .local_tee(tail_slot_ptr)
-        .local_get(head_slot_ptr)
-        .i32_const(32)
-        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
-    // free_bytes = 32 - head_slot_offset
-    let free_bytes = module.locals.add(ValType::I32);
-    builder
-        .i32_const(SLOT_SIZE as i32)
-        .local_get(head_slot_offset)
-        .binop(BinaryOp::I32Sub)
-        .local_set(free_bytes);
-
-    builder
-        .local_get(enum_size)
-        .local_get(free_bytes)
-        .binop(BinaryOp::I32GeU)
-        .if_else(
-            None,
-            |then| {
-                // Case: enum_size >= free_bytes, so it will span multiple slots
-                // 1) *tail_slot_ptr = *head_slot_ptr + ((enum_size - free_bytes) / 32) as u256 LE
-
-                // delta_slot_ptr = (enum_size - free_bytes) / 32 as u256 LE (how many slots to add to the current slot)
-                let delta_slot_ptr = module.locals.add(ValType::I32);
-                // Allocate 32 bytes for the slot offset
-                then.i32_const(32)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(delta_slot_ptr);
-
-                // (enum_size - free_bytes) / 32 as u32
-                then.local_get(enum_size)
-                    .local_get(free_bytes)
-                    .binop(BinaryOp::I32Sub)
-                    .i32_const(SLOT_SIZE as i32)
-                    .binop(BinaryOp::I32DivS)
-                    .i32_const(1)
-                    .binop(BinaryOp::I32Add);
-
-                // Store the offset in the first 4 bytes to make it a u256 LE
-                then.store(
-                    compilation_ctx.memory_id,
-                    StoreKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-
-                // Swap the end slot from BE to LE for addition
-                let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
-                then.local_get(tail_slot_ptr)
-                    .local_get(tail_slot_ptr)
-                    .call(swap_256_fn);
-
-                // Add the offset to the end slot (right now equal to the current slot)
-                let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
-                then.local_get(delta_slot_ptr)
-                    .local_get(tail_slot_ptr)
-                    .local_get(tail_slot_ptr)
-                    .i32_const(32)
-                    .call(add_u256_fn)
-                    .local_set(tail_slot_ptr); // Why do we need to set the end_slot_ptr again? TODO: check this
-
-                // Swap back to BE
-                then.local_get(tail_slot_ptr)
-                    .local_get(tail_slot_ptr)
-                    .call(swap_256_fn);
-
-                // 2) tail_slot_offset = (enum_size - free_bytes) % 32
-                then.local_get(enum_size)
-                    .local_get(free_bytes)
-                    .binop(BinaryOp::I32Sub)
-                    .i32_const(SLOT_SIZE as i32)
-                    .binop(BinaryOp::I32RemS)
-                    .local_set(tail_slot_offset);
-            },
-            |else_| {
-                // Case: enum_size < free_bytes, so it fits entirely in the current slot
-                // 1) end_slot = start_slot (already set by the copy above)
-                // 2) tail_slot_offset = head_slot_offset + enum_size
-                else_
-                    .local_get(head_slot_offset)
-                    .local_get(enum_size)
-                    .binop(BinaryOp::I32Add)
-                    .local_set(tail_slot_offset);
-            },
-        );
-
-    Ok((tail_slot_ptr, tail_slot_offset))
-}
-
 /// Returns the storage-encoded size in bytes for a given intermediate type.
 ///
 /// Note:
@@ -368,12 +238,14 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::compilation_context::{ModuleData, ModuleId};
+    use crate::runtime::RuntimeFunction;
     use crate::test_tools::build_module;
     use crate::translation::intermediate_types::{
         VmHandledStruct,
         enums::IEnumVariant,
         structs::{IStruct, IStructType},
     };
+    use walrus::{Module, ValType};
 
     // Helper to create a compilation context for tests
     fn create_test_ctx(
@@ -412,8 +284,8 @@ mod tests {
         head_slot_offset_data: u32,
     ) -> Result<([u8; 32], u32), Box<dyn std::error::Error>> {
         // Get the runtime function that will be used by compute_enum_storage_tail_position
-        let _get_storage_size_by_offset_fn =
-            RuntimeFunction::GetStorageSizeByOffset.get_generic(module, compilation_ctx, &[itype]);
+        let compute_enum_storage_tail_position_fn = RuntimeFunction::ComputeEnumStorageTailPosition
+            .get_generic(module, compilation_ctx, &[itype]);
 
         // Test function setup
         let mut function = walrus::FunctionBuilder::new(
@@ -423,21 +295,16 @@ mod tests {
         );
 
         let mut builder = function.func_body();
+
+        // Arguments
         let head_slot_ptr = module.locals.add(ValType::I32);
         let head_slot_offset = module.locals.add(ValType::I32);
 
-        // Call compute_enum_end_slot
-        let (tail_slot_ptr, tail_slot_offset) = compute_enum_storage_tail_position(
-            module,
-            &mut builder,
-            itype,
-            head_slot_ptr,
-            head_slot_offset,
-            compilation_ctx,
-        )?;
-
-        builder.local_get(tail_slot_ptr);
-        builder.local_get(tail_slot_offset);
+        // Call compute_enum_storage_tail_position
+        builder
+            .local_get(head_slot_ptr)
+            .local_get(head_slot_offset)
+            .call(compute_enum_storage_tail_position_fn);
 
         let test_func = function.finish(vec![head_slot_ptr, head_slot_offset], &mut module.funcs);
         module
