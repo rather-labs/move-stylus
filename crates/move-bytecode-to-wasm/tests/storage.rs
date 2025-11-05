@@ -6715,7 +6715,8 @@ mod enums {
         assert_eq!(got, (42u64, 43u128, true));
         assert_eq!(0, result);
 
-        let call_data = setGenericFooEnumVariantACall::new((generic_bar_struct_id, 2, 3)).abi_encode();
+        let call_data =
+            setGenericFooEnumVariantACall::new((generic_bar_struct_id, 2, 3)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
@@ -6726,7 +6727,8 @@ mod enums {
         assert_eq!(got, (2u16, 3u32));
         assert_eq!(0, result);
 
-        let call_data = setGenericFooEnumVariantBCall::new((generic_bar_struct_id, 4, 5, true)).abi_encode();
+        let call_data =
+            setGenericFooEnumVariantBCall::new((generic_bar_struct_id, 4, 5, true)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
@@ -6738,7 +6740,8 @@ mod enums {
         assert_eq!(0, result);
 
         let call_data =
-            setGenericFooEnumVariantCCall::new((generic_bar_struct_id, Numbers::Two, Colors::Blue)).abi_encode();
+            setGenericFooEnumVariantCCall::new((generic_bar_struct_id, Numbers::Two, Colors::Blue))
+                .abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
 
