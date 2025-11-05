@@ -6492,6 +6492,17 @@ mod enums {
         function setFooEnumVariantC(bytes32 id, Numbers n, Colors c) public;
         function getAddress(bytes32 id) public view returns (address);
         function destroyBarStruct(bytes32 id) public;
+
+        // GenericBarStruct
+        function createGenericBarStruct(address recipient) public view;
+        function getGenericFooEnumVariantA(bytes32 id) public view returns (uint16, uint32);
+        function getGenericFooEnumVariantB(bytes32 id) public view returns (uint64, uint128, bool);
+        function getGenericFooEnumVariantC(bytes32 id) public view returns (Numbers, Colors);
+        function setGenericFooEnumVariantA(bytes32 id, uint16 x, uint32 y) public;
+        function setGenericFooEnumVariantB(bytes32 id, uint64 x, uint128 y, bool z) public;
+        function setGenericFooEnumVariantC(bytes32 id, Numbers n, Colors c) public;
+        function getGenericAddress(bytes32 id) public view returns (address);
+        function destroyGenericBarStruct(bytes32 id) public;
     );
 
     #[rstest]
@@ -6679,6 +6690,74 @@ mod enums {
 
         let storage_before_destroy = runtime.get_storage();
         let call_data = destroyBarStructCall::new((bar_struct_id,)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+        let storage_after_destroy = runtime.get_storage();
+
+        // Assert that the storage is empty
+        assert_empty_storage(&storage_before_destroy, &storage_after_destroy);
+    }
+
+    #[rstest]
+    fn test_generic_bar_struct(runtime: RuntimeSandbox) {
+        runtime.set_msg_sender(SIGNER_ADDRESS);
+
+        let call_data = createGenericBarStructCall::new((SIGNER_ADDRESS.into(),)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let generic_bar_struct_id = runtime.obtain_uid();
+
+        let call_data = getGenericFooEnumVariantBCall::new((generic_bar_struct_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = getGenericFooEnumVariantBCall::abi_decode_returns(&return_data).unwrap();
+        let got = (return_data._0, return_data._1, return_data._2);
+        assert_eq!(got, (42u64, 43u128, true));
+        assert_eq!(0, result);
+
+        let call_data = setGenericFooEnumVariantACall::new((generic_bar_struct_id, 2, 3)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = getGenericFooEnumVariantACall::new((generic_bar_struct_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = getGenericFooEnumVariantACall::abi_decode_returns(&return_data).unwrap();
+        let got = (return_data._0, return_data._1);
+        assert_eq!(got, (2u16, 3u32));
+        assert_eq!(0, result);
+
+        let call_data = setGenericFooEnumVariantBCall::new((generic_bar_struct_id, 4, 5, true)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = getGenericFooEnumVariantBCall::new((generic_bar_struct_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = getGenericFooEnumVariantBCall::abi_decode_returns(&return_data).unwrap();
+        let got = (return_data._0, return_data._1, return_data._2);
+        assert_eq!(got, (4u64, 5u128, true));
+        assert_eq!(0, result);
+
+        let call_data =
+            setGenericFooEnumVariantCCall::new((generic_bar_struct_id, Numbers::Two, Colors::Blue)).abi_encode();
+        let (result, _) = runtime.call_entrypoint(call_data).unwrap();
+        assert_eq!(0, result);
+
+        let call_data = getGenericFooEnumVariantCCall::new((generic_bar_struct_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = getGenericFooEnumVariantCCall::abi_decode_returns(&return_data).unwrap();
+        let got = (return_data._0, return_data._1);
+        assert_eq!(got, (Numbers::Two, Colors::Blue));
+        assert_eq!(0, result);
+
+        let call_data = getGenericAddressCall::new((generic_bar_struct_id,)).abi_encode();
+        let (result, return_data) = runtime.call_entrypoint(call_data).unwrap();
+        let return_data = getGenericAddressCall::abi_decode_returns(&return_data).unwrap();
+        let got = return_data;
+        assert_eq!(got, address!("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"));
+        assert_eq!(0, result);
+
+        let storage_before_destroy = runtime.get_storage();
+        let call_data = destroyGenericBarStructCall::new((generic_bar_struct_id,)).abi_encode();
         let (result, _) = runtime.call_entrypoint(call_data).unwrap();
         assert_eq!(0, result);
         let storage_after_destroy = runtime.get_storage();
