@@ -14,12 +14,13 @@ use walrus::{
 ///
 /// Returns:
 /// - (i32): storage size in bytes for this enum at the given offset.
-pub fn match_on_offset(
+pub fn get_storage_size_by_offset(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
 ) -> FunctionId {
-    let name = RuntimeFunction::MatchOnOffset.get_generic_function_name(compilation_ctx, &[itype]);
+    let name = RuntimeFunction::GetStorageSizeByOffset
+        .get_generic_function_name(compilation_ctx, &[itype]);
     if let Some(function) = module.funcs.by_name(&name) {
         return function;
     }

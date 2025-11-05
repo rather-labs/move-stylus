@@ -205,14 +205,14 @@ pub fn compute_enum_storage_tail_position(
     head_slot_offset: LocalId,
     compilation_ctx: &CompilationContext,
 ) -> Result<(LocalId, LocalId), TranslationError> {
-    let match_on_offset_fn =
-        RuntimeFunction::MatchOnOffset.get_generic(module, compilation_ctx, &[itype]);
+    let get_storage_size_by_offset_fn =
+        RuntimeFunction::GetStorageSizeByOffset.get_generic(module, compilation_ctx, &[itype]);
 
     let enum_size = module.locals.add(ValType::I32);
 
     builder
         .local_get(head_slot_offset)
-        .call(match_on_offset_fn)
+        .call(get_storage_size_by_offset_fn)
         .local_set(enum_size);
 
     let tail_slot_offset = module.locals.add(ValType::I32);
@@ -412,8 +412,8 @@ mod tests {
         head_slot_offset_data: u32,
     ) -> Result<([u8; 32], u32), Box<dyn std::error::Error>> {
         // Get the runtime function that will be used by compute_enum_storage_tail_position
-        let _match_on_offset_fn =
-            RuntimeFunction::MatchOnOffset.get_generic(module, compilation_ctx, &[itype]);
+        let _get_storage_size_by_offset_fn =
+            RuntimeFunction::GetStorageSizeByOffset.get_generic(module, compilation_ctx, &[itype]);
 
         // Test function setup
         let mut function = walrus::FunctionBuilder::new(
@@ -439,11 +439,10 @@ mod tests {
         builder.local_get(tail_slot_ptr);
         builder.local_get(tail_slot_offset);
 
-        let test_func = function.finish(
-            vec![head_slot_ptr, head_slot_offset],
-            &mut module.funcs,
-        );
-        module.exports.add("test_compute_enum_storage_tail_position", test_func);
+        let test_func = function.finish(vec![head_slot_ptr, head_slot_offset], &mut module.funcs);
+        module
+            .exports
+            .add("test_compute_enum_storage_tail_position", test_func);
 
         // Execute the WASM function - returns (end_slot_ptr, end_written_bytes)
         let (_, instance, mut store, entrypoint) =

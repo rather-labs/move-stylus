@@ -61,10 +61,8 @@ pub struct IEnum {
     /// must be instantiated.
     pub heap_size: Option<u32>,
 
-    /// Precomputed storage sizes for each possible slot offset (0-31).
-    /// Index corresponds to slot_offset, value is the maximum storage size across all variants in bytes.
-    /// This is computed at compile time to avoid runtime computation.
-    /// Empty vector means sizes haven't been precomputed yet.
+    /// Enum storage size for each possible slot offset (0-31).
+    /// Each element is the maximum storage size (Bytes) across all variants in bytes for the corresponding offset (Bytes).
     pub storage_size: Option<Vec<u32>>,
 }
 
@@ -272,6 +270,8 @@ impl IEnum {
     }
 
     /// Replaces all type parameters in the enum with the provided types.
+    /// It also computes the enum heap and storage size, if possible.
+    /// If a type parameter is found, the sizes will be None.
     pub fn instantiate(
         &self,
         types: &[IntermediateType],
@@ -304,29 +304,41 @@ impl IEnum {
         };
 
         // Compute enum storage sizes
-        instantiated.storage_size = instantiated.get_storage_size(compilation_ctx).ok();
+        instantiated.storage_size = instantiated.storage_size_by_offset(compilation_ctx).ok();
 
         Ok(instantiated)
     }
 
-    /// Gets the storage size for an enum for all possible slot offsets, or computes it if it hasn't been computed yet.
-    pub fn get_storage_size(
+    /// Returns the storage sizes of the enum for each possible slot offset, calculating them if not already available.
+    pub fn storage_size_by_offset(
         &self,
         compilation_ctx: &CompilationContext,
     ) -> Result<Vec<u32>, TranslationError> {
-        if self.storage_size.is_none() {
-            let mut storage_size = Vec::with_capacity(32);
-            for offset in 0..32 {
-                let enum_size = crate::storage::storage_layout::compute_enum_storage_size(
-                    self,
-                    offset,
-                    compilation_ctx,
-                )?;
-                storage_size.push(enum_size);
-            }
-            Ok(storage_size)
-        } else {
-            Ok(self.storage_size.clone().unwrap())
+        self.storage_size.clone().map_or_else(
+            || {
+                // Compute the storage size for each possible slot offset (0-31)
+                (0..32)
+                    .map(|offset| {
+                        crate::storage::storage_layout::compute_enum_storage_size(
+                            self,
+                            offset,
+                            compilation_ctx,
+                        )
+                    })
+                    .collect()
+            },
+            Ok,
+        )
+    }
+
+    /// Creates a new `IEnum` with the given storage size.
+    pub fn with_storage_size(&self, storage_size: Vec<u32>) -> Self {
+        Self {
+            index: self.index,
+            is_simple: self.is_simple,
+            variants: self.variants.clone(),
+            heap_size: self.heap_size,
+            storage_size: Some(storage_size),
         }
     }
 

@@ -79,7 +79,7 @@ pub enum RuntimeFunction {
     AccumulateOrAdvanceSlotWrite,
     CacheStorageObjectChanges,
     // Enums
-    MatchOnOffset,
+    GetStorageSizeByOffset,
     // ASCII conversion
     U64ToAsciiBase10,
 }
@@ -147,7 +147,7 @@ impl RuntimeFunction {
             Self::AccumulateOrAdvanceSlotWrite => "accumulate_or_advance_slot_write",
             Self::CacheStorageObjectChanges => "cache_storage_object_changes",
             // Enums
-            Self::MatchOnOffset => "match_on_offset",
+            Self::GetStorageSizeByOffset => "get_storage_size_by_offset",
         }
     }
 
@@ -359,7 +359,7 @@ impl RuntimeFunction {
 
                 storage::cache_storage_object_changes(module, compilation_ctx, generics[0])
             }
-            Self::MatchOnOffset => {
+            Self::GetStorageSizeByOffset => {
                 assert_eq!(
                     1,
                     generics.len(),
@@ -367,7 +367,7 @@ impl RuntimeFunction {
                     self.name(),
                     generics.len(),
                 );
-                enums::match_on_offset(module, compilation_ctx, generics[0])
+                enums::get_storage_size_by_offset(module, compilation_ctx, generics[0])
             }
             _ => panic!(
                 r#"there was an error linking "{}" runtime function, is this function generic?"#,
