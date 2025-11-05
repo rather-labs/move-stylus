@@ -189,12 +189,11 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
     // Compute the tail slot and tail offset for the enum
 
     let tail_slot_ptr = module.locals.add(ValType::I32);
-    let tail_slot_offset = module.locals.add(ValType::I32);
+
     builder
         .local_get(slot_ptr)
         .local_get(slot_offset)
         .call(compute_enum_storage_tail_position_fn)
-        .local_set(tail_slot_offset)
         .local_set(tail_slot_ptr);
 
     let variant_index = module.locals.add(ValType::I32);
@@ -351,7 +350,17 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
     });
 
     // slot_offset = tail_slot_offset
-    builder.local_get(tail_slot_offset).local_set(slot_offset);
+    builder
+        .local_get(tail_slot_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 32,
+            },
+        )
+        .local_set(slot_offset);
 }
 
 /// Emits WASM instructions to encode a vector and write it into storage,

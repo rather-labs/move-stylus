@@ -103,7 +103,7 @@ pub fn compute_enum_storage_tail_position(
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
-        &[ValType::I32, ValType::I32],
+        &[ValType::I32],
     );
     let mut builder = function.name(name).func_body();
 
@@ -125,11 +125,14 @@ pub fn compute_enum_storage_tail_position(
     let tail_slot_offset = module.locals.add(ValType::I32);
     let tail_slot_ptr = module.locals.add(ValType::I32);
 
-    // *tail_slot_ptr = *head_slot_ptr (start by copying the head slot)
+    // Allocate 36 bytes, 32 for the slot and 4 for the offset
     builder
-        .i32_const(32)
+        .i32_const(36)
         .call(compilation_ctx.allocator)
-        .local_tee(tail_slot_ptr)
+        .local_tee(tail_slot_ptr);
+
+    // Copy the head slot to the first 32 bytes of the data pointer
+    builder
         .local_get(head_slot_ptr)
         .i32_const(32)
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
@@ -218,9 +221,21 @@ pub fn compute_enum_storage_tail_position(
             },
         );
 
-    // Return both values
+    // Store the tail offset in the last 4 bytes of the data pointer
+    builder
+        .local_get(tail_slot_ptr)
+        .local_get(tail_slot_offset)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 32,
+            },
+        );
+
+    // Return the pointer
     builder.local_get(tail_slot_ptr);
-    builder.local_get(tail_slot_offset);
 
     function.finish(vec![head_slot_ptr, head_slot_offset], &mut module.funcs)
 }

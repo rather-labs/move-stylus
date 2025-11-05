@@ -245,7 +245,7 @@ mod tests {
         enums::IEnumVariant,
         structs::{IStruct, IStructType},
     };
-    use walrus::{Module, ValType};
+    use walrus::{Module, ValType, ir::{LoadKind, MemArg}};
 
     // Helper to create a compilation context for tests
     fn create_test_ctx(
@@ -300,11 +300,22 @@ mod tests {
         let head_slot_ptr = module.locals.add(ValType::I32);
         let head_slot_offset = module.locals.add(ValType::I32);
 
+        let tail_slot_ptr = module.locals.add(ValType::I32);
+
         // Call compute_enum_storage_tail_position
         builder
             .local_get(head_slot_ptr)
             .local_get(head_slot_offset)
-            .call(compute_enum_storage_tail_position_fn);
+            .call(compute_enum_storage_tail_position_fn)
+            .local_tee(tail_slot_ptr);
+
+        builder
+            .local_get(tail_slot_ptr)
+            .load(
+                compilation_ctx.memory_id,
+                LoadKind::I32 { atomic: false },
+                MemArg { align: 0, offset: 32 },
+            );
 
         let test_func = function.finish(vec![head_slot_ptr, head_slot_offset], &mut module.funcs);
         module
