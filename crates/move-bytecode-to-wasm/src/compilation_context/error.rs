@@ -43,7 +43,4 @@ pub enum CompilationContextError {
 
     #[error("expected enum")]
     ExpectedEnum,
-
-    #[error("unknown error: {0}")]
-    Unknown(String),
 }
