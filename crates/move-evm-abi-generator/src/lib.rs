@@ -44,7 +44,12 @@ pub fn generate_abi(
         let mut abi = Abi::default();
 
         let mut result = String::new();
-        process_functions(&mut result, module_data, &mut abi);
+        process_functions(
+            &mut result,
+            module_data,
+            &package_module_data.modules_data,
+            &mut abi,
+        );
 
         println!("{result}");
     }

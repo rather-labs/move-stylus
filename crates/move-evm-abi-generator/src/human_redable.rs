@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use move_bytecode_to_wasm::compilation_context::{
-    ModuleData, module_data::struct_data::IntermediateType,
+    ModuleData, ModuleId, module_data::struct_data::IntermediateType,
 };
 use move_parse_special_attributes::function_modifiers::Visibility;
 
@@ -13,6 +15,7 @@ use crate::{
 pub(crate) fn process_functions(
     contract_abi: &mut String,
     processing_module: &ModuleData,
+    modules_data: &HashMap<ModuleId, ModuleData>,
     abi: &mut Abi,
 ) {
     // First we filter the functions we are ging to process
@@ -31,7 +34,7 @@ pub(crate) fn process_functions(
             .find(|f| f.name == *function_name)
             .expect("function not found");
 
-        contract_abi.push_str("function ");
+        contract_abi.push_str("    function ");
         contract_abi.push_str(&snake_to_camel(function_name));
         contract_abi.push('(');
 
@@ -68,14 +71,14 @@ pub(crate) fn process_functions(
 
                                 Some(format!(
                                     "{} {}",
-                                    convert_type(name, Some(module_id)),
+                                    convert_type(name, itype, modules_data),
                                     param.name
                                 ))
                             }
                         }
                         _ => Some(format!(
                             "{} {}",
-                            convert_type(&abi_type.name(), None),
+                            convert_type(&abi_type.name(), itype, modules_data),
                             param.name
                         )),
                     }
@@ -104,29 +107,29 @@ pub(crate) fn process_functions(
 
         contract_abi.push_str(&modifiers.join(" "));
 
-        println!("{:?}", function.signature.returns);
-
         match Type::from(&parsed_function.signature.return_type) {
             Type::Unit => (),
-            ref t @ Type::Tuple(ref types) => {
+            Type::Tuple(ref types) => {
+                let mut names = Vec::new();
                 for (type_, itype) in types.iter().zip(&function.signature.returns) {
                     if let Type::UserDefined(_, _) = type_ {
                         abi.struct_to_process.insert(itype.clone());
                     }
+                    names.push(convert_type(&type_.name(), itype, modules_data).to_owned());
                 }
                 contract_abi.push(' ');
-                contract_abi.push_str(&t.name());
+                contract_abi.push_str(&format!("({})", &names.join(", ")));
             }
             ref t @ Type::UserDefined(_, _) => {
                 assert_eq!(1, function.signature.returns.len());
-                abi.struct_to_process
-                    .insert(function.signature.returns[0].clone());
+                let itype = &function.signature.returns[0];
+                abi.struct_to_process.insert(itype.clone());
                 contract_abi.push(' ');
-                contract_abi.push_str(&t.name());
+                contract_abi.push_str(convert_type(&t.name(), itype, modules_data));
             }
             t => {
                 contract_abi.push(' ');
-                contract_abi.push_str(&format!("({})", convert_type(&t.name(), None)));
+                contract_abi.push_str(&format!("({})", &t.name()));
             }
         }
 
@@ -135,9 +138,8 @@ pub(crate) fn process_functions(
         }
 
         contract_abi.push(';');
-
         contract_abi.push('\n');
     }
-
-    println!("{:?}", abi.struct_to_process);
 }
+
+// pub fn process_structs() {}
