@@ -58,7 +58,7 @@ pub(crate) fn process_functions(
                     match (&abi_type, itype) {
                         (Type::None, _) => None,
                         (
-                            Type::UserDefined(name, _),
+                            Type::UserDefined(name, types),
                             IntermediateType::IStruct { module_id, .. }
                             | IntermediateType::IGenericStructInstance { module_id, .. }
                             | IntermediateType::IEnum { module_id, .. }
@@ -67,7 +67,7 @@ pub(crate) fn process_functions(
                             if is_hidden_in_signature(name, Some(module_id)) {
                                 None
                             } else {
-                                abi.struct_to_process.insert(itype.clone());
+                                abi.struct_to_process.insert((itype.clone(), types.clone()));
 
                                 Some(format!(
                                     "{} {}",
@@ -109,21 +109,21 @@ pub(crate) fn process_functions(
 
         match Type::from(&parsed_function.signature.return_type) {
             Type::Unit => (),
-            Type::Tuple(ref types) => {
+            Type::Tuple(ref ret_types) => {
                 let mut names = Vec::new();
-                for (type_, itype) in types.iter().zip(&function.signature.returns) {
-                    if let Type::UserDefined(_, _) = type_ {
-                        abi.struct_to_process.insert(itype.clone());
+                for (type_, itype) in ret_types.iter().zip(&function.signature.returns) {
+                    if let Type::UserDefined(_, types) = type_ {
+                        abi.struct_to_process.insert((itype.clone(), types.clone()));
                     }
                     names.push(convert_type(&type_.name(), itype, modules_data).to_owned());
                 }
                 contract_abi.push(' ');
                 contract_abi.push_str(&format!("({})", &names.join(", ")));
             }
-            ref t @ Type::UserDefined(_, _) => {
+            ref t @ Type::UserDefined(_, ref types) => {
                 assert_eq!(1, function.signature.returns.len());
                 let itype = &function.signature.returns[0];
-                abi.struct_to_process.insert(itype.clone());
+                abi.struct_to_process.insert((itype.clone(), types.clone()));
                 contract_abi.push(' ');
                 contract_abi.push_str(convert_type(&t.name(), itype, modules_data));
             }
@@ -150,10 +150,10 @@ pub(crate) fn process_structs(
 ) {
     let mut struct_section = String::new();
 
-    for itype in &abi.struct_to_process {
+    for (itype, types) in &abi.struct_to_process {
         // Get the IStruct
 
-        let struct_ = match itype {
+        let (struct_, struct_module, types) = match itype {
             IntermediateType::IStruct {
                 module_id, index, ..
             } => {
@@ -161,12 +161,16 @@ pub(crate) fn process_structs(
                     .get(module_id)
                     .expect("struct module not found");
 
-                struct_module.structs.get_by_index(*index).unwrap()
+                (
+                    struct_module.structs.get_by_index(*index).unwrap(),
+                    struct_module,
+                    types,
+                )
             }
             IntermediateType::IGenericStructInstance {
                 module_id,
                 index,
-                types,
+                types: instantiation_types,
                 ..
             } => {
                 let struct_module = modules_data
@@ -174,21 +178,32 @@ pub(crate) fn process_structs(
                     .expect("struct module not found");
 
                 let struct_ = struct_module.structs.get_by_index(*index).unwrap();
-                &struct_.instantiate(types)
+                (
+                    &struct_.instantiate(instantiation_types),
+                    struct_module,
+                    types,
+                )
             }
-            _ => panic!("trying to process a type that is not an struct"),
+            _ => {
+                continue;
+                // panic!("trying to process a type that is not an struct {t:?}",),
+            }
         };
 
-        let parsed_struct = processing_module
+        // println!("Looking for {}", struct_.identifier);
+        let parsed_struct = struct_module
             .special_attributes
             .structs
             .iter()
             .find(|f| f.name == *struct_.identifier)
             .expect("struct not found");
 
+        println!("{parsed_struct:?}");
+
         struct_section.push_str(&format!("    struct {} {{\n", struct_.identifier));
         for (itype, (name, type_)) in struct_.fields.iter().zip(&parsed_struct.fields) {
-            let abi_type = Type::from(type_);
+            println!("PROCESSINGGGG {itype:?}");
+            let abi_type = Type::from_intermediate_type(itype, modules_data);
             struct_section.push_str(&format!(
                 "        {} {};\n",
                 convert_type(&abi_type.name(), itype, modules_data),

@@ -1,10 +1,14 @@
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
+
+use move_bytecode_to_wasm::compilation_context::{
+    ModuleData, ModuleId, module_data::struct_data::IntermediateType,
+};
 
 use crate::common::snake_to_upper_camel;
 
 const TYPES_WITH_NO_SIGNATURE: &[&str] = &["TxContext"];
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub enum Type {
     Address,
     Bool,
@@ -40,6 +44,7 @@ impl From<&move_parse_special_attributes::types::Type> for Type {
                 Self::Bytes32
             }
             move_parse_special_attributes::types::Type::UserDataType(name, types) => {
+                println!("----------> {types:?}");
                 Self::UserDefined(
                     name.clone(),
                     types.as_ref().map(|t| t.iter().map(Self::from).collect()),
@@ -84,6 +89,7 @@ impl Type {
             }
             Type::UserDefined(name, types) => {
                 if let Some(types) = types {
+                    println!("----------> 2 {types:?}");
                     let concrete_type_parameters_names = types
                         .iter()
                         .map(|t| t.name())
@@ -105,6 +111,66 @@ impl Type {
                         .join(", ")
                 )
             }
+        }
+    }
+
+    pub fn from_intermediate_type(
+        itype: &IntermediateType,
+        modules_data: &HashMap<ModuleId, ModuleData>,
+    ) -> Self {
+        match itype {
+            IntermediateType::IBool => Self::Bool,
+            IntermediateType::IU8 => Self::Uint8,
+            IntermediateType::IU16 => Self::Uint16,
+            IntermediateType::IU32 => Self::Uint32,
+            IntermediateType::IU64 => Self::Uint64,
+            IntermediateType::IU128 => Self::Uint128,
+            IntermediateType::IU256 => Self::Uint256,
+            IntermediateType::IAddress => Self::Address,
+            IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => {
+                panic!("Should never happen")
+            }
+            IntermediateType::IVector(intermediate_type) => {
+                let inner = Self::from_intermediate_type(intermediate_type, modules_data);
+                Self::Array(Rc::new(inner))
+            }
+            IntermediateType::IRef(intermediate_type)
+            | IntermediateType::IMutRef(intermediate_type) => {
+                Self::from_intermediate_type(intermediate_type, modules_data)
+            }
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } => {
+                let struct_module = modules_data
+                    .get(module_id)
+                    .expect("struct module not found");
+
+                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+                Self::UserDefined(struct_.identifier.clone(), None)
+            }
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+                ..
+            } => {
+                let struct_module = modules_data
+                    .get(module_id)
+                    .expect("struct module not found");
+
+                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+                let types = types
+                    .iter()
+                    .map(|t| Self::from_intermediate_type(t, modules_data))
+                    .collect();
+                Self::UserDefined(struct_.identifier.clone(), Some(types))
+            }
+            IntermediateType::IEnum { module_id, index } => todo!(),
+            IntermediateType::IGenericEnumInstance {
+                module_id,
+                index,
+                types,
+            } => todo!(),
         }
     }
 }

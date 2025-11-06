@@ -15,12 +15,13 @@ use move_bytecode_to_wasm::{
 };
 use move_compiler::shared::files::MappedFiles;
 use move_parse_special_attributes::SpecialAttributeError;
+use types::Type;
 
 #[derive(Default)]
 pub(crate) struct Abi {
     /// This contains all the structs that appear as argument o return of functions. Once we
     /// process the functions this will be the structs appearing in the ABi
-    struct_to_process: HashSet<IntermediateType>,
+    struct_to_process: HashSet<(IntermediateType, Option<Vec<Type>>)>,
 }
 
 pub fn generate_abi(

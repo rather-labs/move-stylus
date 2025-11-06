@@ -9,11 +9,11 @@ public entry fun get_test_values(self: &Test): (u8, u8) {
     (*value, another_test.get_another_test_value())
 }
 
-public entry fun generic_identity<T>(t: T): T {
+public fun generic_identity<T>(t: T): T {
      generic_identity_2(t)
 }
 
-public entry fun generic_identity_two_types<T, U>(t: T, u: U): (T, U) {
+public fun generic_identity_two_types<T, U>(t: T, u: U): (T, U) {
     (
         generic_identity(t),
         generic_identity(u),
