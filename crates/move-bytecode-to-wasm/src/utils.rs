@@ -46,6 +46,16 @@ pub fn snake_to_camel(input: &str) -> String {
     result
 }
 
+pub fn snake_to_upper_camel(input: &str) -> String {
+    let mut result = snake_to_camel(input);
+
+    if let Some(first) = result.get_mut(0..1) {
+        first.make_ascii_uppercase();
+    }
+
+    result
+}
+
 /// Stores the keccak256 hash of the input string into the memory at the given pointer
 pub fn keccak_string_to_memory(
     builder: &mut InstrSeqBuilder,
