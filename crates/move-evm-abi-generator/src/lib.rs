@@ -4,6 +4,7 @@
 //! NOTE: This is a POC and it is WIP
 mod common;
 mod human_redable;
+mod special_types;
 mod types;
 
 use std::{collections::HashSet, path::Path};
@@ -13,7 +14,7 @@ use move_bytecode_to_wasm::{
     PackageModuleData, compilation_context::module_data::struct_data::IntermediateType,
 };
 use move_compiler::shared::files::MappedFiles;
-use move_parse_special_attributes::{SpecialAttributeError, process_special_attributes};
+use move_parse_special_attributes::SpecialAttributeError;
 
 #[derive(Default)]
 pub(crate) struct Abi {
@@ -30,7 +31,6 @@ pub fn generate_abi(
 
     for file in path.read_dir().unwrap() {
         let file = file.unwrap().path();
-        println!("processing {:?}", &file);
         let module_id = package_module_data
             .modules_paths
             .get(&file)
@@ -44,12 +44,7 @@ pub fn generate_abi(
         let mut abi = Abi::default();
 
         let mut result = String::new();
-        process_functions(
-            &mut result,
-            module_data,
-            &package_module_data.modules_data,
-            &mut abi,
-        );
+        process_functions(&mut result, module_data, &mut abi);
 
         println!("{result}");
     }

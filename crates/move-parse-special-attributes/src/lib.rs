@@ -173,11 +173,8 @@ pub fn process_special_attributes(
             for module_member in module.members {
                 match module_member {
                     ModuleMember::Function(ref f) => {
-                        // let is_entry = f.entry.is_some();
                         let visibility: Visibility = (&f.visibility).into();
                         let signature = Function::parse_signature(&f.signature);
-
-                        // println!("{:#?}", signature);
 
                         if let Some(attributes) = f.attributes.first() {
                             let mut modifiers = attributes
@@ -208,9 +205,6 @@ pub fn process_special_attributes(
                                                 modifiers,
                                                 signature,
                                                 visibility,
-                                                /*
-                                                is_entry,
-                                                */
                                             },
                                         );
                                     }
@@ -224,9 +218,6 @@ pub fn process_special_attributes(
                                         modifiers,
                                         signature,
                                         visibility,
-                                        /*
-                                        is_entry,
-                                                */
                                     });
                                 }
                                 _ => {}
@@ -237,9 +228,6 @@ pub fn process_special_attributes(
                                 modifiers: Vec::new(),
                                 signature,
                                 visibility,
-                                /*
-                                is_entry,
-                                                */
                             });
                         }
                     }

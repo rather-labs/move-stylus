@@ -60,6 +60,10 @@ impl Address {
     pub const fn from_bytes(bytes: [u8; 32]) -> Self {
         Address(bytes)
     }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
 }
 
 impl Display for Address {

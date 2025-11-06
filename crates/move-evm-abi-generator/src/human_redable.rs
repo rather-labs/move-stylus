@@ -1,20 +1,18 @@
-use std::collections::HashMap;
-
 use move_bytecode_to_wasm::compilation_context::{
-    ModuleData, ModuleId, module_data::struct_data::IntermediateType,
+    ModuleData, module_data::struct_data::IntermediateType,
 };
-use move_parse_special_attributes::{
-    Struct_,
-    function_modifiers::{Function, Visibility},
-    types,
-};
+use move_parse_special_attributes::function_modifiers::Visibility;
 
-use crate::{Abi, common::snake_to_camel, types::Type};
+use crate::{
+    Abi,
+    common::snake_to_camel,
+    special_types::{convert_type, is_hidden_in_signature},
+    types::Type,
+};
 
 pub(crate) fn process_functions(
     contract_abi: &mut String,
     processing_module: &ModuleData,
-    modules_data: &HashMap<ModuleId, ModuleData>,
     abi: &mut Abi,
 ) {
     // First we filter the functions we are ging to process
@@ -23,8 +21,6 @@ pub(crate) fn process_functions(
         .information
         .iter()
         .filter(|f| f.is_entry);
-
-    let structs = &processing_module.special_attributes.structs;
 
     for function in functions {
         let function_name = &function.function_id.identifier;
@@ -50,36 +46,38 @@ pub(crate) fn process_functions(
 
                     // Remove the references if any
                     let itype = match itype {
-                        IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => inner.as_ref(),
-                        _ => itype
+                        IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+                            inner.as_ref()
+                        }
+                        _ => itype,
                     };
 
-                    // println!("{abi_type:?}\n{itype:?}");
                     match (&abi_type, itype) {
                         (Type::None, _) => None,
                         (
                             Type::UserDefined(name, _),
-                            IntermediateType::IStruct { module_id, ..} | IntermediateType::IGenericStructInstance { module_id, ..}
+                            IntermediateType::IStruct { module_id, .. }
+                            | IntermediateType::IGenericStructInstance { module_id, .. }
+                            | IntermediateType::IEnum { module_id, .. }
+                            | IntermediateType::IGenericEnumInstance { module_id, .. },
                         ) => {
-                            if let Some(struct_) = &structs.iter().find(|s| s.name == *name) {
-                                if matches!(
-                                struct_.fields.first(),
-                                Some((name, types::Type::UserDataType(type_name, _)))
-                                    if name == "id" && (type_name == "UID" || type_name == "NamedId")
-                                ) {
-                                    Some(format!("bytes32 {}", param.name))
-                                } else {
-                                    let res = Some(format!("{} {}", abi_type.name(), param.name));
-                                    abi.struct_to_process.insert(itype.clone());
-                                    res
-                                }
+                            if is_hidden_in_signature(name, Some(module_id)) {
+                                None
                             } else {
-                                let res = Some(format!("{} {}", abi_type.name(), param.name));
                                 abi.struct_to_process.insert(itype.clone());
-                                res
+
+                                Some(format!(
+                                    "{} {}",
+                                    convert_type(name, Some(module_id)),
+                                    param.name
+                                ))
                             }
                         }
-                        _ => Some(format!("{} {}", abi_type.name(), param.name)),
+                        _ => Some(format!(
+                            "{} {}",
+                            convert_type(&abi_type.name(), None),
+                            param.name
+                        )),
                     }
                 })
                 .collect::<Vec<String>>()
@@ -112,14 +110,14 @@ pub(crate) fn process_functions(
             Type::Unit => (),
             ref t @ Type::Tuple(ref types) => {
                 for (type_, itype) in types.iter().zip(&function.signature.returns) {
-                    if let Type::UserDefined(name, _) = type_ {
+                    if let Type::UserDefined(_, _) = type_ {
                         abi.struct_to_process.insert(itype.clone());
                     }
                 }
                 contract_abi.push(' ');
                 contract_abi.push_str(&t.name());
             }
-            ref t @ Type::UserDefined(ref name, _) => {
+            ref t @ Type::UserDefined(_, _) => {
                 assert_eq!(1, function.signature.returns.len());
                 abi.struct_to_process
                     .insert(function.signature.returns[0].clone());
@@ -128,7 +126,7 @@ pub(crate) fn process_functions(
             }
             t => {
                 contract_abi.push(' ');
-                contract_abi.push_str(&format!("({})", t.name()));
+                contract_abi.push_str(&format!("({})", convert_type(&t.name(), None)));
             }
         }
 
