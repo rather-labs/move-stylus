@@ -4,7 +4,7 @@ use crate::common::snake_to_upper_camel;
 
 const TYPES_WITH_NO_SIGNATURE: &[&str] = &["TxContext"];
 
-#[derive(Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum Type {
     Address,
     Bool,

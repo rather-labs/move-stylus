@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use move_bytecode_to_wasm::compilation_context::{ModuleData, ModuleId};
+use move_bytecode_to_wasm::compilation_context::{
+    ModuleData, ModuleId, module_data::struct_data::IntermediateType,
+};
 use move_parse_special_attributes::{
     Struct_,
     function_modifiers::{Function, Visibility},
@@ -24,7 +26,6 @@ pub(crate) fn process_functions(
 
     let structs = &processing_module.special_attributes.structs;
 
-    // println!("{structs:?}");
     for function in functions {
         let function_name = &function.function_id.identifier;
         let parsed_function = processing_module
@@ -47,9 +48,19 @@ pub(crate) fn process_functions(
                 .filter_map(|(param, itype)| {
                     let abi_type = Type::from(&param.type_);
 
-                    match abi_type {
-                        Type::None => None,
-                        Type::UserDefined(ref name, _) => {
+                    // Remove the references if any
+                    let itype = match itype {
+                        IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => inner.as_ref(),
+                        _ => itype
+                    };
+
+                    // println!("{abi_type:?}\n{itype:?}");
+                    match (&abi_type, itype) {
+                        (Type::None, _) => None,
+                        (
+                            Type::UserDefined(name, _),
+                            IntermediateType::IStruct { module_id, ..} | IntermediateType::IGenericStructInstance { module_id, ..}
+                        ) => {
                             if let Some(struct_) = &structs.iter().find(|s| s.name == *name) {
                                 if matches!(
                                 struct_.fields.first(),
@@ -59,12 +70,12 @@ pub(crate) fn process_functions(
                                     Some(format!("bytes32 {}", param.name))
                                 } else {
                                     let res = Some(format!("{} {}", abi_type.name(), param.name));
-                                    abi.struct_to_process.insert(abi_type.name());
+                                    abi.struct_to_process.insert(itype.clone());
                                     res
                                 }
                             } else {
                                 let res = Some(format!("{} {}", abi_type.name(), param.name));
-                                abi.struct_to_process.insert(abi_type.name());
+                                abi.struct_to_process.insert(itype.clone());
                                 res
                             }
                         }
@@ -86,31 +97,32 @@ pub(crate) fn process_functions(
             .map(|f| f.modifiers.iter().map(|m| m.as_str()).collect())
             .unwrap_or_default();
 
-        /*
-        if function.visibility == Visibility::Public {
+        if parsed_function.visibility == Visibility::Public {
             modifiers.push("public")
         }
-        */
 
         // All functions we process are entry
         modifiers.push("external");
 
         contract_abi.push_str(&modifiers.join(" "));
 
-        /*
-        match Type::from(&function.signature.return_type) {
+        println!("{:?}", function.signature.returns);
+
+        match Type::from(&parsed_function.signature.return_type) {
             Type::Unit => (),
             ref t @ Type::Tuple(ref types) => {
-                for type_ in types {
+                for (type_, itype) in types.iter().zip(&function.signature.returns) {
                     if let Type::UserDefined(name, _) = type_ {
-                        abi.struct_to_process.insert(name.clone());
+                        abi.struct_to_process.insert(itype.clone());
                     }
                 }
                 contract_abi.push(' ');
                 contract_abi.push_str(&t.name());
             }
             ref t @ Type::UserDefined(ref name, _) => {
-                abi.struct_to_process.insert(name.clone());
+                assert_eq!(1, function.signature.returns.len());
+                abi.struct_to_process
+                    .insert(function.signature.returns[0].clone());
                 contract_abi.push(' ');
                 contract_abi.push_str(&t.name());
             }
@@ -123,7 +135,6 @@ pub(crate) fn process_functions(
         if let Some(' ') = contract_abi.chars().last() {
             contract_abi.pop();
         }
-        */
 
         contract_abi.push(';');
 

@@ -9,7 +9,9 @@ mod types;
 use std::{collections::HashSet, path::Path};
 
 use human_redable::process_functions;
-use move_bytecode_to_wasm::PackageModuleData;
+use move_bytecode_to_wasm::{
+    PackageModuleData, compilation_context::module_data::struct_data::IntermediateType,
+};
 use move_compiler::shared::files::MappedFiles;
 use move_parse_special_attributes::{SpecialAttributeError, process_special_attributes};
 
@@ -17,7 +19,7 @@ use move_parse_special_attributes::{SpecialAttributeError, process_special_attri
 pub(crate) struct Abi {
     /// This contains all the structs that appear as argument o return of functions. Once we
     /// process the functions this will be the structs appearing in the ABi
-    struct_to_process: HashSet<String>,
+    struct_to_process: HashSet<IntermediateType>,
 }
 
 pub fn generate_abi(
