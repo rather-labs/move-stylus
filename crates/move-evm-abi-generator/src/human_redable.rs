@@ -142,4 +142,61 @@ pub(crate) fn process_functions(
     }
 }
 
-// pub fn process_structs() {}
+pub(crate) fn process_structs(
+    contract_abi: &mut String,
+    processing_module: &ModuleData,
+    modules_data: &HashMap<ModuleId, ModuleData>,
+    abi: &mut Abi,
+) {
+    let mut struct_section = String::new();
+
+    for itype in &abi.struct_to_process {
+        // Get the IStruct
+
+        let struct_ = match itype {
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } => {
+                let struct_module = modules_data
+                    .get(module_id)
+                    .expect("struct module not found");
+
+                struct_module.structs.get_by_index(*index).unwrap()
+            }
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+                ..
+            } => {
+                let struct_module = modules_data
+                    .get(module_id)
+                    .expect("struct module not found");
+
+                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+                &struct_.instantiate(types)
+            }
+            _ => panic!("trying to process a type that is not an struct"),
+        };
+
+        let parsed_struct = processing_module
+            .special_attributes
+            .structs
+            .iter()
+            .find(|f| f.name == *struct_.identifier)
+            .expect("struct not found");
+
+        struct_section.push_str(&format!("    struct {} {{\n", struct_.identifier));
+        for (itype, (name, type_)) in struct_.fields.iter().zip(&parsed_struct.fields) {
+            let abi_type = Type::from(type_);
+            struct_section.push_str(&format!(
+                "        {} {};\n",
+                convert_type(&abi_type.name(), itype, modules_data),
+                name
+            ));
+        }
+        struct_section.push_str("    }\n\n");
+    }
+
+    contract_abi.insert_str(0, &struct_section);
+}

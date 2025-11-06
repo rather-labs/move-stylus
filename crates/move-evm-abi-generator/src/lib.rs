@@ -9,7 +9,7 @@ mod types;
 
 use std::{collections::HashSet, path::Path};
 
-use human_redable::process_functions;
+use human_redable::{process_functions, process_structs};
 use move_bytecode_to_wasm::{
     PackageModuleData, compilation_context::module_data::struct_data::IntermediateType,
 };
@@ -45,6 +45,13 @@ pub fn generate_abi(
 
         let mut result = String::new();
         process_functions(
+            &mut result,
+            module_data,
+            &package_module_data.modules_data,
+            &mut abi,
+        );
+
+        process_structs(
             &mut result,
             module_data,
             &package_module_data.modules_data,
