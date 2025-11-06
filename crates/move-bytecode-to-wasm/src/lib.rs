@@ -24,7 +24,6 @@ mod compilation_context;
 mod constructor;
 mod data;
 pub mod error;
-mod error_encoding;
 mod generics;
 mod hasher;
 mod hostio;
@@ -470,7 +469,7 @@ fn inject_debug_fns(module: &mut walrus::Module) {
 #[macro_export]
 macro_rules! declare_host_debug_functions {
     ($module: ident) => {
-        (CompilationError::ICE(ice_error)
+        (
             $module.imports.get_func("", "print_i32").unwrap(),
             $module.imports.get_func("", "print_i64").unwrap(),
             $module.imports.get_func("", "print_memory_from").unwrap(),

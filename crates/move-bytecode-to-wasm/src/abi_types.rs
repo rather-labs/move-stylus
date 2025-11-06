@@ -1,3 +1,5 @@
+pub(crate) mod abi_encoding;
+pub mod error_encoding;
 pub(crate) mod event_encoding;
 pub mod function_encoding;
 pub(crate) mod packing;

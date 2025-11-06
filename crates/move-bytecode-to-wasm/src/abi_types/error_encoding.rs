@@ -3,9 +3,113 @@ use walrus::{
     ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg, StoreKind},
 };
 
-use crate::{CompilationContext, runtime::RuntimeFunction};
+use crate::{
+    CompilationContext,
+    abi_types::abi_encoding::{self, AbiFunctionSelector},
+    runtime::RuntimeFunction,
+    translation::intermediate_types::IntermediateType,
+    utils::snake_to_upper_camel,
+};
 
+// Error(string) abi encoded selector
 pub const ERROR_SELECTOR: [u8; 4] = [0x08, 0xc3, 0x79, 0xa0];
+
+/// Calculate the error selector according to Solidity's [ABI encoding](https://docs.soliditylang.org/en/latest/abi-spec.html#function-selector)
+///
+/// Function names are converted to camel case before encoding.
+pub fn move_signature_to_abi_selector(
+    struct_name: &str,
+    struct_fields: &[IntermediateType],
+    compilation_ctx: &CompilationContext,
+) -> AbiFunctionSelector {
+    abi_encoding::move_signature_to_abi_selector(
+        struct_name,
+        struct_fields,
+        compilation_ctx,
+        snake_to_upper_camel,
+    )
+}
+
+/// Builds a custom error message from already ABI-encoded error parameters.
+///
+/// This function takes ABI-encoded error parameters (from `build_pack_instructions`) and
+/// prepends the error selector to create a complete Solidity custom error message.
+///
+/// # Arguments
+/// - `builder`: WASM instruction sequence builder
+/// - `module`: WASM module being built
+/// - `compilation_ctx`: Compilation context with memory and allocator info
+/// - `error_selector`: 4-byte error selector
+/// - `error_ptr`: Pointer to already ABI-encoded error parameters
+/// - `error_len`: Length of the already ABI-encoded error parameters
+///
+/// # Returns
+/// - `LocalId`: Pointer to the allocated error message blob
+///
+/// # Memory Layout
+/// The returned blob has the following structure:
+/// - Byte 0: Total message length (little-endian u8)
+/// - Bytes 1-4: Error selector (4 bytes)
+/// - Bytes 5+: ABI-encoded error parameters (already encoded by `build_pack_instructions`)
+pub fn build_custom_error_message(
+    builder: &mut InstrSeqBuilder,
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+    error_selector: &AbiFunctionSelector,
+    error_ptr: LocalId,
+    error_len: LocalId,
+) -> LocalId {
+    let ptr = module.locals.add(ValType::I32);
+    let total_len = module.locals.add(ValType::I32);
+
+    // Calculate total length: selector(4) + error_data_len
+    const SELECTOR_SIZE: i32 = 4;
+    builder
+        .i32_const(SELECTOR_SIZE)
+        .local_get(error_len)
+        .binop(BinaryOp::I32Add)
+        .local_set(total_len);
+
+    // Allocate memory: 1 byte for length header + total_len bytes for the error message
+    builder
+        .i32_const(1) // 1 byte for the length header
+        .local_get(total_len)
+        .binop(BinaryOp::I32Add)
+        .call(compilation_ctx.allocator)
+        .local_tee(ptr)
+        .local_get(total_len)
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
+
+    // Write error selector (bytes 1-4)
+    for (i, b) in error_selector.iter().enumerate() {
+        builder.local_get(ptr).i32_const(*b as i32).store(
+            compilation_ctx.memory_id,
+            StoreKind::I32_8 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 1 + i as u32,
+            },
+        );
+    }
+
+    // Copy the already ABI-encoded error parameters (bytes 5+)
+    builder
+        .local_get(ptr)
+        .i32_const(1 + SELECTOR_SIZE)
+        .binop(BinaryOp::I32Add)
+        .local_get(error_ptr)
+        .local_get(error_len)
+        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+    ptr
+}
 
 /// Builds an error message with the error code converted to decimal.
 ///
@@ -31,7 +135,7 @@ pub const ERROR_SELECTOR: [u8; 4] = [0x08, 0xc3, 0x79, 0xa0];
 /// - Bytes 5-36: Head word (32 bytes, with 0x20 at offset 35)
 /// - Bytes 37-68: Length word (32 bytes, big-endian message length at offset 64)
 /// - Bytes 69+: Error message text (e.g., "123")
-pub fn build_error_message(
+pub fn build_abort_error_message(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -108,7 +212,6 @@ pub fn build_error_message(
 
     // Write ABI header
 
-    // Write error selector (bytes 1-4)
     for (i, b) in ERROR_SELECTOR.iter().enumerate() {
         builder.local_get(ptr).i32_const(*b as i32).store(
             compilation_ctx.memory_id,
@@ -180,18 +283,19 @@ mod tests {
     #[case(9876543210u64, "9876543210")]
     #[should_panic]
     #[case(u64::MAX, "18446744073709551615")]
-    fn test_build_error_message(#[case] error_code: u64, #[case] expected: &str) {
+    fn test_build_abort_error_message(#[case] error_code: u64, #[case] expected: &str) {
         let (mut raw_module, allocator_func, memory_id) = build_module(None);
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
 
-        // Create a test function that calls build_error_message
+        // Create a test function that calls build_abort_error_message
         let mut function_builder =
             FunctionBuilder::new(&mut raw_module.types, &[ValType::I64], &[ValType::I32]);
         let n = raw_module.locals.add(ValType::I64);
 
         let mut func_body = function_builder.func_body();
         func_body.i64_const(error_code as i64);
-        let error_ptr = build_error_message(&mut func_body, &mut raw_module, &compilation_ctx);
+        let error_ptr =
+            build_abort_error_message(&mut func_body, &mut raw_module, &compilation_ctx);
         func_body.local_get(error_ptr);
         let function = function_builder.finish(vec![n], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
