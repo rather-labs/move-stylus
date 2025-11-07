@@ -9,7 +9,11 @@ use move_bytecode_to_wasm::compilation_context::{
 };
 use move_parse_special_attributes::function_modifiers::{FunctionModifier, Parameter};
 
-use crate::{common::snake_to_camel, types::Type};
+use crate::{
+    common::snake_to_camel,
+    special_types::{is_named_id, is_uid},
+    types::Type,
+};
 
 #[derive(Debug)]
 pub struct Abi {
@@ -229,6 +233,25 @@ fn process_functions(
         let return_type = if function.signature.returns.is_empty() {
             Type::None
         } else if function.signature.returns.len() == 1 {
+            match &function.signature.returns[0] {
+                IntermediateType::IGenericStructInstance {
+                    module_id, index, ..
+                }
+                | IntermediateType::IStruct {
+                    module_id, index, ..
+                } => {
+                    let struct_module = modules_data.get(module_id).unwrap();
+                    let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+
+                    if !is_named_id(&struct_.identifier, module_id)
+                        && !is_uid(&struct_.identifier, module_id)
+                    {
+                        struct_to_process.insert(function.signature.returns[0].clone());
+                    }
+                }
+                _ => {}
+            }
+
             Type::from_intermediate_type(&function.signature.returns[0], modules_data)
         } else {
             Type::Tuple(
@@ -236,7 +259,27 @@ fn process_functions(
                     .signature
                     .returns
                     .iter()
-                    .map(|t| Type::from_intermediate_type(t, modules_data))
+                    .map(|t| {
+                        match &function.signature.returns[0] {
+                            IntermediateType::IGenericStructInstance {
+                                module_id, index, ..
+                            }
+                            | IntermediateType::IStruct {
+                                module_id, index, ..
+                            } => {
+                                let struct_module = modules_data.get(module_id).unwrap();
+                                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+
+                                if !is_named_id(&struct_.identifier, module_id)
+                                    && !is_uid(&struct_.identifier, module_id)
+                                {
+                                    struct_to_process.insert(function.signature.returns[0].clone());
+                                }
+                            }
+                            _ => {}
+                        }
+                        Type::from_intermediate_type(t, modules_data)
+                    })
                     .collect(),
             )
         };
