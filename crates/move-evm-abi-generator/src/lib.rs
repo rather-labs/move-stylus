@@ -52,12 +52,7 @@ pub fn generate_abi(
             &mut abi,
         );
 
-        process_structs(
-            &mut result,
-            module_data,
-            &package_module_data.modules_data,
-            &mut abi,
-        );
+        process_structs(&mut result, &package_module_data.modules_data, &mut abi);
 
         println!("{result}");
     }

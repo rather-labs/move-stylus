@@ -33,7 +33,7 @@ use types::Type;
 #[derive(Debug)]
 pub struct Struct_ {
     pub name: String,
-    pub fields: Vec<(String, Type, bool)>,
+    pub fields: Vec<(String, Type)>,
 }
 
 #[derive(Default, Debug)]
@@ -75,45 +75,22 @@ pub fn process_special_attributes(
 
                         // No matter if it is a struct marked with special attributes, we collect
                         // its information.
-                        let fields: Vec<(String, Type, bool)> = match &s.fields {
+                        let fields: Vec<(String, Type)> = match &s.fields {
                             move_compiler::parser::ast::StructFields::Named(items) => items
                                 .iter()
                                 .map(|(_, field, type_)| {
                                     let name = field.value();
-                                    (
-                                        name.to_string(),
-                                        Type::parse_type(&type_.value),
-                                        s.type_parameters.iter().any(|param| {
-                                            println!(
-                                                "AAAAAA {name} {} {} {}",
-                                                type_.value,
-                                                param.name.value,
-                                                type_.value.to_string()
-                                                    == param.name.value.as_str(),
-                                            );
-                                            !param.is_phantom
-                                                && type_.value.to_string()
-                                                    == param.name.value.as_str() // TODO Comparing
-                                            // strings is not the best way of doing this...
-                                        }),
-                                    )
+                                    (name.to_string(), Type::parse_type(&type_.value))
                                 })
                                 .collect(),
                             move_compiler::parser::ast::StructFields::Positional(items) => items
                                 .iter()
                                 .enumerate()
                                 .map(|(index, (_, type_))| {
-                                    let name = format!("pos{index}");
-                                    (
-                                        format!("pos{index}"),
-                                        Type::parse_type(&type_.value),
-                                        s.type_parameters.iter().any(|param| {
-                                            !param.is_phantom && param.name.value.as_str() == name
-                                        }),
-                                    )
+                                    (format!("pos{index}"), Type::parse_type(&type_.value))
                                 })
                                 .collect(),
-                            move_compiler::parser::ast::StructFields::Native(loc) => todo!(),
+                            move_compiler::parser::ast::StructFields::Native(_) => todo!(),
                         };
 
                         result.structs.push(Struct_ {

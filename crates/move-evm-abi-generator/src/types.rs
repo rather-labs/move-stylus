@@ -44,7 +44,6 @@ impl From<&move_parse_special_attributes::types::Type> for Type {
                 Self::Bytes32
             }
             move_parse_special_attributes::types::Type::UserDataType(name, types) => {
-                println!("----------> {types:?}");
                 Self::UserDefined(
                     name.clone(),
                     types.as_ref().map(|t| t.iter().map(Self::from).collect()),
@@ -95,7 +94,6 @@ impl Type {
             }
             Type::UserDefined(name, types) => {
                 if let Some(types) = types {
-                    println!("----------> 2 {types:?}");
                     let concrete_type_parameters_names = types
                         .iter()
                         .map(|t| t.name())
@@ -171,11 +169,14 @@ impl Type {
                     .collect();
                 Self::UserDefined(struct_.identifier.clone(), Some(types))
             }
-            IntermediateType::IEnum { module_id, index } => todo!(),
+            IntermediateType::IEnum {
+                module_id: _,
+                index: _,
+            } => todo!(),
             IntermediateType::IGenericEnumInstance {
-                module_id,
-                index,
-                types,
+                module_id: _,
+                index: _,
+                types: _,
             } => todo!(),
         }
     }

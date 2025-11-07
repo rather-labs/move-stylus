@@ -144,13 +144,15 @@ pub(crate) fn process_functions(
 
 pub(crate) fn process_structs(
     contract_abi: &mut String,
-    processing_module: &ModuleData,
     modules_data: &HashMap<ModuleId, ModuleData>,
     abi: &mut Abi,
 ) {
     let mut struct_section = String::new();
 
     for (itype, types) in &abi.struct_to_process {
+        if type_contains_generics(itype) {
+            continue;
+        }
         // Get the IStruct
 
         let (struct_, struct_module) = match itype {
@@ -194,13 +196,8 @@ pub(crate) fn process_structs(
             .expect("struct not found");
 
         let struct_abi_type = Type::UserDefined(struct_.identifier.clone(), types.clone());
-        if type_contains_generics(itype) {
-            continue;
-        }
         struct_section.push_str(&format!("    struct {} {{\n", struct_abi_type.name()));
-        for (itype, (name, type_, is_type_param)) in
-            struct_.fields.iter().zip(&parsed_struct.fields)
-        {
+        for (itype, (name, _)) in struct_.fields.iter().zip(&parsed_struct.fields) {
             let abi_type = &Type::from_intermediate_type(itype, modules_data);
 
             struct_section.push_str(&format!(
