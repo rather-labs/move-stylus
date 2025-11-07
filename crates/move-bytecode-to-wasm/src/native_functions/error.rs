@@ -14,7 +14,9 @@ use crate::{
 
 use super::NativeFunction;
 
-/// Adds thenative 'revert' function that
+/// Adds the native 'revert' function.
+/// Expects the error type to be a struct. Each field of the error struct is loaded from memory and ABI-encoded to construct a revert reason message.
+/// The encoding format follows the ABI convention for custom errors, as if calling a function named after the error type with its fields as parameters.
 pub fn add_revert_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -42,7 +44,7 @@ pub fn add_revert_fn(
     // Arguments
     let error_struct_ptr = module.locals.add(ValType::I32);
 
-    // Load each field of the error struct for ABI encoding them.
+    // Load each field to prepare them for ABI encoding.
     for (index, field) in error_struct.fields.iter().enumerate() {
         // Load each field's middle pointer
         builder.local_get(error_struct_ptr).load(
@@ -78,11 +80,11 @@ pub fn add_revert_fn(
         }
     }
 
-    // Pack the error data as if it was for a call to a function with the error struct fields as arguments
+    // Combine all the error struct fields into one ABI-encoded error data buffer.
     let (error_data_ptr, error_data_len) =
         build_pack_instructions(&mut builder, &error_struct.fields, module, compilation_ctx);
 
-    // Calculate the error selector
+    // Compute the error selector
     let error_selector = move_signature_to_abi_selector(
         &error_struct.identifier,
         &error_struct.fields,
