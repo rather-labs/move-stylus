@@ -36,8 +36,18 @@ pub fn generate_abi(
             .get(module_id)
             .expect("error getting module data");
 
-        let (functions, _structs_to_process) =
+        let (functions, structs_to_process) =
             abi::process_functions(module_data, &package_module_data.modules_data);
+
+        let mut processed_structs = HashSet::new();
+        let structs = abi::process_structs(
+            structs_to_process,
+            &package_module_data.modules_data,
+            &mut processed_structs,
+        );
+
+        println!("{structs:#?}");
+
         let mut result = String::new();
 
         let abi = abi::Abi { functions };

@@ -38,6 +38,18 @@ pub struct FunctionParameters {
     pub(crate) type_: Type,
 }
 
+#[derive(Debug)]
+pub struct Struct_ {
+    pub(crate) identifier: String,
+    pub(crate) fields: Vec<StructField>,
+}
+
+#[derive(Debug)]
+pub struct StructField {
+    pub(crate) identifier: String,
+    pub(crate) type_: Type,
+}
+
 /// This contains all the structs that appear as argument o return of functions. Once we
 /// process the functions this will be the structs appearing in the ABi
 pub(crate) fn process_functions(
@@ -110,10 +122,7 @@ pub(crate) fn process_functions(
                     }
                 }
                 IntermediateType::IGenericStructInstance {
-                    module_id,
-                    index,
-                    types,
-                    ..
+                    module_id, index, ..
                 } => {
                     let struct_module = modules_data.get(module_id).unwrap();
                     let struct_ = struct_module.structs.get_by_index(*index).unwrap();
@@ -182,4 +191,88 @@ pub(crate) fn process_functions(
         });
     }
     (result, struct_to_process)
+}
+
+pub(crate) fn process_structs(
+    structs: HashSet<IntermediateType>,
+    modules_data: &HashMap<ModuleId, ModuleData>,
+    processed_structs: &mut HashSet<IntermediateType>,
+) -> Vec<Struct_> {
+    let mut result = Vec::new();
+    for struct_itype in structs {
+        if processed_structs.contains(&struct_itype) {
+            continue;
+        }
+
+        let (struct_, parsed_struct) = match &struct_itype {
+            IntermediateType::IStruct {
+                module_id, index, ..
+            } => {
+                let struct_module = modules_data.get(module_id).unwrap();
+                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+                let parsed_struct = struct_module
+                    .special_attributes
+                    .structs
+                    .iter()
+                    .find(|s| s.name == struct_.identifier)
+                    .unwrap();
+
+                (struct_.clone(), parsed_struct)
+            }
+            IntermediateType::IGenericStructInstance {
+                module_id,
+                index,
+                types,
+                ..
+            } => {
+                let struct_module = modules_data.get(module_id).unwrap();
+                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+                let struct_ = struct_.instantiate(types);
+                let parsed_struct = struct_module
+                    .special_attributes
+                    .structs
+                    .iter()
+                    .find(|s| s.name == struct_.identifier)
+                    .unwrap();
+
+                (struct_, parsed_struct)
+            }
+            t => panic!("found {t:?} instead of struct"),
+        };
+
+        let mut child_structs_to_process = HashSet::new();
+        let fields = struct_
+            .fields
+            .iter()
+            .zip(&parsed_struct.fields)
+            .map(|(field_itype, (name, _))| {
+                match field_itype {
+                    IntermediateType::IStruct { .. }
+                    | IntermediateType::IGenericStructInstance { .. } => {
+                        child_structs_to_process.insert(field_itype.clone());
+                    }
+                    _ => {}
+                }
+                StructField {
+                    identifier: name.clone(),
+                    type_: Type::from_intermediate_type(field_itype, modules_data),
+                }
+            })
+            .collect();
+
+        result.push(Struct_ {
+            identifier: struct_.identifier.clone(),
+            fields,
+        });
+
+        processed_structs.insert(struct_itype);
+
+        // Process child structs
+        let child_structs =
+            process_structs(child_structs_to_process, modules_data, processed_structs);
+
+        result.extend(child_structs);
+    }
+
+    result
 }
