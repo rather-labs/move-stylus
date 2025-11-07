@@ -43,6 +43,11 @@ impl From<&move_parse_special_attributes::types::Type> for Type {
             {
                 Self::Bytes32
             }
+            move_parse_special_attributes::types::Type::UserDataType(name, Some(_))
+                if name == "NamedId" =>
+            {
+                Self::Bytes32
+            }
             move_parse_special_attributes::types::Type::UserDataType(name, types) => {
                 Self::UserDefined(
                     name.clone(),
@@ -150,6 +155,7 @@ impl Type {
                     .expect("struct module not found");
 
                 let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+
                 Self::UserDefined(struct_.identifier.clone(), None)
             }
             IntermediateType::IGenericStructInstance {

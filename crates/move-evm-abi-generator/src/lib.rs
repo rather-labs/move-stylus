@@ -2,6 +2,7 @@
 //! Parses the AST of a package to extract the ABI
 //!
 //! NOTE: This is a POC and it is WIP
+mod abi;
 mod common;
 mod human_redable;
 mod special_types;
@@ -42,7 +43,12 @@ pub fn generate_abi(
             .get(module_id)
             .expect("error getting module data");
 
+        let result = abi::process_functions(module_data, &package_module_data.modules_data);
+        println!("{result:#?}");
+
+        /*
         let mut abi = Abi::default();
+
 
         let mut result = String::new();
         process_functions(
@@ -52,9 +58,11 @@ pub fn generate_abi(
             &mut abi,
         );
 
+
         process_structs(&mut result, &package_module_data.modules_data, &mut abi);
 
         println!("{result}");
+        */
     }
 
     Ok(())

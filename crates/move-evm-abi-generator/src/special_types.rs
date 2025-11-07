@@ -29,6 +29,7 @@ pub const STDLIB_MODULE_NAME_STRING: &str = "string";
 
 /// This function checks if the type is hidden from signature.
 pub fn is_hidden_in_signature(identifier: &str, module_id: Option<&ModuleId>) -> bool {
+    println!("HIDDEN {identifier}  {module_id:?}");
     match (identifier, module_id) {
         ("NamedId", Some(module_id)) => {
             module_id.module_name == SF_MODULE_NAME_OBJECT
@@ -43,14 +44,62 @@ pub fn is_hidden_in_signature(identifier: &str, module_id: Option<&ModuleId>) ->
     }
 }
 
-/// This function checks if the type is hidden from signature.
-pub fn convert_type<'a>(
+pub fn is_named_id(identifier: &str, module_id: &ModuleId) -> bool {
+    "NamedId" == identifier
+        && module_id.module_name == SF_MODULE_NAME_OBJECT
+        && module_id.address.as_slice() == STYLUS_FRAMEWORK_ADDRESS
+}
+
+pub fn convert_type_for_signature<'a>(
     identifier: &'a str,
     intermediate_type: &IntermediateType,
     modules_data: &HashMap<ModuleId, ModuleData>,
 ) -> &'a str {
     match (identifier, intermediate_type) {
         ("UID", IntermediateType::IStruct { module_id, .. })
+            if module_id.module_name == SF_MODULE_NAME_OBJECT
+                && module_id.address.as_slice() == STYLUS_FRAMEWORK_ADDRESS =>
+        {
+            "bytes32"
+        }
+        (
+            _,
+            IntermediateType::IStruct {
+                module_id, index, ..
+            }
+            | IntermediateType::IGenericStructInstance {
+                module_id, index, ..
+            },
+        ) => {
+            if let Some(module_data) = modules_data.get(module_id) {
+                let struct_ = module_data.structs.get_by_index(*index).unwrap();
+                if struct_.has_key {
+                    "bytes32"
+                } else {
+                    identifier
+                }
+            } else {
+                panic!("module {module_id} not found in module data")
+            }
+        }
+        _ => identifier,
+    }
+}
+
+pub fn convert_type_for_struct_field<'a>(
+    identifier: &'a str,
+    intermediate_type: &IntermediateType,
+    modules_data: &HashMap<ModuleId, ModuleData>,
+) -> &'a str {
+    println!("===> {identifier}");
+    match (identifier, intermediate_type) {
+        ("UID", IntermediateType::IStruct { module_id, .. })
+            if module_id.module_name == SF_MODULE_NAME_OBJECT
+                && module_id.address.as_slice() == STYLUS_FRAMEWORK_ADDRESS =>
+        {
+            "bytes32"
+        }
+        ("NamedId", IntermediateType::IGenericStructInstance { module_id, .. })
             if module_id.module_name == SF_MODULE_NAME_OBJECT
                 && module_id.address.as_slice() == STYLUS_FRAMEWORK_ADDRESS =>
         {

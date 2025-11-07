@@ -1,4 +1,4 @@
-use std::{collections::HashMap, usize};
+use std::collections::HashMap;
 
 use move_bytecode_to_wasm::compilation_context::{
     ModuleData, ModuleId, module_data::struct_data::IntermediateType,
@@ -8,7 +8,9 @@ use move_parse_special_attributes::function_modifiers::Visibility;
 use crate::{
     Abi,
     common::snake_to_camel,
-    special_types::{convert_type, is_hidden_in_signature},
+    special_types::{
+        convert_type_for_signature, convert_type_for_struct_field, is_hidden_in_signature,
+    },
     types::{Type, type_contains_generics},
 };
 
@@ -59,26 +61,40 @@ pub(crate) fn process_functions(
                         (Type::None, _) => None,
                         (
                             Type::UserDefined(name, types),
-                            IntermediateType::IStruct { module_id, .. }
-                            | IntermediateType::IGenericStructInstance { module_id, .. }
-                            | IntermediateType::IEnum { module_id, .. }
-                            | IntermediateType::IGenericEnumInstance { module_id, .. },
+                            IntermediateType::IStruct {
+                                module_id, index, ..
+                            }
+                            | IntermediateType::IGenericStructInstance {
+                                module_id, index, ..
+                            },
                         ) => {
                             if is_hidden_in_signature(name, Some(module_id)) {
                                 None
                             } else {
+                                let struct_module = modules_data.get(module_id).unwrap();
+                                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+
+                                /*
+                                match struct_.fields.first() {
+                                    Some(IntermediateType::IGenericStructInstance { module_id, index, types, vm_handled_struct })
+
+                                }
+                                */
+                                if let Some(first_field) = struct_.fields.first() {}
+
                                 abi.struct_to_process.insert((itype.clone(), types.clone()));
+                                println!("1 inserting {itype:?}");
 
                                 Some(format!(
                                     "{} {}",
-                                    convert_type(name, itype, modules_data),
+                                    convert_type_for_signature(name, itype, modules_data),
                                     param.name
                                 ))
                             }
                         }
                         _ => Some(format!(
                             "{} {}",
-                            convert_type(&abi_type.name(), itype, modules_data),
+                            convert_type_for_signature(&abi_type.name(), itype, modules_data),
                             param.name
                         )),
                     }
@@ -114,8 +130,11 @@ pub(crate) fn process_functions(
                 for (type_, itype) in ret_types.iter().zip(&function.signature.returns) {
                     if let Type::UserDefined(_, types) = type_ {
                         abi.struct_to_process.insert((itype.clone(), types.clone()));
+                        println!("2 inserting {itype:?}");
                     }
-                    names.push(convert_type(&type_.name(), itype, modules_data).to_owned());
+                    names.push(
+                        convert_type_for_signature(&type_.name(), itype, modules_data).to_owned(),
+                    );
                 }
                 contract_abi.push(' ');
                 contract_abi.push_str(&format!("({})", &names.join(", ")));
@@ -124,8 +143,9 @@ pub(crate) fn process_functions(
                 assert_eq!(1, function.signature.returns.len());
                 let itype = &function.signature.returns[0];
                 abi.struct_to_process.insert((itype.clone(), types.clone()));
+                println!("3 inserting {itype:?}");
                 contract_abi.push(' ');
-                contract_abi.push_str(convert_type(&t.name(), itype, modules_data));
+                contract_abi.push_str(convert_type_for_signature(&t.name(), itype, modules_data));
             }
             t => {
                 contract_abi.push(' ');
@@ -140,6 +160,7 @@ pub(crate) fn process_functions(
         contract_abi.push(';');
         contract_abi.push('\n');
     }
+    println!("AAAA {:?}", abi.struct_to_process);
 }
 
 pub(crate) fn process_structs(
@@ -150,6 +171,8 @@ pub(crate) fn process_structs(
     let mut struct_section = String::new();
 
     for (itype, types) in &abi.struct_to_process {
+        // If the struct contains a generic type, means it should not be part of the ABI, since
+        // Solidity does not support generics yet
         if type_contains_generics(itype) {
             continue;
         }
@@ -187,7 +210,6 @@ pub(crate) fn process_structs(
             }
         };
 
-        // println!("Looking for {}", struct_.identifier);
         let parsed_struct = struct_module
             .special_attributes
             .structs
@@ -195,14 +217,15 @@ pub(crate) fn process_structs(
             .find(|f| f.name == *struct_.identifier)
             .expect("struct not found");
 
-        let struct_abi_type = Type::UserDefined(struct_.identifier.clone(), types.clone());
+        let struct_abi_type = Type::from_intermediate_type(itype, modules_data);
         struct_section.push_str(&format!("    struct {} {{\n", struct_abi_type.name()));
+
         for (itype, (name, _)) in struct_.fields.iter().zip(&parsed_struct.fields) {
             let abi_type = &Type::from_intermediate_type(itype, modules_data);
 
             struct_section.push_str(&format!(
                 "        {} {};\n",
-                convert_type(&abi_type.name(), itype, modules_data),
+                convert_type_for_struct_field(&abi_type.name(), itype, modules_data),
                 name
             ));
         }
