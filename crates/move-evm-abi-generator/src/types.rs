@@ -1,7 +1,9 @@
 use std::{collections::HashMap, rc::Rc};
 
 use move_bytecode_to_wasm::compilation_context::{
-    ModuleData, ModuleId, module_data::struct_data::IntermediateType,
+    ModuleData, ModuleId,
+    module_data::struct_data::IntermediateType,
+    reserved_modules::{SF_MODULE_NAME_OBJECT, STYLUS_FRAMEWORK_ADDRESS},
 };
 
 use crate::common::snake_to_upper_camel;
@@ -111,9 +113,16 @@ impl Type {
 
                 let struct_ = struct_module.structs.get_by_index(*index).unwrap();
 
-                Self::Struct {
-                    identifier: struct_.identifier.clone(),
-                    type_instances: None,
+                match (
+                    struct_.identifier.as_str(),
+                    module_id.address,
+                    module_id.module_name.as_str(),
+                ) {
+                    ("UID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => Self::Bytes32,
+                    _ => Self::Struct {
+                        identifier: struct_.identifier.clone(),
+                        type_instances: None,
+                    },
                 }
             }
             IntermediateType::IGenericStructInstance {
@@ -131,9 +140,16 @@ impl Type {
                     .map(|t| Self::from_intermediate_type(t, modules_data))
                     .collect();
 
-                Self::Struct {
-                    identifier: struct_.identifier.clone(),
-                    type_instances: Some(types),
+                match (
+                    struct_.identifier.as_str(),
+                    module_id.address,
+                    module_id.module_name.as_str(),
+                ) {
+                    ("NamedId", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => Self::Bytes32,
+                    _ => Self::Struct {
+                        identifier: struct_.identifier.clone(),
+                        type_instances: Some(types),
+                    },
                 }
             }
             IntermediateType::IEnum { module_id, index } => {

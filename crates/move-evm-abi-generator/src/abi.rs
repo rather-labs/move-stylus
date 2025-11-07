@@ -51,9 +51,21 @@ pub struct StructField {
     pub(crate) type_: Type,
 }
 
+pub(crate) fn get_module_abi(
+    processing_module: &ModuleData,
+    modules_data: &HashMap<ModuleId, ModuleData>,
+) -> Abi {
+    let (functions, structs_to_process) = process_functions(processing_module, modules_data);
+
+    let mut processed_structs = HashSet::new();
+    let structs = process_structs(structs_to_process, modules_data, &mut processed_structs);
+
+    Abi { functions, structs }
+}
+
 /// This contains all the structs that appear as argument o return of functions. Once we
 /// process the functions this will be the structs appearing in the ABi
-pub(crate) fn process_functions(
+fn process_functions(
     processing_module: &ModuleData,
     modules_data: &HashMap<ModuleId, ModuleData>,
 ) -> (Vec<Function>, HashSet<IntermediateType>) {
@@ -322,7 +334,7 @@ fn process_storage_struct(
     }
 }
 
-pub(crate) fn process_structs(
+pub fn process_structs(
     structs: HashSet<IntermediateType>,
     modules_data: &HashMap<ModuleId, ModuleData>,
     processed_structs: &mut HashSet<IntermediateType>,

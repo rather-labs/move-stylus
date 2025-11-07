@@ -1,13 +1,6 @@
-use std::collections::HashMap;
-
-use move_bytecode_to_wasm::compilation_context::{
-    ModuleData, ModuleId, module_data::struct_data::IntermediateType,
-};
-
 use crate::{
-    abi::{Abi, Struct_, Visibility},
-    special_types::convert_type_for_struct_field,
-    types::{Type, type_contains_generics},
+    abi::{Abi, Visibility},
+    types::Type,
 };
 
 pub(crate) fn process_functions(contract_abi: &mut String, abi: &Abi) {
