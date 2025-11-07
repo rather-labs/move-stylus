@@ -448,7 +448,7 @@ fn inject_debug_fns(module: &mut walrus::Module) {
         let func_ty = module.types.add(&[ValType::I32], &[]);
         module.add_import_func("", "print_i32", func_ty);
 
-        let func_ty = module.types.add(&[ValType::I32], &[]);
+        let func_ty = module.types.add(&[ValType::I32, ValType::I32], &[]);
         module.add_import_func("", "print_memory_from", func_ty);
 
         let func_ty = module.types.add(&[ValType::I64], &[]);
