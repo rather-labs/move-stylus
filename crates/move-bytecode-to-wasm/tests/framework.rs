@@ -1471,24 +1471,163 @@ mod cross_contract_calls_result {
         .unwrap();
         let error_ptr = u32::from_le_bytes(error_ptr.try_into().unwrap());
 
-        // Read the len
-        let error_len_ptr =
-            RuntimeSandbox::read_memory_from(&instance, &mut store, error_ptr as usize, 1).unwrap();
-        let error_len = usize::from(error_len_ptr[0]);
+        // Read the actual message length from the ABI header (4 bytes big-endian at offset 68)
+        let msg_len_bytes =
+            RuntimeSandbox::read_memory_from(&instance, &mut store, error_ptr as usize + 68, 4)
+                .unwrap();
+        let msg_len = u32::from_be_bytes(msg_len_bytes.try_into().unwrap()) as usize;
 
-        let error = String::abi_decode(
-            &RuntimeSandbox::read_memory_from(
-                &instance,
-                &mut store,
-                // raw error data (skip size -1 byte- and selector -4 bytes-)
-                error_ptr as usize + 5,
-                // Length minus selector
-                error_len - 4,
-            )
-            .unwrap(),
+        // Read the raw error message bytes (not ABI-encoded, just UTF-8 string bytes)
+        let error_bytes = RuntimeSandbox::read_memory_from(
+            &instance,
+            &mut store,
+            // raw error data (skip 4-byte length header + 68-byte ABI header)
+            error_ptr as usize + 72,
+            // Use the actual message length from the ABI header
+            msg_len,
         )
         .unwrap();
 
+        // Convert raw UTF-8 bytes to string
+        let error = String::from_utf8(error_bytes).unwrap();
+
         assert_eq!(GET_RESULT_ERROR_CODE, error);
+    }
+}
+
+mod error {
+    use alloy_primitives::{U256, address, keccak256};
+
+    use crate::common::translate_test_package_with_framework;
+
+    use super::*;
+
+    #[fixture]
+    fn runtime() -> RuntimeSandbox {
+        const MODULE_NAME: &str = "error";
+        const SOURCE_PATH: &str = "tests/framework/error.move";
+
+        let mut translated_package =
+            translate_test_package_with_framework(SOURCE_PATH, MODULE_NAME);
+
+        RuntimeSandbox::new(&mut translated_package)
+    }
+
+    sol!(
+        struct Error {
+            string e;
+        }
+
+        struct CustomError {
+            string message;
+            address addr;
+            bool boolean;
+            string second_message;
+        }
+
+        struct CustomError2 {
+            uint16 a;
+            uint32 b;
+            uint64 c;
+            string message;
+            uint128 d;
+            uint256 e;
+        }
+
+        struct CustomError3 {
+            uint16 a;
+            uint32 b;
+            uint64 c;
+            uint128 d;
+            uint256 e;
+        }
+
+        struct CustomError4 {
+            uint16 a;
+            CustomError3 b;
+            uint32 c;
+        }
+
+        struct CustomError5 {
+            uint32[] a;
+            uint128[] b;
+        }
+
+        function revertStandardError(Error e) external;
+        function revertCustomError(CustomError e) external;
+        function revertCustomError2(CustomError2 e) external;
+        function revertCustomError3(CustomError3 e) external;
+        function revertCustomError4(CustomError4 e) external;
+        function revertCustomError5(CustomError5 e) external;
+    );
+
+    #[rstest]
+    #[case(
+        revertStandardErrorCall::new((Error { e: String::from("Not enough Ether provided.") },)),
+        [
+            keccak256(b"Error(string)")[..4].to_vec(),
+            <sol!((string,))>::abi_encode_params(&("Not enough Ether provided.",)),
+        ].concat()
+    )]
+    #[case(
+        revertCustomErrorCall::new((
+            CustomError {
+                message: String::from("Custom error message"),
+                addr: address!("0xffffffffffffffffffffffffffffffffffffffff"),
+                boolean: true,
+                second_message: String::from("Second error message"),
+            },
+        )),
+        [
+            keccak256(b"CustomError(string,address,bool,string)")[..4].to_vec(),
+            <sol!((string, address, bool, string))>::abi_encode_params(&(
+                "Custom error message",
+                address!("0xffffffffffffffffffffffffffffffffffffffff"),
+                true,
+                "Second error message",
+            )),
+        ].concat()
+    )]
+    #[case(
+        revertCustomError2Call::new((CustomError2 { a: 1, b: 2, c: 3, message: String::from("ERROR"), d: 4, e: U256::from(5) },)),
+        [
+            keccak256(b"CustomError2(uint16,uint32,uint64,string,uint128,uint256)")[..4].to_vec(),
+            <sol!((uint16, uint32, uint64, string, uint128, uint256))>::abi_encode_params(&(1, 2, 3, "ERROR", 4, U256::from(5))),
+        ].concat()
+    )]
+    #[case(
+        revertCustomError3Call::new((CustomError3 { a: 1, b: 2, c: 3, d: 4, e: U256::from(5) },)),
+        [
+            keccak256(b"CustomError3(uint16,uint32,uint64,uint128,uint256)")[..4].to_vec(),
+            <sol!((uint16, uint32, uint64, uint128, uint256))>::abi_encode_params(&(1, 2, 3, 4, U256::from(5))),
+        ].concat()
+    )]
+    #[case(
+        revertCustomError4Call::new((CustomError4 { a: 1, b: CustomError3 { a: 2, b: 3, c: 4, d: 5, e: U256::from(6) }, c: 7 },)),
+        [
+            keccak256(b"CustomError4(uint16,(uint16,uint32,uint64,uint128,uint256),uint32)")[..4].to_vec(),
+            <sol!((uint16, (uint16, uint32, uint64, uint128, uint256), uint32))>::abi_encode_params(&(
+                1,
+                (2, 3, 4, 5, U256::from(6)),
+                7,
+            )),
+        ].concat()
+    )]
+    #[case(
+        revertCustomError5Call::new((CustomError5 { a: vec![1, 2, 3], b: vec![4, 5] },)),
+        [
+            keccak256(b"CustomError5(uint32[],uint128[])")[..4].to_vec(),
+            <sol!((uint32[], uint128[]))>::abi_encode_params(&(vec![1, 2, 3], vec![4, 5])),
+        ].concat()
+    )]
+    fn test_revert<T: SolCall>(
+        runtime: RuntimeSandbox,
+        #[case] call_data: T,
+        #[case] expected_data: Vec<u8>,
+    ) {
+        let (result, return_data) = runtime.call_entrypoint(call_data.abi_encode()).unwrap();
+        assert_eq!(1, result);
+
+        assert_eq!(return_data, expected_data);
     }
 }
