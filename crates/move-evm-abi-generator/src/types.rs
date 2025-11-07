@@ -93,9 +93,7 @@ impl Type {
             IntermediateType::IU128 => Self::Uint128,
             IntermediateType::IU256 => Self::Uint256,
             IntermediateType::IAddress => Self::Address,
-            IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => {
-                panic!("Should never happen")
-            }
+            IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => Self::None,
             IntermediateType::IVector(intermediate_type) => {
                 let inner = Self::from_intermediate_type(intermediate_type, modules_data);
                 Self::Array(Rc::new(inner))
