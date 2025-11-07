@@ -13,10 +13,8 @@ entry fun revert_standard_error(error: Error) {
 
 #[allow(unused_field)]
 public struct CustomError has copy, drop {
-    message: String,
-    addr: address,
-    boolean: bool,
-    second_message: String,
+    error_message: String,
+    error_code: u64,
 }
 
 entry fun revert_custom_error(error: CustomError) {
@@ -25,12 +23,14 @@ entry fun revert_custom_error(error: CustomError) {
 
 #[allow(unused_field)]
 public struct CustomError2 has copy, drop {
-    a: u16,
-    b: u32,
-    c: u64,
-    message: String,
-    d: u128,
-    e: u256,
+    a: bool,
+    b: u8,
+    c: u16,
+    d: u32,
+    e: u64,
+    f: u128,
+    g: u256,
+    h: address,
 }
 
 entry fun revert_custom_error2(error: CustomError2) {
@@ -39,11 +39,9 @@ entry fun revert_custom_error2(error: CustomError2) {
 
 #[allow(unused_field)]
 public struct CustomError3 has copy, drop {
-    a: u16,
-    b: u32,
-    c: u64,
-    d: u128,
-    e: u256,
+    a: vector<u32>,
+    b: vector<u128>,
+    c: vector<vector<u64>>,
 }
 
 entry fun revert_custom_error3(error: CustomError3) {
@@ -52,9 +50,8 @@ entry fun revert_custom_error3(error: CustomError3) {
 
 #[allow(unused_field)]
 public struct CustomError4 has copy, drop {
-    a: u16,
-    b: CustomError3,
-    c: u32,
+    a: CustomError,
+    b: CustomError2,
 }
 
 entry fun revert_custom_error4(error: CustomError4) {
@@ -62,11 +59,11 @@ entry fun revert_custom_error4(error: CustomError4) {
 }
 
 #[allow(unused_field)]
-public struct CustomError5 has copy, drop {
-    a: vector<u32>,
-    b: vector<u128>,
+public struct GenericCustomError<T> has copy, drop {
+    a: T,
+    b: vector<T>,
 }
 
-entry fun revert_custom_error5(error: CustomError5) {
+entry fun revert_generic_custom_error_32(error: GenericCustomError<u32>) {
     revert(error);
 }

@@ -1519,46 +1519,42 @@ mod error {
         }
 
         struct CustomError {
-            string message;
-            address addr;
-            bool boolean;
-            string second_message;
+            string error_message;
+            uint64 error_code;
         }
 
         struct CustomError2 {
-            uint16 a;
-            uint32 b;
-            uint64 c;
-            string message;
-            uint128 d;
-            uint256 e;
+            bool a;
+            uint8 b;
+            uint16 c;
+            uint32 d;
+            uint64 e;
+            uint128 f;
+            uint256 g;
+            address h;
         }
 
         struct CustomError3 {
-            uint16 a;
-            uint32 b;
-            uint64 c;
-            uint128 d;
-            uint256 e;
+            uint32[] a;
+            uint128[] b;
+            uint64[][] c;
         }
 
         struct CustomError4 {
-            uint16 a;
-            CustomError3 b;
-            uint32 c;
+            CustomError a;
+            CustomError2 b;
         }
 
-        struct CustomError5 {
-            uint32[] a;
-            uint128[] b;
+        struct GenericCustomError32 {
+            uint32 a;
+            uint32[] b;
         }
-
         function revertStandardError(Error e) external;
         function revertCustomError(CustomError e) external;
         function revertCustomError2(CustomError2 e) external;
         function revertCustomError3(CustomError3 e) external;
         function revertCustomError4(CustomError4 e) external;
-        function revertCustomError5(CustomError5 e) external;
+        function revertGenericCustomError32(GenericCustomError32 e) external;
     );
 
     #[rstest]
@@ -1572,52 +1568,79 @@ mod error {
     #[case(
         revertCustomErrorCall::new((
             CustomError {
-                message: String::from("Custom error message"),
-                addr: address!("0xffffffffffffffffffffffffffffffffffffffff"),
-                boolean: true,
-                second_message: String::from("Second error message"),
+                error_message: String::from("Custom error message"),
+                error_code: 42,
             },
         )),
         [
-            keccak256(b"CustomError(string,address,bool,string)")[..4].to_vec(),
-            <sol!((string, address, bool, string))>::abi_encode_params(&(
+            keccak256(b"CustomError(string,uint64)")[..4].to_vec(),
+            <sol!((string, uint64))>::abi_encode_params(&(
                 "Custom error message",
-                address!("0xffffffffffffffffffffffffffffffffffffffff"),
-                true,
-                "Second error message",
+                42,
             )),
         ].concat()
     )]
     #[case(
-        revertCustomError2Call::new((CustomError2 { a: 1, b: 2, c: 3, message: String::from("ERROR"), d: 4, e: U256::from(5) },)),
+        revertCustomError2Call::new((CustomError2 { a: true, b: 2, c: 3, d: 4, e: 5, f: 5, g: U256::from(5), h: address!("0xffffffffffffffffffffffffffffffffffffffff") },)),
         [
-            keccak256(b"CustomError2(uint16,uint32,uint64,string,uint128,uint256)")[..4].to_vec(),
-            <sol!((uint16, uint32, uint64, string, uint128, uint256))>::abi_encode_params(&(1, 2, 3, "ERROR", 4, U256::from(5))),
+            keccak256(b"CustomError2(bool,uint8,uint16,uint32,uint64,uint128,uint256,address)")[..4].to_vec(),
+            <sol!((bool, uint8, uint16, uint32, uint64, uint128, uint256, address))>::abi_encode_params(&(true, 2u8, 3u16, 4u32, 5u64, 5u128, U256::from(5), address!("0xffffffffffffffffffffffffffffffffffffffff"))),
         ].concat()
     )]
     #[case(
-        revertCustomError3Call::new((CustomError3 { a: 1, b: 2, c: 3, d: 4, e: U256::from(5) },)),
+        revertCustomError3Call::new((CustomError3 { a: vec![1, 2, 3], b: vec![4, 5], c: vec![vec![6, 7, 8], vec![9, 10, 11]] },)),
         [
-            keccak256(b"CustomError3(uint16,uint32,uint64,uint128,uint256)")[..4].to_vec(),
-            <sol!((uint16, uint32, uint64, uint128, uint256))>::abi_encode_params(&(1, 2, 3, 4, U256::from(5))),
+            keccak256(b"CustomError3(uint32[],uint128[],uint64[][])")[..4].to_vec(),
+            <sol!((uint32[], uint128[], uint64[][]))>::abi_encode_params(&(vec![1, 2, 3], vec![4, 5], vec![vec![6, 7, 8], vec![9, 10, 11]])),
         ].concat()
     )]
     #[case(
-        revertCustomError4Call::new((CustomError4 { a: 1, b: CustomError3 { a: 2, b: 3, c: 4, d: 5, e: U256::from(6) }, c: 7 },)),
+        revertCustomError4Call::new((
+            CustomError4 {
+                a: CustomError {
+                    error_message: String::from("Custom error message"),
+                    error_code: 42,
+                },
+                b: CustomError2 {
+                    a: true,
+                    b: 1,
+                    c: 2,
+                    d: 3,
+                    e: 4,
+                    f: 5,
+                    g: U256::from(6),
+                    h: address!("0xffffffffffffffffffffffffffffffffffffffff"),
+                },
+            },
+        )),
         [
-            keccak256(b"CustomError4(uint16,(uint16,uint32,uint64,uint128,uint256),uint32)")[..4].to_vec(),
-            <sol!((uint16, (uint16, uint32, uint64, uint128, uint256), uint32))>::abi_encode_params(&(
-                1,
-                (2, 3, 4, 5, U256::from(6)),
-                7,
-            )),
+            keccak256(b"CustomError4((string,uint64),(bool,uint8,uint16,uint32,uint64,uint128,uint256,address))")[..4].to_vec(),
+            {
+                let params = (
+                    CustomError {
+                        error_message: String::from("Custom error message"),
+                        error_code: 42,
+                    },
+                    CustomError2 {
+                        a: true,
+                        b: 1,
+                        c: 2,
+                        d: 3,
+                        e: 4,
+                        f: 5,
+                        g: U256::from(6),
+                        h: address!("0xffffffffffffffffffffffffffffffffffffffff"),
+                    },
+                );
+                <sol!((CustomError, CustomError2)) as alloy_sol_types::SolValue>::abi_encode_params(&params)
+            },
         ].concat()
     )]
     #[case(
-        revertCustomError5Call::new((CustomError5 { a: vec![1, 2, 3], b: vec![4, 5] },)),
+        revertGenericCustomError32Call::new((GenericCustomError32 { a: 42, b: vec![43, 44, 45] },)),
         [
-            keccak256(b"CustomError5(uint32[],uint128[])")[..4].to_vec(),
-            <sol!((uint32[], uint128[]))>::abi_encode_params(&(vec![1, 2, 3], vec![4, 5])),
+            keccak256(b"GenericCustomError(uint32,uint32[])")[..4].to_vec(),
+            <sol!((uint32, uint32[]))>::abi_encode_params(&(42, vec![43, 44, 45])),
         ].concat()
     )]
     fn test_revert<T: SolCall>(
