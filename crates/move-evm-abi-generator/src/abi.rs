@@ -320,12 +320,7 @@ fn process_storage_struct(
                 module_id.address,
                 module_id.module_name.as_str(),
             ) {
-                ("NamedId", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
-                    function_parameters.push(FunctionParameters {
-                        identifier: param.name.clone(),
-                        type_: Type::Bytes32,
-                    });
-                }
+                ("NamedId", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {}
                 _ => {
                     function_parameters.push(FunctionParameters {
                         identifier: param.name.clone(),
