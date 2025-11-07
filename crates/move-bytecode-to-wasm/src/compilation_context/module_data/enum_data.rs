@@ -45,6 +45,13 @@ pub struct EnumData {
 }
 
 impl EnumData {
+    pub fn get_by_index(&self, index: u16) -> Result<&IEnum> {
+        self.enums
+            .iter()
+            .find(|e| e.index == index)
+            .ok_or(CompilationContextError::EnumNotFound(index))
+    }
+
     pub fn get_enum_by_variant_handle_idx(&self, idx: &VariantHandleIndex) -> Result<&IEnum> {
         let VariantData { enum_index, .. } = self
             .variants_to_enum

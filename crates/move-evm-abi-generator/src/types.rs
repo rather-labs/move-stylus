@@ -21,63 +21,16 @@ pub enum Type {
     Unit,
     Array(Rc<Type>),
     Bytes32,
-    UserDefined(String, Option<Vec<Type>>),
+    Struct {
+        identifier: String,
+        type_instances: Option<Vec<Type>>,
+    },
+    Enum {
+        identifier: String,
+    },
     Tuple(Vec<Type>),
     // This type represents a type that appears in Move but not in the ABI signature
     None,
-}
-
-impl From<&move_parse_special_attributes::types::Type> for Type {
-    fn from(value: &move_parse_special_attributes::types::Type) -> Self {
-        match value {
-            move_parse_special_attributes::types::Type::Address => Self::Address,
-            move_parse_special_attributes::types::Type::Bool => Self::Bool,
-
-            move_parse_special_attributes::types::Type::UserDataType(name, None)
-                if TYPES_WITH_NO_SIGNATURE.contains(&name.as_str()) =>
-            {
-                Self::None
-            }
-            move_parse_special_attributes::types::Type::UserDataType(name, None)
-                if name == "UID" =>
-            {
-                Self::Bytes32
-            }
-            move_parse_special_attributes::types::Type::UserDataType(name, Some(_))
-                if name == "NamedId" =>
-            {
-                Self::Bytes32
-            }
-            move_parse_special_attributes::types::Type::UserDataType(name, types) => {
-                Self::UserDefined(
-                    name.clone(),
-                    types.as_ref().map(|t| t.iter().map(Self::from).collect()),
-                )
-            }
-            move_parse_special_attributes::types::Type::Signer => Self::Address, // TODO: This is
-            // not correct
-            move_parse_special_attributes::types::Type::Vector(t) => {
-                Self::Array(Rc::new(Self::from(t.as_ref())))
-            }
-            move_parse_special_attributes::types::Type::U8 => Self::Uint8,
-            move_parse_special_attributes::types::Type::U16 => Self::Uint16,
-            move_parse_special_attributes::types::Type::U32 => Self::Uint32,
-            move_parse_special_attributes::types::Type::U64 => Self::Uint64,
-            move_parse_special_attributes::types::Type::U128 => Self::Uint128,
-            move_parse_special_attributes::types::Type::U256 => Self::Uint256,
-            move_parse_special_attributes::types::Type::Unit => Self::Unit,
-            move_parse_special_attributes::types::Type::Tuple(items) => {
-                Self::Tuple(items.iter().map(Self::from).collect())
-            }
-            move_parse_special_attributes::types::Type::Function(_, _) => Self::None,
-        }
-    }
-}
-
-impl From<move_parse_special_attributes::types::Type> for Type {
-    fn from(value: move_parse_special_attributes::types::Type) -> Self {
-        Self::from(&value)
-    }
 }
 
 impl Type {
@@ -94,22 +47,26 @@ impl Type {
             Type::Unit | Type::None => "".to_owned(),
             Type::Array(inner) => format!("{}[]", inner.name()),
             Type::Bytes32 => "bytes32".to_owned(),
-            Type::UserDefined(name, None) if TYPES_WITH_NO_SIGNATURE.contains(&name.as_str()) => {
-                "".to_owned()
-            }
-            Type::UserDefined(name, types) => {
-                if let Some(types) = types {
+            Type::Struct {
+                identifier,
+                type_instances,
+            } => {
+                if let Some(types) = type_instances {
                     let concrete_type_parameters_names = types
                         .iter()
                         .map(|t| t.name())
                         .collect::<Vec<String>>()
                         .join("_");
 
-                    snake_to_upper_camel(&format!("{}_{}", name, concrete_type_parameters_names))
+                    snake_to_upper_camel(&format!(
+                        "{}_{}",
+                        identifier, concrete_type_parameters_names
+                    ))
                 } else {
-                    name.clone()
+                    identifier.clone()
                 }
             }
+            Type::Enum { identifier, .. } => identifier.clone(),
             Type::Tuple(items) => {
                 format!(
                     "({})",
@@ -156,7 +113,10 @@ impl Type {
 
                 let struct_ = struct_module.structs.get_by_index(*index).unwrap();
 
-                Self::UserDefined(struct_.identifier.clone(), None)
+                Self::Struct {
+                    identifier: struct_.identifier.clone(),
+                    type_instances: None,
+                }
             }
             IntermediateType::IGenericStructInstance {
                 module_id,
@@ -167,23 +127,48 @@ impl Type {
                 let struct_module = modules_data
                     .get(module_id)
                     .expect("struct module not found");
-
                 let struct_ = struct_module.structs.get_by_index(*index).unwrap();
                 let types = types
                     .iter()
                     .map(|t| Self::from_intermediate_type(t, modules_data))
                     .collect();
-                Self::UserDefined(struct_.identifier.clone(), Some(types))
+
+                Self::Struct {
+                    identifier: struct_.identifier.clone(),
+                    type_instances: Some(types),
+                }
             }
-            IntermediateType::IEnum {
-                module_id: _,
-                index: _,
-            } => todo!(),
+            IntermediateType::IEnum { module_id, index } => {
+                let enum_module = modules_data.get(module_id).expect("enum module not found");
+                let enum_ = enum_module.enums.get_by_index(*index).unwrap();
+                if enum_.is_simple {
+                    Type::Enum {
+                        identifier: enum_.identifier.clone(),
+                    }
+                } else {
+                    Type::None
+                }
+            }
             IntermediateType::IGenericEnumInstance {
-                module_id: _,
-                index: _,
-                types: _,
-            } => todo!(),
+                module_id,
+                index,
+                types,
+            } => {
+                let enum_module = modules_data.get(module_id).expect("enum module not found");
+                let enum_ = enum_module
+                    .enums
+                    .get_by_index(*index)
+                    .unwrap()
+                    .instantiate(types);
+
+                if enum_.is_simple {
+                    Type::Enum {
+                        identifier: enum_.identifier.clone(),
+                    }
+                } else {
+                    Type::None
+                }
+            }
         }
     }
 }

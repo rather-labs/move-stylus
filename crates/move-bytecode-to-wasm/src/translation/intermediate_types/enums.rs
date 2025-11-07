@@ -42,6 +42,8 @@ pub struct IEnumVariant {
 
 #[derive(Debug, Clone)]
 pub struct IEnum {
+    pub identifier: String,
+
     pub index: u16,
 
     pub is_simple: bool,
@@ -73,10 +75,15 @@ impl IEnumVariant {
 }
 
 impl IEnum {
-    pub fn new(index: u16, variants: Vec<IEnumVariant>) -> Result<Self, TranslationError> {
+    pub fn new(
+        identifier: String,
+        index: u16,
+        variants: Vec<IEnumVariant>,
+    ) -> Result<Self, TranslationError> {
         let is_simple = variants.iter().all(|v| v.fields.is_empty());
         let heap_size = Self::compute_heap_size(&variants)?;
         Ok(Self {
+            identifier,
             is_simple,
             variants,
             index,
@@ -284,6 +291,7 @@ impl IEnum {
         let heap_size = Self::compute_heap_size(&variants).unwrap_or(None);
 
         Self {
+            identifier: self.identifier.clone(),
             index: self.index,
             is_simple: self.is_simple,
             variants,
