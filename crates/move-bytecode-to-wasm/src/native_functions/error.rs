@@ -14,6 +14,7 @@ use crate::{
 
 use super::NativeFunction;
 
+/// Adds thenative 'revert' function that
 pub fn add_revert_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
@@ -30,7 +31,7 @@ pub fn add_revert_fn(
         return function;
     };
 
-    // Get the error type. If its not a struct it panics.
+    // Get the error type. Should be a struct, otherwise it panics.
     let error_struct = compilation_ctx
         .get_struct_by_intermediate_type(error_itype)
         .unwrap();
@@ -41,7 +42,7 @@ pub fn add_revert_fn(
     // Arguments
     let error_struct_ptr = module.locals.add(ValType::I32);
 
-    // The error_ptr points to the error struct in memory, but what we need is a pointer to each of its fields.
+    // Load each field of the error struct for ABI encoding them.
     for (index, field) in error_struct.fields.iter().enumerate() {
         // Load each field's middle pointer
         builder.local_get(error_struct_ptr).load(
@@ -53,7 +54,7 @@ pub fn add_revert_fn(
             },
         );
 
-        // If the field is a stack type, we need to load the value from the memory
+        // If the field is a stack type, load the value from memory
         if field.is_stack_type() {
             if field.stack_data_size() == 8 {
                 builder.load(

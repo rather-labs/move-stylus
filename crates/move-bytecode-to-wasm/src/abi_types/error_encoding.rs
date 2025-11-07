@@ -48,9 +48,9 @@ pub fn move_signature_to_abi_selector(
 ///
 /// # Memory Layout
 /// The returned blob has the following structure:
-/// - Byte 0: Total message length (little-endian u8)
-/// - Bytes 1-4: Error selector (4 bytes)
-/// - Bytes 5+: ABI-encoded error parameters (already encoded by `build_pack_instructions`)
+/// - Byte 0-3: Total message length (little-endian u32)
+/// - Bytes 4-7: Error selector (4 bytes)
+/// - Bytes 8+: ABI-encoded error parameters (already encoded by `build_pack_instructions`)
 pub fn build_custom_error_message(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
@@ -70,9 +70,10 @@ pub fn build_custom_error_message(
         .binop(BinaryOp::I32Add)
         .local_set(total_len);
 
-    // Allocate memory: 1 byte for length header + total_len bytes for the error message
+    // Allocate memory: 4 bytes for length header + total_len bytes for the error message
+    const LENGTH_HEADER_SIZE: i32 = 4;
     builder
-        .i32_const(1) // 1 byte for the length header
+        .i32_const(LENGTH_HEADER_SIZE)
         .local_get(total_len)
         .binop(BinaryOp::I32Add)
         .call(compilation_ctx.allocator)
@@ -87,22 +88,22 @@ pub fn build_custom_error_message(
             },
         );
 
-    // Write error selector (bytes 1-4)
+    // Write error selector after the length
     for (i, b) in error_selector.iter().enumerate() {
         builder.local_get(ptr).i32_const(*b as i32).store(
             compilation_ctx.memory_id,
             StoreKind::I32_8 { atomic: false },
             MemArg {
                 align: 0,
-                offset: 1 + i as u32,
+                offset: (LENGTH_HEADER_SIZE + (i as i32)) as u32,
             },
         );
     }
 
-    // Copy the already ABI-encoded error parameters (bytes 5+)
+    // Copy the already ABI-encoded error parameters after the selector
     builder
         .local_get(ptr)
-        .i32_const(1 + SELECTOR_SIZE)
+        .i32_const(LENGTH_HEADER_SIZE + SELECTOR_SIZE)
         .binop(BinaryOp::I32Add)
         .local_get(error_ptr)
         .local_get(error_len)
@@ -130,11 +131,11 @@ pub fn build_custom_error_message(
 ///
 /// # Memory Layout
 /// The returned blob has the following structure:
-/// - Byte 0: Total message length (little-endian u8)
-/// - Bytes 1-4: Error selector (4 bytes)
-/// - Bytes 5-36: Head word (32 bytes, with 0x20 at offset 35)
-/// - Bytes 37-68: Length word (32 bytes, big-endian message length at offset 64)
-/// - Bytes 69+: Error message text (e.g., "123")
+/// - Bytes 0-3: Total message length (little-endian u32)
+/// - Bytes 4-7: Error selector (4 bytes)
+/// - Bytes 8-39: Head word (32 bytes, with 0x20 at offset 39)
+/// - Bytes 40-71: Length word (32 bytes, big-endian message length at offset 68)
+/// - Bytes 72+: Error message text (e.g., "123")
 pub fn build_abort_error_message(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
@@ -193,16 +194,16 @@ pub fn build_abort_error_message(
         .local_set(total_len);
 
     // Allocate memory
-    // We allocate 1 + total_len bytes to store the total length of the message plus the memory for the ABI-encoded error message.
+    // We allocate 4 + total_len bytes to store the total length of the message plus the memory for the ABI-encoded error message.
     builder
-        .i32_const(1) // 1 byte for the length
+        .i32_const(4) // 4 bytes for the length
         .local_get(total_len) // total length of the message
         .binop(BinaryOp::I32Add)
         .call(compilation_ctx.allocator)
         .local_tee(ptr)
         .local_get(total_len)
         .store(
-            compilation_ctx.memory_id, // Store the total length in memory
+            compilation_ctx.memory_id, // Store the total length in memory (4 bytes, little-endian u32)
             StoreKind::I32 { atomic: false },
             MemArg {
                 align: 0,
@@ -218,24 +219,26 @@ pub fn build_abort_error_message(
             StoreKind::I32_8 { atomic: false },
             MemArg {
                 align: 0,
-                offset: 1 + i as u32,
+                offset: 4 + i as u32,
             },
         );
     }
 
     // Write head word
-    const HEAD_WORD_END: u32 = 35; // last byte of the 32 bytes head word
+    // Head word is at offset 8-39 (32 bytes), last byte at offset 39
+    // Relative to ABI header start (offset 4), head word is at 4-35, last byte at offset 35
+    const HEAD_WORD_END: u32 = 35; // last byte of the 32 bytes head word (relative to ABI header start)
     builder.local_get(ptr).i32_const(32).store(
         compilation_ctx.memory_id,
         StoreKind::I32_8 { atomic: false },
         MemArg {
             align: 0,
-            offset: 1 + HEAD_WORD_END,
+            offset: 4 + HEAD_WORD_END, // 4 + 35 = 39, which is the last byte of the head word
         },
     );
 
     // Write message length in big-endian format
-    const LENGTH_WORD_END: u32 = 64; // last 4 bytes of the 32 bytes length word
+    const LENGTH_WORD_END: u32 = 64; // last 4 bytes of the 32 bytes length word (offset 68 = 4 + 64)
     let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None);
     builder
         .local_get(ptr)
@@ -246,14 +249,14 @@ pub fn build_abort_error_message(
             StoreKind::I32 { atomic: false },
             MemArg {
                 align: 0,
-                offset: 1 + LENGTH_WORD_END,
+                offset: 4 + LENGTH_WORD_END,
             },
         );
 
     // Step 4: Write error message data
     builder
         .local_get(ptr)
-        .i32_const(1 + ABI_HEADER_SIZE)
+        .i32_const(4 + ABI_HEADER_SIZE)
         .binop(BinaryOp::I32Add)
         .local_get(error_ptr)
         .local_get(error_len)
@@ -309,31 +312,37 @@ mod tests {
         let memory = instance.get_memory(&mut store, "memory").unwrap();
         let memory_data = memory.data(&mut store);
 
-        // Read the total length (1 byte)
-        let total_len = memory_data[ptr as usize] as u32;
+        // Read the total length (4 bytes, little-endian u32)
+        let total_len = u32::from_le_bytes([
+            memory_data[ptr as usize],
+            memory_data[ptr as usize + 1],
+            memory_data[ptr as usize + 2],
+            memory_data[ptr as usize + 3],
+        ]);
 
-        // Read the error selector (4 bytes at offset 1)
-        let error_selector = memory_data[ptr as usize + 1..ptr as usize + 5].to_vec();
+        // Read the error selector (4 bytes at offset 4)
+        let error_selector = memory_data[ptr as usize + 4..ptr as usize + 8].to_vec();
         assert_eq!(error_selector, ERROR_SELECTOR, "Error selector mismatch");
 
-        // Read the head word (32 bytes at offset 5)
-        let head_word = memory_data[ptr as usize + 5..ptr as usize + 37].to_vec();
+        // Read the head word (32 bytes at offset 8)
+        let head_word = memory_data[ptr as usize + 8..ptr as usize + 40].to_vec();
         let mut expected_head_word = vec![0; 32];
-        expected_head_word[31] = 0x20;
+        expected_head_word[31] = 0x20; // Last byte of the 32-byte head word
         assert_eq!(head_word, expected_head_word, "Head word mismatch");
 
-        // Read the error message length from the ABI header (4 bytes big-endian at offset 65 = 1 + 4 + 32 + 32 - 4)
+        // Read the error message length from the ABI header (4 bytes big-endian at offset 68 = 4 + 4 + 32 + 32 - 4)
         let msg_len = u32::from_be_bytes([
-            memory_data[ptr as usize + 65],
-            memory_data[ptr as usize + 66],
-            memory_data[ptr as usize + 67],
             memory_data[ptr as usize + 68],
+            memory_data[ptr as usize + 69],
+            memory_data[ptr as usize + 70],
+            memory_data[ptr as usize + 71],
         ]) as usize;
 
         // round up the msg_len to 32 bytes
         let padded_msg_len = (msg_len + 31) & !31;
 
         // Assert that the total length is the sum of the padded message length and the ABI header length
+        // Header size = 4 (length) + 68 (ABI header: selector + head + length word) = 72
         assert_eq!(
             total_len,
             padded_msg_len as u32 + 68,
@@ -341,7 +350,7 @@ mod tests {
         );
 
         // Read the error message
-        let error_start = ptr as usize + 69; // 1 + 4 + 32 + 32 = 69
+        let error_start = ptr as usize + 72; // 4 + 4 + 32 + 32 = 72
         let error_message_data = &memory_data[error_start..error_start + msg_len];
         let result_str = String::from_utf8(error_message_data.to_vec()).unwrap();
         assert_eq!(result_str, expected, "Failed for input {}", error_code);

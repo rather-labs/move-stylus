@@ -1,6 +1,6 @@
 use walrus::{
     FunctionBuilder, FunctionId, GlobalId, Module, ValType,
-    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg},
+    ir::{BinaryOp, LoadKind, MemArg},
 };
 
 use crate::{
@@ -83,15 +83,13 @@ pub fn build_entrypoint_router(
     router_builder
         // Skip header
         .local_get(ptr)
-        .i32_const(1)
+        .i32_const(4)
         .binop(BinaryOp::I32Add)
         // Load msg length
         .local_get(ptr)
         .load(
             compilation_ctx.memory_id,
-            LoadKind::I32_8 {
-                kind: ExtendedLoad::ZeroExtend,
-            },
+            LoadKind::I32 { atomic: false },
             MemArg {
                 align: 0,
                 offset: 0,

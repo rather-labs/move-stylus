@@ -1,6 +1,6 @@
 use walrus::{
     FunctionId, GlobalId, InstrSeqBuilder, LocalId, Module, ValType,
-    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg},
+    ir::{BinaryOp, LoadKind, MemArg},
 };
 
 use crate::{
@@ -216,9 +216,7 @@ impl<'a> PublicFunction<'a> {
                 .local_get(ptr)
                 .load(
                     compilation_ctx.memory_id,
-                    LoadKind::I32_8 {
-                        kind: ExtendedLoad::ZeroExtend,
-                    },
+                    LoadKind::I32 { atomic: false },
                     MemArg {
                         align: 0,
                         offset: 0,
@@ -229,7 +227,7 @@ impl<'a> PublicFunction<'a> {
             // Load the abort message pointer and set data_ptr
             abort_block
                 .local_get(ptr)
-                .i32_const(1)
+                .i32_const(4)
                 .binop(BinaryOp::I32Add)
                 .local_set(data_ptr);
 
