@@ -14,6 +14,7 @@ use crate::{common::snake_to_camel, types::Type};
 #[derive(Debug)]
 pub struct Abi {
     pub(crate) functions: Vec<Function>,
+    pub(crate) structs: Vec<Struct_>,
 }
 
 #[derive(Debug, PartialEq, Eq)]

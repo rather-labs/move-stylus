@@ -46,12 +46,13 @@ pub fn generate_abi(
             &mut processed_structs,
         );
 
-        println!("{structs:#?}");
+        // println!("{structs:#?}");
 
         let mut result = String::new();
 
-        let abi = abi::Abi { functions };
+        let abi = abi::Abi { functions, structs };
 
+        human_redable::process_structs(&mut result, &abi);
         human_redable::process_functions(&mut result, &abi);
         println!("{result}");
 
