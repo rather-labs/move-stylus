@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, usize};
 
 use move_bytecode_to_wasm::compilation_context::{
     ModuleData, ModuleId, module_data::struct_data::IntermediateType,
@@ -9,7 +9,7 @@ use crate::{
     Abi,
     common::snake_to_camel,
     special_types::{convert_type, is_hidden_in_signature},
-    types::Type,
+    types::{Type, type_contains_generics},
 };
 
 pub(crate) fn process_functions(
@@ -153,7 +153,7 @@ pub(crate) fn process_structs(
     for (itype, types) in &abi.struct_to_process {
         // Get the IStruct
 
-        let (struct_, struct_module, types) = match itype {
+        let (struct_, struct_module) = match itype {
             IntermediateType::IStruct {
                 module_id, index, ..
             } => {
@@ -164,7 +164,6 @@ pub(crate) fn process_structs(
                 (
                     struct_module.structs.get_by_index(*index).unwrap(),
                     struct_module,
-                    types,
                 )
             }
             IntermediateType::IGenericStructInstance {
@@ -178,11 +177,7 @@ pub(crate) fn process_structs(
                     .expect("struct module not found");
 
                 let struct_ = struct_module.structs.get_by_index(*index).unwrap();
-                (
-                    &struct_.instantiate(instantiation_types),
-                    struct_module,
-                    types,
-                )
+                (&struct_.instantiate(instantiation_types), struct_module)
             }
             _ => {
                 continue;
@@ -198,12 +193,16 @@ pub(crate) fn process_structs(
             .find(|f| f.name == *struct_.identifier)
             .expect("struct not found");
 
-        println!("{parsed_struct:?}");
+        let struct_abi_type = Type::UserDefined(struct_.identifier.clone(), types.clone());
+        if type_contains_generics(itype) {
+            continue;
+        }
+        struct_section.push_str(&format!("    struct {} {{\n", struct_abi_type.name()));
+        for (itype, (name, type_, is_type_param)) in
+            struct_.fields.iter().zip(&parsed_struct.fields)
+        {
+            let abi_type = &Type::from_intermediate_type(itype, modules_data);
 
-        struct_section.push_str(&format!("    struct {} {{\n", struct_.identifier));
-        for (itype, (name, type_)) in struct_.fields.iter().zip(&parsed_struct.fields) {
-            println!("PROCESSINGGGG {itype:?}");
-            let abi_type = Type::from_intermediate_type(itype, modules_data);
             struct_section.push_str(&format!(
                 "        {} {};\n",
                 convert_type(&abi_type.name(), itype, modules_data),

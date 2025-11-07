@@ -70,6 +70,12 @@ impl From<&move_parse_special_attributes::types::Type> for Type {
     }
 }
 
+impl From<move_parse_special_attributes::types::Type> for Type {
+    fn from(value: move_parse_special_attributes::types::Type) -> Self {
+        Self::from(&value)
+    }
+}
+
 impl Type {
     pub fn name(&self) -> String {
         match self {
@@ -172,5 +178,23 @@ impl Type {
                 types,
             } => todo!(),
         }
+    }
+}
+
+/// This function returns true if there is a type parameter in some of the intermediate types and
+/// `false` otherwise.
+pub fn type_contains_generics(itype: &IntermediateType) -> bool {
+    match itype {
+        IntermediateType::IRef(intermediate_type)
+        | IntermediateType::IMutRef(intermediate_type) => {
+            type_contains_generics(intermediate_type.as_ref())
+        }
+        IntermediateType::ITypeParameter(_) => true,
+        IntermediateType::IGenericStructInstance { types, .. }
+        | IntermediateType::IGenericEnumInstance { types, .. } => {
+            types.iter().any(type_contains_generics)
+        }
+        IntermediateType::IVector(inner) => type_contains_generics(inner),
+        _ => false,
     }
 }
