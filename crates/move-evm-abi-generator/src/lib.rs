@@ -34,10 +34,7 @@ pub fn generate_abi(
 
         let abi = abi::get_module_abi(module_data, &package_module_data.modules_data);
 
-        let mut result = String::new();
-
-        human_redable::process_structs(&mut result, &abi);
-        human_redable::process_functions(&mut result, &abi);
+        let result = human_redable::process_abi(&abi);
         println!("{result}");
     }
 

@@ -13,6 +13,7 @@ use crate::{common::snake_to_camel, types::Type};
 
 #[derive(Debug)]
 pub struct Abi {
+    pub(crate) contract_name: String,
     pub(crate) functions: Vec<Function>,
     pub(crate) structs: Vec<Struct_>,
 }
@@ -60,7 +61,11 @@ pub(crate) fn get_module_abi(
     let mut processed_structs = HashSet::new();
     let structs = process_structs(structs_to_process, modules_data, &mut processed_structs);
 
-    Abi { functions, structs }
+    Abi {
+        contract_name: processing_module.special_attributes.module_name.clone(),
+        functions,
+        structs,
+    }
 }
 
 /// This contains all the structs that appear as argument o return of functions. Once we

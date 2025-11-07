@@ -38,6 +38,7 @@ pub struct Struct_ {
 
 #[derive(Default, Debug)]
 pub struct SpecialAttributes {
+    pub module_name: String,
     pub events: HashMap<String, Event>,
     pub functions: Vec<Function>,
     pub structs: Vec<Struct_>,
@@ -68,6 +69,7 @@ pub fn process_special_attributes(
     // ones) that should have as first argument structs marked with a modifier.
     for source in &ast.source_definitions {
         if let Definition::Module(ref module) = source.def {
+            result.module_name = module.name.0.to_string();
             for module_member in &module.members {
                 match module_member {
                     ModuleMember::Struct(s) => {

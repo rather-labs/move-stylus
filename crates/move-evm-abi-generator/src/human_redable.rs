@@ -1,9 +1,25 @@
 use crate::{
     abi::{Abi, Visibility},
+    common::snake_to_upper_camel,
     types::Type,
 };
 
-pub(crate) fn process_functions(contract_abi: &mut String, abi: &Abi) {
+pub fn process_abi(abi: &Abi) -> String {
+    let mut result = String::new();
+
+    result.push_str("contract ");
+    result.push_str(&snake_to_upper_camel(&abi.contract_name));
+    result.push_str(" {\n\n");
+
+    process_structs(&mut result, abi);
+    process_functions(&mut result, abi);
+
+    result.push_str("\n}");
+
+    result
+}
+
+pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
     for function in &abi.functions {
         if function.visibility == Visibility::Private && !function.is_entry {
             continue;
@@ -58,7 +74,7 @@ pub(crate) fn process_functions(contract_abi: &mut String, abi: &Abi) {
     }
 }
 
-pub(crate) fn process_structs(contract_abi: &mut String, abi: &Abi) {
+pub fn process_structs(contract_abi: &mut String, abi: &Abi) {
     for struct_ in &abi.structs {
         // Declaration
         contract_abi.push_str("    struct ");
