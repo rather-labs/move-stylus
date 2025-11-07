@@ -2,12 +2,12 @@ use std::collections::{HashMap, HashSet};
 
 use move_bytecode_to_wasm::compilation_context::{
     ModuleData, ModuleId,
-    module_data::struct_data::IntermediateType,
+    module_data::struct_data::{IStruct, IntermediateType},
     reserved_modules::{
         SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_TX_CONTEXT, STYLUS_FRAMEWORK_ADDRESS,
     },
 };
-use move_parse_special_attributes::function_modifiers::FunctionModifier;
+use move_parse_special_attributes::function_modifiers::{FunctionModifier, Parameter};
 
 use crate::{common::snake_to_camel, types::Type};
 
@@ -114,11 +114,24 @@ pub(crate) fn process_functions(
                             continue;
                         }
                         _ => {
-                            function_parameters.push(FunctionParameters {
-                                identifier: param.name.clone(),
-                                type_: Type::from_intermediate_type(itype, modules_data),
-                            });
-                            struct_to_process.insert(itype.clone());
+                            if struct_.has_key {
+                                process_storage_struct(
+                                    struct_,
+                                    itype,
+                                    modules_data,
+                                    &mut function_parameters,
+                                    param,
+                                    &mut struct_to_process,
+                                );
+                            } else {
+                                {
+                                    function_parameters.push(FunctionParameters {
+                                        identifier: param.name.clone(),
+                                        type_: Type::from_intermediate_type(itype, modules_data),
+                                    });
+                                    struct_to_process.insert(itype.clone());
+                                }
+                            }
                         }
                     }
                 }
@@ -135,72 +148,17 @@ pub(crate) fn process_functions(
                         .unwrap()
                         .instantiate(types);
 
-                    let first_parameter = struct_.fields.first();
-                    // If the first parameter:
-                    // - is a UID, then the signature type is bytes32
-                    // - is a NamedId<>, then the signature type ignored
-
-                    match first_parameter {
-                        Some(IntermediateType::IStruct {
-                            module_id, index, ..
-                        }) => {
-                            let struct_module = modules_data.get(module_id).unwrap();
-                            let struct_ = struct_module.structs.get_by_index(*index).unwrap();
-
-                            match (
-                                struct_.identifier.as_str(),
-                                module_id.address,
-                                module_id.module_name.as_str(),
-                            ) {
-                                ("UID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
-                                    function_parameters.push(FunctionParameters {
-                                        identifier: param.name.clone(),
-                                        type_: Type::Bytes32,
-                                    });
-                                }
-                                _ => {
-                                    function_parameters.push(FunctionParameters {
-                                        identifier: param.name.clone(),
-                                        type_: Type::from_intermediate_type(itype, modules_data),
-                                    });
-                                    struct_to_process.insert(itype.clone());
-                                }
-                            }
-                        }
-                        Some(IntermediateType::IGenericStructInstance {
-                            module_id,
-                            index,
-                            types,
-                            ..
-                        }) => {
-                            let struct_module = modules_data.get(module_id).unwrap();
-                            let struct_ = struct_module
-                                .structs
-                                .get_by_index(*index)
-                                .unwrap()
-                                .instantiate(types);
-
-                            match (
-                                struct_.identifier.as_str(),
-                                module_id.address,
-                                module_id.module_name.as_str(),
-                            ) {
-                                ("NamedId", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
-                                    function_parameters.push(FunctionParameters {
-                                        identifier: param.name.clone(),
-                                        type_: Type::Bytes32,
-                                    });
-                                }
-                                _ => {
-                                    function_parameters.push(FunctionParameters {
-                                        identifier: param.name.clone(),
-                                        type_: Type::from_intermediate_type(itype, modules_data),
-                                    });
-                                    struct_to_process.insert(itype.clone());
-                                }
-                            }
-                        }
-                        _ => {
+                    if struct_.has_key {
+                        process_storage_struct(
+                            &struct_,
+                            itype,
+                            modules_data,
+                            &mut function_parameters,
+                            param,
+                            &mut struct_to_process,
+                        );
+                    } else {
+                        {
                             function_parameters.push(FunctionParameters {
                                 identifier: param.name.clone(),
                                 type_: Type::from_intermediate_type(itype, modules_data),
@@ -209,12 +167,39 @@ pub(crate) fn process_functions(
                         }
                     }
                 }
-                IntermediateType::IEnum { module_id, index } => todo!(),
+                IntermediateType::IEnum { module_id, index } => {
+                    let enum_module = modules_data.get(module_id).unwrap();
+                    let enum_ = enum_module.enums.get_by_index(*index).unwrap();
+                    if !enum_.is_simple {
+                        panic!("found not simple enum in function signature");
+                    } else {
+                        function_parameters.push(FunctionParameters {
+                            identifier: param.name.clone(),
+                            type_: Type::from_intermediate_type(itype, modules_data),
+                        });
+                    }
+                }
                 IntermediateType::IGenericEnumInstance {
                     module_id,
                     index,
                     types,
-                } => todo!(),
+                } => {
+                    let enum_module = modules_data.get(module_id).unwrap();
+                    let enum_ = enum_module
+                        .enums
+                        .get_by_index(*index)
+                        .unwrap()
+                        .instantiate(types);
+
+                    if !enum_.is_simple {
+                        panic!("found not simple enum in function signature");
+                    } else {
+                        function_parameters.push(FunctionParameters {
+                            identifier: param.name.clone(),
+                            type_: Type::from_intermediate_type(itype, modules_data),
+                        });
+                    }
+                }
                 _ => {
                     function_parameters.push(FunctionParameters {
                         identifier: param.name.clone(),
@@ -257,6 +242,84 @@ pub(crate) fn process_functions(
         });
     }
     (result, struct_to_process)
+}
+
+fn process_storage_struct(
+    struct_: &IStruct,
+    struct_itype: &IntermediateType,
+    modules_data: &HashMap<ModuleId, ModuleData>,
+    function_parameters: &mut Vec<FunctionParameters>,
+    param: &Parameter,
+    struct_to_process: &mut HashSet<IntermediateType>,
+) {
+    assert!(struct_.has_key);
+    let first_parameter = struct_.fields.first();
+    // If the first parameter:
+    // - is a UID, then the signature type is bytes32
+    // - is a NamedId<>, then the signature type ignored
+
+    match first_parameter {
+        Some(IntermediateType::IStruct {
+            module_id, index, ..
+        }) => {
+            let struct_module = modules_data.get(module_id).unwrap();
+            let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+
+            match (
+                struct_.identifier.as_str(),
+                module_id.address,
+                module_id.module_name.as_str(),
+            ) {
+                ("UID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
+                    function_parameters.push(FunctionParameters {
+                        identifier: param.name.clone(),
+                        type_: Type::Bytes32,
+                    });
+                }
+                _ => {
+                    function_parameters.push(FunctionParameters {
+                        identifier: param.name.clone(),
+                        type_: Type::from_intermediate_type(struct_itype, modules_data),
+                    });
+                    struct_to_process.insert(struct_itype.clone());
+                }
+            }
+        }
+        Some(IntermediateType::IGenericStructInstance {
+            module_id,
+            index,
+            types,
+            ..
+        }) => {
+            let struct_module = modules_data.get(module_id).unwrap();
+            let struct_ = struct_module
+                .structs
+                .get_by_index(*index)
+                .unwrap()
+                .instantiate(types);
+
+            match (
+                struct_.identifier.as_str(),
+                module_id.address,
+                module_id.module_name.as_str(),
+            ) {
+                ("NamedId", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
+                    function_parameters.push(FunctionParameters {
+                        identifier: param.name.clone(),
+                        type_: Type::Bytes32,
+                    });
+                }
+                _ => {
+                    function_parameters.push(FunctionParameters {
+                        identifier: param.name.clone(),
+                        type_: Type::from_intermediate_type(struct_itype, modules_data),
+                    });
+                    struct_to_process.insert(struct_itype.clone());
+                }
+            }
+        }
+        _ => panic!("processing a storager struct that has no id as first parameter"),
+    }
 }
 
 pub(crate) fn process_structs(
