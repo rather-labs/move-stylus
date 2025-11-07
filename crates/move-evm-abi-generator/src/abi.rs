@@ -13,10 +13,10 @@ use crate::{common::snake_to_camel, types::Type};
 
 #[derive(Debug)]
 pub struct Abi {
-    functions: Vec<Function>,
+    pub(crate) functions: Vec<Function>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Visibility {
     Public,
     Private,
@@ -38,6 +38,8 @@ pub struct FunctionParameters {
     pub(crate) type_: Type,
 }
 
+/// This contains all the structs that appear as argument o return of functions. Once we
+/// process the functions this will be the structs appearing in the ABi
 pub(crate) fn process_functions(
     processing_module: &ModuleData,
     modules_data: &HashMap<ModuleId, ModuleData>,
