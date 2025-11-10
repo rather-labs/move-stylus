@@ -13,6 +13,7 @@ use crate::{
 
 // Error(string) abi encoded selector
 pub const ERROR_SELECTOR: [u8; 4] = [0x08, 0xc3, 0x79, 0xa0];
+const LENGTH_HEADER_SIZE: i32 = 4;
 
 /// Calculate the error selector according to Solidity's [ABI encoding](https://docs.soliditylang.org/en/latest/abi-spec.html#function-selector)
 ///
@@ -71,7 +72,6 @@ pub fn build_custom_error_message(
         .local_set(total_len);
 
     // Allocate memory: 4 bytes for length header + total_len bytes for the error message
-    const LENGTH_HEADER_SIZE: i32 = 4;
     builder
         .i32_const(LENGTH_HEADER_SIZE)
         .local_get(total_len)
@@ -188,7 +188,7 @@ pub fn build_abort_error_message(
     // Calculate total allocation: header(68) + padded_error
     const ABI_HEADER_SIZE: i32 = 4 + 32 + 32; // selector(4) + head(32) + length(32)
     builder
-        .i32_const(ABI_HEADER_SIZE)
+        .i32_const(ABI_HEADER_SIZE as i32)
         .local_get(padded_error_len)
         .binop(BinaryOp::I32Add)
         .local_set(total_len);
@@ -196,7 +196,7 @@ pub fn build_abort_error_message(
     // Allocate memory
     // We allocate 4 + total_len bytes to store the total length of the message plus the memory for the ABI-encoded error message.
     builder
-        .i32_const(4) // 4 bytes for the length
+        .i32_const(LENGTH_HEADER_SIZE) // 4 bytes for the length
         .local_get(total_len) // total length of the message
         .binop(BinaryOp::I32Add)
         .call(compilation_ctx.allocator)
@@ -219,7 +219,7 @@ pub fn build_abort_error_message(
             StoreKind::I32_8 { atomic: false },
             MemArg {
                 align: 0,
-                offset: 4 + i as u32,
+                offset: LENGTH_HEADER_SIZE as u32 + i as u32,
             },
         );
     }
@@ -227,18 +227,18 @@ pub fn build_abort_error_message(
     // Write head word
     // Head word is at offset 8-39 (32 bytes), last byte at offset 39
     // Relative to ABI header start (offset 4), head word is at 4-35, last byte at offset 35
-    const HEAD_WORD_END: u32 = 35; // last byte of the 32 bytes head word (relative to ABI header start)
+    const HEAD_WORD_END: i32 = 35; // last byte of the 32 bytes head word (relative to ABI header start)
     builder.local_get(ptr).i32_const(32).store(
         compilation_ctx.memory_id,
         StoreKind::I32_8 { atomic: false },
         MemArg {
             align: 0,
-            offset: 4 + HEAD_WORD_END, // 4 + 35 = 39, which is the last byte of the head word
+            offset: (LENGTH_HEADER_SIZE + HEAD_WORD_END) as u32, // 4 + 35 = 39, which is the last byte of the head word
         },
     );
 
     // Write message length in big-endian format
-    const LENGTH_WORD_END: u32 = 64; // last 4 bytes of the 32 bytes length word (offset 68 = 4 + 64)
+    const LENGTH_WORD_END: i32 = 64; // last 4 bytes of the 32 bytes length word (offset 68 = 4 + 64)
     let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None);
     builder
         .local_get(ptr)
@@ -249,14 +249,14 @@ pub fn build_abort_error_message(
             StoreKind::I32 { atomic: false },
             MemArg {
                 align: 0,
-                offset: 4 + LENGTH_WORD_END,
+                offset: (LENGTH_HEADER_SIZE + LENGTH_WORD_END) as u32,
             },
         );
 
     // Step 4: Write error message data
     builder
         .local_get(ptr)
-        .i32_const(4 + ABI_HEADER_SIZE)
+        .i32_const((LENGTH_HEADER_SIZE + ABI_HEADER_SIZE) as i32)
         .binop(BinaryOp::I32Add)
         .local_get(error_ptr)
         .local_get(error_len)
