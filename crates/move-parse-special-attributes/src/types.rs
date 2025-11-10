@@ -63,7 +63,22 @@ impl Type {
                         Self::UserDataType(datatype.to_string(), types)
                     }
                 },
-                NameAccessChain_::Path(_name_path) => todo!(),
+                NameAccessChain_::Path(name_path) => {
+                    // The last entry is the one that contains the datatype name
+                    let last_entry = name_path.entries.last().unwrap();
+                    let types = if let Some(ref types) = last_entry.tyargs {
+                        let types = types
+                            .value
+                            .iter()
+                            .map(|t| Self::parse_type(&t.value))
+                            .collect::<Vec<Type>>();
+                        Some(types)
+                    } else {
+                        None
+                    };
+
+                    Self::UserDataType(last_entry.name.to_string(), types)
+                }
             },
             Type_::Ref(_, spanned) => Self::parse_type(&spanned.value),
             Type_::Unit => Self::Unit,
