@@ -43,7 +43,7 @@ pub enum EventParseError {
 impl From<&EventParseError> for DiagnosticInfo {
     fn from(value: &EventParseError) -> Self {
         custom(
-            "External call struct error",
+            "Event struct error",
             Severity::BlockingError,
             3,
             3,

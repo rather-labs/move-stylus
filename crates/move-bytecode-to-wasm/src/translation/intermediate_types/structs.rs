@@ -67,6 +67,7 @@ use walrus::{
 pub enum IStructType {
     OneTimeWitness,
     Event { indexes: u8, is_anonymous: bool },
+    AbiError,
     Common,
 }
 
