@@ -35,12 +35,16 @@ pub const DATA_STORAGE_OBJECT_OWNER_OFFSET: i32 = 224;
 /// The memory layout is structured as: [length, data], where the first byte represent the length of the message.
 pub const DATA_ABORT_MESSAGE_PTR_OFFSET: i32 = 256;
 
+/// When searching for the enum's storage size, we will use this piece of memory to save the size of the enum.
+/// It takes 128 bytes (32 * 4 bytes) to store the size of the enum for each offset.
+pub const DATA_ENUM_STORAGE_SIZE_OFFSET: i32 = 260;
+
 /// Amount of memory reserved starting from offset 0.
 ///
 /// # WARNING
 /// This value must be kept in sync to correctly initialize the memory allocator
 /// at the proper offset.
-pub const TOTAL_RESERVED_MEMORY: i32 = 260;
+pub const TOTAL_RESERVED_MEMORY: i32 = 388;
 
 /// Initializes the module's data segment.
 pub fn setup_data_segment(module: &mut Module, memory_id: MemoryId) {

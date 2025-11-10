@@ -11,7 +11,7 @@ use crate::{
     data::{DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET, DATA_SLOT_DATA_PTR_OFFSET},
     hostio::host_functions::{native_keccak256, storage_load_bytes32},
     runtime::RuntimeFunction,
-    storage::storage_layout::{compute_enum_storage_tail_position, field_size},
+    storage::storage_layout::field_size,
     translation::intermediate_types::{IntermediateType, vector::IVector},
     wasm_builder_extensions::WasmBuilderExtension,
 };
@@ -250,6 +250,8 @@ pub fn add_read_and_decode_storage_enum_instructions(
     // Runtime functions
     let accumulate_or_advance_slot_read_fn =
         RuntimeFunction::AccumulateOrAdvanceSlotRead.get(module, Some(compilation_ctx));
+    let compute_enum_storage_tail_position_fn = RuntimeFunction::ComputeEnumStorageTailPosition
+        .get_generic(module, compilation_ctx, &[itype]);
 
     // Get the IEnum representation
     let enum_ = compilation_ctx
@@ -261,15 +263,13 @@ pub fn add_read_and_decode_storage_enum_instructions(
         .expect("cannot decode enum with unresolved generic heap size") as i32;
 
     // Compute the tail slot and tail offset for the enum
-    let (tail_slot_ptr, tail_slot_offset) = compute_enum_storage_tail_position(
-        module,
-        builder,
-        &enum_,
-        slot_ptr,
-        slot_offset,
-        compilation_ctx,
-    )
-    .unwrap();
+    let tail_slot_ptr = module.locals.add(ValType::I32);
+
+    builder
+        .local_get(slot_ptr)
+        .local_get(slot_offset)
+        .call(compute_enum_storage_tail_position_fn)
+        .local_set(tail_slot_ptr);
 
     // Locals
     let enum_ptr = module.locals.add(ValType::I32);
@@ -354,7 +354,18 @@ pub fn add_read_and_decode_storage_enum_instructions(
     });
 
     // slot_offset = tail_slot_offset
-    builder.local_get(tail_slot_offset).local_set(slot_offset);
+    builder
+        .local_get(tail_slot_ptr)
+        .load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 32,
+            },
+        )
+        .local_set(slot_offset);
+
     // *slot_ptr = *tail_slot_ptr
     builder.local_get(tail_slot_ptr).local_set(slot_ptr);
 

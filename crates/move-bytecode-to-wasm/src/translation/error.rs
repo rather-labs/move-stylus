@@ -88,6 +88,9 @@ pub enum TranslationError {
     )]
     FoundUnknownTypeInsideEnumVariant { enum_index: u16, variant_index: u16 },
 
+    #[error("enum with index {enum_index} size not computed")]
+    EnumSizeNotComputed { enum_index: u16 },
+
     // TODO: identify concrete errors and add its corresponding enum variant
     #[error("unknown error: {0}")]
     Unknown(#[from] anyhow::Error),

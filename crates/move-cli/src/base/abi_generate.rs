@@ -1,12 +1,11 @@
 use clap::*;
-use move_bytecode_to_wasm::{
-    error::{CompilationError, CompilationErrorKind},
-    package_module_data,
-};
+use move_bytecode_to_wasm::package_module_data;
 use move_compiler::diagnostics::{Diagnostics, report_diagnostics};
 use move_evm_abi_generator::generate_abi;
 use move_package::BuildConfig;
 use std::path::Path;
+
+use crate::error::print_error_diagnostic;
 
 use super::reroot_path;
 
@@ -21,20 +20,7 @@ impl AbiGenerate {
 
         let package = config.compile_package(&rerooted_path, &mut Vec::new())?;
 
-        let package_modules = match package_module_data(package, None) {
-            Ok(package_modules) => package_modules,
-            Err(CompilationError { files, kind }) => match kind {
-                CompilationErrorKind::ICE(_iceerror) => todo!(),
-                CompilationErrorKind::CodeError(code_errors) => {
-                    let mut diagnostics = Diagnostics::new();
-                    for error in &code_errors {
-                        diagnostics.add(error.into());
-                    }
-
-                    report_diagnostics(&files, diagnostics)
-                }
-            },
-        };
+        let package_modules = package_module_data(package, None).map_err(print_error_diagnostic)?;
 
         match generate_abi(&rerooted_path, &package_modules) {
             Ok(mut processed_abis) => {
@@ -42,13 +28,10 @@ impl AbiGenerate {
                 // Create the build directory if it doesn't exist
                 std::fs::create_dir_all(&build_directory).unwrap();
 
-                println!("{build_directory:?}");
-
                 for abi in &mut processed_abis {
                     // Change the extension
                     abi.file.set_extension("abi");
-                    let file = abi.file.file_name().expect("file not found");
-                    println!("asd {:?}", build_directory.join(&abi.file));
+                    let file = abi.file.file_name().expect("Source file name not found.");
                     std::fs::write(build_directory.join(file), abi.content.as_bytes())?;
                 }
             }

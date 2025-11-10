@@ -43,11 +43,7 @@ pub enum ICEError {
 
 impl From<CodeError> for Diagnostic {
     fn from(value: CodeError) -> Self {
-        match value {
-            CodeError::SpecialAttributesError(ref special_attribute_error) => {
-                special_attribute_error.into()
-            }
-        }
+        Diagnostic::from(&value)
     }
 }
 
