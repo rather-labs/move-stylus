@@ -12,7 +12,7 @@ pub enum ExternalCallFunctionError {
     FunctionIsNotNative,
 
     #[error(
-        "A function marked with #[ext(external_call, ..)] must have as first argument a reference to a struct marked with #[ext(external_struct)]"
+        "A function marked with #[ext(external_call, ..)] must have as first argument a reference to a struct marked with #[ext(external_call)]"
     )]
     InvalidFirstArgument,
 }

@@ -2,60 +2,51 @@
 //! Parses the AST of a package to extract the ABI
 //!
 //! NOTE: This is a POC and it is WIP
-mod function_modifiers;
+mod abi;
+mod common;
+mod human_redable;
+mod special_types;
+mod types;
 
-use function_modifiers::FunctionModifier;
-use move_compiler::{
-    Compiler, PASS_PARSER,
-    parser::ast::{Definition, ModuleMember},
-    shared::NumericalAddress,
-};
-use std::{collections::BTreeMap, path::Path};
+use std::path::{Path, PathBuf};
 
-#[derive(Debug)]
-struct Function {
-    name: String,
-    modifiers: Vec<FunctionModifier>,
+use move_bytecode_to_wasm::PackageModuleData;
+use move_compiler::shared::files::MappedFiles;
+use move_parse_special_attributes::SpecialAttributeError;
+
+pub struct Abi {
+    pub file: PathBuf,
+    pub content: String,
 }
 
-pub fn generate_abi(path: Option<&Path>) {
-    let sources_path = path.unwrap().join("sources");
+pub fn generate_abi(
+    path: &Path,
+    package_module_data: &PackageModuleData,
+) -> Result<Vec<Abi>, (MappedFiles, Vec<SpecialAttributeError>)> {
+    let path = path.join("sources");
 
-    let (_, program_res) = Compiler::from_files(
-        None,
-        vec![sources_path.to_str().unwrap()],
-        Vec::new(),
-        BTreeMap::<String, NumericalAddress>::new(),
-    )
-    .run::<PASS_PARSER>()
-    .unwrap();
+    let mut result = Vec::new();
+    for file in path.read_dir().unwrap() {
+        let file = file.unwrap().path();
+        let module_id = package_module_data
+            .modules_paths
+            .get(&file)
+            .expect("error getting module id");
 
-    let ast = program_res.unwrap().into_ast().1;
+        let module_data = package_module_data
+            .modules_data
+            .get(module_id)
+            .expect("error getting module data");
 
-    for source in ast.source_definitions {
-        if let Definition::Module(module) = source.def {
-            println!("{:#?}", module);
-            for module_member in module.members {
-                match module_member {
-                    ModuleMember::Function(f) => {
-                        let modifiers = f.attributes[0]
-                            .value
-                            .iter()
-                            .flat_map(|s| FunctionModifier::parse_modifiers(&s.value))
-                            .collect::<Vec<FunctionModifier>>();
+        let abi = abi::Abi::new(module_data, &package_module_data.modules_data);
 
-                        let function = Function {
-                            name: f.name.to_owned().to_string(),
-                            modifiers,
-                        };
-
-                        println!("{function:#?}");
-                    }
-                    _ => continue,
-                }
-            }
-        } else {
+        if abi.is_empty() {
             continue;
-        };
+        }
+
+        let abi = human_redable::process_abi(&abi);
+        result.push(Abi { file, content: abi });
     }
+
+    Ok(result)
 }

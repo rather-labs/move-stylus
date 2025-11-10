@@ -4,6 +4,7 @@ mod external_call;
 pub mod function_modifiers;
 mod shared;
 pub mod struct_modifiers;
+pub mod types;
 
 pub use error::SpecialAttributeError;
 use error::SpecialAttributeErrorKind;
@@ -12,35 +13,44 @@ use event::EventParseError;
 pub use external_call::error::{ExternalCallFunctionError, ExternalCallStructError};
 // TODO: Create error struct with LOC and error info
 
-#[derive(Default, Debug)]
-pub struct SpecialAttributes {
-    pub events: HashMap<String, Event>,
-    pub functions: Vec<Function>,
-    pub external_calls: HashMap<String, Function>,
-    pub external_struct: HashMap<String, ExternalStruct>,
-    pub external_call_structs: Vec<String>,
-}
-
 use external_call::{
     external_struct::{ExternalStruct, ExternalStructError},
     validate_external_call_function, validate_external_call_struct,
 };
-use function_modifiers::{Function, FunctionModifier};
+use function_modifiers::{Function, FunctionModifier, Visibility};
 use move_compiler::{
     Compiler, PASS_PARSER,
     parser::ast::{Definition, ModuleMember},
-    shared::{Identifier, NumericalAddress},
+    shared::{Identifier, NumericalAddress, files::MappedFiles},
 };
 use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
     path::Path,
 };
 use struct_modifiers::StructModifier;
+use types::Type;
+
+#[derive(Debug)]
+pub struct Struct_ {
+    pub name: String,
+    pub fields: Vec<(String, Type)>,
+}
+
+#[derive(Default, Debug)]
+pub struct SpecialAttributes {
+    pub module_name: String,
+    pub events: HashMap<String, Event>,
+    pub functions: Vec<Function>,
+    pub structs: Vec<Struct_>,
+    pub external_calls: HashMap<String, Function>,
+    pub external_struct: HashMap<String, ExternalStruct>,
+    pub external_call_structs: HashSet<String>,
+}
 
 pub fn process_special_attributes(
     path: &Path,
-) -> Result<SpecialAttributes, Vec<SpecialAttributeError>> {
-    let (_mapped_files, program_res) = Compiler::from_files(
+) -> Result<SpecialAttributes, (MappedFiles, Vec<SpecialAttributeError>)> {
+    let (mapped_files, program_res) = Compiler::from_files(
         None,
         vec![path.to_str().unwrap()],
         Vec::new(),
@@ -59,9 +69,37 @@ pub fn process_special_attributes(
     // ones) that should have as first argument structs marked with a modifier.
     for source in &ast.source_definitions {
         if let Definition::Module(ref module) = source.def {
+            result.module_name = module.name.0.to_string();
             for module_member in &module.members {
                 match module_member {
                     ModuleMember::Struct(s) => {
+                        let struct_name = s.name.value().as_str().to_string();
+
+                        // No matter if it is a struct marked with special attributes, we collect
+                        // its information.
+                        let fields: Vec<(String, Type)> = match &s.fields {
+                            move_compiler::parser::ast::StructFields::Named(items) => items
+                                .iter()
+                                .map(|(_, field, type_)| {
+                                    let name = field.value();
+                                    (name.to_string(), Type::parse_type(&type_.value))
+                                })
+                                .collect(),
+                            move_compiler::parser::ast::StructFields::Positional(items) => items
+                                .iter()
+                                .enumerate()
+                                .map(|(index, (_, type_))| {
+                                    (format!("pos{index}"), Type::parse_type(&type_.value))
+                                })
+                                .collect(),
+                            move_compiler::parser::ast::StructFields::Native(_) => todo!(),
+                        };
+
+                        result.structs.push(Struct_ {
+                            name: struct_name.clone(),
+                            fields,
+                        });
+
                         if let Some(attributes) = s.attributes.first() {
                             let first_modifier = attributes.value.first().and_then(|s| {
                                 let sm = StructModifier::parse_modifiers(&s.value);
@@ -71,9 +109,14 @@ pub fn process_special_attributes(
                             match first_modifier {
                                 Some(StructModifier::ExternalCall) => {
                                     match validate_external_call_struct(s) {
-                                        Ok(_) => result
-                                            .external_call_structs
-                                            .push(s.name.value().to_string()),
+                                        Ok(_)
+                                            if !result
+                                                .external_call_structs
+                                                .contains(&struct_name) =>
+                                        {
+                                            result.external_call_structs.insert(struct_name);
+                                        }
+                                        Ok(_) => {}
                                         Err(e) => {
                                             found_error = true;
                                             module_errors.extend(e);
@@ -85,7 +128,7 @@ pub fn process_special_attributes(
                                         Ok(external_struct) => {
                                             result
                                                 .external_struct
-                                                .insert(s.name.to_string(), external_struct);
+                                                .insert(struct_name, external_struct);
                                         }
                                         Err(SpecialAttributeError {
                                             kind:
@@ -93,7 +136,7 @@ pub fn process_special_attributes(
                                                     ExternalStructError::NotAnExternalStruct,
                                                 ),
                                             ..
-                                        }) => continue,
+                                        }) => {}
                                         Err(e) => {
                                             found_error = true;
                                             module_errors.push(e);
@@ -102,7 +145,7 @@ pub fn process_special_attributes(
                                 }
                                 Some(StructModifier::Event) => match Event::try_from(s) {
                                     Ok(event) => {
-                                        result.events.insert(s.name.to_string(), event);
+                                        result.events.insert(struct_name, event);
                                     }
                                     Err(SpecialAttributeError {
                                         kind:
@@ -116,7 +159,7 @@ pub fn process_special_attributes(
                                         module_errors.push(e);
                                     }
                                 },
-                                None => continue,
+                                None => {}
                             }
                         }
                     }
@@ -133,6 +176,9 @@ pub fn process_special_attributes(
             for module_member in module.members {
                 match module_member {
                     ModuleMember::Function(ref f) => {
+                        let visibility: Visibility = (&f.visibility).into();
+                        let signature = Function::parse_signature(&f.signature);
+
                         if let Some(attributes) = f.attributes.first() {
                             let mut modifiers = attributes
                                 .value
@@ -140,34 +186,52 @@ pub fn process_special_attributes(
                                 .flat_map(|s| FunctionModifier::parse_modifiers(&s.value))
                                 .collect::<VecDeque<FunctionModifier>>();
 
-                            if let Some(FunctionModifier::ExternalCall) = modifiers.pop_front() {
-                                let modifiers: Vec<FunctionModifier> =
-                                    modifiers.into_iter().collect();
+                            match modifiers.pop_front() {
+                                Some(FunctionModifier::ExternalCall) => {
+                                    let modifiers: Vec<FunctionModifier> =
+                                        modifiers.into_iter().collect();
 
-                                let errors = validate_external_call_function(
-                                    f,
-                                    &modifiers,
-                                    &result.external_call_structs,
-                                );
-
-                                if let Err(errors) = errors {
-                                    found_error = true;
-                                    module_errors.extend(errors);
-                                } else if !found_error {
-                                    result.external_calls.insert(
-                                        f.name.to_owned().to_string(),
-                                        Function {
-                                            name: f.name.to_owned().to_string(),
-                                            modifiers,
-                                        },
+                                    let errors = validate_external_call_function(
+                                        f,
+                                        &modifiers,
+                                        &result.external_call_structs,
                                     );
+
+                                    if let Err(errors) = errors {
+                                        found_error = true;
+                                        module_errors.extend(errors);
+                                    } else if !found_error {
+                                        result.external_calls.insert(
+                                            f.name.to_owned().to_string(),
+                                            Function {
+                                                name: f.name.to_owned().to_string(),
+                                                modifiers,
+                                                signature,
+                                                visibility,
+                                            },
+                                        );
+                                    }
                                 }
-                            } else {
-                                result.functions.push(Function {
-                                    name: f.name.to_owned().to_string(),
-                                    modifiers: modifiers.into_iter().collect(),
-                                });
+                                Some(FunctionModifier::Abi) => {
+                                    let modifiers: Vec<FunctionModifier> =
+                                        modifiers.into_iter().collect();
+
+                                    result.functions.push(Function {
+                                        name: f.name.to_owned().to_string(),
+                                        modifiers,
+                                        signature,
+                                        visibility,
+                                    });
+                                }
+                                _ => {}
                             }
+                        } else {
+                            result.functions.push(Function {
+                                name: f.name.to_owned().to_string(),
+                                modifiers: Vec::new(),
+                                signature,
+                                visibility,
+                            });
                         }
                     }
                     _ => continue,
@@ -179,7 +243,7 @@ pub fn process_special_attributes(
     }
 
     if found_error {
-        Err(module_errors)
+        Err((mapped_files, module_errors))
     } else {
         Ok(result)
     }
