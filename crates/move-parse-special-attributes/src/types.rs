@@ -63,7 +63,7 @@ impl Type {
                         Self::UserDataType(datatype.to_string(), types)
                     }
                 },
-                NameAccessChain_::Path(name_path) => todo!(),
+                NameAccessChain_::Path(_name_path) => todo!(),
             },
             Type_::Ref(_, spanned) => Self::parse_type(&spanned.value),
             Type_::Unit => Self::Unit,

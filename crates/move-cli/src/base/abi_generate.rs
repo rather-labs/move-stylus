@@ -24,7 +24,7 @@ impl AbiGenerate {
         let package_modules = match package_module_data(package, None) {
             Ok(package_modules) => package_modules,
             Err(CompilationError { files, kind }) => match kind {
-                CompilationErrorKind::ICE(iceerror) => todo!(),
+                CompilationErrorKind::ICE(_iceerror) => todo!(),
                 CompilationErrorKind::CodeError(code_errors) => {
                     let mut diagnostics = Diagnostics::new();
                     for error in &code_errors {
@@ -36,14 +36,32 @@ impl AbiGenerate {
             },
         };
 
-        if let Err((mapped_files, errors)) = generate_abi(&rerooted_path, &package_modules) {
-            let mut diagnostics = Diagnostics::new();
-            for error in &errors {
-                diagnostics.add(error.into());
-            }
+        match generate_abi(&rerooted_path, &package_modules) {
+            Ok(mut processed_abis) => {
+                let build_directory = rerooted_path.join("build/wasm");
+                // Create the build directory if it doesn't exist
+                std::fs::create_dir_all(&build_directory).unwrap();
 
-            report_diagnostics(&mapped_files, diagnostics)
+                println!("{build_directory:?}");
+
+                for abi in &mut processed_abis {
+                    // Change the extension
+                    abi.file.set_extension("abi");
+                    let file = abi.file.file_name().expect("file not found");
+                    println!("asd {:?}", build_directory.join(&abi.file));
+                    std::fs::write(build_directory.join(file), abi.content.as_bytes())?;
+                }
+            }
+            Err((mapped_files, errors)) => {
+                let mut diagnostics = Diagnostics::new();
+                for error in &errors {
+                    diagnostics.add(error.into());
+                }
+
+                report_diagnostics(&mapped_files, diagnostics)
+            }
         }
+
         Ok(())
     }
 }

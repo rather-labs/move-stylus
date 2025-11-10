@@ -8,7 +8,6 @@ use move_compiler::{
 pub struct Function {
     pub name: String,
     pub modifiers: Vec<FunctionModifier>,
-    // pub is_entry: bool,
     pub visibility: Visibility,
     pub signature: Signature,
 }

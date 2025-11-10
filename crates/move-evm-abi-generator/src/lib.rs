@@ -8,18 +8,24 @@ mod human_redable;
 mod special_types;
 mod types;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use move_bytecode_to_wasm::PackageModuleData;
 use move_compiler::shared::files::MappedFiles;
 use move_parse_special_attributes::SpecialAttributeError;
 
+pub struct Abi {
+    pub file: PathBuf,
+    pub content: String,
+}
+
 pub fn generate_abi(
     path: &Path,
     package_module_data: &PackageModuleData,
-) -> Result<(), (MappedFiles, Vec<SpecialAttributeError>)> {
+) -> Result<Vec<Abi>, (MappedFiles, Vec<SpecialAttributeError>)> {
     let path = path.join("sources");
 
+    let mut result = Vec::new();
     for file in path.read_dir().unwrap() {
         let file = file.unwrap().path();
         let module_id = package_module_data
@@ -32,11 +38,15 @@ pub fn generate_abi(
             .get(module_id)
             .expect("error getting module data");
 
-        let abi = abi::get_module_abi(module_data, &package_module_data.modules_data);
+        let abi = abi::Abi::new(module_data, &package_module_data.modules_data);
 
-        let result = human_redable::process_abi(&abi);
-        println!("{result}");
+        if abi.is_empty() {
+            continue;
+        }
+
+        let abi = human_redable::process_abi(&abi);
+        result.push(Abi { file, content: abi });
     }
 
-    Ok(())
+    Ok(result)
 }
