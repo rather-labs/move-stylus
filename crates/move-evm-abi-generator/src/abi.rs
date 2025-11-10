@@ -444,8 +444,9 @@ pub fn process_structs(
             })
             .collect();
 
+        let struct_abi_type = Type::from_intermediate_type(&struct_itype, modules_data);
         result.push(Struct_ {
-            identifier: struct_.identifier.clone(),
+            identifier: struct_abi_type.name(),
             fields,
         });
 
