@@ -1,14 +1,11 @@
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
-    ir::{LoadKind, MemArg, StoreKind},
+    ir::{MemArg, StoreKind},
 };
 
 use crate::{
-    CompilationContext,
-    abi_types::error_encoding::{build_custom_error_message, move_signature_to_abi_selector},
-    abi_types::packing::build_pack_instructions,
-    compilation_context::ModuleId,
-    data::DATA_ABORT_MESSAGE_PTR_OFFSET,
+    CompilationContext, abi_types::error_encoding::build_custom_error_message,
+    compilation_context::ModuleId, data::DATA_ABORT_MESSAGE_PTR_OFFSET,
     translation::intermediate_types::IntermediateType,
 };
 
@@ -44,63 +41,13 @@ pub fn add_revert_fn(
     // Arguments
     let error_struct_ptr = module.locals.add(ValType::I32);
 
-    // Load each field to prepare them for ABI encoding.
-    for (index, field) in error_struct.fields.iter().enumerate() {
-        // Load each field's middle pointer
-        builder.local_get(error_struct_ptr).load(
-            compilation_ctx.memory_id,
-            LoadKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: index as u32 * 4,
-            },
-        );
-
-        // If the field is a stack type, load the value from memory
-        if field.is_stack_type() {
-            if field.stack_data_size() == 8 {
-                builder.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I64 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            } else {
-                builder.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            }
-        }
-    }
-
-    // Combine all the error struct fields into one ABI-encoded error data buffer.
-    let (error_data_ptr, error_data_len) =
-        build_pack_instructions(&mut builder, &error_struct.fields, module, compilation_ctx);
-
-    // Compute the error selector
-    let error_selector = move_signature_to_abi_selector(
-        &error_struct.identifier,
-        &error_struct.fields,
-        compilation_ctx,
-    );
-
-    // Build the abi encoded error message
     let encoded_error_ptr = build_custom_error_message(
         &mut builder,
         module,
         compilation_ctx,
-        &error_selector,
-        error_data_ptr,
-        error_data_len,
+        &error_struct,
+        error_struct_ptr,
     );
-
     // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
     builder
         .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)

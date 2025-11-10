@@ -6,8 +6,9 @@ use walrus::{
 use crate::{
     CompilationContext,
     abi_types::abi_encoding::{self, AbiFunctionSelector},
+    abi_types::packing::build_pack_instructions,
     runtime::RuntimeFunction,
-    translation::intermediate_types::IntermediateType,
+    translation::intermediate_types::{IntermediateType, structs::IStruct},
     utils::snake_to_upper_camel,
 };
 
@@ -56,37 +57,24 @@ pub fn build_custom_error_message(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-    error_selector: &AbiFunctionSelector,
-    error_ptr: LocalId,
-    error_len: LocalId,
+    error_struct: &IStruct,
+    error_struct_ptr: LocalId,
 ) -> LocalId {
     let ptr = module.locals.add(ValType::I32);
-    let total_len = module.locals.add(ValType::I32);
 
-    // Calculate total length: selector(4) + error_data_len
+    // Compute the error selector
+    let error_selector = move_signature_to_abi_selector(
+        &error_struct.identifier,
+        &error_struct.fields,
+        compilation_ctx,
+    );
+
+    // Allocate memory: 4 bytes for length + 4 bytes for the error selector
     const SELECTOR_SIZE: i32 = 4;
     builder
-        .i32_const(SELECTOR_SIZE)
-        .local_get(error_len)
-        .binop(BinaryOp::I32Add)
-        .local_set(total_len);
-
-    // Allocate memory: 4 bytes for length header + total_len bytes for the error message
-    builder
-        .i32_const(LENGTH_HEADER_SIZE)
-        .local_get(total_len)
-        .binop(BinaryOp::I32Add)
+        .i32_const(LENGTH_HEADER_SIZE + SELECTOR_SIZE)
         .call(compilation_ctx.allocator)
-        .local_tee(ptr)
-        .local_get(total_len)
-        .store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
+        .local_set(ptr);
 
     // Write error selector after the length
     for (i, b) in error_selector.iter().enumerate() {
@@ -100,15 +88,60 @@ pub fn build_custom_error_message(
         );
     }
 
-    // Copy the already ABI-encoded error parameters after the selector
+    // Load each field to prepare them for ABI encoding.
+    for (index, field) in error_struct.fields.iter().enumerate() {
+        // Load each field's middle pointer
+        builder.local_get(error_struct_ptr).load(
+            compilation_ctx.memory_id,
+            LoadKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: index as u32 * 4,
+            },
+        );
+
+        // If the field is a stack type, load the value from memory
+        if field.is_stack_type() {
+            if field.stack_data_size() == 8 {
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I64 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            } else {
+                builder.load(
+                    compilation_ctx.memory_id,
+                    LoadKind::I32 { atomic: false },
+                    MemArg {
+                        align: 0,
+                        offset: 0,
+                    },
+                );
+            }
+        }
+    }
+
+    // Combine all the error struct fields into one ABI-encoded error data buffer.
+    let (_error_data_ptr, error_data_len) =
+        build_pack_instructions(builder, &error_struct.fields, module, compilation_ctx);
+
+    // Store the total length of the error message: length(4) + selector(4) + error_data_len
     builder
         .local_get(ptr)
-        .i32_const(LENGTH_HEADER_SIZE + SELECTOR_SIZE)
+        .local_get(error_data_len)
+        .i32_const(SELECTOR_SIZE)
         .binop(BinaryOp::I32Add)
-        .local_get(error_ptr)
-        .local_get(error_len)
-        .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
-
+        .store(
+            compilation_ctx.memory_id,
+            StoreKind::I32 { atomic: false },
+            MemArg {
+                align: 0,
+                offset: 0,
+            },
+        );
     ptr
 }
 
@@ -188,7 +221,7 @@ pub fn build_abort_error_message(
     // Calculate total allocation: header(68) + padded_error
     const ABI_HEADER_SIZE: i32 = 4 + 32 + 32; // selector(4) + head(32) + length(32)
     builder
-        .i32_const(ABI_HEADER_SIZE as i32)
+        .i32_const(ABI_HEADER_SIZE)
         .local_get(padded_error_len)
         .binop(BinaryOp::I32Add)
         .local_set(total_len);
@@ -256,7 +289,7 @@ pub fn build_abort_error_message(
     // Step 4: Write error message data
     builder
         .local_get(ptr)
-        .i32_const((LENGTH_HEADER_SIZE + ABI_HEADER_SIZE) as i32)
+        .i32_const(LENGTH_HEADER_SIZE + ABI_HEADER_SIZE)
         .binop(BinaryOp::I32Add)
         .local_get(error_ptr)
         .local_get(error_len)
