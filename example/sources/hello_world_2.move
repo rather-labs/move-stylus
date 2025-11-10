@@ -14,17 +14,14 @@ public entry fun echo_with_generic_function_u16(x: u16): u16 {
     generic_identity(x)
 }
 
-#[ext(abi, view)]
 public entry fun echo_with_generic_function_vec32(x: vector<u32>): vector<u32> {
     generic_identity(x)
 }
 
-#[ext(abi, payable)]
 entry fun echo_with_generic_function_u16_vec32(x: u16, y: vector<u32>): (u16, vector<u32>) {
     generic_identity_two_types(x, y)
 }
 
-#[ext(abi, view, pure)]
 entry fun echo_with_generic_function_address_vec128(x: address, y: vector<u128>): (address, vector<u128>) {
     generic_identity_two_types(x, y)
 }
