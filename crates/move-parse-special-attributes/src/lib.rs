@@ -104,19 +104,19 @@ pub fn process_special_attributes(
                             fields,
                         });
 
-                        let mut found_match: Option<StructModifier> = None;
-                        'outer: for attributes in &s.attributes {
+                        let mut found_modifier: bool = false;
+                        'loop_att: for attributes in &s.attributes {
                             if let Some(att) = attributes.value.first() {
-                                let modifiers = StructModifier::parse_modifiers(&att.value);
-                                for modifier in modifiers {
-                                    if found_match.is_some() {
+                                let modifier = StructModifier::parse_struct_modifier(&att.value);
+                                if let Some(modifier) = modifier {
+                                    if found_modifier {
                                         // Found a second match
                                         found_error = true;
                                         module_errors.push(SpecialAttributeError {
                                             kind: SpecialAttributeErrorKind::TooManyAttributes,
                                             line_of_code: s.loc,
                                         });
-                                        break 'outer;
+                                        break 'loop_att;
                                     }
 
                                     match modifier {
@@ -128,15 +128,15 @@ pub fn process_special_attributes(
                                                         .contains(&struct_name) =>
                                                 {
                                                     result.external_call_structs.insert(struct_name.clone());
-                                                    found_match = Some(StructModifier::ExternalCall);
+                                                    found_modifier = true;
                                                 }
                                                 Ok(_) => {
-                                                    found_match = Some(StructModifier::ExternalCall);
+                                                    found_modifier = true;
                                                 }
                                                 Err(e) => {
                                                     found_error = true;
                                                     module_errors.extend(e);
-                                                    break 'outer;
+                                                    break 'loop_att;
                                                 }
                                             }
                                         }
@@ -146,7 +146,7 @@ pub fn process_special_attributes(
                                                     result
                                                         .external_struct
                                                         .insert(struct_name.clone(), external_struct);
-                                                    found_match = Some(StructModifier::ExternalStruct);
+                                                    found_modifier = true;
                                                 }
                                                 Err(SpecialAttributeError {
                                                     kind:
@@ -158,7 +158,7 @@ pub fn process_special_attributes(
                                                 Err(e) => {
                                                     found_error = true;
                                                     module_errors.push(e);
-                                                    break 'outer;
+                                                    break 'loop_att;
                                                 }
                                             }
                                         }
@@ -166,7 +166,7 @@ pub fn process_special_attributes(
                                             match Event::try_from(s) {
                                                 Ok(event) => {
                                                     result.events.insert(struct_name.clone(), event);
-                                                    found_match = Some(StructModifier::Event);
+                                                    found_modifier = true;
                                                 }
                                                 Err(SpecialAttributeError {
                                                     kind:
@@ -178,7 +178,7 @@ pub fn process_special_attributes(
                                                 Err(e) => {
                                                     found_error = true;
                                                     module_errors.push(e);
-                                                    break 'outer;
+                                                    break 'loop_att;
                                                 }
                                             }
                                         }
@@ -186,7 +186,7 @@ pub fn process_special_attributes(
                                             match AbiError::try_from(s) {
                                                 Ok(abi_error) => {
                                                     result.abi_errors.insert(struct_name.clone(), abi_error);
-                                                    found_match = Some(StructModifier::AbiError);
+                                                    found_modifier = true;
                                                 }
                                                 Err(SpecialAttributeError {
                                                     kind:
@@ -198,7 +198,7 @@ pub fn process_special_attributes(
                                                 Err(e) => {
                                                     found_error = true;
                                                     module_errors.push(e);
-                                                    break 'outer;
+                                                    break 'loop_att;
                                                 }
                                             }
                                         }
