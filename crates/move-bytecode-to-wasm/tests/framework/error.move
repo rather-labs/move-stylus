@@ -4,6 +4,7 @@ use stylus::error::revert;
 use std::ascii::String;
 
 // Standard error type
+#[ext(abi_error)]
 #[allow(unused_field)]
 public struct Error(String) has copy, drop;
 
@@ -11,6 +12,7 @@ entry fun revert_standard_error(error: Error) {
     revert(error);
 }
 
+#[ext(abi_error)]
 #[allow(unused_field)]
 public struct CustomError has copy, drop {
     error_message: String,
@@ -22,6 +24,7 @@ entry fun revert_custom_error(error: CustomError) {
 }
 
 #[allow(unused_field)]
+#[ext(abi_error)]
 public struct CustomError2 has copy, drop {
     a: bool,
     b: u8,
@@ -37,6 +40,7 @@ entry fun revert_custom_error2(error: CustomError2) {
     revert(error);
 }
 
+#[ext(abi_error)]
 #[allow(unused_field)]
 public struct CustomError3 has copy, drop {
     a: vector<u32>,
@@ -48,6 +52,7 @@ entry fun revert_custom_error3(error: CustomError3) {
     revert(error);
 }
 
+#[ext(abi_error)]
 #[allow(unused_field)]
 public struct CustomError4 has copy, drop {
     a: CustomError,
@@ -58,6 +63,7 @@ entry fun revert_custom_error4(error: CustomError4) {
     revert(error);
 }
 
+#[ext(abi_error)]
 #[allow(unused_field)]
 public struct GenericCustomError<T> has copy, drop {
     a: T,

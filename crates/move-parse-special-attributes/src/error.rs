@@ -2,11 +2,12 @@ use std::fmt::{self, Display};
 
 use move_compiler::{
     diag,
-    diagnostics::{Diagnostic, codes::DiagnosticInfo},
+    diagnostics::{Diagnostic, codes::{DiagnosticInfo, Severity, custom}},
 };
 use move_ir_types::location::Loc;
 
 use crate::{
+    abi_error::AbiErrorParseError,
     event::EventParseError,
     external_call::{
         error::{ExternalCallFunctionError, ExternalCallStructError},
@@ -16,6 +17,9 @@ use crate::{
 
 #[derive(thiserror::Error, Debug)]
 pub enum SpecialAttributeErrorKind {
+    #[error("Abi error: {0}")]
+    AbiError(#[from] AbiErrorParseError),
+
     #[error("External call error: {0}")]
     ExternalCallFunction(#[from] ExternalCallFunctionError),
 
@@ -27,6 +31,9 @@ pub enum SpecialAttributeErrorKind {
 
     #[error("External struct error: {0}")]
     ExternalStruct(#[from] ExternalStructError),
+
+    #[error("Too many attributes found")]
+    TooManyAttributes,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -49,6 +56,15 @@ impl From<&SpecialAttributeError> for Diagnostic {
             SpecialAttributeErrorKind::ExternalCallStruct(e) => e.into(),
             SpecialAttributeErrorKind::Event(e) => e.into(),
             SpecialAttributeErrorKind::ExternalStruct(e) => e.into(),
+            SpecialAttributeErrorKind::AbiError(e) => e.into(),
+            SpecialAttributeErrorKind::TooManyAttributes =>  custom(
+                "Special attributes error",
+                Severity::BlockingError,
+                3,
+                3,
+                Box::leak(value.to_string().into_boxed_str()),
+            ),
+
         };
 
         diag!(diagnostic_info, (value.line_of_code, "".to_string()))

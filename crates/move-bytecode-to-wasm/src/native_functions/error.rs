@@ -4,9 +4,11 @@ use walrus::{
 };
 
 use crate::{
-    CompilationContext, abi_types::error_encoding::build_custom_error_message,
-    compilation_context::ModuleId, data::DATA_ABORT_MESSAGE_PTR_OFFSET,
-    translation::intermediate_types::IntermediateType,
+    CompilationContext,
+    abi_types::error_encoding::build_custom_error_message,
+    compilation_context::ModuleId,
+    data::DATA_ABORT_MESSAGE_PTR_OFFSET,
+    translation::intermediate_types::{IntermediateType, structs::IStructType},
 };
 
 use super::NativeFunction;
@@ -35,6 +37,14 @@ pub fn add_revert_fn(
         .get_struct_by_intermediate_type(error_itype)
         .unwrap();
 
+    // TODO: This should be a compile error not a panic
+    let IStructType::AbiError = error_struct.type_ else {
+        panic!(
+            "trying to revert with the struct {} which is not an abi error",
+            error_struct.identifier
+        );
+    };
+
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
 
@@ -48,6 +58,7 @@ pub fn add_revert_fn(
         &error_struct,
         error_struct_ptr,
     );
+    
     // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
     builder
         .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)

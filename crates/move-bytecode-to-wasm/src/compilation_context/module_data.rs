@@ -413,6 +413,8 @@ impl ModuleData {
                     indexes: event.indexes,
                     is_anonymous: event.is_anonymous,
                 }
+            } else if let Some(_abi_error) = module_special_attributes.abi_errors.get(&identifier) {
+                IStructType::AbiError
             } else {
                 IStructType::Common
             };
