@@ -2,7 +2,10 @@ use std::fmt::{self, Display};
 
 use move_compiler::{
     diag,
-    diagnostics::{Diagnostic, codes::{DiagnosticInfo, Severity, custom}},
+    diagnostics::{
+        Diagnostic,
+        codes::{DiagnosticInfo, Severity, custom},
+    },
 };
 use move_ir_types::location::Loc;
 
@@ -57,14 +60,13 @@ impl From<&SpecialAttributeError> for Diagnostic {
             SpecialAttributeErrorKind::Event(e) => e.into(),
             SpecialAttributeErrorKind::ExternalStruct(e) => e.into(),
             SpecialAttributeErrorKind::AbiError(e) => e.into(),
-            SpecialAttributeErrorKind::TooManyAttributes =>  custom(
+            SpecialAttributeErrorKind::TooManyAttributes => custom(
                 "Special attributes error",
                 Severity::BlockingError,
                 3,
                 3,
                 Box::leak(value.to_string().into_boxed_str()),
             ),
-
         };
 
         diag!(diagnostic_info, (value.line_of_code, "".to_string()))

@@ -58,7 +58,7 @@ pub fn add_revert_fn(
         &error_struct,
         error_struct_ptr,
     );
-    
+
     // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
     builder
         .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)

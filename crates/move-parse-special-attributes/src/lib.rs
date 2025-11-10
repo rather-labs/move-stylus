@@ -103,7 +103,7 @@ pub fn process_special_attributes(
                             name: struct_name.clone(),
                             fields,
                         });
-                        
+
                         let mut found_match: Option<StructModifier> = None;
                         'outer: for attributes in &s.attributes {
                             if let Some(att) = attributes.value.first() {
