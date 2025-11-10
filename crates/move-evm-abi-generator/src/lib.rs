@@ -10,10 +10,10 @@ mod types;
 
 use std::{collections::HashSet, path::PathBuf};
 
-use move_binary_format::file_format::{Bytecode, Signature};
+use move_binary_format::file_format::{Bytecode, Signature, SignatureToken};
 use move_bytecode_to_wasm::PackageModuleData;
 use move_compiler::shared::files::MappedFiles;
-use move_core_types::language_storage::ModuleId;
+use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use move_package::compilation::{
     compiled_package::{CompiledPackage, CompiledUnitWithSource},
     package_layout::CompiledPackageLayout,
@@ -69,18 +69,22 @@ pub fn generate_abi(
     Ok(result)
 }
 
+const STYLUS_FRAMEWORK_ADDRESS: AccountAddress = AccountAddress::new([
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+]);
+
 #[derive(Debug)]
 struct FunctionCall {
     module_id: ModuleId,
     identifier: String,
-    signature: Signature,
+    // signature: Signature,
 }
 
 #[derive(Debug)]
 struct EventStruct {
     module_id: ModuleId,
     identifier: String,
-    signature: Signature,
+    // index: u16,
 }
 
 fn collect_generic_function_calls(
@@ -107,12 +111,40 @@ fn collect_generic_function_calls(
                             .module_id_for_handle(module.module_handle_at(function_handle.module));
                         let identifier = module.identifier_at(function_handle.name).to_string();
 
-                        let signature = module.signature_at(instantiation.type_parameters).map();
+                        if module_id.address() == &STYLUS_FRAMEWORK_ADDRESS {
+                            if module_id.name().as_str() == "event" && identifier == "emit" {
+                                let signature = module.signature_at(instantiation.type_parameters);
+                                let event_struct = match signature.0[0] {
+                                    SignatureToken::Datatype(datatype_handle_index) => {
+                                        let struct_handle =
+                                            module.datatype_handle_at(datatype_handle_index);
+                                        EventStruct {
+                                            module_id: module.module_id_for_handle(
+                                                module.module_handle_at(struct_handle.module),
+                                            ),
+                                            identifier: module
+                                                .identifier_at(struct_handle.name)
+                                                .to_string(),
+                                        }
+                                    }
+                                    _ => panic!("invalid type found in emit function"),
+                                };
+
+                                println!("Found event emition {signature:?} {event_struct:?}")
+                            } else if module_id.name().as_str() == "error" && identifier == "revert"
+                            {
+                                println!("Found revert")
+                            }
+                            /*
+                            let signature = module.signature_at(instantiation.type_parameters);
+
+                            */
+                        }
                         top_level.push(FunctionCall {
                             module_id,
                             identifier,
-                            signature,
                         });
+
                         /*
                         println!("Instantaition: {instantiation:?}");
                         println!("Function: {function_handle:?}");
@@ -157,7 +189,7 @@ fn collect_generic_function_calls(
 
     result.extend(top_level);
 
-    println!("\n\n{result:#?}\n\n");
+    // println!("\n\n{result:#?}\n\n");
 
     result
 }
