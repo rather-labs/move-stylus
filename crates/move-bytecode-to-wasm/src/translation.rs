@@ -2655,7 +2655,7 @@ fn translate_instruction(
                         .collect::<Vec<IntermediateType>>();
 
                     (
-                        &enum_.instantiate(&type_parameters_instantiations).unwrap(),
+                        &enum_.instantiate(&type_parameters_instantiations),
                         instantiations,
                     )
                 }
@@ -2723,7 +2723,7 @@ fn translate_instruction(
                         instantiations.push(replace_type_parameters(field, caller_type_instances));
                     }
 
-                    (&enum_.instantiate(&instantiations).unwrap(), instantiations)
+                    (&enum_.instantiate(&instantiations), instantiations)
                 }
                 // This should never happen
                 else {
@@ -2797,7 +2797,7 @@ fn translate_instruction(
                         instantiations.push(replace_type_parameters(field, caller_type_instances));
                     }
 
-                    (&enum_.instantiate(&instantiations).unwrap(), instantiations)
+                    (&enum_.instantiate(&instantiations), instantiations)
                 }
                 // This should never happen
                 else {

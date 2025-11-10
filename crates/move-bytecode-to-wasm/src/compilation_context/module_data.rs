@@ -1,6 +1,6 @@
-mod enum_data;
-mod function_data;
-mod struct_data;
+pub mod enum_data;
+pub mod function_data;
+pub mod struct_data;
 
 use crate::{
     GlobalFunctionTable,
@@ -59,6 +59,10 @@ pub struct Address([u8; 32]);
 impl Address {
     pub const fn from_bytes(bytes: [u8; 32]) -> Self {
         Address(bytes)
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
     }
 }
 
@@ -574,7 +578,9 @@ impl ModuleData {
                 }
             }
 
-            module_enums.push(IEnum::new(index as u16, variants).unwrap());
+            let enum_datatype_handle = module.datatype_handle_at(enum_def.enum_handle);
+            let identifier = module.identifier_at(enum_datatype_handle.name);
+            module_enums.push(IEnum::new(identifier.to_string(), index as u16, variants).unwrap());
         }
 
         (module_enums, variants_to_enum_map)

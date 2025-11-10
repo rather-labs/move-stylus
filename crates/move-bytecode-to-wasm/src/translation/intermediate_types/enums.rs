@@ -42,6 +42,8 @@ pub struct IEnumVariant {
 
 #[derive(Debug, Clone)]
 pub struct IEnum {
+    pub identifier: String,
+
     pub index: u16,
 
     pub is_simple: bool,
@@ -73,11 +75,16 @@ impl IEnumVariant {
 }
 
 impl IEnum {
-    pub fn new(index: u16, variants: Vec<IEnumVariant>) -> Result<Self, TranslationError> {
+    pub fn new(
+        identifier: String,
+        index: u16,
+        variants: Vec<IEnumVariant>,
+    ) -> Result<Self, TranslationError> {
         let is_simple = variants.iter().all(|v| v.fields.is_empty());
         let heap_size = Self::compute_heap_size(&variants)?;
 
         Ok(Self {
+            identifier,
             is_simple,
             variants,
             index,
@@ -267,7 +274,7 @@ impl IEnum {
     /// Replaces all type parameters in the enum with the provided types.
     /// It also computes the enum heap and storage size, if possible.
     /// If a type parameter is found, the sizes will be None.
-    pub fn instantiate(&self, types: &[IntermediateType]) -> Result<Self, TranslationError> {
+    pub fn instantiate(&self, types: &[IntermediateType]) -> Self {
         let variants: Vec<IEnumVariant> = self
             .variants
             .iter()
@@ -284,16 +291,15 @@ impl IEnum {
             .collect();
 
         // Recompute heap_size after instantiating the types.
-        let heap_size = Self::compute_heap_size(&variants).unwrap_or(None);
+        let heap_size = Self::compute_heap_size(&variants).unwrap_or_default();
 
-        let instantiated = Self {
+        Self {
+            identifier: self.identifier.clone(),
             index: self.index,
             is_simple: self.is_simple,
             variants,
             heap_size,
-        };
-
-        Ok(instantiated)
+        }
     }
 
     /// Returns the storage sizes of the enum for each possible slot offset

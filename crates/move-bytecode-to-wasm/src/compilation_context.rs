@@ -121,7 +121,7 @@ impl CompilationContext<'_> {
                 ..
             } => {
                 let enum_ = self.get_enum_by_index(module_id, *index)?;
-                let instance = enum_.instantiate(types).unwrap();
+                let instance = enum_.instantiate(types);
                 Ok(Cow::Owned(instance))
             }
             _ => Err(CompilationContextError::ExpectedEnum),

@@ -5,3 +5,5 @@ edition = "2024"
 
 [dependencies]
 move-compiler.workspace = true
+move-parse-special-attributes.workspace = true
+move-bytecode-to-wasm.workspace = true
