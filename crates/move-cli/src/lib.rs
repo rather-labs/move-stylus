@@ -80,9 +80,11 @@ pub fn run_cli(
     //         1. It's still using the old CostTable.
     //         2. The CostTable only affects sandbox runs, but not unit tests, which use a unit cost table.
     match cmd {
-        Command::AbiGenerate(c) => {
-            c.execute(move_args.package_path.as_deref(), move_args.build_config)
-        }
+        Command::AbiGenerate(c) => c.execute(
+            move_args.package_path.as_deref(),
+            None,
+            move_args.build_config,
+        ),
         Command::Build(c) => c.execute(move_args.package_path.as_deref(), move_args.build_config),
         Command::Coverage(c) => {
             c.execute(move_args.package_path.as_deref(), move_args.build_config)

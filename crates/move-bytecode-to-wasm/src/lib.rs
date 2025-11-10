@@ -66,14 +66,14 @@ pub fn translate_package(
     package: CompiledPackage,
     module_name: Option<String>,
 ) -> Result<HashMap<String, Module>, CompilationError> {
-    let root_compiled_units: Vec<CompiledUnitWithSource> = if let Some(module_name) = module_name {
+    let root_compiled_units: Vec<&CompiledUnitWithSource> = if let Some(module_name) = module_name {
         package
             .root_compiled_units
-            .into_iter()
+            .iter()
             .filter(move |unit| unit.unit.name.to_string() == module_name)
             .collect()
     } else {
-        package.root_compiled_units.into_iter().collect()
+        package.root_compiled_units.iter().collect()
     };
 
     assert!(
@@ -236,7 +236,7 @@ pub struct PackageModuleData {
 }
 
 pub fn package_module_data(
-    package: CompiledPackage,
+    package: &CompiledPackage,
     module_name: Option<String>,
 ) -> Result<PackageModuleData, CompilationError> {
     let mut modules_data = HashMap::new();
@@ -246,14 +246,14 @@ pub fn package_module_data(
     // This is not used in this function but is used in the others
     let mut function_definitions: GlobalFunctionTable = HashMap::new();
 
-    let root_compiled_units: Vec<CompiledUnitWithSource> = if let Some(module_name) = module_name {
+    let root_compiled_units: Vec<&CompiledUnitWithSource> = if let Some(module_name) = module_name {
         package
             .root_compiled_units
-            .into_iter()
+            .iter()
             .filter(move |unit| unit.unit.name.to_string() == module_name)
             .collect()
     } else {
-        package.root_compiled_units.into_iter().collect()
+        package.root_compiled_units.iter().collect()
     };
 
     for root_compiled_module in &root_compiled_units {
@@ -276,7 +276,7 @@ pub fn package_module_data(
             match dependencies_errors {
                 CompilationErrorKind::ICE(ice_error) => {
                     return Err(CompilationError {
-                        files: package.file_map,
+                        files: package.file_map.clone(),
                         kind: CompilationErrorKind::ICE(ice_error),
                     });
                 }
@@ -320,7 +320,7 @@ pub fn package_module_data(
         })
     } else {
         Err(CompilationError {
-            files: package.file_map,
+            files: package.file_map.clone(),
             kind: CompilationErrorKind::CodeError(errors),
         })
     }
@@ -359,7 +359,7 @@ pub fn translate_package_cli(
 pub fn process_dependency_tree<'move_package>(
     dependencies_data: &mut HashMap<ModuleId, ModuleData>,
     deps_compiled_units: &'move_package [(PackageName, CompiledUnitWithSource)],
-    root_compiled_units: &'move_package [CompiledUnitWithSource],
+    root_compiled_units: &'move_package [&CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
     function_definitions: &mut GlobalFunctionTable<'move_package>,
 ) -> Result<(), CompilationErrorKind> {

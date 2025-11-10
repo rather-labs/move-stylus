@@ -3331,8 +3331,11 @@ dependencies = [
 name = "move-evm-abi-generator"
 version = "0.1.0"
 dependencies = [
+ "move-binary-format",
  "move-bytecode-to-wasm",
  "move-compiler",
+ "move-core-types",
+ "move-package",
  "move-parse-special-attributes",
 ]
 

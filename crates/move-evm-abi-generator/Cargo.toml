@@ -7,3 +7,6 @@ edition = "2024"
 move-compiler.workspace = true
 move-parse-special-attributes.workspace = true
 move-bytecode-to-wasm.workspace = true
+move-package.workspace = true
+move-binary-format.workspace = true
+move-core-types.workspace = true
