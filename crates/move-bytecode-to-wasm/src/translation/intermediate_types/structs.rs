@@ -440,29 +440,13 @@ impl IStruct {
                 IntermediateType::IStruct {
                     module_id, index, ..
                 } if String_::is_vm_type(module_id, *index, compilation_ctx) => return true,
-                IntermediateType::IStruct {
-                    module_id, index, ..
-                } => {
+                IntermediateType::IStruct { .. }
+                | IntermediateType::IGenericStructInstance { .. } => {
                     let child_struct = compilation_ctx
-                        .get_struct_by_index(module_id, *index)
+                        .get_struct_by_intermediate_type(field)
                         .unwrap();
 
                     if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                        return true;
-                    }
-                }
-                IntermediateType::IGenericStructInstance {
-                    module_id,
-                    index,
-                    types,
-                    ..
-                } => {
-                    let child_struct = compilation_ctx
-                        .get_struct_by_index(module_id, *index)
-                        .unwrap();
-                    let child_struct_instance = child_struct.instantiate(types);
-
-                    if child_struct_instance.solidity_abi_encode_is_dynamic(compilation_ctx) {
                         return true;
                     }
                 }
@@ -497,28 +481,10 @@ impl IStruct {
                 | IntermediateType::IGenericEnumInstance { .. } => {
                     size += (field as &dyn Packable).encoded_size(compilation_ctx);
                 }
-                IntermediateType::IGenericStructInstance {
-                    module_id,
-                    index,
-                    types,
-                    ..
-                } => {
+                IntermediateType::IStruct { .. }
+                | IntermediateType::IGenericStructInstance { .. } => {
                     let child_struct = compilation_ctx
-                        .get_struct_by_index(module_id, *index)
-                        .unwrap();
-                    let child_struct_instance = child_struct.instantiate(types);
-
-                    if child_struct_instance.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                        size += 32;
-                    } else {
-                        size += field.encoded_size(compilation_ctx);
-                    }
-                }
-                IntermediateType::IStruct {
-                    module_id, index, ..
-                } => {
-                    let child_struct = compilation_ctx
-                        .get_struct_by_index(module_id, *index)
+                        .get_struct_by_intermediate_type(field)
                         .unwrap();
 
                     if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {

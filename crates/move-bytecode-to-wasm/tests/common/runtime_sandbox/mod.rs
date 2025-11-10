@@ -509,15 +509,13 @@ impl RuntimeSandbox {
                 .func_wrap(
                     "",
                     "print_memory_from",
-                    |mut caller: Caller<'_, ModuleData>, ptr: i32| {
-                        println!("--- 512 from position {ptr}----");
-
+                    |mut caller: Caller<'_, ModuleData>, ptr: i32, len: i32| {
                         let memory = match caller.get_export("memory") {
                             Some(wasmtime::Extern::Memory(mem)) => mem,
                             _ => panic!("failed to find host memory"),
                         };
 
-                        let mut result = [0; 96];
+                        let mut result = vec![0; len as usize];
                         memory.read(&caller, ptr as usize, &mut result).unwrap();
                         println!("Data {result:?}");
                         println!("--- --- ---\n");

@@ -446,23 +446,9 @@ impl Packable for IntermediateType {
             IntermediateType::IVector(_) => 32,
             IntermediateType::IRef(inner) => inner.encoded_size(compilation_ctx),
             IntermediateType::IMutRef(inner) => inner.encoded_size(compilation_ctx),
-            IntermediateType::IGenericStructInstance {
-                module_id,
-                index,
-                types,
-                ..
-            } => {
+            IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
-                let struct_instance = struct_.instantiate(types);
-                struct_instance.solidity_abi_encode_size(compilation_ctx)
-            }
-            IntermediateType::IStruct {
-                module_id, index, ..
-            } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
+                    .get_struct_by_intermediate_type(self)
                     .unwrap();
 
                 struct_.solidity_abi_encode_size(compilation_ctx)
@@ -487,25 +473,11 @@ impl Packable for IntermediateType {
             | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => false,
             IntermediateType::IVector(_) => true,
-            IntermediateType::IStruct {
-                module_id, index, ..
-            } => {
+            IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
+                    .get_struct_by_intermediate_type(self)
                     .unwrap();
                 struct_.solidity_abi_encode_is_dynamic(compilation_ctx)
-            }
-            IntermediateType::IGenericStructInstance {
-                module_id,
-                index,
-                types,
-                ..
-            } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
-                let struct_instance = struct_.instantiate(types);
-                struct_instance.solidity_abi_encode_is_dynamic(compilation_ctx)
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot check if generic type parameter is dynamic at compile time");

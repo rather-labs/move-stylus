@@ -4,6 +4,7 @@
 //! mechanism, we direcly implement them in WASM and limk them into the file.
 mod contract_calls;
 mod dynamic_field;
+mod error;
 mod event;
 pub mod object;
 mod tests;
@@ -20,9 +21,9 @@ use crate::{
     compilation_context::{
         ModuleId,
         reserved_modules::{
-            SF_MODULE_NAME_DYNAMIC_FIELD, SF_MODULE_NAME_EVENT, SF_MODULE_NAME_OBJECT,
-            SF_MODULE_NAME_TRANSFER, SF_MODULE_NAME_TX_CONTEXT, SF_MODULE_NAME_TYPES,
-            STYLUS_FRAMEWORK_ADDRESS,
+            SF_MODULE_NAME_DYNAMIC_FIELD, SF_MODULE_NAME_ERROR, SF_MODULE_NAME_EVENT,
+            SF_MODULE_NAME_OBJECT, SF_MODULE_NAME_TRANSFER, SF_MODULE_NAME_TX_CONTEXT,
+            SF_MODULE_NAME_TYPES, STYLUS_FRAMEWORK_ADDRESS,
         },
     },
     hasher::get_hasher,
@@ -60,6 +61,9 @@ impl NativeFunction {
 
     // Event functions
     const NATIVE_EMIT: &str = "emit";
+
+    // Error functions
+    const NATIVE_REVERT: &str = "revert";
 
     // Object functions
     // This is for objects with UID as id.
@@ -276,6 +280,14 @@ impl NativeFunction {
             (Self::NATIVE_EMIT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_EVENT) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id);
                 event::add_emit_log_fn(module, compilation_ctx, &generics[0], module_id)
+            }
+
+            //
+            // Error
+            //
+            (Self::NATIVE_REVERT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_ERROR) => {
+                Self::assert_generics_length(generics.len(), 1, name, module_id);
+                error::add_revert_fn(module, compilation_ctx, &generics[0], module_id)
             }
 
             //

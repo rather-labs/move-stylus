@@ -208,37 +208,14 @@ impl IStruct {
             // current offset of writer pointer, we are going to write the offset where we can find
             // the struct
             let advancement = match field {
-                IntermediateType::IStruct {
-                    module_id, index, ..
-                } => {
+                IntermediateType::IStruct { .. }
+                | IntermediateType::IGenericStructInstance { .. } => {
                     let child_struct = compilation_ctx
-                        .get_struct_by_index(module_id, *index)
+                        .get_struct_by_intermediate_type(field)
                         .unwrap();
 
                     pack_child_struct(
-                        child_struct,
-                        module,
-                        compilation_ctx,
-                        block,
-                        field_local,
-                        data_ptr,
-                        inner_data_reference,
-                        field,
-                    )
-                }
-                IntermediateType::IGenericStructInstance {
-                    module_id,
-                    index,
-                    types,
-                    ..
-                } => {
-                    let child_struct = compilation_ctx
-                        .get_struct_by_index(module_id, *index)
-                        .unwrap();
-                    let child_struct_instance = child_struct.instantiate(types);
-
-                    pack_child_struct(
-                        &child_struct_instance,
+                        &child_struct,
                         module,
                         compilation_ctx,
                         block,

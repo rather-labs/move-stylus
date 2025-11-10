@@ -6,6 +6,7 @@ use crate::{
     vm_handled_types::{VmHandledType, string::String_, tx_context::TxContext},
 };
 
+use super::abi_encoding::struct_fields_sol_name;
 use super::sol_name::SolName;
 
 type AbiEventSignatureHash = [u8; 32];
@@ -60,43 +61,15 @@ fn solidity_name(
         } if String_::is_vm_type(module_id, *index, compilation_ctx) => {
             argument.sol_name(compilation_ctx)
         }
-        IntermediateType::IStruct {
-            module_id, index, ..
-        } => {
+        IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
             let struct_ = compilation_ctx
-                .get_struct_by_index(module_id, *index)
+                .get_struct_by_intermediate_type(argument)
                 .unwrap();
 
-            struct_fields_sol_name(struct_, compilation_ctx)
-        }
-        IntermediateType::IGenericStructInstance {
-            module_id,
-            index,
-            types,
-            ..
-        } => {
-            let struct_ = compilation_ctx
-                .get_struct_by_index(module_id, *index)
-                .unwrap();
-            let struct_instance = struct_.instantiate(types);
-
-            struct_fields_sol_name(&struct_instance, compilation_ctx)
+            struct_fields_sol_name(&struct_, compilation_ctx, SolName::sol_name)
         }
         IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => None,
     }
-}
-
-fn struct_fields_sol_name(
-    struct_: &IStruct,
-    compilation_ctx: &CompilationContext,
-) -> Option<String> {
-    struct_
-        .fields
-        .iter()
-        .map(|field| field.sol_name(compilation_ctx))
-        .collect::<Option<Vec<String>>>()
-        .map(|fields| fields.join(","))
-        .map(|fields| format!("({fields})"))
 }
 
 #[cfg(test)]

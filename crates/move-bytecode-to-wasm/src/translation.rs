@@ -30,6 +30,7 @@ use move_binary_format::{
 
 use crate::{
     CompilationContext,
+    abi_types::error_encoding::build_abort_error_message,
     compilation_context::{
         ModuleData, ModuleId,
         reserved_modules::{
@@ -38,7 +39,6 @@ use crate::{
         },
     },
     data::DATA_ABORT_MESSAGE_PTR_OFFSET,
-    error_encoding::build_error_message,
     generics::{replace_type_parameters, type_contains_generics},
     hostio::host_functions::storage_flush_cache,
     native_functions::NativeFunction,
@@ -2308,7 +2308,7 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IU64)?;
 
             // Returns a ptr to the encoded error message
-            let ptr = build_error_message(builder, module, compilation_ctx);
+            let ptr = build_abort_error_message(builder, module, compilation_ctx);
 
             // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
             builder

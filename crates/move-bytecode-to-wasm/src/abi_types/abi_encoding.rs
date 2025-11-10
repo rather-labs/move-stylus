@@ -1,0 +1,134 @@
+use alloy_primitives::keccak256;
+use alloy_sol_types::{SolType, sol_data};
+
+use crate::{
+    CompilationContext,
+    translation::intermediate_types::{IntermediateType, structs::IStruct},
+    vm_handled_types::{
+        VmHandledType, named_id::NamedId, string::String_, tx_context::TxContext, uid::Uid,
+    },
+};
+
+use super::sol_name::SolName;
+
+pub type AbiFunctionSelector = [u8; 4];
+
+pub fn selector<T: AsRef<[u8]>>(bytes: T) -> AbiFunctionSelector {
+    keccak256(bytes)[..4].try_into().unwrap()
+}
+
+/// Calculate the function selector according to Solidity's [ABI encoding](https://docs.soliditylang.org/en/latest/abi-spec.html#function-selector)
+///
+/// Function names are converted to camel case before encoding.
+pub fn move_signature_to_abi_selector<F>(
+    function_name: &str,
+    signature: &[IntermediateType],
+    compilation_ctx: &CompilationContext,
+    case_callback: F,
+) -> AbiFunctionSelector
+where
+    F: Fn(&str) -> String,
+{
+    let parameter_strings = signature
+        .iter()
+        .filter_map(|s| solidity_name(s, compilation_ctx))
+        .collect::<Vec<String>>()
+        .join(",");
+
+    let function_name = case_callback(function_name);
+
+    selector(format!("{}({})", function_name, parameter_strings))
+}
+
+fn solidity_name(
+    argument: &IntermediateType,
+    compilation_ctx: &CompilationContext,
+) -> Option<String> {
+    match argument {
+        IntermediateType::IBool
+        | IntermediateType::IU8
+        | IntermediateType::IU16
+        | IntermediateType::IU32
+        | IntermediateType::IU64
+        | IntermediateType::IU128
+        | IntermediateType::IU256
+        | IntermediateType::IAddress => argument.sol_name(compilation_ctx),
+        IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
+            let enum_ = compilation_ctx
+                .get_enum_by_intermediate_type(argument)
+                .unwrap();
+            if enum_.is_simple {
+                argument.sol_name(compilation_ctx)
+            } else {
+                None
+            }
+        }
+        IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
+            solidity_name(inner, compilation_ctx)
+        }
+        IntermediateType::IVector(inner) => {
+            solidity_name(inner, compilation_ctx).map(|sol_n| format!("{sol_n}[]"))
+        }
+        IntermediateType::IStruct {
+            module_id, index, ..
+        } if TxContext::is_vm_type(module_id, *index, compilation_ctx) => None,
+        IntermediateType::IStruct {
+            module_id, index, ..
+        } if String_::is_vm_type(module_id, *index, compilation_ctx) => {
+            argument.sol_name(compilation_ctx)
+        }
+        IntermediateType::IStruct {
+            module_id, index, ..
+        } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+            Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
+        }
+        IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
+            let struct_ = compilation_ctx
+                .get_struct_by_intermediate_type(argument)
+                .unwrap();
+
+            if struct_.has_key {
+                sol_name_storage_ids(&struct_, compilation_ctx)
+            } else {
+                struct_fields_sol_name(&struct_, compilation_ctx, solidity_name)
+            }
+        }
+        IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => None,
+    }
+}
+
+fn sol_name_storage_ids(struct_: &IStruct, compilation_ctx: &CompilationContext) -> Option<String> {
+    match struct_.fields.first() {
+        Some(IntermediateType::IStruct {
+            module_id, index, ..
+        }) if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+            Some(sol_data::FixedBytes::<32>::SOL_NAME.to_string())
+        }
+        Some(IntermediateType::IGenericStructInstance {
+            module_id, index, ..
+        }) if NamedId::is_vm_type(module_id, *index, compilation_ctx) => None,
+
+        _ => panic!(
+            "expected stylus::object::UID or stylus::object::NamedId as first field in {} struct (it has key ability)",
+            struct_.identifier
+        ),
+    }
+}
+
+#[inline]
+pub fn struct_fields_sol_name<F>(
+    struct_: &IStruct,
+    compilation_ctx: &CompilationContext,
+    field_encoding_callback: F,
+) -> Option<String>
+where
+    F: Fn(&IntermediateType, &CompilationContext) -> Option<String>,
+{
+    struct_
+        .fields
+        .iter()
+        .map(|field| field_encoding_callback(field, compilation_ctx))
+        .collect::<Option<Vec<String>>>()
+        .map(|fields| fields.join(","))
+        .map(|fields| format!("({fields})"))
+}

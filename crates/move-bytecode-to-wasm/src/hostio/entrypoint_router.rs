@@ -1,11 +1,11 @@
 use walrus::{
     FunctionBuilder, FunctionId, GlobalId, Module, ValType,
-    ir::{BinaryOp, ExtendedLoad, LoadKind, MemArg},
+    ir::{BinaryOp, LoadKind, MemArg},
 };
 
 use crate::{
-    CompilationContext, abi_types::public_function::PublicFunction,
-    error_encoding::build_error_message, runtime_error_codes::ERROR_NO_FUNCTION_MATCH,
+    CompilationContext, abi_types::error_encoding::build_abort_error_message,
+    abi_types::public_function::PublicFunction, runtime_error_codes::ERROR_NO_FUNCTION_MATCH,
     translation::intermediate_types::IntermediateType,
 };
 
@@ -77,21 +77,19 @@ pub fn build_entrypoint_router(
 
     // Build no function match error message
     router_builder.i64_const(ERROR_NO_FUNCTION_MATCH);
-    let ptr = build_error_message(&mut router_builder, module, compilation_ctx);
+    let ptr = build_abort_error_message(&mut router_builder, module, compilation_ctx);
 
     // Write error data to memory
     router_builder
         // Skip header
         .local_get(ptr)
-        .i32_const(1)
+        .i32_const(4)
         .binop(BinaryOp::I32Add)
         // Load msg length
         .local_get(ptr)
         .load(
             compilation_ctx.memory_id,
-            LoadKind::I32_8 {
-                kind: ExtendedLoad::ZeroExtend,
-            },
+            LoadKind::I32 { atomic: false },
             MemArg {
                 align: 0,
                 offset: 0,
