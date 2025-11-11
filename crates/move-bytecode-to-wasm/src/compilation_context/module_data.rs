@@ -156,7 +156,7 @@ impl ModuleData {
         module_id: ModuleId,
         move_module: &'move_package CompiledUnitWithSource,
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
-        root_compiled_units: &'move_package [CompiledUnitWithSource],
+        root_compiled_units: &'move_package [&CompiledUnitWithSource],
         function_definitions: &mut GlobalFunctionTable<'move_package>,
         special_attributes: SpecialAttributes,
     ) -> Result<Self> {
@@ -239,7 +239,7 @@ impl ModuleData {
         module_id: &ModuleId,
         module: &CompiledModule,
         move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
-        root_compiled_units: &[CompiledUnitWithSource],
+        root_compiled_units: &[&CompiledUnitWithSource],
     ) -> HashMap<DatatypeHandleIndex, UserDefinedType> {
         let mut datatype_handles_map = HashMap::new();
 

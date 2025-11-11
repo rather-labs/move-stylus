@@ -10,6 +10,7 @@ use move_bytecode_to_wasm::compilation_context::{
 use move_parse_special_attributes::function_modifiers::{FunctionModifier, Parameter};
 
 use crate::{
+    ErrorStruct, EventStruct,
     common::snake_to_camel,
     special_types::{is_named_id, is_uid},
     types::Type,
@@ -50,10 +51,25 @@ pub struct StructField {
 }
 
 #[derive(Debug)]
+pub struct Event {
+    pub(crate) identifier: String,
+    pub(crate) fields: Vec<EventField>,
+    pub(crate) is_anonymous: bool,
+}
+
+#[derive(Debug)]
+pub struct EventField {
+    pub(crate) identifier: String,
+    pub(crate) type_: Type,
+    pub(crate) indexed: bool,
+}
+
+#[derive(Debug)]
 pub struct Abi {
     pub(crate) contract_name: String,
     pub(crate) functions: Vec<Function>,
     pub(crate) structs: Vec<Struct_>,
+    pub(crate) events: Vec<Event>,
 }
 
 impl Abi {
@@ -64,6 +80,8 @@ impl Abi {
     pub(crate) fn new(
         processing_module: &ModuleData,
         modules_data: &HashMap<ModuleId, ModuleData>,
+        event_structs: &HashSet<EventStruct>,
+        _error_structs: &HashSet<ErrorStruct>,
     ) -> Abi {
         let (functions, structs_to_process) =
             Self::process_functions(processing_module, modules_data);
@@ -72,10 +90,13 @@ impl Abi {
         let structs =
             Self::process_structs(structs_to_process, modules_data, &mut processed_structs);
 
+        let events = Self::process_events(event_structs, modules_data);
+
         Abi {
             contract_name: processing_module.special_attributes.module_name.clone(),
             functions,
             structs,
+            events,
         }
     }
 
@@ -473,6 +494,57 @@ impl Abi {
                 Self::process_structs(child_structs_to_process, modules_data, processed_structs);
 
             result.extend(child_structs);
+        }
+
+        result
+    }
+
+    pub fn process_events(
+        event_structs: &HashSet<EventStruct>,
+        modules_data: &HashMap<ModuleId, ModuleData>,
+    ) -> Vec<Event> {
+        let mut result = Vec::new();
+        for event_struct in event_structs {
+            let event_module = modules_data
+                .get(&ModuleId {
+                    address: event_struct.module_id.address().into_bytes().into(),
+                    module_name: event_struct.module_id.name().to_string(),
+                })
+                .unwrap();
+
+            let event_struct = event_module
+                .structs
+                .get_by_identifier(&event_struct.identifier)
+                .unwrap();
+
+            let event_special_attributes = event_module
+                .special_attributes
+                .events
+                .get(&event_struct.identifier)
+                .unwrap();
+
+            let event_struct_parsed = event_module
+                .special_attributes
+                .structs
+                .iter()
+                .find(|s| s.name.as_str() == event_struct.identifier)
+                .unwrap();
+
+            result.push(Event {
+                identifier: event_struct.identifier.to_string(),
+                fields: event_struct
+                    .fields
+                    .iter()
+                    .zip(&event_struct_parsed.fields)
+                    .enumerate()
+                    .map(|(index, (f, (identifier, _)))| EventField {
+                        identifier: identifier.clone(),
+                        type_: Type::from_intermediate_type(f, modules_data),
+                        indexed: index < event_special_attributes.indexes as usize,
+                    })
+                    .collect(),
+                is_anonymous: event_special_attributes.is_anonymous,
+            });
         }
 
         result
