@@ -657,13 +657,7 @@ fn translate_instruction(
 
                 dependency_data
                     .functions
-                    .information
-                    .iter()
-                    .find(|f| {
-                        f.function_id.module_id == function_id.module_id
-                            && f.function_id.identifier == function_id.identifier
-                            && f.function_id.type_instantiations.is_none()
-                    })
+                    .get_information_by_identifier(&function_id.identifier)
                     .unwrap()
             };
 

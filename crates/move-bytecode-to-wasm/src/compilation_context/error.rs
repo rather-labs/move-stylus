@@ -3,6 +3,8 @@ use move_binary_format::file_format::{
     StructDefinitionIndex,
 };
 
+use crate::error::{CompilationErrorKind, ICEError, ICEErrorKind};
+
 use super::ModuleId;
 
 #[derive(Debug, thiserror::Error)]
@@ -35,7 +37,7 @@ pub enum CompilationContextError {
     #[error("enum with enum id {0} not found in compilation context")]
     EnumWithVariantIdxNotFound(u16),
 
-    #[error("module {0:?} not found")]
+    #[error("module {0} not found")]
     ModuleNotFound(ModuleId),
 
     #[error("expected struct")]
@@ -43,4 +45,10 @@ pub enum CompilationContextError {
 
     #[error("expected enum")]
     ExpectedEnum,
+}
+
+impl From<CompilationContextError> for CompilationErrorKind {
+    fn from(value: CompilationContextError) -> Self {
+        CompilationErrorKind::ICE(ICEError::new(ICEErrorKind::CompilationContext(value)))
+    }
 }

@@ -162,7 +162,7 @@ pub fn translate_package(
         )
         .map_err(|e| CompilationError {
             files: package.file_map.clone(),
-            kind: CompilationErrorKind::ICE(e.into()),
+            kind: e.into(),
         })?;
 
         let compilation_ctx =
@@ -310,7 +310,7 @@ pub fn package_module_data(
         )
         .map_err(|e| CompilationError {
             files: package.file_map.clone(),
-            kind: CompilationErrorKind::ICE(e.into()),
+            kind: e.into(),
         })?;
 
         modules_data.insert(root_module_id.clone(), root_module_data);
@@ -432,8 +432,7 @@ pub fn process_dependency_tree<'move_package>(
             root_compiled_units,
             function_definitions,
             special_attributes,
-        )
-        .map_err(|e| CompilationErrorKind::ICE(e.into()))?;
+        )?;
 
         let processed_dependency = dependencies_data.insert(module_id, dependency_module_data);
 

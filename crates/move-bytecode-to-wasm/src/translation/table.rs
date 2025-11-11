@@ -8,7 +8,7 @@ use walrus::{
 
 use crate::{
     compilation_context::ModuleId,
-    error::{CompilationErrorKind, ICEError},
+    error::{CompilationErrorKind, ICEError, ICEErrorKind},
 };
 
 use super::{functions::MappedFunction, intermediate_types::IntermediateType};
@@ -64,7 +64,7 @@ pub enum FunctionTableError {
 
 impl From<FunctionTableError> for CompilationErrorKind {
     fn from(value: FunctionTableError) -> Self {
-        CompilationErrorKind::ICE(ICEError::FunctionTable(value))
+        CompilationErrorKind::ICE(ICEError::new(ICEErrorKind::FunctionTable(value)))
     }
 }
 

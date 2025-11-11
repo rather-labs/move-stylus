@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{backtrace::Backtrace, fmt::Display};
 
 use move_compiler::{diagnostics::Diagnostic, shared::files::MappedFiles};
 use move_parse_special_attributes::SpecialAttributeError;
@@ -23,9 +23,7 @@ impl Display for CompilationError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum CompilationErrorKind {
-    #[error(
-        "An internal compiler error has ocurred. If this keeps happening, please open an issue in\n<gh url>"
-    )]
+    #[error("An internal compiler error (ICE) has ocurred.\n{0}")]
     ICE(#[from] ICEError),
 
     #[error("internal compiler error(s) ocurred")]
@@ -38,8 +36,35 @@ pub enum CodeError {
     SpecialAttributesError(#[from] SpecialAttributeError),
 }
 
+#[derive(Debug)]
+pub struct ICEError {
+    pub kind: ICEErrorKind,
+    pub backtrace: Backtrace,
+}
+
+impl std::error::Error for ICEError {}
+
+impl ICEError {
+    pub fn new(kind: ICEErrorKind) -> Self {
+        Self {
+            kind,
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
+
+impl Display for ICEError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            r#"{}\nPlease open an issue in Github <project url> with this message.\n\n{}"#,
+            self.kind, self.backtrace
+        )
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
-pub enum ICEError {
+pub enum ICEErrorKind {
     #[error("an error ocurred processing the compilation context")]
     CompilationContext(#[from] CompilationContextError),
 
