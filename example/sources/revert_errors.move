@@ -62,14 +62,3 @@ public struct CustomError4 has copy, drop {
 entry fun revert_custom_error4(error: CustomError4) {
     revert(error);
 }
-
-#[ext(abi_error)]
-#[allow(unused_field)]
-public struct GenericCustomError<T, U> has copy, drop {
-    a: T,
-    b: U,
-}
-
-entry fun revert_generic_custom_error_32(a: u32, b: vector<u64>) {
-    revert(GenericCustomError<u32, vector<u64>> { a, b });
-}
