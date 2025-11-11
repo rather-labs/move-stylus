@@ -40,10 +40,10 @@ pub fn generate_abi(
             .get(module_id)
             .expect("error getting module data");
 
-        // Collect all the calls to emit<> function to know which events are emmited in this module
-        // so we can put them in the ABI
+        // Collect all the calls to emit<> and revert<> function to know which events and errors
+        // are emmited in this module so we can put them in the ABI
         let mut processed_modules = HashSet::new();
-        let (module_emitted_events, module_errors) = collect_generic_function_calls(
+        let (module_emitted_events, module_errors) = process_events_and_errors(
             package,
             root_compiled_module,
             root_compiled_units,
@@ -79,7 +79,6 @@ const STYLUS_FRAMEWORK_ADDRESS: AccountAddress = AccountAddress::new([
 pub(crate) struct FunctionCall {
     module_id: ModuleId,
     identifier: String,
-    // signature: Signature,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -94,7 +93,9 @@ pub(crate) struct ErrorStruct {
     identifier: String,
 }
 
-fn collect_generic_function_calls(
+/// This functions recursively searches for `emit` and `revert` calls to put in the ABI which
+/// structs are used for events and errors respectively.
+fn process_events_and_errors(
     package: &CompiledPackage,
     root_compiled_module: &CompiledUnitWithSource,
     root_compiled_units: &[&CompiledUnitWithSource],
@@ -153,7 +154,7 @@ fn collect_generic_function_calls(
                                                 .to_string(),
                                         });
                                     }
-                                    _ => panic!("invalid type found in emit function"),
+                                    _ => panic!("invalid type found in revert function"),
                                 }
                             }
                         }
@@ -180,8 +181,6 @@ fn collect_generic_function_calls(
         }
     }
 
-    processed_modules.insert(module.self_id());
-
     let mut result_events = HashSet::new();
     let mut result_errors = HashSet::new();
     // Recursively process calls
@@ -202,7 +201,7 @@ fn collect_generic_function_calls(
                 })
                 .unwrap_or_else(|| panic!("Could not find dependency {}", function_call.module_id));
 
-            let (events, errors) = collect_generic_function_calls(
+            let (events, errors) = process_events_and_errors(
                 package,
                 child_module,
                 root_compiled_units,
