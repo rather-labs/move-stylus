@@ -177,6 +177,7 @@ impl Abi {
                             }
                             _ => {
                                 if struct_.has_key {
+                                    // TODO: can an error/event have a key? if so, we need to resolve conflicts here too!
                                     Self::process_storage_struct(
                                         struct_,
                                         itype,
@@ -504,14 +505,13 @@ impl Abi {
                 .collect();
 
             let struct_abi_type = Type::from_intermediate_type(&struct_itype, modules_data);
-            let mut identifier = struct_abi_type.name();
+            let identifier = struct_abi_type.name();
 
-            // Check if this struct identifier conflicts with events or errors
-            if is_struct_identifier_conflict(&identifier, events, abi_errors) {
-                identifier = format!("{}_", identifier);
-            }
-
-            result.push(Struct_ { identifier, fields });
+            result.push(Struct_ {
+                // Resolve struct identifier conflicts with events or errors
+                identifier: resolve_struct_identifier_conflict(&identifier, events, abi_errors),
+                fields,
+            });
 
             processed_structs.insert(struct_itype);
 
@@ -624,14 +624,23 @@ impl Abi {
     }
 }
 
-/// Helper function to check if a struct identifier matches any event or error identifier
-fn is_struct_identifier_conflict(
+/// Helper function to resolve struct identifier conflicts with events or errors
+/// Returns the identifier with appropriate suffix (_event or _error) if there's a conflict
+fn resolve_struct_identifier_conflict(
     identifier: &str,
     events: &[Event],
     abi_errors: &[Struct_],
-) -> bool {
-    events.iter().any(|e| e.identifier == identifier)
-        || abi_errors.iter().any(|e| e.identifier == identifier)
+) -> String {
+    let is_event = events.iter().any(|e| e.identifier == identifier);
+    let is_error = abi_errors.iter().any(|e| e.identifier == identifier);
+
+    if is_event {
+        format!("{}_event", identifier)
+    } else if is_error {
+        format!("{}_error", identifier)
+    } else {
+        identifier.to_string()
+    }
 }
 
 /// Helper function to recursively resolve struct identifier conflicts in types
@@ -642,13 +651,15 @@ fn resolve_struct_conflicts_in_type(ty: &Type, events: &[Event], abi_errors: &[S
             identifier,
             type_instances,
         } => {
-            if is_struct_identifier_conflict(identifier, events, abi_errors) {
+            let resolved_identifier =
+                resolve_struct_identifier_conflict(identifier, events, abi_errors);
+            if resolved_identifier != *identifier {
                 if type_instances.is_some() {
                     // This should never happen because events and errors are not generic
                     panic!("Found a generic struct with conflicting identifier: {identifier}");
                 }
                 Type::Struct {
-                    identifier: format!("{}_", identifier),
+                    identifier: resolved_identifier,
                     type_instances: None,
                 }
             } else {
