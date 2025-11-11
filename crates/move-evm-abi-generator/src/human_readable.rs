@@ -168,24 +168,17 @@ pub fn process_abi_errors(contract_abi: &mut String, abi: &Abi) {
 /// that match events or errors to avoid naming conflicts
 fn format_type_name_for_display(ty: &Type, abi: &Abi) -> String {
     match ty {
-        Type::Struct {
-            identifier,
-            type_instances,
-        } => {
+        Type::Struct { identifier, .. } => {
             // Check if this struct identifier matches any event or error
             let is_event = abi.events.iter().any(|e| e.identifier == *identifier);
             let is_error = abi.abi_errors.iter().any(|e| e.identifier == *identifier);
 
-            // Create a modified Type with underscore in identifier if it matches
+            // Add underscore after the struct type name, not after the identifier
+            let base_name = ty.name();
             if is_event || is_error {
-                let modified_identifier = format!("{}_", identifier);
-                let modified_type = Type::Struct {
-                    identifier: modified_identifier,
-                    type_instances: type_instances.clone(),
-                };
-                modified_type.name()
+                format!("{}_", base_name)
             } else {
-                ty.name()
+                base_name
             }
         }
         Type::Array(inner) => {
