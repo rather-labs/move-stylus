@@ -46,14 +46,19 @@ pub fn generate_abi(
         // Collect all the calls to emit<> function to know which events are emmited in this module
         // so we can put them in the ABI
         let mut processed_modules = HashSet::new();
-        collect_generic_function_calls(
+        let (module_emitted_events, module_errors) = collect_generic_function_calls(
             package,
             root_compiled_module,
             root_compiled_units,
             &mut processed_modules,
         );
 
-        let abi = abi::Abi::new(module_data, &package_module_data.modules_data);
+        let abi = abi::Abi::new(
+            module_data,
+            &package_module_data.modules_data,
+            &module_emitted_events,
+            &module_errors,
+        );
 
         if abi.is_empty() {
             continue;
@@ -74,17 +79,22 @@ const STYLUS_FRAMEWORK_ADDRESS: AccountAddress = AccountAddress::new([
 ]);
 
 #[derive(Debug)]
-struct FunctionCall {
+pub(crate) struct FunctionCall {
     module_id: ModuleId,
     identifier: String,
     // signature: Signature,
 }
 
 #[derive(Debug)]
-struct EventStruct {
+pub(crate) struct EventStruct {
     module_id: ModuleId,
     identifier: String,
-    // index: u16,
+}
+
+#[derive(Debug)]
+pub(crate) struct ErrorStruct {
+    module_id: ModuleId,
+    identifier: String,
 }
 
 fn collect_generic_function_calls(
@@ -92,14 +102,15 @@ fn collect_generic_function_calls(
     root_compiled_module: &CompiledUnitWithSource,
     root_compiled_units: &[&CompiledUnitWithSource],
     processed_modules: &mut HashSet<ModuleId>,
-) -> Vec<FunctionCall> {
+) -> (Vec<EventStruct>, Vec<ErrorStruct>) {
     let module = &root_compiled_module.unit.module;
 
     processed_modules.insert(module.self_id());
 
     // Process top level functions
-    let mut result = Vec::new();
-    let mut top_level = Vec::new();
+    let mut top_level_functions = Vec::new();
+    let mut top_level_events = Vec::new();
+    let mut top_level_errors = Vec::new();
     for function in module.function_defs() {
         if let Some(ref code) = function.code {
             for instruction in &code.code {
@@ -114,33 +125,43 @@ fn collect_generic_function_calls(
                         if module_id.address() == &STYLUS_FRAMEWORK_ADDRESS {
                             if module_id.name().as_str() == "event" && identifier == "emit" {
                                 let signature = module.signature_at(instantiation.type_parameters);
-                                let event_struct = match signature.0[0] {
+                                match signature.0[0] {
                                     SignatureToken::Datatype(datatype_handle_index) => {
                                         let struct_handle =
                                             module.datatype_handle_at(datatype_handle_index);
-                                        EventStruct {
+                                        top_level_events.push(EventStruct {
                                             module_id: module.module_id_for_handle(
                                                 module.module_handle_at(struct_handle.module),
                                             ),
                                             identifier: module
                                                 .identifier_at(struct_handle.name)
                                                 .to_string(),
-                                        }
+                                        });
                                     }
                                     _ => panic!("invalid type found in emit function"),
-                                };
-
-                                println!("Found event emition {signature:?} {event_struct:?}")
+                                }
                             } else if module_id.name().as_str() == "error" && identifier == "revert"
                             {
-                                println!("Found revert")
+                                let signature = module.signature_at(instantiation.type_parameters);
+                                match signature.0[0] {
+                                    SignatureToken::Datatype(datatype_handle_index) => {
+                                        let struct_handle =
+                                            module.datatype_handle_at(datatype_handle_index);
+                                        top_level_errors.push(ErrorStruct {
+                                            module_id: module.module_id_for_handle(
+                                                module.module_handle_at(struct_handle.module),
+                                            ),
+                                            identifier: module
+                                                .identifier_at(struct_handle.name)
+                                                .to_string(),
+                                        });
+                                    }
+                                    _ => panic!("invalid type found in emit function"),
+                                }
                             }
-                            /*
-                            let signature = module.signature_at(instantiation.type_parameters);
-
-                            */
                         }
-                        top_level.push(FunctionCall {
+
+                        top_level_functions.push(FunctionCall {
                             module_id,
                             identifier,
                         });
@@ -159,8 +180,10 @@ fn collect_generic_function_calls(
 
     processed_modules.insert(module.self_id());
 
+    let mut result_events = Vec::new();
+    let mut result_errors = Vec::new();
     // Recursively process calls
-    for function_call in &top_level {
+    for function_call in &top_level_functions {
         if function_call.module_id != module.self_id()
             && !processed_modules.contains(&function_call.module_id)
         {
@@ -177,19 +200,21 @@ fn collect_generic_function_calls(
                 })
                 .unwrap_or_else(|| panic!("Could not find dependency {}", function_call.module_id));
 
-            let child_module_result = collect_generic_function_calls(
+            let (events, errors) = collect_generic_function_calls(
                 package,
                 child_module,
                 root_compiled_units,
                 processed_modules,
             );
-            result.extend(child_module_result);
+            result_events.extend(events);
+            result_errors.extend(errors);
         }
     }
 
-    result.extend(top_level);
+    result_events.extend(top_level_events);
+    result_errors.extend(top_level_errors);
 
     // println!("\n\n{result:#?}\n\n");
 
-    result
+    (result_events, result_errors)
 }
