@@ -179,7 +179,11 @@ pub fn translate_package(
                 &mut module,
                 &compilation_ctx,
                 &mut dynamic_fields_global_variables,
-            );
+            )
+            .map_err(|kind| CompilationError {
+                files: package.file_map.clone(),
+                kind,
+            })?;
 
             if function_information.is_entry {
                 let wasm_function_id = function_table
@@ -456,7 +460,7 @@ fn translate_and_link_functions(
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
     dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
-) {
+) -> Result<(), CompilationErrorKind> {
     // Obtain the function information and module's data
     let (function_information, module_data) = if let Some(fi) = compilation_ctx
         .root_module_data
@@ -498,7 +502,7 @@ fn translate_and_link_functions(
         // If it has asigned a wasm function id means that we already translated it, so we skip
         // it
         if table_entry.wasm_function_id.is_some() {
-            return;
+            return Ok(());
         }
     }
     // If it is not present, we add an entry for it
@@ -523,15 +527,12 @@ fn translate_and_link_functions(
             function_information,
             move_bytecode,
             dynamic_fields_global_variables,
-        )
-        .unwrap_or_else(|_| panic!("there was an error translating {}", function_id));
+        )?;
 
-        function_table
-            .add_to_wasm_table(module, function_id, wasm_function_id)
-            .expect("there was an error adding the module's functions to the function table");
+        function_table.add_to_wasm_table(module, function_id, wasm_function_id)?;
 
         // Recursively translate and link functions called by this function
-        functions_to_link.iter().for_each(|function_id| {
+        for function_id in &functions_to_link {
             translate_and_link_functions(
                 function_id,
                 function_table,
@@ -539,9 +540,11 @@ fn translate_and_link_functions(
                 module,
                 compilation_ctx,
                 dynamic_fields_global_variables,
-            )
-        });
+            )?;
+        }
     }
+
+    Ok(())
 }
 
 #[cfg(feature = "inject-host-debug-fns")]

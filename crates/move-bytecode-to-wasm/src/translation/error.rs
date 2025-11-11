@@ -91,6 +91,9 @@ pub enum TranslationError {
     #[error("enum with index {enum_index} size not computed")]
     EnumSizeNotComputed { enum_index: u16 },
 
+    #[error("calling field borrow mut without type instantiations")]
+    DynamicFieldBorrowMutNoTypeInstantiations,
+
     // TODO: identify concrete errors and add its corresponding enum variant
     #[error("unknown error: {0}")]
     Unknown(#[from] anyhow::Error),

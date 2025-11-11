@@ -3,7 +3,10 @@ use std::fmt::Display;
 use move_compiler::{diagnostics::Diagnostic, shared::files::MappedFiles};
 use move_parse_special_attributes::SpecialAttributeError;
 
-use crate::compilation_context::CompilationContextError;
+use crate::{
+    compilation_context::CompilationContextError,
+    translation::{TranslationError, table::FunctionTableError},
+};
 
 #[derive(thiserror::Error, Debug)]
 pub struct CompilationError {
@@ -39,6 +42,12 @@ pub enum CodeError {
 pub enum ICEError {
     #[error("an error ocurred processing the compilation context")]
     CompilationContext(#[from] CompilationContextError),
+
+    #[error("an error ocurred while translating move bytecode")]
+    Translation(#[from] TranslationError),
+
+    #[error("an error ocurred while handling the function table")]
+    FunctionTable(#[from] FunctionTableError),
 }
 
 impl From<CodeError> for Diagnostic {

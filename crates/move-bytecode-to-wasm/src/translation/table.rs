@@ -6,7 +6,10 @@ use walrus::{
     ir::Value,
 };
 
-use crate::compilation_context::ModuleId;
+use crate::{
+    compilation_context::ModuleId,
+    error::{CompilationErrorKind, ICEError},
+};
 
 use super::{functions::MappedFunction, intermediate_types::IntermediateType};
 
@@ -48,6 +51,21 @@ pub struct FunctionTable {
     /// WASM table id
     table_id: TableId,
     entries: Vec<TableEntry>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum FunctionTableError {
+    #[error("invalid entry {0}")]
+    InvalidEntry(FunctionId),
+
+    #[error("function {0} was not added to the functions table")]
+    FunctionNotInTable(FunctionId),
+}
+
+impl From<FunctionTableError> for CompilationErrorKind {
+    fn from(value: FunctionTableError) -> Self {
+        CompilationErrorKind::ICE(ICEError::FunctionTable(value))
+    }
 }
 
 impl FunctionTable {
@@ -92,22 +110,22 @@ impl FunctionTable {
         module: &mut Module,
         function_id: &FunctionId,
         wasm_function_id: WasmFunctionId,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), FunctionTableError> {
         let entry = self
             .get_by_function_id(function_id)
-            .ok_or(anyhow::anyhow!("invalid entry {function_id:?}"))?;
+            .ok_or(FunctionTableError::InvalidEntry(function_id.clone()))?;
 
         module.elements.add(
             ElementKind::Active {
                 table: self.table_id,
-                offset: ConstExpr::Value(Value::I32(entry.index as i32)),
+                offset: ConstExpr::Value(Value::I32(entry.index)),
             },
             walrus::ElementItems::Functions(vec![wasm_function_id]),
         );
 
         let entry = self
             .get_mut_by_function_id(function_id)
-            .ok_or(anyhow::anyhow!("invalid entry {function_id:?}"))?;
+            .ok_or(FunctionTableError::InvalidEntry(function_id.clone()))?;
 
         entry.wasm_function_id = Some(wasm_function_id);
 
@@ -128,14 +146,13 @@ impl FunctionTable {
         self.table_id
     }
 
-    pub fn ensure_all_functions_added(&self) -> Result<()> {
+    pub fn ensure_all_functions_added(&self) -> Result<(), FunctionTableError> {
         if let Some(entry) = self.entries.iter().find(|e| e.wasm_function_id.is_none()) {
-            anyhow::bail!(
-                "function {} was not added to the functions table",
-                entry.function_id
-            );
+            Err(FunctionTableError::FunctionNotInTable(
+                entry.function_id.clone(),
+            ))
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 }
