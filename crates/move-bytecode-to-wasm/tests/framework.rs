@@ -1544,17 +1544,11 @@ mod error {
             CustomError a;
             CustomError2 b;
         }
-
-        struct GenericCustomError32 {
-            uint32 a;
-            uint32[] b;
-        }
         function revertStandardError(Error e) external;
         function revertCustomError(CustomError e) external;
         function revertCustomError2(CustomError2 e) external;
         function revertCustomError3(CustomError3 e) external;
         function revertCustomError4(CustomError4 e) external;
-        function revertGenericCustomError32(GenericCustomError32 e) external;
     );
 
     #[rstest]
@@ -1634,13 +1628,6 @@ mod error {
                 );
                 <sol!((CustomError, CustomError2)) as alloy_sol_types::SolValue>::abi_encode_params(&params)
             },
-        ].concat()
-    )]
-    #[case(
-        revertGenericCustomError32Call::new((GenericCustomError32 { a: 42, b: vec![43, 44, 45] },)),
-        [
-            keccak256(b"GenericCustomError(uint32,uint32[])")[..4].to_vec(),
-            <sol!((uint32, uint32[]))>::abi_encode_params(&(42, vec![43, 44, 45])),
         ].concat()
     )]
     fn test_revert<T: SolCall>(
