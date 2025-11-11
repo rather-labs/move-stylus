@@ -70,6 +70,7 @@ pub struct Abi {
     pub(crate) functions: Vec<Function>,
     pub(crate) structs: Vec<Struct_>,
     pub(crate) events: Vec<Event>,
+    pub(crate) abi_errors: Vec<Struct_>,
 }
 
 impl Abi {
@@ -81,7 +82,7 @@ impl Abi {
         processing_module: &ModuleData,
         modules_data: &HashMap<ModuleId, ModuleData>,
         event_structs: &HashSet<EventStruct>,
-        _error_structs: &HashSet<ErrorStruct>,
+        error_structs: &HashSet<ErrorStruct>,
     ) -> Abi {
         let (functions, structs_to_process) =
             Self::process_functions(processing_module, modules_data);
@@ -92,11 +93,14 @@ impl Abi {
 
         let events = Self::process_events(event_structs, modules_data);
 
+        let abi_errors = Self::process_abi_errors(error_structs, modules_data);
+
         Abi {
             contract_name: processing_module.special_attributes.module_name.clone(),
             functions,
             structs,
             events,
+            abi_errors,
         }
     }
 
@@ -544,6 +548,48 @@ impl Abi {
                     })
                     .collect(),
                 is_anonymous: event_special_attributes.is_anonymous,
+            });
+        }
+
+        result
+    }
+
+    pub fn process_abi_errors(
+        error_structs: &HashSet<ErrorStruct>,
+        modules_data: &HashMap<ModuleId, ModuleData>,
+    ) -> Vec<Struct_> {
+        let mut result = Vec::new();
+        for error_struct in error_structs {
+            let error_module = modules_data
+                .get(&ModuleId {
+                    address: error_struct.module_id.address().into_bytes().into(),
+                    module_name: error_struct.module_id.name().to_string(),
+                })
+                .unwrap();
+
+            let error_struct = error_module
+                .structs
+                .get_by_identifier(&error_struct.identifier)
+                .unwrap();
+
+            let error_struct_parsed = error_module
+                .special_attributes
+                .structs
+                .iter()
+                .find(|s| s.name.as_str() == error_struct.identifier)
+                .unwrap();
+
+            result.push(Struct_ {
+                identifier: error_struct.identifier.to_string(),
+                fields: error_struct
+                    .fields
+                    .iter()
+                    .zip(&error_struct_parsed.fields)
+                    .map(|(f, (identifier, _))| StructField {
+                        identifier: identifier.clone(),
+                        type_: Type::from_intermediate_type(f, modules_data),
+                    })
+                    .collect(),
             });
         }
 

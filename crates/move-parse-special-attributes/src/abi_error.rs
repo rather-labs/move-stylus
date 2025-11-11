@@ -14,6 +14,9 @@ pub struct AbiError {
 pub enum AbiErrorParseError {
     #[error(r#"not marked as an abierror"#)]
     NotAnAbiError,
+
+    #[error(r#"generic abi errors are not supported"#)]
+    GenericAbiError,
 }
 
 impl From<&AbiErrorParseError> for DiagnosticInfo {
@@ -32,6 +35,8 @@ impl TryFrom<&StructDefinition> for AbiError {
     type Error = SpecialAttributeError;
 
     fn try_from(value: &StructDefinition) -> Result<Self, Self::Error> {
+        let is_generic = !value.type_parameters.is_empty();
+
         // Find the attribute we neekd
         for attribute in &value.attributes {
             for att in &attribute.value {
@@ -50,6 +55,15 @@ impl TryFrom<&StructDefinition> for AbiError {
                     },
                     _ => continue,
                 };
+
+                if is_generic {
+                    return Err(SpecialAttributeError {
+                        kind: SpecialAttributeErrorKind::AbiError(
+                            AbiErrorParseError::GenericAbiError,
+                        ),
+                        line_of_code: value.loc,
+                    });
+                }
 
                 // If we have more than one attribute, return an error
                 if parameterized.len() > 1 {

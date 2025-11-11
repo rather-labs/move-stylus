@@ -38,6 +38,9 @@ pub enum EventParseError {
 
     #[error(r#"not marked as an event"#)]
     NotAnEvent,
+
+    #[error(r#"generic events are not supported"#)]
+    GenericEvent,
 }
 
 impl From<&EventParseError> for DiagnosticInfo {
@@ -56,7 +59,9 @@ impl TryFrom<&StructDefinition> for Event {
     type Error = SpecialAttributeError;
 
     fn try_from(value: &StructDefinition) -> Result<Self, Self::Error> {
-        // Find the attribute we neekd
+        let is_generic = !value.type_parameters.is_empty();
+
+        // Find the attribute we need
         for attribute in &value.attributes {
             for att in &attribute.value {
                 let parameterized = match &att.value {
@@ -76,6 +81,13 @@ impl TryFrom<&StructDefinition> for Event {
                     },
                     _ => continue,
                 };
+
+                if is_generic {
+                    return Err(SpecialAttributeError {
+                        kind: SpecialAttributeErrorKind::Event(EventParseError::GenericEvent),
+                        line_of_code: value.loc,
+                    });
+                }
 
                 for attribute in parameterized.iter().skip(1) {
                     match &attribute.value {

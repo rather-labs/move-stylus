@@ -119,3 +119,23 @@ pub fn process_events(contract_abi: &mut String, abi: &Abi) {
     }
     contract_abi.push('\n');
 }
+
+pub fn process_abi_errors(contract_abi: &mut String, abi: &Abi) {
+    for error in &abi.abi_errors {
+        // Declaration
+        contract_abi.push_str("    error ");
+        contract_abi.push_str(&error.identifier);
+        contract_abi.push('(');
+        contract_abi.push_str(
+            &error
+                .fields
+                .iter()
+                .map(|f| format!("{}{}", &f.type_.name(), &f.identifier))
+                .collect::<Vec<String>>()
+                .join(", "),
+        );
+
+        contract_abi.push_str(");\n");
+    }
+    contract_abi.push('\n');
+}
