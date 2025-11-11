@@ -69,6 +69,7 @@ pub struct Abi {
     pub(crate) contract_name: String,
     pub(crate) functions: Vec<Function>,
     pub(crate) structs: Vec<Struct_>,
+    pub(crate) events: Vec<Event>,
 }
 
 impl Abi {
@@ -79,8 +80,8 @@ impl Abi {
     pub(crate) fn new(
         processing_module: &ModuleData,
         modules_data: &HashMap<ModuleId, ModuleData>,
-        event_structs: &[EventStruct],
-        error_structs: &[ErrorStruct],
+        event_structs: &HashSet<EventStruct>,
+        _error_structs: &HashSet<ErrorStruct>,
     ) -> Abi {
         let (functions, structs_to_process) =
             Self::process_functions(processing_module, modules_data);
@@ -89,12 +90,13 @@ impl Abi {
         let structs =
             Self::process_structs(structs_to_process, modules_data, &mut processed_structs);
 
-        let events = Self::process_events(event_structs, modules_data, &mut processed_structs);
+        let events = Self::process_events(event_structs, modules_data);
 
         Abi {
             contract_name: processing_module.special_attributes.module_name.clone(),
             functions,
             structs,
+            events,
         }
     }
 
@@ -498,9 +500,8 @@ impl Abi {
     }
 
     pub fn process_events(
-        event_structs: &[EventStruct],
+        event_structs: &HashSet<EventStruct>,
         modules_data: &HashMap<ModuleId, ModuleData>,
-        processed_structs: &mut HashSet<IntermediateType>,
     ) -> Vec<Event> {
         let mut result = Vec::new();
         for event_struct in event_structs {
@@ -526,7 +527,7 @@ impl Abi {
                 .special_attributes
                 .structs
                 .iter()
-                .find(|s| s.name.as_str() == &event_struct.identifier)
+                .find(|s| s.name.as_str() == event_struct.identifier)
                 .unwrap();
 
             result.push(Event {
@@ -544,11 +545,7 @@ impl Abi {
                     .collect(),
                 is_anonymous: event_special_attributes.is_anonymous,
             });
-
-            //module_name: event_struct.identifier.clone(),
         }
-
-        println!("{result:#?}");
 
         result
     }

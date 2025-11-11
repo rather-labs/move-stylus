@@ -12,6 +12,7 @@ pub fn process_abi(abi: &Abi) -> String {
     result.push_str(" {\n\n");
 
     process_structs(&mut result, abi);
+    process_events(&mut result, abi);
     process_functions(&mut result, abi);
 
     result.push_str("\n}");
@@ -90,4 +91,31 @@ pub fn process_structs(contract_abi: &mut String, abi: &Abi) {
 
         contract_abi.push_str("    }\n\n");
     }
+}
+
+pub fn process_events(contract_abi: &mut String, abi: &Abi) {
+    for event in &abi.events {
+        // Declaration
+        contract_abi.push_str("    event ");
+        contract_abi.push_str(&event.identifier);
+        contract_abi.push('(');
+        contract_abi.push_str(
+            &event
+                .fields
+                .iter()
+                .map(|f| {
+                    format!(
+                        "{}{}{}",
+                        &f.type_.name(),
+                        if f.indexed { " indexed " } else { " " },
+                        &f.identifier
+                    )
+                })
+                .collect::<Vec<String>>()
+                .join(", "),
+        );
+
+        contract_abi.push_str(");\n");
+    }
+    contract_abi.push('\n');
 }

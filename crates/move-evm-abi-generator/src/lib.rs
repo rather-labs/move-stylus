@@ -10,14 +10,11 @@ mod types;
 
 use std::{collections::HashSet, path::PathBuf};
 
-use move_binary_format::file_format::{Bytecode, Signature, SignatureToken};
+use move_binary_format::file_format::{Bytecode, SignatureToken};
 use move_bytecode_to_wasm::PackageModuleData;
 use move_compiler::shared::files::MappedFiles;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
-use move_package::compilation::{
-    compiled_package::{CompiledPackage, CompiledUnitWithSource},
-    package_layout::CompiledPackageLayout,
-};
+use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
 use move_parse_special_attributes::SpecialAttributeError;
 
 pub struct Abi {
@@ -85,13 +82,13 @@ pub(crate) struct FunctionCall {
     // signature: Signature,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) struct EventStruct {
     module_id: ModuleId,
     identifier: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub(crate) struct ErrorStruct {
     module_id: ModuleId,
     identifier: String,
@@ -102,15 +99,15 @@ fn collect_generic_function_calls(
     root_compiled_module: &CompiledUnitWithSource,
     root_compiled_units: &[&CompiledUnitWithSource],
     processed_modules: &mut HashSet<ModuleId>,
-) -> (Vec<EventStruct>, Vec<ErrorStruct>) {
+) -> (HashSet<EventStruct>, HashSet<ErrorStruct>) {
     let module = &root_compiled_module.unit.module;
 
     processed_modules.insert(module.self_id());
 
     // Process top level functions
     let mut top_level_functions = Vec::new();
-    let mut top_level_events = Vec::new();
-    let mut top_level_errors = Vec::new();
+    let mut top_level_events = HashSet::new();
+    let mut top_level_errors = HashSet::new();
     for function in module.function_defs() {
         if let Some(ref code) = function.code {
             for instruction in &code.code {
@@ -129,7 +126,7 @@ fn collect_generic_function_calls(
                                     SignatureToken::Datatype(datatype_handle_index) => {
                                         let struct_handle =
                                             module.datatype_handle_at(datatype_handle_index);
-                                        top_level_events.push(EventStruct {
+                                        top_level_events.insert(EventStruct {
                                             module_id: module.module_id_for_handle(
                                                 module.module_handle_at(struct_handle.module),
                                             ),
@@ -147,7 +144,7 @@ fn collect_generic_function_calls(
                                     SignatureToken::Datatype(datatype_handle_index) => {
                                         let struct_handle =
                                             module.datatype_handle_at(datatype_handle_index);
-                                        top_level_errors.push(ErrorStruct {
+                                        top_level_errors.insert(ErrorStruct {
                                             module_id: module.module_id_for_handle(
                                                 module.module_handle_at(struct_handle.module),
                                             ),
@@ -165,13 +162,18 @@ fn collect_generic_function_calls(
                             module_id,
                             identifier,
                         });
-
-                        /*
-                        println!("Instantaition: {instantiation:?}");
-                        println!("Function: {function_handle:?}");
-                        println!("Module: {module:?}");
-                        */
                     }
+                    Bytecode::Call(idx) => {
+                        let function_handle = module.function_handle_at(*idx);
+                        let module_id = module
+                            .module_id_for_handle(module.module_handle_at(function_handle.module));
+                        let identifier = module.identifier_at(function_handle.name).to_string();
+                        top_level_functions.push(FunctionCall {
+                            module_id,
+                            identifier,
+                        });
+                    }
+
                     _ => continue,
                 }
             }
@@ -180,8 +182,8 @@ fn collect_generic_function_calls(
 
     processed_modules.insert(module.self_id());
 
-    let mut result_events = Vec::new();
-    let mut result_errors = Vec::new();
+    let mut result_events = HashSet::new();
+    let mut result_errors = HashSet::new();
     // Recursively process calls
     for function_call in &top_level_functions {
         if function_call.module_id != module.self_id()
@@ -213,8 +215,6 @@ fn collect_generic_function_calls(
 
     result_events.extend(top_level_events);
     result_errors.extend(top_level_errors);
-
-    // println!("\n\n{result:#?}\n\n");
 
     (result_events, result_errors)
 }
