@@ -35,13 +35,7 @@ pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
         let formatted_parameters = function
             .parameters
             .iter()
-            .map(|param| {
-                format!(
-                    "{} {}",
-                    format_type_name_for_abi(&param.type_, abi),
-                    param.identifier
-                )
-            })
+            .map(|param| format!("{} {}", param.type_.name(), param.identifier))
             .collect::<Vec<String>>();
 
         contract_abi.push_str(&formatted_parameters.join(", "));
@@ -69,10 +63,10 @@ pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
             contract_abi.push(' ');
 
             if let Type::Tuple(_) = function.return_types {
-                contract_abi.push_str(&format_type_name_for_abi(&function.return_types, abi));
+                contract_abi.push_str(&function.return_types.name());
             } else {
                 contract_abi.push('(');
-                contract_abi.push_str(&format_type_name_for_abi(&function.return_types, abi));
+                contract_abi.push_str(&function.return_types.name());
                 contract_abi.push(')');
             }
         }
@@ -84,20 +78,13 @@ pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
 
 pub fn process_structs(contract_abi: &mut String, abi: &Abi) {
     for struct_ in &abi.structs {
-        // Add underscore suffix if it's also an event or error
-        let identifier = if is_struct_identifier_conflict(&struct_.identifier, abi) {
-            format!("{}_", struct_.identifier)
-        } else {
-            struct_.identifier.clone()
-        };
-
         // Declaration
         contract_abi.push_str("    struct ");
-        contract_abi.push_str(&identifier);
+        contract_abi.push_str(&struct_.identifier);
         contract_abi.push_str(" {\n");
         for field in &struct_.fields {
             contract_abi.push_str("        ");
-            contract_abi.push_str(&format_type_name_for_abi(&field.type_, abi));
+            contract_abi.push_str(&field.type_.name());
             contract_abi.push(' ');
             contract_abi.push_str(&field.identifier);
             contract_abi.push_str(";\n");
@@ -152,40 +139,4 @@ pub fn process_abi_errors(contract_abi: &mut String, abi: &Abi) {
         contract_abi.push_str(");\n");
     }
     contract_abi.push('\n');
-}
-
-/// Helper function to check if a struct identifier matches any event or error identifier
-fn is_struct_identifier_conflict(identifier: &str, abi: &Abi) -> bool {
-    abi.events.iter().any(|e| e.identifier == identifier)
-        || abi.abi_errors.iter().any(|e| e.identifier == identifier)
-}
-
-/// Helper function to format type name for display, adding underscore suffix to struct identifiers
-/// that match events or errors to avoid naming conflicts
-fn format_type_name_for_abi(ty: &Type, abi: &Abi) -> String {
-    match ty {
-        Type::Struct { identifier, .. } => {
-            // Add underscore after the struct type name if identifier conflicts with event/error
-            let ty_name = ty.name();
-            if is_struct_identifier_conflict(identifier, abi) {
-                format!("{}_", ty_name)
-            } else {
-                ty_name
-            }
-        }
-        Type::Array(inner) => {
-            format!("{}[]", format_type_name_for_abi(inner, abi))
-        }
-        Type::Tuple(items) => {
-            format!(
-                "({})",
-                items
-                    .iter()
-                    .map(|i| format_type_name_for_abi(i, abi))
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            )
-        }
-        _ => ty.name(),
-    }
 }
