@@ -13,6 +13,7 @@ pub fn process_abi(abi: &Abi) -> String {
 
     process_structs(&mut result, abi);
     process_events(&mut result, abi);
+    process_abi_errors(&mut result, abi);
     process_functions(&mut result, abi);
 
     result.push_str("\n}");
@@ -130,7 +131,7 @@ pub fn process_abi_errors(contract_abi: &mut String, abi: &Abi) {
             &error
                 .fields
                 .iter()
-                .map(|f| format!("{}{}", &f.type_.name(), &f.identifier))
+                .map(|f| format!("{}{}{}", &f.type_.name(), " ", &f.identifier))
                 .collect::<Vec<String>>()
                 .join(", "),
         );

@@ -48,8 +48,8 @@ public struct CustomError3 has copy, drop {
     c: vector<vector<u64>>,
 }
 
-entry fun revert_custom_error3(error: CustomError3) {
-    revert(error);
+entry fun revert_custom_error3(a: vector<u32>, b: vector<u128>, c: vector<vector<u64>>) {
+    revert(CustomError3 { a, b, c });
 }
 
 #[ext(abi_error)]
