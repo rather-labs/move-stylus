@@ -11,9 +11,9 @@ pub fn process_abi(abi: &Abi) -> String {
     result.push_str(&snake_to_upper_camel(&abi.contract_name));
     result.push_str(" {\n\n");
 
-    process_structs(&mut result, abi);
     process_events(&mut result, abi);
     process_abi_errors(&mut result, abi);
+    process_structs(&mut result, abi);
     process_functions(&mut result, abi);
 
     result.push_str("\n}");
@@ -35,7 +35,13 @@ pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
         let formatted_parameters = function
             .parameters
             .iter()
-            .map(|param| format!("{} {}", &param.type_.name(), param.identifier))
+            .map(|param| {
+                format!(
+                    "{} {}",
+                    format_type_name_for_display(&param.type_, abi),
+                    param.identifier
+                )
+            })
             .collect::<Vec<String>>();
 
         contract_abi.push_str(&formatted_parameters.join(", "));
@@ -63,10 +69,10 @@ pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
             contract_abi.push(' ');
 
             if let Type::Tuple(_) = function.return_types {
-                contract_abi.push_str(&function.return_types.name());
+                contract_abi.push_str(&format_type_name_for_display(&function.return_types, abi));
             } else {
                 contract_abi.push('(');
-                contract_abi.push_str(&function.return_types.name());
+                contract_abi.push_str(&format_type_name_for_display(&function.return_types, abi));
                 contract_abi.push(')');
             }
         }
@@ -78,9 +84,26 @@ pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
 
 pub fn process_structs(contract_abi: &mut String, abi: &Abi) {
     for struct_ in &abi.structs {
+        // Check if this struct is also an event or error
+        let is_event = abi
+            .events
+            .iter()
+            .any(|e| e.identifier == struct_.identifier);
+        let is_error = abi
+            .abi_errors
+            .iter()
+            .any(|e| e.identifier == struct_.identifier);
+
+        // Add underscore suffix if it's also an event or error
+        let identifier = if is_event || is_error {
+            format!("{}_", struct_.identifier)
+        } else {
+            struct_.identifier.clone()
+        };
+
         // Declaration
         contract_abi.push_str("    struct ");
-        contract_abi.push_str(&struct_.identifier);
+        contract_abi.push_str(&identifier);
         contract_abi.push_str(" {\n");
         for field in &struct_.fields {
             contract_abi.push_str("        ");
@@ -139,4 +162,45 @@ pub fn process_abi_errors(contract_abi: &mut String, abi: &Abi) {
         contract_abi.push_str(");\n");
     }
     contract_abi.push('\n');
+}
+
+/// Helper function to format type name for display, adding underscore suffix to struct identifiers
+/// that match events or errors to avoid naming conflicts
+fn format_type_name_for_display(ty: &Type, abi: &Abi) -> String {
+    match ty {
+        Type::Struct {
+            identifier,
+            type_instances,
+        } => {
+            // Check if this struct identifier matches any event or error
+            let is_event = abi.events.iter().any(|e| e.identifier == *identifier);
+            let is_error = abi.abi_errors.iter().any(|e| e.identifier == *identifier);
+
+            // Create a modified Type with underscore in identifier if it matches
+            if is_event || is_error {
+                let modified_identifier = format!("{}_", identifier);
+                let modified_type = Type::Struct {
+                    identifier: modified_identifier,
+                    type_instances: type_instances.clone(),
+                };
+                modified_type.name()
+            } else {
+                ty.name()
+            }
+        }
+        Type::Array(inner) => {
+            format!("{}[]", format_type_name_for_display(inner, abi))
+        }
+        Type::Tuple(items) => {
+            format!(
+                "({})",
+                items
+                    .iter()
+                    .map(|i| format_type_name_for_display(i, abi))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            )
+        }
+        _ => ty.name(),
+    }
 }

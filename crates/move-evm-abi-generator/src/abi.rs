@@ -104,8 +104,8 @@ impl Abi {
         }
     }
 
-    /// This contains all the structs that appear as argument o return of functions. Once we
-    /// process the functions this will be the structs appearing in the ABi
+    /// This contains all the structs that appear as argument or return of functions. Once we
+    /// process the functions this will be the structs appearing in the ABI
     fn process_functions(
         processing_module: &ModuleData,
         modules_data: &HashMap<ModuleId, ModuleData>,
@@ -113,7 +113,7 @@ impl Abi {
         let mut result = Vec::new();
         let mut struct_to_process = HashSet::new();
 
-        // First we filter the functions we are ging to process
+        // First we filter the functions we are going to process
         let functions = processing_module
             .functions
             .information
