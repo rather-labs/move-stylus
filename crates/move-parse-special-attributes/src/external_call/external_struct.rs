@@ -63,7 +63,7 @@ impl TryFrom<&StructDefinition> for ExternalStruct {
         // Find the attribute we need
         for attribute in &value.attributes {
             for att in &attribute.value {
-                let parametrized = match &att.value {
+                let parameterized = match &att.value {
                     Attribute_::Parameterized(n, spanned) if n.value.as_str() == "ext" => {
                         &spanned.value
                     }
@@ -72,7 +72,7 @@ impl TryFrom<&StructDefinition> for ExternalStruct {
 
                 // To be an event, the first named parameter must be "event". If we dont find it,
                 // continue
-                let mut external_struct = match parametrized.first() {
+                let mut external_struct = match parameterized.first() {
                     Some(p) if p.value.attribute_name().value.as_str() == "external_struct" => {
                         ExternalStruct {
                             name: value.name.to_string(),
@@ -83,7 +83,7 @@ impl TryFrom<&StructDefinition> for ExternalStruct {
                     _ => continue,
                 };
 
-                for attribute in parametrized.iter().skip(1) {
+                for attribute in parameterized.iter().skip(1) {
                     match &attribute.value {
                         // Parse address
                         Attribute_::Assigned(n, spanned1) if n.value.as_str() == "address" => {

@@ -35,7 +35,7 @@ impl TryFrom<&StructDefinition> for AbiError {
         // Find the attribute we neekd
         for attribute in &value.attributes {
             for att in &attribute.value {
-                let parametrized = match &att.value {
+                let parameterized = match &att.value {
                     Attribute_::Parameterized(n, spanned) if n.value.as_str() == "ext" => {
                         &spanned.value
                     }
@@ -44,7 +44,7 @@ impl TryFrom<&StructDefinition> for AbiError {
 
                 // To be an abi error, the first named parameter must be "abi_error". If we dont find it,
                 // continue
-                let abi_error = match parametrized.first() {
+                let abi_error = match parameterized.first() {
                     Some(p) if p.value.attribute_name().value.as_str() == "abi_error" => AbiError {
                         name: value.name.to_string(),
                     },
@@ -52,7 +52,7 @@ impl TryFrom<&StructDefinition> for AbiError {
                 };
 
                 // If we have more than one attribute, return an error
-                if parametrized.len() > 1 {
+                if parameterized.len() > 1 {
                     return Err(SpecialAttributeError {
                         kind: SpecialAttributeErrorKind::TooManyAttributes,
                         line_of_code: value.loc,

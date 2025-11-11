@@ -59,7 +59,7 @@ impl TryFrom<&StructDefinition> for Event {
         // Find the attribute we neekd
         for attribute in &value.attributes {
             for att in &attribute.value {
-                let parametrized = match &att.value {
+                let parameterized = match &att.value {
                     Attribute_::Parameterized(n, spanned) if n.value.as_str() == "ext" => {
                         &spanned.value
                     }
@@ -68,7 +68,7 @@ impl TryFrom<&StructDefinition> for Event {
 
                 // To be an event, the first named parameter must be "event". If we dont find it,
                 // continue
-                let mut event = match parametrized.first() {
+                let mut event = match parameterized.first() {
                     Some(p) if p.value.attribute_name().value.as_str() == "event" => Event {
                         name: value.name.to_string(),
                         is_anonymous: false,
@@ -77,7 +77,7 @@ impl TryFrom<&StructDefinition> for Event {
                     _ => continue,
                 };
 
-                for attribute in parametrized.iter().skip(1) {
+                for attribute in parameterized.iter().skip(1) {
                     match &attribute.value {
                         Attribute_::Name(n) if n.value.as_str() == "anonymous" => {
                             event.is_anonymous = true
