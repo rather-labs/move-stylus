@@ -76,7 +76,7 @@ use crate::{
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
 
-use super::Unpackable;
+use super::{Unpackable, error::AbiUnpackError};
 
 impl IStruct {
     pub fn add_unpack_instructions(
@@ -86,7 +86,7 @@ impl IStruct {
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiUnpackError> {
         let struct_ptr = module.locals.add(ValType::I32);
         let val_32 = module.locals.add(ValType::I32);
         let val_64 = module.locals.add(ValType::I64);
@@ -167,7 +167,7 @@ impl IStruct {
                 data_reader_pointer,
                 calldata_ptr,
                 compilation_ctx,
-            );
+            )?;
 
             // If the field is stack type, we need to create the intermediate pointer, otherwise
             // the add_unpack_instructions function leaves the pointer in the stack
@@ -235,5 +235,7 @@ impl IStruct {
             .local_set(reader_pointer);
 
         builder.local_get(struct_ptr);
+
+        Ok(())
     }
 }

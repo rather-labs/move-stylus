@@ -1,3 +1,4 @@
+use error::AbiUnpackError;
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType};
 
 use crate::{
@@ -25,6 +26,7 @@ use crate::{
     },
 };
 
+mod error;
 mod unpack_enum;
 mod unpack_heap_int;
 mod unpack_native_int;
@@ -50,7 +52,7 @@ pub trait Unpackable {
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    );
+    ) -> Result<(), AbiUnpackError>;
 }
 
 /// Builds the instructions to unpack the abi encoded values to WASM function parameters
@@ -63,7 +65,7 @@ pub fn build_unpack_instructions<T: Unpackable>(
     function_arguments_signature: &[T],
     args_pointer: LocalId,
     compilation_ctx: &CompilationContext,
-) {
+) -> Result<(), AbiUnpackError> {
     let reader_pointer = module.locals.add(ValType::I32);
     let calldata_reader_pointer = module.locals.add(ValType::I32);
 
@@ -80,8 +82,10 @@ pub fn build_unpack_instructions<T: Unpackable>(
             reader_pointer,
             calldata_reader_pointer,
             compilation_ctx,
-        );
+        )?;
     }
+
+    Ok(())
 }
 
 impl Unpackable for IntermediateType {
@@ -92,7 +96,7 @@ impl Unpackable for IntermediateType {
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiUnpackError> {
         match self {
             IntermediateType::IBool => IBool::add_unpack_instructions(
                 function_builder,
@@ -157,7 +161,7 @@ impl Unpackable for IntermediateType {
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
-            ),
+            )?,
             // The signer must not be unpacked here, since it can't be part of the calldata. It is
             // injected directly by the VM into the stack
             IntermediateType::ISigner => (),
@@ -168,7 +172,7 @@ impl Unpackable for IntermediateType {
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
-            ),
+            )?,
             IntermediateType::IMutRef(inner) => IMutRef::add_unpack_instructions(
                 inner,
                 function_builder,
@@ -176,7 +180,7 @@ impl Unpackable for IntermediateType {
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
-            ),
+            )?,
 
             IntermediateType::IStruct {
                 module_id, index, ..
@@ -207,7 +211,7 @@ impl Unpackable for IntermediateType {
                         calldata_reader_pointer,
                         compilation_ctx,
                         &struct_,
-                    );
+                    )?;
 
                     add_unpack_from_storage_instructions(
                         function_builder,
@@ -226,17 +230,15 @@ impl Unpackable for IntermediateType {
                         reader_pointer,
                         calldata_reader_pointer,
                         compilation_ctx,
-                    );
+                    )?;
                 }
             }
-            IntermediateType::IEnum { index, .. }
-            | IntermediateType::IGenericEnumInstance { index, .. } => {
+            IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self).unwrap();
                 if !enum_.is_simple {
-                    panic!(
-                        "cannot abi unpack enum with index {index}, it contains at least one variant with fields"
-                    );
+                    return Err(AbiUnpackError::EnumIsNotSimple(enum_.identifier.to_owned()));
                 }
+
                 IEnum::add_unpack_instructions(
                     &enum_,
                     function_builder,
@@ -246,9 +248,10 @@ impl Unpackable for IntermediateType {
                 )
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("cannot unpack generic type parameter");
+                return Err(AbiUnpackError::UnpackingGenericTypeParameter);
             }
         }
+        Ok(())
     }
 }
 
@@ -265,7 +268,7 @@ fn load_struct_storage_id(
     calldata_reader_pointer: LocalId,
     compilation_ctx: &CompilationContext,
     struct_: &IStruct,
-) {
+) -> Result<(), AbiUnpackError> {
     match struct_.fields.first() {
         Some(IntermediateType::IStruct {
             module_id, index, ..
@@ -297,15 +300,17 @@ fn load_struct_storage_id(
                     module_name: SF_MODULE_NAME_OBJECT.to_owned(),
                 },
                 types,
-            );
+            )?;
 
             function_builder.call(compute_named_id_fn);
         }
-        _ => panic!(
-            "expected stylus::object::UID or stylus::object::NamedId as first field in {} struct (it has key ability)",
-            struct_.identifier
-        ),
+        _ => {
+            return Err(AbiUnpackError::StorageObjectHasNoId(
+                struct_.identifier.clone(),
+            ));
+        }
     }
+    Ok(())
 }
 
 /// This function searches in the storage for the structure that belongs to the object UID passed
@@ -402,7 +407,8 @@ mod tests {
             ],
             args_pointer,
             &compilation_ctx,
-        );
+        )
+        .unwrap();
 
         // validation
         func_body.call(validator_func);
@@ -459,7 +465,8 @@ mod tests {
             ],
             args_pointer,
             &compilation_ctx,
-        );
+        )
+        .unwrap();
 
         // validation
         func_body.call(validator_func);
@@ -523,7 +530,8 @@ mod tests {
             ],
             args_pointer,
             &compilation_ctx,
-        );
+        )
+        .unwrap();
 
         // validation
         func_body.call(validator_func);

@@ -1,3 +1,4 @@
+use super::error::AbiUnpackError;
 use super::{Unpackable, load_struct_storage_id};
 use crate::CompilationContext;
 use crate::abi_types::unpacking::add_unpack_from_storage_instructions;
@@ -16,7 +17,7 @@ impl IRef {
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiUnpackError> {
         match inner {
             // If inner is a heap type, forward the pointer
             IntermediateType::IU128
@@ -32,7 +33,7 @@ impl IRef {
                     reader_pointer,
                     calldata_reader_pointer,
                     compilation_ctx,
-                );
+                )?;
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx
@@ -50,7 +51,7 @@ impl IRef {
                         calldata_reader_pointer,
                         compilation_ctx,
                         &struct_,
-                    );
+                    )?;
 
                     add_unpack_from_storage_instructions(
                         builder,
@@ -66,7 +67,7 @@ impl IRef {
                         reader_pointer,
                         calldata_reader_pointer,
                         compilation_ctx,
-                    );
+                    )?;
                 }
             }
             // For immediates, allocate and store
@@ -87,14 +88,14 @@ impl IRef {
                     reader_pointer,
                     calldata_reader_pointer,
                     compilation_ctx,
-                );
+                )?;
 
                 builder.store(
                     compilation_ctx.memory_id,
                     match inner.stack_data_size() {
                         4 => StoreKind::I32 { atomic: false },
                         8 => StoreKind::I64 { atomic: false },
-                        _ => panic!("Unsupported stack_data_size for IRef"),
+                        s => return Err(AbiUnpackError::RefInvalidStackDataSize(s)),
                     },
                     MemArg {
                         align: 0,
@@ -106,12 +107,13 @@ impl IRef {
             }
 
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                panic!("Inner type cannot be a reference!");
+                return Err(AbiUnpackError::RefInsideRef);
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("cannot unpack generic type parameter");
+                return Err(AbiUnpackError::UnpackingGenericTypeParameter);
             }
         }
+        Ok(())
     }
 }
 
@@ -123,7 +125,7 @@ impl IMutRef {
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiUnpackError> {
         match inner {
             // If inner is a heap type, forward the pointer
             IntermediateType::IU128
@@ -141,7 +143,7 @@ impl IMutRef {
                     reader_pointer,
                     calldata_reader_pointer,
                     compilation_ctx,
-                );
+                )?;
             }
             // For immediates, allocate and store
             IntermediateType::IU8
@@ -161,14 +163,14 @@ impl IMutRef {
                     reader_pointer,
                     calldata_reader_pointer,
                     compilation_ctx,
-                );
+                )?;
 
                 builder.store(
                     compilation_ctx.memory_id,
                     match inner.stack_data_size() {
                         4 => StoreKind::I32 { atomic: false },
                         8 => StoreKind::I64 { atomic: false },
-                        _ => panic!("Unsupported stack_data_size for IRef"),
+                        s => return Err(AbiUnpackError::RefInvalidStackDataSize(s)),
                     },
                     MemArg {
                         align: 0,
@@ -180,12 +182,14 @@ impl IMutRef {
             }
 
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                panic!("Inner type cannot be a reference!");
+                return Err(AbiUnpackError::RefInsideRef);
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("cannot unpack generic type parameter");
+                return Err(AbiUnpackError::UnpackingGenericTypeParameter);
             }
         }
+
+        Ok(())
     }
 }
 
@@ -216,13 +220,15 @@ mod tests {
         func_body.local_tee(args_pointer);
         func_body.local_set(calldata_reader_pointer);
 
-        ref_type.add_unpack_instructions(
-            &mut func_body,
-            &mut raw_module,
-            args_pointer,
-            calldata_reader_pointer,
-            &compilation_ctx,
-        );
+        ref_type
+            .add_unpack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                args_pointer,
+                calldata_reader_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
