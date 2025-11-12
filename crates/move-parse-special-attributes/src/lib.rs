@@ -15,6 +15,7 @@ use error::SpecialAttributeErrorKind;
 pub use event::Event;
 use event::EventParseError;
 pub use external_call::error::{ExternalCallFunctionError, ExternalCallStructError};
+pub use function_validation::FunctionValidationError;
 // TODO: Create error struct with LOC and error info
 
 use external_call::{
