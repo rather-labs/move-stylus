@@ -39,7 +39,7 @@ pub enum EventParseError {
     #[error(r#"not marked as an event"#)]
     NotAnEvent,
 
-    #[error(r#"generic events are not supported"#)]
+    #[error(r#"events with generic type parameters are not supported"#)]
     GenericEvent,
 
     #[error(r#"events with key are not supported"#)]

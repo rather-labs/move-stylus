@@ -15,7 +15,7 @@ pub enum AbiErrorParseError {
     #[error(r#"not marked as an abierror"#)]
     NotAnAbiError,
 
-    #[error(r#"generic abi errors are not supported"#)]
+    #[error(r#"errors with generic type parameters are not supported"#)]
     GenericAbiError,
 
     #[error(r#"abi errors with key are not supported"#)]
