@@ -168,11 +168,16 @@ pub fn add_emit_log_fn(
                 let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
                 let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
 
-                let is_dynamic = struct_.solidity_abi_encode_is_dynamic(compilation_ctx);
+                let is_dynamic = struct_
+                    .solidity_abi_encode_is_dynamic(compilation_ctx)
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
                 let size = if is_dynamic {
                     32
                 } else {
-                    struct_.solidity_abi_encode_size(compilation_ctx) as i32
+                    struct_
+                        .solidity_abi_encode_size(compilation_ctx)
+                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+                        as i32
                 };
 
                 // Use the allocator to get a pointer to the end of the calldata

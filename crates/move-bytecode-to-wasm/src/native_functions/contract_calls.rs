@@ -222,10 +222,15 @@ pub fn add_external_contract_call_fn(
             // definition, a tuple T is dynamic (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k.
             // The encode size for a dynamically encoded field inside a dynamically encoded tuple is
             // just 32 bytes (the value is the offset to where the values are packed)
-            args_size += if signature_token.is_dynamic(compilation_ctx) {
+            args_size += if signature_token
+                .is_dynamic(compilation_ctx)
+                .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+            {
                 32
             } else {
-                signature_token.encoded_size(compilation_ctx)
+                signature_token
+                    .encoded_size(compilation_ctx)
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
             };
         }
 
@@ -241,7 +246,10 @@ pub fn add_external_contract_call_fn(
                 _ => argument,
             };
 
-            if argument.is_dynamic(compilation_ctx) {
+            if argument
+                .is_dynamic(compilation_ctx)
+                .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+            {
                 argument
                     .add_pack_instructions_dynamic(
                         &mut builder,
@@ -272,7 +280,12 @@ pub fn add_external_contract_call_fn(
 
                 builder
                     .local_get(writer_pointer)
-                    .i32_const(argument.encoded_size(compilation_ctx) as i32)
+                    .i32_const(
+                        argument
+                            .encoded_size(compilation_ctx)
+                            .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+                            as i32,
+                    )
                     .binop(BinaryOp::I32Add)
                     .local_set(writer_pointer);
             }

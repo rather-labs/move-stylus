@@ -1,6 +1,6 @@
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
 
-use super::{Packable, pack_native_int::pack_i32_type_instructions};
+use super::{Packable, error::AbiPackError, pack_native_int::pack_i32_type_instructions};
 use crate::{
     CompilationContext,
     translation::intermediate_types::{IntermediateType, vector::IVector},
@@ -15,7 +15,7 @@ impl IVector {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiPackError> {
         let data_pointer = module.locals.add(ValType::I32);
         let inner_data_reference = module.locals.add(ValType::I32);
 
@@ -26,10 +26,10 @@ impl IVector {
             compilation_ctx.memory_id,
         );
 
-        let inner_encoded_size = if inner.is_dynamic(compilation_ctx) {
+        let inner_encoded_size = if inner.is_dynamic(compilation_ctx)? {
             32
         } else {
-            inner.encoded_size(compilation_ctx) as i32
+            inner.encoded_size(compilation_ctx)? as i32
         };
 
         // Allocate memory for the packed value, this will be allocate at the end of calldata
@@ -86,6 +86,7 @@ impl IVector {
             .local_set(inner_data_reference); // This will be the reference for next allocated calldata
 
         // Outer block: if the vector length is 0, we skip to the end
+        let mut inner_result = Ok(());
         builder.block(None, |outer_block| {
             let outer_block_id = outer_block.id();
 
@@ -109,24 +110,32 @@ impl IVector {
                     compilation_ctx.memory_id,
                 );
 
-                if inner.is_dynamic(compilation_ctx) {
-                    inner.add_pack_instructions_dynamic(
-                        loop_block,
-                        module,
-                        inner_local,
-                        data_pointer,
-                        inner_data_reference,
-                        compilation_ctx,
-                    );
-                } else {
-                    inner.add_pack_instructions(
-                        loop_block,
-                        module,
-                        inner_local,
-                        data_pointer,
-                        inner_data_reference,
-                        compilation_ctx,
-                    );
+                let is_dynamic = inner.is_dynamic(compilation_ctx);
+                match is_dynamic {
+                    Err(error) => {
+                        inner_result = Err(error.into());
+                    }
+                    Ok(is_dyn) => {
+                        if is_dyn {
+                            inner_result = inner.add_pack_instructions_dynamic(
+                                loop_block,
+                                module,
+                                inner_local,
+                                data_pointer,
+                                inner_data_reference,
+                                compilation_ctx,
+                            );
+                        } else {
+                            inner_result = inner.add_pack_instructions(
+                                loop_block,
+                                module,
+                                inner_local,
+                                data_pointer,
+                                inner_data_reference,
+                                compilation_ctx,
+                            );
+                        }
+                    }
                 }
 
                 // increment the local to point to next first value
@@ -156,6 +165,8 @@ impl IVector {
                     .br_if(loop_block_id);
             });
         });
+
+        inner_result
     }
 }
 
@@ -191,20 +202,22 @@ mod tests {
         func_body.call(alloc_function);
         func_body.local_set(local);
 
-        func_body.i32_const(int_type.encoded_size(&compilation_ctx) as i32);
+        func_body.i32_const(int_type.encoded_size(&compilation_ctx).unwrap() as i32);
         func_body.call(alloc_function);
         func_body.local_tee(writer_pointer);
         func_body.local_set(calldata_reference_pointer);
 
         // Args data should already be stored in memory
-        int_type.add_pack_instructions(
-            &mut func_body,
-            &mut raw_module,
-            local,
-            writer_pointer,
-            calldata_reference_pointer,
-            &compilation_ctx,
-        );
+        int_type
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                calldata_reference_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
 
         func_body.local_get(writer_pointer);
 

@@ -1,4 +1,4 @@
-use crate::native_functions::error::NativeFunctionError;
+use crate::{abi_types::error::AbiEncodingError, native_functions::error::NativeFunctionError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AbiUnpackError {
@@ -21,4 +21,7 @@ pub enum AbiUnpackError {
 
     #[error("an error ocurred while generating a native funciton's code")]
     NativeFunction(#[from] NativeFunctionError),
+
+    #[error("abi encoding error")]
+    AbiEncoding(#[from] AbiEncodingError),
 }

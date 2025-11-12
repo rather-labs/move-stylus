@@ -47,7 +47,7 @@ use std::collections::HashMap;
 
 use crate::{
     CompilationContext,
-    abi_types::packing::Packable,
+    abi_types::{error::AbiEncodingError, packing::Packable},
     compilation_context::ModuleData,
     generics::replace_type_parameters,
     vm_handled_types::{VmHandledType, string::String_},
@@ -424,7 +424,10 @@ impl IStruct {
     ///
     /// For more information:
     /// https://docs.soliditylang.org/en/develop/abi-spec.html#formal-specification-of-the-encoding
-    pub fn solidity_abi_encode_is_dynamic(&self, compilation_ctx: &CompilationContext) -> bool {
+    pub fn solidity_abi_encode_is_dynamic(
+        &self,
+        compilation_ctx: &CompilationContext,
+    ) -> Result<bool, AbiEncodingError> {
         for field in &self.fields {
             match field {
                 IntermediateType::IBool
@@ -437,35 +440,38 @@ impl IStruct {
                 | IntermediateType::IAddress
                 | IntermediateType::IEnum { .. }
                 | IntermediateType::IGenericEnumInstance { .. } => continue,
-                IntermediateType::IVector(_) => return true,
+                IntermediateType::IVector(_) => return Ok(true),
                 IntermediateType::IStruct {
                     module_id, index, ..
-                } if String_::is_vm_type(module_id, *index, compilation_ctx) => return true,
+                } if String_::is_vm_type(module_id, *index, compilation_ctx) => return Ok(true),
                 IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. } => {
                     let child_struct = compilation_ctx
                         .get_struct_by_intermediate_type(field)
                         .unwrap();
 
-                    if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
-                        return true;
+                    if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx)? {
+                        return Ok(true);
                     }
                 }
-                IntermediateType::ISigner => panic!("signer is not abi econdable"),
+                IntermediateType::ISigner => return Err(AbiEncodingError::FoundSignerType),
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                    panic!("found reference inside struct")
+                    return Err(AbiEncodingError::RefInsideRef);
                 }
                 IntermediateType::ITypeParameter(_) => {
-                    panic!("cannot know if a type parameter is dynamic, expected a concrete type");
+                    return Err(AbiEncodingError::GenericTypeParameterIsDynamic);
                 }
             }
         }
 
-        false
+        Ok(false)
     }
 
     /// Returns the size of the struct when encoded in Solidity ABI format.
-    pub fn solidity_abi_encode_size(&self, compilation_ctx: &CompilationContext) -> usize {
+    pub fn solidity_abi_encode_size(
+        &self,
+        compilation_ctx: &CompilationContext,
+    ) -> Result<usize, AbiEncodingError> {
         let mut size = 0;
         for field in &self.fields {
             match field {
@@ -480,7 +486,7 @@ impl IStruct {
                 | IntermediateType::IVector(_)
                 | IntermediateType::IEnum { .. }
                 | IntermediateType::IGenericEnumInstance { .. } => {
-                    size += (field as &dyn Packable).encoded_size(compilation_ctx);
+                    size += (field as &dyn Packable).encoded_size(compilation_ctx)?;
                 }
                 IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. } => {
@@ -488,23 +494,23 @@ impl IStruct {
                         .get_struct_by_intermediate_type(field)
                         .unwrap();
 
-                    if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
+                    if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx)? {
                         size += 32;
                     } else {
-                        size += field.encoded_size(compilation_ctx);
+                        size += field.encoded_size(compilation_ctx)?;
                     }
                 }
-                IntermediateType::ISigner => panic!("signer is not abi econdable"),
+                IntermediateType::ISigner => return Err(AbiEncodingError::FoundSignerType),
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                    panic!("found reference inside struct")
+                    return Err(AbiEncodingError::RefInsideRef);
                 }
                 IntermediateType::ITypeParameter(_) => {
-                    panic!("cannot know a type parameter's size, expected a concrete type");
+                    return Err(AbiEncodingError::FoundGenericTypeParameter);
                 }
             }
         }
 
-        size
+        Ok(size)
     }
 
     /// Replaces all type parameters in the struct with the provided types.
