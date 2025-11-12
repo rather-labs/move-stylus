@@ -2,7 +2,7 @@ use abi_types::{error::AbiError, public_function::PublicFunction};
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use compilation_context::{ModuleData, ModuleId};
 use constructor::inject_constructor;
-use error::{CodeError, CompilationError, CompilationErrorKind};
+use error::{CodeError, CompilationError, DependencyError, ICEError, ICEErrorKind};
 use move_binary_format::file_format::FunctionDefinition;
 use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
@@ -130,13 +130,10 @@ pub fn translate_package(
             &mut function_definitions,
         ) {
             match dependencies_errors {
-                CompilationErrorKind::ICE(ice_error) => {
-                    return Err(CompilationError {
-                        files: package.file_map,
-                        kind: CompilationErrorKind::ICE(ice_error),
-                    });
+                DependencyError::ICE(ice_error) => {
+                    return Err(CompilationError::ICE(ice_error));
                 }
-                CompilationErrorKind::CodeError(code_errors) => {
+                DependencyError::CodeError(code_errors) => {
                     errors.extend(code_errors);
                     continue;
                 }
@@ -159,11 +156,7 @@ pub fn translate_package(
             &root_compiled_units,
             &mut function_definitions,
             special_attributes,
-        )
-        .map_err(|e| CompilationError {
-            files: package.file_map.clone(),
-            kind: e.into(),
-        })?;
+        )?;
 
         let compilation_ctx =
             CompilationContext::new(&root_module_data, &modules_data, memory_id, allocator_func);
@@ -179,11 +172,7 @@ pub fn translate_package(
                 &mut module,
                 &compilation_ctx,
                 &mut dynamic_fields_global_variables,
-            )
-            .map_err(|kind| CompilationError {
-                files: package.file_map.clone(),
-                kind,
-            })?;
+            )?;
 
             if function_information.is_entry {
                 let wasm_function_id = function_table
@@ -199,10 +188,7 @@ pub fn translate_package(
                         &function_information.signature,
                         &compilation_ctx,
                     )
-                    .map_err(|kind| CompilationError {
-                        files: package.file_map.clone(),
-                        kind: AbiError::from(kind).into(),
-                    })?,
+                    .map_err(AbiError::from)?,
                 );
             }
         }
@@ -232,9 +218,9 @@ pub fn translate_package(
     if errors.is_empty() {
         Ok(modules)
     } else {
-        Err(CompilationError {
-            files: package.file_map,
-            kind: CompilationErrorKind::CodeError(errors),
+        Err(CompilationError::CodeError {
+            mapped_files: package.file_map,
+            errors,
         })
     }
 }
@@ -284,13 +270,10 @@ pub fn package_module_data(
             &mut function_definitions,
         ) {
             match dependencies_errors {
-                CompilationErrorKind::ICE(ice_error) => {
-                    return Err(CompilationError {
-                        files: package.file_map.clone(),
-                        kind: CompilationErrorKind::ICE(ice_error),
-                    });
+                DependencyError::ICE(ice_error) => {
+                    return Err(CompilationError::ICE(ice_error));
                 }
-                CompilationErrorKind::CodeError(code_errors) => {
+                DependencyError::CodeError(code_errors) => {
                     errors.extend(code_errors);
                     continue;
                 }
@@ -313,11 +296,7 @@ pub fn package_module_data(
             &root_compiled_units,
             &mut function_definitions,
             special_attributes,
-        )
-        .map_err(|e| CompilationError {
-            files: package.file_map.clone(),
-            kind: e.into(),
-        })?;
+        )?;
 
         modules_data.insert(root_module_id.clone(), root_module_data);
         modules_paths.insert(root_compiled_module.source_path.clone(), root_module_id);
@@ -329,9 +308,9 @@ pub fn package_module_data(
             modules_paths,
         })
     } else {
-        Err(CompilationError {
-            files: package.file_map.clone(),
-            kind: CompilationErrorKind::CodeError(errors),
+        Err(CompilationError::CodeError {
+            mapped_files: package.file_map.clone(),
+            errors,
         })
     }
 }
@@ -372,7 +351,7 @@ pub fn process_dependency_tree<'move_package>(
     root_compiled_units: &'move_package [&CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
     function_definitions: &mut GlobalFunctionTable<'move_package>,
-) -> Result<(), CompilationErrorKind> {
+) -> Result<(), DependencyError> {
     let mut errors = Vec::new();
     for dependency in dependencies {
         let module_id = ModuleId {
@@ -413,10 +392,10 @@ pub fn process_dependency_tree<'move_package>(
 
         if let Err(dependencies_errors) = dependencies_process_result {
             match dependencies_errors {
-                CompilationErrorKind::ICE(ice_error) => {
-                    return Err(CompilationErrorKind::ICE(ice_error));
+                DependencyError::ICE(ice_error) => {
+                    return Err(DependencyError::ICE(ice_error));
                 }
-                CompilationErrorKind::CodeError(code_errors) => {
+                DependencyError::CodeError(code_errors) => {
                     errors.extend(code_errors);
                     continue;
                 }
@@ -438,7 +417,8 @@ pub fn process_dependency_tree<'move_package>(
             root_compiled_units,
             function_definitions,
             special_attributes,
-        )?;
+        )
+        .map_err(|e| DependencyError::ICE(ICEError::new(ICEErrorKind::CompilationContext(e))))?;
 
         let processed_dependency = dependencies_data.insert(module_id, dependency_module_data);
 
@@ -451,7 +431,7 @@ pub fn process_dependency_tree<'move_package>(
     if errors.is_empty() {
         Ok(())
     } else {
-        Err(CompilationErrorKind::CodeError(errors))
+        Err(DependencyError::CodeError(errors))
     }
 }
 
@@ -465,7 +445,7 @@ fn translate_and_link_functions(
     module: &mut walrus::Module,
     compilation_ctx: &CompilationContext,
     dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
-) -> Result<(), CompilationErrorKind> {
+) -> Result<(), CompilationError> {
     // Obtain the function information and module's data
     let (function_information, module_data) = if let Some(fi) = compilation_ctx
         .root_module_data

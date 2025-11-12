@@ -11,25 +11,24 @@ use crate::{
 };
 
 #[derive(thiserror::Error, Debug)]
-pub struct CompilationError {
-    pub files: MappedFiles,
-
-    pub kind: CompilationErrorKind,
-}
-
-impl Display for CompilationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "A compilation error has ocurred: {}", self.kind)
-    }
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum CompilationErrorKind {
+pub enum DependencyError {
     #[error("An internal compiler error (ICE) has ocurred.\n{0}")]
     ICE(#[from] ICEError),
 
     #[error("internal compiler error(s) ocurred")]
     CodeError(Vec<CodeError>),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum CompilationError {
+    #[error("An internal compiler error (ICE) has ocurred.\n{0}")]
+    ICE(#[from] ICEError),
+
+    #[error("internal compiler error(s) ocurred")]
+    CodeError {
+        mapped_files: MappedFiles,
+        errors: Vec<CodeError>,
+    },
 }
 
 #[derive(thiserror::Error, Debug)]

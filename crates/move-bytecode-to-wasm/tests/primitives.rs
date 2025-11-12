@@ -183,9 +183,13 @@ mod signer_type {
     }
 
     #[rstest]
-    #[should_panic(expected = "only one \"signer\" argument at the beginning is admitted")]
+    #[should_panic(
+        expected = "called `Result::unwrap()` on an `Err` value: ICE(ICEError { kind: Abi(PublicFunction(SignatureArgumentPosition(2, \"echo\"))), backtrace: <disabled> })"
+    )]
     #[case("tests/primitives/signer_invalid_dup_signer.move")]
-    #[should_panic(expected = "complex types can't contain the type \"signer\"")]
+    #[should_panic(
+        expected = "called `Result::unwrap()` on an `Err` value: ICE(ICEError { kind: Abi(PublicFunction(ComplexTypeContainsSigner(1, \"echo\"))), backtrace: <disabled> })"
+    )]
     #[case("tests/primitives/signer_invalid_nested_signer.move")]
     fn test_signer_invalid(#[case] path: &str) {
         translate_test_package(path, MODULE_NAME);

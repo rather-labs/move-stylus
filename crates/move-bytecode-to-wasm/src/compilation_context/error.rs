@@ -3,7 +3,7 @@ use move_binary_format::file_format::{
     StructDefinitionIndex,
 };
 
-use crate::error::{CompilationErrorKind, ICEError, ICEErrorKind};
+use crate::error::{CompilationError, ICEError, ICEErrorKind};
 
 use super::ModuleId;
 
@@ -50,8 +50,8 @@ pub enum CompilationContextError {
     FunctionByIdentifierNotFound(String),
 }
 
-impl From<CompilationContextError> for CompilationErrorKind {
+impl From<CompilationContextError> for CompilationError {
     fn from(value: CompilationContextError) -> Self {
-        CompilationErrorKind::ICE(ICEError::new(ICEErrorKind::CompilationContext(value)))
+        CompilationError::ICE(ICEError::new(ICEErrorKind::CompilationContext(value)))
     }
 }

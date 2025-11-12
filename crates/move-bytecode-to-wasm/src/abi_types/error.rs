@@ -1,4 +1,4 @@
-use crate::error::{CompilationErrorKind, ICEError, ICEErrorKind};
+use crate::error::{CompilationError, ICEError, ICEErrorKind};
 
 use super::{public_function::PublicFunctionValidationError, unpacking::error::AbiUnpackError};
 
@@ -11,8 +11,8 @@ pub enum AbiError {
     PublicFunction(#[from] PublicFunctionValidationError),
 }
 
-impl From<AbiError> for CompilationErrorKind {
+impl From<AbiError> for CompilationError {
     fn from(value: AbiError) -> Self {
-        CompilationErrorKind::ICE(ICEError::new(ICEErrorKind::Abi(value)))
+        CompilationError::ICE(ICEError::new(ICEErrorKind::Abi(value)))
     }
 }
