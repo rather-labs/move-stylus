@@ -3,6 +3,7 @@ pub mod error;
 pub mod event;
 mod external_call;
 pub mod function_modifiers;
+mod function_validation;
 mod shared;
 pub mod struct_modifiers;
 pub mod types;
@@ -21,6 +22,7 @@ use external_call::{
     validate_external_call_function, validate_external_call_struct,
 };
 use function_modifiers::{Function, FunctionModifier, Visibility};
+use function_validation::validate_function;
 use move_compiler::{
     Compiler, PASS_PARSER,
     parser::ast::{Definition, ModuleMember},
@@ -223,6 +225,15 @@ pub fn process_special_attributes(
                         let visibility: Visibility = (&f.visibility).into();
                         let signature = Function::parse_signature(&f.signature);
 
+                        // Validate function:
+                        // - If it has an Event parameter, it must be a native emit function.
+                        // - If it has an Error parameter, it must be a native revert function.
+                        if let Err(error) = validate_function(f, &result.events, &result.abi_errors)
+                        {
+                            found_error = true;
+                            module_errors.push(error);
+                        }
+
                         if let Some(attributes) = f.attributes.first() {
                             let mut modifiers = attributes
                                 .value
@@ -260,16 +271,27 @@ pub fn process_special_attributes(
                                     let modifiers: Vec<FunctionModifier> =
                                         modifiers.into_iter().collect();
 
-                                    result.functions.push(Function {
-                                        name: f.name.to_owned().to_string(),
-                                        modifiers,
-                                        signature,
-                                        visibility,
-                                    });
+                                    if !found_error {
+                                        result.functions.push(Function {
+                                            name: f.name.to_owned().to_string(),
+                                            modifiers,
+                                            signature,
+                                            visibility,
+                                        });
+                                    }
                                 }
-                                _ => {}
+                                _ => {
+                                    if !found_error {
+                                        result.functions.push(Function {
+                                            name: f.name.to_owned().to_string(),
+                                            modifiers: Vec::new(),
+                                            signature,
+                                            visibility,
+                                        });
+                                    }
+                                }
                             }
-                        } else {
+                        } else if !found_error {
                             result.functions.push(Function {
                                 name: f.name.to_owned().to_string(),
                                 modifiers: Vec::new(),

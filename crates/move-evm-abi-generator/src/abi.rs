@@ -89,7 +89,7 @@ impl Abi {
         let abi_errors = Self::process_abi_errors(error_structs, modules_data);
 
         let (functions, structs_to_process) =
-            Self::process_functions(processing_module, modules_data, &events, &abi_errors);
+            Self::process_functions(processing_module, modules_data);
 
         let mut processed_structs = HashSet::new();
         let structs = Self::process_structs(
@@ -114,8 +114,6 @@ impl Abi {
     fn process_functions(
         processing_module: &ModuleData,
         modules_data: &HashMap<ModuleId, ModuleData>,
-        events: &[Event],
-        abi_errors: &[Struct_],
     ) -> (Vec<Function>, HashSet<IntermediateType>) {
         let mut result = Vec::new();
         let mut struct_to_process = HashSet::new();
@@ -188,16 +186,12 @@ impl Abi {
                                     );
                                 } else {
                                     {
-                                        let param_type =
-                                            Type::from_intermediate_type(itype, modules_data);
-                                        let resolved_type = resolve_struct_conflicts_in_type(
-                                            &param_type,
-                                            events,
-                                            abi_errors,
-                                        );
                                         function_parameters.push(FunctionParameters {
                                             identifier: param.name.clone(),
-                                            type_: resolved_type,
+                                            type_: Type::from_intermediate_type(
+                                                itype,
+                                                modules_data,
+                                            ),
                                         });
                                         struct_to_process.insert(itype.clone());
                                     }
@@ -271,12 +265,9 @@ impl Abi {
                         }
                     }
                     _ => {
-                        let param_type = Type::from_intermediate_type(itype, modules_data);
-                        let resolved_type =
-                            resolve_struct_conflicts_in_type(&param_type, events, abi_errors);
                         function_parameters.push(FunctionParameters {
                             identifier: param.name.clone(),
-                            type_: resolved_type,
+                            type_: Type::from_intermediate_type(itype, modules_data),
                         });
                     }
                 }
@@ -304,9 +295,7 @@ impl Abi {
                     _ => {}
                 }
 
-                let return_type =
-                    Type::from_intermediate_type(&function.signature.returns[0], modules_data);
-                resolve_struct_conflicts_in_type(&return_type, events, abi_errors)
+                Type::from_intermediate_type(&function.signature.returns[0], modules_data)
             } else {
                 let tuple_types: Vec<Type> = function
                     .signature
@@ -334,8 +323,7 @@ impl Abi {
                         Type::from_intermediate_type(t, modules_data)
                     })
                     .collect();
-                let tuple_type = Type::Tuple(tuple_types);
-                resolve_struct_conflicts_in_type(&tuple_type, events, abi_errors)
+                Type::Tuple(tuple_types)
             };
 
             let visibility = if parsed_function.visibility
@@ -444,40 +432,34 @@ impl Abi {
                 continue;
             }
 
-            let (struct_, parsed_struct) = match &struct_itype {
-                IntermediateType::IStruct {
-                    module_id, index, ..
-                } => {
-                    let struct_module = modules_data.get(module_id).unwrap();
-                    let struct_ = struct_module.structs.get_by_index(*index).unwrap();
-                    let parsed_struct = struct_module
-                        .special_attributes
-                        .structs
-                        .iter()
-                        .find(|s| s.name == struct_.identifier)
-                        .unwrap();
+            let (struct_, parsed_struct) = {
+                let (module_id, index, types) = match &struct_itype {
+                    IntermediateType::IStruct {
+                        module_id, index, ..
+                    } => (module_id, index, None),
+                    IntermediateType::IGenericStructInstance {
+                        module_id,
+                        index,
+                        types,
+                        ..
+                    } => (module_id, index, Some(types)),
+                    t => panic!("found {t:?} instead of struct"),
+                };
 
-                    (struct_.clone(), parsed_struct)
-                }
-                IntermediateType::IGenericStructInstance {
-                    module_id,
-                    index,
-                    types,
-                    ..
-                } => {
-                    let struct_module = modules_data.get(module_id).unwrap();
-                    let struct_ = struct_module.structs.get_by_index(*index).unwrap();
-                    let struct_ = struct_.instantiate(types);
-                    let parsed_struct = struct_module
-                        .special_attributes
-                        .structs
-                        .iter()
-                        .find(|s| s.name == struct_.identifier)
-                        .unwrap();
+                let struct_module = modules_data.get(module_id).unwrap();
+                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+                let struct_ = match types {
+                    Some(types) => struct_.instantiate(types),
+                    None => struct_.clone(),
+                };
+                let parsed_struct = struct_module
+                    .special_attributes
+                    .structs
+                    .iter()
+                    .find(|s| s.name == struct_.identifier)
+                    .unwrap();
 
-                    (struct_, parsed_struct)
-                }
-                t => panic!("found {t:?} instead of struct"),
+                (struct_, parsed_struct)
             };
 
             let mut child_structs_to_process = HashSet::new();
@@ -493,23 +475,18 @@ impl Abi {
                         }
                         _ => {}
                     }
-                    let field_type = Type::from_intermediate_type(field_itype, modules_data);
-                    let resolved_type =
-                        resolve_struct_conflicts_in_type(&field_type, events, abi_errors);
-
                     StructField {
                         identifier: name.clone(),
-                        type_: resolved_type,
+                        type_: Type::from_intermediate_type(field_itype, modules_data),
                     }
                 })
                 .collect();
 
             let struct_abi_type = Type::from_intermediate_type(&struct_itype, modules_data);
-            let identifier = struct_abi_type.name();
 
             result.push(Struct_ {
                 // Resolve struct identifier conflicts with events or errors
-                identifier: resolve_struct_identifier_conflict(&identifier, events, abi_errors),
+                identifier: struct_abi_type.name(),
                 fields,
             });
 
@@ -621,62 +598,5 @@ impl Abi {
         }
 
         result
-    }
-}
-
-/// Helper function to resolve struct identifier conflicts with events or errors
-/// Returns the identifier with appropriate suffix (_event or _error) if there's a conflict
-fn resolve_struct_identifier_conflict(
-    identifier: &str,
-    events: &[Event],
-    abi_errors: &[Struct_],
-) -> String {
-    let is_event = events.iter().any(|e| e.identifier == identifier);
-    let is_error = abi_errors.iter().any(|e| e.identifier == identifier);
-
-    if is_event {
-        format!("{}_event", identifier)
-    } else if is_error {
-        format!("{}_error", identifier)
-    } else {
-        identifier.to_string()
-    }
-}
-
-/// Helper function to recursively resolve struct identifier conflicts in types
-/// (handles structs, arrays, and tuples)
-fn resolve_struct_conflicts_in_type(ty: &Type, events: &[Event], abi_errors: &[Struct_]) -> Type {
-    match ty {
-        Type::Struct {
-            identifier,
-            type_instances,
-        } => {
-            let resolved_identifier =
-                resolve_struct_identifier_conflict(identifier, events, abi_errors);
-            if resolved_identifier != *identifier {
-                if type_instances.is_some() {
-                    // This should never happen because events and errors are not generic
-                    panic!("Found a generic struct with conflicting identifier: {identifier}");
-                }
-                Type::Struct {
-                    identifier: resolved_identifier,
-                    type_instances: None,
-                }
-            } else {
-                ty.clone()
-            }
-        }
-        Type::Array(inner) => {
-            let resolved_inner = resolve_struct_conflicts_in_type(inner, events, abi_errors);
-            Type::Array(std::rc::Rc::new(resolved_inner))
-        }
-        Type::Tuple(items) => {
-            let resolved_items: Vec<Type> = items
-                .iter()
-                .map(|item| resolve_struct_conflicts_in_type(item, events, abi_errors))
-                .collect();
-            Type::Tuple(resolved_items)
-        }
-        _ => ty.clone(),
     }
 }
