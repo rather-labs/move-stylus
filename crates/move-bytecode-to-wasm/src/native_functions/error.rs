@@ -1,4 +1,10 @@
-use crate::compilation_context::{CompilationContextError, ModuleId};
+use std::rc::Rc;
+
+use crate::{
+    abi_types::error::AbiError,
+    compilation_context::{CompilationContextError, ModuleId},
+    translation::table::FunctionId,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum NativeFunctionError {
@@ -14,7 +20,15 @@ pub enum NativeFunctionError {
     #[error("compilation context error ocurred while processing a native function")]
     CompilationContext(#[from] CompilationContextError),
 
-    // TODO: This should be a code error
+    #[error("abi error ocurred while processing a native function")]
+    Abi(Rc<AbiError>),
+
     #[error(r#"missing special attributes for external call "{0}::{1}""#)]
     NotExternalCall(ModuleId, String),
+
+    #[error(r#"contract call function "{0}::{1}" has no arguments"#)]
+    ContractCallFunctionNoArgs(ModuleId, String),
+
+    #[error(r#"external contract call function "{0}" must return a ContractCallResult<T> or ContractCallEmptyResult with a single type parameter"#)]
+    ContractCallFunctionInvalidReturn(FunctionId),
 }
