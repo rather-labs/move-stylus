@@ -26,6 +26,8 @@ use crate::{
     },
 };
 
+use super::error::NativeFunctionError;
+
 /// Adds a function to perform an external contract call.
 ///
 /// The functions are built using the signature contained in `function_information` and the
@@ -43,7 +45,7 @@ pub fn add_external_contract_call_fn(
     function_modifiers: &[FunctionModifier],
     arguments_types: &[IntermediateType],
     named_ids: &[IntermediateType],
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     let name = format!(
         "{}_{}_{}",
         module_id.hash(),
@@ -52,7 +54,7 @@ pub fn add_external_contract_call_fn(
     );
 
     if let Some(function_id) = module.funcs.by_name(&name) {
-        return function_id;
+        return Ok(function_id);
     }
 
     let (read_return_data, _) = read_return_data(module);
@@ -752,5 +754,5 @@ pub fn add_external_contract_call_fn(
     // After the call we read the data
     builder.local_get(call_result);
 
-    function.finish(function_args, &mut module.funcs)
+    Ok(function.finish(function_args, &mut module.funcs))
 }

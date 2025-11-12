@@ -4,6 +4,7 @@ use move_compiler::{diagnostics::Diagnostic, shared::files::MappedFiles};
 use move_parse_special_attributes::SpecialAttributeError;
 
 use crate::{
+    abi_types::error::AbiError,
     compilation_context::CompilationContextError,
     native_functions::error::NativeFunctionError,
     translation::{TranslationError, table::FunctionTableError},
@@ -77,6 +78,9 @@ pub enum ICEErrorKind {
 
     #[error("an error ocurred while generating a native funciton's code")]
     NativeFunction(#[from] NativeFunctionError),
+
+    #[error("an error ocurred while processing a contract's ABI")]
+    Abi(#[from] AbiError),
 }
 
 impl From<CodeError> for Diagnostic {

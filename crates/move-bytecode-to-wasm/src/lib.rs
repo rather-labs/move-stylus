@@ -1,4 +1,4 @@
-use abi_types::public_function::PublicFunction;
+use abi_types::{error::AbiError, public_function::PublicFunction};
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use compilation_context::{ModuleData, ModuleId};
 use constructor::inject_constructor;
@@ -192,12 +192,18 @@ pub fn translate_package(
                     .wasm_function_id
                     .unwrap();
 
-                public_functions.push(PublicFunction::new(
-                    wasm_function_id,
-                    &function_information.function_id.identifier,
-                    &function_information.signature,
-                    &compilation_ctx,
-                ));
+                public_functions.push(
+                    PublicFunction::new(
+                        wasm_function_id,
+                        &function_information.function_id.identifier,
+                        &function_information.signature,
+                        &compilation_ctx,
+                    )
+                    .map_err(|kind| CompilationError {
+                        files: package.file_map.clone(),
+                        kind: AbiError::from(kind).into(),
+                    })?,
+                );
             }
         }
 

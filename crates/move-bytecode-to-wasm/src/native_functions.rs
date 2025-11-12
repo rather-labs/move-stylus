@@ -220,7 +220,7 @@ impl NativeFunction {
             if let Some(special_attributes) =
                 module_data.special_attributes.external_calls.get(name)
             {
-                Ok(contract_calls::add_external_contract_call_fn(
+                contract_calls::add_external_contract_call_fn(
                     module,
                     compilation_ctx,
                     module_id,
@@ -228,7 +228,7 @@ impl NativeFunction {
                     &special_attributes.modifiers,
                     arguments_types,
                     named_ids,
-                ))
+                )
             } else {
                 Err(NativeFunctionError::NotExternalCall(
                     module_id.clone(),

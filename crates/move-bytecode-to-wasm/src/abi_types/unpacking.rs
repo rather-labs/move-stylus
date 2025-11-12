@@ -26,7 +26,7 @@ use crate::{
     },
 };
 
-mod error;
+pub(crate) mod error;
 mod unpack_enum;
 mod unpack_heap_int;
 mod unpack_native_int;
