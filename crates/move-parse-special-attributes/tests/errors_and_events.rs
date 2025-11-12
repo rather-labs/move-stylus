@@ -1,8 +1,8 @@
 use std::{fs, path::PathBuf};
 
 use move_parse_special_attributes::{
-    abi_error::AbiErrorParseError, event::EventParseError, error::SpecialAttributeErrorKind,
-    FunctionValidationError, process_special_attributes,
+    FunctionValidationError, abi_error::AbiErrorParseError, error::SpecialAttributeErrorKind,
+    event::EventParseError, process_special_attributes,
 };
 
 #[test]
@@ -22,9 +22,7 @@ pub fn test_errors_and_events() {
             .iter()
             .filter(|e| matches!(
                 &e.kind,
-                SpecialAttributeErrorKind::AbiError(
-                    AbiErrorParseError::AbiErrorWithKey
-                )
+                SpecialAttributeErrorKind::AbiError(AbiErrorParseError::AbiErrorWithKey)
             ))
             .count()
     );
