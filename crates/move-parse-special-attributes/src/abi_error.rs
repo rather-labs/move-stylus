@@ -1,6 +1,6 @@
 use move_compiler::{
     diagnostics::codes::{DiagnosticInfo, Severity, custom},
-    parser::ast::{Attribute_, StructDefinition},
+    parser::ast::{Ability_, Attribute_, StructDefinition},
 };
 
 use crate::{SpecialAttributeError, error::SpecialAttributeErrorKind};
@@ -17,6 +17,9 @@ pub enum AbiErrorParseError {
 
     #[error(r#"generic abi errors are not supported"#)]
     GenericAbiError,
+
+    #[error(r#"abi errors with key are not supported"#)]
+    AbiErrorWithKey,
 }
 
 impl From<&AbiErrorParseError> for DiagnosticInfo {
@@ -35,8 +38,6 @@ impl TryFrom<&StructDefinition> for AbiError {
     type Error = SpecialAttributeError;
 
     fn try_from(value: &StructDefinition) -> Result<Self, Self::Error> {
-        let is_generic = !value.type_parameters.is_empty();
-
         // Find the attribute we neekd
         for attribute in &value.attributes {
             for att in &attribute.value {
@@ -56,10 +57,20 @@ impl TryFrom<&StructDefinition> for AbiError {
                     _ => continue,
                 };
 
-                if is_generic {
+                if !value.type_parameters.is_empty() {
                     return Err(SpecialAttributeError {
                         kind: SpecialAttributeErrorKind::AbiError(
                             AbiErrorParseError::GenericAbiError,
+                        ),
+                        line_of_code: value.loc,
+                    });
+                }
+
+                // Check if the event has a key
+                if value.abilities.iter().any(|a| a.value == Ability_::Key) {
+                    return Err(SpecialAttributeError {
+                        kind: SpecialAttributeErrorKind::AbiError(
+                            AbiErrorParseError::AbiErrorWithKey,
                         ),
                         line_of_code: value.loc,
                     });

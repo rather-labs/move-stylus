@@ -1,6 +1,6 @@
 use move_compiler::{
     diagnostics::codes::{DiagnosticInfo, Severity, custom},
-    parser::ast::{Attribute_, AttributeValue_, StructDefinition, Value_},
+    parser::ast::{Ability_, Attribute_, AttributeValue_, StructDefinition, Value_},
 };
 
 use crate::{SpecialAttributeError, error::SpecialAttributeErrorKind};
@@ -41,6 +41,9 @@ pub enum EventParseError {
 
     #[error(r#"generic events are not supported"#)]
     GenericEvent,
+
+    #[error(r#"events with key are not supported"#)]
+    EventWithKey,
 }
 
 impl From<&EventParseError> for DiagnosticInfo {
@@ -59,8 +62,6 @@ impl TryFrom<&StructDefinition> for Event {
     type Error = SpecialAttributeError;
 
     fn try_from(value: &StructDefinition) -> Result<Self, Self::Error> {
-        let is_generic = !value.type_parameters.is_empty();
-
         // Find the attribute we need
         for attribute in &value.attributes {
             for att in &attribute.value {
@@ -82,9 +83,18 @@ impl TryFrom<&StructDefinition> for Event {
                     _ => continue,
                 };
 
-                if is_generic {
+                // Check if the event has generic types
+                if !value.type_parameters.is_empty() {
                     return Err(SpecialAttributeError {
                         kind: SpecialAttributeErrorKind::Event(EventParseError::GenericEvent),
+                        line_of_code: value.loc,
+                    });
+                }
+
+                // Check if the event has a key
+                if value.abilities.iter().any(|a| a.value == Ability_::Key) {
+                    return Err(SpecialAttributeError {
+                        kind: SpecialAttributeErrorKind::Event(EventParseError::EventWithKey),
                         line_of_code: value.loc,
                     });
                 }
