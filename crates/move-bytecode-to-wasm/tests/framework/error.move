@@ -8,7 +8,8 @@ use std::ascii::String;
 #[allow(unused_field)]
 public struct Error(String) has copy, drop;
 
-entry fun revert_standard_error(error: Error) {
+entry fun revert_standard_error(s: String) {
+    let error = Error(s);
     revert(error);
 }
 
@@ -19,8 +20,8 @@ public struct CustomError has copy, drop {
     error_code: u64,
 }
 
-entry fun revert_custom_error(error: CustomError) {
-    revert(error);
+entry fun revert_custom_error(s: String, code: u64) {
+    revert(CustomError { error_message: s, error_code: code });
 }
 
 #[allow(unused_field)]
@@ -36,7 +37,8 @@ public struct CustomError2 has copy, drop {
     h: address,
 }
 
-entry fun revert_custom_error2(error: CustomError2) {
+entry fun revert_custom_error2(a: bool, b: u8, c: u16, d: u32, e: u64, f: u128, g: u256, h: address) {
+    let error = CustomError2 { a, b, c, d, e, f, g, h };
     revert(error);
 }
 
@@ -48,17 +50,21 @@ public struct CustomError3 has copy, drop {
     c: vector<vector<u64>>,
 }
 
-entry fun revert_custom_error3(error: CustomError3) {
+entry fun revert_custom_error3(a: vector<u32>, b: vector<u128>, c: vector<vector<u64>>) {
+    let error = CustomError3 { a, b, c };
     revert(error);
 }
 
 #[ext(abi_error)]
 #[allow(unused_field)]
 public struct CustomError4 has copy, drop {
-    a: CustomError,
-    b: CustomError2,
+    a: Error,
+    b: CustomError,
 }
 
-entry fun revert_custom_error4(error: CustomError4) {
+entry fun revert_custom_error4(a: String, b: String, c: u64) {
+    let error = Error(a);
+    let custom_error = CustomError { error_message: b, error_code: c };
+    let error = CustomError4 { a: error, b: custom_error };
     revert(error);
 }

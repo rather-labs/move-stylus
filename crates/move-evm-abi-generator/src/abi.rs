@@ -92,13 +92,8 @@ impl Abi {
             Self::process_functions(processing_module, modules_data);
 
         let mut processed_structs = HashSet::new();
-        let structs = Self::process_structs(
-            structs_to_process,
-            modules_data,
-            &mut processed_structs,
-            &events,
-            &abi_errors,
-        );
+        let structs =
+            Self::process_structs(structs_to_process, modules_data, &mut processed_structs);
 
         Abi {
             contract_name: processing_module.special_attributes.module_name.clone(),
@@ -423,8 +418,6 @@ impl Abi {
         structs: HashSet<IntermediateType>,
         modules_data: &HashMap<ModuleId, ModuleData>,
         processed_structs: &mut HashSet<IntermediateType>,
-        events: &[Event],
-        abi_errors: &[Struct_],
     ) -> Vec<Struct_> {
         let mut result = Vec::new();
         for struct_itype in structs {
@@ -493,13 +486,8 @@ impl Abi {
             processed_structs.insert(struct_itype);
 
             // Process child structs
-            let child_structs = Self::process_structs(
-                child_structs_to_process,
-                modules_data,
-                processed_structs,
-                events,
-                abi_errors,
-            );
+            let child_structs =
+                Self::process_structs(child_structs_to_process, modules_data, processed_structs);
 
             result.extend(child_structs);
         }
