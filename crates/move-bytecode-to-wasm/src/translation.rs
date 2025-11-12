@@ -853,7 +853,7 @@ fn translate_instruction(
                         compilation_ctx,
                         &function_id.module_id,
                         type_instantiations,
-                    );
+                    )?;
 
                     builder.call(native_function_id);
                 } else {
@@ -1040,7 +1040,7 @@ fn translate_instruction(
                                 &function_information.function_id.module_id,
                                 &argument_types,
                                 &named_ids_types,
-                            );
+                            )?;
 
                             // Add as arguments the NamedIds
                             // The first load derefences the IMutRef
@@ -1074,7 +1074,7 @@ fn translate_instruction(
                                 module,
                                 compilation_ctx,
                                 &function_information.function_id.module_id,
-                            )
+                            )?
                         };
 
                     builder.call(native_function_id);

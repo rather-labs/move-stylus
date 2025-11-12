@@ -1,6 +1,9 @@
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
 
-use crate::compilation_context::{CompilationContextError, ModuleId};
+use crate::{
+    compilation_context::{CompilationContextError, ModuleId},
+    native_functions::error::NativeFunctionError,
+};
 
 use super::{intermediate_types::IntermediateType, types_stack::TypesStackError};
 
@@ -11,6 +14,9 @@ pub enum TranslationError {
 
     #[error("Compilation context error: {0}")]
     CompilationContextError(#[from] CompilationContextError),
+
+    #[error("an error ocurred while generating a native funciton's code")]
+    NativeFunctionError(#[from] NativeFunctionError),
 
     #[error("types mistach: expected {expected:?} but found {found:?}")]
     TypeMismatch {

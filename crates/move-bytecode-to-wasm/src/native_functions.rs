@@ -2,9 +2,10 @@
 //!
 //! Native functions in Move are functions directly implemented inside the Move VM. To emulate that
 //! mechanism, we direcly implement them in WASM and limk them into the file.
+mod abi_error;
 mod contract_calls;
 mod dynamic_field;
-mod error;
+pub mod error;
 mod event;
 pub mod object;
 mod tests;
@@ -14,6 +15,7 @@ mod types;
 
 use std::hash::Hasher;
 
+use error::NativeFunctionError;
 use walrus::{FunctionId, Module};
 
 use crate::{
@@ -99,7 +101,7 @@ impl NativeFunction {
         module: &mut Module,
         compilation_ctx: &CompilationContext,
         module_id: &ModuleId,
-    ) -> FunctionId {
+    ) -> Result<FunctionId, NativeFunctionError> {
         let ModuleId {
             address,
             module_name,
@@ -109,8 +111,9 @@ impl NativeFunction {
         // Some functions are implemented by host functions directly. For those, we just import and
         // use them without wrapping them.
         if let Some(host_fn_name) = Self::host_fn_name(name) {
-            if let Ok(function_id) = module.imports.get_func("vm_hooks", host_fn_name) {
-                return function_id;
+            let host_fn = if let Ok(function_id) = module.imports.get_func("vm_hooks", host_fn_name)
+            {
+                function_id
             } else {
                 match (host_fn_name, *address, module_name.as_str()) {
                     (
@@ -119,7 +122,7 @@ impl NativeFunction {
                         SF_MODULE_NAME_TX_CONTEXT,
                     ) => {
                         let (function_id, _) = hostio::host_functions::block_number(module);
-                        return function_id;
+                        function_id
                     }
                     (
                         Self::HOST_BLOCK_GAS_LIMIT,
@@ -127,7 +130,7 @@ impl NativeFunction {
                         SF_MODULE_NAME_TX_CONTEXT,
                     ) => {
                         let (function_id, _) = hostio::host_functions::block_gas_limit(module);
-                        return function_id;
+                        function_id
                     }
                     (
                         Self::HOST_BLOCK_TIMESTAMP,
@@ -135,24 +138,28 @@ impl NativeFunction {
                         SF_MODULE_NAME_TX_CONTEXT,
                     ) => {
                         let (function_id, _) = hostio::host_functions::block_timestamp(module);
-                        return function_id;
+                        function_id
                     }
                     (Self::HOST_CHAIN_ID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
                         let (function_id, _) = hostio::host_functions::chain_id(module);
-                        return function_id;
+                        function_id
                     }
 
                     _ => {
-                        panic!("host function {host_fn_name} not supported yet");
+                        return Err(NativeFunctionError::HostFunctionNotSupported(
+                            host_fn_name.to_string(),
+                        ));
                     }
                 }
-            }
+            };
+
+            return Ok(host_fn);
         }
 
         if let Some(function) = module.funcs.by_name(&native_fn_name) {
-            function
+            Ok(function)
         } else {
-            match (name, *address, module_name.as_str()) {
+            Ok(match (name, *address, module_name.as_str()) {
                 (Self::NATIVE_SENDER, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TX_CONTEXT) => {
                     transaction::add_native_sender_fn(module, compilation_ctx, module_id)
                 }
@@ -179,8 +186,13 @@ impl NativeFunction {
                 (Self::NATIVE_GET_LAST_MEMORY_POSITION, _, _) => {
                     tests::add_get_last_memory_position_fn(module, compilation_ctx)
                 }
-                _ => panic!("native function {module_id}::{name} not supported yet"),
-            }
+                _ => {
+                    return Err(NativeFunctionError::NativeFunctionNotSupported(
+                        module_id.clone(),
+                        name.to_string(),
+                    ));
+                }
+            })
         }
     }
 
@@ -195,27 +207,20 @@ impl NativeFunction {
         module_id: &ModuleId,
         arguments_types: &[IntermediateType],
         named_ids: &[IntermediateType],
-    ) -> FunctionId {
+    ) -> Result<FunctionId, NativeFunctionError> {
         let native_fn_name = Self::get_function_name(name, module_id);
 
         if let Some(function) = module.funcs.by_name(&native_fn_name) {
-            function
+            Ok(function)
         } else {
-            let module_data = compilation_ctx
-                .get_module_data_by_id(module_id)
-                .unwrap_or_else(|_| panic!("external call {module_id}::{name} not found"));
+            let module_data = compilation_ctx.get_module_data_by_id(module_id)?;
 
-            let function_information = module_data
-                .functions
-                .get_information_by_identifier(name)
-                .unwrap_or_else(|| {
-                    panic!("could not find function information for {module_id}::{name}")
-                });
+            let function_information = module_data.functions.get_information_by_identifier(name)?;
 
             if let Some(special_attributes) =
                 module_data.special_attributes.external_calls.get(name)
             {
-                contract_calls::add_external_contract_call_fn(
+                Ok(contract_calls::add_external_contract_call_fn(
                     module,
                     compilation_ctx,
                     module_id,
@@ -223,9 +228,12 @@ impl NativeFunction {
                     &special_attributes.modifiers,
                     arguments_types,
                     named_ids,
-                )
+                ))
             } else {
-                panic!("missing special attributes for external call {module_id}::{name}")
+                Err(NativeFunctionError::NotExternalCall(
+                    module_id.clone(),
+                    name.to_owned(),
+                ))
             }
         }
     }
@@ -241,13 +249,13 @@ impl NativeFunction {
         compilation_ctx: &CompilationContext,
         module_id: &ModuleId,
         generics: &[IntermediateType],
-    ) -> FunctionId {
+    ) -> Result<FunctionId, NativeFunctionError> {
         let ModuleId {
             address,
             module_name,
         } = module_id;
 
-        match (name, *address, module_name.as_str()) {
+        let function_id = match (name, *address, module_name.as_str()) {
             //
             // Transfer
             //
@@ -287,7 +295,7 @@ impl NativeFunction {
             //
             (Self::NATIVE_REVERT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_ERROR) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id);
-                error::add_revert_fn(module, compilation_ctx, &generics[0], module_id)
+                abi_error::add_revert_fn(module, compilation_ctx, &generics[0], module_id)
             }
 
             //
@@ -367,7 +375,7 @@ impl NativeFunction {
                     compilation_ctx,
                     &generics[0],
                     module_id,
-                )
+                )?
             }
 
             // This native function is only available in debug mode to help with testing. It should
@@ -408,8 +416,15 @@ impl NativeFunction {
                 )
             }
 
-            _ => panic!("generic native function {module_id}::{name} not supported yet"),
-        }
+            _ => {
+                return Err(NativeFunctionError::GenericdNativeFunctionNotSupported(
+                    module_id.clone(),
+                    name.to_owned(),
+                ));
+            }
+        };
+
+        Ok(function_id)
     }
 
     /// Maps the native function name to the host function name.

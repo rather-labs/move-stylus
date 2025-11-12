@@ -45,6 +45,9 @@ pub enum CompilationContextError {
 
     #[error("expected enum")]
     ExpectedEnum,
+
+    #[error("function with identifier {0} not found in compilation context")]
+    FunctionByIdentifierNotFound(String),
 }
 
 impl From<CompilationContextError> for CompilationErrorKind {

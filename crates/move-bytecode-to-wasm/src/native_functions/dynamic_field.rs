@@ -1,4 +1,4 @@
-use super::NativeFunction;
+use super::{NativeFunction, error::NativeFunctionError};
 use crate::{
     CompilationContext,
     compilation_context::{
@@ -202,7 +202,7 @@ pub fn add_remove_child_object_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
     module_id: &ModuleId,
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_REMOVE_CHILD_OBJECT,
         compilation_ctx,
@@ -210,7 +210,7 @@ pub fn add_remove_child_object_fn(
         module_id,
     );
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     };
 
     let mut function = FunctionBuilder::new(
@@ -229,7 +229,7 @@ pub fn add_remove_child_object_fn(
             module_name: SF_MODULE_NAME_DYNAMIC_FIELD.to_owned(),
         },
         &[itype.clone()],
-    );
+    )?;
 
     // Arguments
     let parent_uid = module.locals.add(ValType::I32);
@@ -251,7 +251,7 @@ pub fn add_remove_child_object_fn(
         },
     );
 
-    function.finish(vec![parent_uid, child_id], &mut module.funcs)
+    Ok(function.finish(vec![parent_uid, child_id], &mut module.funcs))
 }
 
 /// Checks if a child object exists for a given parent and child ID

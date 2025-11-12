@@ -5,6 +5,7 @@ use move_parse_special_attributes::SpecialAttributeError;
 
 use crate::{
     compilation_context::CompilationContextError,
+    native_functions::error::NativeFunctionError,
     translation::{TranslationError, table::FunctionTableError},
 };
 
@@ -73,6 +74,9 @@ pub enum ICEErrorKind {
 
     #[error("an error ocurred while handling the function table")]
     FunctionTable(#[from] FunctionTableError),
+
+    #[error("an error ocurred while generating a native funciton's code")]
+    NativeFunction(#[from] NativeFunctionError),
 }
 
 impl From<CodeError> for Diagnostic {
