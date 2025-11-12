@@ -287,7 +287,7 @@ impl NativeFunction {
             //
             (Self::NATIVE_EMIT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_EVENT) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id);
-                event::add_emit_log_fn(module, compilation_ctx, &generics[0], module_id)
+                event::add_emit_log_fn(module, compilation_ctx, &generics[0], module_id)?
             }
 
             //
@@ -295,7 +295,7 @@ impl NativeFunction {
             //
             (Self::NATIVE_REVERT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_ERROR) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id);
-                abi_error::add_revert_fn(module, compilation_ctx, &generics[0], module_id)
+                abi_error::add_revert_fn(module, compilation_ctx, &generics[0], module_id)?
             }
 
             //

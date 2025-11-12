@@ -1,4 +1,5 @@
 use alloy_sol_types::{SolType, sol_data};
+use error::AbiPackError;
 use pack_native_int::{pack_i32_type_instructions, pack_i64_type_instructions};
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
@@ -17,6 +18,7 @@ use crate::{
     vm_handled_types::{VmHandledType, string::String_},
 };
 
+pub mod error;
 mod pack_enum;
 mod pack_heap_int;
 mod pack_native_int;
@@ -42,7 +44,7 @@ pub trait Packable {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    );
+    ) -> Result<(), AbiPackError>;
 
     /// Adds the instructions to pack the value into memory according to Solidity's ABI encoding.
     ///
@@ -70,7 +72,7 @@ pub trait Packable {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    );
+    ) -> Result<(), AbiPackError>;
 
     /// Adds the instructions to load the value into a local variable.
     /// This is used to reverse the order of the stack before packing
@@ -113,7 +115,7 @@ pub fn build_pack_instructions<T: Packable>(
     function_return_signature: &[T],
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-) -> (LocalId, LocalId) {
+) -> Result<(LocalId, LocalId), AbiPackError> {
     // We need to load all return types into locals in order to reverse the read order
     // Otherwise they would be popped in reverse order
     let mut locals = Vec::new();
@@ -166,7 +168,7 @@ pub fn build_pack_instructions<T: Packable>(
                 writer_pointer,
                 calldata_reference_pointer,
                 compilation_ctx,
-            );
+            )?;
 
             // A dynamic value will only save the offset to where the values are located, so, we
             // just use 32 bytes
@@ -183,7 +185,7 @@ pub fn build_pack_instructions<T: Packable>(
                 writer_pointer,
                 calldata_reference_pointer,
                 compilation_ctx,
-            );
+            )?;
 
             builder
                 .local_get(writer_pointer)
@@ -201,7 +203,7 @@ pub fn build_pack_instructions<T: Packable>(
         .binop(BinaryOp::I32Sub)
         .local_set(len);
 
-    (pointer, len)
+    Ok((pointer, len))
 }
 
 impl Packable for IntermediateType {
@@ -249,7 +251,7 @@ impl Packable for IntermediateType {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiPackError> {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -339,20 +341,19 @@ impl Packable for IntermediateType {
                     None,
                 )
             }
-            IntermediateType::IEnum { index, .. }
-            | IntermediateType::IGenericEnumInstance { index, .. } => {
+            IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self).unwrap();
                 if !enum_.is_simple {
-                    panic!(
-                        "cannot abi pack enum with index {index}, it contains at least one variant with fields"
-                    );
+                    return Err(AbiPackError::EnumIsNotSimple(enum_.identifier.clone()));
                 }
                 enum_.add_pack_instructions(builder, module, local, writer_pointer, compilation_ctx)
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("cannot pack generic type parameter");
+                return Err(AbiPackError::PackingGenericTypeParameter);
             }
         }
+
+        Ok(())
     }
 
     fn add_pack_instructions_dynamic(
@@ -363,7 +364,7 @@ impl Packable for IntermediateType {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiPackError> {
         match self {
             IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
                 // Load the intermediate pointer
@@ -387,7 +388,7 @@ impl Packable for IntermediateType {
                     writer_pointer,
                     calldata_reference_pointer,
                     compilation_ctx,
-                );
+                )?;
             }
             IntermediateType::IStruct {
                 module_id, index, ..
@@ -423,8 +424,9 @@ impl Packable for IntermediateType {
                 writer_pointer,
                 calldata_reference_pointer,
                 compilation_ctx,
-            ),
+            )?,
         }
+        Ok(())
     }
 
     fn encoded_size(&self, compilation_ctx: &CompilationContext) -> usize {
@@ -560,7 +562,8 @@ mod tests {
             ],
             &mut raw_module,
             &compilation_ctx,
-        );
+        )
+        .unwrap();
 
         func_body.local_get(data_start).local_get(data_end);
 
@@ -623,7 +626,8 @@ mod tests {
             ],
             &mut raw_module,
             &compilation_ctx,
-        );
+        )
+        .unwrap();
 
         func_body.local_get(data_start).local_get(data_end);
 
@@ -715,7 +719,8 @@ mod tests {
             ],
             &mut raw_module,
             &compilation_ctx,
-        );
+        )
+        .unwrap();
 
         func_body.local_get(data_start).local_get(data_end);
 

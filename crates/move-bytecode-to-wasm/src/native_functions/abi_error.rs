@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
     ir::{MemArg, StoreKind},
@@ -11,7 +13,7 @@ use crate::{
     translation::intermediate_types::{IntermediateType, structs::IStructType},
 };
 
-use super::NativeFunction;
+use super::{NativeFunction, error::NativeFunctionError};
 
 /// Adds the native 'revert' function.
 /// Expects the error type to be a struct. Each field of the error struct is loaded from memory and ABI-encoded to construct a revert reason message.
@@ -21,7 +23,7 @@ pub fn add_revert_fn(
     compilation_ctx: &CompilationContext,
     error_itype: &IntermediateType,
     module_id: &ModuleId,
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_REVERT,
         compilation_ctx,
@@ -29,7 +31,7 @@ pub fn add_revert_fn(
         module_id,
     );
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     };
 
     // Get the error type. Should be a struct, otherwise it panics.
@@ -57,7 +59,8 @@ pub fn add_revert_fn(
         compilation_ctx,
         &error_struct,
         error_struct_ptr,
-    );
+    )
+    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
 
     // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
     builder
@@ -76,5 +79,5 @@ pub fn add_revert_fn(
     builder.i32_const(1);
     builder.return_();
 
-    function.finish(vec![error_struct_ptr], &mut module.funcs)
+    Ok(function.finish(vec![error_struct_ptr], &mut module.funcs))
 }

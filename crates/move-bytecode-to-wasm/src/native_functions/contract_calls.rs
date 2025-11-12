@@ -242,14 +242,16 @@ pub fn add_external_contract_call_fn(
             };
 
             if argument.is_dynamic(compilation_ctx) {
-                argument.add_pack_instructions_dynamic(
-                    &mut builder,
-                    module,
-                    *wasm_local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                );
+                argument
+                    .add_pack_instructions_dynamic(
+                        &mut builder,
+                        module,
+                        *wasm_local,
+                        writer_pointer,
+                        calldata_reference_pointer,
+                        compilation_ctx,
+                    )
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
 
                 builder
                     .local_get(writer_pointer)
@@ -257,14 +259,16 @@ pub fn add_external_contract_call_fn(
                     .binop(BinaryOp::I32Add)
                     .local_set(writer_pointer);
             } else {
-                argument.add_pack_instructions(
-                    &mut builder,
-                    module,
-                    *wasm_local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                );
+                argument
+                    .add_pack_instructions(
+                        &mut builder,
+                        module,
+                        *wasm_local,
+                        writer_pointer,
+                        calldata_reference_pointer,
+                        compilation_ctx,
+                    )
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
 
                 builder
                     .local_get(writer_pointer)

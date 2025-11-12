@@ -185,7 +185,7 @@ impl<'a> PublicFunction<'a> {
         } else {
             // Set data_ptr and data_len to the result of packing the return values
             let (data_ptr_, data_len_) =
-                build_pack_instructions(block, &self.signature.returns, module, compilation_ctx);
+                build_pack_instructions(block, &self.signature.returns, module, compilation_ctx)?;
             block.local_get(data_ptr_).local_set(data_ptr);
             block.local_get(data_len_).local_set(data_len);
         }
