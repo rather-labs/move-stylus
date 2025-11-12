@@ -6,6 +6,7 @@ use walrus::{
 use crate::{
     CompilationContext,
     abi_types::public_function::{PublicFunction, PublicFunctionValidationError},
+    error::{CompilationError, ICEError, ICEErrorKind},
     hostio::host_functions,
     runtime::RuntimeFunction,
     translation::{intermediate_types::ISignature, table::FunctionTable},
@@ -22,6 +23,12 @@ static EMPTY_SIGNATURE: ISignature = ISignature {
 pub enum ConstructorError {
     #[error("there was an error creating the constructor function")]
     CreatingPublicFunction(#[from] PublicFunctionValidationError),
+}
+
+impl From<ConstructorError> for CompilationError {
+    fn from(value: ConstructorError) -> Self {
+        CompilationError::ICE(ICEError::new(ICEErrorKind::Constructor(value)))
+    }
 }
 
 /// Injects the constructor as a public function in the module, which will be accesible via the entrypoint router.

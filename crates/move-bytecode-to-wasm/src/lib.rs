@@ -199,14 +199,14 @@ pub fn translate_package(
             &mut module,
             &compilation_ctx,
             &mut public_functions,
-        );
+        )?;
 
         hostio::build_entrypoint_router(
             &mut module,
             &public_functions,
             &compilation_ctx,
             &dynamic_fields_global_variables,
-        );
+        )?;
 
         function_table.ensure_all_functions_added().unwrap();
         validate_stylus_wasm(&mut module).unwrap();

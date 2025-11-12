@@ -6,6 +6,8 @@ use move_parse_special_attributes::SpecialAttributeError;
 use crate::{
     abi_types::error::AbiError,
     compilation_context::CompilationContextError,
+    constructor::ConstructorError,
+    hostio::error::HostIOError,
     native_functions::error::NativeFunctionError,
     translation::{TranslationError, table::FunctionTableError},
 };
@@ -78,8 +80,14 @@ pub enum ICEErrorKind {
     #[error("an error ocurred while generating a native funciton's code")]
     NativeFunction(#[from] NativeFunctionError),
 
-    #[error("an error ocurred while processing a contract's ABI")]
+    #[error("an error ocurred whie processing a contract's ABI")]
     Abi(#[from] AbiError),
+
+    #[error("an error ocurred while processing a contract's constructor")]
+    Constructor(#[from] ConstructorError),
+
+    #[error("an error ocurred while processing building host environment")]
+    HostIO(#[from] HostIOError),
 }
 
 impl From<CodeError> for Diagnostic {

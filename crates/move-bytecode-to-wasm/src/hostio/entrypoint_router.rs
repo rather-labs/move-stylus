@@ -9,7 +9,7 @@ use crate::{
     translation::intermediate_types::IntermediateType,
 };
 
-use super::host_functions;
+use super::{error::HostIOError, host_functions};
 
 /// Builds an entrypoint router for the list of public functions provided
 /// and adds it to the module exporting it as `user_entrypoint`
@@ -20,7 +20,7 @@ pub fn build_entrypoint_router(
     functions: &[PublicFunction],
     compilation_ctx: &CompilationContext,
     dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
-) {
+) -> Result<(), HostIOError> {
     let (read_args_function, _) = host_functions::read_args(module);
     let (write_return_data_function, _) = host_functions::write_result(module);
 
@@ -72,7 +72,7 @@ pub fn build_entrypoint_router(
             write_return_data_function,
             compilation_ctx,
             dynamic_fields_global_variables,
-        );
+        )?;
     }
 
     // Build no function match error message
@@ -103,6 +103,8 @@ pub fn build_entrypoint_router(
 
     let router = router.finish(vec![args_len], &mut module.funcs);
     add_entrypoint(module, router);
+
+    Ok(())
 }
 
 /// Add an entrypoint to the module with the interface defined by Stylus
@@ -294,7 +296,8 @@ mod tests {
         let noop_selector_data = noop.get_selector().to_vec();
         let noop_2_selector_data = noop_2.get_selector().to_vec();
 
-        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx, &vec![]);
+        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx, &vec![])
+            .unwrap();
         display_module(&mut raw_module);
 
         let data = ReadArgsData {
@@ -330,7 +333,8 @@ mod tests {
         let noop = add_noop_function(&mut raw_module, &signature, &compilation_ctx);
         let noop_2 = add_noop_2_function(&mut raw_module, &signature, &compilation_ctx);
 
-        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx, &vec![]);
+        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx, &vec![])
+            .unwrap();
         display_module(&mut raw_module);
 
         // Invalid selector
@@ -353,7 +357,8 @@ mod tests {
         let noop = add_noop_function(&mut raw_module, &signature, &compilation_ctx);
         let noop_2 = add_noop_2_function(&mut raw_module, &signature, &compilation_ctx);
 
-        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx, &vec![]);
+        build_entrypoint_router(&mut raw_module, &[noop, noop_2], &compilation_ctx, &vec![])
+            .unwrap();
         display_module(&mut raw_module);
 
         // Invalid selector
