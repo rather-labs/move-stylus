@@ -1,6 +1,6 @@
 use move_compiler::{
     diagnostics::codes::{DiagnosticInfo, Severity, custom},
-    parser::ast::{Attribute_, AttributeValue_, StructDefinition, Value_},
+    parser::ast::{Ability_, Attribute_, AttributeValue_, StructDefinition, Value_},
 };
 
 use crate::{SpecialAttributeError, error::SpecialAttributeErrorKind};
@@ -38,6 +38,12 @@ pub enum EventParseError {
 
     #[error(r#"not marked as an event"#)]
     NotAnEvent,
+
+    #[error(r#"events with generic type parameters are not supported"#)]
+    GenericEvent,
+
+    #[error(r#"events with key are not supported"#)]
+    EventWithKey,
 }
 
 impl From<&EventParseError> for DiagnosticInfo {
@@ -56,10 +62,10 @@ impl TryFrom<&StructDefinition> for Event {
     type Error = SpecialAttributeError;
 
     fn try_from(value: &StructDefinition) -> Result<Self, Self::Error> {
-        // Find the attribute we neekd
+        // Find the attribute we need
         for attribute in &value.attributes {
             for att in &attribute.value {
-                let parametrized = match &att.value {
+                let parameterized = match &att.value {
                     Attribute_::Parameterized(n, spanned) if n.value.as_str() == "ext" => {
                         &spanned.value
                     }
@@ -68,7 +74,7 @@ impl TryFrom<&StructDefinition> for Event {
 
                 // To be an event, the first named parameter must be "event". If we dont find it,
                 // continue
-                let mut event = match parametrized.first() {
+                let mut event = match parameterized.first() {
                     Some(p) if p.value.attribute_name().value.as_str() == "event" => Event {
                         name: value.name.to_string(),
                         is_anonymous: false,
@@ -77,7 +83,23 @@ impl TryFrom<&StructDefinition> for Event {
                     _ => continue,
                 };
 
-                for attribute in parametrized.iter().skip(1) {
+                // Check if the event has generic types
+                if !value.type_parameters.is_empty() {
+                    return Err(SpecialAttributeError {
+                        kind: SpecialAttributeErrorKind::Event(EventParseError::GenericEvent),
+                        line_of_code: value.loc,
+                    });
+                }
+
+                // Check if the event has a key
+                if value.abilities.iter().any(|a| a.value == Ability_::Key) {
+                    return Err(SpecialAttributeError {
+                        kind: SpecialAttributeErrorKind::Event(EventParseError::EventWithKey),
+                        line_of_code: value.loc,
+                    });
+                }
+
+                for attribute in parameterized.iter().skip(1) {
                     match &attribute.value {
                         Attribute_::Name(n) if n.value.as_str() == "anonymous" => {
                             event.is_anonymous = true

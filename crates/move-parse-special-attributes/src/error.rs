@@ -16,6 +16,7 @@ use crate::{
         error::{ExternalCallFunctionError, ExternalCallStructError},
         external_struct::ExternalStructError,
     },
+    function_validation::FunctionValidationError,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -34,6 +35,9 @@ pub enum SpecialAttributeErrorKind {
 
     #[error("External struct error: {0}")]
     ExternalStruct(#[from] ExternalStructError),
+
+    #[error("Function validation error: {0}")]
+    FunctionValidation(#[from] FunctionValidationError),
 
     #[error("Too many attributes found")]
     TooManyAttributes,
@@ -60,6 +64,7 @@ impl From<&SpecialAttributeError> for Diagnostic {
             SpecialAttributeErrorKind::Event(e) => e.into(),
             SpecialAttributeErrorKind::ExternalStruct(e) => e.into(),
             SpecialAttributeErrorKind::AbiError(e) => e.into(),
+            SpecialAttributeErrorKind::FunctionValidation(e) => e.into(),
             SpecialAttributeErrorKind::TooManyAttributes => custom(
                 "Special attributes error",
                 Severity::BlockingError,

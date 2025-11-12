@@ -70,6 +70,7 @@ pub struct Abi {
     pub(crate) functions: Vec<Function>,
     pub(crate) structs: Vec<Struct_>,
     pub(crate) events: Vec<Event>,
+    pub(crate) abi_errors: Vec<Struct_>,
 }
 
 impl Abi {
@@ -81,8 +82,12 @@ impl Abi {
         processing_module: &ModuleData,
         modules_data: &HashMap<ModuleId, ModuleData>,
         event_structs: &HashSet<EventStruct>,
-        _error_structs: &HashSet<ErrorStruct>,
+        error_structs: &HashSet<ErrorStruct>,
     ) -> Abi {
+        let events = Self::process_events(event_structs, modules_data);
+
+        let abi_errors = Self::process_abi_errors(error_structs, modules_data);
+
         let (functions, structs_to_process) =
             Self::process_functions(processing_module, modules_data);
 
@@ -90,18 +95,17 @@ impl Abi {
         let structs =
             Self::process_structs(structs_to_process, modules_data, &mut processed_structs);
 
-        let events = Self::process_events(event_structs, modules_data);
-
         Abi {
             contract_name: processing_module.special_attributes.module_name.clone(),
             functions,
             structs,
             events,
+            abi_errors,
         }
     }
 
-    /// This contains all the structs that appear as argument o return of functions. Once we
-    /// process the functions this will be the structs appearing in the ABi
+    /// This contains all the structs that appear as argument or return of functions. Once we
+    /// process the functions this will be the structs appearing in the ABI
     fn process_functions(
         processing_module: &ModuleData,
         modules_data: &HashMap<ModuleId, ModuleData>,
@@ -109,7 +113,7 @@ impl Abi {
         let mut result = Vec::new();
         let mut struct_to_process = HashSet::new();
 
-        // First we filter the functions we are ging to process
+        // First we filter the functions we are going to process
         let functions = processing_module
             .functions
             .information
@@ -166,6 +170,7 @@ impl Abi {
                             }
                             _ => {
                                 if struct_.has_key {
+                                    // TODO: can an error/event have a key? if so, we need to resolve conflicts here too!
                                     Self::process_storage_struct(
                                         struct_,
                                         itype,
@@ -287,38 +292,33 @@ impl Abi {
 
                 Type::from_intermediate_type(&function.signature.returns[0], modules_data)
             } else {
-                Type::Tuple(
-                    function
-                        .signature
-                        .returns
-                        .iter()
-                        .map(|t| {
-                            match &function.signature.returns[0] {
-                                IntermediateType::IGenericStructInstance {
-                                    module_id,
-                                    index,
-                                    ..
-                                }
-                                | IntermediateType::IStruct {
-                                    module_id, index, ..
-                                } => {
-                                    let struct_module = modules_data.get(module_id).unwrap();
-                                    let struct_ =
-                                        struct_module.structs.get_by_index(*index).unwrap();
-
-                                    if !is_named_id(&struct_.identifier, module_id)
-                                        && !is_uid(&struct_.identifier, module_id)
-                                    {
-                                        struct_to_process
-                                            .insert(function.signature.returns[0].clone());
-                                    }
-                                }
-                                _ => {}
+                let tuple_types: Vec<Type> = function
+                    .signature
+                    .returns
+                    .iter()
+                    .map(|t| {
+                        match &function.signature.returns[0] {
+                            IntermediateType::IGenericStructInstance {
+                                module_id, index, ..
                             }
-                            Type::from_intermediate_type(t, modules_data)
-                        })
-                        .collect(),
-                )
+                            | IntermediateType::IStruct {
+                                module_id, index, ..
+                            } => {
+                                let struct_module = modules_data.get(module_id).unwrap();
+                                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+
+                                if !is_named_id(&struct_.identifier, module_id)
+                                    && !is_uid(&struct_.identifier, module_id)
+                                {
+                                    struct_to_process.insert(function.signature.returns[0].clone());
+                                }
+                            }
+                            _ => {}
+                        }
+                        Type::from_intermediate_type(t, modules_data)
+                    })
+                    .collect();
+                Type::Tuple(tuple_types)
             };
 
             let visibility = if parsed_function.visibility
@@ -425,40 +425,34 @@ impl Abi {
                 continue;
             }
 
-            let (struct_, parsed_struct) = match &struct_itype {
-                IntermediateType::IStruct {
-                    module_id, index, ..
-                } => {
-                    let struct_module = modules_data.get(module_id).unwrap();
-                    let struct_ = struct_module.structs.get_by_index(*index).unwrap();
-                    let parsed_struct = struct_module
-                        .special_attributes
-                        .structs
-                        .iter()
-                        .find(|s| s.name == struct_.identifier)
-                        .unwrap();
+            let (struct_, parsed_struct) = {
+                let (module_id, index, types) = match &struct_itype {
+                    IntermediateType::IStruct {
+                        module_id, index, ..
+                    } => (module_id, index, None),
+                    IntermediateType::IGenericStructInstance {
+                        module_id,
+                        index,
+                        types,
+                        ..
+                    } => (module_id, index, Some(types)),
+                    t => panic!("found {t:?} instead of struct"),
+                };
 
-                    (struct_.clone(), parsed_struct)
-                }
-                IntermediateType::IGenericStructInstance {
-                    module_id,
-                    index,
-                    types,
-                    ..
-                } => {
-                    let struct_module = modules_data.get(module_id).unwrap();
-                    let struct_ = struct_module.structs.get_by_index(*index).unwrap();
-                    let struct_ = struct_.instantiate(types);
-                    let parsed_struct = struct_module
-                        .special_attributes
-                        .structs
-                        .iter()
-                        .find(|s| s.name == struct_.identifier)
-                        .unwrap();
+                let struct_module = modules_data.get(module_id).unwrap();
+                let struct_ = struct_module.structs.get_by_index(*index).unwrap();
+                let struct_ = match types {
+                    Some(types) => struct_.instantiate(types),
+                    None => struct_.clone(),
+                };
+                let parsed_struct = struct_module
+                    .special_attributes
+                    .structs
+                    .iter()
+                    .find(|s| s.name == struct_.identifier)
+                    .unwrap();
 
-                    (struct_, parsed_struct)
-                }
-                t => panic!("found {t:?} instead of struct"),
+                (struct_, parsed_struct)
             };
 
             let mut child_structs_to_process = HashSet::new();
@@ -482,7 +476,9 @@ impl Abi {
                 .collect();
 
             let struct_abi_type = Type::from_intermediate_type(&struct_itype, modules_data);
+
             result.push(Struct_ {
+                // Resolve struct identifier conflicts with events or errors
                 identifier: struct_abi_type.name(),
                 fields,
             });
@@ -544,6 +540,48 @@ impl Abi {
                     })
                     .collect(),
                 is_anonymous: event_special_attributes.is_anonymous,
+            });
+        }
+
+        result
+    }
+
+    pub fn process_abi_errors(
+        error_structs: &HashSet<ErrorStruct>,
+        modules_data: &HashMap<ModuleId, ModuleData>,
+    ) -> Vec<Struct_> {
+        let mut result = Vec::new();
+        for error_struct in error_structs {
+            let error_module = modules_data
+                .get(&ModuleId {
+                    address: error_struct.module_id.address().into_bytes().into(),
+                    module_name: error_struct.module_id.name().to_string(),
+                })
+                .unwrap();
+
+            let error_struct = error_module
+                .structs
+                .get_by_identifier(&error_struct.identifier)
+                .unwrap();
+
+            let error_struct_parsed = error_module
+                .special_attributes
+                .structs
+                .iter()
+                .find(|s| s.name.as_str() == error_struct.identifier)
+                .unwrap();
+
+            result.push(Struct_ {
+                identifier: error_struct.identifier.to_string(),
+                fields: error_struct
+                    .fields
+                    .iter()
+                    .zip(&error_struct_parsed.fields)
+                    .map(|(f, (identifier, _))| StructField {
+                        identifier: identifier.clone(),
+                        type_: Type::from_intermediate_type(f, modules_data),
+                    })
+                    .collect(),
             });
         }
 
