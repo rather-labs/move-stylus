@@ -29,7 +29,7 @@ pub fn add_revert_fn(
         compilation_ctx,
         &[error_itype],
         module_id,
-    );
+    )?;
     if let Some(function) = module.funcs.by_name(&name) {
         return Ok(function);
     };
@@ -39,12 +39,10 @@ pub fn add_revert_fn(
         .get_struct_by_intermediate_type(error_itype)
         .unwrap();
 
-    // TODO: This should be a compile error not a panic
     let IStructType::AbiError = error_struct.type_ else {
-        panic!(
-            "trying to revert with the struct {} which is not an abi error",
-            error_struct.identifier
-        );
+        return Err(NativeFunctionError::RevertFunctionNoError(
+            error_struct.identifier.clone(),
+        ));
     };
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);

@@ -3,7 +3,7 @@ use std::rc::Rc;
 use crate::{
     abi_types::error::AbiError,
     compilation_context::{CompilationContextError, ModuleId},
-    translation::table::FunctionId,
+    translation::{intermediate_types::IntermediateType, table::FunctionId},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -31,4 +31,28 @@ pub enum NativeFunctionError {
 
     #[error(r#"external contract call function "{0}" must return a ContractCallResult<T> or ContractCallEmptyResult with a single type parameter"#)]
     ContractCallFunctionInvalidReturn(FunctionId),
+
+    #[error(
+        r#"called get_generic_function_name for function "{0}::{1}" with no generic parameters"#
+    )]
+    GetGenericFunctionNameNoGenerics(ModuleId, String),
+
+    #[error(r#"there was an error linking "{0}" function, expected IStruct, found {1:?}"#)]
+    WrongGenericType(String, IntermediateType),
+
+    // Emit function section
+    #[error(r#"trying to emit log with the struct {0} which is not an event"#)]
+    EmitFunctionNoEvent(String),
+
+    #[error(r#"invalid event field {0:?}"#)]
+    EmitFunctionInvalidEventField(IntermediateType),
+
+    #[error(
+        "there was an error instantiating an emit event function: vector does not have abi encoded data"
+    )]
+    EmitFunctionInvalidVectorData,
+
+    // revert function section
+    #[error(r#"trying to revert with the struct "{0}" which is not an error"#)]
+    RevertFunctionNoError(String),
 }

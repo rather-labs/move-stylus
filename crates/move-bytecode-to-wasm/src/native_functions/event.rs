@@ -35,7 +35,7 @@ pub fn add_emit_log_fn(
         compilation_ctx,
         &[itype],
         module_id,
-    );
+    )?;
     if let Some(function) = module.funcs.by_name(&name) {
         return Ok(function);
     };
@@ -50,10 +50,9 @@ pub fn add_emit_log_fn(
         is_anonymous,
     } = struct_.type_
     else {
-        panic!(
-            "trying to emit log with the struct {} which is not an event",
-            struct_.identifier
-        );
+        return Err(NativeFunctionError::EmitFunctionNoEvent(
+            struct_.identifier.clone(),
+        ));
     };
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
@@ -225,7 +224,11 @@ pub fn add_emit_log_fn(
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 todo!()
             }
-            _ => panic!("invalid event field {field:?}"),
+            _ => {
+                return Err(NativeFunctionError::EmitFunctionInvalidEventField(
+                    field.clone(),
+                ));
+            }
         }
     }
 
@@ -341,9 +344,7 @@ pub fn add_emit_log_fn(
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. } => {
                 let Some((encode_start, encode_end)) = abi_encoded_data else {
-                    panic!(
-                        "there was an error instantiating an emit event function: vector does not have abi encoded data"
-                    )
+                    return Err(NativeFunctionError::EmitFunctionInvalidVectorData);
                 };
 
                 builder
@@ -395,7 +396,11 @@ pub fn add_emit_log_fn(
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 todo!()
             }
-            _ => panic!("invalid event field {field:?}"),
+            _ => {
+                return Err(NativeFunctionError::EmitFunctionInvalidEventField(
+                    field.clone(),
+                ));
+            }
         }
     }
 

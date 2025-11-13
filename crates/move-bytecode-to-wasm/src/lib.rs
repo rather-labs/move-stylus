@@ -502,7 +502,6 @@ fn translate_and_link_functions(
     }
 
     let function_definition = function_definitions
-        // TODO do this in nother way
         .get(&function_id.get_generic_fn_id())
         .ok_or_else(|| TranslationError::FunctionDefinitionNotFound(function_id.clone()))?;
 

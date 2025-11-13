@@ -261,15 +261,15 @@ impl NativeFunction {
             //
             (Self::NATIVE_SHARE_OBJECT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TRANSFER) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id);
-                transfer::add_share_object_fn(module, compilation_ctx, &generics[0], module_id)
+                transfer::add_share_object_fn(module, compilation_ctx, &generics[0], module_id)?
             }
             (Self::NATIVE_TRANSFER_OBJECT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TRANSFER) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id);
-                transfer::add_transfer_object_fn(module, compilation_ctx, &generics[0], module_id)
+                transfer::add_transfer_object_fn(module, compilation_ctx, &generics[0], module_id)?
             }
             (Self::NATIVE_FREEZE_OBJECT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TRANSFER) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id);
-                transfer::add_freeze_object_fn(module, compilation_ctx, &generics[0], module_id)
+                transfer::add_freeze_object_fn(module, compilation_ctx, &generics[0], module_id)?
             }
             (Self::NATIVE_DELETE_OBJECT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TRANSFER)
             | (Self::NATIVE_REMOVE_OBJECT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TRANSFER) => {
@@ -303,7 +303,7 @@ impl NativeFunction {
             //
             (Self::NATIVE_IS_ONE_TIME_WITNESS, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_TYPES) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id);
-                types::add_is_one_time_witness_fn(module, compilation_ctx, &generics[0], module_id)
+                types::add_is_one_time_witness_fn(module, compilation_ctx, &generics[0], module_id)?
             }
 
             //
@@ -311,7 +311,7 @@ impl NativeFunction {
             //
             (Self::NATIVE_COMPUTE_NAMED_ID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id);
-                object::add_compute_named_id_fn(module, compilation_ctx, &generics[0], module_id)
+                object::add_compute_named_id_fn(module, compilation_ctx, &generics[0], module_id)?
             }
             (Self::NATIVE_AS_UID, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT)
             | (Self::NATIVE_AS_UID_MUT, STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
@@ -336,7 +336,7 @@ impl NativeFunction {
                     compilation_ctx,
                     &generics[0],
                     module_id,
-                )
+                )?
             }
             (
                 Self::NATIVE_ADD_CHILD_OBJECT,
@@ -344,7 +344,12 @@ impl NativeFunction {
                 SF_MODULE_NAME_DYNAMIC_FIELD,
             ) => {
                 Self::assert_generics_length(generics.len(), 1, name, module_id);
-                dynamic_field::add_child_object_fn(module, compilation_ctx, &generics[0], module_id)
+                dynamic_field::add_child_object_fn(
+                    module,
+                    compilation_ctx,
+                    &generics[0],
+                    module_id,
+                )?
             }
             (
                 Self::NATIVE_BORROW_CHILD_OBJECT,
@@ -362,7 +367,7 @@ impl NativeFunction {
                     compilation_ctx,
                     &generics[0],
                     module_id,
-                )
+                )?
             }
             (
                 Self::NATIVE_REMOVE_CHILD_OBJECT,
@@ -413,7 +418,7 @@ impl NativeFunction {
                     compilation_ctx,
                     &generics[0],
                     module_id,
-                )
+                )?
             }
 
             _ => {
@@ -454,9 +459,12 @@ impl NativeFunction {
         compilation_ctx: &CompilationContext,
         generics: &[&IntermediateType],
         module_id: &ModuleId,
-    ) -> String {
+    ) -> Result<String, NativeFunctionError> {
         if generics.is_empty() {
-            panic!("generic_function_name called with no generics");
+            return Err(NativeFunctionError::GetGenericFunctionNameNoGenerics(
+                module_id.clone(),
+                name.to_owned(),
+            ));
         }
 
         let mut hasher = get_hasher();
@@ -465,6 +473,6 @@ impl NativeFunction {
             .for_each(|t| t.process_hash(&mut hasher, compilation_ctx));
         let hash = format!("{:x}", hasher.finish());
 
-        format!("___{name}_{hash}_{:x}", module_id.hash())
+        Ok(format!("___{name}_{hash}_{:x}", module_id.hash()))
     }
 }
