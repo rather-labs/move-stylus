@@ -41,6 +41,7 @@ use types::Type;
 pub struct Struct_ {
     pub name: String,
     pub fields: Vec<(String, Type)>,
+    pub positional_fields: bool,
     pub loc: Loc,
 }
 
@@ -107,6 +108,10 @@ pub fn process_special_attributes(
                         result.structs.push(Struct_ {
                             name: struct_name.clone(),
                             fields,
+                            positional_fields: matches!(
+                                s.fields,
+                                move_compiler::parser::ast::StructFields::Positional(_)
+                            ),
                             loc: s.loc,
                         });
 

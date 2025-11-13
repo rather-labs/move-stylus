@@ -16,13 +16,15 @@ use crate::{
     types::Type,
 };
 
-#[derive(Debug, PartialEq, Eq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Visibility {
     Public,
     Private,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Function {
     pub(crate) identifier: String,
     pub(crate) parameters: Vec<FunctionParameters>,
@@ -32,39 +34,39 @@ pub struct Function {
     pub(crate) is_entry: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FunctionParameters {
     pub(crate) identifier: String,
     pub(crate) type_: Type,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Struct_ {
     pub(crate) identifier: String,
     pub(crate) fields: Vec<StructField>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct StructField {
     pub(crate) identifier: String,
     pub(crate) type_: Type,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Event {
     pub(crate) identifier: String,
     pub(crate) fields: Vec<EventField>,
     pub(crate) is_anonymous: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct EventField {
     pub(crate) identifier: String,
     pub(crate) type_: Type,
     pub(crate) indexed: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Abi {
     pub(crate) contract_name: String,
     pub(crate) functions: Vec<Function>,

@@ -46,10 +46,18 @@ impl AbiGenerate {
                 std::fs::create_dir_all(&build_directory).unwrap();
 
                 for abi in &mut processed_abis {
-                    // Change the extension
-                    abi.file.set_extension("abi");
-                    let file = abi.file.file_name().expect("Source file name not found.");
-                    std::fs::write(build_directory.join(file), abi.content.as_bytes())?;
+                    if let Some(content) = &abi.content_human_readable {
+                        // Change the extension
+                        abi.file.set_extension("abi");
+                        let file = abi.file.file_name().expect("Source file name not found.");
+                        std::fs::write(build_directory.join(file), content.as_bytes())?;
+                    }
+                    if let Some(content) = &abi.content_json {
+                        // Change the extension
+                        abi.file.set_extension("json");
+                        let file = abi.file.file_name().expect("Source file name not found.");
+                        std::fs::write(build_directory.join(file), content.as_bytes())?;
+                    }
                 }
             }
             Err((mapped_files, errors)) => {

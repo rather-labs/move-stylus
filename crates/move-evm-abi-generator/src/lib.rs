@@ -5,6 +5,7 @@
 mod abi;
 mod common;
 mod human_readable;
+mod json_format;
 mod special_types;
 mod types;
 
@@ -19,7 +20,8 @@ use move_parse_special_attributes::SpecialAttributeError;
 
 pub struct Abi {
     pub file: PathBuf,
-    pub content: String,
+    pub content_json: Option<String>,
+    pub content_human_readable: Option<String>,
 }
 
 pub fn generate_abi(
@@ -61,10 +63,14 @@ pub fn generate_abi(
             continue;
         }
 
-        let abi = human_readable::process_abi(&abi);
+        let json_abi =
+            json_format::process_abi(&abi, module_data, &package_module_data.modules_data);
+        let hr_abi = human_readable::process_abi(&abi);
+
         result.push(Abi {
             file: file.to_path_buf(),
-            content: abi,
+            content_json: Some(json_abi),
+            content_human_readable: Some(hr_abi),
         });
     }
 
