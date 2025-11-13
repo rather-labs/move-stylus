@@ -1,4 +1,6 @@
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
+use relooper::BranchMode;
+use walrus::ValType;
 
 use crate::{
     compilation_context::{CompilationContextError, ModuleId},
@@ -21,6 +23,10 @@ pub enum TranslationError {
     #[error("an error ocurred while generating a native funciton's code")]
     NativeFunctionError(#[from] NativeFunctionError),
 
+    /*
+    #[error("an error ocurred while generating a native funciton's code")]
+    Flow(#[from] FlowError),
+    */
     #[error(r#"function "{0}" not found in global functions table"#)]
     FunctionDefinitionNotFound(FunctionId),
 
@@ -117,6 +123,16 @@ pub enum TranslationError {
 
     #[error("branch target not found")]
     BranchTargetNotFound(u16),
+
+    // Flow
+    #[error("switch: more than one case returns a value, Move should have merged them")]
+    SwitchMoreThanOneCase,
+
+    #[error("IfElse result mismatch: then={0:?}, else={1:?}")]
+    IfElseMismatch(Vec<ValType>, Vec<ValType>),
+
+    #[error("unsupported branch mode: {0:?}")]
+    UnssuportedBranchMode(BranchMode),
 
     // TODO: identify concrete errors and add its corresponding enum variant
     #[error("unknown error: {0}")]
