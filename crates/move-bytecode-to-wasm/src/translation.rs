@@ -61,7 +61,7 @@ use intermediate_types::{
 use table::{FunctionId, FunctionTable, TableEntry};
 
 use functions::JumpTableData;
-use types_stack::TypesStack;
+use types_stack::{TypesStack, TypesStackError};
 
 #[derive(Copy, Clone)]
 struct SimpleScope {
@@ -212,7 +212,7 @@ pub fn translate_function(
         compilation_ctx,
         &mut function_locals,
         function_information,
-    );
+    )?;
 
     let flow = Flow::new(move_bytecode);
 
@@ -362,33 +362,26 @@ fn translate_flow(
             ..
         } => {
             // When the if/else flow stems from a two-branch match on an enum, the jump_table will be Some.
-            if ctx.jump_table.is_some() {
-                let offsets = &ctx.jump_table.as_ref().unwrap().offsets;
-                let enum_index = ctx.jump_table.as_ref().unwrap().enum_index;
+            if let Some(jump_table) = ctx.jump_table.take() {
                 let enum_data = ctx
                     .module_data
                     .enums
-                    .get_enum_by_index(enum_index as u16)
-                    .unwrap();
+                    .get_enum_by_index(jump_table.enum_index as u16)?;
 
                 // The jump_table should have exactly 2 entries in this case.
-                assert_eq!(
-                    offsets.len(),
-                    2,
-                    "Jump table for IfElse flow should contain exactly 2 elements"
-                );
+                if jump_table.offsets.len() != 2 {
+                    return Err(TranslationError::IfElseJumpTableBranchesNumberMismatch);
+                }
 
                 // If offset[0] < offset[1], it means the `consequent` block corresponds to the first variant
                 // and the `alternative` block corresponds to the second variant.
                 // In that case the first variant index should match the value on the stack.
-                if offsets[0] <= offsets[1] {
+                if jump_table.offsets[0] <= jump_table.offsets[1] {
                     builder.i32_const(enum_data.variants[0].index as i32);
                 } else {
                     builder.i32_const(enum_data.variants[1].index as i32);
                 };
                 builder.binop(BinaryOp::I32Eq);
-
-                *ctx.jump_table = None;
             }
 
             let condition = module.locals.add(ValType::I32);
@@ -700,8 +693,7 @@ fn translate_instruction(
 
                 dependency_data
                     .functions
-                    .get_information_by_identifier(&function_id.identifier)
-                    .unwrap()
+                    .get_information_by_identifier(&function_id.identifier)?
             };
 
             if NamedId::is_remove_function(
@@ -1324,13 +1316,27 @@ fn translate_instruction(
                     t
                 ),
                 (
-                    IntermediateType::IStruct { ref module_id, index, .. },
+                    IntermediateType::IStruct { ref module_id, index, vm_handled_struct },
                     "struct",
                     *ref_inner
                 )
             );
-            assert_eq!(module_id, &module_data.id);
-            assert_eq!(struct_.index(), index);
+
+            if module_id != &module_data.id || index != struct_.index() {
+                return Err(TypesStackError::TypeMismatch {
+                    expected: IntermediateType::IStruct {
+                        module_id: module_data.id.clone(),
+                        index: struct_.index(),
+                        vm_handled_struct: VmHandledStruct::None,
+                    },
+                    found: IntermediateType::IStruct {
+                        module_id: module_id.clone(),
+                        index,
+                        vm_handled_struct,
+                    },
+                }
+                .into());
+            }
 
             let field_type =
                 bytecodes::structs::borrow_field(struct_, field_id, builder, compilation_ctx);
@@ -1392,14 +1398,28 @@ fn translate_instruction(
                     t
                 ),
                 (
-                    IntermediateType::IGenericStructInstance { ref module_id, index, ref types, .. },
+                    IntermediateType::IGenericStructInstance { ref module_id, index, ref types, vm_handled_struct },
                     "generic struct",
                     *ref_inner
                 )
             );
-            assert_eq!(module_id, &module_data.id);
-            assert_eq!(struct_.index(), index);
-            assert_eq!(types, &instantiation_types);
+            if module_id != &module_data.id || index != struct_.index() {
+                return Err(TypesStackError::TypeMismatch {
+                    expected: IntermediateType::IGenericStructInstance {
+                        module_id: module_data.id.clone(),
+                        index: struct_.index(),
+                        types: instantiation_types.clone(),
+                        vm_handled_struct: VmHandledStruct::None,
+                    },
+                    found: IntermediateType::IGenericStructInstance {
+                        module_id: module_id.clone(),
+                        index,
+                        types: types.clone(),
+                        vm_handled_struct,
+                    },
+                }
+                .into());
+            }
 
             let field_type = bytecodes::structs::borrow_field(
                 &struct_,
@@ -2965,7 +2985,7 @@ pub fn box_args(
     compilation_ctx: &CompilationContext,
     function_locals: &mut [LocalId],
     function_information: &MappedFunction,
-) {
+) -> Result<(), TranslationError> {
     // Store the changes we need to make
     let mut updates = Vec::new();
 
@@ -2983,10 +3003,7 @@ pub fn box_args(
                 if let Some(index) = function_locals.iter().position(|&id| id == *local) {
                     updates.push((index, outer_ptr));
                 } else {
-                    panic!(
-                        "Couldn't find original local {:?} in function_information",
-                        local
-                    );
+                    return Err(TranslationError::LocalNotFound(*local));
                 }
             }
             _ => {
@@ -2998,6 +3015,8 @@ pub fn box_args(
     for (index, pointer) in updates {
         function_locals[index] = pointer;
     }
+
+    Ok(())
 }
 
 /// This function saves into the storage cache all the changes made to the storage objects of the

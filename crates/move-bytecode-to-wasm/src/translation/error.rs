@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
 use relooper::BranchMode;
-use walrus::ValType;
+use walrus::{LocalId, ValType};
 
 use crate::{
     compilation_context::{CompilationContextError, ModuleId},
@@ -110,6 +110,16 @@ pub enum TranslationError {
     #[error("calling field borrow mut without type instantiations")]
     DynamicFieldBorrowMutNoTypeInstantiations,
 
+    #[error(
+        "there was an error processing field borrow, expected struct from module {expected_module_id} and index {expected_struct_index} and got module {actual_module_id} and index {actual_struct_index}"
+    )]
+    BorrowFieldStructMismatch {
+        expected_module_id: ModuleId,
+        expected_struct_index: u16,
+        actual_module_id: ModuleId,
+        actual_struct_index: u16,
+    },
+
     #[error("could not instantiate generic types")]
     CouldNotInstantiateGenericTypes,
 
@@ -122,6 +132,12 @@ pub enum TranslationError {
     #[error("branch target not found")]
     BranchTargetNotFound(u16),
 
+    #[error("a translation error ocurred translating instruction {0:?}\n{1}")]
+    AtInstruction(Bytecode, Rc<TranslationError>),
+
+    #[error(r#"could not find original local "{0:?}" in function information"#)]
+    LocalNotFound(LocalId),
+
     // Flow
     #[error("switch: more than one case returns a value, Move should have merged them")]
     SwitchMoreThanOneCase,
@@ -132,8 +148,10 @@ pub enum TranslationError {
     #[error("unsupported branch mode: {0:?}")]
     UnssuportedBranchMode(BranchMode),
 
-    #[error("a translation error ocurred translating instruction {0:?}\n{1}")]
-    AtInstruction(Bytecode, Rc<TranslationError>),
+    #[error("jump table for IfElse flow should contain exactly 2 elements")]
+    IfElseJumpTableBranchesNumberMismatch,
+
+    // Unknown
 
     // TODO: identify concrete errors and add its corresponding enum variant
     #[error("unknown error: {0}")]
