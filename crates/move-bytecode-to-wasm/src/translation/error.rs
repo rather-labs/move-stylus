@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use move_binary_format::file_format::{Bytecode, SignatureIndex};
 use relooper::BranchMode;
 use walrus::ValType;
@@ -23,10 +25,6 @@ pub enum TranslationError {
     #[error("an error ocurred while generating a native funciton's code")]
     NativeFunctionError(#[from] NativeFunctionError),
 
-    /*
-    #[error("an error ocurred while generating a native funciton's code")]
-    Flow(#[from] FlowError),
-    */
     #[error(r#"function "{0}" not found in global functions table"#)]
     FunctionDefinitionNotFound(FunctionId),
 
@@ -133,6 +131,9 @@ pub enum TranslationError {
 
     #[error("unsupported branch mode: {0:?}")]
     UnssuportedBranchMode(BranchMode),
+
+    #[error("a translation error ocurred translating instruction {0:?}\n{1}")]
+    AtInstruction(Bytecode, Rc<TranslationError>),
 
     // TODO: identify concrete errors and add its corresponding enum variant
     #[error("unknown error: {0}")]

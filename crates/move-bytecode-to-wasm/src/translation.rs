@@ -12,7 +12,10 @@ pub mod functions;
 pub mod intermediate_types;
 pub mod table;
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use walrus::{
     FunctionBuilder, FunctionId as WasmFunctionId, GlobalId, InstrSeqBuilder, LocalId, Module,
@@ -289,21 +292,22 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in *instructions {
-                    let mut fns_to_link = translate_instruction(
-                        instruction,
-                        ctx,
-                        block,
-                        module,
-                        branches,
-                    )
-                    .unwrap_or_else(|e| {
-                        panic!("there was an error translating instruction {instruction:?}.\n{e}")
-                    });
-
-                    functions_to_link.extend(fns_to_link.drain(..));
+                    match translate_instruction(instruction, ctx, block, module, branches) {
+                        Ok(mut fns_to_link) => {
+                            functions_to_link.extend(fns_to_link.drain(..));
+                        }
+                        Err(e) => {
+                            inner_result = Err(TranslationError::AtInstruction(
+                                instruction.clone(),
+                                Rc::new(e),
+                            ));
+                        }
+                    }
                 }
-                // Translate the immediate flow within the current scope
-                inner_result = translate_flow(ctx, block, module, immediate, functions_to_link);
+                if inner_result.is_ok() {
+                    // Translate the immediate flow within the current scope
+                    inner_result = translate_flow(ctx, block, module, immediate, functions_to_link);
+                }
 
                 // Done with this Simple's inner region. Pop the simple scope.
                 ctx.control_targets.pop_simple_scope();
