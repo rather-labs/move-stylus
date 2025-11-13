@@ -2,10 +2,13 @@ use move_binary_format::file_format::{Bytecode, SignatureIndex};
 
 use crate::{
     compilation_context::{CompilationContextError, ModuleId},
+    error::{CompilationError, ICEError, ICEErrorKind},
     native_functions::error::NativeFunctionError,
 };
 
-use super::{intermediate_types::IntermediateType, types_stack::TypesStackError};
+use super::{
+    intermediate_types::IntermediateType, table::FunctionId, types_stack::TypesStackError,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum TranslationError {
@@ -17,6 +20,9 @@ pub enum TranslationError {
 
     #[error("an error ocurred while generating a native funciton's code")]
     NativeFunctionError(#[from] NativeFunctionError),
+
+    #[error(r#"function "{0}" not found in global functions table"#)]
+    FunctionDefinitionNotFound(FunctionId),
 
     #[error("types mistach: expected {expected:?} but found {found:?}")]
     TypeMismatch {
@@ -103,4 +109,10 @@ pub enum TranslationError {
     // TODO: identify concrete errors and add its corresponding enum variant
     #[error("unknown error: {0}")]
     Unknown(#[from] anyhow::Error),
+}
+
+impl From<TranslationError> for CompilationError {
+    fn from(value: TranslationError) -> Self {
+        CompilationError::ICE(ICEError::new(ICEErrorKind::Translation(value)))
+    }
 }

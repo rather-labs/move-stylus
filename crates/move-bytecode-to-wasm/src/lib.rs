@@ -2,7 +2,9 @@ use abi_types::{error::AbiError, public_function::PublicFunction};
 pub(crate) use compilation_context::{CompilationContext, UserDefinedType};
 use compilation_context::{ModuleData, ModuleId};
 use constructor::inject_constructor;
-use error::{CodeError, CompilationError, DependencyError, ICEError, ICEErrorKind};
+use error::{
+    CodeError, CompilationError, DependencyError, DependencyProcessingError, ICEError, ICEErrorKind,
+};
 use move_binary_format::file_format::FunctionDefinition;
 use move_package::{
     compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource},
@@ -14,6 +16,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use translation::{
+    TranslationError,
     intermediate_types::IntermediateType,
     table::{FunctionId, FunctionTable},
     translate_function,
@@ -130,10 +133,10 @@ pub fn translate_package(
             &mut function_definitions,
         ) {
             match dependencies_errors {
-                DependencyError::ICE(ice_error) => {
+                DependencyProcessingError::ICE(ice_error) => {
                     return Err(CompilationError::ICE(ice_error));
                 }
-                DependencyError::CodeError(code_errors) => {
+                DependencyProcessingError::CodeError(code_errors) => {
                     errors.extend(code_errors);
                     continue;
                 }
@@ -270,10 +273,10 @@ pub fn package_module_data(
             &mut function_definitions,
         ) {
             match dependencies_errors {
-                DependencyError::ICE(ice_error) => {
+                DependencyProcessingError::ICE(ice_error) => {
                     return Err(CompilationError::ICE(ice_error));
                 }
-                DependencyError::CodeError(code_errors) => {
+                DependencyProcessingError::CodeError(code_errors) => {
                     errors.extend(code_errors);
                     continue;
                 }
@@ -351,7 +354,7 @@ pub fn process_dependency_tree<'move_package>(
     root_compiled_units: &'move_package [&CompiledUnitWithSource],
     dependencies: &[move_core_types::language_storage::ModuleId],
     function_definitions: &mut GlobalFunctionTable<'move_package>,
-) -> Result<(), DependencyError> {
+) -> Result<(), DependencyProcessingError> {
     let mut errors = Vec::new();
     for dependency in dependencies {
         let module_id = ModuleId {
@@ -374,7 +377,7 @@ pub fn process_dependency_tree<'move_package>(
                     && module.unit.address.into_bytes() == **dependency.address()
             })
             .map(|(_, module)| module)
-            .unwrap_or_else(|| panic!("could not find dependency {}", dependency.name()));
+            .ok_or_else(|| DependencyError::DependencyNotFound(dependency.name().to_string()))?;
 
         let immediate_dependencies = &dependency_module.unit.module.immediate_dependencies();
         // If the the dependency has dependency, we process them first
@@ -392,10 +395,10 @@ pub fn process_dependency_tree<'move_package>(
 
         if let Err(dependencies_errors) = dependencies_process_result {
             match dependencies_errors {
-                DependencyError::ICE(ice_error) => {
-                    return Err(DependencyError::ICE(ice_error));
+                DependencyProcessingError::ICE(ice_error) => {
+                    return Err(DependencyProcessingError::ICE(ice_error));
                 }
-                DependencyError::CodeError(code_errors) => {
+                DependencyProcessingError::CodeError(code_errors) => {
                     errors.extend(code_errors);
                     continue;
                 }
@@ -418,7 +421,9 @@ pub fn process_dependency_tree<'move_package>(
             function_definitions,
             special_attributes,
         )
-        .map_err(|e| DependencyError::ICE(ICEError::new(ICEErrorKind::CompilationContext(e))))?;
+        .map_err(|e| {
+            DependencyProcessingError::ICE(ICEError::new(ICEErrorKind::CompilationContext(e)))
+        })?;
 
         let processed_dependency = dependencies_data.insert(module_id, dependency_module_data);
 
@@ -431,10 +436,11 @@ pub fn process_dependency_tree<'move_package>(
     if errors.is_empty() {
         Ok(())
     } else {
-        Err(DependencyError::CodeError(errors))
+        Err(DependencyProcessingError::CodeError(errors))
     }
 }
 
+// TODO: Move to translation.rs
 /// Trnaslates a function to WASM and links it to the WASM module
 ///
 /// It also recursively translates and links all the functions called by this function
@@ -498,7 +504,7 @@ fn translate_and_link_functions(
     let function_definition = function_definitions
         // TODO do this in nother way
         .get(&function_id.get_generic_fn_id())
-        .unwrap_or_else(|| panic!("could not find function definition for {}", function_id));
+        .ok_or_else(|| TranslationError::FunctionDefinitionNotFound(function_id.clone()))?;
 
     // If the function contains code we translate it
     // If it does not it means is a native function, we do nothing, it is linked and called

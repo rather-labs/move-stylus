@@ -13,7 +13,7 @@ use crate::{
 };
 
 #[derive(thiserror::Error, Debug)]
-pub enum DependencyError {
+pub enum DependencyProcessingError {
     #[error("An internal compiler error (ICE) has ocurred.\n{0}")]
     ICE(#[from] ICEError),
 
@@ -67,6 +67,18 @@ impl Display for ICEError {
 }
 
 #[derive(thiserror::Error, Debug)]
+pub enum DependencyError {
+    #[error("could not find dependency {0}")]
+    DependencyNotFound(String),
+}
+
+impl From<DependencyError> for DependencyProcessingError {
+    fn from(value: DependencyError) -> Self {
+        DependencyProcessingError::ICE(ICEError::new(value.into()))
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
 pub enum ICEErrorKind {
     #[error("an error ocurred processing the compilation context")]
     CompilationContext(#[from] CompilationContextError),
@@ -88,6 +100,9 @@ pub enum ICEErrorKind {
 
     #[error("an error ocurred while processing building host environment")]
     HostIO(#[from] HostIOError),
+
+    #[error("an error ocurred while processing a contact's dependencies")]
+    Dependency(#[from] DependencyError),
 }
 
 impl From<CodeError> for Diagnostic {
