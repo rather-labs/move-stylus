@@ -686,10 +686,8 @@ fn translate_instruction(
 
             // Obtain the generic function information
             let function_information = {
-                let dependency_data = compilation_ctx
-                    .deps_data
-                    .get(&function_id.module_id)
-                    .unwrap_or(module_data);
+                let dependency_data =
+                    compilation_ctx.get_module_data_by_id(&function_id.module_id)?;
 
                 dependency_data
                     .functions
@@ -750,7 +748,10 @@ fn translate_instruction(
 
                 builder.call(delete_fn);
             } else {
-                let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
+                let type_instantiations = function_id
+                    .type_instantiations
+                    .as_ref()
+                    .ok_or(TranslationError::CallGenericWihtoutTypeInstantiations)?;
 
                 // If the type_instantiations contains generic parameters, those generic parameters
                 // refer to instantiations whithin this context. Instantiatons are obtained using
@@ -880,7 +881,7 @@ fn translate_instruction(
                         .function_id
                         .type_instantiations
                         .as_ref()
-                        .unwrap();
+                        .ok_or(TranslationError::CallGenericWihtoutTypeInstantiations)?;
 
                     let native_function_id = NativeFunction::get_generic(
                         &function_id.identifier,
@@ -939,10 +940,8 @@ fn translate_instruction(
             {
                 fi
             } else {
-                let dependency_data = compilation_ctx
-                    .deps_data
-                    .get(&function_id.module_id)
-                    .unwrap();
+                let dependency_data =
+                    compilation_ctx.get_module_data_by_id(&function_id.module_id)?;
 
                 dependency_data
                     .functions

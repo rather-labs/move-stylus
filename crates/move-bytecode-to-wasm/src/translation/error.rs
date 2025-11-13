@@ -89,6 +89,9 @@ pub enum TranslationError {
     #[error("found reference inside enum with index {enum_index}")]
     FoundReferenceInsideEnum { enum_index: u16 },
 
+    #[error("processing CallGeneric bytecode without type instantiations")]
+    CallGenericWihtoutTypeInstantiations,
+
     #[error(
         "trying to pack an enum variant using the generic enum definition with index {enum_index}"
     )]
