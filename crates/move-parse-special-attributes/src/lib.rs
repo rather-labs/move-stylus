@@ -6,6 +6,7 @@ pub mod function_modifiers;
 mod function_validation;
 mod shared;
 pub mod struct_modifiers;
+mod struct_validation;
 pub mod types;
 
 pub use abi_error::AbiError;
@@ -29,17 +30,20 @@ use move_compiler::{
     parser::ast::{Definition, ModuleMember},
     shared::{Identifier, NumericalAddress, files::MappedFiles},
 };
+use move_ir_types::location::Loc;
 use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
     path::Path,
 };
 use struct_modifiers::StructModifier;
+use struct_validation::validate_structs;
 use types::Type;
 
 #[derive(Debug)]
 pub struct Struct_ {
     pub name: String,
     pub fields: Vec<(String, Type)>,
+    pub loc: Loc,
 }
 
 #[derive(Default, Debug)]
@@ -105,6 +109,7 @@ pub fn process_special_attributes(
                         result.structs.push(Struct_ {
                             name: struct_name.clone(),
                             fields,
+                            loc: s.loc,
                         });
 
                         let mut found_modifier: bool = false;
@@ -216,6 +221,14 @@ pub fn process_special_attributes(
         } else {
             continue;
         };
+    }
+
+    // Validate that no struct fields contain events or errors
+    let struct_validation_errors =
+        validate_structs(&result.structs, &result.events, &result.abi_errors);
+    if !struct_validation_errors.is_empty() {
+        found_error = true;
+        module_errors.extend(struct_validation_errors);
     }
 
     for source in ast.source_definitions {

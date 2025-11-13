@@ -41,6 +41,12 @@ pub enum SpecialAttributeErrorKind {
 
     #[error("Too many attributes found")]
     TooManyAttributes,
+
+    #[error("Events cannot be nested. Found {0} in struct.")]
+    NestedEvent(String),
+
+    #[error("Errors cannot be nested. Found {0} in struct.")]
+    NestedError(String),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -67,6 +73,20 @@ impl From<&SpecialAttributeError> for Diagnostic {
             SpecialAttributeErrorKind::FunctionValidation(e) => e.into(),
             SpecialAttributeErrorKind::TooManyAttributes => custom(
                 "Special attributes error",
+                Severity::BlockingError,
+                3,
+                3,
+                Box::leak(value.to_string().into_boxed_str()),
+            ),
+            SpecialAttributeErrorKind::NestedEvent(_) => custom(
+                "Struct field validation error",
+                Severity::BlockingError,
+                3,
+                3,
+                Box::leak(value.to_string().into_boxed_str()),
+            ),
+            SpecialAttributeErrorKind::NestedError(_) => custom(
+                "Struct field validation error",
                 Severity::BlockingError,
                 3,
                 3,
