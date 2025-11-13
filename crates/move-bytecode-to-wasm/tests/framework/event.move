@@ -2,6 +2,12 @@ module test::event;
 
 use stylus::event::emit;
 
+public struct NestedStruct has copy, drop {
+    a: u32,
+    b: address,
+    c: u128,
+}
+
 #[ext(event, indexes = 1)]
 public struct TestEvent1 has copy, drop {
     n: u32
@@ -28,7 +34,7 @@ public struct TestEvent4 has copy, drop {
     b: address,
     c: u128,
     d: vector<u8>,
-    e: TestEvent2,
+    e: NestedStruct,
 }
 
 #[ext(event, indexes = 3)]
@@ -42,14 +48,14 @@ public struct TestEvent5 has copy, drop {
 public struct TestEvent6 has copy, drop {
     a: u32,
     b: address,
-    c: TestEvent2,
+    c: NestedStruct,
 }
 
 #[ext(event, indexes = 3)]
 public struct TestEvent7 has copy, drop {
     a: u32,
     b: vector<u8>,
-    c: TestEvent2,
+    c: NestedStruct,
 }
 
 #[ext(event, indexes = 1)]
@@ -77,7 +83,7 @@ entry fun emit_test_event3(a: u32, b: address, c: u128, d: vector<u8>) {
 }
 
 entry fun emit_test_event4(a: u32, b: address, c: u128, d: vector<u8>, e: u32, f: address, g: u128) {
-    let e = TestEvent2 {a: e, b: f, c: g };
+    let e = NestedStruct {a: e, b: f, c: g };
     emit(TestEvent4 { a, b, c, d, e });
 }
 
@@ -86,12 +92,12 @@ entry fun emit_test_event5(a: u32, b: address, c: vector<u8>) {
 }
 
 entry fun emit_test_event6(a: u32, b: address, c: u32, d: address, e: u128) {
-    let c = TestEvent2 {a: c, b: d, c: e };
+    let c = NestedStruct {a: c, b: d, c: e };
     emit(TestEvent6 { a, b, c });
 }
 
 entry fun emit_test_event7(a: u32, b: vector<u8>, c: u32, d: address, e: u128) {
-    let c = TestEvent2 {a: c, b: d, c: e };
+    let c = NestedStruct {a: c, b: d, c: e };
     emit(TestEvent7 { a, b, c });
 }
 
@@ -129,7 +135,7 @@ public struct TestEvent4Anon has copy, drop {
     b: address,
     c: u128,
     d: vector<u8>,
-    e: TestEvent2,
+    e: NestedStruct,
 }
 
 #[ext(event, anonymous, indexes = 3)]
@@ -143,14 +149,14 @@ public struct TestEvent5Anon has copy, drop {
 public struct TestEvent6Anon has copy, drop {
     a: u32,
     b: address,
-    c: TestEvent2,
+    c: NestedStruct,
 }
 
 #[ext(event, anonymous, indexes = 3)]
 public struct TestEvent7Anon has copy, drop {
     a: u32,
     b: vector<u8>,
-    c: TestEvent2,
+    c: NestedStruct,
 }
 
 #[ext(event, anonymous, indexes = 1)]
@@ -170,7 +176,7 @@ public struct Anonymous has copy, drop {
     a: u32,
     b: u128,
     c: vector<u8>,
-    d: TestEvent2,
+    d: NestedStruct,
 }
 
 #[ext(event, anonymous, indexes = 4)]
@@ -178,12 +184,12 @@ public struct Anonymous2 has copy, drop {
     a: u32,
     b: u128,
     c: vector<u8>,
-    d: TestEvent2,
+    d: NestedStruct,
     e: u32,
     f: address,
     g: u128,
     h: vector<u8>,
-    i: TestEvent2,
+    i: NestedStruct,
 }
 
 entry fun emit_test_anon_event1(n: u32) {
@@ -199,7 +205,7 @@ entry fun emit_test_anon_event3(a: u32, b: address, c: u128, d: vector<u8>) {
 }
 
 entry fun emit_test_anon_event4(a: u32, b: address, c: u128, d: vector<u8>, e: u32, f: address, g: u128) {
-    let e = TestEvent2 {a: e, b: f, c: g };
+    let e = NestedStruct {a: e, b: f, c: g };
     emit(TestEvent4Anon { a, b, c, d, e });
 }
 
@@ -208,12 +214,12 @@ entry fun emit_test_anon_event5(a: u32, b: address, c: vector<u8>) {
 }
 
 entry fun emit_test_anon_event6(a: u32, b: address, c: u32, d: address, e: u128) {
-    let c = TestEvent2 {a: c, b: d, c: e };
+    let c = NestedStruct {a: c, b: d, c: e };
     emit(TestEvent6Anon { a, b, c });
 }
 
 entry fun emit_test_anon_event7(a: u32, b: vector<u8>, c: u32, d: address, e: u128) {
-    let c = TestEvent2 {a: c, b: d, c: e };
+    let c = NestedStruct {a: c, b: d, c: e };
     emit(TestEvent7Anon { a, b, c });
 }
 
@@ -226,6 +232,6 @@ entry fun emit_test_anon_event9(a: u64, b: std::ascii::String) {
 }
 
 entry fun emit_test_anonymous(a: u32, b: u128, c: vector<u8>, d: u32, e: address, f: u128) {
-    let d = TestEvent2 {a: d, b: e, c: f };
+    let d = NestedStruct {a: d, b: e, c: f };
     emit(Anonymous { a, b, c, d });
 }

@@ -53,12 +53,12 @@ pub fn validate_structs(
             if let Some((is_event, name)) = check_type(field_type, events, abi_errors) {
                 let error = if is_event {
                     SpecialAttributeError {
-                        kind: SpecialAttributeErrorKind::NestedEvent(format!("{}", name)),
+                        kind: SpecialAttributeErrorKind::NestedEvent(name.to_string()),
                         line_of_code: struct_.loc,
                     }
                 } else {
                     SpecialAttributeError {
-                        kind: SpecialAttributeErrorKind::NestedError(format!("{}", name)),
+                        kind: SpecialAttributeErrorKind::NestedError(name.to_string()),
                         line_of_code: struct_.loc,
                     }
                 };

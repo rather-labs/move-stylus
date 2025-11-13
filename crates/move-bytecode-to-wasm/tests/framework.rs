@@ -130,7 +130,7 @@ mod event {
 
     sol!(
         #[allow(missing_docs)]
-        struct TestEvent2 {
+        struct NestedStruct {
             uint32 a;
             address b;
             uint128 c;
@@ -201,7 +201,7 @@ mod event {
         address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
         u128::MAX.abi_encode().to_vec(),
         vec![1, 2, 3, 4, 5].abi_encode().to_vec(),
-        TestEvent2 {
+        NestedStruct {
             a: 42,
             b: address!("0xcafe000000000000000000000000000000007357"),
             c: u128::MAX,
@@ -229,7 +229,7 @@ mod event {
         keccak256(b"TestEvent6(uint32,address,(uint32,address,uint128))").to_vec(),
         41.abi_encode().to_vec(),
         address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
-        keccak256(TestEvent2 {
+        keccak256(NestedStruct {
             a: 43,
             b: address!("0xcafe000000000000000000000000000000007357"),
             c: u128::MAX,
@@ -246,7 +246,7 @@ mod event {
         keccak256(b"TestEvent7(uint32,uint8[],(uint32,address,uint128))").to_vec(),
         42.abi_encode().to_vec(),
         keccak256(vec![1, 2, 3, 4, 5].abi_encode()).to_vec(),
-        keccak256(TestEvent2 {
+        keccak256(NestedStruct {
             a: 43,
             b: address!("0xcafe000000000000000000000000000000007357"),
             c: u128::MAX,
@@ -306,7 +306,7 @@ mod event {
         address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
         u128::MAX.abi_encode().to_vec(),
         vec![1, 2, 3, 4, 5].abi_encode().to_vec(),
-        TestEvent2 {
+        NestedStruct {
             a: 42,
             b: address!("0xcafe000000000000000000000000000000007357"),
             c: u128::MAX,
@@ -332,7 +332,7 @@ mod event {
     [
         41.abi_encode().to_vec(),
         address!("0xcafe000000000000000000000000000000007357").abi_encode().to_vec(),
-        keccak256(TestEvent2 {
+        keccak256(NestedStruct {
             a: 43,
             b: address!("0xcafe000000000000000000000000000000007357"),
             c: u128::MAX,
@@ -348,7 +348,7 @@ mod event {
     [
         42.abi_encode().to_vec(),
         keccak256(vec![1, 2, 3, 4, 5].abi_encode()).to_vec(),
-        keccak256(TestEvent2 {
+        keccak256(NestedStruct {
             a: 43,
             b: address!("0xcafe000000000000000000000000000000007357"),
             c: u128::MAX,
@@ -382,7 +382,7 @@ mod event {
         42.abi_encode().to_vec(),
         u128::MAX.abi_encode(),
         keccak256(vec![1, 2, 3, 4, 5].abi_encode()).to_vec(),
-        keccak256(TestEvent2 {
+        keccak256(NestedStruct {
             a: 43,
             b: address!("0xcafe000000000000000000000000000000007357"),
             c: u128::MAX,
@@ -1482,6 +1482,14 @@ mod error {
             CustomError b;
         }
 
+        struct NestedStruct1 {
+            string e;
+        }
+        struct NestedStruct2 {
+            string a;
+            uint64 b;
+        }
+
         function revertStandardError(string s) external;
         function revertCustomError(string s, uint64 code) external;
         function revertCustomError2(bool a, uint8 b, uint16 c, uint32 d, uint64 e, uint128 f, uint256 g, address h) external;
@@ -1534,13 +1542,10 @@ mod error {
             keccak256(b"CustomError4((string),(string,uint64))")[..4].to_vec(),
             {
                 let params = (
-                    Error { e: String::from("Custom error message") },
-                    CustomError {
-                        error_message: String::from("Custom error message 2"),
-                        error_code: 42,
-                    },
+                    NestedStruct1 { e: String::from("Custom error message") },
+                    NestedStruct2 { a: String::from("Custom error message 2"), b: 42 },
                 );
-                <sol!((Error, CustomError)) as alloy_sol_types::SolValue>::abi_encode_params(&params)
+                <sol!((NestedStruct1, NestedStruct2)) as alloy_sol_types::SolValue>::abi_encode_params(&params)
             },
         ].concat()
     )]
