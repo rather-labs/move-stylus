@@ -6,7 +6,6 @@ pub mod function_modifiers;
 mod function_validation;
 mod shared;
 pub mod struct_modifiers;
-mod struct_validation;
 pub mod types;
 
 pub use abi_error::AbiError;
@@ -36,7 +35,6 @@ use std::{
     path::Path,
 };
 use struct_modifiers::StructModifier;
-use struct_validation::validate_structs;
 use types::Type;
 
 #[derive(Debug)]
@@ -224,11 +222,15 @@ pub fn process_special_attributes(
     }
 
     // Validate that no struct fields contain events or errors
-    let struct_validation_errors =
-        validate_structs(&result.structs, &result.events, &result.abi_errors);
-    if !struct_validation_errors.is_empty() {
-        found_error = true;
-        module_errors.extend(struct_validation_errors);
+    for s in &result.structs {
+        for (_, field_type) in &s.fields {
+            if let Some(error) =
+                validate_struct_field(field_type, &result.events, &result.abi_errors, s.loc)
+            {
+                module_errors.push(error);
+                found_error = true;
+            }
+        }
     }
 
     for source in ast.source_definitions {
@@ -326,5 +328,43 @@ pub fn process_special_attributes(
         Err((mapped_files, module_errors))
     } else {
         Ok(result)
+    }
+}
+
+/// Checks if a field of a struct is an event or an error (or an array/tuple of them)
+/// If so, returns a SpecialAttributeError.
+fn validate_struct_field(
+    ty: &Type,
+    events: &HashMap<String, Event>,
+    abi_errors: &HashMap<String, AbiError>,
+    loc: Loc,
+) -> Option<SpecialAttributeError> {
+    match ty {
+        Type::UserDataType(name, _) => {
+            // Check if the type itself is an event or error
+            if events.contains_key(name) {
+                return Some(SpecialAttributeError {
+                    kind: SpecialAttributeErrorKind::NestedEvent(name.to_string()),
+                    line_of_code: loc,
+                });
+            }
+            if abi_errors.contains_key(name) {
+                return Some(SpecialAttributeError {
+                    kind: SpecialAttributeErrorKind::NestedError(name.to_string()),
+                    line_of_code: loc,
+                });
+            }
+            None
+        }
+        Type::Vector(inner) => validate_struct_field(inner, events, abi_errors, loc),
+        Type::Tuple(types) => {
+            for t in types {
+                if let Some(error) = validate_struct_field(t, events, abi_errors, loc) {
+                    return Some(error);
+                }
+            }
+            None
+        }
+        _ => None,
     }
 }
