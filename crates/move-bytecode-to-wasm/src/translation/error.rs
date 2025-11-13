@@ -106,6 +106,18 @@ pub enum TranslationError {
     #[error("calling field borrow mut without type instantiations")]
     DynamicFieldBorrowMutNoTypeInstantiations,
 
+    #[error("could not instantiate generic types")]
+    CouldNotInstantiateGenericTypes,
+
+    #[error("expected generic struct instance, found {0:?}")]
+    ExpectedGenericStructInstance(IntermediateType),
+
+    #[error("expected generic struct instance")]
+    ExpectedGenericStructInstanceNotFound,
+
+    #[error("branch target not found")]
+    BranchTargetNotFound(u16),
+
     // TODO: identify concrete errors and add its corresponding enum variant
     #[error("unknown error: {0}")]
     Unknown(#[from] anyhow::Error),

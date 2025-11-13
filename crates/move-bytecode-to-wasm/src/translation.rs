@@ -787,7 +787,7 @@ fn translate_instruction(
                     }
                     // This should never happen
                     else {
-                        panic!("could not instantiate generic types");
+                        return Err(TranslationError::CouldNotInstantiateGenericTypes);
                     }
                 } else {
                     function_information.instantiate(type_instantiations)
@@ -1308,14 +1308,17 @@ fn translate_instruction(
                 .unwrap();
 
             let instantiation_types = if instantiation_types.iter().any(type_contains_generics) {
-                match &types_stack.last().unwrap() {
-                    IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
-                        match &**inner {
-                            IntermediateType::IGenericStructInstance { types, .. } => types.clone(),
-                            _ => panic!(),
+                match &types_stack.last() {
+                    Some(IntermediateType::IRef(inner))
+                    | Some(IntermediateType::IMutRef(inner)) => match &**inner {
+                        IntermediateType::IGenericStructInstance { types, .. } => types.clone(),
+                        _ => {
+                            return Err(TranslationError::ExpectedGenericStructInstance(
+                                inner.as_ref().clone(),
+                            ));
                         }
-                    }
-                    _ => panic!(),
+                    },
+                    _ => return Err(TranslationError::ExpectedGenericStructInstanceNotFound),
                 }
             } else {
                 instantiation_types.clone()
@@ -1402,13 +1405,17 @@ fn translate_instruction(
                 .unwrap();
 
             let instantiation_types = if instantiation_types.iter().any(type_contains_generics) {
-                if let Some(IntermediateType::IMutRef(inner)) = &types_stack.last() {
-                    match &**inner {
+                match &types_stack.last() {
+                    Some(IntermediateType::IRef(inner))
+                    | Some(IntermediateType::IMutRef(inner)) => match &**inner {
                         IntermediateType::IGenericStructInstance { types, .. } => types.clone(),
-                        _ => panic!(),
-                    }
-                } else {
-                    panic!()
+                        _ => {
+                            return Err(TranslationError::ExpectedGenericStructInstance(
+                                inner.as_ref().clone(),
+                            ));
+                        }
+                    },
+                    _ => return Err(TranslationError::ExpectedGenericStructInstanceNotFound),
                 }
             } else {
                 instantiation_types.clone()
@@ -1464,7 +1471,7 @@ fn translate_instruction(
                 {
                     replace_type_parameters(&inner, caller_type_instances)
                 } else {
-                    panic!("could not compute concrete type")
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 inner
@@ -1561,7 +1568,7 @@ fn translate_instruction(
                 {
                     replace_type_parameters(&inner, caller_type_instances)
                 } else {
-                    panic!("could not compute concrete type")
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 inner
@@ -1715,7 +1722,7 @@ fn translate_instruction(
                 {
                     replace_type_parameters(&expected_vec_inner, caller_type_instances)
                 } else {
-                    panic!("could not compute concrete type")
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 expected_vec_inner
@@ -2458,7 +2465,7 @@ fn translate_instruction(
                 }
                 // This should never happen
                 else {
-                    panic!("could not instantiate generic types");
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 let types = module_data
@@ -2534,7 +2541,7 @@ fn translate_instruction(
                 }
                 // This should never happen
                 else {
-                    panic!("could not instantiate generic types");
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 (struct_, types.to_vec())
@@ -2561,7 +2568,7 @@ fn translate_instruction(
                 if let Some(target) = control_targets.resolve(*mode, *code_offset) {
                     builder.br_if(target);
                 } else {
-                    panic!("BrTrue target not found for code offset: {code_offset}");
+                    return Err(TranslationError::BranchTargetNotFound(*code_offset));
                 }
             }
         }
@@ -2572,7 +2579,7 @@ fn translate_instruction(
                     builder.unop(UnaryOp::I32Eqz);
                     builder.br_if(target);
                 } else {
-                    panic!("BrFalse target not found for code offset: {code_offset}");
+                    return Err(TranslationError::BranchTargetNotFound(*code_offset));
                 }
             }
         }
@@ -2581,7 +2588,7 @@ fn translate_instruction(
                 if let Some(target) = control_targets.resolve(*mode, *code_offset) {
                     builder.br(target);
                 } else {
-                    panic!("Branch target not found for code offset: {code_offset}");
+                    return Err(TranslationError::BranchTargetNotFound(*code_offset));
                 }
             }
         }
@@ -2649,7 +2656,7 @@ fn translate_instruction(
                 }
                 // This should never happen
                 else {
-                    panic!("could not instantiate generic types");
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 let types = module_data.enums.get_enum_instance_types(index)?.to_vec();
@@ -2715,7 +2722,7 @@ fn translate_instruction(
                 }
                 // This should never happen
                 else {
-                    panic!("could not instantiate generic types");
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 (enum_, type_instantiations.to_vec())
@@ -2789,7 +2796,7 @@ fn translate_instruction(
                 }
                 // This should never happen
                 else {
-                    panic!("could not instantiate generic types");
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 (enum_, type_instantiations.to_vec())
