@@ -280,7 +280,7 @@ impl NativeFunction {
                     module,
                     compilation_ctx,
                     &[&generics[0]],
-                )
+                )?
             }
             //
             // Event
@@ -394,7 +394,7 @@ impl NativeFunction {
                     module,
                     compilation_ctx,
                     &[&generics[0]],
-                )
+                )?
             }
             // This native function is only available in debug mode to help with testing. It should
             // not be compiled in release mode.
@@ -408,7 +408,7 @@ impl NativeFunction {
                     module,
                     compilation_ctx,
                     &[&generics[0]],
-                )
+                )?
             }
             #[cfg(debug_assertions)]
             (Self::NATIVE_HASH_TYPE_AND_KEY, _, _) => {

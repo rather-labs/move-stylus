@@ -1,0 +1,11 @@
+#[derive(thiserror::Error, Debug)]
+pub enum RuntimeFunctionError {
+    #[error(r#"there was an error linking "{0}" runtime function, missing compilation context?"#)]
+    CouldNotLink(String),
+
+    #[error(r#"there was an error linking "{0}" runtime function, is this function generic?"#)]
+    CouldNotLinkGeneric(String),
+
+    #[error("generic_function_name called with no generics")]
+    GenericFunctionNameNoGenerics,
+}

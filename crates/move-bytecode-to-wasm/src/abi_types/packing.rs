@@ -266,7 +266,7 @@ impl Packable for IntermediateType {
                     compilation_ctx.memory_id,
                     local,
                     writer_pointer,
-                );
+                )?;
             }
             IntermediateType::IU64 => {
                 pack_i64_type_instructions(
@@ -275,7 +275,7 @@ impl Packable for IntermediateType {
                     compilation_ctx.memory_id,
                     local,
                     writer_pointer,
-                );
+                )?;
             }
             IntermediateType::IU128 => IU128::add_pack_instructions(
                 builder,
@@ -283,14 +283,14 @@ impl Packable for IntermediateType {
                 local,
                 writer_pointer,
                 compilation_ctx.memory_id,
-            ),
+            )?,
             IntermediateType::IU256 => IU256::add_pack_instructions(
                 builder,
                 module,
                 local,
                 writer_pointer,
                 compilation_ctx.memory_id,
-            ),
+            )?,
             IntermediateType::ISigner => return Err(AbiPackError::FoundSignerType),
             IntermediateType::IAddress => IAddress::add_pack_instructions(
                 builder,
@@ -347,7 +347,13 @@ impl Packable for IntermediateType {
                 if !enum_.is_simple {
                     return Err(AbiPackError::EnumIsNotSimple(enum_.identifier.clone()));
                 }
-                enum_.add_pack_instructions(builder, module, local, writer_pointer, compilation_ctx)
+                enum_.add_pack_instructions(
+                    builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    compilation_ctx,
+                )?
             }
             IntermediateType::ITypeParameter(_) => {
                 return Err(AbiPackError::PackingGenericTypeParameter);

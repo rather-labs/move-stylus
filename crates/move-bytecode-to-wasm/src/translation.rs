@@ -731,7 +731,7 @@ fn translate_instruction(
                     module,
                     compilation_ctx,
                     &[&parent_struct],
-                );
+                )?;
 
                 // At this point, in the stack que have the pointer to the Uid struct, but what we
                 // really need is the pointer to the struct that holds that UId. The struct ptr can
@@ -989,7 +989,7 @@ fn translate_instruction(
                     module,
                     compilation_ctx,
                     &[&parent_struct],
-                );
+                )?;
 
                 // At this point, in the stack que have the pointer to the Uid struct, but what we
                 // really need is the pointer to the struct that holds that UId. The struct ptr can
@@ -1696,12 +1696,12 @@ fn translate_instruction(
                 | IntermediateType::IEnum { .. }
                 | IntermediateType::IGenericEnumInstance { .. } => {
                     let pop_back_f =
-                        RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
+                        RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx))?;
                     builder.call(pop_back_f);
                 }
                 IntermediateType::IU64 => {
                     let pop_back_f =
-                        RuntimeFunction::VecPopBack64.get(module, Some(compilation_ctx));
+                        RuntimeFunction::VecPopBack64.get(module, Some(compilation_ctx))?;
                     builder.call(pop_back_f);
                 }
                 IntermediateType::ITypeParameter(_)
@@ -1798,11 +1798,11 @@ fn translate_instruction(
 
             match *vec_inner {
                 IntermediateType::IU64 => {
-                    let swap_f = RuntimeFunction::VecSwap64.get(module, Some(compilation_ctx));
+                    let swap_f = RuntimeFunction::VecSwap64.get(module, Some(compilation_ctx))?;
                     builder.call(swap_f);
                 }
                 _ => {
-                    let swap_f = RuntimeFunction::VecSwap32.get(module, Some(compilation_ctx));
+                    let swap_f = RuntimeFunction::VecSwap32.get(module, Some(compilation_ctx))?;
                     builder.call(swap_f);
                 }
             }
@@ -2064,12 +2064,14 @@ fn translate_instruction(
                     builder.binop(BinaryOp::I64LtU);
                 }
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     builder.i32_const(IU128::HEAP_SIZE).call(less_than_f);
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     builder.i32_const(IU256::HEAP_SIZE).call(less_than_f);
                 }
@@ -2101,7 +2103,8 @@ fn translate_instruction(
                 // For u128 and u256 instead of doing a <= b, we do !(b < a) == a <= b, this way
                 // we can reuse the LessThan function
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
@@ -2114,7 +2117,8 @@ fn translate_instruction(
                         .negate();
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
@@ -2154,7 +2158,8 @@ fn translate_instruction(
                 // For u128 and u256 instead of doing a > b, we do b < a, this way we can reuse the
                 // LessThan function
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
@@ -2165,7 +2170,8 @@ fn translate_instruction(
                         .call(less_than_f);
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
@@ -2203,7 +2209,8 @@ fn translate_instruction(
                 // For u128 and u256 instead of doing a >= b, we do !(a < b) == a >= b, this way we can reuse the
                 // LessThan function
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     // Compare
                     builder
@@ -2212,7 +2219,8 @@ fn translate_instruction(
                         .negate();
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     builder
                         .i32_const(IU256::HEAP_SIZE)
@@ -3030,7 +3038,7 @@ fn add_cache_storage_object_instructions(
     compilation_ctx: &CompilationContext,
     function_argumets: &[IntermediateType],
     function_locals: &[LocalId],
-) {
+) -> Result<(), TranslationError> {
     let object_to_cache = function_argumets
         .iter()
         .enumerate()
@@ -3056,12 +3064,14 @@ fn add_cache_storage_object_instructions(
 
     for (itype, wasm_local_var) in object_to_cache {
         let cache_storage_object_changes_fn = RuntimeFunction::CacheStorageObjectChanges
-            .get_generic(module, compilation_ctx, &[itype]);
+            .get_generic(module, compilation_ctx, &[itype])?;
 
         builder
             .local_get(wasm_local_var)
             .call(cache_storage_object_changes_fn);
     }
+
+    Ok(())
 }
 
 /// This function checks if the field we are borrowing from struct is a UID or NamedId. If we are

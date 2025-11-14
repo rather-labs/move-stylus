@@ -139,14 +139,14 @@ impl Unpackable for IntermediateType {
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
-            ),
+            )?,
             IntermediateType::IU256 => IU256::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
-            ),
+            )?,
             IntermediateType::IAddress => IAddress::add_unpack_instructions(
                 function_builder,
                 module,
@@ -321,10 +321,10 @@ fn add_unpack_from_storage_instructions(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
     unpack_frozen: bool,
-) {
+) -> Result<(), AbiUnpackError> {
     // Search for the object in the objects mappings
     let locate_storage_data_fn =
-        RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
+        RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx))?;
 
     let uid_ptr = module.locals.add(ValType::I32);
     builder.local_tee(uid_ptr);
@@ -339,7 +339,7 @@ fn add_unpack_from_storage_instructions(
 
     // Read the object
     let read_and_decode_from_storage_fn =
-        RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype]);
+        RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype])?;
 
     // Copy the slot number into a local to avoid overwriting it later
     let slot_ptr = module.locals.add(ValType::I32);
@@ -355,6 +355,8 @@ fn add_unpack_from_storage_instructions(
         .local_get(slot_ptr)
         .local_get(uid_ptr)
         .call(read_and_decode_from_storage_fn);
+
+    Ok(())
 }
 
 #[cfg(test)]

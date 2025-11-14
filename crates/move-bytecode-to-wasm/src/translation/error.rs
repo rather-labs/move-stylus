@@ -8,6 +8,7 @@ use crate::{
     compilation_context::{CompilationContextError, ModuleId},
     error::{CompilationError, ICEError, ICEErrorKind},
     native_functions::error::NativeFunctionError,
+    runtime::error::RuntimeFunctionError,
 };
 
 use super::{
@@ -22,8 +23,11 @@ pub enum TranslationError {
     #[error("compilation context error")]
     CompilationContextError(#[from] CompilationContextError),
 
-    #[error("an error ocurred while generating a native funciton's code")]
+    #[error("an error ocurred while generating a native function's code")]
     NativeFunctionError(#[from] NativeFunctionError),
+
+    #[error("an error ocurred while generating a runtime function's code")]
+    RuntimeFunction(#[from] RuntimeFunctionError),
 
     #[error(r#"function "{0}" not found in global functions table"#)]
     FunctionDefinitionNotFound(FunctionId),

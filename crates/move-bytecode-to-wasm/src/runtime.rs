@@ -1,5 +1,6 @@
 use std::hash::Hasher;
 
+use error::RuntimeFunctionError;
 use walrus::{FunctionId, GlobalId, Module};
 
 use crate::{
@@ -14,6 +15,7 @@ use crate::{
 mod copy;
 mod enums;
 mod equality;
+pub mod error;
 mod integers;
 mod storage;
 mod swap;
@@ -161,11 +163,11 @@ impl RuntimeFunction {
         &self,
         module: &mut Module,
         compilation_ctx: Option<&CompilationContext>,
-    ) -> FunctionId {
+    ) -> Result<FunctionId, RuntimeFunctionError> {
         if let Some(function) = module.funcs.by_name(self.name()) {
-            function
+            Ok(function)
         } else {
-            match (self, compilation_ctx) {
+            let function_id = match (self, compilation_ctx) {
                 // Integers
                 (Self::HeapIntSum, Some(ctx)) => integers::add::heap_integers_add(module, ctx),
                 (Self::HeapIntSub, Some(ctx)) => integers::sub::heap_integers_sub(module, ctx),
@@ -191,7 +193,7 @@ impl RuntimeFunction {
                 // Swap
                 (Self::SwapI32Bytes, _) => swap::swap_i32_bytes_function(module),
                 (Self::SwapI64Bytes, _) => {
-                    let swap_i32_f = Self::SwapI32Bytes.get(module, compilation_ctx);
+                    let swap_i32_f = Self::SwapI32Bytes.get(module, compilation_ctx)?;
                     swap::swap_i64_bytes_function(module, swap_i32_f)
                 }
                 (Self::SwapI128Bytes, Some(ctx)) => swap::swap_bytes_function::<2>(
@@ -271,11 +273,10 @@ impl RuntimeFunction {
                     integers::ascii::u64_to_ascii_base_10(module, ctx)
                 }
                 // Error
-                _ => panic!(
-                    r#"there was an error linking "{}" runtime function, missing compilation context?"#,
-                    self.name()
-                ),
-            }
+                _ => return Err(RuntimeFunctionError::CouldNotLink(self.name().to_owned())),
+            };
+
+            Ok(function_id)
         }
     }
 
@@ -289,8 +290,8 @@ impl RuntimeFunction {
         module: &mut Module,
         compilation_ctx: &CompilationContext,
         generics: &[&IntermediateType],
-    ) -> FunctionId {
-        match self {
+    ) -> Result<FunctionId, RuntimeFunctionError> {
+        let function_id = match self {
             Self::EncodeAndSaveInStorage => {
                 assert_eq!(
                     1,
@@ -381,11 +382,14 @@ impl RuntimeFunction {
                 );
                 enums::compute_enum_storage_tail_position(module, compilation_ctx, generics[0])
             }
-            _ => panic!(
-                r#"there was an error linking "{}" runtime function, is this function generic?"#,
-                self.name()
-            ),
-        }
+            _ => {
+                return Err(RuntimeFunctionError::CouldNotLinkGeneric(
+                    self.name().to_owned(),
+                ));
+            }
+        };
+
+        Ok(function_id)
     }
 
     /// Links the function `commit_changes_to_storage` into the module and returns its id.
@@ -414,9 +418,9 @@ impl RuntimeFunction {
         &self,
         compilation_ctx: &CompilationContext,
         generics: &[&IntermediateType],
-    ) -> String {
+    ) -> Result<String, RuntimeFunctionError> {
         if generics.is_empty() {
-            panic!("generic_function_name called with no generics");
+            return Err(RuntimeFunctionError::GenericFunctionNameNoGenerics);
         }
 
         let mut hasher = get_hasher();
@@ -425,6 +429,6 @@ impl RuntimeFunction {
             .for_each(|t| t.process_hash(&mut hasher, compilation_ctx));
         let hash = format!("{:x}", hasher.finish());
 
-        format!("runtime_{}_{hash}", self.name())
+        Ok(format!("runtime_{}_{hash}", self.name()))
     }
 }

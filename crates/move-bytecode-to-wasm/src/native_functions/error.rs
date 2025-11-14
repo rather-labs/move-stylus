@@ -3,11 +3,15 @@ use std::rc::Rc;
 use crate::{
     abi_types::error::AbiError,
     compilation_context::{CompilationContextError, ModuleId},
+    runtime::error::RuntimeFunctionError,
     translation::{intermediate_types::IntermediateType, table::FunctionId},
 };
 
 #[derive(Debug, thiserror::Error)]
 pub enum NativeFunctionError {
+    #[error("an error ocurred while generating a runtime function's code")]
+    RuntimeFunction(#[from] RuntimeFunctionError),
+
     #[error(r#"host function "{0}" not supported yet"#)]
     HostFunctionNotSupported(String),
 

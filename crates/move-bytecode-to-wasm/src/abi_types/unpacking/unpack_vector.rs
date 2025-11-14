@@ -23,7 +23,7 @@ impl IVector {
     ) -> Result<(), AbiUnpackError> {
         let mut result: Result<(), AbiUnpackError> = Ok(());
         // Big-endian to Little-endian
-        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
+        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
 
         let data_reader_pointer = module.locals.add(ValType::I32);
 

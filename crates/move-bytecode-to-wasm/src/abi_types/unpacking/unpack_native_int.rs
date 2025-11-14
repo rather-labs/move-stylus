@@ -13,6 +13,8 @@ use crate::{
     },
 };
 
+use super::error::AbiUnpackError;
+
 impl IBool {
     pub fn add_unpack_instructions(
         block: &mut InstrSeqBuilder,
@@ -117,7 +119,7 @@ pub fn unpack_i32_type_instructions(
     memory: MemoryId,
     reader_pointer: LocalId,
     encoded_size: usize,
-) {
+) -> Result<(), AbiUnpackError> {
     // Load the value
     block.local_get(reader_pointer);
     block.load(
@@ -130,7 +132,7 @@ pub fn unpack_i32_type_instructions(
         },
     );
     // Big-endian to Little-endian
-    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
     block.call(swap_i32_bytes_function);
 
     // increment reader pointer
@@ -138,6 +140,8 @@ pub fn unpack_i32_type_instructions(
     block.i32_const(encoded_size as i32);
     block.binop(BinaryOp::I32Add);
     block.local_set(reader_pointer);
+
+    Ok(())
 }
 
 pub fn unpack_i64_type_instructions(
@@ -146,7 +150,7 @@ pub fn unpack_i64_type_instructions(
     memory: MemoryId,
     reader_pointer: LocalId,
     encoded_size: usize,
-) {
+) -> Result<(), AbiUnpackError> {
     // Load the value
     block.local_get(reader_pointer);
     block.load(
@@ -159,7 +163,7 @@ pub fn unpack_i64_type_instructions(
         },
     );
     // Big-endian to Little-endian
-    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None);
+    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
     block.call(swap_i64_bytes_function);
 
     // increment reader pointer
@@ -167,6 +171,8 @@ pub fn unpack_i64_type_instructions(
     block.i32_const(encoded_size as i32);
     block.binop(BinaryOp::I32Add);
     block.local_set(reader_pointer);
+
+    Ok(())
 }
 
 #[cfg(test)]

@@ -101,7 +101,7 @@ impl IStruct {
         // In a dynamic struct, the first value is where the values are packed in the calldata
         if self.solidity_abi_encode_is_dynamic(compilation_ctx)? {
             // Big-endian to Little-endian
-            let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
+            let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
 
             // We are just assuming that the max value can fit in 32 bits, otherwise we cannot
             // reference WASM memory. If the value is greater than 32 bits, the WASM program

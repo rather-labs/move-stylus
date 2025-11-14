@@ -1,4 +1,7 @@
-use crate::error::{CompilationError, ICEError, ICEErrorKind};
+use crate::{
+    error::{CompilationError, ICEError, ICEErrorKind},
+    runtime::error::RuntimeFunctionError,
+};
 
 use super::{
     packing::error::AbiPackError, public_function::PublicFunctionValidationError,
@@ -21,6 +24,9 @@ pub enum AbiEncodingError {
 
     #[error("cannot check if generic type parameter is dynamic at compile time")]
     GenericTypeParameterIsDynamic,
+
+    #[error("an error ocurred while generating a runtime function's code")]
+    RuntimeFunction(#[from] RuntimeFunctionError),
 }
 
 #[derive(thiserror::Error, Debug)]
