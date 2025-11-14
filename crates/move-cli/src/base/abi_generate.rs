@@ -47,7 +47,7 @@ impl AbiGenerate {
                 package.root_compiled_units.iter().collect()
             };
 
-        // If neither flag is specified, generate both formats (backward compatibility)
+        // If neither flag is specified, generate both formats
         let generate_both = !self.json && !self.human_readable;
         let generate_json = self.json || generate_both;
         let generate_human_readable = self.human_readable || generate_both;
