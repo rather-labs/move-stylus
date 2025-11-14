@@ -17,10 +17,12 @@ jobs:
       run: |
         rustup component add --toolchain 1.88.0-x86_64-unknown-linux-gnu rustfmt
         rustup component add --toolchain 1.88.0-x86_64-unknown-linux-gnu clippy
-    - uses: actions/checkout@v4
+    - name: Install check tools
+      run: df -h
+    - uses: actions/checkout@v5
     - uses: Swatinem/rust-cache@v2
     - name: Build
-      run: cargo clean && cargo build --all-targets
+      run: cargo build --all-targets
     - name: Check style and warnings
       run: .githooks/pre-commit
     - name: Run tests
