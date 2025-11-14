@@ -19,6 +19,8 @@ jobs:
         rustup component add --toolchain 1.88.0-x86_64-unknown-linux-gnu clippy
     - name: Install check tools
       run: df -h
+    - name: cleanup
+      run: rm -rf /root/dev/*
     - uses: actions/checkout@v5
     - uses: Swatinem/rust-cache@v2
     - name: Build
