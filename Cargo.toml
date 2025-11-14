@@ -33,3 +33,4 @@ move-evm-abi-generator = { path = "crates/move-evm-abi-generator" }
 move-parse-special-attributes = { path = "crates/move-parse-special-attributes" }
 move-ir-types = { git = "https://github.com/MystenLabs/sui" }
 
+
