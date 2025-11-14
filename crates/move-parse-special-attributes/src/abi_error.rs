@@ -1,6 +1,6 @@
 use move_compiler::{
     diagnostics::codes::{DiagnosticInfo, Severity, custom},
-    parser::ast::{Attribute_, StructDefinition},
+    parser::ast::{Ability_, Attribute_, StructDefinition},
 };
 
 use crate::{SpecialAttributeError, error::SpecialAttributeErrorKind};
@@ -14,6 +14,12 @@ pub struct AbiError {
 pub enum AbiErrorParseError {
     #[error(r#"not marked as an abierror"#)]
     NotAnAbiError,
+
+    #[error(r#"errors with generic type parameters are not supported"#)]
+    GenericAbiError,
+
+    #[error(r#"abi errors with key are not supported"#)]
+    AbiErrorWithKey,
 }
 
 impl From<&AbiErrorParseError> for DiagnosticInfo {
@@ -35,7 +41,7 @@ impl TryFrom<&StructDefinition> for AbiError {
         // Find the attribute we neekd
         for attribute in &value.attributes {
             for att in &attribute.value {
-                let parametrized = match &att.value {
+                let parameterized = match &att.value {
                     Attribute_::Parameterized(n, spanned) if n.value.as_str() == "ext" => {
                         &spanned.value
                     }
@@ -44,15 +50,34 @@ impl TryFrom<&StructDefinition> for AbiError {
 
                 // To be an abi error, the first named parameter must be "abi_error". If we dont find it,
                 // continue
-                let abi_error = match parametrized.first() {
+                let abi_error = match parameterized.first() {
                     Some(p) if p.value.attribute_name().value.as_str() == "abi_error" => AbiError {
                         name: value.name.to_string(),
                     },
                     _ => continue,
                 };
 
+                if !value.type_parameters.is_empty() {
+                    return Err(SpecialAttributeError {
+                        kind: SpecialAttributeErrorKind::AbiError(
+                            AbiErrorParseError::GenericAbiError,
+                        ),
+                        line_of_code: value.loc,
+                    });
+                }
+
+                // Check if the event has a key
+                if value.abilities.iter().any(|a| a.value == Ability_::Key) {
+                    return Err(SpecialAttributeError {
+                        kind: SpecialAttributeErrorKind::AbiError(
+                            AbiErrorParseError::AbiErrorWithKey,
+                        ),
+                        line_of_code: value.loc,
+                    });
+                }
+
                 // If we have more than one attribute, return an error
-                if parametrized.len() > 1 {
+                if parameterized.len() > 1 {
                     return Err(SpecialAttributeError {
                         kind: SpecialAttributeErrorKind::TooManyAttributes,
                         line_of_code: value.loc,

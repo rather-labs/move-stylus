@@ -76,7 +76,8 @@ entry fun emit_test_event3(a: u32, b: address, c: u128, d: vector<u8>) {
     emit(TestEvent3 { a, b, c, d });
 }
 
-entry fun emit_test_event4(a: u32, b: address, c: u128, d: vector<u8>, e: TestEvent2) {
+entry fun emit_test_event4(a: u32, b: address, c: u128, d: vector<u8>, e: u32, f: address, g: u128) {
+    let e = TestEvent2 {a: e, b: f, c: g };
     emit(TestEvent4 { a, b, c, d, e });
 }
 
@@ -84,11 +85,13 @@ entry fun emit_test_event5(a: u32, b: address, c: vector<u8>) {
     emit(TestEvent5 { a, b, c });
 }
 
-entry fun emit_test_event6(a: u32, b: address, c: TestEvent2) {
+entry fun emit_test_event6(a: u32, b: address, c: u32, d: address, e: u128) {
+    let c = TestEvent2 {a: c, b: d, c: e };
     emit(TestEvent6 { a, b, c });
 }
 
-entry fun emit_test_event7(a: u32, b: vector<u8>, c: TestEvent2) {
+entry fun emit_test_event7(a: u32, b: vector<u8>, c: u32, d: address, e: u128) {
+    let c = TestEvent2 {a: c, b: d, c: e };
     emit(TestEvent7 { a, b, c });
 }
 
@@ -195,7 +198,8 @@ entry fun emit_test_anon_event3(a: u32, b: address, c: u128, d: vector<u8>) {
     emit(TestEvent3Anon { a, b, c, d });
 }
 
-entry fun emit_test_anon_event4(a: u32, b: address, c: u128, d: vector<u8>, e: TestEvent2) {
+entry fun emit_test_anon_event4(a: u32, b: address, c: u128, d: vector<u8>, e: u32, f: address, g: u128) {
+    let e = TestEvent2 {a: e, b: f, c: g };
     emit(TestEvent4Anon { a, b, c, d, e });
 }
 
@@ -203,11 +207,13 @@ entry fun emit_test_anon_event5(a: u32, b: address, c: vector<u8>) {
     emit(TestEvent5Anon { a, b, c });
 }
 
-entry fun emit_test_anon_event6(a: u32, b: address, c: TestEvent2) {
+entry fun emit_test_anon_event6(a: u32, b: address, c: u32, d: address, e: u128) {
+    let c = TestEvent2 {a: c, b: d, c: e };
     emit(TestEvent6Anon { a, b, c });
 }
 
-entry fun emit_test_anon_event7(a: u32, b: vector<u8>, c: TestEvent2) {
+entry fun emit_test_anon_event7(a: u32, b: vector<u8>, c: u32, d: address, e: u128) {
+    let c = TestEvent2 {a: c, b: d, c: e };
     emit(TestEvent7Anon { a, b, c });
 }
 
@@ -219,20 +225,7 @@ entry fun emit_test_anon_event9(a: u64, b: std::ascii::String) {
     emit(TestEvent9Anon { a, b });
 }
 
-entry fun emit_test_anonymous(a: u32, b: u128, c: vector<u8>, d: TestEvent2) {
+entry fun emit_test_anonymous(a: u32, b: u128, c: vector<u8>, d: u32, e: address, f: u128) {
+    let d = TestEvent2 {a: d, b: e, c: f };
     emit(Anonymous { a, b, c, d });
-}
-
-entry fun emit_test_anonymous2(
-    a: u32,
-    b: u128,
-    c: vector<u8>,
-    d: TestEvent2,
-    e: u32,
-    f: address,
-    g: u128,
-    h: vector<u8>,
-    i: TestEvent2,
-) {
-    emit(Anonymous2{ a, b, c, d, e, f, g, h, i });
 }

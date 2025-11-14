@@ -11,8 +11,9 @@ pub fn process_abi(abi: &Abi) -> String {
     result.push_str(&snake_to_upper_camel(&abi.contract_name));
     result.push_str(" {\n\n");
 
-    process_structs(&mut result, abi);
     process_events(&mut result, abi);
+    process_abi_errors(&mut result, abi);
+    process_structs(&mut result, abi);
     process_functions(&mut result, abi);
 
     result.push_str("\n}");
@@ -34,7 +35,7 @@ pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
         let formatted_parameters = function
             .parameters
             .iter()
-            .map(|param| format!("{} {}", &param.type_.name(), param.identifier))
+            .map(|param| format!("{} {}", param.type_.name(), param.identifier))
             .collect::<Vec<String>>();
 
         contract_abi.push_str(&formatted_parameters.join(", "));
@@ -111,6 +112,26 @@ pub fn process_events(contract_abi: &mut String, abi: &Abi) {
                         &f.identifier
                     )
                 })
+                .collect::<Vec<String>>()
+                .join(", "),
+        );
+
+        contract_abi.push_str(");\n");
+    }
+    contract_abi.push('\n');
+}
+
+pub fn process_abi_errors(contract_abi: &mut String, abi: &Abi) {
+    for error in &abi.abi_errors {
+        // Declaration
+        contract_abi.push_str("    error ");
+        contract_abi.push_str(&error.identifier);
+        contract_abi.push('(');
+        contract_abi.push_str(
+            &error
+                .fields
+                .iter()
+                .map(|f| format!("{}{}{}", &f.type_.name(), " ", &f.identifier))
                 .collect::<Vec<String>>()
                 .join(", "),
         );

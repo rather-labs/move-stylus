@@ -4,7 +4,7 @@
 //! NOTE: This is a POC and it is WIP
 mod abi;
 mod common;
-mod human_redable;
+mod human_readable;
 mod special_types;
 mod types;
 
@@ -61,7 +61,7 @@ pub fn generate_abi(
             continue;
         }
 
-        let abi = human_redable::process_abi(&abi);
+        let abi = human_readable::process_abi(&abi);
         result.push(Abi {
             file: file.to_path_buf(),
             content: abi,

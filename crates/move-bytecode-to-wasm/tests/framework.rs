@@ -140,33 +140,22 @@ mod event {
         function emitTestEvent1(uint32 n) external;
         function emitTestEvent2(uint32 a, address b, uint128 c) external;
         function emitTestEvent3(uint32 a, address b, uint128 c, uint8[] d) external;
-        function emitTestEvent4(uint32 a, address b, uint128 c, uint8[] d, TestEvent2 e) external;
+        function emitTestEvent4(uint32 a, address b, uint128 c, uint8[] d, uint32 e, address f, uint128 g) external;
         function emitTestEvent5(uint32 a, address b, uint8[] c) external;
-        function emitTestEvent6(uint32 a, address b, TestEvent2 c) external;
-        function emitTestEvent7(uint32 a, uint8[] b, TestEvent2 c) external;
+        function emitTestEvent6(uint32 a, address b, uint32 c, address d, uint128 e) external;
+        function emitTestEvent7(uint32 a, uint8[] b, uint32 c, address d, uint128 e) external;
         function emitTestEvent8(uint64 a, string b) external;
         function emitTestEvent9(uint64 a, string b) external;
         function emitTestAnonEvent1(uint32 n) external;
         function emitTestAnonEvent2(uint32 a, address b, uint128 c) external;
         function emitTestAnonEvent3(uint32 a, address b, uint128 c, uint8[] d) external;
-        function emitTestAnonEvent4(uint32 a, address b, uint128 c, uint8[] d, TestEvent2 e) external;
+        function emitTestAnonEvent4(uint32 a, address b, uint128 c, uint8[] d, uint32 e, address f, uint128 g) external;
         function emitTestAnonEvent5(uint32 a, address b, uint8[] c) external;
-        function emitTestAnonEvent6(uint32 a, address b, TestEvent2 c) external;
-        function emitTestAnonEvent7(uint32 a, uint8[] b, TestEvent2 c) external;
+        function emitTestAnonEvent6(uint32 a, address b, uint32 c, address d, uint128 e) external;
+        function emitTestAnonEvent7(uint32 a, uint8[] b, uint32 c, address d, uint128 e) external;
         function emitTestAnonEvent8(uint64 a, string b) external;
         function emitTestAnonEvent9(uint64 a, string b) external;
-        function emitTestAnonymous(uint32 a, uint128 b, uint8[] c, TestEvent2 d) external;
-        function emitTestAnonymous2(
-            uint32 a,
-            uint128 b,
-            uint8[] c,
-            TestEvent2 d,
-            uint32 e,
-            address f,
-            uint128 g,
-            uint8[] h,
-            TestEvent2 i,
-        ) external;
+        function emitTestAnonymous(uint32 a, uint128 b, uint8[] c, uint32 d, address e, uint128 f) external;
     );
 
     #[rstest]
@@ -202,11 +191,9 @@ mod event {
         address!("0xcafe000000000000000000000000000000007357"),
         u128::MAX,
         vec![1, 2, 3, 4, 5],
-        TestEvent2 {
-            a: 42,
-            b: address!("0xcafe000000000000000000000000000000007357"),
-            c: u128::MAX,
-        }
+        42,
+        address!("0xcafe000000000000000000000000000000007357"),
+        u128::MAX
     )), 3,
     [
         keccak256(b"TestEvent4(uint32,address,uint128,uint8[],(uint32,address,uint128))").to_vec(),
@@ -234,11 +221,9 @@ mod event {
     #[case(emitTestEvent6Call::new((
         41,
         address!("0xcafe000000000000000000000000000000007357"),
-        TestEvent2 {
-            a: 43,
-            b: address!("0xcafe000000000000000000000000000000007357"),
-            c: u128::MAX,
-        }
+        43,
+        address!("0xcafe000000000000000000000000000000007357"),
+        u128::MAX
     )), 4,
     [
         keccak256(b"TestEvent6(uint32,address,(uint32,address,uint128))").to_vec(),
@@ -253,11 +238,9 @@ mod event {
     #[case(emitTestEvent7Call::new((
         42,
         vec![1, 2, 3, 4, 5],
-        TestEvent2 {
-            a: 43,
-            b: address!("0xcafe000000000000000000000000000000007357"),
-            c: u128::MAX,
-        }
+        43,
+        address!("0xcafe000000000000000000000000000000007357"),
+        u128::MAX
     )), 4,
     [
         keccak256(b"TestEvent7(uint32,uint8[],(uint32,address,uint128))").to_vec(),
@@ -314,11 +297,9 @@ mod event {
         address!("0xcafe000000000000000000000000000000007357"),
         u128::MAX,
         vec![1, 2, 3, 4, 5],
-        TestEvent2 {
-            a: 42,
-            b: address!("0xcafe000000000000000000000000000000007357"),
-            c: u128::MAX,
-        }
+        42,
+        address!("0xcafe000000000000000000000000000000007357"),
+        u128::MAX
     )), 2,
     [
         42.abi_encode().to_vec(),
@@ -344,11 +325,9 @@ mod event {
     #[case(emitTestAnonEvent6Call::new((
         41,
         address!("0xcafe000000000000000000000000000000007357"),
-        TestEvent2 {
-            a: 43,
-            b: address!("0xcafe000000000000000000000000000000007357"),
-            c: u128::MAX,
-        }
+        43,
+        address!("0xcafe000000000000000000000000000000007357"),
+        u128::MAX
     )), 3,
     [
         41.abi_encode().to_vec(),
@@ -362,11 +341,9 @@ mod event {
     #[case(emitTestAnonEvent7Call::new((
         42,
         vec![1, 2, 3, 4, 5],
-        TestEvent2 {
-            a: 43,
-            b: address!("0xcafe000000000000000000000000000000007357"),
-            c: u128::MAX,
-        }
+        43,
+        address!("0xcafe000000000000000000000000000000007357"),
+        u128::MAX
     )), 3,
     [
         42.abi_encode().to_vec(),
@@ -397,11 +374,9 @@ mod event {
         42,
         u128::MAX,
         vec![1, 2, 3, 4, 5],
-        TestEvent2 {
-            a: 43,
-            b: address!("0xcafe000000000000000000000000000000007357"),
-            c: u128::MAX,
-        }
+        43,
+        address!("0xcafe000000000000000000000000000000007357"),
+        u128::MAX
     )), 4,
     [
         42.abi_encode().to_vec(),
@@ -412,44 +387,6 @@ mod event {
             b: address!("0xcafe000000000000000000000000000000007357"),
             c: u128::MAX,
         }.abi_encode()).to_vec()
-    ].concat())]
-    #[case(emitTestAnonymous2Call::new((
-        42,
-        u128::MAX,
-        vec![1, 2, 3, 4, 5],
-        TestEvent2 {
-            a: 43,
-            b: address!("0xcafe000000000000000000000000000000007357"),
-            c: u128::MAX,
-        },
-        84,
-        address!("0xcafecafecafe0000000000000000000073577357"),
-        u64::MAX as u128,
-        vec![9, 8, 7, 6, 5],
-        TestEvent2 {
-            a: 85,
-            b: address!("0xbeefbeef00000000000000000000000000007357"),
-            c: u128::MAX,
-        }
-    )), 4,
-    [
-        42.abi_encode().to_vec(),
-        u128::MAX.abi_encode(),
-        keccak256(vec![1, 2, 3, 4, 5].abi_encode()).to_vec(),
-        keccak256(TestEvent2 {
-            a: 43,
-            b: address!("0xcafe000000000000000000000000000000007357"),
-            c: u128::MAX,
-        }.abi_encode()).to_vec(),
-        84.abi_encode().to_vec(),
-        address!("0xcafecafecafe0000000000000000000073577357").abi_encode().to_vec(),
-        (u64::MAX as u128).abi_encode().to_vec(),
-        vec![9, 8, 7, 6, 5].abi_encode().to_vec(),
-        TestEvent2 {
-            a: 85,
-            b: address!("0xbeefbeef00000000000000000000000000007357"),
-            c: u128::MAX,
-        }.abi_encode().to_vec()
     ].concat())]
     fn test_emit_event<T: SolCall>(
         runtime: RuntimeSandbox,
@@ -1541,25 +1478,20 @@ mod error {
         }
 
         struct CustomError4 {
-            CustomError a;
-            CustomError2 b;
+            Error a;
+            CustomError b;
         }
 
-        struct GenericCustomError32 {
-            uint32 a;
-            uint32[] b;
-        }
-        function revertStandardError(Error e) external;
-        function revertCustomError(CustomError e) external;
-        function revertCustomError2(CustomError2 e) external;
-        function revertCustomError3(CustomError3 e) external;
-        function revertCustomError4(CustomError4 e) external;
-        function revertGenericCustomError32(GenericCustomError32 e) external;
+        function revertStandardError(string s) external;
+        function revertCustomError(string s, uint64 code) external;
+        function revertCustomError2(bool a, uint8 b, uint16 c, uint32 d, uint64 e, uint128 f, uint256 g, address h) external;
+        function revertCustomError3(uint32[] a, uint128[] b, uint64[][] c) external;
+        function revertCustomError4(string a, string b, uint64 c) external;
     );
 
     #[rstest]
     #[case(
-        revertStandardErrorCall::new((Error { e: String::from("Not enough Ether provided.") },)),
+        revertStandardErrorCall::new((String::from("Not enough Ether provided."),)),
         [
             keccak256(b"Error(string)")[..4].to_vec(),
             <sol!((string,))>::abi_encode_params(&("Not enough Ether provided.",)),
@@ -1567,10 +1499,8 @@ mod error {
     )]
     #[case(
         revertCustomErrorCall::new((
-            CustomError {
-                error_message: String::from("Custom error message"),
-                error_code: 42,
-            },
+            String::from("Custom error message"),
+            42,
         )),
         [
             keccak256(b"CustomError(string,uint64)")[..4].to_vec(),
@@ -1581,14 +1511,14 @@ mod error {
         ].concat()
     )]
     #[case(
-        revertCustomError2Call::new((CustomError2 { a: true, b: 2, c: 3, d: 4, e: 5, f: 5, g: U256::from(5), h: address!("0xffffffffffffffffffffffffffffffffffffffff") },)),
+        revertCustomError2Call::new((true, 2u8, 3u16, 4u32, 5u64, 5u128, U256::from(5), address!("0xffffffffffffffffffffffffffffffffffffffff"))),
         [
             keccak256(b"CustomError2(bool,uint8,uint16,uint32,uint64,uint128,uint256,address)")[..4].to_vec(),
             <sol!((bool, uint8, uint16, uint32, uint64, uint128, uint256, address))>::abi_encode_params(&(true, 2u8, 3u16, 4u32, 5u64, 5u128, U256::from(5), address!("0xffffffffffffffffffffffffffffffffffffffff"))),
         ].concat()
     )]
     #[case(
-        revertCustomError3Call::new((CustomError3 { a: vec![1, 2, 3], b: vec![4, 5], c: vec![vec![6, 7, 8], vec![9, 10, 11]] },)),
+        revertCustomError3Call::new((vec![1, 2, 3], vec![4, 5], vec![vec![6, 7, 8], vec![9, 10, 11]])),
         [
             keccak256(b"CustomError3(uint32[],uint128[],uint64[][])")[..4].to_vec(),
             <sol!((uint32[], uint128[], uint64[][]))>::abi_encode_params(&(vec![1, 2, 3], vec![4, 5], vec![vec![6, 7, 8], vec![9, 10, 11]])),
@@ -1596,51 +1526,22 @@ mod error {
     )]
     #[case(
         revertCustomError4Call::new((
-            CustomError4 {
-                a: CustomError {
-                    error_message: String::from("Custom error message"),
-                    error_code: 42,
-                },
-                b: CustomError2 {
-                    a: true,
-                    b: 1,
-                    c: 2,
-                    d: 3,
-                    e: 4,
-                    f: 5,
-                    g: U256::from(6),
-                    h: address!("0xffffffffffffffffffffffffffffffffffffffff"),
-                },
-            },
+            String::from("Custom error message"),
+            String::from("Custom error message 2"),
+            42,
         )),
         [
-            keccak256(b"CustomError4((string,uint64),(bool,uint8,uint16,uint32,uint64,uint128,uint256,address))")[..4].to_vec(),
+            keccak256(b"CustomError4((string),(string,uint64))")[..4].to_vec(),
             {
                 let params = (
+                    Error { e: String::from("Custom error message") },
                     CustomError {
-                        error_message: String::from("Custom error message"),
+                        error_message: String::from("Custom error message 2"),
                         error_code: 42,
                     },
-                    CustomError2 {
-                        a: true,
-                        b: 1,
-                        c: 2,
-                        d: 3,
-                        e: 4,
-                        f: 5,
-                        g: U256::from(6),
-                        h: address!("0xffffffffffffffffffffffffffffffffffffffff"),
-                    },
                 );
-                <sol!((CustomError, CustomError2)) as alloy_sol_types::SolValue>::abi_encode_params(&params)
+                <sol!((Error, CustomError)) as alloy_sol_types::SolValue>::abi_encode_params(&params)
             },
-        ].concat()
-    )]
-    #[case(
-        revertGenericCustomError32Call::new((GenericCustomError32 { a: 42, b: vec![43, 44, 45] },)),
-        [
-            keccak256(b"GenericCustomError(uint32,uint32[])")[..4].to_vec(),
-            <sol!((uint32, uint32[]))>::abi_encode_params(&(42, vec![43, 44, 45])),
         ].concat()
     )]
     fn test_revert<T: SolCall>(

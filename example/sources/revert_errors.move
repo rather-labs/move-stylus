@@ -1,4 +1,4 @@
-module test::error;
+module hello_world::enums;
 
 use stylus::error::revert;
 use std::ascii::String;
@@ -19,9 +19,9 @@ public struct CustomError has copy, drop {
     error_message: String,
     error_code: u64,
 }
-
+    
 entry fun revert_custom_error(s: String, code: u64) {
-    revert(CustomError { error_message: s, error_code: code });
+    revert( CustomError { error_message: s, error_code: code });
 }
 
 #[allow(unused_field)]
@@ -38,8 +38,7 @@ public struct CustomError2 has copy, drop {
 }
 
 entry fun revert_custom_error2(a: bool, b: u8, c: u16, d: u32, e: u64, f: u128, g: u256, h: address) {
-    let error = CustomError2 { a, b, c, d, e, f, g, h };
-    revert(error);
+    revert(CustomError2 { a, b, c, d, e, f, g, h });
 }
 
 #[ext(abi_error)]
@@ -51,8 +50,7 @@ public struct CustomError3 has copy, drop {
 }
 
 entry fun revert_custom_error3(a: vector<u32>, b: vector<u128>, c: vector<vector<u64>>) {
-    let error = CustomError3 { a, b, c };
-    revert(error);
+    revert(CustomError3 { a, b, c });
 }
 
 #[ext(abi_error)]
@@ -62,9 +60,9 @@ public struct CustomError4 has copy, drop {
     b: CustomError,
 }
 
-entry fun revert_custom_error4(a: String, b: String, c: u64) {
+entry fun revert_custom_error4(a: String, b: u64) {
     let error = Error(a);
-    let custom_error = CustomError { error_message: b, error_code: c };
+    let custom_error = CustomError { error_message: a, error_code: b };
     let error = CustomError4 { a: error, b: custom_error };
     revert(error);
 }
