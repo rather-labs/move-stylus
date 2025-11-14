@@ -47,7 +47,7 @@ async fn main() -> eyre::Result<()> {
     let counter_id =
         FixedBytes::<32>::new(receipt.logs()[0].topics()[1].to_vec().try_into().unwrap());
 
-    println!("Captured counter_id {:?}", counter_id);
+    println!("Captured counter_id {counter_id:?}");
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
         println!("create tx 0x{}", hex::encode(&raw));
@@ -55,7 +55,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value before increment");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSending increment tx");
     let pending_tx = example.increment(counter_id).send().await?;
@@ -67,7 +67,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value after increment");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSetting counter to number 42");
     let pending_tx = example.setValue(counter_id, 42).send().await?;
@@ -79,7 +79,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading counter after set");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSending increment tx");
     let pending_tx = example.increment(counter_id).send().await?;
@@ -91,7 +91,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value after increment");
     let res = example.read(counter_id).call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     // Add a new sender and try to set the value
     let priv_key_2 =
@@ -122,7 +122,7 @@ async fn main() -> eyre::Result<()> {
     // Value did not change as the sender is not the owner
     println!("\nReading value after set value");
     let res = example_2.read(counter_id).call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     Ok(())
 }

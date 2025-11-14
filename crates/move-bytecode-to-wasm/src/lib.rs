@@ -338,13 +338,13 @@ pub fn translate_package_cli(
 
     for (module_name, module) in modules.iter_mut() {
         module
-            .emit_wasm_file(build_directory.join(format!("{}.wasm", module_name)))
+            .emit_wasm_file(build_directory.join(format!("{module_name}.wasm")))
             .unwrap();
 
         // Convert to WAT format
         let wat = wasmprinter::print_bytes(module.emit_wasm()).expect("Failed to generate WAT");
         std::fs::write(
-            build_directory.join(format!("{}.wat", module_name)),
+            build_directory.join(format!("{module_name}.wat")),
             wat.as_bytes(),
         )
         .expect("Failed to write WAT file");
@@ -509,7 +509,7 @@ fn translate_and_link_functions(
     let function_definition = function_definitions
         // TODO do this in nother way
         .get(&function_id.get_generic_fn_id())
-        .unwrap_or_else(|| panic!("could not find function definition for {}", function_id));
+        .unwrap_or_else(|| panic!("could not find function definition for {function_id}"));
 
     // If the function contains code we translate it
     // If it does not it means is a native function, we do nothing, it is linked and called
@@ -524,7 +524,7 @@ fn translate_and_link_functions(
             move_bytecode,
             dynamic_fields_global_variables,
         )
-        .unwrap_or_else(|_| panic!("there was an error translating {}", function_id));
+        .unwrap_or_else(|_| panic!("there was an error translating {function_id}"));
 
         function_table
             .add_to_wasm_table(module, function_id, wasm_function_id)

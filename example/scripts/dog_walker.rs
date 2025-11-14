@@ -46,7 +46,7 @@ async fn main() -> eyre::Result<()> {
     let receipt = pending_tx.get_receipt().await?;
     let capability_id =
         FixedBytes::<32>::new(receipt.logs()[0].topics()[1].to_vec().try_into().unwrap());
-    println!("Captured capability {:?}", capability_id);
+    println!("Captured capability {capability_id:?}");
     for log in receipt.logs() {
         let raw = log.data().data.0.clone();
         println!("constructor 0x{}", hex::encode(&raw));

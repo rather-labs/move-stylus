@@ -687,7 +687,7 @@ impl IntermediateType {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self).unwrap();
                 enum_.copy_local_instructions(module, builder, compilation_ctx, module_data);
             }
-            _ => panic!("Unsupported ReadRef type: {:?}", self),
+            _ => panic!("Unsupported ReadRef type: {self:?}"),
         }
     }
 
@@ -814,11 +814,11 @@ impl IntermediateType {
                 );
             }
             IntermediateType::ISigner => {
-                panic!("This type cannot be mutated: {:?}", self);
+                panic!("This type cannot be mutated: {self:?}");
             }
             // TODO: Is this ok?
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                panic!("Cannot mutate a reference of a reference: {:?}", self);
+                panic!("Cannot mutate a reference of a reference: {self:?}");
             }
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot write to a type parameter, expected a concrete type");

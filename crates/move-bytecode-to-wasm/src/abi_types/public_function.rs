@@ -365,15 +365,15 @@ mod tests {
                       return_data_pointer: u32,
                       return_data_length: u32| {
                     println!("write_result");
-                    println!("return_data_pointer: {}", return_data_pointer);
-                    println!("return_data_length: {}", return_data_length);
+                    println!("return_data_pointer: {return_data_pointer}");
+                    println!("return_data_length: {return_data_length}");
 
                     let mem = get_memory(&mut caller);
 
                     let mut buffer = vec![0; return_data_length as usize];
                     mem.read(&mut caller, return_data_pointer as usize, &mut buffer)
                         .unwrap();
-                    println!("return_data: {:?}", buffer);
+                    println!("return_data: {buffer:?}");
 
                     assert_eq!(buffer, expected_result);
 

@@ -26,6 +26,9 @@ wasmtime = "31.0.0"
 move-packages-build.workspace = true
 rstest = "0.25.0"
 
-
 [features]
 inject-host-debug-fns = []
+
+# TODO: Remove this after finishing error handling
+[lints.clippy]
+result_large_err = "allow"

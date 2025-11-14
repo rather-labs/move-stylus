@@ -46,7 +46,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value before increment");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSending increment tx");
     let pending_tx = example.increment().send().await?;
@@ -58,7 +58,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value after increment");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSetting counter to number 42");
     let pending_tx = example.setValue(42).send().await?;
@@ -70,7 +70,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading counter after set");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSending increment tx");
     let pending_tx = example.increment().send().await?;
@@ -82,7 +82,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value after increment");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     // Add a new sender and try to set the value
     let priv_key_2 =
@@ -113,7 +113,7 @@ async fn main() -> eyre::Result<()> {
     // Value did not change as the sender is not the owner
     println!("\nReading value after set value");
     let res = example_2.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     Ok(())
 }

@@ -69,10 +69,7 @@ impl Type {
                         .collect::<Vec<String>>()
                         .join("_");
 
-                    snake_to_upper_camel(&format!(
-                        "{}_{}",
-                        identifier, concrete_type_parameters_names
-                    ))
+                    snake_to_upper_camel(&format!("{identifier}_{concrete_type_parameters_names}"))
                 } else {
                     identifier.clone()
                 }

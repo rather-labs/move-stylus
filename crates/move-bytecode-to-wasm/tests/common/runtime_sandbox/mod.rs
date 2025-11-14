@@ -125,8 +125,7 @@ impl RuntimeSandbox {
                 "read_return_data",
                 move |mut caller: Caller<'_, ModuleData>, dest_ptr: u32, offset: u32, size: u32| {
                     println!(
-                        "read_return_data called with dest_ptr: {}, offset: {}, size: {}",
-                        dest_ptr, offset, size
+                        "read_return_data called with dest_ptr: {dest_ptr}, offset: {offset}, size: {size}"
                     );
 
                     let mem = get_memory(&mut caller);
@@ -158,8 +157,7 @@ impl RuntimeSandbox {
                       gas: u64,
                       return_data_len_ptr: u32| {
                           println!(
-                              "delegate_call_contract called with address_ptr: {}, calldata_ptr: {}, calldata_len: {}, gas: {}, return_data_len_ptr: {}",
-                              address_ptr, calldata_ptr, calldata_len_ptr, gas, return_data_len_ptr
+                              "delegate_call_contract called with address_ptr: {address_ptr}, calldata_ptr: {calldata_ptr}, calldata_len: {calldata_len_ptr}, gas: {gas}, return_data_len_ptr: {return_data_len_ptr}"
                           );
 
                         if cccs.load(std::sync::atomic::Ordering::Relaxed) {
@@ -205,8 +203,7 @@ impl RuntimeSandbox {
                       gas: u64,
                       return_data_len_ptr: u32| {
                           println!(
-                              "static_call_contract called with address_ptr: {}, calldata_ptr: {}, calldata_len: {}, gas: {}, return_data_len_ptr: {}",
-                              address_ptr, calldata_ptr, calldata_len_ptr, gas, return_data_len_ptr
+                              "static_call_contract called with address_ptr: {address_ptr}, calldata_ptr: {calldata_ptr}, calldata_len: {calldata_len_ptr}, gas: {gas}, return_data_len_ptr: {return_data_len_ptr}"
                           );
                         if cccs.load(std::sync::atomic::Ordering::Relaxed) {
                             let mem = get_memory(&mut caller);
@@ -253,8 +250,7 @@ impl RuntimeSandbox {
                       gas: u64,
                       return_data_len_ptr: u32| {
                             println!(
-                                "call_contract called with address_ptr: {}, calldata_ptr: {}, calldata_len_ptr: {}, value_ptr: {}, gas: {}, return_data_len_ptr: {}",
-                                address_ptr, calldata_ptr, calldata_len_ptr, value_ptr, gas, return_data_len_ptr
+                                "call_contract called with address_ptr: {address_ptr}, calldata_ptr: {calldata_ptr}, calldata_len_ptr: {calldata_len_ptr}, value_ptr: {value_ptr}, gas: {gas}, return_data_len_ptr: {return_data_len_ptr}"
                             );
                             if cccs.load(std::sync::atomic::Ordering::Relaxed) {
                             let mem = get_memory(&mut caller);
@@ -541,7 +537,7 @@ impl RuntimeSandbox {
                             "Data 0x{}",
                             result[12..]
                                 .iter()
-                                .map(|b| format!("{:02x}", b))
+                                .map(|b| format!("{b:02x}"))
                                 .collect::<String>()
                         );
                         println!("--- end address ---\n");
@@ -673,7 +669,7 @@ impl RuntimeSandbox {
         entries.sort_by_key(|(key, _)| *key);
 
         for (key, value) in entries {
-            println!("key: {:?} \n\t value: {:?}", key, value);
+            println!("key: {key:?} \n\t value: {value:?}");
         }
     }
 }

@@ -511,7 +511,7 @@ mod tests {
         data: Vec<u8>,
     ) -> impl Fn(Caller<()>, u32, u32) {
         move |mut caller: Caller<()>, pointer: u32, length: u32| {
-            println!("validator: {}, {}", pointer, length);
+            println!("validator: {pointer}, {length}");
 
             assert_eq!(pointer, pointer_addr);
             assert_eq!(length, data_len as u32);
@@ -573,7 +573,7 @@ mod tests {
         display_module(&mut raw_module);
 
         let data = <sol!((bool, uint16, uint64))>::abi_encode(&(true, 1234, 123456789012345));
-        println!("data: {:?}", data);
+        println!("data: {data:?}");
         let data_len = data.len() as i32;
 
         // Define validator function
@@ -636,7 +636,7 @@ mod tests {
         display_module(&mut raw_module);
 
         let data = <sol!((bool, uint16, uint64))>::abi_encode(&(true, 1234, 123456789012345));
-        println!("data: {:?}", data);
+        println!("data: {data:?}");
         let data_len = data.len() as i32;
 
         // Define validator function
@@ -732,7 +732,7 @@ mod tests {
             vec![vec![1, 2, 3], vec![4, 5, 6]],
             U256::from(123456789012345u128),
         ));
-        println!("expected_data: {:?}", expected_data);
+        println!("expected_data: {expected_data:?}");
 
         // Define validator function
         let mut linker = Linker::new(&Engine::default());

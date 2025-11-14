@@ -91,7 +91,7 @@ async fn main() -> eyre::Result<()> {
     println!("Allow this contract ({address}) to spend 1000 TST from {sender}");
     println!("====================\n");
     let res = erc20.allowance(sender, address).call().await?;
-    println!("  Current allowance = {}", res);
+    println!("  Current allowance = {res}");
 
     println!();
 
@@ -101,7 +101,7 @@ async fn main() -> eyre::Result<()> {
     println!("Approval succeded {}", receipt.is_ok());
 
     let res = erc20.allowance(sender, address).call().await?;
-    println!("  Current allowance = {}", res);
+    println!("  Current allowance = {res}");
 
     println!("====================");
     println!("Using transferFrom function from this contract ({address})");
@@ -121,7 +121,7 @@ async fn main() -> eyre::Result<()> {
     println!("\tBalance of {address_2} = {res:?}");
 
     let res = erc20.allowance(sender, address).call().await?;
-    println!("\tCurrent allowance = {}", res);
+    println!("\tCurrent allowance = {res}");
 
     let pending_tx = example
         .transferFromErc20(contract_address_erc20, sender, address_2, U256::from(1000))
@@ -144,7 +144,7 @@ async fn main() -> eyre::Result<()> {
     println!("\tBalance of {address_2} = {res:?}");
 
     let res = erc20.allowance(sender, address).call().await?;
-    println!("\tCurrent allowance = {}", res);
+    println!("\tCurrent allowance = {res}");
 
     Ok(())
 }
