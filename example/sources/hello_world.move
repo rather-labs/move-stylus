@@ -216,7 +216,7 @@ entry fun multi_values_2(): (u8, bool, u64) {
 }
 
 // Enums
-entry fun echo_variant(x:  TestEnum): TestEnum {
+entry fun echo_variant(x: TestEnum): TestEnum {
     x
 }
 
@@ -224,4 +224,3 @@ entry fun echo_variant(x:  TestEnum): TestEnum {
 entry fun test_values(test: &Test): (u8, u8) {
     test.get_test_values()
 }
-

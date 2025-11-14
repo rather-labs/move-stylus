@@ -107,9 +107,9 @@ pub fn process_events(contract_abi: &mut String, abi: &Abi) {
                 .map(|f| {
                     format!(
                         "{}{}{}",
-                        &f.type_.name(),
+                        &f.named_type.type_.name(),
                         if f.indexed { " indexed " } else { " " },
-                        &f.identifier
+                        &f.named_type.identifier
                     )
                 })
                 .collect::<Vec<String>>()

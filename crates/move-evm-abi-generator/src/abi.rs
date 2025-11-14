@@ -27,7 +27,7 @@ pub enum Visibility {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Function {
     pub(crate) identifier: String,
-    pub(crate) parameters: Vec<FunctionParameters>,
+    pub(crate) parameters: Vec<NamedType>,
     pub(crate) return_types: Type,
     pub(crate) visibility: Visibility,
     pub(crate) modifiers: Vec<FunctionModifier>,
@@ -35,21 +35,9 @@ pub struct Function {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct FunctionParameters {
-    pub(crate) identifier: String,
-    pub(crate) type_: Type,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct Struct_ {
     pub(crate) identifier: String,
-    pub(crate) fields: Vec<StructField>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct StructField {
-    pub(crate) identifier: String,
-    pub(crate) type_: Type,
+    pub(crate) fields: Vec<NamedType>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -59,10 +47,16 @@ pub struct Event {
     pub(crate) is_anonymous: bool,
 }
 
+/// A unified struct representing a typed field used in functions, structs, and events.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct EventField {
+pub struct NamedType {
     pub(crate) identifier: String,
     pub(crate) type_: Type,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EventField {
+    pub(crate) named_type: NamedType,
     pub(crate) indexed: bool,
 }
 
@@ -183,7 +177,7 @@ impl Abi {
                                     );
                                 } else {
                                     {
-                                        function_parameters.push(FunctionParameters {
+                                        function_parameters.push(NamedType {
                                             identifier: param.name.clone(),
                                             type_: Type::from_intermediate_type(
                                                 itype,
@@ -220,7 +214,7 @@ impl Abi {
                             );
                         } else {
                             {
-                                function_parameters.push(FunctionParameters {
+                                function_parameters.push(NamedType {
                                     identifier: param.name.clone(),
                                     type_: Type::from_intermediate_type(itype, modules_data),
                                 });
@@ -234,7 +228,7 @@ impl Abi {
                         if !enum_.is_simple {
                             panic!("found not simple enum in function signature");
                         } else {
-                            function_parameters.push(FunctionParameters {
+                            function_parameters.push(NamedType {
                                 identifier: param.name.clone(),
                                 type_: Type::from_intermediate_type(itype, modules_data),
                             });
@@ -255,14 +249,14 @@ impl Abi {
                         if !enum_.is_simple {
                             panic!("found not simple enum in function signature");
                         } else {
-                            function_parameters.push(FunctionParameters {
+                            function_parameters.push(NamedType {
                                 identifier: param.name.clone(),
                                 type_: Type::from_intermediate_type(itype, modules_data),
                             });
                         }
                     }
                     _ => {
-                        function_parameters.push(FunctionParameters {
+                        function_parameters.push(NamedType {
                             identifier: param.name.clone(),
                             type_: Type::from_intermediate_type(itype, modules_data),
                         });
@@ -347,7 +341,7 @@ impl Abi {
         struct_: &IStruct,
         struct_itype: &IntermediateType,
         modules_data: &HashMap<ModuleId, ModuleData>,
-        function_parameters: &mut Vec<FunctionParameters>,
+        function_parameters: &mut Vec<NamedType>,
         param: &Parameter,
         struct_to_process: &mut HashSet<IntermediateType>,
     ) {
@@ -370,13 +364,13 @@ impl Abi {
                     module_id.module_name.as_str(),
                 ) {
                     ("UID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {
-                        function_parameters.push(FunctionParameters {
+                        function_parameters.push(NamedType {
                             identifier: param.name.clone(),
                             type_: Type::Bytes32,
                         });
                     }
                     _ => {
-                        function_parameters.push(FunctionParameters {
+                        function_parameters.push(NamedType {
                             identifier: param.name.clone(),
                             type_: Type::from_intermediate_type(struct_itype, modules_data),
                         });
@@ -404,7 +398,7 @@ impl Abi {
                 ) {
                     ("NamedId", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => {}
                     _ => {
-                        function_parameters.push(FunctionParameters {
+                        function_parameters.push(NamedType {
                             identifier: param.name.clone(),
                             type_: Type::from_intermediate_type(struct_itype, modules_data),
                         });
@@ -470,7 +464,7 @@ impl Abi {
                         }
                         _ => {}
                     }
-                    StructField {
+                    NamedType {
                         identifier: name.clone(),
                         type_: Type::from_intermediate_type(field_itype, modules_data),
                     }
@@ -536,8 +530,10 @@ impl Abi {
                     .zip(&event_struct_parsed.fields)
                     .enumerate()
                     .map(|(index, (f, (identifier, _)))| EventField {
-                        identifier: identifier.clone(),
-                        type_: Type::from_intermediate_type(f, modules_data),
+                        named_type: NamedType {
+                            identifier: identifier.clone(),
+                            type_: Type::from_intermediate_type(f, modules_data),
+                        },
                         indexed: index < event_special_attributes.indexes as usize,
                     })
                     .collect(),
@@ -579,7 +575,7 @@ impl Abi {
                     .fields
                     .iter()
                     .zip(&error_struct_parsed.fields)
-                    .map(|(f, (identifier, _))| StructField {
+                    .map(|(f, (identifier, _))| NamedType {
                         identifier: identifier.clone(),
                         type_: Type::from_intermediate_type(f, modules_data),
                     })

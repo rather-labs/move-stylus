@@ -3,7 +3,6 @@ use crate::types::Type;
 use move_bytecode_to_wasm::compilation_context::{ModuleData, ModuleId};
 use move_parse_special_attributes::function_modifiers::FunctionModifier;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize)]
@@ -41,6 +40,7 @@ enum AbiItemType {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(untagged)]
 enum JsonAbiItem {
     Event {
         #[serde(rename = "type")]
@@ -97,116 +97,86 @@ struct JsonComponent {
     components: Option<Vec<JsonComponent>>,
 }
 
-pub fn process_abi(
-    abi: &Abi,
-    processing_module: &ModuleData,
-    modules_data: &HashMap<ModuleId, ModuleData>,
-) -> String {
-    let mut json_abi = JsonAbi { abi: Vec::new() };
+pub fn process_abi(abi: &Abi, modules_data: &HashMap<ModuleId, ModuleData>) -> String {
+    // Collect all the JSON ABI items into a single vector
+    let abi_json_items = process_events(&abi.events, modules_data)
+        .into_iter()
+        .chain(process_errors(&abi.abi_errors, modules_data))
+        .chain(process_functions(&abi.functions, modules_data))
+        .collect();
 
-    let json_events = process_events(&abi.events, processing_module, modules_data);
-    let json_errors = process_errors(&abi.abi_errors, processing_module, modules_data);
-    let json_functions = process_functions(&abi.functions, processing_module, modules_data);
-
-    json_abi.abi.extend(json_events);
-    json_abi.abi.extend(json_errors);
-    json_abi.abi.extend(json_functions);
+    let json_abi = JsonAbi {
+        abi: abi_json_items,
+    };
 
     serde_json::to_string_pretty(&json_abi).unwrap()
 }
 
 fn process_errors(
-    errors: &Vec<Struct_>,
-    processing_module: &ModuleData,
+    errors: &[Struct_],
     modules_data: &HashMap<ModuleId, ModuleData>,
 ) -> Vec<JsonAbiItem> {
-    let mut json_errors: Vec<JsonAbiItem> = Vec::new();
-    for error in errors {
-        let inputs = error
-            .fields
-            .iter()
-            .map(|field| {
-                process_io(
-                    field.identifier.clone(),
-                    &field.type_,
-                    None,
-                    processing_module,
-                    modules_data,
-                )
-                // let (field_type_name, components) =
-                //     field.type_.encode_for_abi(processing_module, modules_data);
+    errors
+        .iter()
+        .map(|error| {
+            let inputs = error
+                .fields
+                .iter()
+                .map(|field| {
+                    field
+                        .type_
+                        .to_json_io(field.identifier.clone(), None, modules_data)
+                })
+                .collect();
 
-                // JsonIO {
-                //     name: field.identifier.clone(),
-                //     type_: field_type_name,
-                //     indexed: None, // Only for events
-                //     components,
-                // }
-            })
-            .collect();
-
-        json_errors.push(JsonAbiItem::Error {
-            type_: AbiItemType::Error,
-            name: error.identifier.clone(),
-            inputs,
-        });
-    }
-    json_errors
+            JsonAbiItem::Error {
+                type_: AbiItemType::Error,
+                name: error.identifier.clone(),
+                inputs,
+            }
+        })
+        .collect()
 }
 
 fn process_events(
-    events: &Vec<Event>,
-    processing_module: &ModuleData,
+    events: &[Event],
     modules_data: &HashMap<ModuleId, ModuleData>,
 ) -> Vec<JsonAbiItem> {
-    let mut json_events: Vec<JsonAbiItem> = Vec::new();
+    events
+        .iter()
+        .map(|event| {
+            let inputs = event
+                .fields
+                .iter()
+                .map(|field| {
+                    field.named_type.type_.to_json_io(
+                        field.named_type.identifier.clone(),
+                        Some(field.indexed),
+                        modules_data,
+                    )
+                })
+                .collect();
 
-    for event in events {
-        let inputs = event
-            .fields
-            .iter()
-            .map(|field| {
-                process_io(
-                    field.identifier.clone(),
-                    &field.type_,
-                    Some(field.indexed),
-                    processing_module,
-                    modules_data,
-                )
-                // let (field_type_name, components) =
-                //     field.type_.encode_for_abi(processing_module, modules_data);
-
-                // JsonIO {
-                //     name: field.identifier.clone(),
-                //     type_: field_type_name,
-                //     indexed: Some(field.indexed), // allowed only here at the input level
-                //     components,                   // present if tuple/tuple[]
-                // }
-            })
-            .collect();
-
-        json_events.push(JsonAbiItem::Event {
-            type_: AbiItemType::Event,
-            name: event.identifier.clone(),
-            inputs,
-            anonymous: event.is_anonymous,
-        });
-    }
-
-    json_events
+            JsonAbiItem::Event {
+                type_: AbiItemType::Event,
+                name: event.identifier.clone(),
+                inputs,
+                anonymous: event.is_anonymous,
+            }
+        })
+        .collect()
 }
 
 fn process_functions(
     functions: &[Function],
-    processing_module: &ModuleData,
     modules_data: &HashMap<ModuleId, ModuleData>,
 ) -> Vec<JsonAbiItem> {
     functions
         .iter()
         .map(|f| {
-            let type_ = FunctionType::from_identifier(&f.identifier);
+            let fn_type = FunctionType::from_identifier(&f.identifier);
 
-            let (name, inputs, outputs) = match type_ {
+            let (name, inputs, outputs) = match fn_type {
                 // Fallback and Receive have no name, inputs, or outputs
                 FunctionType::Fallback | FunctionType::Receive => (None, None, None),
                 // Constructor has no name, but has inputs
@@ -214,14 +184,10 @@ fn process_functions(
                     let inputs = Some(
                         f.parameters
                             .iter()
-                            .map(|p| {
-                                process_io(
-                                    p.identifier.clone(),
-                                    &p.type_,
-                                    None,
-                                    processing_module,
-                                    modules_data,
-                                )
+                            .map(|param| {
+                                param
+                                    .type_
+                                    .to_json_io(param.identifier.clone(), None, modules_data)
                             })
                             .collect(),
                     );
@@ -232,55 +198,35 @@ fn process_functions(
                     let inputs = f
                         .parameters
                         .iter()
-                        .map(|p| {
-                            process_io(
-                                p.identifier.clone(),
-                                &p.type_,
-                                None,
-                                processing_module,
-                                modules_data,
-                            )
+                        .map(|param| {
+                            param
+                                .type_
+                                .to_json_io(param.identifier.clone(), None, modules_data)
                         })
                         .collect();
 
                     let outputs = match &f.return_types {
-                        crate::types::Type::Tuple(types) => types
-                            .iter()
-                            .map(|t| JsonIO {
-                                name: "".into(),
-                                type_: t.name(),
-                                indexed: None,
-                                components: None,
-                            })
-                            .collect(),
-                        crate::types::Type::None => Vec::new(),
-                        _ => vec![JsonIO {
-                            name: "".into(),
-                            type_: f.return_types.name(),
-                            indexed: None,
-                            components: None,
-                        }],
+                        Type::Tuple(types_) => {
+                            // For tuples, we iterate over the elements and collect them in a vector of JsonIOs
+                            types_
+                                .iter()
+                                .map(|t| t.to_json_io("".to_string(), None, modules_data))
+                                .collect()
+                        }
+                        _ => vec![
+                            f.return_types
+                                .to_json_io("".to_string(), None, modules_data),
+                        ],
                     };
 
                     (Some(f.identifier.clone()), Some(inputs), Some(outputs))
                 }
             };
 
-            // TODO: what happens if there are multiple modifiers?
-            let state_mutability = if let Some(m) = f.modifiers.first() {
-                match m {
-                    FunctionModifier::Pure => m.as_str().to_string(),
-                    FunctionModifier::View => m.as_str().to_string(),
-                    FunctionModifier::Payable => m.as_str().to_string(),
-                    _ => "nonpayable".to_string(),
-                }
-            } else {
-                // Default is "nonpayable" unless explicitly specified as pure, view, or payable
-                "nonpayable".to_string()
-            };
+            let state_mutability = map_state_mutability(&f.modifiers).to_string();
 
             JsonAbiItem::Function {
-                type_,
+                type_: fn_type,
                 name,
                 inputs,
                 outputs,
@@ -290,27 +236,40 @@ fn process_functions(
         .collect()
 }
 
-fn process_io(
-    name: String,
-    type_: &Type,
-    indexed: Option<bool>,
-    processing_module: &ModuleData,
-    modules_data: &HashMap<ModuleId, ModuleData>,
-) -> JsonIO {
-    let (type_name, components) = type_.encode_for_abi(processing_module, modules_data);
-
-    JsonIO {
-        name,
-        type_: type_name,
-        indexed,
-        components,
+// TODO: what happens if there are multiple modifiers?
+fn map_state_mutability(mods: &[FunctionModifier]) -> &'static str {
+    match mods.first() {
+        Some(FunctionModifier::Pure) => "pure",
+        Some(FunctionModifier::View) => "view",
+        Some(FunctionModifier::Payable) => "payable",
+        _ => "nonpayable",
     }
 }
 
 impl Type {
-    fn encode_for_abi(
+    fn to_json_io(
         &self,
-        processing_module: &ModuleData,
+        name: String,
+        indexed: Option<bool>,
+        modules_data: &HashMap<ModuleId, ModuleData>,
+    ) -> JsonIO {
+        let (type_, components) = self.encode_for_json_abi(modules_data);
+        JsonIO {
+            name,
+            type_,
+            indexed,
+            components,
+        }
+    }
+    /// Encodes a Type into the JSON ABI format.
+    ///
+    /// Returns a tuple of `(type_name, components)` where:
+    /// - `type_name`: The ABI type string (e.g., "uint256", "tuple", "tuple[]")
+    /// - `components`: `Some(Vec<JsonComponent>)` for struct types (tuples), `None` for primitive types
+    ///
+    /// Recursively processes nested types (arrays, struct fields) to build the complete ABI representation.
+    fn encode_for_json_abi(
+        &self,
         modules_data: &HashMap<ModuleId, ModuleData>,
     ) -> (String, Option<Vec<JsonComponent>>) {
         match self {
@@ -326,20 +285,22 @@ impl Type {
             | Type::Bytes32
             | Type::None => (self.name(), None),
             Type::String => (self.name(), None),
+            Type::Enum { .. } => ("uint8".to_string(), None),
             Type::Array(inner) => {
-                let (inner_type_name, inner_components) =
-                    inner.encode_for_abi(processing_module, modules_data);
+                let (inner_type_name, inner_components) = inner.encode_for_json_abi(modules_data);
                 (format!("{}[]", inner_type_name), inner_components)
             }
-            Type::Struct { identifier, .. } => {
+            Type::Struct {
+                identifier,
+                module_id,
+                ..
+            } => {
+                let struct_module = modules_data.get(module_id).unwrap();
                 // We use the IStruct to get the Type of the fields, which differs from the Type defined in special_attributes
-                let struct_ = processing_module
-                    .structs
-                    .get_by_identifier(identifier)
-                    .unwrap();
+                let struct_ = struct_module.structs.get_by_identifier(identifier).unwrap();
 
-                // Get field names from the Struct_ defined inspecial_attributes
-                let struct_sa = processing_module
+                // Get field names from the Struct_ defined in special_attributes
+                let struct_sa = struct_module
                     .special_attributes
                     .structs
                     .iter()
@@ -353,7 +314,7 @@ impl Type {
                     .map(|(field_itype, (field_name, _))| {
                         let field_type = Type::from_intermediate_type(field_itype, modules_data);
                         let (field_type_name, field_comps) =
-                            field_type.encode_for_abi(processing_module, modules_data);
+                            field_type.encode_for_json_abi(modules_data);
                         JsonComponent {
                             // positional fields do not have names in the abi
                             name: if struct_sa.positional_fields {
@@ -369,8 +330,9 @@ impl Type {
 
                 ("tuple".to_string(), Some(components))
             }
-            Type::Enum { .. } => ("enum".to_string(), None),
-            Type::Tuple(_types) => ("tuple".to_string(), None),
+            Type::Tuple(_) => {
+                panic!("Tuple types should be destructered by the caller");
+            }
         }
     }
 }

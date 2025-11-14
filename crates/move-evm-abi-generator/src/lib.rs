@@ -63,8 +63,7 @@ pub fn generate_abi(
             continue;
         }
 
-        let json_abi =
-            json_format::process_abi(&abi, module_data, &package_module_data.modules_data);
+        let json_abi = json_format::process_abi(&abi, &package_module_data.modules_data);
         let hr_abi = human_readable::process_abi(&abi);
 
         result.push(Abi {

@@ -31,6 +31,8 @@ pub enum Type {
     Struct {
         identifier: String,
         type_instances: Option<Vec<Type>>,
+        #[serde(skip)]
+        module_id: ModuleId,
     },
     Enum {
         identifier: String,
@@ -58,6 +60,7 @@ impl Type {
             Type::Struct {
                 identifier,
                 type_instances,
+                ..
             } => {
                 if let Some(types) = type_instances {
                     let concrete_type_parameters_names = types
@@ -130,6 +133,7 @@ impl Type {
                     _ => Self::Struct {
                         identifier: struct_.identifier.clone(),
                         type_instances: None,
+                        module_id: module_id.clone(),
                     },
                 }
             }
@@ -157,6 +161,7 @@ impl Type {
                     _ => Self::Struct {
                         identifier: struct_.identifier.clone(),
                         type_instances: Some(types),
+                        module_id: module_id.clone(),
                     },
                 }
             }
