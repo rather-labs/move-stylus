@@ -629,6 +629,7 @@ fn translate_instruction(
 
             constant_type.load_constant_instructions(module, builder, &mut data, compilation_ctx);
 
+            types_stack.push(IntermediateType::IBool);
             types_stack.push(constant_type);
             assert!(
                 data.next().is_none(),

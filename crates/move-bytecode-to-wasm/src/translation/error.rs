@@ -16,10 +16,10 @@ use super::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum TranslationError {
-    #[error("Types stack error: {0}")]
+    #[error("types stack error")]
     TypesStackError(#[from] TypesStackError),
 
-    #[error("Compilation context error: {0}")]
+    #[error("compilation context error")]
     CompilationContextError(#[from] CompilationContextError),
 
     #[error("an error ocurred while generating a native funciton's code")]
@@ -135,8 +135,8 @@ pub enum TranslationError {
     #[error("branch target not found")]
     BranchTargetNotFound(u16),
 
-    #[error("a translation error ocurred translating instruction {0:?}\n{1}")]
-    AtInstruction(Bytecode, Rc<TranslationError>),
+    #[error("a translation error ocurred translating instruction {0:?}")]
+    AtInstruction(Bytecode, #[source] Rc<TranslationError>),
 
     #[error(r#"could not find original local "{0:?}" in function information"#)]
     LocalNotFound(LocalId),

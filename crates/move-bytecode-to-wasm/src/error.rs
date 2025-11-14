@@ -14,7 +14,7 @@ use crate::{
 
 #[derive(thiserror::Error, Debug)]
 pub enum DependencyProcessingError {
-    #[error("An internal compiler error (ICE) has ocurred.\n{0}")]
+    #[error("{0}")]
     ICE(#[from] ICEError),
 
     #[error("internal compiler error(s) ocurred")]
@@ -23,7 +23,7 @@ pub enum DependencyProcessingError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum CompilationError {
-    #[error("An internal compiler error (ICE) has ocurred.\n{0}")]
+    #[error("{0}")]
     ICE(#[from] ICEError),
 
     #[error("internal compiler error(s) ocurred")]
@@ -41,15 +41,23 @@ pub enum CodeError {
 
 #[derive(Debug)]
 pub struct ICEError {
+    pub version: String,
+    pub name: String,
     pub kind: ICEErrorKind,
     pub backtrace: Backtrace,
 }
 
-impl std::error::Error for ICEError {}
+impl std::error::Error for ICEError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.kind)
+    }
+}
 
 impl ICEError {
     pub fn new(kind: ICEErrorKind) -> Self {
         Self {
+            version: env!("CARGO_PKG_VERSION").to_owned(),
+            name: env!("CARGO_PKG_NAME").to_owned(),
             kind,
             backtrace: Backtrace::capture(),
         }
@@ -58,11 +66,7 @@ impl ICEError {
 
 impl Display for ICEError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            r#"{}\nPlease open an issue in Github <project url> with this message.\n\n{}"#,
-            self.kind, self.backtrace
-        )
+        write!(f, "{} {}\n{}", self.name, self.version, self.kind)
     }
 }
 
