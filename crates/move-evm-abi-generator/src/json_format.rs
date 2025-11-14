@@ -288,7 +288,7 @@ impl Type {
             Type::Enum { .. } => ("uint8".to_string(), None),
             Type::Array(inner) => {
                 let (inner_type_name, inner_components) = inner.encode_for_json_abi(modules_data);
-                (format!("{}[]", inner_type_name), inner_components)
+                (format!("{inner_type_name}[]"), inner_components)
             }
             Type::Struct {
                 identifier,
