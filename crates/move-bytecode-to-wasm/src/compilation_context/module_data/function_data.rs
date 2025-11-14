@@ -1,5 +1,8 @@
-use crate::translation::{
-    functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionId,
+use crate::{
+    compilation_context::CompilationContextError,
+    translation::{
+        functions::MappedFunction, intermediate_types::IntermediateType, table::FunctionId,
+    },
 };
 
 #[derive(Debug, Default)]
@@ -25,9 +28,15 @@ pub struct FunctionData {
 }
 
 impl FunctionData {
-    pub fn get_information_by_identifier(&self, identifier: &str) -> Option<&MappedFunction> {
+    pub fn get_information_by_identifier(
+        &self,
+        identifier: &str,
+    ) -> Result<&MappedFunction, CompilationContextError> {
         self.information
             .iter()
             .find(|f| f.function_id.identifier == identifier)
+            .ok_or(CompilationContextError::FunctionByIdentifierNotFound(
+                identifier.to_string(),
+            ))
     }
 }

@@ -1,4 +1,4 @@
-use super::NativeFunction;
+use super::{NativeFunction, error::NativeFunctionError};
 use crate::{
     CompilationContext,
     compilation_context::ModuleId,
@@ -23,15 +23,15 @@ pub fn add_compute_named_id_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
     module_id: &ModuleId,
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_COMPUTE_NAMED_ID,
         compilation_ctx,
         &[itype],
         module_id,
-    );
+    )?;
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     };
 
     if let IntermediateType::IStruct {
@@ -60,12 +60,12 @@ pub fn add_compute_named_id_fn(
         // Return the ID ptr
         builder.local_get(id_ptr);
 
-        function.finish(vec![], &mut module.funcs)
+        Ok(function.finish(vec![], &mut module.funcs))
     } else {
-        panic!(
-            r#"there was an error linking "{}" function, expected IStruct, found {itype:?}"#,
-            NativeFunction::NATIVE_COMPUTE_NAMED_ID
-        );
+        Err(NativeFunctionError::WrongGenericType(
+            NativeFunction::NATIVE_COMPUTE_NAMED_ID.to_owned(),
+            itype.clone(),
+        ))
     }
 }
 

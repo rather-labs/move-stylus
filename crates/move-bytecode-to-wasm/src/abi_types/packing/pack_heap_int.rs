@@ -153,19 +153,21 @@ mod tests {
         func_body.call(alloc_function);
         func_body.local_set(local);
 
-        func_body.i32_const(int_type.encoded_size(&compilation_ctx) as i32);
+        func_body.i32_const(int_type.encoded_size(&compilation_ctx).unwrap() as i32);
         func_body.call(alloc_function);
         func_body.local_set(writer_pointer);
 
         // Args data should already be stored in memory
-        int_type.add_pack_instructions(
-            &mut func_body,
-            &mut raw_module,
-            local,
-            writer_pointer,
-            writer_pointer, // unused for this type
-            &compilation_ctx,
-        );
+        int_type
+            .add_pack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                local,
+                writer_pointer,
+                writer_pointer, // unused for this type
+                &compilation_ctx,
+            )
+            .unwrap();
 
         func_body.local_get(writer_pointer);
 

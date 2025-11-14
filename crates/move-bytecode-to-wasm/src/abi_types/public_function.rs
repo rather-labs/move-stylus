@@ -15,11 +15,13 @@ use crate::{
 };
 
 use super::{
-    abi_encoding::AbiFunctionSelector, function_encoding::move_signature_to_abi_selector,
-    packing::build_pack_instructions, unpacking::build_unpack_instructions,
+    abi_encoding::AbiFunctionSelector, error::AbiError,
+    function_encoding::move_signature_to_abi_selector, packing::build_pack_instructions,
+    unpacking::build_unpack_instructions,
 };
 
 #[derive(thiserror::Error, Debug)]
+#[cfg_attr(test, derive(Eq, PartialEq))]
 pub enum PublicFunctionValidationError {
     #[error(r#"error in argument {0} of function "{1}", only one "signer" argument at the beginning is admitted"#)]
     SignatureArgumentPosition(usize, String),
@@ -47,18 +49,17 @@ impl<'a> PublicFunction<'a> {
         function_name: &str,
         signature: &'a ISignature,
         compilation_ctx: &CompilationContext,
-    ) -> Self {
-        Self::check_signature_arguments(function_name, &signature.arguments)
-            .unwrap_or_else(|e| panic!("ABI error: {e}"));
+    ) -> Result<Self, PublicFunctionValidationError> {
+        Self::check_signature_arguments(function_name, &signature.arguments)?;
 
         let function_selector =
             move_signature_to_abi_selector(function_name, &signature.arguments, compilation_ctx);
 
-        Self {
+        Ok(Self {
             function_id,
             function_selector,
             signature,
-        }
+        })
     }
 
     #[cfg(test)]
@@ -80,7 +81,8 @@ impl<'a> PublicFunction<'a> {
         write_return_data_function: FunctionId,
         compilation_ctx: &CompilationContext,
         dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
-    ) {
+    ) -> Result<(), AbiError> {
+        let mut inner_result = Ok(());
         router_builder.block(None, |block| {
             let block_id = block.id();
 
@@ -115,7 +117,7 @@ impl<'a> PublicFunction<'a> {
             }
 
             // Wrap function to pack/unpack parameters
-            self.wrap_public_function(module, block, args_pointer, compilation_ctx);
+            inner_result = self.wrap_public_function(module, block, args_pointer, compilation_ctx);
 
             // Stack: [return_data_pointer] [return_data_length] [status]
             let status = module.locals.add(ValType::I32);
@@ -139,6 +141,8 @@ impl<'a> PublicFunction<'a> {
             block.local_get(status);
             block.return_();
         });
+
+        inner_result
     }
 
     /// Wraps the function unpacking input parameters from memory and packing output parameters to memory
@@ -151,7 +155,7 @@ impl<'a> PublicFunction<'a> {
         block: &mut InstrSeqBuilder,
         args_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiError> {
         let status = module.locals.add(ValType::I32);
         let data_ptr = module.locals.add(ValType::I32);
         let data_len = module.locals.add(ValType::I32);
@@ -162,7 +166,7 @@ impl<'a> PublicFunction<'a> {
             &self.signature.arguments,
             args_pointer,
             compilation_ctx,
-        );
+        )?;
 
         block.call(self.function_id);
 
@@ -181,7 +185,7 @@ impl<'a> PublicFunction<'a> {
         } else {
             // Set data_ptr and data_len to the result of packing the return values
             let (data_ptr_, data_len_) =
-                build_pack_instructions(block, &self.signature.returns, module, compilation_ctx);
+                build_pack_instructions(block, &self.signature.returns, module, compilation_ctx)?;
             block.local_get(data_ptr_).local_set(data_ptr);
             block.local_get(data_len_).local_set(data_len);
         }
@@ -240,6 +244,8 @@ impl<'a> PublicFunction<'a> {
             .local_get(data_ptr)
             .local_get(data_len)
             .local_get(status);
+
+        Ok(())
     }
 
     /// This function checks if the arguments of a public functions is valid. A signature is not
@@ -481,16 +487,18 @@ mod tests {
         );
         mock_router_body.local_set(selector);
 
-        public_function.build_router_block(
-            &mut mock_router_body,
-            module,
-            selector,
-            args_pointer,
-            args_len,
-            write_return_data_function,
-            &compilation_ctx,
-            &vec![],
-        );
+        public_function
+            .build_router_block(
+                &mut mock_router_body,
+                module,
+                selector,
+                args_pointer,
+                args_len,
+                write_return_data_function,
+                &compilation_ctx,
+                &vec![],
+            )
+            .unwrap();
 
         // if no match, return -1
         mock_router_body.i32_const(-1);
@@ -549,7 +557,7 @@ mod tests {
             returns,
         };
         let public_function =
-            PublicFunction::new(function, "test_function", &signature, &compilation_ctx);
+            PublicFunction::new(function, "test_function", &signature, &compilation_ctx).unwrap();
 
         let mut data =
             <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
@@ -611,7 +619,7 @@ mod tests {
             returns,
         };
         let public_function =
-            PublicFunction::new(function, "test_function", &signature, &compilation_ctx);
+            PublicFunction::new(function, "test_function", &signature, &compilation_ctx).unwrap();
 
         let mut data = <sol!((uint8,))>::abi_encode_params(&(1,));
         data = [public_function.get_selector().to_vec(), data].concat();
@@ -684,7 +692,7 @@ mod tests {
             returns: vec![IntermediateType::IU32],
         };
         let public_function =
-            PublicFunction::new(function, "test_function", &signature, &compilation_ctx);
+            PublicFunction::new(function, "test_function", &signature, &compilation_ctx).unwrap();
 
         let mut data =
             <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
@@ -739,13 +747,10 @@ mod tests {
             ],
             returns: vec![],
         };
-        PublicFunction::new(function, "test_function", &signature, &compilation_ctx);
+        PublicFunction::new(function, "test_function", &signature, &compilation_ctx).unwrap();
     }
 
     #[test]
-    #[should_panic(
-        expected = r#"ABI error: error in argument 2 of function "test_function", only one "signer" argument at the beginning is admitted"#
-    )]
     fn test_fail_public_function_signature() {
         let (mut raw_module, allocator, memory_id) = build_module(None);
         let compilation_ctx = test_compilation_context!(memory_id, allocator);
@@ -768,13 +773,17 @@ mod tests {
             ],
             returns: vec![],
         };
-        PublicFunction::new(function, "test_function", &signature, &compilation_ctx);
+        let err = PublicFunction::new(function, "test_function", &signature, &compilation_ctx)
+            .err()
+            .unwrap();
+
+        assert_eq!(
+            PublicFunctionValidationError::SignatureArgumentPosition(2, "test_function".to_owned()),
+            err
+        );
     }
 
     #[test]
-    #[should_panic(
-        expected = r#"ABI error: error in argument 3 of function "test_function", complex types can't contain the type "signer""#
-    )]
     fn test_fail_public_function_signature_complex_type() {
         let (mut raw_module, allocator, memory_id) = build_module(None);
         let compilation_ctx = test_compilation_context!(memory_id, allocator);
@@ -797,13 +806,18 @@ mod tests {
             ],
             returns: vec![],
         };
-        PublicFunction::new(function, "test_function", &signature, &compilation_ctx);
+
+        let err = PublicFunction::new(function, "test_function", &signature, &compilation_ctx)
+            .err()
+            .unwrap();
+
+        assert_eq!(
+            PublicFunctionValidationError::ComplexTypeContainsSigner(3, "test_function".to_owned()),
+            err
+        );
     }
 
     #[test]
-    #[should_panic(
-        expected = r#"ABI error: error in argument 3 of function "test_function", complex types can't contain the type "signer""#
-    )]
     fn test_fail_public_function_signature_complex_type_2() {
         let (mut raw_module, allocator, memory_id) = build_module(None);
         let compilation_ctx = test_compilation_context!(memory_id, allocator);
@@ -828,6 +842,15 @@ mod tests {
             ],
             returns: vec![],
         };
-        PublicFunction::new(function, "test_function", &signature, &compilation_ctx);
+        PublicFunction::new(function, "test_function", &signature, &compilation_ctx).err();
+
+        let err = PublicFunction::new(function, "test_function", &signature, &compilation_ctx)
+            .err()
+            .unwrap();
+
+        assert_eq!(
+            PublicFunctionValidationError::ComplexTypeContainsSigner(3, "test_function".to_owned()),
+            err
+        );
     }
 }

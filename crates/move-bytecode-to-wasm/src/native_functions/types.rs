@@ -6,7 +6,7 @@ use crate::{
     translation::intermediate_types::{IntermediateType, structs::IStructType},
 };
 
-use super::NativeFunction;
+use super::{NativeFunction, error::NativeFunctionError};
 
 /// Checks if the given signature token is a one-time witness type.
 //
@@ -20,17 +20,17 @@ pub fn add_is_one_time_witness_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
     module_id: &ModuleId,
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     // TODO: should we check if itype is a reference to a struct here?
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_IS_ONE_TIME_WITNESS,
         compilation_ctx,
         &[itype],
         module_id,
-    );
+    )?;
 
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     };
 
     let struct_ = compilation_ctx
@@ -49,5 +49,5 @@ pub fn add_is_one_time_witness_fn(
         builder.i32_const(0);
     }
 
-    function.finish(vec![ptr], &mut module.funcs)
+    Ok(function.finish(vec![ptr], &mut module.funcs))
 }

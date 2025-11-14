@@ -10,7 +10,7 @@ use crate::{
 
 use crate::CompilationContext;
 
-use super::Unpackable;
+use super::{Unpackable, error::AbiUnpackError};
 
 impl IVector {
     pub fn add_unpack_instructions(
@@ -20,7 +20,8 @@ impl IVector {
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiUnpackError> {
+        let mut result: Result<(), AbiUnpackError> = Ok(());
         // Big-endian to Little-endian
         let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
 
@@ -151,7 +152,7 @@ impl IVector {
 
             loop_block.local_get(writer_pointer);
             // This will leave in the stack [pointer/value i32/i64, length i32]
-            inner.add_unpack_instructions(
+            result = inner.add_unpack_instructions(
                 loop_block,
                 module,
                 data_reader_pointer,
@@ -201,6 +202,8 @@ impl IVector {
 
         // returned values
         block.local_get(vector_pointer);
+
+        result
     }
 }
 
@@ -232,13 +235,15 @@ mod tests {
         func_body.local_set(calldata_reader_pointer);
 
         // Args data should already be stored in memory
-        int_type.add_unpack_instructions(
-            &mut func_body,
-            &mut raw_module,
-            args_pointer,
-            calldata_reader_pointer,
-            &compilation_ctx,
-        );
+        int_type
+            .add_unpack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                args_pointer,
+                calldata_reader_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);

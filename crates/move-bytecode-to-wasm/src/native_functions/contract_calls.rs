@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use move_parse_special_attributes::function_modifiers::FunctionModifier;
 use walrus::{
     FunctionBuilder, FunctionId, LocalId, Module, ValType,
@@ -26,6 +28,8 @@ use crate::{
     },
 };
 
+use super::error::NativeFunctionError;
+
 /// Adds a function to perform an external contract call.
 ///
 /// The functions are built using the signature contained in `function_information` and the
@@ -43,7 +47,7 @@ pub fn add_external_contract_call_fn(
     function_modifiers: &[FunctionModifier],
     arguments_types: &[IntermediateType],
     named_ids: &[IntermediateType],
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     let name = format!(
         "{}_{}_{}",
         module_id.hash(),
@@ -52,7 +56,7 @@ pub fn add_external_contract_call_fn(
     );
 
     if let Some(function_id) = module.funcs.by_name(&name) {
-        return function_id;
+        return Ok(function_id);
     }
 
     let (read_return_data, _) = read_return_data(module);
@@ -69,13 +73,16 @@ pub fn add_external_contract_call_fn(
     arguments.extend(named_id_args);
 
     let mut function = FunctionBuilder::new(&mut module.types, &arguments, &[ValType::I32]);
-    let mut builder = function.name(name).func_body();
+    let mut builder = function.name(name.clone()).func_body();
 
     // Arguments
     let function_args: Vec<LocalId> = arguments.iter().map(|a| module.locals.add(*a)).collect();
     let self_ = function_args
         .first()
-        .unwrap_or_else(|| panic!("contract call function has no arguments"));
+        .ok_or(NativeFunctionError::ContractCallFunctionNoArgs(
+            module_id.clone(),
+            name,
+        ))?;
 
     // Locals
     let address_ptr = module.locals.add(ValType::I32);
@@ -215,10 +222,15 @@ pub fn add_external_contract_call_fn(
             // definition, a tuple T is dynamic (T1,...,Tk) if Ti is dynamic for some 1 <= i <= k.
             // The encode size for a dynamically encoded field inside a dynamically encoded tuple is
             // just 32 bytes (the value is the offset to where the values are packed)
-            args_size += if signature_token.is_dynamic(compilation_ctx) {
+            args_size += if signature_token
+                .is_dynamic(compilation_ctx)
+                .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+            {
                 32
             } else {
-                signature_token.encoded_size(compilation_ctx)
+                signature_token
+                    .encoded_size(compilation_ctx)
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
             };
         }
 
@@ -234,15 +246,20 @@ pub fn add_external_contract_call_fn(
                 _ => argument,
             };
 
-            if argument.is_dynamic(compilation_ctx) {
-                argument.add_pack_instructions_dynamic(
-                    &mut builder,
-                    module,
-                    *wasm_local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                );
+            if argument
+                .is_dynamic(compilation_ctx)
+                .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+            {
+                argument
+                    .add_pack_instructions_dynamic(
+                        &mut builder,
+                        module,
+                        *wasm_local,
+                        writer_pointer,
+                        calldata_reference_pointer,
+                        compilation_ctx,
+                    )
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
 
                 builder
                     .local_get(writer_pointer)
@@ -250,18 +267,25 @@ pub fn add_external_contract_call_fn(
                     .binop(BinaryOp::I32Add)
                     .local_set(writer_pointer);
             } else {
-                argument.add_pack_instructions(
-                    &mut builder,
-                    module,
-                    *wasm_local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                );
+                argument
+                    .add_pack_instructions(
+                        &mut builder,
+                        module,
+                        *wasm_local,
+                        writer_pointer,
+                        calldata_reference_pointer,
+                        compilation_ctx,
+                    )
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
 
                 builder
                     .local_get(writer_pointer)
-                    .i32_const(argument.encoded_size(compilation_ctx) as i32)
+                    .i32_const(
+                        argument
+                            .encoded_size(compilation_ctx)
+                            .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+                            as i32,
+                    )
                     .binop(BinaryOp::I32Add)
                     .local_set(writer_pointer);
             }
@@ -329,19 +353,19 @@ pub fn add_external_contract_call_fn(
     let call_result_code_ptr = module.locals.add(ValType::I32);
 
     if function_information.signature.returns.len() > 1 {
-        panic!(
-            "external contract call function {} must return a ContractCallResult<T> or ContractCallEmptyResult with a single type parameter",
-            function_information.function_id
-        );
+        return Err(NativeFunctionError::ContractCallFunctionInvalidReturn(
+            function_information.function_id.clone(),
+        ));
     }
 
     // Depending on the return type, we allocate the proper size for the call result (4 for empty,
     // 8 for result)
     match function_information.signature.returns.first() {
-        None => panic!(
-            "external contract call function {} must return a ContractCallResult<T> or ContractCallEmptyResult",
-            function_information.function_id
-        ),
+        None => {
+            return Err(NativeFunctionError::ContractCallFunctionInvalidReturn(
+                function_information.function_id.clone(),
+            ));
+        }
         Some(IntermediateType::IGenericStructInstance {
             module_id, index, ..
         }) if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx) => {
@@ -358,10 +382,11 @@ pub fn add_external_contract_call_fn(
                 .call(compilation_ctx.allocator)
                 .local_set(call_result);
         }
-        _ => panic!(
-            "external contract call function {} must return a ContractCallResult<T> or ContractCallEmptyResult",
-            function_information.function_id
-        ),
+        _ => {
+            return Err(NativeFunctionError::ContractCallFunctionInvalidReturn(
+                function_information.function_id.clone(),
+            ));
+        }
     }
 
     // Save the result in the first field of CallResult<>
@@ -398,6 +423,7 @@ pub fn add_external_contract_call_fn(
             module_id, index, ..
         }) if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx)
     ) {
+        let mut inner_error = Ok(());
         builder.block(None, |block| {
             let block_id = block.id();
 
@@ -456,13 +482,15 @@ pub fn add_external_contract_call_fn(
                     let result_type = &types[0];
 
                     // Unpack the value
-                    result_type.add_unpack_instructions(
-                        block,
-                        module,
-                        return_data_abi_encoded_ptr,
-                        calldata_reader_pointer,
-                        compilation_ctx,
-                    );
+                    inner_error = result_type
+                        .add_unpack_instructions(
+                            block,
+                            module,
+                            return_data_abi_encoded_ptr,
+                            calldata_reader_pointer,
+                            compilation_ctx,
+                        )
+                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())));
 
                     let abi_decoded_call_result = if result_type == &IntermediateType::IU64 {
                         module.locals.add(ValType::I64)
@@ -515,6 +543,8 @@ pub fn add_external_contract_call_fn(
                 }
             }
         });
+
+        inner_error?
     }
 
     // Before returning, if the call is a delegated call, we must load from storage the potentially
@@ -752,5 +782,5 @@ pub fn add_external_contract_call_fn(
     // After the call we read the data
     builder.local_get(call_result);
 
-    function.finish(function_args, &mut module.funcs)
+    Ok(function.finish(function_args, &mut module.funcs))
 }

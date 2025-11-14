@@ -1,4 +1,5 @@
 use super::Packable;
+use super::error::AbiPackError;
 use crate::CompilationContext;
 use crate::translation::intermediate_types::IntermediateType;
 use crate::translation::intermediate_types::reference::{IMutRef, IRef};
@@ -17,7 +18,7 @@ impl IRef {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiPackError> {
         match inner {
             IntermediateType::ISigner
             | IntermediateType::IU128
@@ -48,7 +49,7 @@ impl IRef {
                     writer_pointer,
                     calldata_reference_pointer,
                     compilation_ctx,
-                );
+                )?;
             }
             IntermediateType::IU8
             | IntermediateType::IU16
@@ -73,7 +74,7 @@ impl IRef {
                     match inner.stack_data_size() {
                         4 => LoadKind::I32 { atomic: false },
                         8 => LoadKind::I64 { atomic: false },
-                        _ => panic!("Unsupported stack_data_size for IRef pack"),
+                        s => return Err(AbiPackError::RefInvalidStackDataSize(s)),
                     },
                     MemArg {
                         align: 0,
@@ -84,7 +85,7 @@ impl IRef {
                 let value_local = module.locals.add(match inner.stack_data_size() {
                     4 => ValType::I32,
                     8 => ValType::I64,
-                    _ => panic!("Unsupported stack_data_size for IRef pack"),
+                    s => return Err(AbiPackError::RefInvalidStackDataSize(s)),
                 });
                 builder.local_set(value_local);
 
@@ -95,15 +96,17 @@ impl IRef {
                     writer_pointer,
                     calldata_reference_pointer,
                     compilation_ctx,
-                );
+                )?;
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                panic!("Inner type cannot be a reference!");
+                return Err(AbiPackError::RefInsideRef);
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("cannot pack generic type parameter");
+                return Err(AbiPackError::PackingGenericTypeParameter);
             }
         }
+
+        Ok(())
     }
 }
 
@@ -117,7 +120,7 @@ impl IMutRef {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiPackError> {
         match inner {
             IntermediateType::IU128
             | IntermediateType::IU256
@@ -147,7 +150,7 @@ impl IMutRef {
                     writer_pointer,
                     calldata_reference_pointer,
                     compilation_ctx,
-                );
+                )?;
             }
             // Immediate types: deref the pointer and pass the value as LocalId
             IntermediateType::IU8
@@ -172,7 +175,7 @@ impl IMutRef {
                     match inner.stack_data_size() {
                         4 => LoadKind::I32 { atomic: false },
                         8 => LoadKind::I64 { atomic: false },
-                        _ => panic!("Unsupported stack_data_size for IRef pack"),
+                        s => return Err(AbiPackError::RefInvalidStackDataSize(s)),
                     },
                     MemArg {
                         align: 0,
@@ -182,7 +185,7 @@ impl IMutRef {
                 let value_local = module.locals.add(match inner.stack_data_size() {
                     4 => ValType::I32,
                     8 => ValType::I64,
-                    _ => panic!("Unsupported stack_data_size for IRef pack"),
+                    s => return Err(AbiPackError::RefInvalidStackDataSize(s)),
                 });
                 builder.local_set(value_local);
 
@@ -193,15 +196,17 @@ impl IMutRef {
                     writer_pointer,
                     calldata_reference_pointer,
                     compilation_ctx,
-                );
+                )?;
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                panic!("Inner type cannot be a reference!");
+                return Err(AbiPackError::RefInsideRef);
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("cannot pack generic type parameter");
+                return Err(AbiPackError::PackingGenericTypeParameter);
             }
         }
+
+        Ok(())
     }
 }
 
@@ -236,29 +241,33 @@ mod tests {
         func_body.local_set(local);
 
         // Allocate calldata (where to write)
-        func_body.i32_const(ref_type.encoded_size(&compilation_ctx) as i32);
+        func_body.i32_const(ref_type.encoded_size(&compilation_ctx).unwrap() as i32);
         func_body.call(allocator);
         func_body.local_tee(writer_pointer);
         func_body.local_set(calldata_reference_pointer);
 
-        if ref_type.is_dynamic(&compilation_ctx) {
-            ref_type.add_pack_instructions_dynamic(
-                &mut func_body,
-                &mut raw_module,
-                local,
-                writer_pointer,
-                calldata_reference_pointer,
-                &compilation_ctx,
-            );
+        if ref_type.is_dynamic(&compilation_ctx).unwrap() {
+            ref_type
+                .add_pack_instructions_dynamic(
+                    &mut func_body,
+                    &mut raw_module,
+                    local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    &compilation_ctx,
+                )
+                .unwrap();
         } else {
-            ref_type.add_pack_instructions(
-                &mut func_body,
-                &mut raw_module,
-                local,
-                writer_pointer,
-                calldata_reference_pointer,
-                &compilation_ctx,
-            );
+            ref_type
+                .add_pack_instructions(
+                    &mut func_body,
+                    &mut raw_module,
+                    local,
+                    writer_pointer,
+                    calldata_reference_pointer,
+                    &compilation_ctx,
+                )
+                .unwrap();
         };
 
         // Return the writer pointer for reading the calldata back

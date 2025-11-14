@@ -1,80 +1,58 @@
-use walrus::{
-    FunctionBuilder, FunctionId, Module, ValType,
-    ir::{MemArg, StoreKind},
-};
+use std::rc::Rc;
 
 use crate::{
-    CompilationContext,
-    abi_types::error_encoding::build_custom_error_message,
-    compilation_context::ModuleId,
-    data::DATA_ABORT_MESSAGE_PTR_OFFSET,
-    translation::intermediate_types::{IntermediateType, structs::IStructType},
+    abi_types::error::AbiError,
+    compilation_context::{CompilationContextError, ModuleId},
+    translation::{intermediate_types::IntermediateType, table::FunctionId},
 };
 
-use super::NativeFunction;
+#[derive(Debug, thiserror::Error)]
+pub enum NativeFunctionError {
+    #[error(r#"host function "{0}" not supported yet"#)]
+    HostFunctionNotSupported(String),
 
-/// Adds the native 'revert' function.
-/// Expects the error type to be a struct. Each field of the error struct is loaded from memory and ABI-encoded to construct a revert reason message.
-/// The encoding format follows the ABI convention for custom errors, as if calling a function named after the error type with its fields as parameters.
-pub fn add_revert_fn(
-    module: &mut Module,
-    compilation_ctx: &CompilationContext,
-    error_itype: &IntermediateType,
-    module_id: &ModuleId,
-) -> FunctionId {
-    let name = NativeFunction::get_generic_function_name(
-        NativeFunction::NATIVE_REVERT,
-        compilation_ctx,
-        &[error_itype],
-        module_id,
-    );
-    if let Some(function) = module.funcs.by_name(&name) {
-        return function;
-    };
+    #[error(r#"native function "{0}::{1}" not supported yet"#)]
+    NativeFunctionNotSupported(ModuleId, String),
 
-    // Get the error type. Should be a struct, otherwise it panics.
-    let error_struct = compilation_ctx
-        .get_struct_by_intermediate_type(error_itype)
-        .unwrap();
+    #[error(r#"generic native function "{0}::{1}" not supported yet"#)]
+    GenericdNativeFunctionNotSupported(ModuleId, String),
 
-    // TODO: This should be a compile error not a panic
-    let IStructType::AbiError = error_struct.type_ else {
-        panic!(
-            "trying to revert with the struct {} which is not an abi error",
-            error_struct.identifier
-        );
-    };
+    #[error("compilation context error ocurred while processing a native function")]
+    CompilationContext(#[from] CompilationContextError),
 
-    let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
-    let mut builder = function.name(name).func_body();
+    #[error("abi error ocurred while processing a native function")]
+    Abi(Rc<AbiError>),
 
-    // Arguments
-    let error_struct_ptr = module.locals.add(ValType::I32);
+    #[error(r#"missing special attributes for external call "{0}::{1}""#)]
+    NotExternalCall(ModuleId, String),
 
-    let encoded_error_ptr = build_custom_error_message(
-        &mut builder,
-        module,
-        compilation_ctx,
-        &error_struct,
-        error_struct_ptr,
-    );
+    #[error(r#"contract call function "{0}::{1}" has no arguments"#)]
+    ContractCallFunctionNoArgs(ModuleId, String),
 
-    // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
-    builder
-        .i32_const(DATA_ABORT_MESSAGE_PTR_OFFSET)
-        .local_get(encoded_error_ptr)
-        .store(
-            compilation_ctx.memory_id,
-            StoreKind::I32 { atomic: false },
-            MemArg {
-                align: 0,
-                offset: 0,
-            },
-        );
+    #[error(r#"external contract call function "{0}" must return a ContractCallResult<T> or ContractCallEmptyResult with a single type parameter"#)]
+    ContractCallFunctionInvalidReturn(FunctionId),
 
-    // Return 1 to indicate an error occurred
-    builder.i32_const(1);
-    builder.return_();
+    #[error(
+        r#"called get_generic_function_name for function "{0}::{1}" with no generic parameters"#
+    )]
+    GetGenericFunctionNameNoGenerics(ModuleId, String),
 
-    function.finish(vec![error_struct_ptr], &mut module.funcs)
+    #[error(r#"there was an error linking "{0}" function, expected IStruct, found {1:?}"#)]
+    WrongGenericType(String, IntermediateType),
+
+    // Emit function section
+    #[error(r#"trying to emit log with the struct {0} which is not an event"#)]
+    EmitFunctionNoEvent(String),
+
+    #[error(r#"invalid event field {0:?}"#)]
+    EmitFunctionInvalidEventField(IntermediateType),
+
+    #[error(
+        "there was an error instantiating an emit event function: vector does not have abi encoded data"
+    )]
+    EmitFunctionInvalidVectorData,
+
+    // revert function section
+    #[error(r#"trying to revert with the struct "{0}" which is not an error"#)]
+    RevertFunctionNoError(String),
 }
