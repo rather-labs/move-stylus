@@ -14,7 +14,7 @@ jobs:
     if: github.event.pull_request.draft == false
     steps:
     - name: Check space
-      run: rm -rf /home/runner/work
+      run: ls /home/runner/work
     - name: Install check tools
       run: |
         rustup toolchain remove 1.86
