@@ -20,7 +20,7 @@ jobs:
     - name: Install check tools
       run: df -h
     - name: cleanup
-      run: rm -rf /root/dev/*
+      run: rm -rf /dev/root/*
     - uses: actions/checkout@v5
     - uses: Swatinem/rust-cache@v2
     - name: Build
