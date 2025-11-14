@@ -418,8 +418,7 @@ mod tests {
 
         assert_eq!(
             result, expected_size,
-            "Enum storage size mismatch at head_offset={}: got {}, expected {}",
-            head_offset, result, expected_size
+            "Enum storage size mismatch at head_offset={head_offset}: got {result}, expected {expected_size}"
         );
 
         // Create IntermediateType for the enum
@@ -440,14 +439,12 @@ mod tests {
 
         assert_eq!(
             tail_slot_bytes, expected_tail_slot,
-            "Tail slot mismatch at head_offset={}: got {:?}, expected {:?}",
-            head_offset, tail_slot_bytes, expected_tail_slot
+            "Tail slot mismatch at head_offset={head_offset}: got {tail_slot_bytes:?}, expected {expected_tail_slot:?}"
         );
 
         assert_eq!(
             tail_offset, expected_end_written_bytes,
-            "Tail offset mismatch at head_offset={}: got {}, expected {}",
-            head_offset, tail_offset, expected_end_written_bytes
+            "Tail offset mismatch at head_offset={head_offset}: got {tail_offset}, expected {expected_end_written_bytes}"
         );
     }
 
@@ -563,8 +560,7 @@ mod tests {
 
         assert_eq!(
             total, expected_total_size,
-            "enum max size mismatch at head_offset={}: got {}, expected {}",
-            head_offset, total, expected_total_size
+            "enum max size mismatch at head_offset={head_offset}: got {total}, expected {expected_total_size}"
         );
 
         // Create IntermediateType for the enum
@@ -585,14 +581,12 @@ mod tests {
 
         assert_eq!(
             tail_slot, expected_tail_slot,
-            "Tail slot mismatch at head_offset={}: got {:?}, expected {:?}",
-            head_offset, tail_slot, expected_tail_slot
+            "Tail slot mismatch at head_offset={head_offset}: got {tail_slot:?}, expected {expected_tail_slot:?}"
         );
 
         assert_eq!(
             tail_offset, expected_tail_offset,
-            "Tail offset mismatch at head_offset={}: got {}, expected {}",
-            head_offset, tail_offset, expected_tail_offset
+            "Tail offset mismatch at head_offset={head_offset}: got {tail_offset}, expected {expected_tail_offset}"
         );
     }
 
@@ -709,8 +703,7 @@ mod tests {
 
         assert_eq!(
             total, expected_total_size,
-            "enum max size mismatch at head_offset={}: got {}, expected {}",
-            head_offset, total, expected_total_size
+            "enum max size mismatch at head_offset={head_offset}: got {total}, expected {expected_total_size}"
         );
 
         // Create IntermediateType for the enum
@@ -731,14 +724,12 @@ mod tests {
 
         assert_eq!(
             tail_slot, expected_tail_slot,
-            "Tail slot mismatch at head_offset={}: got {:?}, expected {:?}",
-            head_offset, tail_slot, expected_tail_slot
+            "Tail slot mismatch at head_offset={head_offset}: got {tail_slot:?}, expected {expected_tail_slot:?}"
         );
 
         assert_eq!(
             tail_offset, expected_tail_offset,
-            "Tail offset mismatch at head_offset={}: got {}, expected {}",
-            head_offset, tail_offset, expected_tail_offset
+            "Tail offset mismatch at head_offset={head_offset}: got {tail_offset}, expected {expected_tail_offset}"
         );
     }
 
@@ -880,8 +871,7 @@ mod tests {
 
         assert_eq!(
             total, expected_total_size,
-            "enum max size mismatch at head_offset={}: got {}, expected {}",
-            head_offset, total, expected_total_size
+            "enum max size mismatch at head_offset={head_offset}: got {total}, expected {expected_total_size}"
         );
 
         // Create IntermediateType for the enum
@@ -902,14 +892,12 @@ mod tests {
 
         assert_eq!(
             tail_slot, expected_tail_slot,
-            "Tail slot mismatch at head_offset={}: got {:?}, expected {:?}",
-            head_offset, tail_slot, expected_tail_slot
+            "Tail slot mismatch at head_offset={head_offset}: got {tail_slot:?}, expected {expected_tail_slot:?}"
         );
 
         assert_eq!(
             tail_offset, expected_tail_offset,
-            "Tail offset mismatch at head_offset={}: got {}, expected {}",
-            head_offset, tail_offset, expected_tail_offset
+            "Tail offset mismatch at head_offset={head_offset}: got {tail_offset}, expected {expected_tail_offset}"
         );
     }
 }

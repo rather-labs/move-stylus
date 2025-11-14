@@ -51,5 +51,5 @@ path = "scripts/delegated_counter_named_id.rs"
 dotenv = "0.15.0"
 eyre = "0.6.8"
 tokio = { version = "1.44.2", features = ["macros", "rt-multi-thread"] }
-alloy = "1.0.23"
+alloy = "1.1.1"
 

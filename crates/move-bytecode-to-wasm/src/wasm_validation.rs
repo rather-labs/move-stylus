@@ -8,9 +8,9 @@ pub enum WasmValidationError {
 impl std::fmt::Debug for WasmValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            WasmValidationError::InvalidWasm(s) => write!(f, "Invalid Wasm: {}", s),
+            WasmValidationError::InvalidWasm(s) => write!(f, "Invalid Wasm: {s}"),
             WasmValidationError::InvalidStylusInterface(s) => {
-                write!(f, "Invalid Stylus Interface: {}", s)
+                write!(f, "Invalid Stylus Interface: {s}")
             }
         }
     }

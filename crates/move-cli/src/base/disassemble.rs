@@ -80,7 +80,7 @@ impl Disassemble {
                     if bytecode_map {
                         println!("==========> {}", serialize_to_json_string(&bcode_map)?);
                     }
-                    println!("--> {}", disassemble_string);
+                    println!("--> {disassemble_string}");
                     if debug {
                         println!("\n{:#?}", &unit.unit.module)
                     }

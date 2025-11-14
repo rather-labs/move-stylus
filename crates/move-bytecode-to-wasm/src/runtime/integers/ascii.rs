@@ -254,6 +254,6 @@ mod tests {
         let ascii_data = &memory_data[1..1 + len as usize];
         let result_str = String::from_utf8(ascii_data.to_vec()).unwrap();
 
-        assert_eq!(result_str, expected, "Failed for input {}", error_code);
+        assert_eq!(result_str, expected, "Failed for input {error_code}");
     }
 }

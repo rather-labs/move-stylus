@@ -602,8 +602,7 @@ fn translate_instruction(
             types_stack.push(constant_type);
             assert!(
                 data.next().is_none(),
-                "Constant data not consumed: {:?}",
-                data
+                "Constant data not consumed: {data:?}"
             );
         }
         // Load literals
@@ -2945,10 +2944,7 @@ pub fn box_args(
                 if let Some(index) = function_locals.iter().position(|&id| id == *local) {
                     updates.push((index, outer_ptr));
                 } else {
-                    panic!(
-                        "Couldn't find original local {:?} in function_information",
-                        local
-                    );
+                    panic!("Couldn't find original local {local:?} in function_information");
                 }
             }
             _ => {

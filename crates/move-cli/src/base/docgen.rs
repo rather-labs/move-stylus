@@ -57,7 +57,7 @@ impl Docgen {
             let path = PathBuf::from(&file);
             fs::create_dir_all(path.parent().unwrap())?;
             fs::write(path.as_path(), content)?;
-            println!("Generated {:?}", path);
+            println!("Generated {path:?}");
         }
 
         println!("\nDocumentation generation successful!");
