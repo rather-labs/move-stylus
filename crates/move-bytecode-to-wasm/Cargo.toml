@@ -32,3 +32,4 @@ inject-host-debug-fns = []
 # TODO: Remove this after finishing error handling
 [lints.clippy]
 result_large_err = "allow"
+large_enum_variant = "allow"
