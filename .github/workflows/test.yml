@@ -17,10 +17,12 @@ jobs:
       run: |
         rustup component add --toolchain 1.88.0-x86_64-unknown-linux-gnu rustfmt
         rustup component add --toolchain 1.88.0-x86_64-unknown-linux-gnu clippy
-    - name: Install check tools
+    - name: Check space
       run: df -h
     - name: cleanup
       run: rm -rf /dev/root/*
+    - name: Check space
+      run: df -h
     - uses: actions/checkout@v5
     - uses: Swatinem/rust-cache@v2
     - name: Build
