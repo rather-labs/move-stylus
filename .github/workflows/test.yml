@@ -13,19 +13,23 @@ jobs:
 
     if: github.event.pull_request.draft == false
     steps:
-    - name: Check space
-      run: ls /home/runner/work
+      # Free ~10–15 GB on GitHub-hosted runners
+      - name: Free disk space
+        run: |
+          set -euxo pipefail
+          df -h
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
+          sudo apt-get clean
+          docker system prune -af || true
+          df -h
     - name: Install check tools
       run: |
         rustup toolchain remove 1.86
         rustup component add --toolchain 1.88.0-x86_64-unknown-linux-gnu rustfmt
         rustup component add --toolchain 1.88.0-x86_64-unknown-linux-gnu clippy
-    - name: Check space
-      run: df -h
-    - name: cleanup
-      run: ls /dev/root && rm -rf /dev/root/*
-    - name: Check space
-      run: df -h
     - uses: actions/checkout@v5
     - uses: Swatinem/rust-cache@v2
     - name: Build
