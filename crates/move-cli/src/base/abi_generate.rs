@@ -12,7 +12,15 @@ use super::reroot_path;
 /// Build the package at `path`. If no path is provided defaults to current directory.
 #[derive(Parser)]
 #[clap(name = "abi-generate")]
-pub struct AbiGenerate;
+pub struct AbiGenerate {
+    /// Generate JSON format ABI files
+    #[clap(long = "json", short = 'j')]
+    pub json: bool,
+
+    /// Generate human-readable ABI files (.abi)
+    #[clap(long = "human-readable", short = 'r')]
+    pub human_readable: bool,
+}
 
 impl AbiGenerate {
     pub fn execute(
@@ -39,6 +47,11 @@ impl AbiGenerate {
                 package.root_compiled_units.iter().collect()
             };
 
+        // If neither flag is specified, generate both formats (backward compatibility)
+        let generate_both = !self.json && !self.human_readable;
+        let generate_json = self.json || generate_both;
+        let generate_human_readable = self.human_readable || generate_both;
+
         match generate_abi(&package, &root_compiled_units, &package_modules) {
             Ok(mut processed_abis) => {
                 let build_directory = rerooted_path.join("build/abi");
@@ -46,17 +59,21 @@ impl AbiGenerate {
                 std::fs::create_dir_all(&build_directory).unwrap();
 
                 for abi in &mut processed_abis {
-                    if let Some(content) = &abi.content_human_readable {
-                        // Change the extension
-                        abi.file.set_extension("abi");
-                        let file = abi.file.file_name().expect("Source file name not found.");
-                        std::fs::write(build_directory.join(file), content.as_bytes())?;
+                    if generate_human_readable {
+                        if let Some(content) = &abi.content_human_readable {
+                            // Change the extension
+                            abi.file.set_extension("abi");
+                            let file = abi.file.file_name().expect("Source file name not found.");
+                            std::fs::write(build_directory.join(file), content.as_bytes())?;
+                        }
                     }
-                    if let Some(content) = &abi.content_json {
-                        // Change the extension
-                        abi.file.set_extension("json");
-                        let file = abi.file.file_name().expect("Source file name not found.");
-                        std::fs::write(build_directory.join(file), content.as_bytes())?;
+                    if generate_json {
+                        if let Some(content) = &abi.content_json {
+                            // Change the extension
+                            abi.file.set_extension("json");
+                            let file = abi.file.file_name().expect("Source file name not found.");
+                            std::fs::write(build_directory.join(file), content.as_bytes())?;
+                        }
                     }
                 }
             }
