@@ -12,9 +12,9 @@ jobs:
     runs-on: ubuntu-latest
 
     if: github.event.pull_request.draft == false
+    steps:
     - name: Check space
       run: rm -rf /home/runner/work
-    steps:
     - name: Install check tools
       run: |
         rustup toolchain remove 1.86
