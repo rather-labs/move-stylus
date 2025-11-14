@@ -83,23 +83,23 @@ async fn main() -> eyre::Result<()> {
     println!("====================");
 
     let res = example.totalSupply().call().await?;
-    println!("Total Supply = {}", res);
+    println!("Total Supply = {res}");
 
     let res = example.decimals().call().await?;
-    println!("decimals = {}", res);
+    println!("decimals = {res}");
 
     let res = example.name().call().await?;
-    println!("name = {}", res);
+    println!("name = {res}");
 
     let res = example.symbol().call().await?;
-    println!("symbol = {}", res);
+    println!("symbol = {res}");
 
     println!("\n====================");
     println!("  Mint");
     println!("====================");
 
     let res = example.balanceOf(sender).call().await?;
-    println!("Balance of target address = {}", res);
+    println!("Balance of target address = {res}");
 
     println!("Minting 555555 coins to target address");
 
@@ -111,10 +111,10 @@ async fn main() -> eyre::Result<()> {
         println!("Mint event log {} {:#?}", index + 1, log);
     }
     let res = example.totalSupply().call().await?;
-    println!("Total Supply after mint = {}", res);
+    println!("Total Supply after mint = {res}");
 
     let res = example.balanceOf(sender).call().await?;
-    println!("Balance of target address = {}", res);
+    println!("Balance of target address = {res}");
 
     println!("\n====================");
     println!("  Transfer");
@@ -123,15 +123,9 @@ async fn main() -> eyre::Result<()> {
     println!("Transfering 1000 TST to {address_1}");
 
     let res = example.balanceOf(sender).call().await?;
-    println!(
-        "  Balance of origin address {sender} before transaction = {}",
-        res
-    );
+    println!("  Balance of origin address {sender} before transaction = {res}");
     let res = example.balanceOf(address_1).call().await?;
-    println!(
-        "  Balance of target address {address_1} before transaction = {}",
-        res
-    );
+    println!("  Balance of target address {address_1} before transaction = {res}");
 
     let pending_tx = example.transfer(address_1, U256::from(1000)).send().await?;
     let receipt = pending_tx.get_receipt().await?;
@@ -140,15 +134,9 @@ async fn main() -> eyre::Result<()> {
     }
 
     let res = example.balanceOf(sender).call().await?;
-    println!(
-        "  Balance of origin address {sender} after transaction = {}",
-        res
-    );
+    println!("  Balance of origin address {sender} after transaction = {res}");
     let res = example.balanceOf(address_1).call().await?;
-    println!(
-        "  Balance of target address {address_1} after transaction = {}",
-        res
-    );
+    println!("  Balance of target address {address_1} after transaction = {res}");
 
     println!("\n====================");
     println!("  Burn");
@@ -165,10 +153,10 @@ async fn main() -> eyre::Result<()> {
     }
 
     let res = example.totalSupply().call().await?;
-    println!("Total Supply after burn= {}", res);
+    println!("Total Supply after burn= {res}");
 
     let res = example.balanceOf(sender).call().await?;
-    println!("Balance of target address = {}", res);
+    println!("Balance of target address = {res}");
 
     println!("\n==============================");
     println!("  Allowance and transfer from");
@@ -176,7 +164,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("Allow {sender} to spend 100 TST from {address_1}");
     let res = example.allowance(address_1, sender).call().await?;
-    println!("  Current allowance = {}", res);
+    println!("  Current allowance = {res}");
 
     println!();
 
@@ -192,13 +180,13 @@ async fn main() -> eyre::Result<()> {
 
     println!("Checking balances and allowance");
     let res = example.allowance(address_1, sender).call().await?;
-    println!("  Current allowance = {} TST", res);
+    println!("  Current allowance = {res} TST");
     let res = example.balanceOf(sender).call().await?;
-    println!("  Current balance of {sender}= {} TST", res);
+    println!("  Current balance of {sender}= {res} TST");
     let res = example.balanceOf(address_1).call().await?;
-    println!("  Current balance of {address_1}= {} TST", res);
+    println!("  Current balance of {address_1}= {res} TST");
     let res = example.balanceOf(address_2).call().await?;
-    println!("  Current balance of {address_2}= {} TST", res);
+    println!("  Current balance of {address_2}= {res} TST");
 
     println!();
 
@@ -220,13 +208,13 @@ async fn main() -> eyre::Result<()> {
 
     println!("Checking balances and allowance");
     let res = example.allowance(address_1, sender).call().await?;
-    println!("  Current allowance = {} TST", res);
+    println!("  Current allowance = {res} TST");
     let res = example.balanceOf(sender).call().await?;
-    println!("  Current balance of {sender}= {} TST", res);
+    println!("  Current balance of {sender}= {res} TST");
     let res = example.balanceOf(address_1).call().await?;
-    println!("  Current balance of {address_1}= {} TST", res);
+    println!("  Current balance of {address_1}= {res} TST");
     let res = example.balanceOf(address_2).call().await?;
-    println!("  Current balance of {address_2}= {} TST", res);
+    println!("  Current balance of {address_2}= {res} TST");
 
     Ok(())
 }

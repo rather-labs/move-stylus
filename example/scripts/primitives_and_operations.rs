@@ -78,25 +78,25 @@ async fn main() -> eyre::Result<()> {
     println!("Primitive arithmetic operations");
 
     let res = example.castU8(42u128).call().await?;
-    println!("castU8: {}", res);
+    println!("castU8: {res}");
 
     let res = example
         .sumU256(U256::from(u128::MAX), U256::from(u128::MAX))
         .call()
         .await?;
-    println!("sumU256: {}", res);
+    println!("sumU256: {res}");
 
     let res = example.subU128(u128::MAX, u128::MAX - 1).call().await?;
-    println!("subU128: {}", res);
+    println!("subU128: {res}");
 
     let res = example.mulU64(u32::MAX as u64, 2).call().await?;
-    println!("mulU64: {}", res);
+    println!("mulU64: {res}");
 
     let res = example.divU32(u32::MAX, 2).call().await?;
-    println!("divU32: {}", res);
+    println!("divU32: {res}");
 
     let res = example.modU16(100, 3).call().await?;
-    println!("modU16: {}", res);
+    println!("modU16: {res}");
 
     println!("\nBitwise operations");
 
@@ -107,39 +107,39 @@ async fn main() -> eyre::Result<()> {
         )
         .call()
         .await?;
-    println!("orU256: 0x{:x}", res);
+    println!("orU256: 0x{res:x}");
 
     let res = example.xorU128(u128::MAX, u64::MAX as u128).call().await?;
-    println!("xorU128: 0x{:x}", res);
+    println!("xorU128: 0x{res:x}");
 
     let res = example
         .andU64(u64::MAX, 0xF000FFFFFFFF000Fu64)
         .call()
         .await?;
-    println!("andU64: 0x{:x}", res);
+    println!("andU64: 0x{res:x}");
 
     let res = example.shiftLeftU32(1, 31).call().await?;
-    println!("shiftLeftU32: 0x{:x}", res);
+    println!("shiftLeftU32: 0x{res:x}");
 
     let res = example.shiftRightU16(0xFFFF, 15).call().await?;
-    println!("shiftRightU16: 0x{:x}", res);
+    println!("shiftRightU16: 0x{res:x}");
 
     println!("\nBoolean operations");
 
     let res = example.notTrue().call().await?;
-    println!("notTrue: {}", res);
+    println!("notTrue: {res}");
 
     let res = example.not(true).call().await?;
-    println!("not(true): {}", res);
+    println!("not(true): {res}");
 
     let res = example.not(false).call().await?;
-    println!("not(false): {}", res);
+    println!("not(false): {res}");
 
     let res = example.and(true, false).call().await?;
-    println!("and(true, false): {}", res);
+    println!("and(true, false): {res}");
 
     let res = example.or(true, false).call().await?;
-    println!("or(true, false): {}", res);
+    println!("or(true, false): {res}");
 
     println!("\nComparison operations");
 
@@ -147,43 +147,43 @@ async fn main() -> eyre::Result<()> {
         .lessThanU256(U256::from(10), U256::from(20))
         .call()
         .await?;
-    println!("lessThanU256(10, 20): {}", res);
+    println!("lessThanU256(10, 20): {res}");
 
     let res = example
         .lessThanU256(U256::from(20), U256::from(10))
         .call()
         .await?;
-    println!("lessThanU256(20, 10): {}", res);
+    println!("lessThanU256(20, 10): {res}");
 
     let res = example.lessThanEqU128(u128::MAX, u128::MAX).call().await?;
-    println!("lessThanEqU128(u128::MAX, u128::MAX): {}", res);
+    println!("lessThanEqU128(u128::MAX, u128::MAX): {res}");
 
     let res = example
         .lessThanEqU128(u128::MAX - 1, u128::MAX)
         .call()
         .await?;
-    println!("lessThanEqU128(u128::MAX - 1, u128::MAX): {}", res);
+    println!("lessThanEqU128(u128::MAX - 1, u128::MAX): {res}");
 
     let res = example
         .lessThanEqU128(u128::MAX, u128::MAX - 1)
         .call()
         .await?;
-    println!("lessThanEqU128(u128::MAX, u128::MAX - 1): {}", res);
+    println!("lessThanEqU128(u128::MAX, u128::MAX - 1): {res}");
 
     let res = example.greaterThanU64(100, 50).call().await?;
-    println!("greaterThanU64(100, 50): {}", res);
+    println!("greaterThanU64(100, 50): {res}");
 
     let res = example.greaterThanU64(50, 100).call().await?;
-    println!("greaterThanU64(50, 100): {}", res);
+    println!("greaterThanU64(50, 100): {res}");
 
     let res = example.greaterThanEqU32(200, 200).call().await?;
-    println!("greaterThanEqU32(200, 200): {}", res);
+    println!("greaterThanEqU32(200, 200): {res}");
 
     let res = example.greaterThanEqU32(200 - 1, 200).call().await?;
-    println!("greaterThanEqU32(200 - 1, 200): {}", res);
+    println!("greaterThanEqU32(200 - 1, 200): {res}");
 
     let res = example.greaterThanEqU32(200, 200 - 1).call().await?;
-    println!("greaterThanEqU32(200, 200 - 1): {}", res);
+    println!("greaterThanEqU32(200, 200 - 1): {res}");
 
     println!("\nVector operations");
 
@@ -191,19 +191,19 @@ async fn main() -> eyre::Result<()> {
         .vecFromU256(U256::from(1), U256::from(2))
         .call()
         .await?;
-    println!("vecFromU256(1, 2): {:?}", res);
+    println!("vecFromU256(1, 2): {res:?}");
 
     let res = example.vecLenU128(vec![1, 2, 3, 4]).call().await?;
-    println!("vecLenU128([1, 2, 3, 4]): {}", res);
+    println!("vecLenU128([1, 2, 3, 4]): {res}");
 
     let res = example.vecPopBackU64(vec![1, 2, 3, 4]).call().await?;
-    println!("vecPopBackU64([1, 2, 3, 4]): {:?}", res);
+    println!("vecPopBackU64([1, 2, 3, 4]): {res:?}");
 
     let res = example.vecSwapU32(vec![1, 2, 3, 4], 0, 3).call().await?;
-    println!("vecSwapU32([1, 2, 3, 4], 0, 3): {:?}", res);
+    println!("vecSwapU32([1, 2, 3, 4], 0, 3): {res:?}");
 
     let res = example.vecPushBackU16(vec![1, 2, 3], 4).call().await?;
-    println!("vecPushBackU16([1, 2, 3], 4): {:?}", res);
+    println!("vecPushBackU16([1, 2, 3], 4): {res:?}");
 
     Ok(())
 }

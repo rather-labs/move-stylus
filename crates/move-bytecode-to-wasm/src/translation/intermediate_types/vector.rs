@@ -142,7 +142,7 @@ impl IVector {
 
                 store_offset += 8;
             } else {
-                panic!("Unsupported data size for vector: {}", data_size);
+                panic!("Unsupported data size for vector: {data_size}");
             }
 
             builder.local_get(ptr_local);

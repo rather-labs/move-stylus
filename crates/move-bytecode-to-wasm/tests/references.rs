@@ -9,7 +9,7 @@ mod common;
 
 fn run_test(runtime: &RuntimeSandbox, call_data: Vec<u8>, expected_result: Vec<u8>) -> Result<()> {
     let (result, return_data) = runtime.call_entrypoint(call_data)?;
-    println!("return_data: {:?}", return_data);
+    println!("return_data: {return_data:?}");
     anyhow::ensure!(
         result == 0,
         "Function returned non-zero exit code: {result}"
@@ -628,7 +628,7 @@ mod reference_vec_64 {
         #[case] expected_result: Vec<u64>,
     ) {
         let expected_result = <sol!(uint64[])>::abi_encode(&expected_result);
-        println!("expected_result: {:?}", expected_result);
+        println!("expected_result: {expected_result:?}");
         run_test(runtime, call_data.abi_encode(), expected_result).unwrap();
     }
 }

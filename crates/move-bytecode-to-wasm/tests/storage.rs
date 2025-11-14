@@ -58,8 +58,7 @@ pub fn assert_empty_storage(
             let value_after = storage_after_delete.get(key).unwrap_or(&[0u8; 32]);
             assert_eq!(
                 *value_after, [0u8; 32],
-                "Unexpected non-zero value at key {:?} after delete",
-                key
+                "Unexpected non-zero value at key {key:?} after delete"
             );
         }
     }
@@ -1871,14 +1870,12 @@ mod storage_transfer {
                 // Assert that the key existed in storage before deletion
                 assert!(
                     storage_before_delete.contains_key(key),
-                    "Key {:?} should exist in storage_before_delete",
-                    key
+                    "Key {key:?} should exist in storage_before_delete"
                 );
 
                 assert_eq!(
                     *value, [0u8; 32],
-                    "Unexpected non-zero value at key: {:?}",
-                    key
+                    "Unexpected non-zero value at key: {key:?}"
                 );
             }
         }
@@ -1939,14 +1936,12 @@ mod storage_transfer {
                 // Assert that the key existed in storage before deletion
                 assert!(
                     storage_before_delete.contains_key(key),
-                    "Key {:?} should exist in storage_before_delete",
-                    key
+                    "Key {key:?} should exist in storage_before_delete"
                 );
 
                 assert_eq!(
                     *value, [0u8; 32],
-                    "Unexpected non-zero value at key: {:?}",
-                    key
+                    "Unexpected non-zero value at key: {key:?}"
                 );
             }
         }
@@ -2262,8 +2257,7 @@ mod storage_transfer {
                 let value = storage_after_delete.get(key).unwrap_or(&[0u8; 32]);
                 assert_eq!(
                     *value, [0u8; 32],
-                    "Unexpected non-zero value at key: {:?}",
-                    key
+                    "Unexpected non-zero value at key: {key:?}"
                 );
             }
         }
@@ -2927,7 +2921,7 @@ mod storage_encoding {
         // Check if it is encoded correctly in storage
         for (i, expected) in expected_encode.iter().enumerate() {
             let storage = runtime.get_storage_at_slot(U256::from(i).to_be_bytes());
-            assert_eq!(expected, &storage, "Mismatch at slot {}", i);
+            assert_eq!(expected, &storage, "Mismatch at slot {i}");
         }
 
         // Use the read function to check if it decodes correctly
@@ -3297,7 +3291,7 @@ mod storage_encoding {
         // Check if it is encoded correctly in storage
         for (i, slot) in expected_slots.iter().enumerate() {
             let storage = runtime.get_storage_at_slot(*slot);
-            assert_eq!(expected_encode[i], storage, "Mismatch at slot {}", i);
+            assert_eq!(expected_encode[i], storage, "Mismatch at slot {i}");
         }
 
         // Use the read function to check if it decodes correctly
@@ -3512,7 +3506,7 @@ mod storage_encoding {
         // Check if it is encoded correctly in storage
         for (i, slot) in expected_slots.iter().enumerate() {
             let storage = runtime.get_storage_at_slot(*slot);
-            assert_eq!(expected_encode[i], storage, "Mismatch at slot {}", i);
+            assert_eq!(expected_encode[i], storage, "Mismatch at slot {i}");
         }
 
         // Use the read function to check if it decodes correctly
@@ -3625,7 +3619,7 @@ mod storage_encoding {
         // Check if it is encoded correctly in storage
         for (i, slot) in expected_slots.iter().enumerate() {
             let storage = runtime.get_storage_at_slot(*slot);
-            assert_eq!(expected_encode[i], storage, "Mismatch at slot {}", i);
+            assert_eq!(expected_encode[i], storage, "Mismatch at slot {i}");
         }
     }
 }
@@ -3721,7 +3715,7 @@ mod trusted_swap {
 
         // Read the swap request id emmited from the contract's events
         let swap_request_a_id = runtime.obtain_uid();
-        println!("Swap Request A ID: {:#x}", swap_request_a_id);
+        println!("Swap Request A ID: {swap_request_a_id:#x}");
 
         // Assert that the slot is empty
         assert_eq!(
@@ -3788,7 +3782,7 @@ mod trusted_swap {
 
         for (key, value) in storage_after_delete.iter() {
             if *key != COUNTER_KEY && value != &[0u8; 32] {
-                println!("{:?} \n {:?} \n", key, value);
+                println!("{key:?} \n {value:?} \n");
             }
         }
 

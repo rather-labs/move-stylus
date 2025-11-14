@@ -213,7 +213,7 @@ mod tests {
                     let mem = get_memory(&mut caller);
 
                     let args_data = caller.data().data.clone();
-                    println!("args_data: {:?}", args_data);
+                    println!("args_data: {args_data:?}");
 
                     mem.write(&mut caller, args_ptr as usize, &args_data)
                         .unwrap();

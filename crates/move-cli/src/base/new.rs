@@ -143,7 +143,7 @@ edition = "2024.beta" # edition = "legacy" to use legacy (pre-2024) Move
 
         // custom addition in the end
         if !custom.is_empty() {
-            writeln!(w, "{}", custom)?;
+            writeln!(w, "{custom}")?;
         }
 
         Ok(())

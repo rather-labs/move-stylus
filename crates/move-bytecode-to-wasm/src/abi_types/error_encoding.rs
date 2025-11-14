@@ -386,6 +386,6 @@ mod tests {
         let error_start = ptr as usize + 72; // 4 + 4 + 32 + 32 = 72
         let error_message_data = &memory_data[error_start..error_start + msg_len];
         let result_str = String::from_utf8(error_message_data.to_vec()).unwrap();
-        assert_eq!(result_str, expected, "Failed for input {}", error_code);
+        assert_eq!(result_str, expected, "Failed for input {error_code}");
     }
 }
