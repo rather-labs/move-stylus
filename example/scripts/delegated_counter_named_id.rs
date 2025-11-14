@@ -79,7 +79,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading contract logic address");
     let res = example.logicAddress().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("==============================================================================");
     println!(" Executing increment and setValue on logic contract:");
@@ -88,7 +88,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value before increment");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSending increment tx");
 
@@ -102,7 +102,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value after increment");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSetting counter to number 42");
     let pending_tx = example.setValue(42).send().await?;
@@ -114,7 +114,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading counter after set");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSending increment tx");
     let pending_tx = example.increment().send().await?;
@@ -126,7 +126,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value after increment");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSending increment BEFORE tx (shuld increment by 10 and 1)");
     let pending_tx = example.incrementModifyBefore().send().await?;
@@ -138,7 +138,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value after increment");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSending increment AFTER tx (shuld increment by 20 and 1)");
     let pending_tx = example.incrementModifyAfter().send().await?;
@@ -150,7 +150,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value after increment");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSending increment BEFORE And AFTER tx (shuld increment by 10, 1, and 20)");
     let pending_tx = example.incrementModifyBeforeAfter().send().await?;
@@ -162,7 +162,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value after increment");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     // Add a new sender and try to set the value
     let priv_key_2 =
@@ -193,7 +193,7 @@ async fn main() -> eyre::Result<()> {
     // Value did not change as the sender is not the owner
     println!("\nReading value after set value");
     let res = example_2.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("==============================================================================");
     println!(" Changing contract logic from {address_logic_1}");
@@ -209,7 +209,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value before increment");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSending increment tx");
 
@@ -222,7 +222,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value after increment");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSetting counter to number 42 (should set 42*2)");
     let pending_tx = example.setValue(42).send().await?;
@@ -234,7 +234,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading counter after set");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSending increment tx");
     let pending_tx = example.increment().send().await?;
@@ -246,7 +246,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value after increment");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSending increment BEFORE tx (shuld increment by 10 and 2)");
     let pending_tx = example.incrementModifyBefore().send().await?;
@@ -258,7 +258,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value after increment");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSending increment AFTER tx (shuld increment by 20 and 2)");
     let pending_tx = example.incrementModifyAfter().send().await?;
@@ -270,7 +270,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value after increment");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     println!("\nSending increment BEFORE And AFTER tx (shuld increment by 10, 2, and 20)");
     let pending_tx = example.incrementModifyBeforeAfter().send().await?;
@@ -282,7 +282,7 @@ async fn main() -> eyre::Result<()> {
 
     println!("\nReading value after increment");
     let res = example.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     // Add a new sender and try to set the value
     let priv_key_2 =
@@ -313,7 +313,7 @@ async fn main() -> eyre::Result<()> {
     // Value did not change as the sender is not the owner
     println!("\nReading value after set value");
     let res = example_2.read().call().await?;
-    println!("counter = {}", res);
+    println!("counter = {res}");
 
     Ok(())
 }

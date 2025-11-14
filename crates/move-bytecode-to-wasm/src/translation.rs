@@ -632,8 +632,7 @@ fn translate_instruction(
             types_stack.push(constant_type);
             assert!(
                 data.next().is_none(),
-                "Constant data not consumed: {:?}",
-                data
+                "Constant data not consumed: {data:?}"
             );
         }
         // Load literals

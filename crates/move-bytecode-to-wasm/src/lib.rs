@@ -330,13 +330,13 @@ pub fn translate_package_cli(
 
     for (module_name, module) in modules.iter_mut() {
         module
-            .emit_wasm_file(build_directory.join(format!("{}.wasm", module_name)))
+            .emit_wasm_file(build_directory.join(format!("{module_name}.wasm")))
             .unwrap();
 
         // Convert to WAT format
         let wat = wasmprinter::print_bytes(module.emit_wasm()).expect("Failed to generate WAT");
         std::fs::write(
-            build_directory.join(format!("{}.wat", module_name)),
+            build_directory.join(format!("{module_name}.wat")),
             wat.as_bytes(),
         )
         .expect("Failed to write WAT file");

@@ -124,7 +124,7 @@ async fn main() -> eyre::Result<()> {
     // If the constructor is called, the storage value at init_key is should be different from 0
     let init_key = alloy::primitives::U256::from_be_bytes(keccak256(b"init_key").into());
     let init_value_le = storage_value_to_le(&provider, address, init_key).await?;
-    println!("Storage value at init_key: {:?}", init_value_le);
+    println!("Storage value at init_key: {init_value_le:?}");
 
     // Storage key for the counter
     let counter_key =
@@ -138,7 +138,7 @@ async fn main() -> eyre::Result<()> {
     }
 
     let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
-    println!("Counter value: {:?}", storage_value_le);
+    println!("Counter value: {storage_value_le:?}");
 
     let pending_tx = example.getUniqueId().send().await?;
     let receipt = pending_tx.get_receipt().await?;
@@ -147,7 +147,7 @@ async fn main() -> eyre::Result<()> {
         println!("getUniqueId - Emitted UID: 0x{}", hex::encode(raw));
     }
     let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
-    println!("Counter value: {:?}", storage_value_le);
+    println!("Counter value: {storage_value_le:?}");
 
     let pending_tx = example.getUniqueId().send().await?;
     let receipt = pending_tx.get_receipt().await?;
@@ -157,13 +157,13 @@ async fn main() -> eyre::Result<()> {
     }
 
     let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
-    println!("Counter value: {:?}", storage_value_le);
+    println!("Counter value: {storage_value_le:?}");
 
     let ret = example.getFreshObjectAddress().call().await?;
     println!("fresh new id {ret:?}");
 
     let storage_value_le = storage_value_to_le(&provider, address, counter_key).await?;
-    println!("Counter value: {:?}", storage_value_le);
+    println!("Counter value: {storage_value_le:?}");
 
     // Events
     // Emit test event 1
@@ -177,7 +177,7 @@ async fn main() -> eyre::Result<()> {
         let data = log.data().data.0.clone();
         let decoded_event = <Example::TestEvent1 as SolValue>::abi_decode(&data)?;
         assert_eq!(event, decoded_event);
-        println!("Decoded event data = {:?}", decoded_event);
+        println!("Decoded event data = {decoded_event:?}");
     }
 
     // Emit test event 2
@@ -197,7 +197,7 @@ async fn main() -> eyre::Result<()> {
     for log in logs {
         let data = log.data().data.0.clone();
         let decoded_event = <Example::TestEvent2 as SolValue>::abi_decode(&data)?;
-        println!("Decoded event data = {:?}", decoded_event);
+        println!("Decoded event data = {decoded_event:?}");
         assert_eq!(event, decoded_event);
     }
 
@@ -228,7 +228,7 @@ async fn main() -> eyre::Result<()> {
     for log in logs {
         let data = log.data().data.0.clone();
         let decoded_event = <Example::TestEvent3 as SolValue>::abi_decode(&data)?;
-        println!("Decoded event data = {:?}", decoded_event);
+        println!("Decoded event data = {decoded_event:?}");
         assert_eq!(event, decoded_event);
     }
 

@@ -99,19 +99,19 @@ async fn main() -> eyre::Result<()> {
     let example = Example::new(address, provider.clone());
 
     let num = example.echo(123).call().await?;
-    println!("echo(123) = {}", num);
+    println!("echo(123) = {num}");
 
     let num = example.getConstant().call().await?;
-    println!("getConstant = {}", num);
+    println!("getConstant = {num}");
 
     let num = example.getConstantLocal().call().await?;
-    println!("getConstantLocal = {}", num);
+    println!("getConstantLocal = {num}");
 
     let num = example.getCopiedLocal().call().await?;
-    println!("getCopiedLocal = {}", num);
+    println!("getCopiedLocal = {num}");
 
     let num = example.getLocal(456).call().await?;
-    println!("getLocal = {}", num);
+    println!("getLocal = {num}");
 
     let tx_context = example.txContextProperties().call().await?;
     println!("txContextProperties:");
@@ -125,22 +125,22 @@ async fn main() -> eyre::Result<()> {
     println!("  - tx.gas_price: {}", tx_context._7);
 
     let fib10 = example.fibonacci(10).call().await?;
-    println!("fibonacci(10) = {}", fib10);
+    println!("fibonacci(10) = {fib10}");
 
     let fib20 = example.fibonacci(20).call().await?;
-    println!("fibonacci(20) = {}", fib20);
+    println!("fibonacci(20) = {fib20}");
 
     let sum_special_2 = example.sumSpecial(2).call().await?;
-    println!("sumSpecial(2) = {}", sum_special_2);
+    println!("sumSpecial(2) = {sum_special_2}");
 
     let sum_special_4 = example.sumSpecial(4).call().await?;
-    println!("sumSpecial(4) = {}", sum_special_4);
+    println!("sumSpecial(4) = {sum_special_4}");
 
     let create_foo = example.createFooU16(55, 66).call().await?;
-    println!("createFooU16(55, 66) = {:#?}", create_foo);
+    println!("createFooU16(55, 66) = {create_foo:#?}");
 
     let create_baz = example.createBazU16(55, 66).call().await?;
-    println!("createBazU16(55, 66) = {:#?}", create_baz);
+    println!("createBazU16(55, 66) = {create_baz:#?}");
 
     let create_foo = example.createFoo2U16(55, 66).call().await?;
     println!(
@@ -167,18 +167,18 @@ async fn main() -> eyre::Result<()> {
     );
 
     let num = example.echo(123).call().await;
-    println!("Example echo = {:?}", num);
+    println!("Example echo = {num:?}");
     let echo_variant = example
         .echoVariant(Example::TestEnum::FirstVariant)
         .call()
         .await?;
-    println!("echoVariant(FirstVariant) = {:?}", echo_variant);
+    println!("echoVariant(FirstVariant) = {echo_variant:?}");
 
     let echo_variant = example
         .echoVariant(Example::TestEnum::SecondVariant)
         .call()
         .await?;
-    println!("echoVariant(SecondVariant) = {:?}", echo_variant);
+    println!("echoVariant(SecondVariant) = {echo_variant:?}");
 
     let test_values = example
         .testValues(Example::Test {

@@ -372,7 +372,7 @@ mod tests {
     use super::*;
 
     fn validator(param: u32, param2: u32, param3: u64) {
-        println!("validator: {}, {}, {}", param, param2, param3);
+        println!("validator: {param}, {param2}, {param3}");
 
         assert_eq!(param, 1);
         assert_eq!(param2, 1234);
@@ -420,7 +420,7 @@ mod tests {
 
         let data =
             <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
-        println!("data: {:?}", data);
+        println!("data: {data:?}");
         let data_len = data.len() as i32;
 
         // Define validator function
@@ -478,14 +478,14 @@ mod tests {
 
         let data =
             <sol!((uint64, uint16, bool))>::abi_encode_params(&(123456789012345, 1234, true));
-        println!("data: {:?}", data);
+        println!("data: {data:?}");
         let data_len = data.len() as i32;
 
         // Define validator function
         let mut linker = Linker::new(&Engine::default());
         linker
             .func_wrap("", "validator", |param: u64, param2: u32, param3: u32| {
-                println!("validator: {}, {}, {}", param, param2, param3);
+                println!("validator: {param}, {param2}, {param3}");
 
                 assert_eq!(param3, 1);
                 assert_eq!(param2, 1234);
@@ -545,7 +545,7 @@ mod tests {
             <sol!((bool, uint16, uint64))>::abi_encode_params(&(true, 1234, 123456789012345));
         // Offset data by 10 bytes
         data = [vec![0; 10], data].concat();
-        println!("data: {:?}", data);
+        println!("data: {data:?}");
         let data_len = data.len() as i32;
 
         // Define validator function

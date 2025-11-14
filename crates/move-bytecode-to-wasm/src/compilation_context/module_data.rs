@@ -70,7 +70,7 @@ impl Display for Address {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(last_nonzero) = self.0.iter().rposition(|&b| b != 0) {
             for byte in &self.0[last_nonzero..] {
-                write!(f, "0x{:02x}", byte)?;
+                write!(f, "0x{byte:02x}")?;
             }
         } else {
             write!(f, "0x0")?;
@@ -82,7 +82,7 @@ impl Display for Address {
 
 impl Debug for Address {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Address[{}]", self)
+        write!(f, "Address[{self}]")
     }
 }
 
@@ -871,8 +871,7 @@ impl ModuleData {
         assert_eq!(
             function_def.visibility,
             Visibility::Private,
-            "{}",
-            BAD_VISIBILITY_ERROR_MESSAGE
+            "{BAD_VISIBILITY_ERROR_MESSAGE}"
         );
 
         // Must have 1 or 2 arguments
