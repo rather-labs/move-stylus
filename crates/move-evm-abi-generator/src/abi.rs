@@ -16,15 +16,13 @@ use crate::{
     types::Type,
 };
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Visibility {
     Public,
     Private,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Function {
     pub(crate) identifier: String,
     pub(crate) parameters: Vec<NamedType>,
@@ -34,13 +32,13 @@ pub struct Function {
     pub(crate) is_entry: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Struct_ {
     pub(crate) identifier: String,
     pub(crate) fields: Vec<NamedType>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Event {
     pub(crate) identifier: String,
     pub(crate) fields: Vec<EventField>,
@@ -48,19 +46,19 @@ pub struct Event {
 }
 
 /// A unified struct representing a typed field used in functions, structs, and events.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct NamedType {
     pub(crate) identifier: String,
     pub(crate) type_: Type,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct EventField {
     pub(crate) named_type: NamedType,
     pub(crate) indexed: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Abi {
     pub(crate) contract_name: String,
     pub(crate) functions: Vec<Function>,

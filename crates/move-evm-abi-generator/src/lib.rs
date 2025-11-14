@@ -28,6 +28,8 @@ pub fn generate_abi(
     package: &CompiledPackage,
     root_compiled_units: &[&CompiledUnitWithSource],
     package_module_data: &PackageModuleData,
+    generate_json: bool,
+    generate_human_readable: bool,
 ) -> Result<Vec<Abi>, (MappedFiles, Vec<SpecialAttributeError>)> {
     let mut result = Vec::new();
     for root_compiled_module in root_compiled_units {
@@ -63,13 +65,25 @@ pub fn generate_abi(
             continue;
         }
 
-        let json_abi = json_format::process_abi(&abi, &package_module_data.modules_data);
-        let hr_abi = human_readable::process_abi(&abi);
+        let json_abi = if generate_json {
+            Some(json_format::process_abi(
+                &abi,
+                &package_module_data.modules_data,
+            ))
+        } else {
+            None
+        };
+
+        let hr_abi = if generate_human_readable {
+            Some(human_readable::process_abi(&abi))
+        } else {
+            None
+        };
 
         result.push(Abi {
             file: file.to_path_buf(),
-            content_json: Some(json_abi),
-            content_human_readable: Some(hr_abi),
+            content_json: json_abi,
+            content_human_readable: hr_abi,
         });
     }
 

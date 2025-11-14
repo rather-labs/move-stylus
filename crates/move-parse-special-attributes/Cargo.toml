@@ -7,4 +7,3 @@ edition = "2024"
 move-compiler.workspace = true
 move-ir-types.workspace = true
 thiserror = "2.0.17"
-serde.workspace = true

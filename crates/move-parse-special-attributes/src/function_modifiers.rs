@@ -4,8 +4,6 @@ use move_compiler::{
     shared::Identifier,
 };
 
-use serde::{Deserialize, Serialize};
-
 #[derive(Debug)]
 pub struct Function {
     pub name: String,
@@ -41,7 +39,7 @@ pub struct Signature {
     pub return_type: Type,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum FunctionModifier {
     Pure,
     View,

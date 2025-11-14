@@ -47,12 +47,17 @@ impl AbiGenerate {
                 package.root_compiled_units.iter().collect()
             };
 
-        // If neither flag is specified, generate both formats
-        let generate_both = !self.json && !self.human_readable;
-        let generate_json = self.json || generate_both;
-        let generate_human_readable = self.human_readable || generate_both;
+        // If neither flag is set, default to generating JSON
+        let generate_json = self.json || !self.human_readable;
+        let generate_human_readable = self.human_readable;
 
-        match generate_abi(&package, &root_compiled_units, &package_modules) {
+        match generate_abi(
+            &package,
+            &root_compiled_units,
+            &package_modules,
+            generate_json,
+            generate_human_readable,
+        ) {
             Ok(mut processed_abis) => {
                 let build_directory = rerooted_path.join("build/abi");
                 // Create the build directory if it doesn't exist

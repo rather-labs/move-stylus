@@ -3658,7 +3658,6 @@ version = "0.1.0"
 dependencies = [
  "move-compiler",
  "move-ir-types",
- "serde",
  "thiserror 2.0.17",
 ]
 

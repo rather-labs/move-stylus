@@ -2,15 +2,15 @@ use crate::abi::{Abi, Event, Function, Struct_};
 use crate::types::Type;
 use move_bytecode_to_wasm::compilation_context::{ModuleData, ModuleId};
 use move_parse_special_attributes::function_modifiers::FunctionModifier;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 struct JsonAbi {
     abi: Vec<JsonAbiItem>,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
 enum FunctionType {
     Constructor,
@@ -31,7 +31,7 @@ impl FunctionType {
 }
 
 // Todo: is it possible to get the FunctionType from within the Function variant to serialize the type as a string?
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
 enum AbiItemType {
     Event,
@@ -39,7 +39,7 @@ enum AbiItemType {
     Function(FunctionType),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 #[serde(untagged)]
 enum JsonAbiItem {
     Event {
@@ -77,7 +77,7 @@ enum JsonAbiItem {
     },
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 struct JsonIO {
     name: String,
     #[serde(rename = "type")]
@@ -88,7 +88,7 @@ struct JsonIO {
     components: Option<Vec<JsonComponent>>, // present iff type is tuple/tuple[]/tuple[k]
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 struct JsonComponent {
     name: String,
     #[serde(rename = "type")]
@@ -123,9 +123,14 @@ fn process_errors(
                 .fields
                 .iter()
                 .map(|field| {
-                    field
-                        .type_
-                        .to_json_io(field.identifier.clone(), None, modules_data)
+                    let (abi_type, components) =
+                        encode_for_json_abi(field.type_.clone(), modules_data);
+                    JsonIO {
+                        name: field.identifier.clone(),
+                        type_: abi_type,
+                        indexed: None,
+                        components,
+                    }
                 })
                 .collect();
 
@@ -149,11 +154,14 @@ fn process_events(
                 .fields
                 .iter()
                 .map(|field| {
-                    field.named_type.type_.to_json_io(
-                        field.named_type.identifier.clone(),
-                        Some(field.indexed),
-                        modules_data,
-                    )
+                    let (abi_type, components) =
+                        encode_for_json_abi(field.named_type.type_.clone(), modules_data);
+                    JsonIO {
+                        name: field.named_type.identifier.clone(),
+                        type_: abi_type,
+                        indexed: Some(field.indexed),
+                        components,
+                    }
                 })
                 .collect();
 
@@ -185,9 +193,14 @@ fn process_functions(
                         f.parameters
                             .iter()
                             .map(|param| {
-                                param
-                                    .type_
-                                    .to_json_io(param.identifier.clone(), None, modules_data)
+                                let (abi_type, components) =
+                                    encode_for_json_abi(param.type_.clone(), modules_data);
+                                JsonIO {
+                                    name: param.identifier.clone(),
+                                    type_: abi_type,
+                                    indexed: None,
+                                    components,
+                                }
                             })
                             .collect(),
                     );
@@ -199,9 +212,14 @@ fn process_functions(
                         .parameters
                         .iter()
                         .map(|param| {
-                            param
-                                .type_
-                                .to_json_io(param.identifier.clone(), None, modules_data)
+                            let (abi_type, components) =
+                                encode_for_json_abi(param.type_.clone(), modules_data);
+                            JsonIO {
+                                name: param.identifier.clone(),
+                                type_: abi_type,
+                                indexed: None,
+                                components,
+                            }
                         })
                         .collect();
 
@@ -210,13 +228,28 @@ fn process_functions(
                             // For tuples, we iterate over the elements and collect them in a vector of JsonIOs
                             types_
                                 .iter()
-                                .map(|t| t.to_json_io("".to_string(), None, modules_data))
+                                .map(|t| {
+                                    let (abi_type, components) =
+                                        encode_for_json_abi(t.clone(), modules_data);
+                                    JsonIO {
+                                        name: "".to_string(),
+                                        type_: abi_type,
+                                        indexed: None,
+                                        components,
+                                    }
+                                })
                                 .collect()
                         }
-                        _ => vec![
-                            f.return_types
-                                .to_json_io("".to_string(), None, modules_data),
-                        ],
+                        _ => {
+                            let (abi_type, components) =
+                                encode_for_json_abi(f.return_types.clone(), modules_data);
+                            vec![JsonIO {
+                                name: "".to_string(),
+                                type_: abi_type,
+                                indexed: None,
+                                components,
+                            }]
+                        }
                     };
 
                     (Some(f.identifier.clone()), Some(inputs), Some(outputs))
@@ -246,93 +279,81 @@ fn map_state_mutability(mods: &[FunctionModifier]) -> &'static str {
     }
 }
 
-impl Type {
-    fn to_json_io(
-        &self,
-        name: String,
-        indexed: Option<bool>,
-        modules_data: &HashMap<ModuleId, ModuleData>,
-    ) -> JsonIO {
-        let (type_, components) = self.encode_for_json_abi(modules_data);
-        JsonIO {
-            name,
-            type_,
-            indexed,
-            components,
+/// Encodes a Type into the JSON ABI format.
+///
+/// Returns a tuple of `(type_name, components)` where:
+/// - `type_name`: The ABI type string (e.g., "uint256", "tuple", "tuple[]")
+/// - `components`: `Some(Vec<JsonComponent>)` for struct types (tuples), `None` for primitive types
+///
+/// Recursively processes nested types (arrays, struct fields) to build the complete ABI representation.
+fn encode_for_json_abi(
+    type_: Type,
+    modules_data: &HashMap<ModuleId, ModuleData>,
+) -> (String, Option<Vec<JsonComponent>>) {
+    match type_ {
+        Type::Address
+        | Type::Bool
+        | Type::Uint8
+        | Type::Uint16
+        | Type::Uint32
+        | Type::Uint64
+        | Type::Uint128
+        | Type::Uint256
+        | Type::Unit
+        | Type::Bytes32
+        | Type::None => (type_.name(), None),
+        Type::String => (type_.name(), None),
+        Type::Enum { .. } => ("uint8".to_string(), None),
+        Type::Array(inner) => {
+            let (inner_abi_type, inner_components) =
+                encode_for_json_abi((*inner).clone(), modules_data);
+            (format!("{inner_abi_type}[]"), inner_components)
         }
-    }
-    /// Encodes a Type into the JSON ABI format.
-    ///
-    /// Returns a tuple of `(type_name, components)` where:
-    /// - `type_name`: The ABI type string (e.g., "uint256", "tuple", "tuple[]")
-    /// - `components`: `Some(Vec<JsonComponent>)` for struct types (tuples), `None` for primitive types
-    ///
-    /// Recursively processes nested types (arrays, struct fields) to build the complete ABI representation.
-    fn encode_for_json_abi(
-        &self,
-        modules_data: &HashMap<ModuleId, ModuleData>,
-    ) -> (String, Option<Vec<JsonComponent>>) {
-        match self {
-            Type::Address
-            | Type::Bool
-            | Type::Uint8
-            | Type::Uint16
-            | Type::Uint32
-            | Type::Uint64
-            | Type::Uint128
-            | Type::Uint256
-            | Type::Unit
-            | Type::Bytes32
-            | Type::None => (self.name(), None),
-            Type::String => (self.name(), None),
-            Type::Enum { .. } => ("uint8".to_string(), None),
-            Type::Array(inner) => {
-                let (inner_type_name, inner_components) = inner.encode_for_json_abi(modules_data);
-                (format!("{inner_type_name}[]"), inner_components)
-            }
-            Type::Struct {
-                identifier,
-                module_id,
-                ..
-            } => {
-                let struct_module = modules_data.get(module_id).unwrap();
-                // We use the IStruct to get the Type of the fields, which differs from the Type defined in special_attributes
-                let struct_ = struct_module.structs.get_by_identifier(identifier).unwrap();
+        Type::Struct {
+            identifier,
+            module_id,
+            ..
+        } => {
+            let struct_module = modules_data.get(&module_id).unwrap();
+            // We use the IStruct to get the Type of the fields, which differs from the Type defined in special_attributes
+            let struct_ = struct_module
+                .structs
+                .get_by_identifier(&identifier)
+                .unwrap();
 
-                // Get field names from the Struct_ defined in special_attributes
-                let struct_sa = struct_module
-                    .special_attributes
-                    .structs
-                    .iter()
-                    .find(|s| s.name.as_str() == identifier)
-                    .unwrap();
+            // Get field names from the Struct_ defined in special_attributes
+            let struct_sa = struct_module
+                .special_attributes
+                .structs
+                .iter()
+                .find(|s| s.name.as_str() == identifier)
+                .unwrap();
 
-                let components = struct_
-                    .fields
-                    .iter()
-                    .zip(&struct_sa.fields)
-                    .map(|(field_itype, (field_name, _))| {
-                        let field_type = Type::from_intermediate_type(field_itype, modules_data);
-                        let (field_type_name, field_comps) =
-                            field_type.encode_for_json_abi(modules_data);
-                        JsonComponent {
-                            // positional fields do not have names in the abi
-                            name: if struct_sa.positional_fields {
-                                "".to_string()
-                            } else {
-                                field_name.clone()
-                            },
-                            type_: field_type_name,
-                            components: field_comps,
-                        }
-                    })
-                    .collect();
+            let components = struct_
+                .fields
+                .iter()
+                .zip(&struct_sa.fields)
+                .map(|(field_itype, (field_name, _))| {
+                    let field_type = Type::from_intermediate_type(field_itype, modules_data);
+                    let (field_abi_type, field_comps) =
+                        encode_for_json_abi(field_type, modules_data);
+                    JsonComponent {
+                        // positional fields do not have names in the abi
+                        name: if struct_sa.positional_fields {
+                            "".to_string()
+                        } else {
+                            field_name.clone()
+                        },
+                        type_: field_abi_type,
+                        components: field_comps,
+                    }
+                })
+                .collect();
 
-                ("tuple".to_string(), Some(components))
-            }
-            Type::Tuple(_) => {
-                panic!("Tuple types should be destructered by the caller");
-            }
+            ("tuple".to_string(), Some(components))
+        }
+        Type::Tuple(_) => {
+            panic!("Tuple types should be destructered by the caller");
         }
     }
 }
