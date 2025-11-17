@@ -217,6 +217,8 @@ pub fn test_generated_abi(
         .map_err(|e| format!("Failed to parse expected JSON: {e}"))?;
 
     if actual_json != expected_json {
+        println!("Actual JSON: {actual_json}");
+        println!("Expected JSON: {expected_json}");
         // Try to provide a helpful diff message
         let actual_pretty =
             serde_json::to_string_pretty(&actual_json).unwrap_or_else(|_| actual_json.to_string());

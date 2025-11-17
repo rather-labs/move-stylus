@@ -1,17 +1,7 @@
-module test::abi_error;
+module test::abi_error_2;
 
 use stylus::error::revert;
 use std::ascii::String;
-
-// Standard error type
-#[ext(abi_error)]
-#[allow(unused_field)]
-public struct Error(String) has copy, drop;
-
-entry fun revert_standard_error(s: String) {
-    let error = Error(s);
-    revert(error);
-}
 
 #[ext(abi_error)]
 #[allow(unused_field)]
@@ -39,36 +29,4 @@ public struct CustomError2 has copy, drop {
 
 entry fun revert_custom_error2(a: bool, b: u8, c: u16, d: u32, e: u64, f: u128, g: u256, h: address) {
     revert(CustomError2 { a, b, c, d, e, f, g, h });
-}
-
-#[ext(abi_error)]
-#[allow(unused_field)]
-public struct CustomError3 has copy, drop {
-    a: vector<u32>,
-    b: vector<u128>,
-    c: vector<vector<u64>>,
-}
-
-entry fun revert_custom_error3(a: vector<u32>, b: vector<u128>, c: vector<vector<u64>>) {
-    revert(CustomError3 { a, b, c });
-}
-
-public struct NestedStruct(String) has copy, drop;
-public struct NestedStruct2 has copy, drop {
-    a: String,
-    b: u64,
-}
-
-#[ext(abi_error)]
-#[allow(unused_field)]
-public struct CustomError4 has copy, drop {
-    a: NestedStruct,
-    b: NestedStruct2,
-}
-
-entry fun revert_custom_error4(a: String, b: u64) {
-    let error = NestedStruct(a);
-    let custom_error = NestedStruct2 { a, b };
-    let error = CustomError4 { a: error, b: custom_error };
-    revert(error);
 }
