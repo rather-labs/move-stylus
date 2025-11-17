@@ -34,14 +34,15 @@ pub fn add_transfer_object_fn(
     };
 
     // Runtime functions
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
-    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
-    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
     let storage_save_fn =
-        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
+        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype])?;
     let delete_object_fn =
-        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype]);
+        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype])?;
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
@@ -105,7 +106,7 @@ pub fn add_transfer_object_fn(
 
     // Remove any objects that have been recently transferred into the struct from the original owner's mapping in storage.
     let check_and_delete_struct_tto_fields_fn = RuntimeFunction::CheckAndDeleteStructTtoFields
-        .get_generic(module, compilation_ctx, &[itype]);
+        .get_generic(module, compilation_ctx, &[itype])?;
     builder
         .local_get(struct_ptr)
         .call(check_and_delete_struct_tto_fields_fn);
@@ -166,14 +167,15 @@ pub fn add_share_object_fn(
     };
 
     // Runtime functions
-    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
-    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
     let storage_save_fn =
-        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
+        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype])?;
     let delete_object_fn =
-        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype]);
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
+        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype])?;
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
@@ -184,6 +186,7 @@ pub fn add_share_object_fn(
     let struct_ptr = module.locals.add(ValType::I32);
     let slot_ptr = module.locals.add(ValType::I32);
 
+    let mut inner_result = Ok(());
     builder.block(None, |block| {
         let block_id = block.id();
 
@@ -234,42 +237,52 @@ pub fn add_share_object_fn(
                         compilation_ctx,
                         &[itype],
                     );
-                else_
-                    .local_get(struct_ptr)
-                    .call(check_and_delete_struct_tto_fields_fn);
 
-                // Update the object ownership in memory to the shared objects key
-                else_
-                    .local_get(owner_ptr)
-                    .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
-                    .i32_const(32)
-                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                match check_and_delete_struct_tto_fields_fn {
+                    Ok(check_and_delete_struct_tto_fields_fn) => {
+                        else_
+                            .local_get(struct_ptr)
+                            .call(check_and_delete_struct_tto_fields_fn);
 
-                // Calculate the slot number in the shared objects mapping
-                else_
-                    .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
-                    .local_get(struct_ptr)
-                    .call(get_id_bytes_ptr_fn)
-                    .call(write_object_slot_fn);
+                        // Update the object ownership in memory to the shared objects key
+                        else_
+                            .local_get(owner_ptr)
+                            .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
+                            .i32_const(32)
+                            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-                // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
-                // This is needed because DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET might be overwritten later on
-                else_
-                    .i32_const(32)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(slot_ptr)
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                    .i32_const(32)
-                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                        // Calculate the slot number in the shared objects mapping
+                        else_
+                            .i32_const(DATA_SHARED_OBJECTS_KEY_OFFSET)
+                            .local_get(struct_ptr)
+                            .call(get_id_bytes_ptr_fn)
+                            .call(write_object_slot_fn);
 
-                // Save the struct in the shared objects mapping
-                else_
-                    .local_get(struct_ptr)
-                    .local_get(slot_ptr)
-                    .call(storage_save_fn);
+                        // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
+                        // This is needed because DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET might be overwritten later on
+                        else_
+                            .i32_const(32)
+                            .call(compilation_ctx.allocator)
+                            .local_tee(slot_ptr)
+                            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                            .i32_const(32)
+                            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+                        // Save the struct in the shared objects mapping
+                        else_
+                            .local_get(struct_ptr)
+                            .local_get(slot_ptr)
+                            .call(storage_save_fn);
+                    }
+                    Err(e) => {
+                        inner_result = Err(e);
+                    }
+                }
             },
         );
     });
+
+    inner_result?;
 
     Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }
@@ -292,14 +305,15 @@ pub fn add_freeze_object_fn(
     };
 
     // Runtime functions
-    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
-    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
     let storage_save_fn =
-        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
+        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype])?;
     let delete_object_fn =
-        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype]);
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
+        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype])?;
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
@@ -310,6 +324,7 @@ pub fn add_freeze_object_fn(
     let struct_ptr = module.locals.add(ValType::I32);
     let slot_ptr = module.locals.add(ValType::I32);
 
+    let mut inner_error = Ok(());
     builder.block(None, |block| {
         let block_id = block.id();
         // Get the owner key, which is stored in the 32 bytes prefixing the struct, which can either be:
@@ -368,41 +383,49 @@ pub fn add_freeze_object_fn(
                         compilation_ctx,
                         &[itype],
                     );
-                else_
-                    .local_get(struct_ptr)
-                    .call(check_and_delete_struct_tto_fields_fn);
 
-                // Update the object ownership in memory to the frozen objects key
-                else_
-                    .local_get(owner_ptr)
-                    .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
-                    .i32_const(32)
-                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                match check_and_delete_struct_tto_fields_fn {
+                    Ok(check_and_delete_struct_tto_fields_fn) => {
+                        else_
+                            .local_get(struct_ptr)
+                            .call(check_and_delete_struct_tto_fields_fn);
 
-                // Calculate the struct slot in the frozen objects mapping
-                else_
-                    .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
-                    .local_get(struct_ptr)
-                    .call(get_id_bytes_ptr_fn)
-                    .call(write_object_slot_fn);
+                        // Update the object ownership in memory to the frozen objects key
+                        else_
+                            .local_get(owner_ptr)
+                            .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+                            .i32_const(32)
+                            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-                // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
-                else_
-                    .i32_const(32)
-                    .call(compilation_ctx.allocator)
-                    .local_tee(slot_ptr)
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                    .i32_const(32)
-                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                        // Calculate the struct slot in the frozen objects mapping
+                        else_
+                            .i32_const(DATA_FROZEN_OBJECTS_KEY_OFFSET)
+                            .local_get(struct_ptr)
+                            .call(get_id_bytes_ptr_fn)
+                            .call(write_object_slot_fn);
 
-                // Save the struct into the frozen objects mapping
-                else_
-                    .local_get(struct_ptr)
-                    .local_get(slot_ptr)
-                    .call(storage_save_fn);
+                        // Allocate 32 bytes for the slot pointer and copy the DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET to it
+                        else_
+                            .i32_const(32)
+                            .call(compilation_ctx.allocator)
+                            .local_tee(slot_ptr)
+                            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                            .i32_const(32)
+                            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+
+                        // Save the struct into the frozen objects mapping
+                        else_
+                            .local_get(struct_ptr)
+                            .local_get(slot_ptr)
+                            .call(storage_save_fn);
+                    }
+                    Err(e) => inner_error = Err(e),
+                }
             },
         );
     });
+
+    inner_error?;
 
     Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }

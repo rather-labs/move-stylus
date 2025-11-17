@@ -331,12 +331,12 @@ pub fn add_delete_storage_enum_instructions(
     slot_ptr: LocalId,
     slot_offset: LocalId,
     itype: &IntermediateType,
-) {
+) -> Result<(), NativeFunctionError> {
     let (storage_cache, _) = storage_cache_bytes32(module);
-    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
-    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx))?;
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
     let compute_enum_storage_tail_position_fn = RuntimeFunction::ComputeEnumStorageTailPosition
-        .get_generic(module, compilation_ctx, &[itype]);
+        .get_generic(module, compilation_ctx, &[itype])?;
 
     // Compute the end slot
     let tail_slot_ptr = module.locals.add(ValType::I32);
@@ -389,6 +389,8 @@ pub fn add_delete_storage_enum_instructions(
             },
         )
         .local_set(slot_offset);
+
+    Ok(())
 }
 
 /// This function adds instructions to recursively delete all storage slots
@@ -407,14 +409,14 @@ pub fn add_delete_storage_vector_instructions(
     compilation_ctx: &CompilationContext,
     slot_ptr: LocalId,
     inner: &IntermediateType,
-) {
+) -> Result<(), NativeFunctionError> {
     // Host functions
     let (storage_load, _) = storage_load_bytes32(module);
     let (storage_cache, _) = storage_cache_bytes32(module);
     let (native_keccak, _) = native_keccak256(module);
 
     // Runtime functions
-    let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None);
+    let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None)?;
 
     // Locals
     let len = module.locals.add(ValType::I32);
@@ -517,6 +519,8 @@ pub fn add_delete_storage_vector_instructions(
             .i32_const(DATA_ZERO_OFFSET)
             .call(storage_cache);
     });
+
+    Ok(())
 }
 
 /// This function extracts common logic to wipe storage slots,
@@ -538,9 +542,9 @@ pub fn add_delete_field_instructions(
     slot_offset: LocalId,
     itype: &IntermediateType,
     size: i32,
-) {
+) -> Result<(), NativeFunctionError> {
     let accumulate_or_advance_slot_delete_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotDelete.get(module, Some(compilation_ctx));
+        RuntimeFunction::AccumulateOrAdvanceSlotDelete.get(module, Some(compilation_ctx))?;
 
     // Use accumulate_or_advance_slot with mode=2 (delete) to handle slot advancement
     // Mode 2 will wipe the slot to zero before advancing when needed
@@ -607,4 +611,6 @@ pub fn add_delete_field_instructions(
         }
         _ => {}
     }
+
+    Ok(())
 }

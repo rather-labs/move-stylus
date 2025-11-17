@@ -45,10 +45,11 @@ pub fn add_child_object_fn(
         return Ok(function);
     };
 
-    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
-    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
     let save_struct_into_storage_fn =
-        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
+        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype])?;
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
 
@@ -113,9 +114,10 @@ pub fn add_borrow_object_fn(
     if let Some(function) = module.funcs.by_name(&name) {
         return Ok(function);
     };
-    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
     let read_and_decode_from_storage_fn =
-        RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype]);
+        RuntimeFunction::ReadAndDecodeFromStorage.get_generic(module, compilation_ctx, &[itype])?;
 
     let mut function = FunctionBuilder::new(
         &mut module.types,
@@ -266,7 +268,7 @@ pub fn add_has_child_object_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     module_id: &ModuleId,
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32],
@@ -281,8 +283,9 @@ pub fn add_has_child_object_fn(
         .func_body();
 
     let (storage_load, _) = storage_load_bytes32(module);
-    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
 
     // Arguments
     let parent_uid = module.locals.add(ValType::I32);
@@ -305,7 +308,7 @@ pub fn add_has_child_object_fn(
         .call(is_zero_fn)
         .negate();
 
-    function.finish(vec![parent_uid, child_id], &mut module.funcs)
+    Ok(function.finish(vec![parent_uid, child_id], &mut module.funcs))
 }
 
 /// Computes a keccak256 hash from:
