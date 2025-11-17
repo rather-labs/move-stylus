@@ -20,6 +20,9 @@ pub enum AbiErrorParseError {
 
     #[error(r#"abi errors with key are not supported"#)]
     AbiErrorWithKey,
+
+    #[error(r#"The built-in errors "Error" and "Panic" cannot be re-defined."#)]
+    InvalidAbiErrorName,
 }
 
 impl From<&AbiErrorParseError> for DiagnosticInfo {
@@ -51,9 +54,19 @@ impl TryFrom<&StructDefinition> for AbiError {
                 // To be an abi error, the first named parameter must be "abi_error". If we dont find it,
                 // continue
                 let abi_error = match parameterized.first() {
-                    Some(p) if p.value.attribute_name().value.as_str() == "abi_error" => AbiError {
-                        name: value.name.to_string(),
-                    },
+                    Some(p) if p.value.attribute_name().value.as_str() == "abi_error" => {
+                        if value.name.to_string() == "Error" || value.name.to_string() == "Panic" {
+                            return Err(SpecialAttributeError {
+                                kind: SpecialAttributeErrorKind::AbiError(
+                                    AbiErrorParseError::InvalidAbiErrorName,
+                                ),
+                                line_of_code: value.loc,
+                            });
+                        }
+                        AbiError {
+                            name: value.name.to_string(),
+                        }
+                    }
                     _ => continue,
                 };
 

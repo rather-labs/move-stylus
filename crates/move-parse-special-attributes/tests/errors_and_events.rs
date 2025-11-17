@@ -14,7 +14,7 @@ pub fn test_errors_and_events() {
         panic!("Expected error due to invalid errors and events usage");
     };
 
-    assert_eq!(special_attributes_errors.len(), 4);
+    assert_eq!(special_attributes_errors.len(), 5);
 
     assert_eq!(
         1,
@@ -60,6 +60,17 @@ pub fn test_errors_and_events() {
                 SpecialAttributeErrorKind::FunctionValidation(
                     FunctionValidationError::InvalidEmitFunction
                 )
+            ))
+            .count()
+    );
+
+    assert_eq!(
+        1,
+        special_attributes_errors
+            .iter()
+            .filter(|e| matches!(
+                &e.kind,
+                SpecialAttributeErrorKind::AbiError(AbiErrorParseError::InvalidAbiErrorName)
             ))
             .count()
     );
