@@ -55,10 +55,20 @@ public struct TestEvent2 has copy, drop {
     c: u128,
 }
 
+public struct NestedStruct1 has copy, drop {
+    n: u32
+}
+
+public struct NestedStruct2 has copy, drop {
+    a: u32,
+    b: vector<u8>,
+    c: u128,
+}
+
 #[ext(event, indexes = 2)]
 public struct TestEvent3 has copy, drop {
-    a: TestEvent1,
-    b: TestEvent2,
+    a: NestedStruct1,
+    b: NestedStruct2,
 }
 
 
@@ -71,7 +81,7 @@ entry fun emit_test_event2(a: u32, b: vector<u8>, c: u128) {
 }
 
 entry fun emit_test_event3(n: u32, a: u32, b: vector<u8>, c: u128) {
-    emit(TestEvent3 { a: TestEvent1 { n }, b: TestEvent2 { a, b, c } });
+    emit(TestEvent3 { a: NestedStruct1 { n }, b: NestedStruct2 { a, b, c } });
 }
 
 entry fun test_stack_1(): (Stack<u32>, u64) {

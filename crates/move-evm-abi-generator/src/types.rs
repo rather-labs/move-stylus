@@ -3,7 +3,10 @@ use std::{collections::HashMap, rc::Rc};
 use move_bytecode_to_wasm::compilation_context::{
     ModuleData, ModuleId,
     module_data::struct_data::IntermediateType,
-    reserved_modules::{SF_MODULE_NAME_OBJECT, STYLUS_FRAMEWORK_ADDRESS},
+    reserved_modules::{
+        SF_MODULE_NAME_OBJECT, STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_ASCII,
+        STDLIB_MODULE_NAME_STRING, STYLUS_FRAMEWORK_ADDRESS,
+    },
 };
 
 use crate::common::snake_to_upper_camel;
@@ -23,9 +26,11 @@ pub enum Type {
     Unit,
     Array(Rc<Type>),
     Bytes32,
+    String,
     Struct {
         identifier: String,
         type_instances: Option<Vec<Type>>,
+        module_id: ModuleId,
     },
     Enum {
         identifier: String,
@@ -47,11 +52,13 @@ impl Type {
             Type::Uint128 => "uint128".to_owned(),
             Type::Uint256 => "uint256".to_owned(),
             Type::Unit | Type::None => "".to_owned(),
-            Type::Array(inner) => format!("{}[]", inner.name()),
             Type::Bytes32 => "bytes32".to_owned(),
+            Type::String => "string".to_owned(),
+            Type::Array(inner) => format!("{}[]", inner.name()),
             Type::Struct {
                 identifier,
                 type_instances,
+                ..
             } => {
                 if let Some(types) = type_instances {
                     let concrete_type_parameters_names = types
@@ -116,9 +123,12 @@ impl Type {
                     module_id.module_name.as_str(),
                 ) {
                     ("UID", STYLUS_FRAMEWORK_ADDRESS, SF_MODULE_NAME_OBJECT) => Self::Bytes32,
+                    ("String", STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_STRING) => Self::String,
+                    ("String", STANDARD_LIB_ADDRESS, STDLIB_MODULE_NAME_ASCII) => Self::String,
                     _ => Self::Struct {
                         identifier: struct_.identifier.clone(),
                         type_instances: None,
+                        module_id: module_id.clone(),
                     },
                 }
             }
@@ -146,6 +156,7 @@ impl Type {
                     _ => Self::Struct {
                         identifier: struct_.identifier.clone(),
                         type_instances: Some(types),
+                        module_id: module_id.clone(),
                     },
                 }
             }

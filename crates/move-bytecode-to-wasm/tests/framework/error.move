@@ -55,16 +55,23 @@ entry fun revert_custom_error3(a: vector<u32>, b: vector<u128>, c: vector<vector
     revert(error);
 }
 
+public struct NestedStruct1(String) has copy, drop;
+
+public struct NestedStruct2 has copy, drop {
+    a: String,
+    b: u64,
+}
+
 #[ext(abi_error)]
 #[allow(unused_field)]
 public struct CustomError4 has copy, drop {
-    a: Error,
-    b: CustomError,
+    a: NestedStruct1,
+    b: NestedStruct2,
 }
 
 entry fun revert_custom_error4(a: String, b: String, c: u64) {
-    let error = Error(a);
-    let custom_error = CustomError { error_message: b, error_code: c };
+    let error = NestedStruct1(a);
+    let custom_error = NestedStruct2 { a: b, b: c };
     let error = CustomError4 { a: error, b: custom_error };
     revert(error);
 }

@@ -91,7 +91,7 @@ impl TryFrom<&StructDefinition> for Event {
                     });
                 }
 
-                // Check if the event has a key
+                // Check if the event has the key ability
                 if value.abilities.iter().any(|a| a.value == Ability_::Key) {
                     return Err(SpecialAttributeError {
                         kind: SpecialAttributeErrorKind::Event(EventParseError::EventWithKey),

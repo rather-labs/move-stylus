@@ -29,6 +29,7 @@ use move_compiler::{
     parser::ast::{Definition, ModuleMember},
     shared::{Identifier, NumericalAddress, files::MappedFiles},
 };
+use move_ir_types::location::Loc;
 use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
     path::Path,
@@ -40,6 +41,8 @@ use types::Type;
 pub struct Struct_ {
     pub name: String,
     pub fields: Vec<(String, Type)>,
+    pub positional_fields: bool,
+    pub loc: Loc,
 }
 
 #[derive(Default, Debug)]
@@ -105,6 +108,11 @@ pub fn process_special_attributes(
                         result.structs.push(Struct_ {
                             name: struct_name.clone(),
                             fields,
+                            positional_fields: matches!(
+                                s.fields,
+                                move_compiler::parser::ast::StructFields::Positional(_)
+                            ),
+                            loc: s.loc,
                         });
 
                         let mut found_modifier: bool = false;
@@ -218,6 +226,18 @@ pub fn process_special_attributes(
         };
     }
 
+    // Validate that no struct fields contain events or errors
+    for s in &result.structs {
+        for (_, field_type) in &s.fields {
+            if let Some(error) =
+                validate_struct_field(field_type, &result.events, &result.abi_errors, s.loc)
+            {
+                module_errors.push(error);
+                found_error = true;
+            }
+        }
+    }
+
     for source in ast.source_definitions {
         if let Definition::Module(module) = source.def {
             for module_member in module.members {
@@ -313,5 +333,43 @@ pub fn process_special_attributes(
         Err((mapped_files, module_errors))
     } else {
         Ok(result)
+    }
+}
+
+/// Checks if a field of a struct is an event or an error (or an array/tuple of them)
+/// If so, returns a SpecialAttributeError.
+fn validate_struct_field(
+    ty: &Type,
+    events: &HashMap<String, Event>,
+    abi_errors: &HashMap<String, AbiError>,
+    loc: Loc,
+) -> Option<SpecialAttributeError> {
+    match ty {
+        Type::UserDataType(name, _) => {
+            // Check if the type itself is an event or error
+            if events.contains_key(name) {
+                return Some(SpecialAttributeError {
+                    kind: SpecialAttributeErrorKind::NestedEvent(name.to_string()),
+                    line_of_code: loc,
+                });
+            }
+            if abi_errors.contains_key(name) {
+                return Some(SpecialAttributeError {
+                    kind: SpecialAttributeErrorKind::NestedError(name.to_string()),
+                    line_of_code: loc,
+                });
+            }
+            None
+        }
+        Type::Vector(inner) => validate_struct_field(inner, events, abi_errors, loc),
+        Type::Tuple(types) => {
+            for t in types {
+                if let Some(error) = validate_struct_field(t, events, abi_errors, loc) {
+                    return Some(error);
+                }
+            }
+            None
+        }
+        _ => None,
     }
 }
