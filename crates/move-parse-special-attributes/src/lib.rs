@@ -262,10 +262,11 @@ pub fn process_special_attributes(
                                 .flat_map(|s| FunctionModifier::parse_modifiers(&s.value))
                                 .collect::<VecDeque<FunctionModifier>>();
 
-                            match modifiers.pop_front() {
+                            let first_modifier = modifiers.pop_front();
+                            match first_modifier {
                                 Some(FunctionModifier::ExternalCall) => {
-                                    let modifiers: Vec<FunctionModifier> =
-                                        modifiers.into_iter().collect();
+                                    let modifiers =
+                                        modifiers.into_iter().collect::<Vec<FunctionModifier>>();
 
                                     let errors = validate_external_call_function(
                                         f,
@@ -289,8 +290,8 @@ pub fn process_special_attributes(
                                     }
                                 }
                                 Some(FunctionModifier::Abi) => {
-                                    let modifiers: Vec<FunctionModifier> =
-                                        modifiers.into_iter().collect();
+                                    let modifiers =
+                                        modifiers.into_iter().collect::<Vec<FunctionModifier>>();
 
                                     if !found_error {
                                         result.functions.push(Function {
@@ -303,9 +304,15 @@ pub fn process_special_attributes(
                                 }
                                 _ => {
                                     if !found_error {
+                                        if let Some(modifier) = first_modifier {
+                                            modifiers.push_front(modifier);
+                                        }
+                                        let modifiers = modifiers
+                                            .into_iter()
+                                            .collect::<Vec<FunctionModifier>>();
                                         result.functions.push(Function {
                                             name: f.name.to_owned().to_string(),
-                                            modifiers: Vec::new(),
+                                            modifiers,
                                             signature,
                                             visibility,
                                         });
