@@ -50,6 +50,9 @@ pub enum TranslationError {
         operand_type: IntermediateType,
     },
 
+    #[error("cast error: trying to cast {0:?}")]
+    InvalidCast(IntermediateType),
+
     #[error("unsupported operation: {operation:?}")]
     UnsupportedOperation { operation: Bytecode },
 

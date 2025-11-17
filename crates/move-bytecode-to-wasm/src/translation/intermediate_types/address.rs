@@ -3,7 +3,7 @@ use walrus::{
     ir::{MemArg, StoreKind},
 };
 
-use crate::{CompilationContext, runtime::RuntimeFunction};
+use crate::{CompilationContext, runtime::RuntimeFunction, translation::TranslationError};
 
 #[derive(Clone, Copy)]
 pub struct IAddress;
@@ -55,8 +55,10 @@ impl IAddress {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) {
-        let equality_f_id = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+    ) -> Result<(), TranslationError> {
+        let equality_f_id = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
         builder.i32_const(Self::HEAP_SIZE).call(equality_f_id);
+
+        Ok(())
     }
 }

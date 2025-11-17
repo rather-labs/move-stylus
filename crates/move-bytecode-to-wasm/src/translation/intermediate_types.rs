@@ -25,6 +25,8 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
+use super::TranslationError;
+
 pub mod address;
 pub mod boolean;
 pub mod enums;
@@ -341,7 +343,7 @@ impl IntermediateType {
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
         local: LocalId,
-    ) {
+    ) -> Result<(), TranslationError> {
         builder.local_get(local);
         match self {
             IntermediateType::IBool
@@ -394,7 +396,7 @@ impl IntermediateType {
                         offset: 0,
                     },
                 );
-                let copy_f = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx));
+                let copy_f = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx))?;
                 builder.call(copy_f);
             }
             IntermediateType::IU256 | IntermediateType::IAddress => {
@@ -406,7 +408,7 @@ impl IntermediateType {
                         offset: 0,
                     },
                 );
-                let copy_f = RuntimeFunction::CopyU256.get(module, Some(compilation_ctx));
+                let copy_f = RuntimeFunction::CopyU256.get(module, Some(compilation_ctx))?;
                 builder.call(copy_f);
             }
             IntermediateType::IVector(inner_type) => {
@@ -430,9 +432,7 @@ impl IntermediateType {
             IntermediateType::IStruct {
                 module_id, index, ..
             } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
+                let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
                 builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -449,9 +449,7 @@ impl IntermediateType {
                 types,
                 ..
             } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
+                let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
                 let struct_instance = struct_.instantiate(types);
                 builder.load(
                     compilation_ctx.memory_id,
@@ -478,7 +476,7 @@ impl IntermediateType {
                 panic!("cannot copy a type parameter, expected a concrete type");
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self).unwrap();
+                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
                 builder.load(
                     compilation_ctx.memory_id,
                     LoadKind::I32 { atomic: false },
@@ -490,6 +488,8 @@ impl IntermediateType {
                 enum_.copy_local_instructions(module, builder, compilation_ctx, module_data);
             }
         }
+
+        Ok(())
     }
 
     pub fn add_load_memory_to_local_instructions(
@@ -623,7 +623,7 @@ impl IntermediateType {
         module: &mut Module,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) {
+    ) -> Result<(), TranslationError> {
         builder.load(
             compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
@@ -657,11 +657,11 @@ impl IntermediateType {
                 );
             }
             IntermediateType::IU128 => {
-                let copy_f = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx));
+                let copy_f = RuntimeFunction::CopyU128.get(module, Some(compilation_ctx))?;
                 builder.call(copy_f);
             }
             IntermediateType::IU256 | IntermediateType::IAddress => {
-                let copy_f = RuntimeFunction::CopyU256.get(module, Some(compilation_ctx));
+                let copy_f = RuntimeFunction::CopyU256.get(module, Some(compilation_ctx))?;
                 builder.call(copy_f);
             }
             IntermediateType::IVector(inner_type) => {
@@ -675,20 +675,20 @@ impl IntermediateType {
                 );
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_intermediate_type(self)
-                    .unwrap();
+                let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
                 struct_.copy_local_instructions(module, builder, compilation_ctx, module_data);
             }
             IntermediateType::ISigner => {
                 // Signer type is read-only, we push the pointer only
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self).unwrap();
+                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
                 enum_.copy_local_instructions(module, builder, compilation_ctx, module_data);
             }
             _ => panic!("Unsupported ReadRef type: {self:?}"),
         }
+
+        Ok(())
     }
 
     pub fn add_write_ref_instructions(
@@ -696,7 +696,7 @@ impl IntermediateType {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), TranslationError> {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -824,6 +824,8 @@ impl IntermediateType {
                 panic!("cannot write to a type parameter, expected a concrete type");
             }
         }
+
+        Ok(())
     }
 
     pub fn box_local_instructions(
@@ -936,7 +938,7 @@ impl IntermediateType {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) {
+    ) -> Result<(), TranslationError> {
         match self {
             Self::IBool | Self::IU8 | Self::IU16 | Self::IU32 => {
                 builder.binop(BinaryOp::I32Eq);
@@ -944,9 +946,9 @@ impl IntermediateType {
             Self::IU64 => {
                 builder.binop(BinaryOp::I64Eq);
             }
-            Self::IU128 => IU128::equality(builder, module, compilation_ctx),
-            Self::IU256 => IU256::equality(builder, module, compilation_ctx),
-            Self::IAddress => IAddress::equality(builder, module, compilation_ctx),
+            Self::IU128 => IU128::equality(builder, module, compilation_ctx)?,
+            Self::IU256 => IU256::equality(builder, module, compilation_ctx)?,
+            Self::IAddress => IAddress::equality(builder, module, compilation_ctx)?,
             Self::ISigner => {
                 // Signers can only be created by the VM and injected into the smart contract.
                 // There can only be one signer, so if we find a situation where signers are
@@ -954,14 +956,12 @@ impl IntermediateType {
                 builder.i32_const(1);
             }
             Self::IVector(inner) => {
-                IVector::equality(builder, module, compilation_ctx, module_data, inner)
+                IVector::equality(builder, module, compilation_ctx, module_data, inner)?
             }
             Self::IStruct {
                 index, module_id, ..
             } => {
-                let struct_ = compilation_ctx
-                    .get_struct_by_index(module_id, *index)
-                    .unwrap();
+                let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
                 struct_.equality(builder, module, compilation_ctx, module_data)
             }
             Self::IGenericStructInstance {
@@ -978,7 +978,7 @@ impl IntermediateType {
                     .equality(builder, module, compilation_ctx, module_data)
             }
             Self::IEnum { .. } | Self::IGenericEnumInstance { .. } => {
-                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self).unwrap();
+                let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
                 enum_.equality(builder, module, compilation_ctx, module_data);
             }
             Self::IRef(inner) | Self::IMutRef(inner) => {
@@ -1062,13 +1062,15 @@ impl IntermediateType {
                     }
                 }
 
-                inner.load_equality_instructions(module, builder, compilation_ctx, module_data)
+                inner.load_equality_instructions(module, builder, compilation_ctx, module_data)?
             }
 
             IntermediateType::ITypeParameter(_) => {
                 panic!("cannot compare a type parameter, expected a concrete type");
             }
         }
+
+        Ok(())
     }
 
     pub fn load_not_equality_instructions(

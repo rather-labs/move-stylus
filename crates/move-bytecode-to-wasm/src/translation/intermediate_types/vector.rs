@@ -3,9 +3,9 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, compilation_context::ModuleData};
+use crate::{runtime::RuntimeFunction, translation::TranslationError};
 
 use super::{IntermediateType, heap_integers::IU128};
 
@@ -451,7 +451,7 @@ impl IVector {
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
         inner: &IntermediateType,
-    ) {
+    ) -> Result<(), TranslationError> {
         let v1_ptr = module.locals.add(ValType::I32);
         let v2_ptr = module.locals.add(ValType::I32);
         let len = module.locals.add(ValType::I32);
@@ -482,6 +482,7 @@ impl IVector {
             .local_tee(len);
 
         // If both lengths are equal, we skip the capacity and compare element by element, otherwise we return false
+        let mut inner_result = Ok(());
         builder.binop(BinaryOp::I32Eq).if_else(
             None,
             |then| {
@@ -497,15 +498,21 @@ impl IVector {
                     | IntermediateType::IU64 => {
                         let equality_f =
                             RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-
-                        // Call the generic equality function
-                        then.skip_vec_header(v1_ptr)
-                            .skip_vec_header(v2_ptr)
-                            .local_get(len)
-                            .i32_const(inner.stack_data_size() as i32)
-                            .binop(BinaryOp::I32Mul)
-                            .call(equality_f)
-                            .local_set(result);
+                        match equality_f {
+                            Ok(equality_f) => {
+                                // Call the generic equality function
+                                then.skip_vec_header(v1_ptr)
+                                    .skip_vec_header(v2_ptr)
+                                    .local_get(len)
+                                    .i32_const(inner.stack_data_size() as i32)
+                                    .binop(BinaryOp::I32Mul)
+                                    .call(equality_f)
+                                    .local_set(result);
+                            }
+                            Err(e) => {
+                                inner_result = Err(e);
+                            }
+                        }
                     }
                     IntermediateType::IU128
                     | IntermediateType::IU256
@@ -579,7 +586,11 @@ impl IVector {
             },
         );
 
+        inner_result?;
+
         builder.local_get(result);
+
+        Ok(())
     }
 
     pub fn vec_pack_instructions(
@@ -729,8 +740,8 @@ impl IVector {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
-    ) {
-        let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None);
+    ) -> Result<(), TranslationError> {
+        let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None)?;
 
         match inner {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -765,8 +776,10 @@ impl IVector {
 
         builder.i32_const(inner.stack_data_size() as i32);
 
-        let borrow_f = RuntimeFunction::VecBorrow.get(module, Some(compilation_ctx));
+        let borrow_f = RuntimeFunction::VecBorrow.get(module, Some(compilation_ctx))?;
         builder.call(borrow_f);
+
+        Ok(())
     }
 
     /// Appends an element to the end of a vector.
@@ -784,7 +797,7 @@ impl IVector {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) {
+    ) -> Result<(), TranslationError> {
         let valtype = inner.into();
         let size = inner.stack_data_size() as i32;
         let vec_ref = module.locals.add(ValType::I32);
@@ -876,10 +889,14 @@ impl IVector {
             );
 
         // length++
+        let vec_increment_len_fn =
+            RuntimeFunction::VecIncrementLen.get(module, Some(compilation_ctx))?;
         builder
             .local_get(vec_ptr)
             .local_get(len)
-            .call(RuntimeFunction::VecIncrementLen.get(module, Some(compilation_ctx)));
+            .call(vec_increment_len_fn);
+
+        Ok(())
     }
 }
 
@@ -1079,13 +1096,15 @@ mod tests {
             | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => {
-                let swap_f =
-                    RuntimeFunction::VecPopBack32.get(&mut raw_module, Some(&compilation_ctx));
+                let swap_f = RuntimeFunction::VecPopBack32
+                    .get(&mut raw_module, Some(&compilation_ctx))
+                    .unwrap();
                 builder.call(swap_f);
             }
             IntermediateType::IU64 => {
-                let swap_f =
-                    RuntimeFunction::VecPopBack64.get(&mut raw_module, Some(&compilation_ctx));
+                let swap_f = RuntimeFunction::VecPopBack64
+                    .get(&mut raw_module, Some(&compilation_ctx))
+                    .unwrap();
                 builder.call(swap_f);
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -1276,13 +1295,15 @@ mod tests {
 
         match inner_type {
             IntermediateType::IU64 => {
-                let swap_f =
-                    RuntimeFunction::VecSwap64.get(&mut raw_module, Some(&compilation_ctx));
+                let swap_f = RuntimeFunction::VecSwap64
+                    .get(&mut raw_module, Some(&compilation_ctx))
+                    .unwrap();
                 builder.call(swap_f);
             }
             _ => {
-                let swap_f =
-                    RuntimeFunction::VecSwap32.get(&mut raw_module, Some(&compilation_ctx));
+                let swap_f = RuntimeFunction::VecSwap32
+                    .get(&mut raw_module, Some(&compilation_ctx))
+                    .unwrap();
                 builder.call(swap_f);
             }
         }
