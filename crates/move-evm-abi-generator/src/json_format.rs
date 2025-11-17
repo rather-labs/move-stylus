@@ -249,11 +249,14 @@ fn process_functions(
 }
 
 fn map_state_mutability(mods: &[FunctionModifier]) -> &'static str {
-    match mods.first() {
-        Some(FunctionModifier::Pure) => "pure",
-        Some(FunctionModifier::View) => "view",
-        Some(FunctionModifier::Payable) => "payable",
-        _ => "nonpayable",
+    if mods.contains(&FunctionModifier::Pure) {
+        "pure"
+    } else if mods.contains(&FunctionModifier::View) {
+        "view"
+    } else if mods.contains(&FunctionModifier::Payable) {
+        "payable"
+    } else {
+        "nonpayable"
     }
 }
 
