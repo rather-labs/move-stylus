@@ -162,7 +162,7 @@ pub fn generate_abi(path: &str, module_name: &str) -> Result<String, Box<dyn std
     }
 
     let package_module_data = package_module_data(&package, Some(module_name.to_string()))
-        .map_err(|e| format!("Failed to get package module data: {:?}", e))?;
+        .map_err(|e| format!("Failed to get package module data: {e:?}"))?;
 
     let abis = generate_abi(
         &package,
@@ -176,7 +176,7 @@ pub fn generate_abi(path: &str, module_name: &str) -> Result<String, Box<dyn std
             "Failed to generate ABI: {:?}",
             errors
                 .iter()
-                .map(|e| format!("{:?}", e))
+                .map(|e| format!("{e:?}"))
                 .collect::<Vec<_>>()
                 .join(", ")
         )
@@ -192,7 +192,7 @@ pub fn generate_abi(path: &str, module_name: &str) -> Result<String, Box<dyn std
                 .map(|s| s == module_name)
                 .unwrap_or(false)
         })
-        .ok_or_else(|| format!("ABI not found for module: {}", module_name))?;
+        .ok_or_else(|| format!("ABI not found for module: {module_name}"))?;
 
     abi.content_json
         .clone()
@@ -206,15 +206,15 @@ pub fn test_generated_abi(
     module_name: &str,
 ) -> Result<(), String> {
     let actual_json = generate_abi(module_path, module_name)
-        .map_err(|e| format!("Failed to generate ABI: {}", e))?;
+        .map_err(|e| format!("Failed to generate ABI: {e}"))?;
     let expected_json = fs::read_to_string(json_path)
-        .map_err(|e| format!("Failed to read expected JSON file: {}", e))?;
+        .map_err(|e| format!("Failed to read expected JSON file: {e}"))?;
 
     let actual_json: serde_json::Value = serde_json::from_str(&actual_json)
-        .map_err(|e| format!("Failed to parse actual JSON: {}", e))?;
+        .map_err(|e| format!("Failed to parse actual JSON: {e}"))?;
 
     let expected_json: serde_json::Value = serde_json::from_str(&expected_json)
-        .map_err(|e| format!("Failed to parse expected JSON: {}", e))?;
+        .map_err(|e| format!("Failed to parse expected JSON: {e}"))?;
 
     if actual_json != expected_json {
         // Try to provide a helpful diff message
@@ -224,8 +224,7 @@ pub fn test_generated_abi(
             .unwrap_or_else(|_| expected_json.to_string());
 
         return Err(format!(
-            "JSON mismatch\n\nExpected:\n{}\n\nActual:\n{}",
-            expected_pretty, actual_pretty
+            "JSON mismatch\n\nExpected:\n{expected_pretty}\n\nActual:\n{actual_pretty}"
         ));
     }
 

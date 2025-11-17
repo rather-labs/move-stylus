@@ -15,7 +15,7 @@ fn test_abi_generation(
     #[case] module_path: &str,
     #[case] json_path: &str,
 ) {
-    let module_path = format!("tests/{}", module_path);
-    let json_path = format!("tests/{}", json_path);
+    let module_path = format!("tests/{module_path}");
+    let json_path = format!("tests/{json_path}");
     test_generated_abi(&json_path, &module_path, module_name).unwrap();
 }
