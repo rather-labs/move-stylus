@@ -127,7 +127,11 @@ fn process_errors(
             error.fields.iter().for_each(|field| {
                 process_io(
                     field.type_.clone(),
-                    field.identifier.clone(),
+                    if error.positional_fields {
+                        "".to_string()
+                    } else {
+                        field.identifier.clone()
+                    },
                     None,
                     &mut inputs,
                     modules_data,
@@ -154,7 +158,11 @@ fn process_events(
             event.fields.iter().for_each(|field| {
                 process_io(
                     field.named_type.type_.clone(),
-                    field.named_type.identifier.clone(),
+                    if event.positional_fields {
+                        "".to_string()
+                    } else {
+                        field.named_type.identifier.clone()
+                    },
                     Some(field.indexed),
                     &mut inputs,
                     modules_data,
@@ -272,7 +280,9 @@ fn process_io(
     io: &mut Vec<JsonIO>,
     modules_data: &HashMap<ModuleId, ModuleData>,
 ) {
-    let (abi_type, abi_internal_type, components) = encode_for_json_abi(type_, modules_data);
+    let (abi_type, abi_internal_type, components) =
+        encode_for_json_abi(type_.clone(), modules_data);
+
     if !abi_type.is_empty() {
         io.push(JsonIO {
             name,
@@ -360,13 +370,9 @@ fn encode_for_json_abi(
                     let field_type = Type::from_intermediate_type(field_itype, modules_data);
                     let (field_abi_type, field_abi_internal_type, field_comps) =
                         encode_for_json_abi(field_type, modules_data);
+
                     JsonComponent {
-                        // positional fields do not have names in the abi
-                        name: if struct_sa.positional_fields {
-                            "".to_string()
-                        } else {
-                            field_name.clone()
-                        },
+                        name: field_name.clone(),
                         type_: field_abi_type,
                         internal_type: field_abi_internal_type,
                         components: field_comps,

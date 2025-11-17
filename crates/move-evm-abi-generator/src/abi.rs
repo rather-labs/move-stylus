@@ -36,6 +36,7 @@ pub struct Function {
 pub struct Struct_ {
     pub(crate) identifier: String,
     pub(crate) fields: Vec<NamedType>,
+    pub(crate) positional_fields: bool,
 }
 
 #[derive(Debug)]
@@ -43,6 +44,7 @@ pub struct Event {
     pub(crate) identifier: String,
     pub(crate) fields: Vec<EventField>,
     pub(crate) is_anonymous: bool,
+    pub(crate) positional_fields: bool,
 }
 
 /// A unified struct representing a typed field used in functions, structs, and events.
@@ -475,6 +477,7 @@ impl Abi {
                 // Resolve struct identifier conflicts with events or errors
                 identifier: struct_abi_type.name(),
                 fields,
+                positional_fields: parsed_struct.positional_fields,
             });
 
             processed_structs.insert(struct_itype);
@@ -536,6 +539,7 @@ impl Abi {
                     })
                     .collect(),
                 is_anonymous: event_special_attributes.is_anonymous,
+                positional_fields: event_struct_parsed.positional_fields,
             });
         }
 
@@ -578,6 +582,7 @@ impl Abi {
                         type_: Type::from_intermediate_type(f, modules_data),
                     })
                     .collect(),
+                positional_fields: error_struct_parsed.positional_fields,
             });
         }
 
