@@ -1,0 +1,40 @@
+{
+    "abi": [
+		{
+			"inputs": [
+				{
+					"internalType": "uint64",
+					"name": "a",
+					"type": "uint64"
+				},
+				{
+					"internalType": "uint256",
+					"name": "b",
+					"type": "uint256"
+				}
+			],
+			"name": "f",
+			"outputs": [
+				{
+					"components": [
+						{
+							"internalType": "uint64",
+							"name": "a",
+							"type": "uint64"
+						},
+						{
+							"internalType": "uint256",
+							"name": "b",
+							"type": "uint256"
+						}
+					],
+					"internalType": "struct simple.S",
+					"name": "",
+					"type": "tuple"
+				}
+			],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		}
+	]
+}

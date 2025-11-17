@@ -1,13 +1,7 @@
-module test::errors;
+module test::abi_error;
 
 use stylus::error::revert;
 use std::ascii::String;
-
-public enum MyEnum has drop, copy {
-    A,
-    B,
-    C,
-}
 
 // Standard error type
 #[ext(abi_error)]
@@ -41,11 +35,10 @@ public struct CustomError2 has copy, drop {
     f: u128,
     g: u256,
     h: address,
-    i: MyEnum,
 }
 
-entry fun revert_custom_error2(a: bool, b: u8, c: u16, d: u32, e: u64, f: u128, g: u256, h: address, i: MyEnum) {
-    revert(CustomError2 { a, b, c, d, e, f, g, h, i });
+entry fun revert_custom_error2(a: bool, b: u8, c: u16, d: u32, e: u64, f: u128, g: u256, h: address) {
+    revert(CustomError2 { a, b, c, d, e, f, g, h });
 }
 
 #[ext(abi_error)]
