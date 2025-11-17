@@ -78,10 +78,12 @@ enum JsonAbiItem {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct JsonIO {
     name: String,
     #[serde(rename = "type")]
     type_: String, // "uint256", "tuple", "tuple[]", "tuple[3]", ...
+    internal_type: String, // "uint256", "tuple", "tuple[]", "tuple[3]", ...
     #[serde(skip_serializing_if = "Option::is_none")]
     indexed: Option<bool>, // present for event top-level inputs only
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -89,10 +91,12 @@ struct JsonIO {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct JsonComponent {
     name: String,
     #[serde(rename = "type")]
     type_: String,
+    internal_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     components: Option<Vec<JsonComponent>>,
 }
@@ -268,11 +272,12 @@ fn process_io(
     io: &mut Vec<JsonIO>,
     modules_data: &HashMap<ModuleId, ModuleData>,
 ) {
-    let (abi_type, components) = encode_for_json_abi(type_, modules_data);
+    let (abi_type, abi_internal_type, components) = encode_for_json_abi(type_, modules_data);
     if !abi_type.is_empty() {
         io.push(JsonIO {
             name,
             type_: abi_type,
+            internal_type: abi_internal_type,
             indexed,
             components,
         });
@@ -289,7 +294,7 @@ fn process_io(
 fn encode_for_json_abi(
     type_: Type,
     modules_data: &HashMap<ModuleId, ModuleData>,
-) -> (String, Option<Vec<JsonComponent>>) {
+) -> (String, String, Option<Vec<JsonComponent>>) {
     match type_ {
         Type::Address
         | Type::Bool
@@ -301,13 +306,31 @@ fn encode_for_json_abi(
         | Type::Uint256
         | Type::Unit
         | Type::Bytes32
-        | Type::None => (type_.name(), None),
-        Type::String => (type_.name(), None),
-        Type::Enum { .. } => ("uint8".to_string(), None),
+        | Type::None => {
+            let abi_type = type_.name();
+            (abi_type.clone(), abi_type, None)
+        }
+        Type::String => {
+            let abi_type = type_.name();
+            (abi_type.clone(), abi_type, None)
+        }
+        Type::Enum {
+            identifier,
+            module_id,
+        } => {
+            let abi_type = "uint8".to_string();
+            let abi_internal_type = format!("enum {}.{}", module_id.module_name, identifier);
+            (abi_type, abi_internal_type, None)
+        }
         Type::Array(inner) => {
-            let (inner_abi_type, inner_components) =
+            let (inner_abi_type, inner_internal_type, inner_components) =
                 encode_for_json_abi((*inner).clone(), modules_data);
-            (format!("{inner_abi_type}[]"), inner_components)
+
+            (
+                format!("{inner_abi_type}[]"),
+                format!("{inner_internal_type}[]"),
+                inner_components,
+            )
         }
         Type::Struct {
             identifier,
@@ -335,7 +358,7 @@ fn encode_for_json_abi(
                 .zip(&struct_sa.fields)
                 .map(|(field_itype, (field_name, _))| {
                     let field_type = Type::from_intermediate_type(field_itype, modules_data);
-                    let (field_abi_type, field_comps) =
+                    let (field_abi_type, field_abi_internal_type, field_comps) =
                         encode_for_json_abi(field_type, modules_data);
                     JsonComponent {
                         // positional fields do not have names in the abi
@@ -345,12 +368,15 @@ fn encode_for_json_abi(
                             field_name.clone()
                         },
                         type_: field_abi_type,
+                        internal_type: field_abi_internal_type,
                         components: field_comps,
                     }
                 })
                 .collect();
 
-            ("tuple".to_string(), Some(components))
+            let abi_type = "tuple".to_string();
+            let abi_internal_type = format!("struct {}.{}", module_id.module_name, identifier);
+            (abi_type, abi_internal_type, Some(components))
         }
         Type::Tuple(_) => {
             panic!("Tuple types should be destructered by the caller");
