@@ -58,6 +58,7 @@ enum JsonAbiItem {
     },
 
     // Unified Function-like variant
+    #[serde(rename_all = "camelCase")]
     Function {
         #[serde(rename = "type")]
         type_: FunctionType,
@@ -72,7 +73,6 @@ enum JsonAbiItem {
         #[serde(skip_serializing_if = "Option::is_none")]
         outputs: Option<Vec<JsonIO>>,
 
-        #[serde(rename = "stateMutability")]
         state_mutability: String,
     },
 }
@@ -119,20 +119,16 @@ fn process_errors(
     errors
         .iter()
         .map(|error| {
-            let inputs = error
-                .fields
-                .iter()
-                .map(|field| {
-                    let (abi_type, components) =
-                        encode_for_json_abi(field.type_.clone(), modules_data);
-                    JsonIO {
-                        name: field.identifier.clone(),
-                        type_: abi_type,
-                        indexed: None,
-                        components,
-                    }
-                })
-                .collect();
+            let mut inputs = vec![];
+            error.fields.iter().for_each(|field| {
+                process_io(
+                    field.type_.clone(),
+                    field.identifier.clone(),
+                    None,
+                    &mut inputs,
+                    modules_data,
+                );
+            });
 
             JsonAbiItem::Error {
                 type_: AbiItemType::Error,
@@ -150,20 +146,16 @@ fn process_events(
     events
         .iter()
         .map(|event| {
-            let inputs = event
-                .fields
-                .iter()
-                .map(|field| {
-                    let (abi_type, components) =
-                        encode_for_json_abi(field.named_type.type_.clone(), modules_data);
-                    JsonIO {
-                        name: field.named_type.identifier.clone(),
-                        type_: abi_type,
-                        indexed: Some(field.indexed),
-                        components,
-                    }
-                })
-                .collect();
+            let mut inputs = vec![];
+            event.fields.iter().for_each(|field| {
+                process_io(
+                    field.named_type.type_.clone(),
+                    field.named_type.identifier.clone(),
+                    Some(field.indexed),
+                    &mut inputs,
+                    modules_data,
+                );
+            });
 
             JsonAbiItem::Event {
                 type_: AbiItemType::Event,
@@ -189,66 +181,53 @@ fn process_functions(
                 FunctionType::Fallback | FunctionType::Receive => (None, None, None),
                 // Constructor has no name, but has inputs
                 FunctionType::Constructor => {
-                    let inputs = Some(
-                        f.parameters
-                            .iter()
-                            .map(|param| {
-                                let (abi_type, components) =
-                                    encode_for_json_abi(param.type_.clone(), modules_data);
-                                JsonIO {
-                                    name: param.identifier.clone(),
-                                    type_: abi_type,
-                                    indexed: None,
-                                    components,
-                                }
-                            })
-                            .collect(),
-                    );
-                    (None, inputs, None)
+                    let mut inputs = vec![];
+                    f.parameters.iter().for_each(|param| {
+                        process_io(
+                            param.type_.clone(),
+                            param.identifier.clone(),
+                            None,
+                            &mut inputs,
+                            modules_data,
+                        );
+                    });
+                    (None, Some(inputs), None)
                 }
                 FunctionType::Function => {
                     // Handle normal functions
-                    let inputs = f
-                        .parameters
-                        .iter()
-                        .map(|param| {
-                            let (abi_type, components) =
-                                encode_for_json_abi(param.type_.clone(), modules_data);
-                            JsonIO {
-                                name: param.identifier.clone(),
-                                type_: abi_type,
-                                indexed: None,
-                                components,
-                            }
-                        })
-                        .collect();
+                    let mut inputs = vec![];
+                    f.parameters.iter().for_each(|param| {
+                        process_io(
+                            param.type_.clone(),
+                            param.identifier.clone(),
+                            None,
+                            &mut inputs,
+                            modules_data,
+                        );
+                    });
 
-                    let outputs = match &f.return_types {
+                    let mut outputs = vec![];
+                    match &f.return_types {
                         Type::Tuple(types_) => {
                             // For tuples, we iterate over the elements and collect them in a vector of JsonIOs
-                            types_
-                                .iter()
-                                .map(|t| {
-                                    let (abi_type, components) =
-                                        encode_for_json_abi(t.clone(), modules_data);
-                                    JsonIO {
-                                        name: "".to_string(),
-                                        type_: abi_type,
-                                        indexed: None,
-                                        components,
-                                    }
-                                })
-                                .collect()
+                            types_.iter().for_each(|t| {
+                                process_io(
+                                    t.clone(),
+                                    "".to_string(),
+                                    None,
+                                    &mut outputs,
+                                    modules_data,
+                                );
+                            });
                         }
                         _ => {
-                            let (abi_type, components) =
-                                encode_for_json_abi(f.return_types.clone(), modules_data);
-                            vec![JsonIO {
-                                name: "".to_string(),
-                                type_: abi_type,
-                                indexed: None,
-                                components,
-                            }]
+                            process_io(
+                                f.return_types.clone(),
+                                "".to_string(),
+                                None,
+                                &mut outputs,
+                                modules_data,
+                            );
                         }
                     };
 
@@ -269,13 +248,31 @@ fn process_functions(
         .collect()
 }
 
-// TODO: what happens if there are multiple modifiers?
 fn map_state_mutability(mods: &[FunctionModifier]) -> &'static str {
     match mods.first() {
         Some(FunctionModifier::Pure) => "pure",
         Some(FunctionModifier::View) => "view",
         Some(FunctionModifier::Payable) => "payable",
         _ => "nonpayable",
+    }
+}
+
+/// Processes an IO (input/output) parameter and adds it to the given vector if the type is not empty.
+fn process_io(
+    type_: Type,
+    name: String,
+    indexed: Option<bool>,
+    io: &mut Vec<JsonIO>,
+    modules_data: &HashMap<ModuleId, ModuleData>,
+) {
+    let (abi_type, components) = encode_for_json_abi(type_, modules_data);
+    if !abi_type.is_empty() {
+        io.push(JsonIO {
+            name,
+            type_: abi_type,
+            indexed,
+            components,
+        });
     }
 }
 

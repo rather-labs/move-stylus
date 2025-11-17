@@ -10,11 +10,10 @@ use move_bytecode_to_wasm::compilation_context::{
 };
 
 use crate::common::snake_to_upper_camel;
-use serde::Serialize;
 
 const TYPES_WITH_NO_SIGNATURE: &[&str] = &["TxContext"];
 
-#[derive(Debug, Eq, PartialEq, Hash, Clone, Serialize)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub enum Type {
     Address,
     Bool,
@@ -31,7 +30,6 @@ pub enum Type {
     Struct {
         identifier: String,
         type_instances: Option<Vec<Type>>,
-        #[serde(skip)]
         module_id: ModuleId,
     },
     Enum {
