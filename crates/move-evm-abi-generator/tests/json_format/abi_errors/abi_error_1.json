@@ -19,7 +19,7 @@
 					"type": "string"
 				}
 			],
-			"name": "revert_simple_error",
+			"name": "revertSimpleError",
 			"outputs": [],
 			"stateMutability": "pure",
 			"type": "function"

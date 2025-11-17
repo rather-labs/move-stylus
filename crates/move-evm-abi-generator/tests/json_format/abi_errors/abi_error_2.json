@@ -75,7 +75,7 @@
 					"type": "uint64"
 				}
 			],
-			"name": "revert_custom_error",
+			"name": "revertCustomError",
 			"outputs": [],
 			"stateMutability": "nonpayable",
 			"type": "function"
@@ -123,7 +123,7 @@
 					"type": "address"
 				}
 			],
-			"name": "revert_custom_error2",
+			"name": "revertCustomError2",
 			"outputs": [],
 			"stateMutability": "nonpayable",
 			"type": "function"
