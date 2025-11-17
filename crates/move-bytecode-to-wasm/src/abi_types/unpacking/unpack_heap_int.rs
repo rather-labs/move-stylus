@@ -164,13 +164,15 @@ mod tests {
         func_body.local_set(args_pointer);
 
         // Args data should already be stored in memory
-        int_type.add_unpack_instructions(
-            &mut func_body,
-            &mut raw_module,
-            args_pointer,
-            args_pointer,
-            &compilation_ctx,
-        );
+        int_type
+            .add_unpack_instructions(
+                &mut func_body,
+                &mut raw_module,
+                args_pointer,
+                args_pointer,
+                &compilation_ctx,
+            )
+            .unwrap();
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);

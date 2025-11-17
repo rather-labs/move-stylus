@@ -93,7 +93,7 @@ use crate::{
     translation::intermediate_types::{IntermediateType, structs::IStruct},
 };
 
-use super::Packable;
+use super::{Packable, error::AbiPackError};
 
 impl IStruct {
     #[allow(clippy::too_many_arguments)]
@@ -106,7 +106,7 @@ impl IStruct {
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
         base_calldata_reference_pointer: Option<LocalId>,
-    ) {
+    ) -> Result<(), AbiPackError> {
         let val_32 = module.locals.add(ValType::I32);
         let val_64 = module.locals.add(ValType::I64);
         let struct_ptr = local;
@@ -124,7 +124,7 @@ impl IStruct {
             // Allocate memory for the packed value. Set the data_ptr the beginning, since
             // we are going to pack the values from there
             block
-                .i32_const(self.solidity_abi_encode_size(compilation_ctx) as i32)
+                .i32_const(self.solidity_abi_encode_size(compilation_ctx)? as i32)
                 .call(compilation_ctx.allocator)
                 .local_tee(data_ptr)
                 .local_tee(inner_data_reference);
@@ -223,7 +223,7 @@ impl IStruct {
                         data_ptr,
                         inner_data_reference,
                         field,
-                    )
+                    )?
                 }
                 _ => {
                     field.add_pack_instructions(
@@ -233,7 +233,7 @@ impl IStruct {
                         data_ptr,
                         inner_data_reference,
                         compilation_ctx,
-                    );
+                    )?;
                     32
                 }
             };
@@ -254,6 +254,8 @@ impl IStruct {
                 .binop(BinaryOp::I32Add)
                 .local_set(data_ptr);
         }
+
+        Ok(())
     }
 }
 
@@ -267,8 +269,8 @@ fn pack_child_struct(
     data_ptr: LocalId,
     inner_data_reference: LocalId,
     field: &IntermediateType,
-) -> usize {
-    if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx) {
+) -> Result<usize, AbiPackError> {
+    if child_struct.solidity_abi_encode_is_dynamic(compilation_ctx)? {
         field.add_pack_instructions_dynamic(
             block,
             module,
@@ -276,8 +278,8 @@ fn pack_child_struct(
             data_ptr,
             inner_data_reference,
             compilation_ctx,
-        );
-        32
+        )?;
+        Ok(32)
     } else {
         field.add_pack_instructions(
             block,
@@ -286,7 +288,7 @@ fn pack_child_struct(
             data_ptr,
             inner_data_reference,
             compilation_ctx,
-        );
-        field.encoded_size(compilation_ctx)
+        )?;
+        Ok(field.encoded_size(compilation_ctx)?)
     }
 }

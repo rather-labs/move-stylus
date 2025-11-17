@@ -1,4 +1,4 @@
-use super::NativeFunction;
+use super::{NativeFunction, error::NativeFunctionError};
 use crate::{
     CompilationContext,
     compilation_context::{
@@ -34,15 +34,15 @@ pub fn add_child_object_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
     module_id: &ModuleId,
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_ADD_CHILD_OBJECT,
         compilation_ctx,
         &[itype],
         module_id,
-    );
+    )?;
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     };
 
     let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
@@ -81,7 +81,7 @@ pub fn add_child_object_fn(
         .local_get(slot_ptr)
         .call(save_struct_into_storage_fn);
 
-    function.finish(vec![parent_address, child_ptr], &mut module.funcs)
+    Ok(function.finish(vec![parent_address, child_ptr], &mut module.funcs))
 }
 
 // TODO: Check if object exists
@@ -103,15 +103,15 @@ pub fn add_borrow_object_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
     module_id: &ModuleId,
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_BORROW_CHILD_OBJECT,
         compilation_ctx,
         &[itype],
         module_id,
-    );
+    )?;
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     };
     let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
     let read_and_decode_from_storage_fn =
@@ -194,7 +194,7 @@ pub fn add_borrow_object_fn(
 
     builder.local_get(result);
 
-    function.finish(vec![parent_uid, child_id], &mut module.funcs)
+    Ok(function.finish(vec![parent_uid, child_id], &mut module.funcs))
 }
 
 pub fn add_remove_child_object_fn(
@@ -202,15 +202,15 @@ pub fn add_remove_child_object_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
     module_id: &ModuleId,
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_REMOVE_CHILD_OBJECT,
         compilation_ctx,
         &[&itype.clone()],
         module_id,
-    );
+    )?;
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     };
 
     let mut function = FunctionBuilder::new(
@@ -229,7 +229,7 @@ pub fn add_remove_child_object_fn(
             module_name: SF_MODULE_NAME_DYNAMIC_FIELD.to_owned(),
         },
         &[itype.clone()],
-    );
+    )?;
 
     // Arguments
     let parent_uid = module.locals.add(ValType::I32);
@@ -251,7 +251,7 @@ pub fn add_remove_child_object_fn(
         },
     );
 
-    function.finish(vec![parent_uid, child_id], &mut module.funcs)
+    Ok(function.finish(vec![parent_uid, child_id], &mut module.funcs))
 }
 
 /// Checks if a child object exists for a given parent and child ID
@@ -324,15 +324,15 @@ pub fn add_hash_type_and_key_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
     module_id: &ModuleId,
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_HASH_TYPE_AND_KEY,
         compilation_ctx,
         &[itype],
         module_id,
-    );
+    )?;
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     };
 
     let (native_keccak, _) = native_keccak256(module);
@@ -400,7 +400,7 @@ pub fn add_hash_type_and_key_fn(
 
     builder.call(native_keccak).local_get(result_ptr);
 
-    function.finish(vec![parent_address, key], &mut module.funcs)
+    Ok(function.finish(vec![parent_address, key], &mut module.funcs))
 }
 
 fn copy_data_to_memory(

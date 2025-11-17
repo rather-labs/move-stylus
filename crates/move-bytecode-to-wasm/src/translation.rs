@@ -1,3 +1,4 @@
+use bytecodes::dynamic_fields::add_field_borrow_mut_global_var_instructions;
 pub use error::TranslationError;
 
 pub(crate) mod bytecodes;
@@ -11,14 +12,15 @@ pub mod functions;
 pub mod intermediate_types;
 pub mod table;
 
-use std::collections::{HashMap, HashSet};
-
-use anyhow::Result;
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use walrus::{
     FunctionBuilder, FunctionId as WasmFunctionId, GlobalId, InstrSeqBuilder, LocalId, Module,
     TableId, ValType,
-    ir::{BinaryOp, InstrSeqId, InstrSeqType, LoadKind, MemArg, StoreKind, UnaryOp, Value},
+    ir::{BinaryOp, InstrSeqId, InstrSeqType, LoadKind, MemArg, StoreKind, UnaryOp},
 };
 
 use relooper::BranchMode;
@@ -31,13 +33,7 @@ use move_binary_format::{
 use crate::{
     CompilationContext,
     abi_types::error_encoding::build_abort_error_message,
-    compilation_context::{
-        ModuleData, ModuleId,
-        reserved_modules::{
-            SF_MODULE_NAME_DYNAMIC_FIELD, SF_MODULE_NAME_DYNAMIC_FIELD_NAMED_ID,
-            STYLUS_FRAMEWORK_ADDRESS,
-        },
-    },
+    compilation_context::{ModuleData, ModuleId},
     data::DATA_ABORT_MESSAGE_PTR_OFFSET,
     generics::{replace_type_parameters, type_contains_generics},
     hostio::host_functions::storage_flush_cache,
@@ -65,7 +61,7 @@ use intermediate_types::{
 use table::{FunctionId, FunctionTable, TableEntry};
 
 use functions::JumpTableData;
-use types_stack::TypesStack;
+use types_stack::{TypesStack, TypesStackError};
 
 #[derive(Copy, Clone)]
 struct SimpleScope {
@@ -137,8 +133,12 @@ impl ControlTargets {
 
     /* ---------- Unified branch resolver ---------- */
 
-    pub fn resolve(&self, mode: BranchMode, label: u16) -> Option<InstrSeqId> {
-        match mode {
+    pub fn resolve(
+        &self,
+        mode: BranchMode,
+        label: u16,
+    ) -> Result<Option<InstrSeqId>, TranslationError> {
+        let flow_mode = match mode {
             BranchMode::MergedBranch | BranchMode::MergedBranchIntoMulti => {
                 self.resolve_merged(label)
             }
@@ -148,8 +148,10 @@ impl ControlTargets {
             BranchMode::LoopContinue(loop_id) | BranchMode::LoopContinueIntoMulti(loop_id) => {
                 self.loop_continue.get(&loop_id).copied()
             }
-            _ => panic!("Unsupported branch mode: {mode:?}"),
-        }
+            _ => return Err(TranslationError::UnssuportedBranchMode(mode)),
+        };
+
+        Ok(flow_mode)
     }
 }
 
@@ -187,7 +189,7 @@ pub fn translate_function(
     function_information: &MappedFunction,
     move_bytecode: &CodeUnit,
     dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
-) -> Result<(WasmFunctionId, HashSet<FunctionId>)> {
+) -> Result<(WasmFunctionId, HashSet<FunctionId>), TranslationError> {
     let params = function_information.signature.get_argument_wasm_types();
     let results = function_information.signature.get_return_wasm_types();
     let mut function = FunctionBuilder::new(&mut module.types, &params, &results);
@@ -210,7 +212,7 @@ pub fn translate_function(
         compilation_ctx,
         &mut function_locals,
         function_information,
-    );
+    )?;
 
     let flow = Flow::new(move_bytecode);
 
@@ -238,7 +240,7 @@ pub fn translate_function(
         module,
         &flow,
         &mut functions_to_link,
-    );
+    )?;
 
     let function_id = function.finish(arguments, &mut module.funcs);
 
@@ -253,7 +255,7 @@ fn translate_flow(
     module: &mut Module,
     flow: &Flow,
     functions_to_link: &mut HashSet<FunctionId>,
-) {
+) -> Result<(), TranslationError> {
     match flow {
         Flow::Simple {
             instructions,
@@ -277,6 +279,7 @@ fn translate_flow(
                 },
             );
 
+            let mut inner_result = Ok(());
             builder.block(ty, |block| {
                 // Add the simple scope to the control targets.
                 ctx.control_targets.push_simple_scope(
@@ -289,27 +292,29 @@ fn translate_flow(
 
                 // First translate the instuctions associated with the simple flow itself
                 for instruction in *instructions {
-                    let mut fns_to_link = translate_instruction(
-                        instruction,
-                        ctx,
-                        block,
-                        module,
-                        branches,
-                    )
-                    .unwrap_or_else(|e| {
-                        panic!("there was an error translating instruction {instruction:?}.\n{e}")
-                    });
-
-                    functions_to_link.extend(fns_to_link.drain(..));
+                    match translate_instruction(instruction, ctx, block, module, branches) {
+                        Ok(mut fns_to_link) => {
+                            functions_to_link.extend(fns_to_link.drain(..));
+                        }
+                        Err(e) => {
+                            inner_result = Err(TranslationError::AtInstruction(
+                                instruction.clone(),
+                                Rc::new(e),
+                            ));
+                        }
+                    }
                 }
-                // Translate the immediate flow within the current scope
-                translate_flow(ctx, block, module, immediate, functions_to_link);
+                if inner_result.is_ok() {
+                    // Translate the immediate flow within the current scope
+                    inner_result = translate_flow(ctx, block, module, immediate, functions_to_link);
+                }
 
                 // Done with this Simple's inner region. Pop the simple scope.
                 ctx.control_targets.pop_simple_scope();
             });
+            inner_result?;
             // Translate the next flow outside the current scope
-            translate_flow(ctx, builder, module, next, functions_to_link);
+            translate_flow(ctx, builder, module, next, functions_to_link)?;
         }
         Flow::Loop {
             loop_id,
@@ -330,6 +335,7 @@ fn translate_flow(
 
             // We wrap the loop in a block so we have a "landing spot" if we need to break out of it
             // (in case we encounter a BranchMode::LoopBreak).
+            let mut inner_result = Ok(());
             builder.block(ty, |block| {
                 let block_id = block.id();
                 block.loop_(ty, |loop_| {
@@ -338,15 +344,17 @@ fn translate_flow(
                         .set_loop_targets(*loop_id, block_id, loop_.id());
 
                     // Translate the loop body (inner) inside the loop block.
-                    translate_flow(ctx, loop_, module, inner, functions_to_link);
+                    inner_result = translate_flow(ctx, loop_, module, inner, functions_to_link);
 
                     // Clear the loop targets after the loop body is translated.
                     ctx.control_targets.clear_loop_targets(*loop_id);
                 });
             });
 
+            inner_result?;
+
             // Translate the next flow outside the wrapping block.
-            translate_flow(ctx, builder, module, next, functions_to_link);
+            translate_flow(ctx, builder, module, next, functions_to_link)?;
         }
         Flow::IfElse {
             then_body,
@@ -354,33 +362,26 @@ fn translate_flow(
             ..
         } => {
             // When the if/else flow stems from a two-branch match on an enum, the jump_table will be Some.
-            if ctx.jump_table.is_some() {
-                let offsets = &ctx.jump_table.as_ref().unwrap().offsets;
-                let enum_index = ctx.jump_table.as_ref().unwrap().enum_index;
+            if let Some(jump_table) = ctx.jump_table.take() {
                 let enum_data = ctx
                     .module_data
                     .enums
-                    .get_enum_by_index(enum_index as u16)
-                    .unwrap();
+                    .get_enum_by_index(jump_table.enum_index as u16)?;
 
                 // The jump_table should have exactly 2 entries in this case.
-                assert_eq!(
-                    offsets.len(),
-                    2,
-                    "Jump table for IfElse flow should contain exactly 2 elements"
-                );
+                if jump_table.offsets.len() != 2 {
+                    return Err(TranslationError::IfElseJumpTableBranchesNumberMismatch);
+                }
 
                 // If offset[0] < offset[1], it means the `consequent` block corresponds to the first variant
                 // and the `alternative` block corresponds to the second variant.
                 // In that case the first variant index should match the value on the stack.
-                if offsets[0] <= offsets[1] {
+                if jump_table.offsets[0] <= jump_table.offsets[1] {
                     builder.i32_const(enum_data.variants[0].index as i32);
                 } else {
                     builder.i32_const(enum_data.variants[1].index as i32);
                 };
                 builder.binop(BinaryOp::I32Eq);
-
-                *ctx.jump_table = None;
             }
 
             let condition = module.locals.add(ValType::I32);
@@ -402,50 +403,71 @@ fn translate_flow(
                 // CASE 1: both arms have the same result type (often empty)
                 let join_ty = InstrSeqType::new(&mut module.types, &[], &then_ty);
 
+                let mut inner_result = Ok(());
                 builder.block(join_ty, |join| {
                     let join_id = join.id();
                     join.block(None::<ValType>, |guard| {
                         guard.local_get(condition);
                         guard.br_if(guard.id());
                         // ELSE (inside guard)
-                        translate_flow(ctx, guard, module, else_body, functions_to_link);
+                        inner_result =
+                            translate_flow(ctx, guard, module, else_body, functions_to_link);
                         guard.br(join_id); // reconverge
                     });
-                    // THEN (after guard)
-                    translate_flow(ctx, join, module, then_body, functions_to_link);
+                    if inner_result.is_ok() {
+                        // THEN (after guard)
+                        inner_result =
+                            translate_flow(ctx, join, module, then_body, functions_to_link);
+                    }
                 });
+                inner_result?;
             } else if !then_ty.is_empty() && else_ty.is_empty() {
                 // CASE 2: ONLY THEN yields values; ELSE is empty
                 let join_ty = InstrSeqType::new(&mut module.types, &[], &then_ty);
 
+                let mut inner_result = Ok(());
                 builder.block(join_ty, |join| {
                     join.block(None::<ValType>, |guard| {
                         guard.local_get(condition);
                         guard.br_if(guard.id());
                         // ELSE (no result) inside guard
-                        translate_flow(ctx, guard, module, else_body, functions_to_link);
+                        inner_result =
+                            translate_flow(ctx, guard, module, else_body, functions_to_link);
                     });
                     // THEN (produces join result) after guard
-                    translate_flow(ctx, join, module, then_body, functions_to_link);
+                    if inner_result.is_ok() {
+                        inner_result =
+                            translate_flow(ctx, join, module, then_body, functions_to_link);
+                    }
                 });
+                inner_result?;
             } else if then_ty.is_empty() && !else_ty.is_empty() {
                 // CASE 3: ONLY ELSE yields values; THEN is empty
                 let join_ty = InstrSeqType::new(&mut module.types, &[], &else_ty);
 
+                let mut inner_result = Ok(());
                 builder.block(join_ty, |join| {
                     join.block(None::<ValType>, |guard| {
                         guard.local_get(condition);
                         guard.unop(UnaryOp::I32Eqz); // flip so true => ELSE
                         guard.br_if(guard.id());
                         // THEN (no result) inside guard
-                        translate_flow(ctx, guard, module, then_body, functions_to_link);
+                        inner_result =
+                            translate_flow(ctx, guard, module, then_body, functions_to_link);
                     });
                     // ELSE (produces join result) after guard
-                    translate_flow(ctx, join, module, else_body, functions_to_link);
+                    if inner_result.is_ok() {
+                        inner_result =
+                            translate_flow(ctx, join, module, else_body, functions_to_link);
+                    }
                 });
+                inner_result?;
             } else {
                 // Both arms yield but with different types → no valid Wasm join
-                panic!("IfElse result mismatch: then={then_ty:?}, else={else_ty:?}");
+                return Err(TranslationError::IfElseMismatch(
+                    then_ty.clone(),
+                    else_ty.clone(),
+                ));
             }
         }
         Flow::Switch { cases } => {
@@ -464,7 +486,7 @@ fn translate_flow(
                 cases: &[&Flow], // reverse nesting order
                 label_to_block: &mut HashMap<u16, InstrSeqId>,
                 case_index: usize,
-            ) {
+            ) -> Result<(), TranslationError> {
                 let ty = InstrSeqType::new(&mut module.types, &[ValType::I32], &[]);
                 if case_index == cases.len() {
                     // The jump table is a vector of case labels (i.e. code offsets) in the order they were generated by the Move compiler.
@@ -489,12 +511,13 @@ fn translate_flow(
                         trap.br_table(targets.into_boxed_slice(), trap.id());
                     });
                     builder.unreachable();
-                    return;
+                    return Ok(());
                 }
 
+                let mut inner_result = Ok(());
                 builder.block(ty, |case_block| {
                     label_to_block.insert(cases[case_index].get_label(), case_block.id());
-                    open_cases(
+                    inner_result = open_cases(
                         case_block,
                         module,
                         ctx,
@@ -505,8 +528,12 @@ fn translate_flow(
                     );
                 });
 
+                inner_result?;
+
                 // Emit the body *after* its target
-                translate_flow(ctx, builder, module, cases[case_index], functions_to_link);
+                translate_flow(ctx, builder, module, cases[case_index], functions_to_link)?;
+
+                Ok(())
             }
 
             // Check out if any of the Switch cases returns a value (contains a `Ret` instruction).
@@ -519,9 +546,7 @@ fn translate_flow(
                 for (i, c) in cases.iter().enumerate() {
                     if c.dominates_return() {
                         if found.is_some() {
-                            panic!(
-                                "Switch: more than one case returns a value; Move should have merged them."
-                            );
+                            return Err(TranslationError::SwitchMoreThanOneCase);
                         }
                         found = Some(i);
                     }
@@ -537,6 +562,7 @@ fn translate_flow(
             let case_ty = InstrSeqType::new(&mut module.types, &[ValType::I32], &[]);
 
             // Open a block for the yielding case.
+            let mut inner_result = Ok(());
             builder.block(case_ty, |yielding_block| {
                 // Create targets deepest-first by iterating cases in reverse
                 let cases_rev: Vec<&Flow> = cases.iter().rev().collect();
@@ -547,7 +573,7 @@ fn translate_flow(
                 }
 
                 // Build target labels and emit br_table; each case body is emitted after its label
-                open_cases(
+                inner_result = open_cases(
                     yielding_block,
                     module,
                     ctx,
@@ -558,11 +584,15 @@ fn translate_flow(
                 );
             });
 
+            inner_result?;
+
             // Emit yielding case body if any
-            translate_flow(ctx, builder, module, &yielding_case, functions_to_link);
+            translate_flow(ctx, builder, module, &yielding_case, functions_to_link)?;
         }
         Flow::Empty => (),
     }
+
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -655,21 +685,12 @@ fn translate_instruction(
 
             // Obtain the generic function information
             let function_information = {
-                let dependency_data = compilation_ctx
-                    .deps_data
-                    .get(&function_id.module_id)
-                    .unwrap_or(module_data);
+                let dependency_data =
+                    compilation_ctx.get_module_data_by_id(&function_id.module_id)?;
 
                 dependency_data
                     .functions
-                    .information
-                    .iter()
-                    .find(|f| {
-                        f.function_id.module_id == function_id.module_id
-                            && f.function_id.identifier == function_id.identifier
-                            && f.function_id.type_instantiations.is_none()
-                    })
-                    .unwrap()
+                    .get_information_by_identifier(&function_id.identifier)?
             };
 
             if NamedId::is_remove_function(
@@ -726,7 +747,10 @@ fn translate_instruction(
 
                 builder.call(delete_fn);
             } else {
-                let type_instantiations = function_id.type_instantiations.as_ref().unwrap();
+                let type_instantiations = function_id
+                    .type_instantiations
+                    .as_ref()
+                    .ok_or(TranslationError::CallGenericWihtoutTypeInstantiations)?;
 
                 // If the type_instantiations contains generic parameters, those generic parameters
                 // refer to instantiations whithin this context. Instantiatons are obtained using
@@ -798,7 +822,7 @@ fn translate_instruction(
                     }
                     // This should never happen
                     else {
-                        panic!("could not instantiate generic types");
+                        return Err(TranslationError::CouldNotInstantiateGenericTypes);
                     }
                 } else {
                     function_information.instantiate(type_instantiations)
@@ -856,7 +880,7 @@ fn translate_instruction(
                         .function_id
                         .type_instantiations
                         .as_ref()
-                        .unwrap();
+                        .ok_or(TranslationError::CallGenericWihtoutTypeInstantiations)?;
 
                     let native_function_id = NativeFunction::get_generic(
                         &function_id.identifier,
@@ -864,7 +888,7 @@ fn translate_instruction(
                         compilation_ctx,
                         &function_id.module_id,
                         type_instantiations,
-                    );
+                    )?;
 
                     builder.call(native_function_id);
                 } else {
@@ -915,10 +939,8 @@ fn translate_instruction(
             {
                 fi
             } else {
-                let dependency_data = compilation_ctx
-                    .deps_data
-                    .get(&function_id.module_id)
-                    .unwrap();
+                let dependency_data =
+                    compilation_ctx.get_module_data_by_id(&function_id.module_id)?;
 
                 dependency_data
                     .functions
@@ -1051,7 +1073,7 @@ fn translate_instruction(
                                 &function_information.function_id.module_id,
                                 &argument_types,
                                 &named_ids_types,
-                            );
+                            )?;
 
                             // Add as arguments the NamedIds
                             // The first load derefences the IMutRef
@@ -1085,7 +1107,7 @@ fn translate_instruction(
                                 module,
                                 compilation_ctx,
                                 &function_information.function_id.module_id,
-                            )
+                            )?
                         };
 
                     builder.call(native_function_id);
@@ -1292,13 +1314,27 @@ fn translate_instruction(
                     t
                 ),
                 (
-                    IntermediateType::IStruct { ref module_id, index, .. },
+                    IntermediateType::IStruct { ref module_id, index, vm_handled_struct },
                     "struct",
                     *ref_inner
                 )
             );
-            assert_eq!(module_id, &module_data.id);
-            assert_eq!(struct_.index(), index);
+
+            if module_id != &module_data.id || index != struct_.index() {
+                return Err(TypesStackError::TypeMismatch {
+                    expected: IntermediateType::IStruct {
+                        module_id: module_data.id.clone(),
+                        index: struct_.index(),
+                        vm_handled_struct: VmHandledStruct::None,
+                    },
+                    found: IntermediateType::IStruct {
+                        module_id: module_id.clone(),
+                        index,
+                        vm_handled_struct,
+                    },
+                }
+                .into());
+            }
 
             let field_type =
                 bytecodes::structs::borrow_field(struct_, field_id, builder, compilation_ctx);
@@ -1319,14 +1355,17 @@ fn translate_instruction(
                 .unwrap();
 
             let instantiation_types = if instantiation_types.iter().any(type_contains_generics) {
-                match &types_stack.last().unwrap() {
-                    IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
-                        match &**inner {
-                            IntermediateType::IGenericStructInstance { types, .. } => types.clone(),
-                            _ => panic!(),
+                match &types_stack.last() {
+                    Some(IntermediateType::IRef(inner))
+                    | Some(IntermediateType::IMutRef(inner)) => match &**inner {
+                        IntermediateType::IGenericStructInstance { types, .. } => types.clone(),
+                        _ => {
+                            return Err(TranslationError::ExpectedGenericStructInstance(
+                                inner.as_ref().clone(),
+                            ));
                         }
-                    }
-                    _ => panic!(),
+                    },
+                    _ => return Err(TranslationError::ExpectedGenericStructInstanceNotFound),
                 }
             } else {
                 instantiation_types.clone()
@@ -1357,14 +1396,28 @@ fn translate_instruction(
                     t
                 ),
                 (
-                    IntermediateType::IGenericStructInstance { ref module_id, index, ref types, .. },
+                    IntermediateType::IGenericStructInstance { ref module_id, index, ref types, vm_handled_struct },
                     "generic struct",
                     *ref_inner
                 )
             );
-            assert_eq!(module_id, &module_data.id);
-            assert_eq!(struct_.index(), index);
-            assert_eq!(types, &instantiation_types);
+            if module_id != &module_data.id || index != struct_.index() {
+                return Err(TypesStackError::TypeMismatch {
+                    expected: IntermediateType::IGenericStructInstance {
+                        module_id: module_data.id.clone(),
+                        index: struct_.index(),
+                        types: instantiation_types.clone(),
+                        vm_handled_struct: VmHandledStruct::None,
+                    },
+                    found: IntermediateType::IGenericStructInstance {
+                        module_id: module_id.clone(),
+                        index,
+                        types: types.clone(),
+                        vm_handled_struct,
+                    },
+                }
+                .into());
+            }
 
             let field_type = bytecodes::structs::borrow_field(
                 &struct_,
@@ -1413,13 +1466,17 @@ fn translate_instruction(
                 .unwrap();
 
             let instantiation_types = if instantiation_types.iter().any(type_contains_generics) {
-                if let Some(IntermediateType::IMutRef(inner)) = &types_stack.last() {
-                    match &**inner {
+                match &types_stack.last() {
+                    Some(IntermediateType::IRef(inner))
+                    | Some(IntermediateType::IMutRef(inner)) => match &**inner {
                         IntermediateType::IGenericStructInstance { types, .. } => types.clone(),
-                        _ => panic!(),
-                    }
-                } else {
-                    panic!()
+                        _ => {
+                            return Err(TranslationError::ExpectedGenericStructInstance(
+                                inner.as_ref().clone(),
+                            ));
+                        }
+                    },
+                    _ => return Err(TranslationError::ExpectedGenericStructInstanceNotFound),
                 }
             } else {
                 instantiation_types.clone()
@@ -1475,7 +1532,7 @@ fn translate_instruction(
                 {
                     replace_type_parameters(&inner, caller_type_instances)
                 } else {
-                    panic!("could not compute concrete type")
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 inner
@@ -1572,7 +1629,7 @@ fn translate_instruction(
                 {
                     replace_type_parameters(&inner, caller_type_instances)
                 } else {
-                    panic!("could not compute concrete type")
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 inner
@@ -1726,7 +1783,7 @@ fn translate_instruction(
                 {
                     replace_type_parameters(&expected_vec_inner, caller_type_instances)
                 } else {
-                    panic!("could not compute concrete type")
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 expected_vec_inner
@@ -2469,7 +2526,7 @@ fn translate_instruction(
                 }
                 // This should never happen
                 else {
-                    panic!("could not instantiate generic types");
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 let types = module_data
@@ -2545,7 +2602,7 @@ fn translate_instruction(
                 }
                 // This should never happen
                 else {
-                    panic!("could not instantiate generic types");
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 (struct_, types.to_vec())
@@ -2569,30 +2626,30 @@ fn translate_instruction(
         }
         Bytecode::BrTrue(code_offset) => {
             if let Some(mode) = branches.get(code_offset) {
-                if let Some(target) = control_targets.resolve(*mode, *code_offset) {
+                if let Some(target) = control_targets.resolve(*mode, *code_offset)? {
                     builder.br_if(target);
                 } else {
-                    panic!("BrTrue target not found for code offset: {code_offset}");
+                    return Err(TranslationError::BranchTargetNotFound(*code_offset));
                 }
             }
         }
         Bytecode::BrFalse(code_offset) => {
             if let Some(mode) = branches.get(code_offset) {
-                if let Some(target) = control_targets.resolve(*mode, *code_offset) {
+                if let Some(target) = control_targets.resolve(*mode, *code_offset)? {
                     // flip the boolean (Move’s BrFalse consumes the bool)
                     builder.unop(UnaryOp::I32Eqz);
                     builder.br_if(target);
                 } else {
-                    panic!("BrFalse target not found for code offset: {code_offset}");
+                    return Err(TranslationError::BranchTargetNotFound(*code_offset));
                 }
             }
         }
         Bytecode::Branch(code_offset) => {
             if let Some(mode) = branches.get(code_offset) {
-                if let Some(target) = control_targets.resolve(*mode, *code_offset) {
+                if let Some(target) = control_targets.resolve(*mode, *code_offset)? {
                     builder.br(target);
                 } else {
-                    panic!("Branch target not found for code offset: {code_offset}");
+                    return Err(TranslationError::BranchTargetNotFound(*code_offset));
                 }
             }
         }
@@ -2660,7 +2717,7 @@ fn translate_instruction(
                 }
                 // This should never happen
                 else {
-                    panic!("could not instantiate generic types");
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 let types = module_data.enums.get_enum_instance_types(index)?.to_vec();
@@ -2726,7 +2783,7 @@ fn translate_instruction(
                 }
                 // This should never happen
                 else {
-                    panic!("could not instantiate generic types");
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 (enum_, type_instantiations.to_vec())
@@ -2800,7 +2857,7 @@ fn translate_instruction(
                 }
                 // This should never happen
                 else {
-                    panic!("could not instantiate generic types");
+                    return Err(TranslationError::CouldNotInstantiateGenericTypes);
                 }
             } else {
                 (enum_, type_instantiations.to_vec())
@@ -2926,7 +2983,7 @@ pub fn box_args(
     compilation_ctx: &CompilationContext,
     function_locals: &mut [LocalId],
     function_information: &MappedFunction,
-) {
+) -> Result<(), TranslationError> {
     // Store the changes we need to make
     let mut updates = Vec::new();
 
@@ -2944,7 +3001,7 @@ pub fn box_args(
                 if let Some(index) = function_locals.iter().position(|&id| id == *local) {
                     updates.push((index, outer_ptr));
                 } else {
-                    panic!("Couldn't find original local {local:?} in function_information");
+                    return Err(TranslationError::LocalNotFound(*local));
                 }
             }
             _ => {
@@ -2956,70 +3013,6 @@ pub fn box_args(
     for (index, pointer) in updates {
         function_locals[index] = pointer;
     }
-}
-
-pub fn add_field_borrow_mut_global_var_instructions(
-    module: &mut Module,
-    compilation_ctx: &CompilationContext,
-    builder: &mut InstrSeqBuilder,
-    dynamic_fields_global_variables: &mut Vec<(GlobalId, IntermediateType)>,
-    function_id: &FunctionId,
-) -> Result<()> {
-    let global_struct_ptr = module.globals.add_local(
-        ValType::I32,
-        true,
-        false,
-        walrus::ConstExpr::Value(Value::I32(-1)),
-    );
-    let field_value_ref_ptr = module.locals.add(ValType::I32);
-
-    // The borrow_mut functions borrows the value of a `Field`, which is the
-    // third field. So, to get the struct pointer we just need to go 8 bytes
-    // before it.
-    builder
-        .local_tee(field_value_ref_ptr)
-        .i32_const(8)
-        .binop(BinaryOp::I32Sub)
-        .global_set(global_struct_ptr);
-
-    let borrow_mut_type_instantiations = function_id
-        .type_instantiations
-        .as_ref()
-        .expect("calling field borrow mut without type instantiations");
-    let field_types_instances =
-        if function_id.module_id.module_name == SF_MODULE_NAME_DYNAMIC_FIELD_NAMED_ID {
-            vec![
-                borrow_mut_type_instantiations[1].clone(),
-                borrow_mut_type_instantiations[2].clone(),
-            ]
-        } else {
-            vec![
-                borrow_mut_type_instantiations[0].clone(),
-                borrow_mut_type_instantiations[1].clone(),
-            ]
-        };
-
-    let dynamic_fields_module_id = ModuleId {
-        address: STYLUS_FRAMEWORK_ADDRESS,
-        module_name: SF_MODULE_NAME_DYNAMIC_FIELD.to_owned(),
-    };
-
-    let dynamic_fields_module = compilation_ctx.get_module_data_by_id(&dynamic_fields_module_id)?;
-
-    let field_struct = dynamic_fields_module.structs.get_by_identifier("Field")?;
-
-    dynamic_fields_global_variables.push((
-        global_struct_ptr,
-        IntermediateType::IGenericStructInstance {
-            module_id: dynamic_fields_module_id,
-            index: field_struct.index(),
-            types: field_types_instances,
-            vm_handled_struct: VmHandledStruct::None,
-        },
-    ));
-
-    // Leave in the stack the field reference pointer
-    builder.local_get(field_value_ref_ptr);
 
     Ok(())
 }

@@ -12,6 +12,8 @@ use crate::{
     utils::snake_to_upper_camel,
 };
 
+use super::error::AbiError;
+
 // Error(string) abi encoded selector
 pub const ERROR_SELECTOR: [u8; 4] = [0x08, 0xc3, 0x79, 0xa0];
 const LENGTH_HEADER_SIZE: i32 = 4;
@@ -59,7 +61,7 @@ pub fn build_custom_error_message(
     compilation_ctx: &CompilationContext,
     error_struct: &IStruct,
     error_struct_ptr: LocalId,
-) -> LocalId {
+) -> Result<LocalId, AbiError> {
     let ptr = module.locals.add(ValType::I32);
 
     // Compute the error selector
@@ -126,7 +128,7 @@ pub fn build_custom_error_message(
 
     // Combine all the error struct fields into one ABI-encoded error data buffer.
     let (_error_data_ptr, error_data_len) =
-        build_pack_instructions(builder, &error_struct.fields, module, compilation_ctx);
+        build_pack_instructions(builder, &error_struct.fields, module, compilation_ctx)?;
 
     // Store the total length of the error message: length(4) + selector(4) + error_data_len
     builder
@@ -142,7 +144,8 @@ pub fn build_custom_error_message(
                 offset: 0,
             },
         );
-    ptr
+
+    Ok(ptr)
 }
 
 /// Builds an error message with the error code converted to decimal.

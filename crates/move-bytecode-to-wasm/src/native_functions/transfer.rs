@@ -13,7 +13,7 @@ use walrus::{
     ir::{BinaryOp, UnaryOp},
 };
 
-use super::NativeFunction;
+use super::{NativeFunction, error::NativeFunctionError};
 
 /// Adds the instructions to transfer an object to a recipient.
 /// This implies deleting the object from the original owner's mapping and adding it to the recipient's mapping.
@@ -22,15 +22,15 @@ pub fn add_transfer_object_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
     module_id: &ModuleId,
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_TRANSFER_OBJECT,
         compilation_ctx,
         &[itype],
         module_id,
-    );
+    )?;
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     };
 
     // Runtime functions
@@ -145,7 +145,7 @@ pub fn add_transfer_object_fn(
         .local_get(slot_ptr)
         .call(storage_save_fn);
 
-    function.finish(vec![struct_ptr, recipient_ptr], &mut module.funcs)
+    Ok(function.finish(vec![struct_ptr, recipient_ptr], &mut module.funcs))
 }
 
 /// Adds the instructions to share an object.
@@ -154,15 +154,15 @@ pub fn add_share_object_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
     module_id: &ModuleId,
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_SHARE_OBJECT,
         compilation_ctx,
         &[itype],
         module_id,
-    );
+    )?;
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     };
 
     // Runtime functions
@@ -271,7 +271,7 @@ pub fn add_share_object_fn(
         );
     });
 
-    function.finish(vec![struct_ptr], &mut module.funcs)
+    Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }
 
 /// Adds the instructions to freeze an object.
@@ -280,15 +280,15 @@ pub fn add_freeze_object_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
     module_id: &ModuleId,
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_FREEZE_OBJECT,
         compilation_ctx,
         &[itype],
         module_id,
-    );
+    )?;
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     };
 
     // Runtime functions
@@ -404,5 +404,5 @@ pub fn add_freeze_object_fn(
         );
     });
 
-    function.finish(vec![struct_ptr], &mut module.funcs)
+    Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }

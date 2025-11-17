@@ -5,7 +5,8 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    abi_types::public_function::PublicFunction,
+    abi_types::public_function::{PublicFunction, PublicFunctionValidationError},
+    error::{CompilationError, ICEError, ICEErrorKind},
     hostio::host_functions,
     runtime::RuntimeFunction,
     translation::{intermediate_types::ISignature, table::FunctionTable},
@@ -18,13 +19,25 @@ static EMPTY_SIGNATURE: ISignature = ISignature {
     returns: Vec::new(),
 };
 
+#[derive(Debug, thiserror::Error)]
+pub enum ConstructorError {
+    #[error("there was an error creating the constructor function")]
+    CreatingPublicFunction(#[from] PublicFunctionValidationError),
+}
+
+impl From<ConstructorError> for CompilationError {
+    fn from(value: ConstructorError) -> Self {
+        CompilationError::ICE(ICEError::new(ICEErrorKind::Constructor(value)))
+    }
+}
+
 /// Injects the constructor as a public function in the module, which will be accesible via the entrypoint router.
 pub fn inject_constructor(
     function_table: &mut FunctionTable,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     public_functions: &mut Vec<PublicFunction>,
-) {
+) -> Result<(), ConstructorError> {
     if let Some(ref init_id) = compilation_ctx.root_module_data.functions.init {
         let wasm_init_fn = function_table
             .get_by_function_id(init_id)
@@ -39,8 +52,10 @@ pub fn inject_constructor(
             "constructor",
             &EMPTY_SIGNATURE,
             compilation_ctx,
-        ));
+        )?);
     };
+
+    Ok(())
 }
 
 /// Builds the constructor function.
@@ -113,7 +128,7 @@ pub fn build_constructor(
             // Here we replace that logic by writing a marker value into the storage.
             // TODO: revisit the OTW implementation and check if this approach is correct.
             if params.len() == 2 {
-                then.i32_const(0); // OTW = 0 
+                then.i32_const(0); // OTW = 0
             }
 
             // Inject TxContext as last argument

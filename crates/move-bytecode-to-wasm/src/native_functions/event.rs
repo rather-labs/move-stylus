@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use walrus::{
     FunctionBuilder, FunctionId, Module, ValType,
     ir::{BinaryOp, LoadKind, MemArg},
@@ -11,7 +13,7 @@ use crate::{
     translation::intermediate_types::{IntermediateType, structs::IStructType},
 };
 
-use super::NativeFunction;
+use super::{NativeFunction, error::NativeFunctionError};
 
 /// This function ABI-encodes an event struct following the Solidity language specification:
 ///
@@ -27,15 +29,15 @@ pub fn add_emit_log_fn(
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
     module_id: &ModuleId,
-) -> FunctionId {
+) -> Result<FunctionId, NativeFunctionError> {
     let name = NativeFunction::get_generic_function_name(
         NativeFunction::NATIVE_EMIT,
         compilation_ctx,
         &[itype],
         module_id,
-    );
+    )?;
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     };
 
     let struct_ = compilation_ctx
@@ -48,10 +50,9 @@ pub fn add_emit_log_fn(
         is_anonymous,
     } = struct_.type_
     else {
-        panic!(
-            "trying to emit log with the struct {} which is not an event",
-            struct_.identifier
-        );
+        return Err(NativeFunctionError::EmitFunctionNoEvent(
+            struct_.identifier.clone(),
+        ));
     };
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
@@ -112,14 +113,16 @@ pub fn add_emit_log_fn(
                     .local_tee(abi_encoded_data_writer_pointer)
                     .local_set(abi_encoded_data_calldata_reference_pointer);
 
-                field.add_pack_instructions(
-                    &mut builder,
-                    module,
-                    local,
-                    abi_encoded_data_writer_pointer,
-                    abi_encoded_data_calldata_reference_pointer,
-                    compilation_ctx,
-                );
+                field
+                    .add_pack_instructions(
+                        &mut builder,
+                        module,
+                        local,
+                        abi_encoded_data_writer_pointer,
+                        abi_encoded_data_calldata_reference_pointer,
+                        compilation_ctx,
+                    )
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
 
                 // Use the allocator to get a pointer to the end of the data
                 builder
@@ -164,11 +167,16 @@ pub fn add_emit_log_fn(
                 let abi_encoded_data_writer_pointer = module.locals.add(ValType::I32);
                 let abi_encoded_data_calldata_reference_pointer = module.locals.add(ValType::I32);
 
-                let is_dynamic = struct_.solidity_abi_encode_is_dynamic(compilation_ctx);
+                let is_dynamic = struct_
+                    .solidity_abi_encode_is_dynamic(compilation_ctx)
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
                 let size = if is_dynamic {
                     32
                 } else {
-                    struct_.solidity_abi_encode_size(compilation_ctx) as i32
+                    struct_
+                        .solidity_abi_encode_size(compilation_ctx)
+                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?
+                        as i32
                 };
 
                 // Use the allocator to get a pointer to the end of the calldata
@@ -179,23 +187,27 @@ pub fn add_emit_log_fn(
                     .local_set(abi_encoded_data_calldata_reference_pointer);
 
                 if is_dynamic {
-                    field.add_pack_instructions_dynamic(
-                        &mut builder,
-                        module,
-                        local,
-                        abi_encoded_data_writer_pointer,
-                        abi_encoded_data_calldata_reference_pointer,
-                        compilation_ctx,
-                    );
+                    field
+                        .add_pack_instructions_dynamic(
+                            &mut builder,
+                            module,
+                            local,
+                            abi_encoded_data_writer_pointer,
+                            abi_encoded_data_calldata_reference_pointer,
+                            compilation_ctx,
+                        )
+                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
                 } else {
-                    field.add_pack_instructions(
-                        &mut builder,
-                        module,
-                        local,
-                        abi_encoded_data_writer_pointer,
-                        abi_encoded_data_calldata_reference_pointer,
-                        compilation_ctx,
-                    );
+                    field
+                        .add_pack_instructions(
+                            &mut builder,
+                            module,
+                            local,
+                            abi_encoded_data_writer_pointer,
+                            abi_encoded_data_calldata_reference_pointer,
+                            compilation_ctx,
+                        )
+                        .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
                 }
 
                 // Use the allocator to get a pointer to the end of the data
@@ -212,7 +224,11 @@ pub fn add_emit_log_fn(
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 todo!()
             }
-            _ => panic!("invalid event field {field:?}"),
+            _ => {
+                return Err(NativeFunctionError::EmitFunctionInvalidEventField(
+                    field.clone(),
+                ));
+            }
         }
     }
 
@@ -305,14 +321,16 @@ pub fn add_emit_log_fn(
                     .local_tee(writer_pointer)
                     .local_set(calldata_reference_pointer);
 
-                field.add_pack_instructions(
-                    &mut builder,
-                    module,
-                    local,
-                    writer_pointer,
-                    calldata_reference_pointer,
-                    compilation_ctx,
-                );
+                field
+                    .add_pack_instructions(
+                        &mut builder,
+                        module,
+                        local,
+                        writer_pointer,
+                        calldata_reference_pointer,
+                        compilation_ctx,
+                    )
+                    .map_err(|e| NativeFunctionError::Abi(Rc::new(e.into())))?;
 
                 // Add 32 to the writer pointer to write the next topic
                 builder
@@ -326,9 +344,7 @@ pub fn add_emit_log_fn(
             | IntermediateType::IStruct { .. }
             | IntermediateType::IGenericStructInstance { .. } => {
                 let Some((encode_start, encode_end)) = abi_encoded_data else {
-                    panic!(
-                        "there was an error instantiating an emit event function: vector does not have abi encoded data"
-                    )
+                    return Err(NativeFunctionError::EmitFunctionInvalidVectorData);
                 };
 
                 builder
@@ -380,7 +396,11 @@ pub fn add_emit_log_fn(
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 todo!()
             }
-            _ => panic!("invalid event field {field:?}"),
+            _ => {
+                return Err(NativeFunctionError::EmitFunctionInvalidEventField(
+                    field.clone(),
+                ));
+            }
         }
     }
 
@@ -397,5 +417,5 @@ pub fn add_emit_log_fn(
     let indexes = if is_anonymous { indexes } else { 1 + indexes } as i32;
     builder.i32_const(indexes).call(emit_log_fn);
 
-    function.finish(vec![struct_ptr], &mut module.funcs)
+    Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }

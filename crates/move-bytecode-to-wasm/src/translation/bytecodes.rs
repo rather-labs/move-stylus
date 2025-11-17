@@ -3,6 +3,7 @@
 //! PackGeneric.
 
 pub mod constants;
+pub mod dynamic_fields;
 pub mod enums;
 pub mod structs;
 pub mod vectors;

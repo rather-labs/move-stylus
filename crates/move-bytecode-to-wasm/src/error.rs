@@ -1,32 +1,36 @@
-use std::fmt::Display;
+use std::{backtrace::Backtrace, fmt::Display};
 
 use move_compiler::{diagnostics::Diagnostic, shared::files::MappedFiles};
 use move_parse_special_attributes::SpecialAttributeError;
 
-use crate::compilation_context::CompilationContextError;
+use crate::{
+    abi_types::error::AbiError,
+    compilation_context::CompilationContextError,
+    constructor::ConstructorError,
+    hostio::error::HostIOError,
+    native_functions::error::NativeFunctionError,
+    translation::{TranslationError, table::FunctionTableError},
+};
 
 #[derive(thiserror::Error, Debug)]
-pub struct CompilationError {
-    pub files: MappedFiles,
-
-    pub kind: CompilationErrorKind,
-}
-
-impl Display for CompilationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "A compilation error has ocurred: {}", self.kind)
-    }
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum CompilationErrorKind {
-    #[error(
-        "An internal compiler error has ocurred. If this keeps happening, please open an issue in\n<gh url>"
-    )]
+pub enum DependencyProcessingError {
+    #[error("{0}")]
     ICE(#[from] ICEError),
 
     #[error("internal compiler error(s) ocurred")]
     CodeError(Vec<CodeError>),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum CompilationError {
+    #[error("{0}")]
+    ICE(#[from] ICEError),
+
+    #[error("internal compiler error(s) ocurred")]
+    CodeError {
+        mapped_files: MappedFiles,
+        errors: Vec<CodeError>,
+    },
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -35,10 +39,74 @@ pub enum CodeError {
     SpecialAttributesError(#[from] SpecialAttributeError),
 }
 
+#[derive(Debug)]
+pub struct ICEError {
+    pub version: String,
+    pub name: String,
+    pub kind: ICEErrorKind,
+    pub backtrace: Backtrace,
+}
+
+impl std::error::Error for ICEError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.kind)
+    }
+}
+
+impl ICEError {
+    pub fn new(kind: ICEErrorKind) -> Self {
+        Self {
+            version: env!("CARGO_PKG_VERSION").to_owned(),
+            name: env!("CARGO_PKG_NAME").to_owned(),
+            kind,
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
+
+impl Display for ICEError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}\n{}", self.name, self.version, self.kind)
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
-pub enum ICEError {
+pub enum DependencyError {
+    #[error("could not find dependency {0}")]
+    DependencyNotFound(String),
+}
+
+impl From<DependencyError> for DependencyProcessingError {
+    fn from(value: DependencyError) -> Self {
+        DependencyProcessingError::ICE(ICEError::new(value.into()))
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum ICEErrorKind {
     #[error("an error ocurred processing the compilation context")]
     CompilationContext(#[from] CompilationContextError),
+
+    #[error("an error ocurred while translating move bytecode")]
+    Translation(#[from] TranslationError),
+
+    #[error("an error ocurred while handling the function table")]
+    FunctionTable(#[from] FunctionTableError),
+
+    #[error("an error ocurred while generating a native funciton's code")]
+    NativeFunction(#[from] NativeFunctionError),
+
+    #[error("an error ocurred whie processing a contract's ABI")]
+    Abi(#[from] AbiError),
+
+    #[error("an error ocurred while processing a contract's constructor")]
+    Constructor(#[from] ConstructorError),
+
+    #[error("an error ocurred while processing building host environment")]
+    HostIO(#[from] HostIOError),
+
+    #[error("an error ocurred while processing a contact's dependencies")]
+    Dependency(#[from] DependencyError),
 }
 
 impl From<CodeError> for Diagnostic {
