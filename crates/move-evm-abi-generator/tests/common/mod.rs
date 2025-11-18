@@ -210,15 +210,30 @@ pub fn test_generated_abi(
     let expected_json = fs::read_to_string(json_path)
         .map_err(|e| format!("Failed to read expected JSON file: {e}"))?;
 
-    let actual_json: serde_json::Value = serde_json::from_str(&actual_json)
+    let mut actual_json: serde_json::Value = serde_json::from_str(&actual_json)
         .map_err(|e| format!("Failed to parse actual JSON: {e}"))?;
 
-    let expected_json: serde_json::Value = serde_json::from_str(&expected_json)
+    let mut expected_json: serde_json::Value = serde_json::from_str(&expected_json)
         .map_err(|e| format!("Failed to parse expected JSON: {e}"))?;
 
+    // Sort the ABI arrays by name to make comparison order-independent
+    if let (Some(actual_abi), Some(expected_abi)) = (
+        actual_json.get_mut("abi").and_then(|v| v.as_array_mut()),
+        expected_json.get_mut("abi").and_then(|v| v.as_array_mut()),
+    ) {
+        // Sort by name field (empty string if name is None or missing)
+        let sort_key = |item: &serde_json::Value| -> String {
+            item.get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or_else(|| panic!("Name is missing for item: {item:?}"))
+                .to_string()
+        };
+
+        actual_abi.sort_by_key(sort_key);
+        expected_abi.sort_by_key(sort_key);
+    }
+
     if actual_json != expected_json {
-        println!("Actual JSON: {actual_json}");
-        println!("Expected JSON: {expected_json}");
         // Try to provide a helpful diff message
         let actual_pretty =
             serde_json::to_string_pretty(&actual_json).unwrap_or_else(|_| actual_json.to_string());
