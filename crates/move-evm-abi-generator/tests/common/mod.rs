@@ -241,7 +241,7 @@ pub fn test_generated_abi(
 
         println!("Actual JSON: {actual_pretty}");
         println!("Expected JSON: {expected_pretty}");
-        
+
         return Err("Jsons do not match".into());
     }
 

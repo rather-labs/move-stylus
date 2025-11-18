@@ -79,7 +79,7 @@ impl TryFrom<&StructDefinition> for AbiError {
                     });
                 }
 
-                // Check if the event has a key
+                // Check if the event has key
                 if value.abilities.iter().any(|a| a.value == Ability_::Key) {
                     return Err(SpecialAttributeError {
                         kind: SpecialAttributeErrorKind::AbiError(

@@ -2,10 +2,21 @@ module test::events_anon_2;
 
 use stylus::event::emit;
 
+public enum EventEnum has drop, copy {
+    EVENT_1,
+    EVENT_2,
+    EVENT_3,
+}
+
 public struct NestedStruct has copy, drop {
     a: u32,
     b: address,
     c: u128,
+}
+
+public struct NestedStructWithEnum has copy, drop {
+    a: EventEnum,
+    b: vector<EventEnum>,
 }
 
 #[ext(event, anonymous, indexes = 3)]
@@ -34,12 +45,17 @@ public struct TestEvent4Anon has copy, drop {
     b: std::ascii::String,
 }
 
-#[ext(event, anonymous, indexes = 4)]
+#[ext(event, anonymous, indexes = 2)]
 public struct Anonymous has copy, drop {
-    a: u32,
-    b: u128,
-    c: vector<u8>,
-    d: NestedStruct,
+    a: NestedStruct,
+    b: NestedStructWithEnum,
+}
+
+#[ext(event, anonymous, indexes = 3)]
+public struct Anonymous2 has copy, drop {
+    a: EventEnum,
+    b: vector<EventEnum>,
+    c: vector<NestedStructWithEnum>,
 }
 
 entry fun emit_test_anon_event1(a: u32, b: address, c: u32, d: address, e: u128) {
@@ -60,7 +76,10 @@ entry fun emit_test_anon_event4(a: u64, b: std::ascii::String) {
     emit(TestEvent4Anon { a, b });
 }
 
-entry fun emit_test_anonymous(a: u32, b: u128, c: vector<u8>, d: u32, e: address, f: u128) {
-    let d = NestedStruct {a: d, b: e, c: f };
-    emit(Anonymous { a, b, c, d });
+entry fun emit_test_anonymous1(a: NestedStruct, b: NestedStructWithEnum) {
+    emit(Anonymous { a, b });
+}
+
+entry fun emit_test_anonymous2(p1: EventEnum, p2: vector<EventEnum>, p3: vector<NestedStructWithEnum>) {
+    emit(Anonymous2 { a: p1, b: p2, c: p3 });
 }

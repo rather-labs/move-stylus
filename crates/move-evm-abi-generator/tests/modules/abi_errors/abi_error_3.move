@@ -36,3 +36,20 @@ entry fun revert_error_with_nested_structs(a: String, b: String, c: u64) {
     let error = ErrorWithNestedStructs { a: ns, b: ns2 };
     revert(error);
 }
+
+public enum ErrorEnum has drop, copy {
+    ERROR_1,
+    ERROR_2,
+    ERROR_3,    
+}
+
+#[ext(abi_error)]
+#[allow(unused_field)]
+public struct ErrorWithEnum has copy, drop {
+    a: ErrorEnum,
+    b: vector<ErrorEnum>,
+}
+
+entry fun revert_error_with_enum(a: ErrorEnum, b: vector<ErrorEnum>) {
+    revert(ErrorWithEnum { a, b });
+}
