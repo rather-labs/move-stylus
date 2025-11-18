@@ -181,7 +181,7 @@ impl NativeFunction {
                     Self::NATIVE_HAS_CHILD_OBJECT,
                     STYLUS_FRAMEWORK_ADDRESS,
                     SF_MODULE_NAME_DYNAMIC_FIELD,
-                ) => dynamic_field::add_has_child_object_fn(module, compilation_ctx, module_id),
+                ) => dynamic_field::add_has_child_object_fn(module, compilation_ctx, module_id)?,
                 #[cfg(debug_assertions)]
                 (Self::NATIVE_GET_LAST_MEMORY_POSITION, _, _) => {
                     tests::add_get_last_memory_position_fn(module, compilation_ctx)

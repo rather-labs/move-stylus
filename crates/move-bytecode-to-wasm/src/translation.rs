@@ -32,7 +32,7 @@ use move_binary_format::{
 
 use crate::{
     CompilationContext,
-    abi_types::error_encoding::build_abort_error_message,
+    abi_types::{error::AbiError, error_encoding::build_abort_error_message},
     compilation_context::{ModuleData, ModuleId},
     data::DATA_ABORT_MESSAGE_PTR_OFFSET,
     generics::{replace_type_parameters, type_contains_generics},
@@ -1957,12 +1957,12 @@ fn translate_instruction(
             }
 
             match t1 {
-                IntermediateType::IU8 => IU8::add(builder, module),
-                IntermediateType::IU16 => IU16::add(builder, module),
-                IntermediateType::IU32 => IU32::add(builder, module),
-                IntermediateType::IU64 => IU64::add(builder, module),
-                IntermediateType::IU128 => IU128::add(builder, module, compilation_ctx),
-                IntermediateType::IU256 => IU256::add(builder, module, compilation_ctx),
+                IntermediateType::IU8 => IU8::add(builder, module)?,
+                IntermediateType::IU16 => IU16::add(builder, module)?,
+                IntermediateType::IU32 => IU32::add(builder, module)?,
+                IntermediateType::IU64 => IU64::add(builder, module)?,
+                IntermediateType::IU128 => IU128::add(builder, module, compilation_ctx)?,
+                IntermediateType::IU256 => IU256::add(builder, module, compilation_ctx)?,
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Add,
                     operands_types: t1,
@@ -1982,12 +1982,12 @@ fn translate_instruction(
             }
 
             match t1 {
-                IntermediateType::IU8 => IU8::sub(builder, module),
-                IntermediateType::IU16 => IU16::sub(builder, module),
-                IntermediateType::IU32 => IU32::sub(builder, module),
-                IntermediateType::IU64 => IU64::sub(builder, module),
-                IntermediateType::IU128 => IU128::sub(builder, module, compilation_ctx),
-                IntermediateType::IU256 => IU256::sub(builder, module, compilation_ctx),
+                IntermediateType::IU8 => IU8::sub(builder, module)?,
+                IntermediateType::IU16 => IU16::sub(builder, module)?,
+                IntermediateType::IU32 => IU32::sub(builder, module)?,
+                IntermediateType::IU64 => IU64::sub(builder, module)?,
+                IntermediateType::IU128 => IU128::sub(builder, module, compilation_ctx)?,
+                IntermediateType::IU256 => IU256::sub(builder, module, compilation_ctx)?,
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Sub,
                     operands_types: t1,
@@ -2007,12 +2007,12 @@ fn translate_instruction(
             }
 
             match t1 {
-                IntermediateType::IU8 => IU8::mul(builder, module),
-                IntermediateType::IU16 => IU16::mul(builder, module),
-                IntermediateType::IU32 => IU32::mul(builder, module),
-                IntermediateType::IU64 => IU64::mul(builder, module),
-                IntermediateType::IU128 => IU128::mul(builder, module, compilation_ctx),
-                IntermediateType::IU256 => IU256::mul(builder, module, compilation_ctx),
+                IntermediateType::IU8 => IU8::mul(builder, module)?,
+                IntermediateType::IU16 => IU16::mul(builder, module)?,
+                IntermediateType::IU32 => IU32::mul(builder, module)?,
+                IntermediateType::IU64 => IU64::mul(builder, module)?,
+                IntermediateType::IU128 => IU128::mul(builder, module, compilation_ctx)?,
+                IntermediateType::IU256 => IU256::mul(builder, module, compilation_ctx)?,
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Mul,
                     operands_types: t1,
@@ -2036,8 +2036,8 @@ fn translate_instruction(
                 IntermediateType::IU16 => IU16::div(builder),
                 IntermediateType::IU32 => IU32::div(builder),
                 IntermediateType::IU64 => IU64::div(builder),
-                IntermediateType::IU128 => IU128::div(builder, module, compilation_ctx),
-                IntermediateType::IU256 => IU256::div(builder, module, compilation_ctx),
+                IntermediateType::IU128 => IU128::div(builder, module, compilation_ctx)?,
+                IntermediateType::IU256 => IU256::div(builder, module, compilation_ctx)?,
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Div,
                     operands_types: t1,
@@ -2250,8 +2250,8 @@ fn translate_instruction(
                 IntermediateType::IU16 => IU16::remainder(builder),
                 IntermediateType::IU32 => IU32::remainder(builder),
                 IntermediateType::IU64 => IU64::remainder(builder),
-                IntermediateType::IU128 => IU128::remainder(builder, module, compilation_ctx),
-                IntermediateType::IU256 => IU256::remainder(builder, module, compilation_ctx),
+                IntermediateType::IU128 => IU128::remainder(builder, module, compilation_ctx)?,
+                IntermediateType::IU256 => IU256::remainder(builder, module, compilation_ctx)?,
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Mod,
                     operands_types: t1,
@@ -2372,7 +2372,8 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IU64)?;
 
             // Returns a ptr to the encoded error message
-            let ptr = build_abort_error_message(builder, module, compilation_ctx);
+            let ptr = build_abort_error_message(builder, module, compilation_ctx)
+                .map_err(AbiError::from)?;
 
             // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
             builder
@@ -2425,12 +2426,12 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IU8)?;
             let t = types_stack.pop()?;
             match t {
-                IntermediateType::IU8 => IU8::bit_shift_left(builder, module),
-                IntermediateType::IU16 => IU16::bit_shift_left(builder, module),
-                IntermediateType::IU32 => IU32::bit_shift_left(builder, module),
-                IntermediateType::IU64 => IU64::bit_shift_left(builder, module),
-                IntermediateType::IU128 => IU128::bit_shift_left(builder, module, compilation_ctx),
-                IntermediateType::IU256 => IU256::bit_shift_left(builder, module, compilation_ctx),
+                IntermediateType::IU8 => IU8::bit_shift_left(builder, module)?,
+                IntermediateType::IU16 => IU16::bit_shift_left(builder, module)?,
+                IntermediateType::IU32 => IU32::bit_shift_left(builder, module)?,
+                IntermediateType::IU64 => IU64::bit_shift_left(builder, module)?,
+                IntermediateType::IU128 => IU128::bit_shift_left(builder, module, compilation_ctx)?,
+                IntermediateType::IU256 => IU256::bit_shift_left(builder, module, compilation_ctx)?,
                 _ => Err(TranslationError::InvalidOperation {
                     operation: Bytecode::Shl,
                     operand_type: t.clone(),
@@ -2442,12 +2443,16 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IU8)?;
             let t = types_stack.pop()?;
             match t {
-                IntermediateType::IU8 => IU8::bit_shift_right(builder, module),
-                IntermediateType::IU16 => IU16::bit_shift_right(builder, module),
-                IntermediateType::IU32 => IU32::bit_shift_right(builder, module),
-                IntermediateType::IU64 => IU64::bit_shift_right(builder, module),
-                IntermediateType::IU128 => IU128::bit_shift_right(builder, module, compilation_ctx),
-                IntermediateType::IU256 => IU256::bit_shift_right(builder, module, compilation_ctx),
+                IntermediateType::IU8 => IU8::bit_shift_right(builder, module)?,
+                IntermediateType::IU16 => IU16::bit_shift_right(builder, module)?,
+                IntermediateType::IU32 => IU32::bit_shift_right(builder, module)?,
+                IntermediateType::IU64 => IU64::bit_shift_right(builder, module)?,
+                IntermediateType::IU128 => {
+                    IU128::bit_shift_right(builder, module, compilation_ctx)?
+                }
+                IntermediateType::IU256 => {
+                    IU256::bit_shift_right(builder, module, compilation_ctx)?
+                }
                 _ => Err(TranslationError::InvalidOperation {
                     operation: Bytecode::Shr,
                     operand_type: t.clone(),

@@ -5,6 +5,7 @@ use relooper::BranchMode;
 use walrus::{LocalId, ValType};
 
 use crate::{
+    abi_types::error::AbiError,
     compilation_context::{CompilationContextError, ModuleId},
     error::{CompilationError, ICEError, ICEErrorKind},
     native_functions::error::NativeFunctionError,
@@ -28,6 +29,9 @@ pub enum TranslationError {
 
     #[error("an error ocurred while generating a runtime function's code")]
     RuntimeFunction(#[from] RuntimeFunctionError),
+
+    #[error("an abi error ocurred while translating a function")]
+    AbiEncoding(#[from] AbiError),
 
     #[error(r#"function "{0}" not found in global functions table"#)]
     FunctionDefinitionNotFound(FunctionId),

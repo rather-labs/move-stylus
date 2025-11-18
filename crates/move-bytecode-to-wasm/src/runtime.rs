@@ -187,7 +187,7 @@ impl RuntimeFunction {
                 (Self::MulU64, _) => integers::mul::mul_u64(module),
                 (Self::HeapIntMul, Some(ctx)) => integers::mul::heap_integers_mul(module, ctx),
                 (Self::HeapIntDivMod, Some(ctx)) => {
-                    integers::div::heap_integers_div_mod(module, ctx)
+                    integers::div::heap_integers_div_mod(module, ctx)?
                 }
                 (Self::LessThan, Some(ctx)) => integers::check_if_a_less_than_b(module, ctx),
                 // Swap
@@ -200,18 +200,18 @@ impl RuntimeFunction {
                     module,
                     ctx,
                     Self::SwapI128Bytes.name().to_owned(),
-                ),
+                )?,
                 (Self::SwapI256Bytes, Some(ctx)) => swap::swap_bytes_function::<4>(
                     module,
                     ctx,
                     Self::SwapI256Bytes.name().to_owned(),
-                ),
+                )?,
                 // Bitwise
                 (Self::HeapIntShiftLeft, Some(ctx)) => {
-                    integers::bitwise::heap_int_shift_left(module, ctx)
+                    integers::bitwise::heap_int_shift_left(module, ctx)?
                 }
                 (Self::HeapIntShiftRight, Some(ctx)) => {
-                    integers::bitwise::heap_int_shift_right(module, ctx)
+                    integers::bitwise::heap_int_shift_right(module, ctx)?
                 }
                 // Copy
                 (Self::CopyU128, Some(ctx)) => {
@@ -231,14 +231,14 @@ impl RuntimeFunction {
                 // Equality
                 (Self::HeapTypeEquality, Some(ctx)) => equality::a_equals_b(module, ctx),
                 (Self::VecEqualityHeapType, Some(ctx)) => {
-                    equality::vec_equality_heap_type(module, ctx)
+                    equality::vec_equality_heap_type(module, ctx)?
                 }
                 (Self::IsZero, Some(ctx)) => equality::is_zero(module, ctx),
                 // Vector
-                (Self::VecSwap32, Some(ctx)) => vector::vec_swap_32_function(module, ctx),
-                (Self::VecSwap64, Some(ctx)) => vector::vec_swap_64_function(module, ctx),
-                (Self::VecPopBack32, Some(ctx)) => vector::vec_pop_back_32_function(module, ctx),
-                (Self::VecPopBack64, Some(ctx)) => vector::vec_pop_back_64_function(module, ctx),
+                (Self::VecSwap32, Some(ctx)) => vector::vec_swap_32_function(module, ctx)?,
+                (Self::VecSwap64, Some(ctx)) => vector::vec_swap_64_function(module, ctx)?,
+                (Self::VecPopBack32, Some(ctx)) => vector::vec_pop_back_32_function(module, ctx)?,
+                (Self::VecPopBack64, Some(ctx)) => vector::vec_pop_back_64_function(module, ctx)?,
                 (Self::VecBorrow, Some(ctx)) => vector::vec_borrow_function(module, ctx),
                 (Self::VecIncrementLen, Some(ctx)) => {
                     vector::increment_vec_len_function(module, ctx)
@@ -248,25 +248,25 @@ impl RuntimeFunction {
                 }
                 // Storage
                 (Self::StorageNextSlot, Some(ctx)) => {
-                    storage::storage_next_slot_function(module, ctx)
+                    storage::storage_next_slot_function(module, ctx)?
                 }
                 (Self::DeriveMappingSlot, Some(ctx)) => storage::derive_mapping_slot(module, ctx),
                 (Self::DeriveDynArraySlot, Some(ctx)) => {
-                    storage::derive_dyn_array_slot(module, ctx)
+                    storage::derive_dyn_array_slot(module, ctx)?
                 }
-                (Self::WriteObjectSlot, Some(ctx)) => storage::write_object_slot(module, ctx),
-                (Self::LocateStorageData, Some(ctx)) => storage::locate_storage_data(module, ctx),
-                (Self::LocateStructSlot, Some(ctx)) => storage::locate_struct_slot(module, ctx),
+                (Self::WriteObjectSlot, Some(ctx)) => storage::write_object_slot(module, ctx)?,
+                (Self::LocateStorageData, Some(ctx)) => storage::locate_storage_data(module, ctx)?,
+                (Self::LocateStructSlot, Some(ctx)) => storage::locate_struct_slot(module, ctx)?,
                 (Self::GetIdBytesPtr, Some(ctx)) => storage::get_id_bytes_ptr(module, ctx),
-                (Self::GetStructOwner, Some(ctx)) => storage::get_struct_owner_fn(module, ctx),
+                (Self::GetStructOwner, None) => storage::get_struct_owner_fn(module),
                 (Self::AccumulateOrAdvanceSlotDelete, Some(ctx)) => {
-                    storage::accumulate_or_advance_slot_delete(module, ctx)
+                    storage::accumulate_or_advance_slot_delete(module, ctx)?
                 }
                 (Self::AccumulateOrAdvanceSlotRead, Some(ctx)) => {
-                    storage::accumulate_or_advance_slot_read(module, ctx)
+                    storage::accumulate_or_advance_slot_read(module, ctx)?
                 }
                 (Self::AccumulateOrAdvanceSlotWrite, Some(ctx)) => {
-                    storage::accumulate_or_advance_slot_write(module, ctx)
+                    storage::accumulate_or_advance_slot_write(module, ctx)?
                 }
                 // ASCII conversion
                 (Self::U64ToAsciiBase10, Some(ctx)) => {
@@ -301,7 +301,7 @@ impl RuntimeFunction {
                     generics.len(),
                 );
 
-                storage::add_encode_and_save_into_storage_fn(module, compilation_ctx, generics[0])
+                storage::add_encode_and_save_into_storage_fn(module, compilation_ctx, generics[0])?
             }
             Self::ReadAndDecodeFromStorage => {
                 assert_eq!(
@@ -312,7 +312,7 @@ impl RuntimeFunction {
                     generics.len(),
                 );
 
-                storage::add_read_and_decode_from_storage_fn(module, compilation_ctx, generics[0])
+                storage::add_read_and_decode_from_storage_fn(module, compilation_ctx, generics[0])?
             }
             Self::DeleteFromStorage => {
                 assert_eq!(
@@ -323,7 +323,7 @@ impl RuntimeFunction {
                     generics.len(),
                 );
 
-                storage::add_delete_struct_from_storage_fn(module, compilation_ctx, generics[0])
+                storage::add_delete_struct_from_storage_fn(module, compilation_ctx, generics[0])?
             }
             Self::CheckAndDeleteStructTtoFields => {
                 assert_eq!(
@@ -338,7 +338,7 @@ impl RuntimeFunction {
                     module,
                     compilation_ctx,
                     generics[0],
-                )
+                )?
             }
             Self::DeleteTtoObject => {
                 assert_eq!(
@@ -349,7 +349,7 @@ impl RuntimeFunction {
                     generics.len(),
                 );
 
-                storage::add_delete_tto_object_fn(module, compilation_ctx, generics[0])
+                storage::add_delete_tto_object_fn(module, compilation_ctx, generics[0])?
             }
             Self::CacheStorageObjectChanges => {
                 assert_eq!(
@@ -360,7 +360,7 @@ impl RuntimeFunction {
                     generics.len(),
                 );
 
-                storage::cache_storage_object_changes(module, compilation_ctx, generics[0])
+                storage::cache_storage_object_changes(module, compilation_ctx, generics[0])?
             }
             Self::GetStorageSizeByOffset => {
                 assert_eq!(
@@ -370,7 +370,7 @@ impl RuntimeFunction {
                     self.name(),
                     generics.len(),
                 );
-                enums::get_storage_size_by_offset(module, compilation_ctx, generics[0])
+                enums::get_storage_size_by_offset(module, compilation_ctx, generics[0])?
             }
             Self::ComputeEnumStorageTailPosition => {
                 assert_eq!(
@@ -380,7 +380,7 @@ impl RuntimeFunction {
                     self.name(),
                     generics.len(),
                 );
-                enums::compute_enum_storage_tail_position(module, compilation_ctx, generics[0])
+                enums::compute_enum_storage_tail_position(module, compilation_ctx, generics[0])?
             }
             _ => {
                 return Err(RuntimeFunctionError::CouldNotLinkGeneric(
@@ -402,9 +402,9 @@ impl RuntimeFunction {
         module: &mut Module,
         compilation_ctx: &CompilationContext,
         dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
-    ) -> FunctionId {
+    ) -> Result<FunctionId, RuntimeFunctionError> {
         if let Some(function) = module.funcs.by_name(Self::CommitChangesToStorage.name()) {
-            function
+            Ok(function)
         } else {
             storage::add_commit_changes_to_storage_fn(
                 module,
