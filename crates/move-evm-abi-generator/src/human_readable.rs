@@ -22,7 +22,12 @@ pub fn process_abi(abi: &Abi) -> String {
 }
 
 pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
-    for function in &abi.functions {
+    // Sort functions by identifier for deterministic output
+    let mut function_indices: Vec<usize> = (0..abi.functions.len()).collect();
+    function_indices.sort_by_key(|&i| &abi.functions[i].identifier);
+
+    for &i in &function_indices {
+        let function = &abi.functions[i];
         if function.visibility == Visibility::Private && !function.is_entry {
             continue;
         }
@@ -77,7 +82,12 @@ pub fn process_functions(contract_abi: &mut String, abi: &Abi) {
 }
 
 pub fn process_structs(contract_abi: &mut String, abi: &Abi) {
-    for struct_ in &abi.structs {
+    // Sort structs by identifier for deterministic output
+    let mut struct_indices: Vec<usize> = (0..abi.structs.len()).collect();
+    struct_indices.sort_by_key(|&i| &abi.structs[i].identifier);
+
+    for &i in &struct_indices {
+        let struct_ = &abi.structs[i];
         // Declaration
         contract_abi.push_str("    struct ");
         contract_abi.push_str(&struct_.identifier);
@@ -95,7 +105,12 @@ pub fn process_structs(contract_abi: &mut String, abi: &Abi) {
 }
 
 pub fn process_events(contract_abi: &mut String, abi: &Abi) {
-    for event in &abi.events {
+    // Sort events by identifier for deterministic output
+    let mut event_indices: Vec<usize> = (0..abi.events.len()).collect();
+    event_indices.sort_by_key(|&i| &abi.events[i].identifier);
+
+    for &i in &event_indices {
+        let event = &abi.events[i];
         // Declaration
         contract_abi.push_str("    event ");
         contract_abi.push_str(&event.identifier);
@@ -122,7 +137,12 @@ pub fn process_events(contract_abi: &mut String, abi: &Abi) {
 }
 
 pub fn process_abi_errors(contract_abi: &mut String, abi: &Abi) {
-    for error in &abi.abi_errors {
+    // Sort errors by identifier for deterministic output
+    let mut error_indices: Vec<usize> = (0..abi.abi_errors.len()).collect();
+    error_indices.sort_by_key(|&i| &abi.abi_errors[i].identifier);
+
+    for &i in &error_indices {
+        let error = &abi.abi_errors[i];
         // Declaration
         contract_abi.push_str("    error ");
         contract_abi.push_str(&error.identifier);
