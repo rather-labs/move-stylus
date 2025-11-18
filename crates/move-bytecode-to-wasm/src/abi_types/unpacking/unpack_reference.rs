@@ -59,7 +59,7 @@ impl IRef {
                         compilation_ctx,
                         inner,
                         true,
-                    );
+                    )?;
                 } else {
                     inner.add_unpack_instructions(
                         builder,

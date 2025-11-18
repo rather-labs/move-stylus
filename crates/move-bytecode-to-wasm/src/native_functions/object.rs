@@ -296,7 +296,7 @@ pub fn add_delete_storage_struct_instructions(
     slot_ptr: LocalId,
     slot_offset: LocalId,
     struct_: &IStruct,
-) {
+) -> Result<(), NativeFunctionError> {
     let (storage_cache, _) = storage_cache_bytes32(module);
 
     // Iterate over the fields of the struct and delete them
@@ -314,7 +314,7 @@ pub fn add_delete_storage_struct_instructions(
             slot_offset,
             field,
             field_size,
-        );
+        )?;
     }
 
     // Wipe out the last slot before exiting
@@ -322,6 +322,8 @@ pub fn add_delete_storage_struct_instructions(
         .local_get(slot_ptr)
         .i32_const(DATA_ZERO_OFFSET)
         .call(storage_cache);
+
+    Ok(())
 }
 
 pub fn add_delete_storage_enum_instructions(
@@ -454,6 +456,7 @@ pub fn add_delete_storage_vector_instructions(
         .i32_const(DATA_ZERO_OFFSET)
         .call(storage_cache);
 
+    let mut inner_result = Ok(());
     builder.block(None, |block| {
         let block_id = block.id();
 
@@ -485,7 +488,7 @@ pub fn add_delete_storage_vector_instructions(
             inner_block.loop_(None, |loop_| {
                 let loop_id = loop_.id();
 
-                add_delete_field_instructions(
+                inner_result = add_delete_field_instructions(
                     module,
                     loop_,
                     compilation_ctx,
@@ -519,6 +522,7 @@ pub fn add_delete_storage_vector_instructions(
             .i32_const(DATA_ZERO_OFFSET)
             .call(storage_cache);
     });
+    inner_result?;
 
     Ok(())
 }
@@ -584,7 +588,7 @@ pub fn add_delete_field_instructions(
                     slot_ptr,
                     slot_offset,
                     &child_struct,
-                );
+                )?;
             }
         }
         IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
@@ -595,7 +599,7 @@ pub fn add_delete_field_instructions(
                 slot_ptr,
                 slot_offset,
                 itype,
-            );
+            )?;
         }
         IntermediateType::IVector(inner_) => {
             // Delete the vector recursively
@@ -607,7 +611,7 @@ pub fn add_delete_field_instructions(
                 compilation_ctx,
                 slot_ptr,
                 inner_,
-            );
+            )?;
         }
         _ => {}
     }

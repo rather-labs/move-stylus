@@ -407,7 +407,7 @@ impl Packable for IntermediateType {
                     writer_pointer,
                     calldata_reference_pointer,
                     compilation_ctx,
-                );
+                )?;
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx

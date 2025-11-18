@@ -3,7 +3,7 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use super::pack_native_int::pack_i32_type_instructions;
+use super::{error::AbiPackError, pack_native_int::pack_i32_type_instructions};
 use crate::{
     CompilationContext, translation::intermediate_types::IntermediateType,
     vm_handled_types::string::String_,
@@ -17,7 +17,7 @@ impl String_ {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiPackError> {
         let data_pointer = module.locals.add(ValType::I32);
         let inner_data_reference = module.locals.add(ValType::I32);
 
@@ -73,7 +73,7 @@ impl String_ {
             compilation_ctx.memory_id,
             reference_value,
             writer_pointer,
-        );
+        )?;
 
         // Set the local to point to the first element
         builder
@@ -93,7 +93,7 @@ impl String_ {
             compilation_ctx.memory_id,
             len,
             data_pointer,
-        );
+        )?;
 
         // increment the data pointer
         builder
@@ -167,5 +167,7 @@ impl String_ {
                     .br_if(loop_block_id);
             });
         });
+
+        Ok(())
     }
 }

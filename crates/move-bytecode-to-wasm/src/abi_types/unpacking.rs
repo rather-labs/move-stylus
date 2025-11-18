@@ -104,35 +104,35 @@ impl Unpackable for IntermediateType {
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
-            ),
+            )?,
             IntermediateType::IU8 => IU8::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
-            ),
+            )?,
             IntermediateType::IU16 => IU16::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
-            ),
+            )?,
             IntermediateType::IU32 => IU32::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
-            ),
+            )?,
             IntermediateType::IU64 => IU64::add_unpack_instructions(
                 function_builder,
                 module,
                 reader_pointer,
                 calldata_reader_pointer,
                 compilation_ctx,
-            ),
+            )?,
             IntermediateType::IU128 => IU128::add_unpack_instructions(
                 function_builder,
                 module,
@@ -196,7 +196,7 @@ impl Unpackable for IntermediateType {
                     reader_pointer,
                     calldata_reader_pointer,
                     compilation_ctx,
-                );
+                )?;
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx
@@ -219,7 +219,7 @@ impl Unpackable for IntermediateType {
                         compilation_ctx,
                         self,
                         false,
-                    );
+                    )?;
                 } else {
                     // TODO: Check if the struct is TxContext. If it is, panic since the only valid
                     // TxContext is the one defined in the stylus framework.
@@ -245,7 +245,7 @@ impl Unpackable for IntermediateType {
                     module,
                     reader_pointer,
                     compilation_ctx,
-                )
+                )?
             }
             IntermediateType::ITypeParameter(_) => {
                 return Err(AbiUnpackError::UnpackingGenericTypeParameter);

@@ -750,7 +750,8 @@ pub fn add_delete_struct_from_storage_fn(
                 slot_ptr,
                 slot_offset,
                 &struct_,
-            );
+            )
+            .unwrap(); // TODO: unwrap
         },
     );
 
