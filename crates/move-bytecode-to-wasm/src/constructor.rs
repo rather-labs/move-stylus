@@ -8,7 +8,7 @@ use crate::{
     abi_types::public_function::{PublicFunction, PublicFunctionValidationError},
     error::{CompilationError, ICEError, ICEErrorKind},
     hostio::host_functions,
-    runtime::RuntimeFunction,
+    runtime::{RuntimeFunction, error::RuntimeFunctionError},
     translation::{intermediate_types::ISignature, table::FunctionTable},
     utils::keccak_string_to_memory,
     vm_handled_types::{VmHandledType, tx_context::TxContext},
@@ -23,6 +23,9 @@ static EMPTY_SIGNATURE: ISignature = ISignature {
 pub enum ConstructorError {
     #[error("there was an error creating the constructor function")]
     CreatingPublicFunction(#[from] PublicFunctionValidationError),
+
+    #[error("an error ocurred while generating a runtime function's code")]
+    RuntimeFunction(#[from] RuntimeFunctionError),
 }
 
 impl From<ConstructorError> for CompilationError {
@@ -45,7 +48,7 @@ pub fn inject_constructor(
             .wasm_function_id
             .unwrap();
 
-        let constructor_fn_id = build_constructor(module, compilation_ctx, wasm_init_fn);
+        let constructor_fn_id = build_constructor(module, compilation_ctx, wasm_init_fn)?;
 
         public_functions.push(PublicFunction::new(
             constructor_fn_id,
@@ -70,13 +73,13 @@ pub fn build_constructor(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     init: WalrusFunctionId,
-) -> WalrusFunctionId {
+) -> Result<WalrusFunctionId, ConstructorError> {
     // Flag to indicate if the constructor has been called.
     // This is what we are going to be storing in the storage.
     const FLAG: i32 = 1;
 
     // Host function for checking if all bytes are zero
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
 
     // Host functions for storage operations
     let (storage_load_fn, _) = host_functions::storage_load_bytes32(module);
@@ -161,5 +164,5 @@ pub fn build_constructor(
     );
 
     // Finalize and insert the function into the module
-    function.finish(vec![], &mut module.funcs)
+    Ok(function.finish(vec![], &mut module.funcs))
 }

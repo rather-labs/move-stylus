@@ -42,6 +42,9 @@ pub enum AbiError {
 
     #[error("there was an error validating a public function")]
     PublicFunction(#[from] PublicFunctionValidationError),
+
+    #[error("an error ocurred while generating a runtime function's code")]
+    RuntimeFunction(#[from] RuntimeFunctionError),
 }
 
 impl From<AbiError> for CompilationError {

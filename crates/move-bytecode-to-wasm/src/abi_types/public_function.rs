@@ -83,6 +83,12 @@ impl<'a> PublicFunction<'a> {
         dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
     ) -> Result<(), AbiError> {
         let mut inner_result = Ok(());
+        let commit_changes_to_storage_function = RuntimeFunction::get_commit_changes_to_storage_fn(
+            module,
+            compilation_ctx,
+            dynamic_fields_global_variables,
+        )?;
+
         router_builder.block(None, |block| {
             let block_id = block.id();
 
@@ -129,12 +135,6 @@ impl<'a> PublicFunction<'a> {
 
             // TODO: This is repeated for every function, we should move this and the return below
             // outside this into the main body of the entrypoint so we don't needlesly repeat code
-            let commit_changes_to_storage_function =
-                RuntimeFunction::get_commit_changes_to_storage_fn(
-                    module,
-                    compilation_ctx,
-                    dynamic_fields_global_variables,
-                );
             block.call(commit_changes_to_storage_function);
 
             // Return status
