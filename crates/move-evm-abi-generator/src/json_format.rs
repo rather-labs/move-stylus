@@ -329,7 +329,11 @@ fn encode_for_json_abi(
             module_id,
         } => {
             let abi_type = "uint8".to_string();
-            let abi_internal_type = format!("enum {}.{}", module_id.module_name, identifier);
+            let abi_internal_type = format!(
+                "enum {}.{}",
+                snake_to_upper_camel(&module_id.module_name),
+                identifier
+            );
             (abi_type, abi_internal_type, None)
         }
         Type::Array(inner) => {
@@ -381,7 +385,11 @@ fn encode_for_json_abi(
                 .collect();
 
             let abi_type = "tuple".to_string();
-            let abi_internal_type = format!("struct {}.{}", module_id.module_name, identifier);
+            let abi_internal_type = format!(
+                "struct {}.{}",
+                snake_to_upper_camel(&module_id.module_name),
+                identifier
+            );
             (abi_type, abi_internal_type, Some(components))
         }
         Type::Tuple(_) => {
