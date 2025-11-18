@@ -134,9 +134,14 @@ fn get_build_config() -> BuildConfig {
     }
 }
 
-/// Compiles a Move package and generates the JSON ABI for the specified module.
-/// Returns the JSON string if successful.
-pub fn generate_abi(path: &str, module_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+/// Compiles a Move package and generates the ABI for the specified module.
+/// Returns the JSON or human-readable string based on the requested format.
+pub fn generate_abi(
+    path: &str,
+    module_name: &str,
+    generate_json: bool,
+    generate_human_readable: bool,
+) -> Result<String, Box<dyn std::error::Error>> {
     use move_bytecode_to_wasm::package_module_data;
     use move_evm_abi_generator::generate_abi;
 
@@ -168,8 +173,8 @@ pub fn generate_abi(path: &str, module_name: &str) -> Result<String, Box<dyn std
         &package,
         &root_compiled_units,
         &package_module_data,
-        true,
-        false,
+        generate_json,
+        generate_human_readable,
     )
     .map_err(|(_mapped_files, errors)| {
         format!(
@@ -194,18 +199,25 @@ pub fn generate_abi(path: &str, module_name: &str) -> Result<String, Box<dyn std
         })
         .ok_or_else(|| format!("ABI not found for module: {module_name}"))?;
 
-    abi.content_json
-        .clone()
-        .ok_or_else(|| "No JSON content in ABI".to_string())
-        .map_err(|e| e.into())
+    if generate_human_readable {
+        abi.content_human_readable
+            .clone()
+            .ok_or_else(|| "No human readable content found in ABI".to_string())
+            .map_err(|e| e.into())
+    } else {
+        abi.content_json
+            .clone()
+            .ok_or_else(|| "No JSON content found in ABI".to_string())
+            .map_err(|e| e.into())
+    }
 }
 
-pub fn test_generated_abi(
+pub fn compare_json_abi(
     json_path: &str,
     module_path: &str,
     module_name: &str,
 ) -> Result<(), String> {
-    let actual_json = generate_abi(module_path, module_name)
+    let actual_json = generate_abi(module_path, module_name, true, false)
         .map_err(|e| format!("Failed to generate ABI: {e}"))?;
     let expected_json = fs::read_to_string(json_path)
         .map_err(|e| format!("Failed to read expected JSON file: {e}"))?;
@@ -243,6 +255,26 @@ pub fn test_generated_abi(
         println!("Expected JSON: {expected_pretty}");
 
         return Err("Jsons do not match".into());
+    }
+
+    Ok(())
+}
+
+pub fn compare_human_readable_abi(
+    human_readable_path: &str,
+    module_path: &str,
+    module_name: &str,
+) -> Result<(), String> {
+    let actual_human_readable = generate_abi(module_path, module_name, false, true)
+        .map_err(|e| format!("Failed to generate ABI: {e}"))?;
+    let expected_human_readable = fs::read_to_string(human_readable_path)
+        .map_err(|e| format!("Failed to read expected human readable file: {e}"))?;
+
+    if actual_human_readable != expected_human_readable {
+        println!("Actual human readable: {actual_human_readable}");
+        println!("Expected human readable: {expected_human_readable}");
+
+        return Err("Human readable does not match".into());
     }
 
     Ok(())
