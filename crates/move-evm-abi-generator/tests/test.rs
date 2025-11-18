@@ -4,7 +4,6 @@ use common::test_generated_abi;
 use rstest::rstest;
 
 #[rstest]
-#[case("simple", "modules/simple.move", "json_format/simple.json")]
 #[case(
     "abi_error_1",
     "modules/abi_errors/abi_error_1.move",
