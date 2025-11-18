@@ -1,0 +1,12 @@
+contract AbiError1 {
+
+
+    error SimpleError(string pos0);
+
+    struct string {
+        uint8[] bytes;
+    }
+
+    function revertSimpleError(string s) pure external;
+
+}

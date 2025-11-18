@@ -1,0 +1,16 @@
+contract AbiError3 {
+
+
+    error ErrorWithEnum(ErrorEnum a, ErrorEnum[] b);
+    error ErrorWithNestedStructs(NestedStruct a, NestedStruct2 b);
+    error ErrorWithVectors(uint32[] a, uint128[] b, uint64[][] c);
+
+    struct string {
+        uint8[] bytes;
+    }
+
+    function revertErrorWithEnum(ErrorEnum a, ErrorEnum[] b) external;
+    function revertErrorWithNestedStructs(string a, string b, uint64 c) pure external;
+    function revertErrorWithVectors(uint32[] a, uint128[] b, uint64[][] c) pure external;
+
+}
