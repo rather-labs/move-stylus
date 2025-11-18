@@ -234,15 +234,15 @@ pub fn test_generated_abi(
     }
 
     if actual_json != expected_json {
-        // Try to provide a helpful diff message
         let actual_pretty =
             serde_json::to_string_pretty(&actual_json).unwrap_or_else(|_| actual_json.to_string());
         let expected_pretty = serde_json::to_string_pretty(&expected_json)
             .unwrap_or_else(|_| expected_json.to_string());
 
-        return Err(format!(
-            "JSON mismatch\n\nExpected:\n{expected_pretty}\n\nActual:\n{actual_pretty}"
-        ));
+        println!("Actual JSON: {actual_pretty}");
+        println!("Expected JSON: {expected_pretty}");
+        
+        return Err("Jsons do not match".into());
     }
 
     Ok(())

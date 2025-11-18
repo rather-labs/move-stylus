@@ -1,0 +1,346 @@
+{
+    "abi": [
+		{
+			"anonymous": false,
+			"inputs": [
+				{
+					"indexed": true,
+					"internalType": "uint32",
+					"name": "a",
+					"type": "uint32"
+				},
+				{
+					"indexed": true,
+					"internalType": "address",
+					"name": "b",
+					"type": "address"
+				},
+				{
+					"indexed": false,
+					"internalType": "uint128",
+					"name": "c",
+					"type": "uint128"
+				},
+				{
+					"indexed": false,
+					"internalType": "uint8[]",
+					"name": "d",
+					"type": "uint8[]"
+				},
+				{
+					"components": [
+						{
+							"internalType": "uint32",
+							"name": "a",
+							"type": "uint32"
+						},
+						{
+							"internalType": "address",
+							"name": "b",
+							"type": "address"
+						},
+						{
+							"internalType": "uint128",
+							"name": "c",
+							"type": "uint128"
+						}
+					],
+					"indexed": false,
+					"internalType": "struct Events2.NestedStruct",
+					"name": "e",
+					"type": "tuple"
+				}
+			],
+			"name": "TestEvent1",
+			"type": "event"
+		},
+		{
+			"anonymous": false,
+			"inputs": [
+				{
+					"indexed": true,
+					"internalType": "uint32",
+					"name": "a",
+					"type": "uint32"
+				},
+				{
+					"indexed": true,
+					"internalType": "address",
+					"name": "b",
+					"type": "address"
+				},
+				{
+					"components": [
+						{
+							"internalType": "uint32",
+							"name": "a",
+							"type": "uint32"
+						},
+						{
+							"internalType": "address",
+							"name": "b",
+							"type": "address"
+						},
+						{
+							"internalType": "uint128",
+							"name": "c",
+							"type": "uint128"
+						}
+					],
+					"indexed": true,
+					"internalType": "struct Events2.NestedStruct",
+					"name": "c",
+					"type": "tuple"
+				}
+			],
+			"name": "TestEvent2",
+			"type": "event"
+		},
+		{
+			"anonymous": false,
+			"inputs": [
+				{
+					"indexed": true,
+					"internalType": "uint32",
+					"name": "a",
+					"type": "uint32"
+				},
+				{
+					"indexed": true,
+					"internalType": "uint8[]",
+					"name": "b",
+					"type": "uint8[]"
+				},
+				{
+					"components": [
+						{
+							"internalType": "uint32",
+							"name": "a",
+							"type": "uint32"
+						},
+						{
+							"internalType": "address",
+							"name": "b",
+							"type": "address"
+						},
+						{
+							"internalType": "uint128",
+							"name": "c",
+							"type": "uint128"
+						}
+					],
+					"indexed": true,
+					"internalType": "struct Events2.NestedStruct[]",
+					"name": "c",
+					"type": "tuple[]"
+				}
+			],
+			"name": "TestEvent3",
+			"type": "event"
+		},
+		{
+			"anonymous": false,
+			"inputs": [
+				{
+					"indexed": true,
+					"internalType": "uint64",
+					"name": "a",
+					"type": "uint64"
+				},
+				{
+					"indexed": false,
+					"internalType": "string",
+					"name": "b",
+					"type": "string"
+				}
+			],
+			"name": "TestEvent4",
+			"type": "event"
+		},
+		{
+			"anonymous": false,
+			"inputs": [
+				{
+					"indexed": true,
+					"internalType": "uint64",
+					"name": "a",
+					"type": "uint64"
+				},
+				{
+					"indexed": true,
+					"internalType": "string",
+					"name": "b",
+					"type": "string"
+				}
+			],
+			"name": "TestEvent5",
+			"type": "event"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "uint32",
+					"name": "a",
+					"type": "uint32"
+				},
+				{
+					"internalType": "address",
+					"name": "b",
+					"type": "address"
+				},
+				{
+					"internalType": "uint128",
+					"name": "c",
+					"type": "uint128"
+				},
+				{
+					"internalType": "uint8[]",
+					"name": "d",
+					"type": "uint8[]"
+				},
+				{
+					"components": [
+						{
+							"internalType": "uint32",
+							"name": "a",
+							"type": "uint32"
+						},
+						{
+							"internalType": "address",
+							"name": "b",
+							"type": "address"
+						},
+						{
+							"internalType": "uint128",
+							"name": "c",
+							"type": "uint128"
+						}
+					],
+					"internalType": "struct Events2.NestedStruct",
+					"name": "e",
+					"type": "tuple"
+				}
+			],
+			"name": "emitTestEvent1",
+			"outputs": [],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "uint32",
+					"name": "a",
+					"type": "uint32"
+				},
+				{
+					"internalType": "address",
+					"name": "b",
+					"type": "address"
+				},
+				{
+					"components": [
+						{
+							"internalType": "uint32",
+							"name": "a",
+							"type": "uint32"
+						},
+						{
+							"internalType": "address",
+							"name": "b",
+							"type": "address"
+						},
+						{
+							"internalType": "uint128",
+							"name": "c",
+							"type": "uint128"
+						}
+					],
+					"internalType": "struct Events2.NestedStruct",
+					"name": "c",
+					"type": "tuple"
+				}
+			],
+			"name": "emitTestEvent2",
+			"outputs": [],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "uint32",
+					"name": "a",
+					"type": "uint32"
+				},
+				{
+					"internalType": "uint8[]",
+					"name": "b",
+					"type": "uint8[]"
+				},
+				{
+					"components": [
+						{
+							"internalType": "uint32",
+							"name": "a",
+							"type": "uint32"
+						},
+						{
+							"internalType": "address",
+							"name": "b",
+							"type": "address"
+						},
+						{
+							"internalType": "uint128",
+							"name": "c",
+							"type": "uint128"
+						}
+					],
+					"internalType": "struct Events2.NestedStruct[]",
+					"name": "c",
+					"type": "tuple[]"
+				}
+			],
+			"name": "emitTestEvent3",
+			"outputs": [],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "uint64",
+					"name": "a",
+					"type": "uint64"
+				},
+				{
+					"internalType": "string",
+					"name": "b",
+					"type": "string"
+				}
+			],
+			"name": "emitTestEvent4",
+			"outputs": [],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "uint64",
+					"name": "a",
+					"type": "uint64"
+				},
+				{
+					"internalType": "string",
+					"name": "b",
+					"type": "string"
+				}
+			],
+			"name": "emitTestEvent5",
+			"outputs": [],
+			"stateMutability": "nonpayable",
+			"type": "function"
+		}
+	]
+}
