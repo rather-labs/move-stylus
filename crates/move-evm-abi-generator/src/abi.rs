@@ -293,7 +293,7 @@ impl Abi {
                     .returns
                     .iter()
                     .map(|t| {
-                        match &function.signature.returns[0] {
+                        match t {
                             IntermediateType::IGenericStructInstance {
                                 module_id, index, ..
                             }
@@ -306,7 +306,7 @@ impl Abi {
                                 if !is_named_id(&struct_.identifier, module_id)
                                     && !is_uid(&struct_.identifier, module_id)
                                 {
-                                    struct_to_process.insert(function.signature.returns[0].clone());
+                                    struct_to_process.insert(t.clone());
                                 }
                             }
                             _ => {}
