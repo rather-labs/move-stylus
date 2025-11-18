@@ -1,4 +1,5 @@
 use super::RuntimeFunction;
+use super::error::RuntimeFunctionError;
 use crate::data::{
     DATA_FROZEN_OBJECTS_KEY_OFFSET, DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET,
     DATA_OBJECTS_SLOT_OFFSET, DATA_SHARED_OBJECTS_KEY_OFFSET, DATA_SLOT_DATA_PTR_OFFSET,
@@ -43,10 +44,11 @@ use walrus::{
 pub fn locate_storage_data(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-) -> FunctionId {
+) -> Result<FunctionId, RuntimeFunctionError> {
     // Runtime functions
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
-    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
 
     // Host functions
     let (tx_origin, _) = tx_origin(module);
@@ -171,7 +173,7 @@ pub fn locate_storage_data(
         block.unreachable();
     });
 
-    function.finish(vec![uid_ptr, search_frozen], &mut module.funcs)
+    Ok(function.finish(vec![uid_ptr, search_frozen], &mut module.funcs))
 }
 
 /// Computes the storage slot number where the struct should be persisted.
@@ -184,15 +186,19 @@ pub fn locate_storage_data(
 ///
 /// # Arguments
 /// - struct_ptr - pointer to the struct
-pub fn locate_struct_slot(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+pub fn locate_struct_slot(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function
         .name(RuntimeFunction::LocateStructSlot.name().to_owned())
         .func_body();
 
-    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
-    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
-    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
+    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx))?;
 
     let struct_ptr = module.locals.add(ValType::I32);
 
@@ -205,11 +211,14 @@ pub fn locate_struct_slot(module: &mut Module, compilation_ctx: &CompilationCont
     // Compute the slot where it should be saved
     builder.call(write_object_slot_fn);
 
-    function.finish(vec![struct_ptr], &mut module.funcs)
+    Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }
 
 /// Calculates the slot from the slot mapping
-pub fn write_object_slot(module: &mut Module, compilation_ctx: &CompilationContext) -> FunctionId {
+pub fn write_object_slot(
+    module: &mut Module,
+    compilation_ctx: &CompilationContext,
+) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut builder = function
         .name(RuntimeFunction::WriteObjectSlot.name().to_owned())
@@ -219,7 +228,7 @@ pub fn write_object_slot(module: &mut Module, compilation_ctx: &CompilationConte
     let owner_ptr = module.locals.add(ValType::I32);
 
     // Calculate the slot address
-    let derive_slot_fn = RuntimeFunction::DeriveMappingSlot.get(module, Some(compilation_ctx));
+    let derive_slot_fn = RuntimeFunction::DeriveMappingSlot.get(module, Some(compilation_ctx))?;
 
     // Derive the slot for the first mapping
     builder
@@ -235,13 +244,13 @@ pub fn write_object_slot(module: &mut Module, compilation_ctx: &CompilationConte
         .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
         .call(derive_slot_fn);
 
-    function.finish(vec![owner_ptr, uid_ptr], &mut module.funcs)
+    Ok(function.finish(vec![owner_ptr, uid_ptr], &mut module.funcs))
 }
 
 pub fn storage_next_slot_function(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-) -> FunctionId {
+) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[ValType::I32]);
     let mut builder = function
         .name(RuntimeFunction::StorageNextSlot.name().to_owned())
@@ -249,8 +258,8 @@ pub fn storage_next_slot_function(
 
     let slot_ptr = module.locals.add(ValType::I32);
 
-    let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
-    let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
+    let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
+    let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx))?;
 
     // BE to LE ptr so we can make the addition
     builder
@@ -272,7 +281,7 @@ pub fn storage_next_slot_function(
         .local_get(slot_ptr)
         .call(swap_256_fn);
 
-    function.finish(vec![slot_ptr], &mut module.funcs)
+    Ok(function.finish(vec![slot_ptr], &mut module.funcs))
 }
 
 // This function returns a pointer to the 32 bytes holding the data of the id, given a struct pointer as input
@@ -406,7 +415,7 @@ pub fn derive_mapping_slot(
 pub fn derive_dyn_array_slot(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-) -> FunctionId {
+) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32, ValType::I32, ValType::I32],
@@ -424,7 +433,7 @@ pub fn derive_dyn_array_slot(
     let derived_elem_slot_ptr = module.locals.add(ValType::I32);
 
     let (native_keccak, _) = host_functions::native_keccak256(module);
-    let swap_i32_bytes_fn = RuntimeFunction::SwapI32Bytes.get(module, None);
+    let swap_i32_bytes_fn = RuntimeFunction::SwapI32Bytes.get(module, None)?;
 
     // Guard: check elem_size is greater than 0
     builder
@@ -540,10 +549,10 @@ pub fn derive_dyn_array_slot(
         .i32_const(32)
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-    function.finish(
+    Ok(function.finish(
         vec![array_slot_ptr, elem_index, elem_size, derived_elem_slot_ptr],
         &mut module.funcs,
-    )
+    ))
 }
 
 /// Generates a function that encodes and saves an specific struct into the storage.
@@ -555,11 +564,11 @@ pub fn add_encode_and_save_into_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
-) -> FunctionId {
+) -> Result<FunctionId, RuntimeFunctionError> {
     let name = RuntimeFunction::EncodeAndSaveInStorage
-        .get_generic_function_name(compilation_ctx, &[itype]);
+        .get_generic_function_name(compilation_ctx, &[itype])?;
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     }
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
@@ -584,7 +593,7 @@ pub fn add_encode_and_save_into_storage_fn(
         itype,
     );
 
-    function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs)
+    Ok(function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs))
 }
 
 /// Generates a function that reads an specific struct from the storage.
@@ -604,11 +613,11 @@ pub fn add_read_and_decode_from_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
-) -> FunctionId {
+) -> Result<FunctionId, RuntimeFunctionError> {
     let name = RuntimeFunction::ReadAndDecodeFromStorage
-        .get_generic_function_name(compilation_ctx, &[itype]);
+        .get_generic_function_name(compilation_ctx, &[itype])?;
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     }
 
     let mut function = FunctionBuilder::new(
@@ -648,7 +657,7 @@ pub fn add_read_and_decode_from_storage_fn(
 
     builder.local_get(struct_ptr);
 
-    function.finish(vec![slot_ptr, struct_id_ptr], &mut module.funcs)
+    Ok(function.finish(vec![slot_ptr, struct_id_ptr], &mut module.funcs))
 }
 
 /// Generates a function that deletes an object from storage.
@@ -665,11 +674,11 @@ pub fn add_delete_struct_from_storage_fn(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
-) -> FunctionId {
+) -> Result<FunctionId, RuntimeFunctionError> {
     let name =
-        RuntimeFunction::DeleteFromStorage.get_generic_function_name(compilation_ctx, &[itype]);
+        RuntimeFunction::DeleteFromStorage.get_generic_function_name(compilation_ctx, &[itype])?;
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     };
 
     let struct_ = compilation_ctx
@@ -677,9 +686,9 @@ pub fn add_delete_struct_from_storage_fn(
         .unwrap();
 
     let locate_struct_slot_fn =
-        RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx));
-    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx));
-    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+        RuntimeFunction::LocateStructSlot.get(module, Some(compilation_ctx))?;
+    let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, Some(compilation_ctx))?;
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
 
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
@@ -742,7 +751,7 @@ pub fn add_delete_struct_from_storage_fn(
         .i32_const(32)
         .memory_fill(compilation_ctx.memory_id);
 
-    function.finish(vec![struct_ptr], &mut module.funcs)
+    Ok(function.finish(vec![struct_ptr], &mut module.funcs))
 }
 
 /// Remove any objects that have been recently transferred into the struct (transfer-to-object feature or TTO)

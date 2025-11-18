@@ -1,4 +1,4 @@
-use super::RuntimeFunction;
+use super::{RuntimeFunction, error::RuntimeFunctionError};
 use crate::CompilationContext;
 use crate::data::DATA_ENUM_STORAGE_SIZE_OFFSET;
 use crate::translation::intermediate_types::IntermediateType;
@@ -20,11 +20,11 @@ pub fn get_storage_size_by_offset(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
-) -> FunctionId {
+) -> Result<FunctionId, RuntimeFunctionError> {
     let name = RuntimeFunction::GetStorageSizeByOffset
-        .get_generic_function_name(compilation_ctx, &[itype]);
+        .get_generic_function_name(compilation_ctx, &[itype])?;
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     }
 
     let enum_ = compilation_ctx
@@ -73,7 +73,7 @@ pub fn get_storage_size_by_offset(
             },
         );
 
-    function.finish(vec![slot_offset], &mut module.funcs)
+    Ok(function.finish(vec![slot_offset], &mut module.funcs))
 }
 
 /// Compute where an enum's storage ends as a tuple (tail_slot_ptr, tail_slot_offset)
@@ -93,11 +93,11 @@ pub fn compute_enum_storage_tail_position(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     itype: &IntermediateType,
-) -> FunctionId {
+) -> Result<FunctionId, RuntimeFunctionError> {
     let name = RuntimeFunction::ComputeEnumStorageTailPosition
-        .get_generic_function_name(compilation_ctx, &[itype]);
+        .get_generic_function_name(compilation_ctx, &[itype])?;
     if let Some(function) = module.funcs.by_name(&name) {
-        return function;
+        return Ok(function);
     }
 
     let mut function = FunctionBuilder::new(
@@ -113,7 +113,7 @@ pub fn compute_enum_storage_tail_position(
 
     // Get the storage size function for this enum type
     let get_storage_size_by_offset_fn =
-        RuntimeFunction::GetStorageSizeByOffset.get_generic(module, compilation_ctx, &[itype]);
+        RuntimeFunction::GetStorageSizeByOffset.get_generic(module, compilation_ctx, &[itype])?;
 
     // Compute enum_size using the offset
     let enum_size = module.locals.add(ValType::I32);
@@ -145,6 +145,7 @@ pub fn compute_enum_storage_tail_position(
         .binop(BinaryOp::I32Sub)
         .local_set(free_bytes);
 
+    let mut inner_result = Ok(());
     builder
         .local_get(enum_size)
         .local_get(free_bytes)
@@ -181,33 +182,40 @@ pub fn compute_enum_storage_tail_position(
                     },
                 );
 
-                // Swap the end slot from BE to LE for addition
-                let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
-                then.local_get(tail_slot_ptr)
-                    .local_get(tail_slot_ptr)
-                    .call(swap_256_fn);
+                inner_result = (|| {
+                    // Swap the end slot from BE to LE for addition
+                    let swap_256_fn =
+                        RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
+                    then.local_get(tail_slot_ptr)
+                        .local_get(tail_slot_ptr)
+                        .call(swap_256_fn);
 
-                // Add the offset to the end slot (right now equal to the current slot)
-                let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx));
-                then.local_get(delta_slot_ptr)
-                    .local_get(tail_slot_ptr)
-                    .local_get(tail_slot_ptr)
-                    .i32_const(32)
-                    .call(add_u256_fn)
-                    .local_set(tail_slot_ptr);
+                    // Add the offset to the end slot (right now equal to the current slot)
+                    let add_u256_fn =
+                        RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx))?;
 
-                // Swap back to BE
-                then.local_get(tail_slot_ptr)
-                    .local_get(tail_slot_ptr)
-                    .call(swap_256_fn);
+                    then.local_get(delta_slot_ptr)
+                        .local_get(tail_slot_ptr)
+                        .local_get(tail_slot_ptr)
+                        .i32_const(32)
+                        .call(add_u256_fn)
+                        .local_set(tail_slot_ptr);
 
-                // 2) tail_slot_offset = (enum_size - free_bytes) % 32
-                then.local_get(enum_size)
-                    .local_get(free_bytes)
-                    .binop(BinaryOp::I32Sub)
-                    .i32_const(SLOT_SIZE as i32)
-                    .binop(BinaryOp::I32RemS)
-                    .local_set(tail_slot_offset);
+                    // Swap back to BE
+                    then.local_get(tail_slot_ptr)
+                        .local_get(tail_slot_ptr)
+                        .call(swap_256_fn);
+
+                    // 2) tail_slot_offset = (enum_size - free_bytes) % 32
+                    then.local_get(enum_size)
+                        .local_get(free_bytes)
+                        .binop(BinaryOp::I32Sub)
+                        .i32_const(SLOT_SIZE as i32)
+                        .binop(BinaryOp::I32RemS)
+                        .local_set(tail_slot_offset);
+
+                    Ok(())
+                })();
             },
             |else_| {
                 // Case: enum_size < free_bytes, so it fits entirely in the current slot
@@ -220,6 +228,8 @@ pub fn compute_enum_storage_tail_position(
                     .local_set(tail_slot_offset);
             },
         );
+
+    inner_result?;
 
     // Store the tail offset in the last 4 bytes of the data pointer
     builder
@@ -237,5 +247,5 @@ pub fn compute_enum_storage_tail_position(
     // Return the pointer
     builder.local_get(tail_slot_ptr);
 
-    function.finish(vec![head_slot_ptr, head_slot_offset], &mut module.funcs)
+    Ok(function.finish(vec![head_slot_ptr, head_slot_offset], &mut module.funcs))
 }

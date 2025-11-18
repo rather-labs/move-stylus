@@ -3,7 +3,10 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use crate::{CompilationContext, runtime::RuntimeFunction};
+use crate::{
+    CompilationContext,
+    runtime::{RuntimeFunction, error::RuntimeFunctionError},
+};
 
 // Auxiliary function names
 const F_SHIFT_64BITS_RIGHT: &str = "shift_64bits_right";
@@ -80,7 +83,7 @@ const F_SHIFT_64BITS_RIGHT: &str = "shift_64bits_right";
 pub fn heap_integers_div_mod(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-) -> FunctionId {
+) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32, ValType::I32, ValType::I32],
@@ -88,8 +91,8 @@ pub fn heap_integers_div_mod(
     );
 
     let shift_64bits_right_f = shift_64bits_right(module, compilation_ctx);
-    let check_if_a_less_than_b_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
-    let sub_f = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx));
+    let check_if_a_less_than_b_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
+    let sub_f = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx))?;
 
     // Function arguments
     let dividend_ptr = module.locals.add(ValType::I32);
@@ -326,7 +329,7 @@ pub fn heap_integers_div_mod(
             },
         );
 
-    function.finish(
+    Ok(function.finish(
         vec![
             dividend_ptr,
             divisor_ptr,
@@ -334,7 +337,7 @@ pub fn heap_integers_div_mod(
             quotient_or_reminder,
         ],
         &mut module.funcs,
-    )
+    ))
 }
 
 /// Auxiliary function that shifts right by the base.
@@ -567,7 +570,7 @@ mod tests {
             .i32_const(1);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
-        let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx);
+        let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
         // Shift left
         func_body.call(heap_integers_add_f);
 
@@ -629,7 +632,7 @@ mod tests {
             .i32_const(0);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
-        let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx);
+        let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
         // Shift left
         func_body.call(heap_integers_add_f);
 
@@ -702,7 +705,7 @@ mod tests {
             .i32_const(1);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
-        let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx);
+        let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
         // Shift left
         func_body.call(heap_integers_add_f);
 
@@ -775,7 +778,7 @@ mod tests {
             .i32_const(0);
 
         let compilation_ctx = test_compilation_context!(memory_id, allocator_func);
-        let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx);
+        let heap_integers_add_f = heap_integers_div_mod(&mut raw_module, &compilation_ctx).unwrap();
         // Shift left
         func_body.call(heap_integers_add_f);
 
