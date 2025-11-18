@@ -1,10 +1,12 @@
 use crate::abi::{Abi, Event, Function, Struct_};
+use crate::common::snake_to_upper_camel;
 use crate::types::Type;
 use move_bytecode_to_wasm::compilation_context::{ModuleData, ModuleId};
 use move_parse_special_attributes::function_modifiers::FunctionModifier;
 use serde::Serialize;
 use std::collections::HashMap;
 
+const EMPTY_STR: &str = "";
 #[derive(Serialize)]
 struct JsonAbi {
     abi: Vec<JsonAbiItem>,
@@ -128,9 +130,9 @@ fn process_errors(
                 process_io(
                     field.type_.clone(),
                     if error.positional_fields {
-                        "".to_string()
+                        EMPTY_STR
                     } else {
-                        field.identifier.clone()
+                        &field.identifier
                     },
                     None,
                     &mut inputs,
@@ -159,9 +161,9 @@ fn process_events(
                 process_io(
                     field.named_type.type_.clone(),
                     if event.positional_fields {
-                        "".to_string()
+                        EMPTY_STR
                     } else {
-                        field.named_type.identifier.clone()
+                        &field.named_type.identifier
                     },
                     Some(field.indexed),
                     &mut inputs,
@@ -197,7 +199,7 @@ fn process_functions(
                     f.parameters.iter().for_each(|param| {
                         process_io(
                             param.type_.clone(),
-                            param.identifier.clone(),
+                            &param.identifier,
                             None,
                             &mut inputs,
                             modules_data,
@@ -211,7 +213,7 @@ fn process_functions(
                     f.parameters.iter().for_each(|param| {
                         process_io(
                             param.type_.clone(),
-                            param.identifier.clone(),
+                            &param.identifier,
                             None,
                             &mut inputs,
                             modules_data,
@@ -223,19 +225,13 @@ fn process_functions(
                         Type::Tuple(types_) => {
                             // For tuples, we iterate over the elements and collect them in a vector of JsonIOs
                             types_.iter().for_each(|t| {
-                                process_io(
-                                    t.clone(),
-                                    "".to_string(),
-                                    None,
-                                    &mut outputs,
-                                    modules_data,
-                                );
+                                process_io(t.clone(), EMPTY_STR, None, &mut outputs, modules_data);
                             });
                         }
                         _ => {
                             process_io(
                                 f.return_types.clone(),
-                                "".to_string(),
+                                EMPTY_STR,
                                 None,
                                 &mut outputs,
                                 modules_data,
@@ -275,7 +271,7 @@ fn map_state_mutability(mods: &[FunctionModifier]) -> &'static str {
 /// Processes an IO (input/output) parameter and adds it to the given vector if the type is not empty.
 fn process_io(
     type_: Type,
-    name: String,
+    name: impl Into<String>,
     indexed: Option<bool>,
     io: &mut Vec<JsonIO>,
     modules_data: &HashMap<ModuleId, ModuleData>,
@@ -285,7 +281,7 @@ fn process_io(
 
     if !abi_type.is_empty() {
         io.push(JsonIO {
-            name,
+            name: name.into(),
             type_: abi_type,
             internal_type: abi_internal_type,
             indexed,
