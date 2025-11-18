@@ -15,6 +15,11 @@ use rstest::rstest;
     "modules/abi_errors/abi_error_2.move",
     "json_format/abi_errors/abi_error_2.json"
 )]
+#[case(
+    "abi_error_3",
+    "modules/abi_errors/abi_error_3.move",
+    "json_format/abi_errors/abi_error_3.json"
+)]
 fn test_abi_generation(
     #[case] module_name: &str,
     #[case] module_path: &str,

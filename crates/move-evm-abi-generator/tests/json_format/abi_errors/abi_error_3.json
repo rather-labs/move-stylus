@@ -1,0 +1,106 @@
+{
+	"abi": [
+		{
+			"inputs": [
+				{
+					"components": [
+						{
+							"internalType": "string",
+							"name": "pos0",
+							"type": "string"
+						}
+					],
+					"internalType": "struct AbiError3.NestedStruct",
+					"name": "a",
+					"type": "tuple"
+				},
+				{
+					"components": [
+						{
+							"internalType": "string",
+							"name": "a",
+							"type": "string"
+						},
+						{
+							"internalType": "uint64",
+							"name": "b",
+							"type": "uint64"
+						}
+					],
+					"internalType": "struct AbiError3.NestedStruct2",
+					"name": "b",
+					"type": "tuple"
+				}
+			],
+			"name": "ErrorWithNestedStructs",
+			"type": "error"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "uint32[]",
+					"name": "a",
+					"type": "uint32[]"
+				},
+				{
+					"internalType": "uint128[]",
+					"name": "b",
+					"type": "uint128[]"
+				},
+				{
+					"internalType": "uint64[][]",
+					"name": "c",
+					"type": "uint64[][]"
+				}
+			],
+			"name": "ErrorWithVectors",
+			"type": "error"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "string",
+					"name": "a",
+					"type": "string"
+				},
+				{
+					"internalType": "string",
+					"name": "b",
+					"type": "string"
+				},
+				{
+					"internalType": "uint64",
+					"name": "c",
+					"type": "uint64"
+				}
+			],
+			"name": "revertErrorWithNestedStructs",
+			"outputs": [],
+			"stateMutability": "pure",
+			"type": "function"
+		},
+		{
+			"inputs": [
+				{
+					"internalType": "uint32[]",
+					"name": "a",
+					"type": "uint32[]"
+				},
+				{
+					"internalType": "uint128[]",
+					"name": "b",
+					"type": "uint128[]"
+				},
+				{
+					"internalType": "uint64[][]",
+					"name": "c",
+					"type": "uint64[][]"
+				}
+			],
+			"name": "revertErrorWithVectors",
+			"outputs": [],
+			"stateMutability": "pure",
+			"type": "function"
+		}
+	]
+}
