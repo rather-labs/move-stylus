@@ -205,7 +205,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
                 slot_offset,
                 field_owner_ptr,
                 field,
-            );
+            )?;
         }
         // Store the field in the struct at offset index * 4
         builder.local_get(struct_ptr).local_get(field_ptr).store(
@@ -314,6 +314,7 @@ pub fn add_read_and_decode_storage_enum_instructions(
     );
 
     // Decode fields for the active variant
+    let mut inner_result = Ok(());
     enum_.match_on_variant(builder, variant_index, |variant, block| {
         for (index, field) in variant.fields.iter().enumerate() {
             let field_size = field_size(field, compilation_ctx) as i32;
@@ -328,7 +329,7 @@ pub fn add_read_and_decode_storage_enum_instructions(
                 .local_set(slot_offset);
 
             // Decode the field according to its type
-            add_decode_intermediate_type_instructions(
+            inner_result = add_decode_intermediate_type_instructions(
                 module,
                 block,
                 compilation_ctx,
@@ -350,6 +351,8 @@ pub fn add_read_and_decode_storage_enum_instructions(
             );
         }
     });
+
+    inner_result?;
 
     // slot_offset = tail_slot_offset
     builder
@@ -450,6 +453,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
     // Allocate memory for the vector and write the header data
     IVector::allocate_vector_with_header(builder, compilation_ctx, data_ptr, len, len, stack_size);
 
+    let mut inner_result = Ok(());
     // Iterate through the vector reading and decoding the elements from storage.
     builder.block(None, |block| {
         let block_id = block.id();
@@ -497,7 +501,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
                     .local_set(slot_offset);
 
                 // Decode the element and store it at elem_data_ptr
-                add_decode_intermediate_type_instructions(
+                inner_result = add_decode_intermediate_type_instructions(
                     module,
                     loop_,
                     compilation_ctx,
@@ -563,6 +567,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
             });
         });
     });
+    inner_result?;
 
     Ok(())
 }
@@ -826,7 +831,7 @@ pub fn add_decode_intermediate_type_instructions(
                 slot_ptr,
                 owner_ptr,
                 inner_,
-            );
+            )?;
         }
         _ => Err(DecodeError::InvalidType(itype.clone()))?,
     };

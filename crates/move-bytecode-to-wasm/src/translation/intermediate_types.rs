@@ -427,7 +427,7 @@ impl IntermediateType {
                     builder,
                     compilation_ctx,
                     module_data,
-                );
+                )?;
             }
             IntermediateType::IStruct {
                 module_id, index, ..
@@ -441,7 +441,7 @@ impl IntermediateType {
                         offset: 0,
                     },
                 );
-                struct_.copy_local_instructions(module, builder, compilation_ctx, module_data);
+                struct_.copy_local_instructions(module, builder, compilation_ctx, module_data)?;
             }
             IntermediateType::IGenericStructInstance {
                 module_id,
@@ -464,7 +464,7 @@ impl IntermediateType {
                     builder,
                     compilation_ctx,
                     module_data,
-                );
+                )?;
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                 // Nothing to be done, pointer is already correct
@@ -485,7 +485,7 @@ impl IntermediateType {
                         offset: 0,
                     },
                 );
-                enum_.copy_local_instructions(module, builder, compilation_ctx, module_data);
+                enum_.copy_local_instructions(module, builder, compilation_ctx, module_data)?;
             }
         }
 
@@ -672,18 +672,18 @@ impl IntermediateType {
                     builder,
                     compilation_ctx,
                     module_data,
-                );
+                )?;
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx.get_struct_by_intermediate_type(self)?;
-                struct_.copy_local_instructions(module, builder, compilation_ctx, module_data);
+                struct_.copy_local_instructions(module, builder, compilation_ctx, module_data)?;
             }
             IntermediateType::ISigner => {
                 // Signer type is read-only, we push the pointer only
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
-                enum_.copy_local_instructions(module, builder, compilation_ctx, module_data);
+                enum_.copy_local_instructions(module, builder, compilation_ctx, module_data)?;
             }
             _ => panic!("Unsupported ReadRef type: {self:?}"),
         }
@@ -962,7 +962,7 @@ impl IntermediateType {
                 index, module_id, ..
             } => {
                 let struct_ = compilation_ctx.get_struct_by_index(module_id, *index)?;
-                struct_.equality(builder, module, compilation_ctx, module_data)
+                struct_.equality(builder, module, compilation_ctx, module_data)?
             }
             Self::IGenericStructInstance {
                 index,
@@ -973,13 +973,16 @@ impl IntermediateType {
                 let struct_ = compilation_ctx
                     .get_struct_by_index(module_id, *index)
                     .unwrap();
-                struct_
-                    .instantiate(types)
-                    .equality(builder, module, compilation_ctx, module_data)
+                struct_.instantiate(types).equality(
+                    builder,
+                    module,
+                    compilation_ctx,
+                    module_data,
+                )?
             }
             Self::IEnum { .. } | Self::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
-                enum_.equality(builder, module, compilation_ctx, module_data);
+                enum_.equality(builder, module, compilation_ctx, module_data)?;
             }
             Self::IRef(inner) | Self::IMutRef(inner) => {
                 let ptr1 = module.locals.add(ValType::I32);
@@ -1079,9 +1082,10 @@ impl IntermediateType {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) {
-        self.load_equality_instructions(module, builder, compilation_ctx, module_data);
+    ) -> Result<(), TranslationError> {
+        self.load_equality_instructions(module, builder, compilation_ctx, module_data)?;
         builder.negate();
+        Ok(())
     }
 
     /// Returns true if the type is a stack type (the value is directly hanndled in wasm stack

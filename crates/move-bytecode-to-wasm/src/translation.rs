@@ -1062,7 +1062,7 @@ fn translate_instruction(
                                 compilation_ctx,
                                 &mapped_function.signature.arguments,
                                 function_locals,
-                            );
+                            )?;
                             let (flush_cache_fn, _) = storage_flush_cache(module);
                             builder.i32_const(1).call(flush_cache_fn);
 
@@ -1284,7 +1284,7 @@ fn translate_instruction(
                 compilation_ctx,
                 module_data,
                 local,
-            );
+            )?;
             types_stack.push(local_type);
         }
         Bytecode::ImmBorrowLoc(local_id) => {
@@ -1566,7 +1566,7 @@ fn translate_instruction(
                 });
             }
 
-            IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx);
+            IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx)?;
 
             types_stack.push(IntermediateType::IRef(Box::new(*vec_inner)));
         }
@@ -1593,7 +1593,7 @@ fn translate_instruction(
                 });
             }
 
-            IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx);
+            IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx)?;
 
             types_stack.push(IntermediateType::IMutRef(Box::new(*vec_inner)));
         }
@@ -1758,7 +1758,7 @@ fn translate_instruction(
                 builder,
                 compilation_ctx,
                 module_data,
-            );
+            )?;
         }
         Bytecode::VecSwap(signature_index) => {
             let [id2_ty, id1_ty, ref_ty] = types_stack.pop_n_from_stack()?;
@@ -1853,7 +1853,7 @@ fn translate_instruction(
                 ref_type
             ));
 
-            inner.add_read_ref_instructions(builder, module, compilation_ctx, module_data);
+            inner.add_read_ref_instructions(builder, module, compilation_ctx, module_data)?;
             types_stack.push(*inner);
         }
         Bytecode::WriteRef => {
@@ -1862,7 +1862,7 @@ fn translate_instruction(
             types_stack::match_types!((IntermediateType::IMutRef(inner), "IMutRef", iref));
 
             if *inner == value_type {
-                inner.add_write_ref_instructions(module, builder, compilation_ctx);
+                inner.add_write_ref_instructions(module, builder, compilation_ctx)?;
             } else {
                 Err(TranslationError::TypeMismatch {
                     expected: *inner,
@@ -1898,7 +1898,7 @@ fn translate_instruction(
                     compilation_ctx,
                     &mapped_function.signature.arguments,
                     function_locals,
-                );
+                )?;
             }
 
             prepare_function_return(
@@ -1918,22 +1918,22 @@ fn translate_instruction(
         }
         Bytecode::CastU8 => {
             let original_type = types_stack.pop()?;
-            IU8::cast_from(builder, module, original_type, compilation_ctx);
+            IU8::cast_from(builder, module, original_type, compilation_ctx)?;
             types_stack.push(IntermediateType::IU8);
         }
         Bytecode::CastU16 => {
             let original_type = types_stack.pop()?;
-            IU16::cast_from(builder, module, original_type, compilation_ctx);
+            IU16::cast_from(builder, module, original_type, compilation_ctx)?;
             types_stack.push(IntermediateType::IU16);
         }
         Bytecode::CastU32 => {
             let original_type = types_stack.pop()?;
-            IU32::cast_from(builder, module, original_type, compilation_ctx);
+            IU32::cast_from(builder, module, original_type, compilation_ctx)?;
             types_stack.push(IntermediateType::IU32);
         }
         Bytecode::CastU64 => {
             let original_type = types_stack.pop()?;
-            IU64::cast_from(builder, module, original_type, compilation_ctx);
+            IU64::cast_from(builder, module, original_type, compilation_ctx)?;
             types_stack.push(IntermediateType::IU64);
         }
         Bytecode::CastU128 => {
@@ -2270,7 +2270,7 @@ fn translate_instruction(
                 });
             }
 
-            t1.load_equality_instructions(module, builder, compilation_ctx, module_data);
+            t1.load_equality_instructions(module, builder, compilation_ctx, module_data)?;
 
             types_stack.push(IntermediateType::IBool);
         }
@@ -2284,7 +2284,7 @@ fn translate_instruction(
                 });
             }
 
-            t1.load_not_equality_instructions(module, builder, compilation_ctx, module_data);
+            t1.load_not_equality_instructions(module, builder, compilation_ctx, module_data)?;
 
             types_stack.push(IntermediateType::IBool);
         }

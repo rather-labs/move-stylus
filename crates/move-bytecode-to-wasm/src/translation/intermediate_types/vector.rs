@@ -170,7 +170,7 @@ impl IVector {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) {
+    ) -> Result<(), TranslationError> {
         // === Local declarations ===
         let src_ptr = module.locals.add(ValType::I32); // pointer to the vector to be copied
         let dst_ptr = module.locals.add(ValType::I32); // pointer to the newly copied vector
@@ -232,6 +232,7 @@ impl IVector {
         let dst_elem_ptr = module.locals.add(ValType::I32);
 
         // Outer block: if the vector length is 0, we skip to the end
+        let mut inner_result = Ok(());
         builder.block(None, |outer_block| {
             let outer_block_id = outer_block.id();
 
@@ -335,7 +336,7 @@ impl IVector {
                         );
 
                         loop_block.i32_const(1); // We dont increase the capacity of nested vectors
-                        IVector::copy_local_instructions(
+                        inner_result = IVector::copy_local_instructions(
                             inner_,
                             module,
                             loop_block,
@@ -359,7 +360,7 @@ impl IVector {
                             .get_struct_by_index(module_id, *index)
                             .unwrap();
 
-                        struct_.copy_local_instructions(
+                        inner_result = struct_.copy_local_instructions(
                             module,
                             loop_block,
                             compilation_ctx,
@@ -387,7 +388,7 @@ impl IVector {
                             .unwrap();
                         let struct_ = struct_.instantiate(types);
 
-                        struct_.copy_local_instructions(
+                        inner_result = struct_.copy_local_instructions(
                             module,
                             loop_block,
                             compilation_ctx,
@@ -404,7 +405,7 @@ impl IVector {
                             },
                         );
                         let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
-                        enum_.copy_local_instructions(
+                        inner_result = enum_.copy_local_instructions(
                             module,
                             loop_block,
                             compilation_ctx,
@@ -441,8 +442,12 @@ impl IVector {
             });
         });
 
+        inner_result?;
+
         // === Return pointer to copied vector ===
         builder.local_get(dst_ptr);
+
+        Ok(())
     }
 
     pub fn equality(
@@ -452,6 +457,7 @@ impl IVector {
         module_data: &ModuleData,
         inner: &IntermediateType,
     ) -> Result<(), TranslationError> {
+        let equality_f = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
         let v1_ptr = module.locals.add(ValType::I32);
         let v2_ptr = module.locals.add(ValType::I32);
         let len = module.locals.add(ValType::I32);
@@ -496,23 +502,14 @@ impl IVector {
                     | IntermediateType::IU16
                     | IntermediateType::IU32
                     | IntermediateType::IU64 => {
-                        let equality_f =
-                            RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-                        match equality_f {
-                            Ok(equality_f) => {
-                                // Call the generic equality function
-                                then.skip_vec_header(v1_ptr)
-                                    .skip_vec_header(v2_ptr)
-                                    .local_get(len)
-                                    .i32_const(inner.stack_data_size() as i32)
-                                    .binop(BinaryOp::I32Mul)
-                                    .call(equality_f)
-                                    .local_set(result);
-                            }
-                            Err(e) => {
-                                inner_result = Err(e);
-                            }
-                        }
+                        // Call the generic equality function
+                        then.skip_vec_header(v1_ptr)
+                            .skip_vec_header(v2_ptr)
+                            .local_get(len)
+                            .i32_const(inner.stack_data_size() as i32)
+                            .binop(BinaryOp::I32Mul)
+                            .call(equality_f)
+                            .local_set(result);
                     }
                     IntermediateType::IU128
                     | IntermediateType::IU256
@@ -542,7 +539,7 @@ impl IVector {
                                 },
                             );
 
-                            inner.load_equality_instructions(
+                            inner_result = inner.load_equality_instructions(
                                 module,
                                 loop_,
                                 compilation_ctx,
@@ -846,13 +843,20 @@ impl IVector {
         );
 
         // Check if len == capacity. If true, we copy the original vector but doubling its capacity.
+        let mut inner_result = Ok(());
         builder.binop(BinaryOp::I32Eq).if_else(
             None,
             |then| {
                 then.local_get(vec_ptr);
                 then.i32_const(2); // Capacity multiplier
 
-                IVector::copy_local_instructions(inner, module, then, compilation_ctx, module_data);
+                inner_result = IVector::copy_local_instructions(
+                    inner,
+                    module,
+                    then,
+                    compilation_ctx,
+                    module_data,
+                );
 
                 // Set vec_ptr to the new vector pointer and store it at *vec_ref
                 // This modifies the original vector reference to point to the new vector
@@ -870,6 +874,8 @@ impl IVector {
             },
             |_| {},
         );
+
+        inner_result?;
 
         // Store the element in the next free position
         builder
@@ -978,7 +984,8 @@ mod tests {
             &mut builder,
             &compilation_ctx,
             compilation_ctx.root_module_data,
-        );
+        )
+        .unwrap();
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_copy_vector", function);
@@ -1203,7 +1210,8 @@ mod tests {
             &mut builder,
             &compilation_ctx,
             compilation_ctx.root_module_data,
-        );
+        )
+        .unwrap();
 
         // Second push back pushes the element to the new copied vector, which has capacity
         builder.local_get(vec_ref);
@@ -1214,7 +1222,8 @@ mod tests {
             &mut builder,
             &compilation_ctx,
             compilation_ctx.root_module_data,
-        );
+        )
+        .unwrap();
 
         builder.local_get(vec_ref).load(
             compilation_ctx.memory_id,

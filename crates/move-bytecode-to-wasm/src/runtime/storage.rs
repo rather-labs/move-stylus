@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use super::RuntimeFunction;
 use super::error::RuntimeFunctionError;
 use crate::data::{
@@ -434,6 +436,7 @@ pub fn derive_dyn_array_slot(
 
     let (native_keccak, _) = host_functions::native_keccak256(module);
     let swap_i32_bytes_fn = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx))?;
 
     // Guard: check elem_size is greater than 0
     builder
@@ -542,9 +545,15 @@ pub fn derive_dyn_array_slot(
         );
 
     // Add base + offset → final element slot
-    builder.local_get(derived_elem_slot_ptr);
-    builder.local_get(elem_offset_256).local_get(base_slot_ptr);
-    IU256::add(&mut builder, module, compilation_ctx); // add(base, offset) with overflow check
+    builder
+        .local_get(derived_elem_slot_ptr)
+        .local_get(elem_offset_256)
+        .local_get(base_slot_ptr)
+        .i32_const(IU256::HEAP_SIZE)
+        .call(compilation_ctx.allocator)
+        .i32_const(IU256::HEAP_SIZE)
+        .call(add_u256_fn);
+
     builder // copy add(base, offset) result to #derived_elem_slot_ptr
         .i32_const(32)
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
@@ -591,7 +600,8 @@ pub fn add_encode_and_save_into_storage_fn(
         slot_offset,
         None,
         itype,
-    );
+    )
+    .map_err(|e| RuntimeFunctionError::Storage(Rc::new(e)))?;
 
     Ok(function.finish(vec![struct_ptr, slot_ptr], &mut module.funcs))
 }
@@ -653,7 +663,8 @@ pub fn add_read_and_decode_from_storage_fn(
         owner_ptr,
         Some(struct_id_ptr),
         itype,
-    );
+    )
+    .map_err(|e| RuntimeFunctionError::Storage(Rc::new(e)))?;
 
     builder.local_get(struct_ptr);
 
@@ -1067,8 +1078,7 @@ pub fn add_commit_changes_to_storage_fn(
 
     // If we have dynamic fields to process, we put the code to process them.
     if !dynamic_fields_global_variables.is_empty() {
-        let get_struct_owner_fn =
-            RuntimeFunction::GetStructOwner.get(module, None)?;
+        let get_struct_owner_fn = RuntimeFunction::GetStructOwner.get(module, None)?;
         let get_id_bytes_ptr_fn =
             RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
         let write_object_slot_fn =

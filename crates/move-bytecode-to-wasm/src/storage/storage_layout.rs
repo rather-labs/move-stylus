@@ -288,7 +288,8 @@ mod tests {
     ) -> Result<([u8; 32], u32), Box<dyn std::error::Error>> {
         // Get the runtime function that will be used by compute_enum_storage_tail_position
         let compute_enum_storage_tail_position_fn = RuntimeFunction::ComputeEnumStorageTailPosition
-            .get_generic(module, compilation_ctx, &[itype]);
+            .get_generic(module, compilation_ctx, &[itype])
+            .unwrap();
 
         // Test function setup
         let mut function = walrus::FunctionBuilder::new(

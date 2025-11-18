@@ -132,7 +132,7 @@ impl IEnum {
         module: &mut Module,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) {
+    ) -> Result<(), TranslationError> {
         let e1_ptr = module.locals.add(ValType::I32);
         let e2_ptr = module.locals.add(ValType::I32);
         builder.local_set(e1_ptr).local_set(e2_ptr);
@@ -178,6 +178,7 @@ impl IEnum {
         // Compare the variant indices
         builder.binop(BinaryOp::I32Eq);
 
+        let mut inner_result = Ok(());
         builder.if_else(
             ValType::I32,
             |then| {
@@ -187,7 +188,7 @@ impl IEnum {
                 // Copy fields for the active arm, then jump to join
                 self.match_on_variant(then, variant_index, |variant, arm| {
                     // Use the same logic as structs to compare the fields
-                    IStruct::compare_fields(
+                    inner_result = IStruct::compare_fields(
                         &variant.fields,
                         arm,
                         module,
@@ -204,6 +205,10 @@ impl IEnum {
                 else_.i32_const(0);
             },
         );
+
+        inner_result?;
+
+        Ok(())
     }
 
     /// Copies the local instructions for an enum
@@ -218,7 +223,7 @@ impl IEnum {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) {
+    ) -> Result<(), TranslationError> {
         let src_ptr = module.locals.add(ValType::I32);
         let ptr = module.locals.add(ValType::I32);
 
@@ -255,8 +260,9 @@ impl IEnum {
         );
 
         // Copy fields for the active arm, then jump to join
+        let mut inner_result = Ok(());
         self.match_on_variant(builder, variant_index, |variant, arm| {
-            IStruct::copy_fields(
+            inner_result = IStruct::copy_fields(
                 &variant.fields,
                 arm,
                 module,
@@ -267,8 +273,11 @@ impl IEnum {
                 4,
             );
         });
+        inner_result?;
 
         builder.local_get(ptr);
+
+        Ok(())
     }
 
     /// Replaces all type parameters in the enum with the provided types.
