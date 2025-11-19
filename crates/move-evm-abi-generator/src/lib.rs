@@ -66,10 +66,7 @@ pub fn generate_abi(
         }
 
         let json_abi = if generate_json {
-            Some(json_format::process_abi(
-                &abi,
-                &package_module_data.modules_data,
-            ))
+            Some(json_format::process_abi(&abi))
         } else {
             None
         };

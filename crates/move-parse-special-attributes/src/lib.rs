@@ -105,7 +105,6 @@ pub fn process_special_attributes(
                             move_compiler::parser::ast::StructFields::Native(_) => todo!(),
                         };
 
-                        // TODO: if the struct contains an enum that is not simple, we should return an error (here?)
                         result.structs.push(Struct_ {
                             name: struct_name.clone(),
                             fields,

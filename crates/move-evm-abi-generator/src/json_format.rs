@@ -1,10 +1,8 @@
 use crate::abi::Abi;
 use crate::common::snake_to_upper_camel;
 use crate::types::Type;
-use move_bytecode_to_wasm::compilation_context::{ModuleData, ModuleId};
 use move_parse_special_attributes::function_modifiers::FunctionModifier;
 use serde::Serialize;
-use std::collections::HashMap;
 
 const EMPTY_STR: &str = "";
 #[derive(Serialize)]
@@ -103,12 +101,12 @@ struct JsonComponent {
     components: Option<Vec<JsonComponent>>,
 }
 
-pub fn process_abi(abi: &Abi, modules_data: &HashMap<ModuleId, ModuleData>) -> String {
+pub fn process_abi(abi: &Abi) -> String {
     // Collect all the JSON ABI items into a single vector
-    let abi_json_items = process_events(&abi, modules_data)
+    let abi_json_items = process_events(abi)
         .into_iter()
-        .chain(process_errors(&abi, modules_data))
-        .chain(process_functions(&abi, modules_data))
+        .chain(process_errors(abi))
+        .chain(process_functions(abi))
         .collect();
 
     let json_abi = JsonAbi {
@@ -118,7 +116,7 @@ pub fn process_abi(abi: &Abi, modules_data: &HashMap<ModuleId, ModuleData>) -> S
     serde_json::to_string_pretty(&json_abi).unwrap()
 }
 
-fn process_errors(abi: &Abi, modules_data: &HashMap<ModuleId, ModuleData>) -> Vec<JsonAbiItem> {
+fn process_errors(abi: &Abi) -> Vec<JsonAbiItem> {
     abi.abi_errors
         .iter()
         .map(|error| {
@@ -133,7 +131,6 @@ fn process_errors(abi: &Abi, modules_data: &HashMap<ModuleId, ModuleData>) -> Ve
                     },
                     None,
                     &mut inputs,
-                    modules_data,
                     abi,
                 );
             });
@@ -147,7 +144,7 @@ fn process_errors(abi: &Abi, modules_data: &HashMap<ModuleId, ModuleData>) -> Ve
         .collect()
 }
 
-fn process_events(abi: &Abi, modules_data: &HashMap<ModuleId, ModuleData>) -> Vec<JsonAbiItem> {
+fn process_events(abi: &Abi) -> Vec<JsonAbiItem> {
     abi.events
         .iter()
         .map(|event| {
@@ -162,7 +159,6 @@ fn process_events(abi: &Abi, modules_data: &HashMap<ModuleId, ModuleData>) -> Ve
                     },
                     Some(field.indexed),
                     &mut inputs,
-                    modules_data,
                     abi,
                 );
             });
@@ -177,7 +173,7 @@ fn process_events(abi: &Abi, modules_data: &HashMap<ModuleId, ModuleData>) -> Ve
         .collect()
 }
 
-fn process_functions(abi: &Abi, modules_data: &HashMap<ModuleId, ModuleData>) -> Vec<JsonAbiItem> {
+fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
     abi.functions
         .iter()
         .map(|f| {
@@ -195,7 +191,6 @@ fn process_functions(abi: &Abi, modules_data: &HashMap<ModuleId, ModuleData>) ->
                             &param.identifier,
                             None,
                             &mut inputs,
-                            modules_data,
                             abi,
                         );
                     });
@@ -210,7 +205,6 @@ fn process_functions(abi: &Abi, modules_data: &HashMap<ModuleId, ModuleData>) ->
                             &param.identifier,
                             None,
                             &mut inputs,
-                            modules_data,
                             abi,
                         );
                     });
@@ -220,25 +214,11 @@ fn process_functions(abi: &Abi, modules_data: &HashMap<ModuleId, ModuleData>) ->
                         Type::Tuple(types_) => {
                             // For tuples, we iterate over the elements and collect them in a vector of JsonIOs
                             types_.iter().for_each(|t| {
-                                process_io(
-                                    t.clone(),
-                                    EMPTY_STR,
-                                    None,
-                                    &mut outputs,
-                                    modules_data,
-                                    abi,
-                                );
+                                process_io(t.clone(), EMPTY_STR, None, &mut outputs, abi);
                             });
                         }
                         _ => {
-                            process_io(
-                                f.return_types.clone(),
-                                EMPTY_STR,
-                                None,
-                                &mut outputs,
-                                modules_data,
-                                abi,
-                            );
+                            process_io(f.return_types.clone(), EMPTY_STR, None, &mut outputs, abi);
                         }
                     };
 
@@ -277,12 +257,10 @@ fn process_io(
     name: impl Into<String>,
     indexed: Option<bool>,
     io: &mut Vec<JsonIO>,
-    modules_data: &HashMap<ModuleId, ModuleData>,
     abi: &Abi,
 ) {
     if type_ != Type::None {
-        let (abi_type, abi_internal_type, components) =
-            encode_for_json_abi(type_.clone(), modules_data, abi);
+        let (abi_type, abi_internal_type, components) = encode_for_json_abi(type_.clone(), abi);
 
         io.push(JsonIO {
             name: name.into(),
@@ -301,11 +279,7 @@ fn process_io(
 /// - `components`: `Some(Vec<JsonComponent>)` for struct types (tuples), `None` for primitive types
 ///
 /// Recursively processes nested types (arrays, struct fields) to build the complete ABI representation.
-fn encode_for_json_abi(
-    type_: Type,
-    modules_data: &HashMap<ModuleId, ModuleData>,
-    abi: &Abi,
-) -> (String, String, Option<Vec<JsonComponent>>) {
+fn encode_for_json_abi(type_: Type, abi: &Abi) -> (String, String, Option<Vec<JsonComponent>>) {
     match &type_ {
         Type::Address
         | Type::Bool
@@ -338,7 +312,7 @@ fn encode_for_json_abi(
         }
         Type::Array(inner) => {
             let (inner_abi_type, inner_internal_type, inner_components) =
-                encode_for_json_abi((**inner).clone(), modules_data, abi);
+                encode_for_json_abi((**inner).clone(), abi);
 
             (
                 format!("{inner_abi_type}[]"),
@@ -359,7 +333,7 @@ fn encode_for_json_abi(
                 .iter()
                 .map(|named_type| {
                     let (field_abi_type, field_abi_internal_type, field_comps) =
-                        encode_for_json_abi(named_type.type_.clone(), modules_data, abi);
+                        encode_for_json_abi(named_type.type_.clone(), abi);
 
                     JsonComponent {
                         name: named_type.identifier.clone(),
