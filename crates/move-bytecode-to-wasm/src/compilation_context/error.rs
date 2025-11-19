@@ -48,6 +48,30 @@ pub enum CompilationContextError {
 
     #[error("function with identifier {0} not found in compilation context")]
     FunctionByIdentifierNotFound(String),
+
+    #[error(r#"datatype handle index "{0}" not found"#)]
+    DatatypeHanldeIndexNotFound(usize),
+
+    #[error("there can be only a single init function per module")]
+    TwoOrMoreInits,
+
+    #[error("found init funciton with no arguments")]
+    InitFunctionNoAguments,
+
+    #[error("too many arguments for init function")]
+    InitFunctionTooManyArgs,
+
+    #[error("init functions does not have TxContext as parameter")]
+    InitFunctionNoTxContext,
+
+    #[error("init function second argument must be a OTW")]
+    InitFunctionNoOTW,
+
+    #[error("expected no return values for init function")]
+    InitFunctionBadRetrunValues,
+
+    #[error("expected private visibility for init function")]
+    InitFunctionBadPrivacy,
 }
 
 impl From<CompilationContextError> for CompilationError {
