@@ -11,7 +11,7 @@ use move_parse_special_attributes::function_modifiers::{FunctionModifier, Parame
 
 use crate::{
     ErrorStruct, EventStruct,
-    common::{snake_to_camel, snake_to_upper_camel},
+    common::snake_to_camel,
     special_types::{is_named_id, is_uid},
     types::Type,
 };
@@ -500,39 +500,19 @@ impl Abi {
                 })
                 .unwrap();
 
-            let (event_struct, event_identifier) = if let Some(struct_def_instantiation_index) =
+            let event_struct = if let Some(struct_def_instantiation_index) =
                 &event_struct.struct_def_instantiation_index
             {
-                let event_struct = event_module
+                event_module
                     .structs
                     .get_struct_instance_by_struct_definition_idx(struct_def_instantiation_index)
-                    .unwrap();
-
-                let types = event_module
-                    .structs
-                    .get_generic_struct_types_instances(struct_def_instantiation_index)
-                    .unwrap();
-
-                let concrete_type_parameters_names = types
-                    .iter()
-                    .map(|t| Type::from_intermediate_type(t, modules_data).name())
-                    .collect::<Vec<String>>()
-                    .join("_");
-
-                let event_identifier = snake_to_upper_camel(&format!(
-                    "{}_{}",
-                    event_struct.identifier, concrete_type_parameters_names
-                ));
-                (event_struct, event_identifier)
+                    .unwrap()
             } else {
-                (
-                    event_module
-                        .structs
-                        .get_by_identifier(&event_struct.identifier)
-                        .unwrap()
-                        .clone(),
-                    event_struct.identifier.clone(),
-                )
+                event_module
+                    .structs
+                    .get_by_identifier(&event_struct.identifier)
+                    .unwrap()
+                    .clone()
             };
 
             let event_special_attributes = event_module
@@ -557,7 +537,7 @@ impl Abi {
             }
 
             result.push(Event {
-                identifier: event_identifier,
+                identifier: event_struct.identifier.clone(),
                 fields: event_struct
                     .fields
                     .iter()

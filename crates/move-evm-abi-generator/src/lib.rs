@@ -9,17 +9,24 @@ mod json_format;
 mod special_types;
 mod types;
 
-use std::{collections::HashSet, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use move_binary_format::file_format::{
     Bytecode, CompiledModule, DatatypeHandleIndex, SignatureToken, StructDefInstantiationIndex,
     StructDefinitionIndex,
 };
-use move_bytecode_to_wasm::PackageModuleData;
+use move_bytecode_to_wasm::compilation_context as ctx;
+use move_bytecode_to_wasm::{PackageModuleData, compilation_context::ModuleData};
 use move_compiler::shared::files::MappedFiles;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
 use move_parse_special_attributes::SpecialAttributeError;
+
+use crate::common::snake_to_upper_camel;
+use crate::types::Type;
 
 pub struct Abi {
     pub file: PathBuf,
@@ -55,6 +62,7 @@ pub fn generate_abi(
             root_compiled_module,
             root_compiled_units,
             &mut processed_modules,
+            &package_module_data.modules_data,
         );
 
         let abi = abi::Abi::new(
@@ -120,6 +128,7 @@ fn process_events_and_errors(
     root_compiled_module: &CompiledUnitWithSource,
     root_compiled_units: &[&CompiledUnitWithSource],
     processed_modules: &mut HashSet<ModuleId>,
+    modules_data: &HashMap<ctx::ModuleId, ModuleData>,
 ) -> (HashSet<EventStruct>, HashSet<ErrorStruct>) {
     let module = &root_compiled_module.unit.module;
 
@@ -158,30 +167,57 @@ fn process_events_and_errors(
                                         });
                                     }
                                     SignatureToken::DatatypeInstantiation(data) => {
-                                        let (datatype_handle_index, signature_tokens) =
-                                            data.as_ref();
+                                        let (datatype_handle_index, _) = data.as_ref();
                                         let struct_handle =
                                             module.datatype_handle_at(*datatype_handle_index);
 
-                                        println!("signature_tokens: {:?}", signature_tokens);
-                                        println!(
-                                            "datatype_handle_index: {:?}",
-                                            datatype_handle_index
+                                        let struct_def_instantiation_index =
+                                            find_struct_def_instantiation_index(
+                                                module,
+                                                *datatype_handle_index,
+                                            )
+                                            .unwrap();
+
+                                        let event_module_id = module.module_id_for_handle(
+                                            module.module_handle_at(struct_handle.module),
                                         );
 
+                                        let event_module = modules_data
+                                            .get(&ctx::ModuleId {
+                                                address: event_module_id
+                                                    .address()
+                                                    .into_bytes()
+                                                    .into(),
+                                                module_name: event_module_id.name().to_string(),
+                                            })
+                                            .unwrap();
+
+                                        let concrete_types = event_module
+                                            .structs
+                                            .get_generic_struct_types_instances(
+                                                &struct_def_instantiation_index,
+                                            )
+                                            .unwrap();
+
+                                        let concrete_types_names = concrete_types
+                                            .iter()
+                                            .map(|t| {
+                                                Type::from_intermediate_type(t, modules_data).name()
+                                            })
+                                            .collect::<Vec<String>>()
+                                            .join("_");
+
+                                        let event_identifier = snake_to_upper_camel(&format!(
+                                            "{}_{}",
+                                            module.identifier_at(struct_handle.name),
+                                            concrete_types_names
+                                        ));
+
                                         top_level_events.insert(EventStruct {
-                                            module_id: module.module_id_for_handle(
-                                                module.module_handle_at(struct_handle.module),
-                                            ),
-                                            identifier: module
-                                                .identifier_at(struct_handle.name)
-                                                .to_string(),
+                                            module_id: event_module_id,
+                                            identifier: event_identifier,
                                             struct_def_instantiation_index: Some(
-                                                find_struct_def_instantiation_index(
-                                                    module,
-                                                    *datatype_handle_index,
-                                                )
-                                                .unwrap(),
+                                                struct_def_instantiation_index,
                                             ),
                                         });
                                     }
@@ -258,6 +294,7 @@ fn process_events_and_errors(
                 child_module,
                 root_compiled_units,
                 processed_modules,
+                modules_data,
             );
             result_events.extend(events);
             result_errors.extend(errors);
