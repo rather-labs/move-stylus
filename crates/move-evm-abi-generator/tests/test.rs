@@ -83,6 +83,11 @@ fn test_json_abi(#[case] module_name: &str, #[case] module_path: &str, #[case] j
     "human_readable/events/events_anon_2.abi"
 )]
 #[case(
+    "generic_events",
+    "modules/events/generic_events.move",
+    "human_readable/events/generic_events.abi"
+)]
+#[case(
     "generics_1",
     "modules/structs/generics_1.move",
     "human_readable/structs/generics_1.abi"

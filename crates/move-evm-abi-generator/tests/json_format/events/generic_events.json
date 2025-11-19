@@ -1,0 +1,166 @@
+{
+    "abi": [
+      {
+        "type": "event",
+        "name": "TestEvent1Uint16Uint32Uint64",
+        "inputs": [
+          {
+            "name": "a",
+            "type": "uint16",
+            "internalType": "uint16",
+            "indexed": true
+          },
+          {
+            "name": "b",
+            "type": "tuple",
+            "internalType": "struct GenericEvents.NestedStructUint32Uint64",
+            "indexed": true,
+            "components": [
+              {
+                "name": "a",
+                "type": "uint32",
+                "internalType": "uint32"
+              },
+              {
+                "name": "b",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "c",
+                "type": "uint32[]",
+                "internalType": "uint32[]"
+              },
+              {
+                "name": "d",
+                "type": "uint64[]",
+                "internalType": "uint64[]"
+              }
+            ]
+          }
+        ],
+        "anonymous": false
+      },
+      {
+        "type": "event",
+        "name": "TestEvent1AddressBoolUint256",
+        "inputs": [
+          {
+            "name": "a",
+            "type": "address",
+            "internalType": "address",
+            "indexed": true
+          },
+          {
+            "name": "b",
+            "type": "tuple",
+            "internalType": "struct GenericEvents.NestedStructBoolUint256",
+            "indexed": true,
+            "components": [
+              {
+                "name": "a",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "b",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "c",
+                "type": "bool[]",
+                "internalType": "bool[]"
+              },
+              {
+                "name": "d",
+                "type": "uint256[]",
+                "internalType": "uint256[]"
+              }
+            ]
+          }
+        ],
+        "anonymous": false
+      },
+      {
+        "type": "function",
+        "name": "testEventU16U32U64",
+        "inputs": [
+          {
+            "name": "a",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "b",
+            "type": "tuple",
+            "internalType": "struct GenericEvents.NestedStructUint32Uint64",
+            "components": [
+              {
+                "name": "a",
+                "type": "uint32",
+                "internalType": "uint32"
+              },
+              {
+                "name": "b",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "c",
+                "type": "uint32[]",
+                "internalType": "uint32[]"
+              },
+              {
+                "name": "d",
+                "type": "uint64[]",
+                "internalType": "uint64[]"
+              }
+            ]
+          }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "type": "function",
+        "name": "testEventAddressBoolU256",
+        "inputs": [
+          {
+            "name": "a",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "b",
+            "type": "tuple",
+            "internalType": "struct GenericEvents.NestedStructBoolUint256",
+            "components": [
+              {
+                "name": "a",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "b",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "c",
+                "type": "bool[]",
+                "internalType": "bool[]"
+              },
+              {
+                "name": "d",
+                "type": "uint256[]",
+                "internalType": "uint256[]"
+              }
+            ]
+          }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+      }
+    ]
+  }

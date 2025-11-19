@@ -11,7 +11,10 @@ mod types;
 
 use std::{collections::HashSet, path::PathBuf};
 
-use move_binary_format::file_format::{Bytecode, SignatureToken};
+use move_binary_format::file_format::{
+    Bytecode, CompiledModule, DatatypeHandleIndex, SignatureToken, StructDefInstantiationIndex,
+    StructDefinitionIndex,
+};
 use move_bytecode_to_wasm::PackageModuleData;
 use move_compiler::shared::files::MappedFiles;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
@@ -101,6 +104,7 @@ pub(crate) struct FunctionCall {
 pub(crate) struct EventStruct {
     module_id: ModuleId,
     identifier: String,
+    struct_def_instantiation_index: Option<StructDefInstantiationIndex>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -139,10 +143,10 @@ fn process_events_and_errors(
                         if module_id.address() == &STYLUS_FRAMEWORK_ADDRESS {
                             if module_id.name().as_str() == "event" && identifier == "emit" {
                                 let signature = module.signature_at(instantiation.type_parameters);
-                                match signature.0[0] {
+                                match &signature.0[0] {
                                     SignatureToken::Datatype(datatype_handle_index) => {
                                         let struct_handle =
-                                            module.datatype_handle_at(datatype_handle_index);
+                                            module.datatype_handle_at(*datatype_handle_index);
                                         top_level_events.insert(EventStruct {
                                             module_id: module.module_id_for_handle(
                                                 module.module_handle_at(struct_handle.module),
@@ -150,9 +154,41 @@ fn process_events_and_errors(
                                             identifier: module
                                                 .identifier_at(struct_handle.name)
                                                 .to_string(),
+                                            struct_def_instantiation_index: None,
                                         });
                                     }
-                                    _ => panic!("invalid type found in emit function"),
+                                    SignatureToken::DatatypeInstantiation(data) => {
+                                        let (datatype_handle_index, signature_tokens) =
+                                            data.as_ref();
+                                        let struct_handle =
+                                            module.datatype_handle_at(*datatype_handle_index);
+
+                                        println!("signature_tokens: {:?}", signature_tokens);
+                                        println!(
+                                            "datatype_handle_index: {:?}",
+                                            datatype_handle_index
+                                        );
+
+                                        top_level_events.insert(EventStruct {
+                                            module_id: module.module_id_for_handle(
+                                                module.module_handle_at(struct_handle.module),
+                                            ),
+                                            identifier: module
+                                                .identifier_at(struct_handle.name)
+                                                .to_string(),
+                                            struct_def_instantiation_index: Some(
+                                                find_struct_def_instantiation_index(
+                                                    module,
+                                                    *datatype_handle_index,
+                                                )
+                                                .unwrap(),
+                                            ),
+                                        });
+                                    }
+                                    _ => panic!(
+                                        "invalid type found in emit function {:?}",
+                                        signature.0[0]
+                                    ),
                                 }
                             } else if module_id.name().as_str() == "error" && identifier == "revert"
                             {
@@ -232,4 +268,31 @@ fn process_events_and_errors(
     result_errors.extend(top_level_errors);
 
     (result_events, result_errors)
+}
+
+/// Maps a `DatatypeHandleIndex` to a `StructDefInstantiationIndex` by finding the struct definition
+/// and then searching for a matching instantiation. Optionally matches type parameters if provided.
+fn find_struct_def_instantiation_index(
+    module: &CompiledModule,
+    datatype_handle_index: DatatypeHandleIndex,
+) -> Option<StructDefInstantiationIndex> {
+    // Verify the struct definition exists
+    module.find_struct_def(datatype_handle_index)?;
+
+    // Get the index of this struct definition
+    let struct_def_index = module
+        .struct_defs()
+        .iter()
+        .position(|d| d.struct_handle == datatype_handle_index)
+        .map(|idx| StructDefinitionIndex::new(idx as u16))?;
+
+    // Search through struct instantiations to find one that matches
+    for (idx, instantiation) in module.struct_instantiations().iter().enumerate() {
+        if instantiation.def == struct_def_index {
+            // If no type parameters specified, return the first match
+            return Some(StructDefInstantiationIndex::new(idx as u16));
+        }
+    }
+
+    None
 }
