@@ -5,6 +5,15 @@ contract AbiError3 {
     error ErrorWithNestedStructs(NestedStruct a, NestedStruct2 b);
     error ErrorWithVectors(uint32[] a, uint128[] b, uint64[][] c);
 
+    struct NestedStruct {
+        string pos0;
+    }
+
+    struct NestedStruct2 {
+        string a;
+        uint64 b;
+    }
+
     struct string {
         uint8[] bytes;
     }
