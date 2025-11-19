@@ -19,6 +19,31 @@ pub enum StorageError {
 
     #[error("compilation context error")]
     CompilationContext(#[from] CompilationContextError),
+
+    #[error("found a reference inside struct/enum variant fields")]
+    FieldSizeFoundRef(IntermediateType),
+
+    #[error("cannot know the field size of a type parameter")]
+    FieldSizeFoundTypeParameter,
+
+    #[error("found reference inside struct with index {struct_index}")]
+    FoundReferenceInsideStruct { struct_index: u16 },
+
+    #[error(
+        "found type parameter inside struct with index {struct_index} and type parameter index {type_parameter_index}"
+    )]
+    FoundTypeParameterInsideStruct {
+        struct_index: u16,
+        type_parameter_index: u16,
+    },
+
+    #[error(
+        "found type parameter inside enum variant with index {variant_index} and enum index {enum_index}"
+    )]
+    FoundTypeParameterInsideEnumVariant { enum_index: u16, variant_index: u16 },
+
+    #[error("found reference inside enum with index {enum_index}")]
+    FoundReferenceInsideEnum { enum_index: u16 },
 }
 
 #[derive(Debug, thiserror::Error)]

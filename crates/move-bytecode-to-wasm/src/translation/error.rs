@@ -10,6 +10,7 @@ use crate::{
     error::{CompilationError, ICEError, ICEErrorKind},
     native_functions::error::NativeFunctionError,
     runtime::error::RuntimeFunctionError,
+    storage::error::StorageError,
 };
 
 use super::{
@@ -32,6 +33,9 @@ pub enum TranslationError {
 
     #[error("an abi error ocurred while translating a function")]
     AbiEncoding(#[from] AbiError),
+
+    #[error("an storage error ocurred while translating a function")]
+    Storage(#[from] StorageError),
 
     #[error(r#"function "{0}" not found in global functions table"#)]
     FunctionDefinitionNotFound(FunctionId),

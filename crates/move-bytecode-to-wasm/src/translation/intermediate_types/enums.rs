@@ -16,7 +16,7 @@
 //! data.
 use crate::{
     CompilationContext, compilation_context::module_data::ModuleData,
-    generics::replace_type_parameters, translation::TranslationError,
+    generics::replace_type_parameters, storage::error::StorageError, translation::TranslationError,
 };
 
 use super::structs::IStruct;
@@ -317,7 +317,7 @@ impl IEnum {
         compilation_ctx: &CompilationContext,
     ) -> Result<Vec<u32>, TranslationError> {
         // Compute the storage size for each possible slot offset (0-31)
-        (0..32)
+        Ok((0..32)
             .map(|offset| {
                 crate::storage::storage_layout::compute_enum_storage_size(
                     self,
@@ -325,7 +325,7 @@ impl IEnum {
                     compilation_ctx,
                 )
             })
-            .collect()
+            .collect::<Result<Vec<u32>, StorageError>>()?)
     }
 
     /// Iterates all variants and runs `on_match` only for the active one

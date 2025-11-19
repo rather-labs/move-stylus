@@ -4,6 +4,7 @@ use crate::{
     abi_types::error::AbiError,
     compilation_context::{CompilationContextError, ModuleId},
     runtime::error::RuntimeFunctionError,
+    storage::error::StorageError,
     translation::{intermediate_types::IntermediateType, table::FunctionId},
 };
 
@@ -11,6 +12,9 @@ use crate::{
 pub enum NativeFunctionError {
     #[error("an error ocurred while generating a runtime function's code")]
     RuntimeFunction(#[from] RuntimeFunctionError),
+
+    #[error("an storage error ocurred while translating a function")]
+    Storage(#[source] Rc<StorageError>),
 
     #[error(r#"host function "{0}" not supported yet"#)]
     HostFunctionNotSupported(String),

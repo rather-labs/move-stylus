@@ -184,7 +184,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
                     },
                 );
         } else {
-            let field_size = field_size(field, compilation_ctx) as i32;
+            let field_size = field_size(field, compilation_ctx)? as i32;
 
             // Increase the slot_offset by the size of the field.
             // If the entire slot has been read, advance to the next slot and load its data.
@@ -317,8 +317,15 @@ pub fn add_read_and_decode_storage_enum_instructions(
     let mut inner_result = Ok(());
     enum_.match_on_variant(builder, variant_index, |variant, block| {
         for (index, field) in variant.fields.iter().enumerate() {
-            let field_size = field_size(field, compilation_ctx) as i32;
+            let field_size = field_size(field, compilation_ctx);
 
+            let field_size = match field_size {
+                Ok(fs) => fs as i32,
+                Err(e) => {
+                    inner_result = Err(e);
+                    break;
+                }
+            };
             // Increase the slot_offset by the size of the field.
             // If the entire slot has been read, advance to the next slot and load its data.
             block
@@ -448,7 +455,7 @@ pub fn add_read_and_decode_storage_vector_instructions(
     let stack_size = inner.stack_data_size() as i32;
 
     // Element size in STORAGE
-    let elem_size = field_size(inner, compilation_ctx) as i32;
+    let elem_size = field_size(inner, compilation_ctx)? as i32;
 
     // Allocate memory for the vector and write the header data
     IVector::allocate_vector_with_header(builder, compilation_ctx, data_ptr, len, len, stack_size);
@@ -600,7 +607,7 @@ pub fn add_decode_intermediate_type_instructions(
 ) -> Result<(), StorageError> {
     // Stack and storage size of the type
     let stack_size = itype.stack_data_size() as i32;
-    let storage_size = field_size(itype, compilation_ctx) as i32;
+    let storage_size = field_size(itype, compilation_ctx)? as i32;
 
     // Host functions
     let (storage_load, _) = storage_load_bytes32(module);
