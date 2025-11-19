@@ -62,6 +62,11 @@ fn test_json_abi(#[case] module_name: &str, #[case] module_path: &str, #[case] j
     "modules/abi_errors/abi_error_3.move",
     "human_readable/abi_errors/abi_error_3.abi"
 )]
+#[case(
+    "generics_1",
+    "modules/structs/generics_1.move",
+    "human_readable/structs/generics_1.abi"
+)]
 fn test_human_readable_abi(
     #[case] module_name: &str,
     #[case] module_path: &str,
