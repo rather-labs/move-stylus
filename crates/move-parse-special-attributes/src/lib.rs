@@ -247,6 +247,7 @@ pub fn process_special_attributes(
                         let signature = Function::parse_signature(&f.signature);
 
                         // Validate function:
+                        // - If the function is generic, it cannot be an entrypoint.
                         // - If it has an Event parameter, it must be a native emit function.
                         // - If it has an Error parameter, it must be a native revert function.
                         if let Err(error) = validate_function(f, &result.events, &result.abi_errors)
