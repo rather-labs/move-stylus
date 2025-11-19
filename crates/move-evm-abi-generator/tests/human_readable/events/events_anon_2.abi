@@ -1,0 +1,33 @@
+contract EventsAnon2 {
+
+    event Anonymous(NestedStruct indexed a, NestedStructWithEnum indexed b);
+    event Anonymous2(EventEnum indexed a, EventEnum[] indexed b, NestedStructWithEnum[] indexed c);
+    event TestEvent1Anon(uint32 indexed a, address indexed b, NestedStruct indexed c);
+    event TestEvent2Anon(uint32 indexed a, uint8[] indexed b, NestedStruct indexed c);
+    event TestEvent3Anon(uint64 indexed a, string b);
+    event TestEvent4Anon(uint64 indexed a, string indexed b);
+
+
+    struct NestedStruct {
+        uint32 a;
+        address b;
+        uint128 c;
+    }
+
+    struct NestedStructWithEnum {
+        EventEnum a;
+        EventEnum[] b;
+    }
+
+    struct string {
+        uint8[] bytes;
+    }
+
+    function emitTestAnonEvent1(uint32 a, address b, uint32 c, address d, uint128 e) external;
+    function emitTestAnonEvent2(uint32 a, uint8[] b, uint32 c, address d, uint128 e) external;
+    function emitTestAnonEvent3(uint64 a, string b) external;
+    function emitTestAnonEvent4(uint64 a, string b) external;
+    function emitTestAnonymous1(NestedStruct a, NestedStructWithEnum b) external;
+    function emitTestAnonymous2(EventEnum p1, EventEnum[] p2, NestedStructWithEnum[] p3) external;
+
+}
