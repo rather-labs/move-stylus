@@ -370,7 +370,7 @@ pub fn add_hash_type_and_key_fn(
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
     // Copy the data after the parent addresss
-    copy_data_to_memory(&mut builder, compilation_ctx, module, itype, key);
+    copy_data_to_memory(&mut builder, compilation_ctx, module, itype, key)?;
 
     let type_name = itype.get_name(compilation_ctx);
 
@@ -412,7 +412,7 @@ fn copy_data_to_memory(
     module: &mut Module,
     itype: &IntermediateType,
     data: LocalId,
-) {
+) -> Result<(), NativeFunctionError> {
     let load_value_to_stack = |field: &IntermediateType, builder: &mut InstrSeqBuilder<'_>| {
         if field.stack_data_size() == 8 {
             builder.load(
@@ -557,7 +557,7 @@ fn copy_data_to_memory(
 
                 builder.local_set(field_data);
 
-                copy_data_to_memory(builder, compilation_ctx, module, field, field_data);
+                copy_data_to_memory(builder, compilation_ctx, module, field, field_data)?;
             }
         }
         IntermediateType::IVector(inner) => {
@@ -592,6 +592,7 @@ fn copy_data_to_memory(
             builder.i32_const(0).local_set(i);
             builder.skip_vec_header(data).local_set(data);
 
+            let mut inner_result = Ok(());
             builder.block(None, |block| {
                 let block_id = block.id();
                 block.loop_(None, |loop_| {
@@ -614,7 +615,8 @@ fn copy_data_to_memory(
                         )
                         .local_set(field_data);
 
-                    copy_data_to_memory(loop_, compilation_ctx, module, inner, field_data);
+                    inner_result =
+                        copy_data_to_memory(loop_, compilation_ctx, module, inner, field_data);
 
                     // If we reach the last element, we exit
                     loop_
@@ -634,13 +636,12 @@ fn copy_data_to_memory(
                         .br(loop_id);
                 });
             });
+
+            inner_result?;
         }
 
-        _ => {
-            panic!(
-                r#"there was an error linking "{}" function, unsupported key type {itype:?}"#,
-                NativeFunction::NATIVE_HASH_TYPE_AND_KEY
-            );
-        }
+        _ => return Err(NativeFunctionError::DynamicFieldWrongKeyType(itype.clone())),
     }
+
+    Ok(())
 }

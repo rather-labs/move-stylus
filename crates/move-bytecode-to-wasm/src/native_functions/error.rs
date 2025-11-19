@@ -36,6 +36,9 @@ pub enum NativeFunctionError {
     #[error(r#"external contract call function "{0}" must return a ContractCallResult<T> or ContractCallEmptyResult with a single type parameter"#)]
     ContractCallFunctionInvalidReturn(FunctionId),
 
+    #[error(r#"found an struct "{0:?}" that is not a named id in named_ids array"#)]
+    ContractCallInvalidNamedId(IntermediateType),
+
     #[error(
         r#"called get_generic_function_name for function "{0}::{1}" with no generic parameters"#
     )]
@@ -43,6 +46,9 @@ pub enum NativeFunctionError {
 
     #[error(r#"there was an error linking "{0}" function, expected IStruct, found {1:?}"#)]
     WrongGenericType(String, IntermediateType),
+
+    #[error("key type not supported {0:?}")]
+    DynamicFieldWrongKeyType(IntermediateType),
 
     // Emit function section
     #[error(r#"trying to emit log with the struct {0} which is not an event"#)]
