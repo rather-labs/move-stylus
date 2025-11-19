@@ -114,6 +114,8 @@ pub fn compute_enum_storage_tail_position(
     // Get the storage size function for this enum type
     let get_storage_size_by_offset_fn =
         RuntimeFunction::GetStorageSizeByOffset.get_generic(module, compilation_ctx, &[itype])?;
+    let swap_256_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
+    let add_u256_fn = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx))?;
 
     // Compute enum_size using the offset
     let enum_size = module.locals.add(ValType::I32);
@@ -145,7 +147,6 @@ pub fn compute_enum_storage_tail_position(
         .binop(BinaryOp::I32Sub)
         .local_set(free_bytes);
 
-    let mut inner_result = Ok(());
     builder
         .local_get(enum_size)
         .local_get(free_bytes)
@@ -182,40 +183,32 @@ pub fn compute_enum_storage_tail_position(
                     },
                 );
 
-                inner_result = (|| {
-                    // Swap the end slot from BE to LE for addition
-                    let swap_256_fn =
-                        RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
-                    then.local_get(tail_slot_ptr)
-                        .local_get(tail_slot_ptr)
-                        .call(swap_256_fn);
+                // Swap the end slot from BE to LE for addition
+                then.local_get(tail_slot_ptr)
+                    .local_get(tail_slot_ptr)
+                    .call(swap_256_fn);
 
-                    // Add the offset to the end slot (right now equal to the current slot)
-                    let add_u256_fn =
-                        RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx))?;
+                // Add the offset to the end slot (right now equal to the current slot)
 
-                    then.local_get(delta_slot_ptr)
-                        .local_get(tail_slot_ptr)
-                        .local_get(tail_slot_ptr)
-                        .i32_const(32)
-                        .call(add_u256_fn)
-                        .local_set(tail_slot_ptr);
+                then.local_get(delta_slot_ptr)
+                    .local_get(tail_slot_ptr)
+                    .local_get(tail_slot_ptr)
+                    .i32_const(32)
+                    .call(add_u256_fn)
+                    .local_set(tail_slot_ptr);
 
-                    // Swap back to BE
-                    then.local_get(tail_slot_ptr)
-                        .local_get(tail_slot_ptr)
-                        .call(swap_256_fn);
+                // Swap back to BE
+                then.local_get(tail_slot_ptr)
+                    .local_get(tail_slot_ptr)
+                    .call(swap_256_fn);
 
-                    // 2) tail_slot_offset = (enum_size - free_bytes) % 32
-                    then.local_get(enum_size)
-                        .local_get(free_bytes)
-                        .binop(BinaryOp::I32Sub)
-                        .i32_const(SLOT_SIZE as i32)
-                        .binop(BinaryOp::I32RemS)
-                        .local_set(tail_slot_offset);
-
-                    Ok(())
-                })();
+                // 2) tail_slot_offset = (enum_size - free_bytes) % 32
+                then.local_get(enum_size)
+                    .local_get(free_bytes)
+                    .binop(BinaryOp::I32Sub)
+                    .i32_const(SLOT_SIZE as i32)
+                    .binop(BinaryOp::I32RemS)
+                    .local_set(tail_slot_offset);
             },
             |else_| {
                 // Case: enum_size < free_bytes, so it fits entirely in the current slot
@@ -228,8 +221,6 @@ pub fn compute_enum_storage_tail_position(
                     .local_set(tail_slot_offset);
             },
         );
-
-    inner_result?;
 
     // Store the tail offset in the last 4 bytes of the data pointer
     builder
