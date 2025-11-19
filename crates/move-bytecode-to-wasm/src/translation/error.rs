@@ -169,6 +169,9 @@ pub enum TranslationError {
     #[error("jump table for IfElse flow should contain exactly 2 elements")]
     IfElseJumpTableBranchesNumberMismatch,
 
+    #[error("only Simple flow has label")]
+    NotSimpleFlowWithLabel,
+
     // Unknown
 
     // TODO: identify concrete errors and add its corresponding enum variant

@@ -514,18 +514,22 @@ fn translate_flow(
                     return Ok(());
                 }
 
-                let mut inner_result = Ok(());
+                let mut inner_result: Result<(), TranslationError> = Ok(());
                 builder.block(ty, |case_block| {
-                    label_to_block.insert(cases[case_index].get_label(), case_block.id());
-                    inner_result = open_cases(
-                        case_block,
-                        module,
-                        ctx,
-                        functions_to_link,
-                        cases,
-                        label_to_block,
-                        case_index + 1,
-                    );
+                    inner_result = (|| {
+                        label_to_block.insert(cases[case_index].get_label()?, case_block.id());
+                        open_cases(
+                            case_block,
+                            module,
+                            ctx,
+                            functions_to_link,
+                            cases,
+                            label_to_block,
+                            case_index + 1,
+                        )?;
+
+                        Ok(())
+                    })();
                 });
 
                 inner_result?;
@@ -562,26 +566,30 @@ fn translate_flow(
             let case_ty = InstrSeqType::new(&mut module.types, &[ValType::I32], &[]);
 
             // Open a block for the yielding case.
-            let mut inner_result = Ok(());
+            let mut inner_result: Result<(), TranslationError> = Ok(());
             builder.block(case_ty, |yielding_block| {
-                // Create targets deepest-first by iterating cases in reverse
-                let cases_rev: Vec<&Flow> = cases.iter().rev().collect();
+                inner_result = (|| {
+                    // Create targets deepest-first by iterating cases in reverse
+                    let cases_rev: Vec<&Flow> = cases.iter().rev().collect();
 
-                // If the yielding case is not empty, map its label to the yielding block
-                if !matches!(*yielding_case, Flow::Empty) {
-                    label_to_block.insert(yielding_case.get_label(), yielding_block.id());
-                }
+                    // If the yielding case is not empty, map its label to the yielding block
+                    if !matches!(*yielding_case, Flow::Empty) {
+                        label_to_block.insert(yielding_case.get_label()?, yielding_block.id());
+                    }
 
-                // Build target labels and emit br_table; each case body is emitted after its label
-                inner_result = open_cases(
-                    yielding_block,
-                    module,
-                    ctx,
-                    functions_to_link,
-                    &cases_rev,
-                    &mut label_to_block,
-                    0,
-                );
+                    // Build target labels and emit br_table; each case body is emitted after its label
+                    open_cases(
+                        yielding_block,
+                        module,
+                        ctx,
+                        functions_to_link,
+                        &cases_rev,
+                        &mut label_to_block,
+                        0,
+                    )?;
+
+                    Ok(())
+                })();
             });
 
             inner_result?;
