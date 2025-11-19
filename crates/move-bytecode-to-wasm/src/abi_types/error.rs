@@ -1,4 +1,5 @@
 use crate::{
+    compilation_context::CompilationContextError,
     error::{CompilationError, ICEError, ICEErrorKind},
     runtime::error::RuntimeFunctionError,
 };
@@ -31,6 +32,11 @@ pub enum AbiEncodingError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum AbiError {
+    #[error(
+        "expected stylus::object::UID or stylus::object::NamedId as first field in {0} struct (it has key ability)"
+    )]
+    ExpectedUIDOrNamedId(String),
+
     #[error("there was an error performing abi unpack operation")]
     Unpack(#[from] AbiUnpackError),
 
@@ -45,6 +51,9 @@ pub enum AbiError {
 
     #[error("an error ocurred while generating a runtime function's code")]
     RuntimeFunction(#[from] RuntimeFunctionError),
+
+    #[error("compilation context error ocurred while ABI")]
+    CompilationContext(#[from] CompilationContextError),
 }
 
 impl From<AbiError> for CompilationError {

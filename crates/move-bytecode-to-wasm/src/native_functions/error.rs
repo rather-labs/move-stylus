@@ -25,7 +25,7 @@ pub enum NativeFunctionError {
     CompilationContext(#[from] CompilationContextError),
 
     #[error("abi error ocurred while processing a native function")]
-    Abi(Rc<AbiError>),
+    Abi(#[source] Rc<AbiError>),
 
     #[error(r#"missing special attributes for external call "{0}::{1}""#)]
     NotExternalCall(ModuleId, String),

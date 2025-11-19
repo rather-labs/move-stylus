@@ -25,7 +25,7 @@ pub fn move_signature_to_abi_selector(
     struct_name: &str,
     struct_fields: &[IntermediateType],
     compilation_ctx: &CompilationContext,
-) -> AbiFunctionSelector {
+) -> Result<AbiFunctionSelector, AbiError> {
     abi_encoding::move_signature_to_abi_selector(
         struct_name,
         struct_fields,
@@ -69,7 +69,7 @@ pub fn build_custom_error_message(
         &error_struct.identifier,
         &error_struct.fields,
         compilation_ctx,
-    );
+    )?;
 
     // Allocate memory: 4 bytes for length + 4 bytes for the error selector
     const SELECTOR_SIZE: i32 = 4;

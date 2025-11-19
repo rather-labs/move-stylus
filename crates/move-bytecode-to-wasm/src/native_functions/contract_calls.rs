@@ -189,7 +189,8 @@ pub fn add_external_contract_call_fn(
         &function_information.function_id.identifier,
         calldata_arguments,
         compilation_ctx,
-    );
+    )
+    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
 
     // Save the function selector before the arguments
     builder

@@ -49,11 +49,11 @@ impl<'a> PublicFunction<'a> {
         function_name: &str,
         signature: &'a ISignature,
         compilation_ctx: &CompilationContext,
-    ) -> Result<Self, PublicFunctionValidationError> {
+    ) -> Result<Self, AbiError> {
         Self::check_signature_arguments(function_name, &signature.arguments)?;
 
         let function_selector =
-            move_signature_to_abi_selector(function_name, &signature.arguments, compilation_ctx);
+            move_signature_to_abi_selector(function_name, &signature.arguments, compilation_ctx)?;
 
         Ok(Self {
             function_id,
@@ -777,6 +777,10 @@ mod tests {
             .err()
             .unwrap();
 
+        let err = match err {
+            AbiError::PublicFunction(e) => e,
+            _ => panic!("expected PublicFunctionValidationError"),
+        };
         assert_eq!(
             PublicFunctionValidationError::SignatureArgumentPosition(2, "test_function".to_owned()),
             err
@@ -811,6 +815,10 @@ mod tests {
             .err()
             .unwrap();
 
+        let err = match err {
+            AbiError::PublicFunction(e) => e,
+            _ => panic!("expected PublicFunctionValidationError"),
+        };
         assert_eq!(
             PublicFunctionValidationError::ComplexTypeContainsSigner(3, "test_function".to_owned()),
             err
@@ -848,6 +856,10 @@ mod tests {
             .err()
             .unwrap();
 
+        let err = match err {
+            AbiError::PublicFunction(e) => e,
+            _ => panic!("expected PublicFunctionValidationError"),
+        };
         assert_eq!(
             PublicFunctionValidationError::ComplexTypeContainsSigner(3, "test_function".to_owned()),
             err

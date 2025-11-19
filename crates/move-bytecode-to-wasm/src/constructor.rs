@@ -5,7 +5,7 @@ use walrus::{
 
 use crate::{
     CompilationContext,
-    abi_types::public_function::{PublicFunction, PublicFunctionValidationError},
+    abi_types::{error::AbiError, public_function::PublicFunction},
     error::{CompilationError, ICEError, ICEErrorKind},
     hostio::host_functions,
     runtime::{RuntimeFunction, error::RuntimeFunctionError},
@@ -21,8 +21,8 @@ static EMPTY_SIGNATURE: ISignature = ISignature {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConstructorError {
-    #[error("there was an error creating the constructor function")]
-    CreatingPublicFunction(#[from] PublicFunctionValidationError),
+    #[error("abi error ocurred while processing a native function")]
+    Abi(#[from] AbiError),
 
     #[error("an error ocurred while generating a runtime function's code")]
     RuntimeFunction(#[from] RuntimeFunctionError),
