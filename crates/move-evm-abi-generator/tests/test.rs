@@ -50,6 +50,11 @@ use rstest::rstest;
     "json_format/structs/generics_1.json"
 )]
 #[case(
+    "generics_2",
+    "modules/structs/generics_2.move",
+    "json_format/structs/generics_2.json"
+)]
+#[case(
     "misc_structs",
     "modules/structs/misc_structs.move",
     "json_format/structs/misc_structs.json"
@@ -106,6 +111,11 @@ fn test_json_abi(#[case] module_name: &str, #[case] module_path: &str, #[case] j
     "generics_1",
     "modules/structs/generics_1.move",
     "human_readable/structs/generics_1.abi"
+)]
+#[case(
+    "generics_2",
+    "modules/structs/generics_2.move",
+    "human_readable/structs/generics_2.abi"
 )]
 #[case(
     "misc_structs",

@@ -182,28 +182,17 @@ fn process_events(abi: &Abi) -> Vec<JsonAbiItem> {
         })
         .collect();
 
-    // Sort events by name and field identifiers for deterministic output
+    // Sort events by name and field signatures (name + internal_type) for deterministic output
     // This handles event overloading (same name, different fields)
-    events.sort_by(|a, b| {
-        let (name_a, fields_a) = match a {
-            JsonAbiItem::Event { name, inputs, .. } => {
-                let field_ids: Vec<String> =
-                    inputs.iter().map(|input| input.name.clone()).collect();
-                (name.clone(), field_ids)
-            }
-            _ => panic!(),
-        };
-
-        let (name_b, fields_b) = match b {
-            JsonAbiItem::Event { name, inputs, .. } => {
-                let field_ids: Vec<String> =
-                    inputs.iter().map(|input| input.name.clone()).collect();
-                (name.clone(), field_ids)
-            }
-            _ => panic!(),
-        };
-
-        name_a.cmp(&name_b).then_with(|| fields_a.cmp(&fields_b))
+    events.sort_by_key(|item| match item {
+        JsonAbiItem::Event { name, inputs, .. } => {
+            let field_sigs: Vec<String> = inputs
+                .iter()
+                .map(|input| format!("{}{}", input.name, input.internal_type))
+                .collect();
+            format!("{}{}", name, field_sigs.join(""))
+        }
+        _ => panic!(),
     });
 
     events

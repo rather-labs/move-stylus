@@ -6,47 +6,6 @@
         "inputs": [
           {
             "name": "a",
-            "type": "uint16",
-            "internalType": "uint16",
-            "indexed": true
-          },
-          {
-            "name": "b",
-            "type": "tuple",
-            "internalType": "struct GenericEvents.NestedStructUint32Uint64",
-            "indexed": true,
-            "components": [
-              {
-                "name": "a",
-                "type": "uint32",
-                "internalType": "uint32"
-              },
-              {
-                "name": "b",
-                "type": "uint64",
-                "internalType": "uint64"
-              },
-              {
-                "name": "c",
-                "type": "uint32[]",
-                "internalType": "uint32[]"
-              },
-              {
-                "name": "d",
-                "type": "uint64[]",
-                "internalType": "uint64[]"
-              }
-            ]
-          }
-        ],
-        "anonymous": false
-      },
-      {
-        "type": "event",
-        "name": "TestEvent1",
-        "inputs": [
-          {
-            "name": "a",
             "type": "address",
             "internalType": "address",
             "indexed": true
@@ -76,6 +35,47 @@
                 "name": "d",
                 "type": "uint256[]",
                 "internalType": "uint256[]"
+              }
+            ]
+          }
+        ],
+        "anonymous": false
+      },
+      {
+        "type": "event",
+        "name": "TestEvent1",
+        "inputs": [
+          {
+            "name": "a",
+            "type": "uint16",
+            "internalType": "uint16",
+            "indexed": true
+          },
+          {
+            "name": "b",
+            "type": "tuple",
+            "internalType": "struct GenericEvents.NestedStructUint32Uint64",
+            "indexed": true,
+            "components": [
+              {
+                "name": "a",
+                "type": "uint32",
+                "internalType": "uint32"
+              },
+              {
+                "name": "b",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "c",
+                "type": "uint32[]",
+                "internalType": "uint32[]"
+              },
+              {
+                "name": "d",
+                "type": "uint64[]",
+                "internalType": "uint64[]"
               }
             ]
           }
