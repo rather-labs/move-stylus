@@ -1,7 +1,7 @@
 contract GenericEvents {
 
-    event TestEvent1AddressBoolUint256(address indexed a, NestedStructBoolUint256 indexed b);
-    event TestEvent1Uint16Uint32Uint64(uint16 indexed a, NestedStructUint32Uint64 indexed b);
+    event TestEvent1(address indexed a, NestedStructBoolUint256 indexed b);
+    event TestEvent1(uint16 indexed a, NestedStructUint32Uint64 indexed b);
 
 
     struct NestedStructBoolUint256 {

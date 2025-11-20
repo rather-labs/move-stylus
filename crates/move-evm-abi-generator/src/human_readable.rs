@@ -1,5 +1,5 @@
 use crate::{
-    abi::{Abi, Visibility},
+    abi::{Abi, Event, Visibility},
     common::snake_to_upper_camel,
     types::Type,
 };
@@ -105,9 +105,30 @@ pub fn process_structs(contract_abi: &mut String, abi: &Abi) {
 }
 
 pub fn process_events(contract_abi: &mut String, abi: &Abi) {
-    // Sort events by identifier for deterministic output
+    // Helper function to format event signature
+    let format_signature = |event: &Event| -> String {
+        event
+            .fields
+            .iter()
+            .map(|f| {
+                format!(
+                    "{}{}{}",
+                    &f.named_type.type_.name(),
+                    if f.indexed { " indexed " } else { " " },
+                    &f.named_type.identifier
+                )
+            })
+            .collect::<Vec<String>>()
+            .join(", ")
+    };
+
+    // Sort events by identifier and signature for deterministic output
+    // This handles event overloading (same name, different fields)
     let mut event_indices: Vec<usize> = (0..abi.events.len()).collect();
-    event_indices.sort_by_key(|&i| &abi.events[i].identifier);
+    event_indices.sort_by_key(|&i| {
+        let event = &abi.events[i];
+        (event.identifier.clone(), format_signature(event))
+    });
 
     for &i in &event_indices {
         let event = &abi.events[i];
@@ -115,22 +136,7 @@ pub fn process_events(contract_abi: &mut String, abi: &Abi) {
         contract_abi.push_str("    event ");
         contract_abi.push_str(&event.identifier);
         contract_abi.push('(');
-        contract_abi.push_str(
-            &event
-                .fields
-                .iter()
-                .map(|f| {
-                    format!(
-                        "{}{}{}",
-                        &f.named_type.type_.name(),
-                        if f.indexed { " indexed " } else { " " },
-                        &f.named_type.identifier
-                    )
-                })
-                .collect::<Vec<String>>()
-                .join(", "),
-        );
-
+        contract_abi.push_str(&format_signature(event));
         contract_abi.push_str(");\n");
     }
     contract_abi.push('\n');

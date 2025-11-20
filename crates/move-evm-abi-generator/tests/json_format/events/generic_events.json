@@ -2,7 +2,7 @@
     "abi": [
       {
         "type": "event",
-        "name": "TestEvent1Uint16Uint32Uint64",
+        "name": "TestEvent1",
         "inputs": [
           {
             "name": "a",
@@ -43,7 +43,7 @@
       },
       {
         "type": "event",
-        "name": "TestEvent1AddressBoolUint256",
+        "name": "TestEvent1",
         "inputs": [
           {
             "name": "a",

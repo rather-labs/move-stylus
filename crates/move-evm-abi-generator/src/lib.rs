@@ -19,14 +19,14 @@ use move_binary_format::file_format::{
     StructDefinitionIndex,
 };
 use move_bytecode_to_wasm::compilation_context as ctx;
-use move_bytecode_to_wasm::{PackageModuleData, compilation_context::ModuleData};
+use move_bytecode_to_wasm::{
+    PackageModuleData,
+    compilation_context::{ModuleData, module_data::struct_data::IntermediateType},
+};
 use move_compiler::shared::files::MappedFiles;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use move_package::compilation::compiled_package::{CompiledPackage, CompiledUnitWithSource};
 use move_parse_special_attributes::SpecialAttributeError;
-
-use crate::common::snake_to_upper_camel;
-use crate::types::Type;
 
 pub struct Abi {
     pub file: PathBuf,
@@ -112,7 +112,7 @@ pub(crate) struct FunctionCall {
 pub(crate) struct EventStruct {
     module_id: ModuleId,
     identifier: String,
-    struct_def_instantiation_index: Option<StructDefInstantiationIndex>,
+    type_parameters: Option<Vec<IntermediateType>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -163,7 +163,7 @@ fn process_events_and_errors(
                                             identifier: module
                                                 .identifier_at(struct_handle.name)
                                                 .to_string(),
-                                            struct_def_instantiation_index: None,
+                                            type_parameters: None,
                                         });
                                     }
                                     SignatureToken::DatatypeInstantiation(data) => {
@@ -172,18 +172,9 @@ fn process_events_and_errors(
                                         let struct_handle =
                                             module.datatype_handle_at(*datatype_handle_index);
 
-                                        let struct_def_instantiation_index =
-                                            find_struct_def_instantiation_index(
-                                                module,
-                                                *datatype_handle_index,
-                                                type_parameters,
-                                            )
-                                            .unwrap();
-
                                         let event_module_id = module.module_id_for_handle(
                                             module.module_handle_at(struct_handle.module),
                                         );
-
                                         let event_module = modules_data
                                             .get(&ctx::ModuleId {
                                                 address: event_module_id
@@ -194,33 +185,20 @@ fn process_events_and_errors(
                                             })
                                             .unwrap();
 
-                                        let concrete_types = event_module
-                                            .structs
-                                            .get_generic_struct_types_instances(
-                                                &struct_def_instantiation_index,
-                                            )
+                                        let event_type_parameters = type_parameters
+                                            .iter()
+                                            .map(|t| IntermediateType::try_from_signature_token(t, &event_module.datatype_handles_map))
+                                            .collect::<std::result::Result<Vec<IntermediateType>, _>>()
                                             .unwrap();
 
-                                        let concrete_types_names = concrete_types
-                                            .iter()
-                                            .map(|t| {
-                                                Type::from_intermediate_type(t, modules_data).name()
-                                            })
-                                            .collect::<Vec<String>>()
-                                            .join("_");
-
-                                        let event_identifier = snake_to_upper_camel(&format!(
-                                            "{}_{}",
-                                            module.identifier_at(struct_handle.name),
-                                            concrete_types_names
-                                        ));
+                                        // The identifier is the same accross instantiations because events can be overloaded in the ABI
+                                        let event_identifier =
+                                            module.identifier_at(struct_handle.name).to_string();
 
                                         top_level_events.insert(EventStruct {
                                             module_id: event_module_id,
                                             identifier: event_identifier,
-                                            struct_def_instantiation_index: Some(
-                                                struct_def_instantiation_index,
-                                            ),
+                                            type_parameters: Some(event_type_parameters),
                                         });
                                     }
                                     _ => panic!(

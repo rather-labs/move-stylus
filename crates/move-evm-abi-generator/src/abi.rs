@@ -486,36 +486,29 @@ impl Abi {
     }
 
     pub fn process_events(
-        event_structs: &HashSet<EventStruct>,
+        events: &HashSet<EventStruct>,
         modules_data: &HashMap<ModuleId, ModuleData>,
         structs_to_process: &mut HashSet<IntermediateType>,
     ) -> Vec<Event> {
         let mut result = Vec::new();
 
-        for event_struct in event_structs {
+        for event in events {
             let event_module = modules_data
                 .get(&ModuleId {
-                    address: event_struct.module_id.address().into_bytes().into(),
-                    module_name: event_struct.module_id.name().to_string(),
+                    address: event.module_id.address().into_bytes().into(),
+                    module_name: event.module_id.name().to_string(),
                 })
                 .unwrap();
 
-            let event_identifier = event_struct.identifier.clone();
+            let mut event_struct = event_module
+                .structs
+                .get_by_identifier(&event.identifier)
+                .unwrap()
+                .clone();
 
-            let event_struct = if let Some(struct_def_instantiation_index) =
-                &event_struct.struct_def_instantiation_index
-            {
-                event_module
-                    .structs
-                    .get_struct_instance_by_struct_definition_idx(struct_def_instantiation_index)
-                    .unwrap()
-            } else {
-                event_module
-                    .structs
-                    .get_by_identifier(&event_struct.identifier)
-                    .unwrap()
-                    .clone()
-            };
+            if let Some(type_parameters) = &event.type_parameters {
+                event_struct = event_struct.instantiate(type_parameters);
+            }
 
             let event_special_attributes = event_module
                 .special_attributes
@@ -538,7 +531,7 @@ impl Abi {
             }
 
             result.push(Event {
-                identifier: event_identifier,
+                identifier: event.identifier.clone(),
                 fields: event_struct
                     .fields
                     .iter()
