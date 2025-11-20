@@ -1,4 +1,5 @@
 use move_binary_format::file_format::DatatypeHandleIndex;
+use walrus::ValType;
 
 use crate::{compilation_context::CompilationContextError, runtime::error::RuntimeFunctionError};
 
@@ -52,6 +53,10 @@ pub enum IntermediateTypeError {
     #[error("cast error: trying to cast {0:?}")]
     InvalidCast(IntermediateType),
 
+    #[error("unssuported ValType {0:?}")]
+    UnsupportedValType(ValType),
+
+    // Vectors
     #[error("Unsupported data size for vector: {0}")]
     VectorInvalidDataSize(usize),
 
@@ -60,4 +65,10 @@ pub enum IntermediateTypeError {
 
     #[error("type {0:?} not supported in vectors")]
     VectorUnnsuportedType(IntermediateType),
+
+    #[error("found vector of references")]
+    FoundVectorOfReferences,
+
+    #[error("found vector of signer")]
+    FoundVectorOfSigner,
 }

@@ -10,6 +10,7 @@ use crate::{
     error::{CompilationError, ICEError, ICEErrorKind},
     native_functions::error::NativeFunctionError,
     runtime::error::RuntimeFunctionError,
+    vm_handled_types::error::VmHandledTypeError,
 };
 
 use super::{
@@ -37,6 +38,9 @@ pub enum TranslationError {
 
     #[error("an error ocurred while processing an intermediate type")]
     IntermediateType(#[from] IntermediateTypeError),
+
+    #[error("an error ocurred while processing a vm handled type")]
+    VmHandledType(#[from] VmHandledTypeError),
 
     //    #[error("an storage error ocurred while translating a function")]
     //    Storage(#[from] StorageError),

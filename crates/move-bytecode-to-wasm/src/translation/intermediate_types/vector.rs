@@ -578,13 +578,13 @@ impl IVector {
                             loop_result?;
                         }
                         IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                            panic!("Found vector of rereferences")
+                            return Err(IntermediateTypeError::FoundVectorOfReferences);
                         }
                         IntermediateType::ISigner => {
-                            panic!("Found vector of signers")
+                            return Err(IntermediateTypeError::FoundVectorOfSigner);
                         }
                         IntermediateType::ITypeParameter(_) => {
-                            panic!("Found vector of type parameters, expected a concrete type");
+                            return Err(IntermediateTypeError::FoundTypeParameter);
                         }
                     }
 
@@ -651,7 +651,7 @@ impl IVector {
                     match inner.try_into()? {
                         ValType::I64 => StoreKind::I64 { atomic: false },
                         ValType::I32 => StoreKind::I32 { atomic: false },
-                        _ => panic!("Unsupported ValType"),
+                        t => return Err(IntermediateTypeError::UnsupportedValType(t)),
                     },
                     MemArg {
                         align: 0,
@@ -672,79 +672,85 @@ impl IVector {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         length: u64,
-    ) {
+    ) -> Result<(), IntermediateTypeError> {
         let vec_ptr = module.locals.add(ValType::I32);
         builder.local_set(vec_ptr);
 
         let i = module.locals.add(ValType::I32);
         builder.i32_const(0).local_set(i);
 
+        let mut inner_result = Ok(());
         builder.block(None, |block| {
             let exit_loop_id = block.id();
 
             block.loop_(None, |loop_| {
                 let loop_id = loop_.id();
 
-                loop_
-                    .local_get(i)
-                    .i32_const(length as i32)
-                    .binop(BinaryOp::I32GeU)
-                    .br_if(exit_loop_id);
+                inner_result = (|| {
+                    loop_
+                        .local_get(i)
+                        .i32_const(length as i32)
+                        .binop(BinaryOp::I32GeU)
+                        .br_if(exit_loop_id);
 
-                match inner {
-                    IntermediateType::IBool
-                    | IntermediateType::IU8
-                    | IntermediateType::IU16
-                    | IntermediateType::IU32
-                    | IntermediateType::IU128
-                    | IntermediateType::IU256
-                    | IntermediateType::IAddress
-                    | IntermediateType::IVector(_)
-                    | IntermediateType::IStruct { .. }
-                    | IntermediateType::IGenericStructInstance { .. }
-                    | IntermediateType::IEnum { .. }
-                    | IntermediateType::IGenericEnumInstance { .. } => {
-                        loop_.vec_elem_ptr(vec_ptr, i, 4).load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I32 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
+                    match inner {
+                        IntermediateType::IBool
+                        | IntermediateType::IU8
+                        | IntermediateType::IU16
+                        | IntermediateType::IU32
+                        | IntermediateType::IU128
+                        | IntermediateType::IU256
+                        | IntermediateType::IAddress
+                        | IntermediateType::IVector(_)
+                        | IntermediateType::IStruct { .. }
+                        | IntermediateType::IGenericStructInstance { .. }
+                        | IntermediateType::IEnum { .. }
+                        | IntermediateType::IGenericEnumInstance { .. } => {
+                            loop_.vec_elem_ptr(vec_ptr, i, 4).load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I32 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+                        }
+                        IntermediateType::IU64 => {
+                            loop_.vec_elem_ptr(vec_ptr, i, 8).load(
+                                compilation_ctx.memory_id,
+                                LoadKind::I64 { atomic: false },
+                                MemArg {
+                                    align: 0,
+                                    offset: 0,
+                                },
+                            );
+                        }
+                        IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
+                            return Err(IntermediateTypeError::FoundVectorOfReferences);
+                        }
+                        IntermediateType::ISigner => {
+                            return Err(IntermediateTypeError::FoundVectorOfSigner);
+                        }
+                        IntermediateType::ITypeParameter(_) => {
+                            return Err(IntermediateTypeError::FoundTypeParameter);
+                        }
                     }
-                    IntermediateType::IU64 => {
-                        loop_.vec_elem_ptr(vec_ptr, i, 8).load(
-                            compilation_ctx.memory_id,
-                            LoadKind::I64 { atomic: false },
-                            MemArg {
-                                align: 0,
-                                offset: 0,
-                            },
-                        );
-                    }
-                    IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                        panic!("vector of rereferences found")
-                    }
-                    IntermediateType::ISigner => {
-                        panic!("should not be possible to have a vector of signers")
-                    }
-                    IntermediateType::ITypeParameter(_) => {
-                        panic!(
-                            "cannot unpack a vector of type parameters, expected a concrete type"
-                        );
-                    }
-                }
 
-                loop_
-                    .local_get(i)
-                    .i32_const(1)
-                    .binop(BinaryOp::I32Add)
-                    .local_set(i);
+                    loop_
+                        .local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(i);
 
-                loop_.br(loop_id);
+                    loop_.br(loop_id);
+
+                    Ok(())
+                })();
             });
         });
+        inner_result?;
+
+        Ok(())
     }
 
     pub fn vec_borrow_instructions(
@@ -757,7 +763,7 @@ impl IVector {
 
         match inner {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                panic!("VecImmBorrow operation is not allowed on reference types");
+                return Err(IntermediateTypeError::FoundVectorOfReferences);
             }
 
             IntermediateType::IBool
@@ -782,7 +788,7 @@ impl IVector {
                 builder.i32_const(1);
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("cannot borrow generic type parameters, expected a concrete type");
+                return Err(IntermediateTypeError::FoundTypeParameter);
             }
         }
 
@@ -901,7 +907,7 @@ impl IVector {
                 match valtype {
                     ValType::I64 => StoreKind::I64 { atomic: false },
                     ValType::I32 => StoreKind::I32 { atomic: false },
-                    _ => panic!("Unsupported ValType"),
+                    _ => return Err(IntermediateTypeError::UnsupportedValType(valtype)),
                 },
                 MemArg {
                     align: 0,
@@ -1135,11 +1141,8 @@ mod tests {
                     .unwrap();
                 builder.call(swap_f);
             }
-            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                panic!("VecPopBack operation is not allowed on reference types");
-            }
-            IntermediateType::ITypeParameter(_) => {
-                panic!("cannot pop back a vector of type parameters, expected a concrete type");
+            _ => {
+                unreachable!("unreacable condition")
             }
         }
 
