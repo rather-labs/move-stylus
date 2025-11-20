@@ -3,7 +3,7 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg},
 };
 
-use super::RuntimeFunction;
+use super::{RuntimeFunction, error::RuntimeFunctionError};
 use crate::{CompilationContext, wasm_builder_extensions::WasmBuilderExtension};
 
 /// Verifies if two elements a and b are equal
@@ -115,7 +115,7 @@ pub fn a_equals_b(module: &mut Module, compilation_ctx: &crate::CompilationConte
 pub fn vec_equality_heap_type(
     module: &mut Module,
     compilation_ctx: &crate::CompilationContext,
-) -> FunctionId {
+) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function = FunctionBuilder::new(
         &mut module.types,
         &[ValType::I32, ValType::I32, ValType::I32, ValType::I32],
@@ -126,7 +126,7 @@ pub fn vec_equality_heap_type(
         .name(RuntimeFunction::VecEqualityHeapType.name().to_owned())
         .func_body();
 
-    let equality_f_id = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
+    let equality_f_id = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
 
     // Function arguments
     let v1_ptr = module.locals.add(ValType::I32);
@@ -220,10 +220,10 @@ pub fn vec_equality_heap_type(
 
     builder.local_get(res);
 
-    function.finish(
+    Ok(function.finish(
         vec![v1_ptr, v2_ptr, length, type_heap_size],
         &mut module.funcs,
-    )
+    ))
 }
 
 /// Determines if all bytes at a specified address are zero

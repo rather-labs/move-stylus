@@ -7,6 +7,8 @@ use crate::{
     CompilationContext, runtime::RuntimeFunction, translation::intermediate_types::enums::IEnum,
 };
 
+use super::error::AbiPackError;
+
 impl IEnum {
     pub fn add_pack_instructions(
         &self,
@@ -15,11 +17,11 @@ impl IEnum {
         local: LocalId,
         writer_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiPackError> {
         block.local_get(writer_pointer);
 
         // Little-endian to Big-endian
-        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
+        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
 
         // Read variant number
         block
@@ -43,5 +45,7 @@ impl IEnum {
                 offset: 28,
             },
         );
+
+        Ok(())
     }
 }

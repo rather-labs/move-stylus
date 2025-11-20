@@ -3,11 +3,15 @@ use std::rc::Rc;
 use crate::{
     abi_types::error::AbiError,
     compilation_context::{CompilationContextError, ModuleId},
+    runtime::error::RuntimeFunctionError,
     translation::{intermediate_types::IntermediateType, table::FunctionId},
 };
 
 #[derive(Debug, thiserror::Error)]
 pub enum NativeFunctionError {
+    #[error("an error ocurred while generating a runtime function's code")]
+    RuntimeFunction(#[from] RuntimeFunctionError),
+
     #[error(r#"host function "{0}" not supported yet"#)]
     HostFunctionNotSupported(String),
 
@@ -21,7 +25,7 @@ pub enum NativeFunctionError {
     CompilationContext(#[from] CompilationContextError),
 
     #[error("abi error ocurred while processing a native function")]
-    Abi(Rc<AbiError>),
+    Abi(#[source] Rc<AbiError>),
 
     #[error(r#"missing special attributes for external call "{0}::{1}""#)]
     NotExternalCall(ModuleId, String),

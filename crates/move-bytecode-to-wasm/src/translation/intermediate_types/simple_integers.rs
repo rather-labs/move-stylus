@@ -6,6 +6,7 @@ use walrus::{
 use crate::{
     CompilationContext,
     runtime::RuntimeFunction,
+    translation::TranslationError,
     wasm_helpers::{load_i32_from_bytes_instructions, load_i64_from_bytes_instructions},
 };
 
@@ -33,20 +34,29 @@ impl IU8 {
     /// Along with the addition code to check overflow is added. If the result is greater than 255
     /// then the execution is aborted This check is posible because interally we are using
     /// 32bits integers.
-    pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+    pub fn add(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None)?;
         builder
             .binop(BinaryOp::I32Add)
             .i32_const(Self::MAX_VALUE)
             .call(check_overflow_f);
+
+        Ok(())
     }
 
     /// Adds the instructions to substract two u8 values.
     ///
     /// If the substraction is less than 0, then it traps
-    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let sub_u32_f = RuntimeFunction::SubU32.get(module, None);
+    pub fn sub(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
+        let sub_u32_f = RuntimeFunction::SubU32.get(module, None)?;
         builder.call(sub_u32_f);
+        Ok(())
     }
 
     /// Adds the instructions to divide two u8 values.
@@ -68,12 +78,17 @@ impl IU8 {
     /// Along with the multiplication code to check overflow is added. If the result is greater
     /// than 255 then the execution is aborted. This check is posible because interally we are
     /// using 32bits integers.
-    pub fn mul(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+    pub fn mul(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None)?;
         builder
             .binop(BinaryOp::I32Mul)
             .i32_const(Self::MAX_VALUE)
             .call(check_overflow_f);
+
+        Ok(())
     }
 
     pub fn cast_from(
@@ -81,11 +96,9 @@ impl IU8 {
         module: &mut walrus::Module,
         original_type: IntermediateType,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), TranslationError> {
         match original_type {
-            IntermediateType::IU8 => {
-                return;
-            }
+            IntermediateType::IU8 => {}
             // Just check for overflow and leave the value in the stack again
             IntermediateType::IU16 | IntermediateType::IU32 => {}
             IntermediateType::IU64 => {
@@ -93,41 +106,53 @@ impl IU8 {
             }
             IntermediateType::IU128 => {
                 let downcast_u128_u256_to_u32_f =
-                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx))?;
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
             }
             IntermediateType::IU256 => {
                 let downcast_u128_u256_to_u32_f =
-                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx))?;
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
             }
-            t => panic!("type stack error: trying to cast {t:?}"),
+            t => return Err(TranslationError::InvalidCast(t.clone())),
         }
 
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None)?;
         builder.i32_const(Self::MAX_VALUE).call(check_overflow_f);
+
+        Ok(())
     }
 
-    pub fn bit_shift_left(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+    pub fn bit_shift_left(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
         // This operation aborts if the shift amount is greater or equal than 8
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None)?;
         builder.i32_const(7).call(check_overflow_f);
 
         builder.binop(BinaryOp::I32Shl);
         // Mask the bytes outside the u8 range
         builder.i32_const(0xFF).binop(BinaryOp::I32And);
+
+        Ok(())
     }
 
-    pub fn bit_shift_right(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+    pub fn bit_shift_right(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
         // This operation aborts if the shift amount is greater or equal than 8
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None)?;
         builder.i32_const(7).call(check_overflow_f);
 
         builder.binop(BinaryOp::I32ShrU);
+
+        Ok(())
     }
 }
 
@@ -150,20 +175,30 @@ impl IU16 {
     /// Along with the addition code to check overflow is added. If the result is greater than
     /// 65535 then the execution is aborted. This check is posible because interally we are using
     /// 32bits integers.
-    pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+    pub fn add(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None)?;
         builder
             .binop(BinaryOp::I32Add)
             .i32_const(Self::MAX_VALUE)
             .call(check_overflow_f);
+
+        Ok(())
     }
 
     /// Adds the instructions to substract two u16 values.
     ///
     /// If the substraction is less than 0, then it traps
-    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let sub_u32_f = RuntimeFunction::SubU32.get(module, None);
+    pub fn sub(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
+        let sub_u32_f = RuntimeFunction::SubU32.get(module, None)?;
         builder.call(sub_u32_f);
+
+        Ok(())
     }
 
     /// Adds the instructions to divide two u16 values.
@@ -185,12 +220,17 @@ impl IU16 {
     /// Along with the multiplication code to check overflow is added. If the result is greater
     /// than u16::MAX then the execution is aborted. This check is posible because interally we are
     /// using 32bits integers.
-    pub fn mul(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+    pub fn mul(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None)?;
         builder
             .binop(BinaryOp::I32Mul)
             .i32_const(Self::MAX_VALUE)
             .call(check_overflow_f);
+
+        Ok(())
     }
 
     pub fn cast_from(
@@ -198,10 +238,10 @@ impl IU16 {
         module: &mut walrus::Module,
         original_type: IntermediateType,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), TranslationError> {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 => {
-                return;
+                return Ok(());
             }
             // Just check for overflow and leave the value in the stack again
             IntermediateType::IU32 => {}
@@ -210,41 +250,53 @@ impl IU16 {
             }
             IntermediateType::IU128 => {
                 let downcast_u128_u256_to_u32_f =
-                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx))?;
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
             }
             IntermediateType::IU256 => {
                 let downcast_u128_u256_to_u32_f =
-                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx))?;
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
             }
-            t => panic!("type stack error: trying to cast {t:?}"),
+            t => return Err(TranslationError::InvalidCast(t.clone())),
         }
 
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None)?;
         builder.i32_const(Self::MAX_VALUE).call(check_overflow_f);
+
+        Ok(())
     }
 
-    pub fn bit_shift_left(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+    pub fn bit_shift_left(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
         // This operation aborts if the shift amount is greater or equal than 16
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None)?;
         builder.i32_const(15).call(check_overflow_f);
 
         builder.binop(BinaryOp::I32Shl);
         // Mask the bytes outside the u16 range
         builder.i32_const(0xFFFF).binop(BinaryOp::I32And);
+
+        Ok(())
     }
 
-    pub fn bit_shift_right(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+    pub fn bit_shift_right(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
         // This operation aborts if the shift amount is greater or equal than 16
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None)?;
         builder.i32_const(15).call(check_overflow_f);
 
         builder.binop(BinaryOp::I32ShrU);
+
+        Ok(())
     }
 }
 
@@ -262,17 +314,25 @@ impl IU32 {
         load_i32_from_bytes_instructions(builder, &bytes);
     }
 
-    pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let add_function_id = RuntimeFunction::AddU32.get(module, None);
+    pub fn add(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
+        let add_function_id = RuntimeFunction::AddU32.get(module, None)?;
         builder.call(add_function_id);
+        Ok(())
     }
 
     /// Adds the instructions to substract two u32 values.
     ///
     /// If the substraction is less than 0, then it traps
-    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let sub_u32_f = RuntimeFunction::SubU32.get(module, None);
+    pub fn sub(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
+        let sub_u32_f = RuntimeFunction::SubU32.get(module, None)?;
         builder.call(sub_u32_f);
+        Ok(())
     }
 
     /// Adds the instructions to divide two u32 values.
@@ -294,9 +354,13 @@ impl IU32 {
     /// Along with the multiplication code to check overflow is added. If the result is greater
     /// than u32::MAX then the execution is aborted. This check is posible because interally we are
     /// using 32bits integers.
-    pub fn mul(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let mul_f = RuntimeFunction::MulU32.get(module, None);
+    pub fn mul(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
+        let mul_f = RuntimeFunction::MulU32.get(module, None)?;
         builder.call(mul_f);
+        Ok(())
     }
 
     pub fn cast_from(
@@ -304,45 +368,57 @@ impl IU32 {
         module: &mut walrus::Module,
         original_type: IntermediateType,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), TranslationError> {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {}
             IntermediateType::IU64 => {
-                let downcast_u64_to_u32_f = RuntimeFunction::DowncastU64ToU32.get(module, None);
+                let downcast_u64_to_u32_f = RuntimeFunction::DowncastU64ToU32.get(module, None)?;
                 builder.call(downcast_u64_to_u32_f);
             }
             IntermediateType::IU128 => {
                 let downcast_u128_u256_to_u32_f =
-                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx))?;
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
             }
             IntermediateType::IU256 => {
                 let downcast_u128_u256_to_u32_f =
-                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx));
+                    RuntimeFunction::DowncastU128U256ToU32.get(module, Some(compilation_ctx))?;
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u32_f);
             }
-            t => panic!("type stack error: trying to cast {t:?}"),
+            t => return Err(TranslationError::InvalidCast(t.clone())),
         }
+
+        Ok(())
     }
 
-    pub fn bit_shift_left(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+    pub fn bit_shift_left(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
         // This operation aborts if the shift amount is greater or equal than 32
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None)?;
         builder.i32_const(31).call(check_overflow_f);
 
         builder.binop(BinaryOp::I32Shl);
+
+        Ok(())
     }
 
-    pub fn bit_shift_right(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+    pub fn bit_shift_right(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
         // This operation aborts if the shift amount is greater or equal than 32
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None)?;
         builder.i32_const(31).call(check_overflow_f);
 
         builder.binop(BinaryOp::I32ShrU);
+
+        Ok(())
     }
 }
 
@@ -358,17 +434,25 @@ impl IU64 {
         load_i64_from_bytes_instructions(builder, &bytes);
     }
 
-    pub fn add(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let add_function_id = RuntimeFunction::AddU64.get(module, None);
+    pub fn add(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
+        let add_function_id = RuntimeFunction::AddU64.get(module, None)?;
         builder.call(add_function_id);
+        Ok(())
     }
 
     /// Adds the instructions to substract two u8 values.
     ///
     /// If the substraction is less than 0, then it traps
-    pub fn sub(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let sub_u64_f = RuntimeFunction::SubU64.get(module, None);
+    pub fn sub(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
+        let sub_u64_f = RuntimeFunction::SubU64.get(module, None)?;
         builder.call(sub_u64_f);
+        Ok(())
     }
 
     /// Adds the instructions to divide two u64 values.
@@ -390,9 +474,13 @@ impl IU64 {
     /// Along with the multiplication code to check overflow is added. If the result is greater
     /// than u64::MAX then the execution is aborted. This check is posible because interally we are
     /// using 64bits integers.
-    pub fn mul(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
-        let mul_f = RuntimeFunction::MulU64.get(module, None);
+    pub fn mul(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
+        let mul_f = RuntimeFunction::MulU64.get(module, None)?;
         builder.call(mul_f);
+        Ok(())
     }
 
     pub fn cast_from(
@@ -400,7 +488,7 @@ impl IU64 {
         module: &mut walrus::Module,
         original_type: IntermediateType,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), TranslationError> {
         match original_type {
             IntermediateType::IU8 | IntermediateType::IU16 | IntermediateType::IU32 => {
                 builder.unop(UnaryOp::I64ExtendUI32);
@@ -408,37 +496,47 @@ impl IU64 {
             IntermediateType::IU64 => {}
             IntermediateType::IU128 => {
                 let downcast_u128_u256_to_u64_f =
-                    RuntimeFunction::DowncastU128U256ToU64.get(module, Some(compilation_ctx));
+                    RuntimeFunction::DowncastU128U256ToU64.get(module, Some(compilation_ctx))?;
                 builder
                     .i32_const(IU128::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u64_f);
             }
             IntermediateType::IU256 => {
                 let downcast_u128_u256_to_u64_f =
-                    RuntimeFunction::DowncastU128U256ToU64.get(module, Some(compilation_ctx));
+                    RuntimeFunction::DowncastU128U256ToU64.get(module, Some(compilation_ctx))?;
                 builder
                     .i32_const(IU256::HEAP_SIZE)
                     .call(downcast_u128_u256_to_u64_f);
             }
-            t => panic!("type stack error: trying to cast {t:?}"),
+            t => return Err(TranslationError::InvalidCast(t.clone())),
         }
+        Ok(())
     }
 
-    pub fn bit_shift_left(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+    pub fn bit_shift_left(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
         // This operation aborts if the shift amount is greater or equal than 64
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None)?;
         builder.i32_const(63).call(check_overflow_f);
 
         builder.unop(UnaryOp::I64ExtendUI32);
         builder.binop(BinaryOp::I64Shl);
+        Ok(())
     }
 
-    pub fn bit_shift_right(builder: &mut walrus::InstrSeqBuilder, module: &mut walrus::Module) {
+    pub fn bit_shift_right(
+        builder: &mut walrus::InstrSeqBuilder,
+        module: &mut walrus::Module,
+    ) -> Result<(), TranslationError> {
         // This operation aborts if the shift amount is greater or equal than 64
-        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None);
+        let check_overflow_f = RuntimeFunction::CheckOverflowU8U16.get(module, None)?;
         builder.i32_const(63).call(check_overflow_f);
 
         builder.unop(UnaryOp::I64ExtendUI32);
         builder.binop(BinaryOp::I64ShrU);
+
+        Ok(())
     }
 }

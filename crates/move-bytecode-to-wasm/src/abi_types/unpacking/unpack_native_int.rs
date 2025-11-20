@@ -13,6 +13,8 @@ use crate::{
     },
 };
 
+use super::error::AbiUnpackError;
+
 impl IBool {
     pub fn add_unpack_instructions(
         block: &mut InstrSeqBuilder,
@@ -20,7 +22,7 @@ impl IBool {
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiUnpackError> {
         let encoded_size = sol_data::Bool::ENCODED_SIZE.expect("Bool should have a fixed size");
         unpack_i32_type_instructions(
             block,
@@ -28,7 +30,9 @@ impl IBool {
             compilation_ctx.memory_id,
             reader_pointer,
             encoded_size,
-        );
+        )?;
+
+        Ok(())
     }
 }
 
@@ -39,7 +43,7 @@ impl IU8 {
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiUnpackError> {
         let encoded_size = sol_data::Uint::<8>::ENCODED_SIZE.expect("U8 should have a fixed size");
         unpack_i32_type_instructions(
             block,
@@ -47,7 +51,9 @@ impl IU8 {
             compilation_ctx.memory_id,
             reader_pointer,
             encoded_size,
-        );
+        )?;
+
+        Ok(())
     }
 }
 
@@ -58,7 +64,7 @@ impl IU16 {
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiUnpackError> {
         let encoded_size =
             sol_data::Uint::<16>::ENCODED_SIZE.expect("U16 should have a fixed size");
         unpack_i32_type_instructions(
@@ -67,7 +73,9 @@ impl IU16 {
             compilation_ctx.memory_id,
             reader_pointer,
             encoded_size,
-        );
+        )?;
+
+        Ok(())
     }
 }
 
@@ -78,7 +86,7 @@ impl IU32 {
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiUnpackError> {
         let encoded_size =
             sol_data::Uint::<32>::ENCODED_SIZE.expect("U32 should have a fixed size");
         unpack_i32_type_instructions(
@@ -87,7 +95,9 @@ impl IU32 {
             compilation_ctx.memory_id,
             reader_pointer,
             encoded_size,
-        );
+        )?;
+
+        Ok(())
     }
 }
 
@@ -98,7 +108,7 @@ impl IU64 {
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiUnpackError> {
         let encoded_size =
             sol_data::Uint::<64>::ENCODED_SIZE.expect("U64 should have a fixed size");
         unpack_i64_type_instructions(
@@ -107,7 +117,9 @@ impl IU64 {
             compilation_ctx.memory_id,
             reader_pointer,
             encoded_size,
-        );
+        )?;
+
+        Ok(())
     }
 }
 
@@ -117,7 +129,7 @@ pub fn unpack_i32_type_instructions(
     memory: MemoryId,
     reader_pointer: LocalId,
     encoded_size: usize,
-) {
+) -> Result<(), AbiUnpackError> {
     // Load the value
     block.local_get(reader_pointer);
     block.load(
@@ -130,7 +142,7 @@ pub fn unpack_i32_type_instructions(
         },
     );
     // Big-endian to Little-endian
-    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
+    let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
     block.call(swap_i32_bytes_function);
 
     // increment reader pointer
@@ -138,6 +150,8 @@ pub fn unpack_i32_type_instructions(
     block.i32_const(encoded_size as i32);
     block.binop(BinaryOp::I32Add);
     block.local_set(reader_pointer);
+
+    Ok(())
 }
 
 pub fn unpack_i64_type_instructions(
@@ -146,7 +160,7 @@ pub fn unpack_i64_type_instructions(
     memory: MemoryId,
     reader_pointer: LocalId,
     encoded_size: usize,
-) {
+) -> Result<(), AbiUnpackError> {
     // Load the value
     block.local_get(reader_pointer);
     block.load(
@@ -159,7 +173,7 @@ pub fn unpack_i64_type_instructions(
         },
     );
     // Big-endian to Little-endian
-    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None);
+    let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
     block.call(swap_i64_bytes_function);
 
     // increment reader pointer
@@ -167,6 +181,8 @@ pub fn unpack_i64_type_instructions(
     block.i32_const(encoded_size as i32);
     block.binop(BinaryOp::I32Add);
     block.local_set(reader_pointer);
+
+    Ok(())
 }
 
 #[cfg(test)]

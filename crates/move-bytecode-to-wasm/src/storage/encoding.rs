@@ -19,6 +19,8 @@ use crate::{
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
+use super::error::{EncodeError, StorageError};
+
 /// Emits WASM instructions that encode a struct and write it into storage.
 ///
 /// Arguments:
@@ -43,21 +45,17 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
     slot_offset: LocalId,
     owner_ptr: Option<LocalId>,
     itype: &IntermediateType,
-) {
+) -> Result<(), StorageError> {
     // Host functions
     let (storage_cache, _) = storage_cache_bytes32(module);
 
     // Runtime functions
-    let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
+    let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
     let accumulate_or_advance_slot_write_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx));
+        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx))?;
 
     // Get the IStruct representation
-    let struct_ = compilation_ctx
-        .get_struct_by_intermediate_type(itype)
-        .unwrap_or_else(|_| {
-            panic!("there was an error encoding a struct for storage, found {itype:?}")
-        });
+    let struct_ = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
     let field_owner_ptr = module.locals.add(ValType::I32);
 
@@ -132,7 +130,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             field_owner_ptr,
             field,
             true,
-        );
+        )?;
     }
 
     // Always save the last slot
@@ -140,6 +138,8 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
         .local_get(slot_ptr)
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
         .call(storage_cache);
+
+    Ok(())
 }
 
 /// Emits WASM instructions that encode a tagged enum and write the active
@@ -167,24 +167,20 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
     slot_offset: LocalId,
     owner_ptr: LocalId,
     itype: &IntermediateType,
-) {
+) -> Result<(), StorageError> {
     // Host functions
     let (storage_cache, _) = storage_cache_bytes32(module);
 
     // Runtime functions
     let accumulate_or_advance_slot_write_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx));
-    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx));
+        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx))?;
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
+    let next_slot_fn = RuntimeFunction::StorageNextSlot.get(module, Some(compilation_ctx))?;
     let compute_enum_storage_tail_position_fn = RuntimeFunction::ComputeEnumStorageTailPosition
-        .get_generic(module, compilation_ctx, &[itype]);
+        .get_generic(module, compilation_ctx, &[itype])?;
 
     // Get the IEnum representation
-    let enum_ = compilation_ctx
-        .get_enum_by_intermediate_type(itype)
-        .unwrap_or_else(|_| {
-            panic!("there was an error encoding an enum for storage, found {itype:?}")
-        });
+    let enum_ = compilation_ctx.get_enum_by_intermediate_type(itype)?;
 
     // Compute the tail slot and tail offset for the enum
 
@@ -210,6 +206,7 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
         .local_set(variant_index);
 
     // Match on the variant and encode its fields.
+    let mut inner_result = Ok(());
     enum_.match_on_variant(builder, variant_index, |variant, block| {
         // Update the slot_offset to account for the variant index size.
         block
@@ -254,7 +251,7 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
             );
 
             // Encode the field
-            add_encode_intermediate_type_instructions(
+            inner_result = add_encode_intermediate_type_instructions(
                 module,
                 block,
                 compilation_ctx,
@@ -264,6 +261,10 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
                 field,
                 true,
             );
+
+            if inner_result.is_err() {
+                break;
+            }
         }
 
         // Handle leftover storage from large enum variants.
@@ -349,6 +350,8 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
             );
     });
 
+    inner_result?;
+
     // slot_offset = tail_slot_offset
     builder
         .local_get(tail_slot_ptr)
@@ -361,6 +364,8 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
             },
         )
         .local_set(slot_offset);
+
+    Ok(())
 }
 
 /// Emits WASM instructions to encode a vector and write it into storage,
@@ -385,18 +390,18 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     slot_ptr: LocalId,
     owner_ptr: LocalId,
     inner: &IntermediateType,
-) {
+) -> Result<(), StorageError> {
     // Host functions
     let (storage_cache, _) = storage_cache_bytes32(module);
     let (storage_load, _) = storage_load_bytes32(module);
     let (native_keccak, _) = native_keccak256(module);
 
     // Runtime functions
-    let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None);
+    let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None)?;
     let derive_dyn_array_slot_fn =
-        RuntimeFunction::DeriveDynArraySlot.get(module, Some(compilation_ctx));
+        RuntimeFunction::DeriveDynArraySlot.get(module, Some(compilation_ctx))?;
     let accumulate_or_advance_slot_write_fn =
-        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx));
+        RuntimeFunction::AccumulateOrAdvanceSlotWrite.get(module, Some(compilation_ctx))?;
 
     // Locals
     let elem_slot_ptr = module.locals.add(ValType::I32);
@@ -463,6 +468,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     let i = module.locals.add(ValType::I32);
     let elem_slot_offset = module.locals.add(ValType::I32);
 
+    let mut inner_result = Ok(());
     // If the old length is greater than the new length, we need to delete those residual elements from the storage.
     builder.block(None, |outer_block| {
         let outer_block_id = outer_block.id();
@@ -496,7 +502,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                 let loop_id = loop_.id();
 
                 // Delete the field from the storage
-                add_delete_field_instructions(
+                inner_result = add_delete_field_instructions(
                     module,
                     loop_,
                     compilation_ctx,
@@ -534,11 +540,14 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
             .call(storage_cache);
     });
 
+    inner_result?;
+
     // Reset the aux locals for the next loop
     // This loop encodes and saves the vector in memory to the storage.
     builder.i32_const(0).local_set(i);
     builder.i32_const(0).local_set(elem_slot_offset);
 
+    let mut inner_result = Ok(());
     // Loop through the vector and encode and save the elements to the storage.
     builder.block(None, |outer_block| {
         let outer_block_id = outer_block.id();
@@ -587,7 +596,7 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                 );
 
                 // Encode the intermediate type
-                add_encode_intermediate_type_instructions(
+                inner_result = add_encode_intermediate_type_instructions(
                     module,
                     loop_,
                     compilation_ctx,
@@ -625,6 +634,8 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
             .call(storage_cache);
     });
 
+    inner_result?;
+
     // Wipe the data so we can write the length of the vector
     builder
         .i32_const(DATA_SLOT_DATA_PTR_OFFSET)
@@ -645,6 +656,8 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
                 offset: 28,
             },
         );
+
+    Ok(())
 }
 
 /// Emits WASM instructions to encode an intermediate type and write it into a
@@ -672,7 +685,7 @@ pub fn add_encode_intermediate_type_instructions(
     owner_ptr: LocalId,
     itype: &IntermediateType,
     is_field: bool,
-) {
+) -> Result<(), StorageError> {
     // Locals
     let val_32 = module.locals.add(ValType::I32);
     let val_64 = module.locals.add(ValType::I64);
@@ -682,8 +695,9 @@ pub fn add_encode_intermediate_type_instructions(
     let storage_size = field_size(itype, compilation_ctx) as i32;
 
     // Runtime functions
-    let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
-    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
 
     match itype {
         IntermediateType::IBool
@@ -692,10 +706,10 @@ pub fn add_encode_intermediate_type_instructions(
         | IntermediateType::IU32
         | IntermediateType::IU64 => {
             let (val, load_kind, swap_fn) = if stack_size == 8 {
-                let swap_fn = RuntimeFunction::SwapI64Bytes.get(module, None);
+                let swap_fn = RuntimeFunction::SwapI64Bytes.get(module, None)?;
                 (val_64, LoadKind::I64 { atomic: false }, swap_fn)
             } else {
-                let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None);
+                let swap_fn = RuntimeFunction::SwapI32Bytes.get(module, None)?;
                 (val_32, LoadKind::I32 { atomic: false }, swap_fn)
             };
 
@@ -753,7 +767,7 @@ pub fn add_encode_intermediate_type_instructions(
                 );
         }
         IntermediateType::IU128 => {
-            let swap_fn = RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx));
+            let swap_fn = RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx))?;
 
             // Slot data plus offset as dest ptr
             builder.add_slot_data_ptr_plus_offset(slot_offset);
@@ -762,7 +776,7 @@ pub fn add_encode_intermediate_type_instructions(
             builder.call(swap_fn);
         }
         IntermediateType::IU256 => {
-            let swap_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
+            let swap_fn = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
 
             // Slot data plus offset as dest ptr (offset should be zero because data is already
             // 32 bytes in size)
@@ -800,9 +814,7 @@ pub fn add_encode_intermediate_type_instructions(
             builder.local_set(child_struct_ptr);
 
             // Get child struct by (module_id, index)
-            let child_struct = compilation_ctx
-                .get_struct_by_intermediate_type(itype)
-                .expect("struct not found");
+            let child_struct = compilation_ctx.get_struct_by_intermediate_type(itype)?;
 
             if child_struct.has_key {
                 // ====================================================================
@@ -852,7 +864,7 @@ pub fn add_encode_intermediate_type_instructions(
                     slot_offset,
                     None,
                     itype,
-                );
+                )?;
 
                 // After encoding the child struct, we need to store its UID in the
                 // parent struct's data so the parent can reference the child.
@@ -886,7 +898,7 @@ pub fn add_encode_intermediate_type_instructions(
                     slot_offset,
                     Some(owner_ptr),
                     itype,
-                );
+                )?;
             }
         }
         IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
@@ -901,7 +913,7 @@ pub fn add_encode_intermediate_type_instructions(
                 slot_offset,
                 owner_ptr,
                 itype,
-            );
+            )?;
         }
         IntermediateType::IVector(inner) => {
             builder.local_set(val_32);
@@ -914,10 +926,12 @@ pub fn add_encode_intermediate_type_instructions(
                 slot_ptr,
                 owner_ptr,
                 inner,
-            );
+            )?;
 
             builder.i32_const(32).local_set(slot_offset);
         }
-        e => todo!("{e:?}"),
+        _ => return Err(EncodeError::InvalidType(itype.clone()))?,
     };
+
+    Ok(())
 }

@@ -5,7 +5,7 @@ use walrus::{
 
 use crate::CompilationContext;
 
-use super::RuntimeFunction;
+use super::{RuntimeFunction, error::RuntimeFunctionError};
 
 /// Adds a function that swaps the bytes of an i32 value
 /// Useful for converting between Big-endian and Little-endian
@@ -120,7 +120,7 @@ pub fn swap_bytes_function<const N: u32>(
     module: &mut Module,
     compilation_ctx: &CompilationContext,
     name: String,
-) -> FunctionId {
+) -> Result<FunctionId, RuntimeFunctionError> {
     let mut function_builder =
         FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
     let mut function_body = function_builder.func_body();
@@ -129,7 +129,7 @@ pub fn swap_bytes_function<const N: u32>(
     let origin_ptr = module.locals.add(ValType::I32);
     let dest_ptr = module.locals.add(ValType::I32);
 
-    let swap_64 = RuntimeFunction::SwapI64Bytes.get(module, None);
+    let swap_64 = RuntimeFunction::SwapI64Bytes.get(module, None)?;
 
     // We leave in stack
     // dest ptr
@@ -165,5 +165,5 @@ pub fn swap_bytes_function<const N: u32>(
     }
 
     function_builder.name(name);
-    function_builder.finish(vec![origin_ptr, dest_ptr], &mut module.funcs)
+    Ok(function_builder.finish(vec![origin_ptr, dest_ptr], &mut module.funcs))
 }

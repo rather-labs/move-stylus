@@ -2,7 +2,10 @@ use crate::{
     CompilationContext, translation::intermediate_types::IntermediateType, utils::snake_to_camel,
 };
 
-use super::abi_encoding::{self, AbiFunctionSelector};
+use super::{
+    abi_encoding::{self, AbiFunctionSelector},
+    error::AbiError,
+};
 
 /// Calculate the function selector according to Solidity's [ABI encoding](https://docs.soliditylang.org/en/latest/abi-spec.html#function-selector)
 ///
@@ -11,7 +14,7 @@ pub fn move_signature_to_abi_selector(
     function_name: &str,
     signature: &[IntermediateType],
     compilation_ctx: &CompilationContext,
-) -> AbiFunctionSelector {
+) -> Result<AbiFunctionSelector, AbiError> {
     abi_encoding::move_signature_to_abi_selector(
         function_name,
         signature,
@@ -46,13 +49,13 @@ mod tests {
 
         let signature: &[IntermediateType] = &[IntermediateType::IU8, IntermediateType::IU16];
         assert_eq!(
-            move_signature_to_abi_selector("test", signature, &compilation_ctx),
+            move_signature_to_abi_selector("test", signature, &compilation_ctx).unwrap(),
             selector("test(uint8,uint16)")
         );
 
         let signature: &[IntermediateType] = &[IntermediateType::IAddress, IntermediateType::IU256];
         assert_eq!(
-            move_signature_to_abi_selector("transfer", signature, &compilation_ctx),
+            move_signature_to_abi_selector("transfer", signature, &compilation_ctx).unwrap(),
             selector("transfer(address,uint256)")
         );
 
@@ -63,7 +66,7 @@ mod tests {
             IntermediateType::IVector(Box::new(IntermediateType::IBool)),
         ];
         assert_eq!(
-            move_signature_to_abi_selector("set_owner", signature, &compilation_ctx),
+            move_signature_to_abi_selector("set_owner", signature, &compilation_ctx).unwrap(),
             selector("setOwner(address,uint64,bool[])")
         );
 
@@ -72,7 +75,7 @@ mod tests {
             IntermediateType::IVector(Box::new(IntermediateType::IBool)),
         ];
         assert_eq!(
-            move_signature_to_abi_selector("test_array", signature, &compilation_ctx),
+            move_signature_to_abi_selector("test_array", signature, &compilation_ctx).unwrap(),
             selector("testArray(uint128[],bool[])")
         );
 
@@ -83,7 +86,7 @@ mod tests {
             IntermediateType::IVector(Box::new(IntermediateType::IBool)),
         ];
         assert_eq!(
-            move_signature_to_abi_selector("test_array", signature, &compilation_ctx),
+            move_signature_to_abi_selector("test_array", signature, &compilation_ctx).unwrap(),
             selector("testArray(uint128[][],bool[])")
         );
 
@@ -153,7 +156,7 @@ mod tests {
 
         compilation_ctx.root_module_data = &module_data;
         assert_eq!(
-            move_signature_to_abi_selector("test_struct", signature, &compilation_ctx),
+            move_signature_to_abi_selector("test_struct", signature, &compilation_ctx).unwrap(),
             selector(
                 "testStruct((address,uint32[],uint128[],bool,uint8,uint16,uint32,uint64,uint128,uint256,(uint32,uint128)),(uint32,uint128)[])"
             )

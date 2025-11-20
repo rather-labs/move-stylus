@@ -145,7 +145,7 @@ impl IStruct {
                 compilation_ctx.memory_id,
                 reference_value,
                 writer_pointer,
-            );
+            )?;
         } else {
             block.local_get(writer_pointer).local_set(data_ptr);
         }

@@ -49,11 +49,11 @@ impl<'a> PublicFunction<'a> {
         function_name: &str,
         signature: &'a ISignature,
         compilation_ctx: &CompilationContext,
-    ) -> Result<Self, PublicFunctionValidationError> {
+    ) -> Result<Self, AbiError> {
         Self::check_signature_arguments(function_name, &signature.arguments)?;
 
         let function_selector =
-            move_signature_to_abi_selector(function_name, &signature.arguments, compilation_ctx);
+            move_signature_to_abi_selector(function_name, &signature.arguments, compilation_ctx)?;
 
         Ok(Self {
             function_id,
@@ -83,6 +83,12 @@ impl<'a> PublicFunction<'a> {
         dynamic_fields_global_variables: &Vec<(GlobalId, IntermediateType)>,
     ) -> Result<(), AbiError> {
         let mut inner_result = Ok(());
+        let commit_changes_to_storage_function = RuntimeFunction::get_commit_changes_to_storage_fn(
+            module,
+            compilation_ctx,
+            dynamic_fields_global_variables,
+        )?;
+
         router_builder.block(None, |block| {
             let block_id = block.id();
 
@@ -129,12 +135,6 @@ impl<'a> PublicFunction<'a> {
 
             // TODO: This is repeated for every function, we should move this and the return below
             // outside this into the main body of the entrypoint so we don't needlesly repeat code
-            let commit_changes_to_storage_function =
-                RuntimeFunction::get_commit_changes_to_storage_fn(
-                    module,
-                    compilation_ctx,
-                    dynamic_fields_global_variables,
-                );
             block.call(commit_changes_to_storage_function);
 
             // Return status
@@ -777,6 +777,10 @@ mod tests {
             .err()
             .unwrap();
 
+        let err = match err {
+            AbiError::PublicFunction(e) => e,
+            _ => panic!("expected PublicFunctionValidationError"),
+        };
         assert_eq!(
             PublicFunctionValidationError::SignatureArgumentPosition(2, "test_function".to_owned()),
             err
@@ -811,6 +815,10 @@ mod tests {
             .err()
             .unwrap();
 
+        let err = match err {
+            AbiError::PublicFunction(e) => e,
+            _ => panic!("expected PublicFunctionValidationError"),
+        };
         assert_eq!(
             PublicFunctionValidationError::ComplexTypeContainsSigner(3, "test_function".to_owned()),
             err
@@ -848,6 +856,10 @@ mod tests {
             .err()
             .unwrap();
 
+        let err = match err {
+            AbiError::PublicFunction(e) => e,
+            _ => panic!("expected PublicFunctionValidationError"),
+        };
         assert_eq!(
             PublicFunctionValidationError::ComplexTypeContainsSigner(3, "test_function".to_owned()),
             err

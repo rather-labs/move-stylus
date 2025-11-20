@@ -10,6 +10,8 @@ use crate::{
 
 use crate::CompilationContext;
 
+use super::error::AbiUnpackError;
+
 impl String_ {
     pub fn add_unpack_instructions(
         block: &mut InstrSeqBuilder,
@@ -17,9 +19,9 @@ impl String_ {
         reader_pointer: LocalId,
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiUnpackError> {
         // Big-endian to Little-endian
-        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
+        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
 
         let data_reader_pointer = module.locals.add(ValType::I32);
 
@@ -223,5 +225,7 @@ impl String_ {
 
         // Return the String struct
         block.local_get(struct_ptr);
+
+        Ok(())
     }
 }

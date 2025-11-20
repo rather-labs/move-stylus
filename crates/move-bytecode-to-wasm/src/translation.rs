@@ -32,7 +32,7 @@ use move_binary_format::{
 
 use crate::{
     CompilationContext,
-    abi_types::error_encoding::build_abort_error_message,
+    abi_types::{error::AbiError, error_encoding::build_abort_error_message},
     compilation_context::{ModuleData, ModuleId},
     data::DATA_ABORT_MESSAGE_PTR_OFFSET,
     generics::{replace_type_parameters, type_contains_generics},
@@ -731,7 +731,7 @@ fn translate_instruction(
                     module,
                     compilation_ctx,
                     &[&parent_struct],
-                );
+                )?;
 
                 // At this point, in the stack que have the pointer to the Uid struct, but what we
                 // really need is the pointer to the struct that holds that UId. The struct ptr can
@@ -989,7 +989,7 @@ fn translate_instruction(
                     module,
                     compilation_ctx,
                     &[&parent_struct],
-                );
+                )?;
 
                 // At this point, in the stack que have the pointer to the Uid struct, but what we
                 // really need is the pointer to the struct that holds that UId. The struct ptr can
@@ -1062,7 +1062,7 @@ fn translate_instruction(
                                 compilation_ctx,
                                 &mapped_function.signature.arguments,
                                 function_locals,
-                            );
+                            )?;
                             let (flush_cache_fn, _) = storage_flush_cache(module);
                             builder.i32_const(1).call(flush_cache_fn);
 
@@ -1284,7 +1284,7 @@ fn translate_instruction(
                 compilation_ctx,
                 module_data,
                 local,
-            );
+            )?;
             types_stack.push(local_type);
         }
         Bytecode::ImmBorrowLoc(local_id) => {
@@ -1566,7 +1566,7 @@ fn translate_instruction(
                 });
             }
 
-            IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx);
+            IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx)?;
 
             types_stack.push(IntermediateType::IRef(Box::new(*vec_inner)));
         }
@@ -1593,7 +1593,7 @@ fn translate_instruction(
                 });
             }
 
-            IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx);
+            IVector::vec_borrow_instructions(&vec_inner, module, builder, compilation_ctx)?;
 
             types_stack.push(IntermediateType::IMutRef(Box::new(*vec_inner)));
         }
@@ -1696,12 +1696,12 @@ fn translate_instruction(
                 | IntermediateType::IEnum { .. }
                 | IntermediateType::IGenericEnumInstance { .. } => {
                     let pop_back_f =
-                        RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx));
+                        RuntimeFunction::VecPopBack32.get(module, Some(compilation_ctx))?;
                     builder.call(pop_back_f);
                 }
                 IntermediateType::IU64 => {
                     let pop_back_f =
-                        RuntimeFunction::VecPopBack64.get(module, Some(compilation_ctx));
+                        RuntimeFunction::VecPopBack64.get(module, Some(compilation_ctx))?;
                     builder.call(pop_back_f);
                 }
                 IntermediateType::ITypeParameter(_)
@@ -1758,7 +1758,7 @@ fn translate_instruction(
                 builder,
                 compilation_ctx,
                 module_data,
-            );
+            )?;
         }
         Bytecode::VecSwap(signature_index) => {
             let [id2_ty, id1_ty, ref_ty] = types_stack.pop_n_from_stack()?;
@@ -1798,11 +1798,11 @@ fn translate_instruction(
 
             match *vec_inner {
                 IntermediateType::IU64 => {
-                    let swap_f = RuntimeFunction::VecSwap64.get(module, Some(compilation_ctx));
+                    let swap_f = RuntimeFunction::VecSwap64.get(module, Some(compilation_ctx))?;
                     builder.call(swap_f);
                 }
                 _ => {
-                    let swap_f = RuntimeFunction::VecSwap32.get(module, Some(compilation_ctx));
+                    let swap_f = RuntimeFunction::VecSwap32.get(module, Some(compilation_ctx))?;
                     builder.call(swap_f);
                 }
             }
@@ -1853,7 +1853,7 @@ fn translate_instruction(
                 ref_type
             ));
 
-            inner.add_read_ref_instructions(builder, module, compilation_ctx, module_data);
+            inner.add_read_ref_instructions(builder, module, compilation_ctx, module_data)?;
             types_stack.push(*inner);
         }
         Bytecode::WriteRef => {
@@ -1862,7 +1862,7 @@ fn translate_instruction(
             types_stack::match_types!((IntermediateType::IMutRef(inner), "IMutRef", iref));
 
             if *inner == value_type {
-                inner.add_write_ref_instructions(module, builder, compilation_ctx);
+                inner.add_write_ref_instructions(module, builder, compilation_ctx)?;
             } else {
                 Err(TranslationError::TypeMismatch {
                     expected: *inner,
@@ -1898,7 +1898,7 @@ fn translate_instruction(
                     compilation_ctx,
                     &mapped_function.signature.arguments,
                     function_locals,
-                );
+                )?;
             }
 
             prepare_function_return(
@@ -1918,22 +1918,22 @@ fn translate_instruction(
         }
         Bytecode::CastU8 => {
             let original_type = types_stack.pop()?;
-            IU8::cast_from(builder, module, original_type, compilation_ctx);
+            IU8::cast_from(builder, module, original_type, compilation_ctx)?;
             types_stack.push(IntermediateType::IU8);
         }
         Bytecode::CastU16 => {
             let original_type = types_stack.pop()?;
-            IU16::cast_from(builder, module, original_type, compilation_ctx);
+            IU16::cast_from(builder, module, original_type, compilation_ctx)?;
             types_stack.push(IntermediateType::IU16);
         }
         Bytecode::CastU32 => {
             let original_type = types_stack.pop()?;
-            IU32::cast_from(builder, module, original_type, compilation_ctx);
+            IU32::cast_from(builder, module, original_type, compilation_ctx)?;
             types_stack.push(IntermediateType::IU32);
         }
         Bytecode::CastU64 => {
             let original_type = types_stack.pop()?;
-            IU64::cast_from(builder, module, original_type, compilation_ctx);
+            IU64::cast_from(builder, module, original_type, compilation_ctx)?;
             types_stack.push(IntermediateType::IU64);
         }
         Bytecode::CastU128 => {
@@ -1957,12 +1957,12 @@ fn translate_instruction(
             }
 
             match t1 {
-                IntermediateType::IU8 => IU8::add(builder, module),
-                IntermediateType::IU16 => IU16::add(builder, module),
-                IntermediateType::IU32 => IU32::add(builder, module),
-                IntermediateType::IU64 => IU64::add(builder, module),
-                IntermediateType::IU128 => IU128::add(builder, module, compilation_ctx),
-                IntermediateType::IU256 => IU256::add(builder, module, compilation_ctx),
+                IntermediateType::IU8 => IU8::add(builder, module)?,
+                IntermediateType::IU16 => IU16::add(builder, module)?,
+                IntermediateType::IU32 => IU32::add(builder, module)?,
+                IntermediateType::IU64 => IU64::add(builder, module)?,
+                IntermediateType::IU128 => IU128::add(builder, module, compilation_ctx)?,
+                IntermediateType::IU256 => IU256::add(builder, module, compilation_ctx)?,
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Add,
                     operands_types: t1,
@@ -1982,12 +1982,12 @@ fn translate_instruction(
             }
 
             match t1 {
-                IntermediateType::IU8 => IU8::sub(builder, module),
-                IntermediateType::IU16 => IU16::sub(builder, module),
-                IntermediateType::IU32 => IU32::sub(builder, module),
-                IntermediateType::IU64 => IU64::sub(builder, module),
-                IntermediateType::IU128 => IU128::sub(builder, module, compilation_ctx),
-                IntermediateType::IU256 => IU256::sub(builder, module, compilation_ctx),
+                IntermediateType::IU8 => IU8::sub(builder, module)?,
+                IntermediateType::IU16 => IU16::sub(builder, module)?,
+                IntermediateType::IU32 => IU32::sub(builder, module)?,
+                IntermediateType::IU64 => IU64::sub(builder, module)?,
+                IntermediateType::IU128 => IU128::sub(builder, module, compilation_ctx)?,
+                IntermediateType::IU256 => IU256::sub(builder, module, compilation_ctx)?,
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Sub,
                     operands_types: t1,
@@ -2007,12 +2007,12 @@ fn translate_instruction(
             }
 
             match t1 {
-                IntermediateType::IU8 => IU8::mul(builder, module),
-                IntermediateType::IU16 => IU16::mul(builder, module),
-                IntermediateType::IU32 => IU32::mul(builder, module),
-                IntermediateType::IU64 => IU64::mul(builder, module),
-                IntermediateType::IU128 => IU128::mul(builder, module, compilation_ctx),
-                IntermediateType::IU256 => IU256::mul(builder, module, compilation_ctx),
+                IntermediateType::IU8 => IU8::mul(builder, module)?,
+                IntermediateType::IU16 => IU16::mul(builder, module)?,
+                IntermediateType::IU32 => IU32::mul(builder, module)?,
+                IntermediateType::IU64 => IU64::mul(builder, module)?,
+                IntermediateType::IU128 => IU128::mul(builder, module, compilation_ctx)?,
+                IntermediateType::IU256 => IU256::mul(builder, module, compilation_ctx)?,
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Mul,
                     operands_types: t1,
@@ -2036,8 +2036,8 @@ fn translate_instruction(
                 IntermediateType::IU16 => IU16::div(builder),
                 IntermediateType::IU32 => IU32::div(builder),
                 IntermediateType::IU64 => IU64::div(builder),
-                IntermediateType::IU128 => IU128::div(builder, module, compilation_ctx),
-                IntermediateType::IU256 => IU256::div(builder, module, compilation_ctx),
+                IntermediateType::IU128 => IU128::div(builder, module, compilation_ctx)?,
+                IntermediateType::IU256 => IU256::div(builder, module, compilation_ctx)?,
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Div,
                     operands_types: t1,
@@ -2064,12 +2064,14 @@ fn translate_instruction(
                     builder.binop(BinaryOp::I64LtU);
                 }
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     builder.i32_const(IU128::HEAP_SIZE).call(less_than_f);
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     builder.i32_const(IU256::HEAP_SIZE).call(less_than_f);
                 }
@@ -2101,7 +2103,8 @@ fn translate_instruction(
                 // For u128 and u256 instead of doing a <= b, we do !(b < a) == a <= b, this way
                 // we can reuse the LessThan function
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
@@ -2114,7 +2117,8 @@ fn translate_instruction(
                         .negate();
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     // Temp variables to perform the swap
                     let a = module.locals.add(ValType::I32);
@@ -2154,7 +2158,8 @@ fn translate_instruction(
                 // For u128 and u256 instead of doing a > b, we do b < a, this way we can reuse the
                 // LessThan function
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
@@ -2165,7 +2170,8 @@ fn translate_instruction(
                         .call(less_than_f);
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     let a = module.locals.add(ValType::I32);
                     let b = module.locals.add(ValType::I32);
@@ -2203,7 +2209,8 @@ fn translate_instruction(
                 // For u128 and u256 instead of doing a >= b, we do !(a < b) == a >= b, this way we can reuse the
                 // LessThan function
                 IntermediateType::IU128 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     // Compare
                     builder
@@ -2212,7 +2219,8 @@ fn translate_instruction(
                         .negate();
                 }
                 IntermediateType::IU256 => {
-                    let less_than_f = RuntimeFunction::LessThan.get(module, Some(compilation_ctx));
+                    let less_than_f =
+                        RuntimeFunction::LessThan.get(module, Some(compilation_ctx))?;
 
                     builder
                         .i32_const(IU256::HEAP_SIZE)
@@ -2242,8 +2250,8 @@ fn translate_instruction(
                 IntermediateType::IU16 => IU16::remainder(builder),
                 IntermediateType::IU32 => IU32::remainder(builder),
                 IntermediateType::IU64 => IU64::remainder(builder),
-                IntermediateType::IU128 => IU128::remainder(builder, module, compilation_ctx),
-                IntermediateType::IU256 => IU256::remainder(builder, module, compilation_ctx),
+                IntermediateType::IU128 => IU128::remainder(builder, module, compilation_ctx)?,
+                IntermediateType::IU256 => IU256::remainder(builder, module, compilation_ctx)?,
                 _ => Err(TranslationError::InvalidBinaryOperation {
                     operation: Bytecode::Mod,
                     operands_types: t1,
@@ -2262,7 +2270,7 @@ fn translate_instruction(
                 });
             }
 
-            t1.load_equality_instructions(module, builder, compilation_ctx, module_data);
+            t1.load_equality_instructions(module, builder, compilation_ctx, module_data)?;
 
             types_stack.push(IntermediateType::IBool);
         }
@@ -2276,7 +2284,7 @@ fn translate_instruction(
                 });
             }
 
-            t1.load_not_equality_instructions(module, builder, compilation_ctx, module_data);
+            t1.load_not_equality_instructions(module, builder, compilation_ctx, module_data)?;
 
             types_stack.push(IntermediateType::IBool);
         }
@@ -2364,7 +2372,8 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IU64)?;
 
             // Returns a ptr to the encoded error message
-            let ptr = build_abort_error_message(builder, module, compilation_ctx);
+            let ptr = build_abort_error_message(builder, module, compilation_ctx)
+                .map_err(AbiError::from)?;
 
             // Store the ptr at DATA_ABORT_MESSAGE_PTR_OFFSET
             builder
@@ -2417,12 +2426,12 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IU8)?;
             let t = types_stack.pop()?;
             match t {
-                IntermediateType::IU8 => IU8::bit_shift_left(builder, module),
-                IntermediateType::IU16 => IU16::bit_shift_left(builder, module),
-                IntermediateType::IU32 => IU32::bit_shift_left(builder, module),
-                IntermediateType::IU64 => IU64::bit_shift_left(builder, module),
-                IntermediateType::IU128 => IU128::bit_shift_left(builder, module, compilation_ctx),
-                IntermediateType::IU256 => IU256::bit_shift_left(builder, module, compilation_ctx),
+                IntermediateType::IU8 => IU8::bit_shift_left(builder, module)?,
+                IntermediateType::IU16 => IU16::bit_shift_left(builder, module)?,
+                IntermediateType::IU32 => IU32::bit_shift_left(builder, module)?,
+                IntermediateType::IU64 => IU64::bit_shift_left(builder, module)?,
+                IntermediateType::IU128 => IU128::bit_shift_left(builder, module, compilation_ctx)?,
+                IntermediateType::IU256 => IU256::bit_shift_left(builder, module, compilation_ctx)?,
                 _ => Err(TranslationError::InvalidOperation {
                     operation: Bytecode::Shl,
                     operand_type: t.clone(),
@@ -2434,12 +2443,16 @@ fn translate_instruction(
             types_stack.pop_expecting(&IntermediateType::IU8)?;
             let t = types_stack.pop()?;
             match t {
-                IntermediateType::IU8 => IU8::bit_shift_right(builder, module),
-                IntermediateType::IU16 => IU16::bit_shift_right(builder, module),
-                IntermediateType::IU32 => IU32::bit_shift_right(builder, module),
-                IntermediateType::IU64 => IU64::bit_shift_right(builder, module),
-                IntermediateType::IU128 => IU128::bit_shift_right(builder, module, compilation_ctx),
-                IntermediateType::IU256 => IU256::bit_shift_right(builder, module, compilation_ctx),
+                IntermediateType::IU8 => IU8::bit_shift_right(builder, module)?,
+                IntermediateType::IU16 => IU16::bit_shift_right(builder, module)?,
+                IntermediateType::IU32 => IU32::bit_shift_right(builder, module)?,
+                IntermediateType::IU64 => IU64::bit_shift_right(builder, module)?,
+                IntermediateType::IU128 => {
+                    IU128::bit_shift_right(builder, module, compilation_ctx)?
+                }
+                IntermediateType::IU256 => {
+                    IU256::bit_shift_right(builder, module, compilation_ctx)?
+                }
                 _ => Err(TranslationError::InvalidOperation {
                     operation: Bytecode::Shr,
                     operand_type: t.clone(),
@@ -3030,7 +3043,7 @@ fn add_cache_storage_object_instructions(
     compilation_ctx: &CompilationContext,
     function_argumets: &[IntermediateType],
     function_locals: &[LocalId],
-) {
+) -> Result<(), TranslationError> {
     let object_to_cache = function_argumets
         .iter()
         .enumerate()
@@ -3056,12 +3069,14 @@ fn add_cache_storage_object_instructions(
 
     for (itype, wasm_local_var) in object_to_cache {
         let cache_storage_object_changes_fn = RuntimeFunction::CacheStorageObjectChanges
-            .get_generic(module, compilation_ctx, &[itype]);
+            .get_generic(module, compilation_ctx, &[itype])?;
 
         builder
             .local_get(wasm_local_var)
             .call(cache_storage_object_changes_fn);
     }
+
+    Ok(())
 }
 
 /// This function checks if the field we are borrowing from struct is a UID or NamedId. If we are

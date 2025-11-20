@@ -63,8 +63,8 @@ pub fn add_external_contract_call_fn(
     let (call_contract, _) = call_contract(module);
     let (delegate_call_contract, _) = delegate_call_contract(module);
     let (static_call_contract, _) = static_call_contract(module);
-    let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None);
-    let swap = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
+    let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None)?;
+    let swap = RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
 
     let mut arguments = function_information.signature.get_argument_wasm_types();
 
@@ -189,7 +189,8 @@ pub fn add_external_contract_call_fn(
         &function_information.function_id.identifier,
         calldata_arguments,
         compilation_ctx,
-    );
+    )
+    .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
 
     // Save the function selector before the arguments
     builder
@@ -665,8 +666,9 @@ pub fn add_external_contract_call_fn(
 
     if !storage_objects.is_empty() {
         let locate_storage_data_fn =
-            RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx));
+            RuntimeFunction::LocateStorageData.get(module, Some(compilation_ctx))?;
 
+        let mut inner_result = Ok(());
         builder.block(None, |block| {
             let block_id = block.id();
 
@@ -724,59 +726,67 @@ pub fn add_external_contract_call_fn(
                 let read_and_decode_from_storage_fn = RuntimeFunction::ReadAndDecodeFromStorage
                     .get_generic(module, compilation_ctx, &[&storage_obj_itype]);
 
-                block
-                    .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
-                    .local_get(uid_ptr)
-                    .call(read_and_decode_from_storage_fn)
-                    .local_set(new_struct_ptr);
+                match read_and_decode_from_storage_fn {
+                    Err(e) => {
+                        inner_result = Err(e);
+                    }
+                    Ok(read_and_decode_from_storage_fn) => {
+                        block
+                            .i32_const(DATA_OBJECTS_MAPPING_SLOT_NUMBER_OFFSET)
+                            .local_get(uid_ptr)
+                            .call(read_and_decode_from_storage_fn)
+                            .local_set(new_struct_ptr);
 
-                // Once we return from the reading the allegedly modified object from storage, we
-                // replace the old pointer representation with the new one returned by the
-                // function.
-                // If it happens that the owner changed in the delegated call, the object will NOT
-                // be located by locate_storage_data_fn and it will throw an unrechable.
-                // That's ok, if the delegate call changed the owner, we can't continue handling
-                // the object here
-                //
-                // By overwriting the struct, we update the data that could have change in the
-                // call. For example, if we have the struct
-                //
-                // publict structr Foo {
-                //      id: UID,
-                //      value: u64,
-                // }
-                //
-                // The underlying representation in memory will be:
-                //
-                // 0xX: [ptr_uid, ptr_value]
-                //
-                // located at address 0xX
-                //
-                // After the read_and_decode_from_storage_fn execution, we will have in a new
-                // memory location 0xY another representation of the struct with the possibly
-                // updated balues by the delegate call:
-                //
-                // 0xY: [ptr_uid_updated, ptr_value_updated]
-                //
-                // located at address 0xY
-                //
-                // (NOTE: The uid is not really updated, is just to reflect that those are new
-                // pointers)
-                //
-                // Since the struct located at 0xY contains the updated values by the delegated
-                // call but in our current execution, all the references of Foo are pointing to
-                // 0xX, we replace all the pointers in 0xX for the pointers of 0xY, since the ones
-                // in 0xY are pointing to the updated values. So at the end of the delegate call,
-                // the Foo located at 0xX will have the following representation in memory;
-                //
-                // 0xX: [ptr_uid_updated, ptr_value_updated]
-                block
-                    .local_get(original_struct_ptr)
-                    .local_get(new_struct_ptr)
-                    .i32_const(storage_obj.heap_size as i32)
-                    .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                        // Once we return from the reading the allegedly modified object from storage, we
+                        // replace the old pointer representation with the new one returned by the
+                        // function.
+                        // If it happens that the owner changed in the delegated call, the object will NOT
+                        // be located by locate_storage_data_fn and it will throw an unrechable.
+                        // That's ok, if the delegate call changed the owner, we can't continue handling
+                        // the object here
+                        //
+                        // By overwriting the struct, we update the data that could have change in the
+                        // call. For example, if we have the struct
+                        //
+                        // publict structr Foo {
+                        //      id: UID,
+                        //      value: u64,
+                        // }
+                        //
+                        // The underlying representation in memory will be:
+                        //
+                        // 0xX: [ptr_uid, ptr_value]
+                        //
+                        // located at address 0xX
+                        //
+                        // After the read_and_decode_from_storage_fn execution, we will have in a new
+                        // memory location 0xY another representation of the struct with the possibly
+                        // updated balues by the delegate call:
+                        //
+                        // 0xY: [ptr_uid_updated, ptr_value_updated]
+                        //
+                        // located at address 0xY
+                        //
+                        // (NOTE: The uid is not really updated, is just to reflect that those are new
+                        // pointers)
+                        //
+                        // Since the struct located at 0xY contains the updated values by the delegated
+                        // call but in our current execution, all the references of Foo are pointing to
+                        // 0xX, we replace all the pointers in 0xX for the pointers of 0xY, since the ones
+                        // in 0xY are pointing to the updated values. So at the end of the delegate call,
+                        // the Foo located at 0xX will have the following representation in memory;
+                        //
+                        // 0xX: [ptr_uid_updated, ptr_value_updated]
+                        block
+                            .local_get(original_struct_ptr)
+                            .local_get(new_struct_ptr)
+                            .i32_const(storage_obj.heap_size as i32)
+                            .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
+                    }
+                }
             }
         });
+        inner_result?;
     }
 
     // After the call we read the data
