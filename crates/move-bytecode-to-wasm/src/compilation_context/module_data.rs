@@ -33,7 +33,10 @@ use move_package::{
     compilation::compiled_package::CompiledUnitWithSource,
     source_package::parsed_manifest::PackageName,
 };
-use move_parse_special_attributes::SpecialAttributes;
+use move_parse_special_attributes::{
+    SpecialAttributes,
+    function_modifiers::{Function, FunctionModifier},
+};
 use std::{
     collections::HashMap,
     fmt::{Debug, Display},
@@ -210,7 +213,8 @@ impl ModuleData {
             &datatype_handles_map,
             function_definitions,
             move_module_dependencies,
-        );
+            &special_attributes,
+        )?;
 
         let signatures = move_module_unit
             .signatures()
@@ -671,13 +675,26 @@ impl ModuleData {
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         function_definitions: &mut GlobalFunctionTable<'move_package>,
         move_module_dependencies: &'move_package [(PackageName, CompiledUnitWithSource)],
-    ) -> FunctionData {
+        special_attributes: &SpecialAttributes,
+    ) -> Result<FunctionData> {
         // Return types of functions in intermediate types. Used to fill the stack type
         let mut functions_returns = Vec::new();
         let mut functions_arguments = Vec::new();
         let mut function_calls = Vec::new();
         let mut function_information = Vec::new();
-        let mut init = None;
+
+        // Special functions
+        struct ReservedFunctions {
+            init: Option<FunctionId>,
+            receive: Option<FunctionId>,
+            fallback: Option<FunctionId>,
+        }
+
+        let mut reserved_functions = ReservedFunctions {
+            init: None,
+            receive: None,
+            fallback: None,
+        };
 
         for (index, function) in move_module.function_handles().iter().enumerate() {
             let move_function_arguments = &move_module.signature_at(function.parameters);
@@ -754,10 +771,41 @@ impl ModuleData {
                 );
 
                 if is_init {
-                    if init.is_some() {
+                    if reserved_functions.init.is_some() {
                         panic!("There can be only a single init function per module.");
                     }
-                    init = Some(function_id.clone());
+                    reserved_functions.init = Some(function_id.clone());
+                }
+
+                let function_sa = special_attributes
+                    .functions
+                    .iter()
+                    .find(|f| f.name == function_name)
+                    .or_else(|| special_attributes.external_calls.get(function_name))
+                    .expect("function not found in special attributes");
+
+                let is_receive = Self::is_receive(
+                    &function_id,
+                    move_function_arguments,
+                    move_function_return,
+                    function_def,
+                    function_sa,
+                )?;
+
+                if is_receive {
+                    if reserved_functions.receive.is_some() {
+                        return Err(CompilationContextError::DuplicateReceiveFunction);
+                    }
+                    reserved_functions.receive = Some(function_id.clone());
+                }
+
+                let is_fallback = Self::is_fallback(&function_id, function_def)?;
+
+                if is_fallback {
+                    if reserved_functions.fallback.is_some() {
+                        return Err(CompilationContextError::DuplicateFallbackFunction);
+                    }
+                    reserved_functions.fallback = Some(function_id.clone());
                 }
 
                 function_information.push(MappedFunction::new(
@@ -806,14 +854,16 @@ impl ModuleData {
             generic_function_calls.push(function_id);
         }
 
-        FunctionData {
+        Ok(FunctionData {
             arguments: functions_arguments,
             returns: functions_returns,
             calls: function_calls,
             generic_calls: generic_function_calls,
             information: function_information,
-            init,
-        }
+            init: reserved_functions.init,
+            receive: reserved_functions.receive,
+            fallback: reserved_functions.fallback,
+        })
     }
 
     pub fn get_signatures_by_index(&self, index: SignatureIndex) -> Result<&Vec<IntermediateType>> {
@@ -1001,5 +1051,78 @@ impl ModuleData {
         }
 
         true
+    }
+
+    // Determines whether a function is a valid receive function.
+    // Returns true if the function is a valid receive function, otherwise returns false.
+    // If the function name is "Receive" but does not fulfill the requirements, returns an error.
+    fn is_receive(
+        function_id: &FunctionId,
+        move_function_arguments: &Signature,
+        move_function_return: &Signature,
+        function_def: &FunctionDefinition,
+        function_sa: &Function,
+    ) -> Result<bool> {
+        // Receive function definition (see https://docs.soliditylang.org/en/latest/contracts.html#receive-ether-function):
+        // - A contract can have at most one receive function, declared using receive() external payable { ... } (without the function keyword).
+        // - This function cannot have arguments, cannot return anything and must have external visibility and payable state mutability.
+        // - It can be virtual, can override and can have modifiers. (TODO: can we check this?)
+
+        const RECEIVE_FUNCTION_NAME: &str = "receive";
+
+        // Must be named `receive`. Otherwise, it is not a receive function.
+        if function_id.identifier != RECEIVE_FUNCTION_NAME {
+            return Ok(false);
+        }
+
+        // Since the function is named `receive`, we must verify that it satisfies all specified constraints.
+        // If any requirement is not fulfilled, an error will be returned; otherwise return true.
+
+        // Must have external visibility, i.e. it must be entry
+        if !function_def.is_entry {
+            return Err(CompilationContextError::ReceiveFunctionBadVisibility);
+        }
+
+        // Must have no arguments
+        if !move_function_arguments.is_empty() {
+            return Err(CompilationContextError::ReceiveFunctionHasArguments);
+        }
+
+        // Must have no return values
+        if !move_function_return.is_empty() {
+            return Err(CompilationContextError::ReceiveFunctionHasReturns);
+        }
+
+        // Must be payable
+        if !function_sa.modifiers.contains(&FunctionModifier::Payable) {
+            return Err(CompilationContextError::ReceiveFunctionIsNotPayable);
+        }
+
+        Ok(true)
+    }
+
+    // Determines whether a function is a valid fallback function.
+    // Returns true if the function is a valid fallback function, otherwise returns false.
+    // If the function name is "Fallback" but does not fulfill the requirements, returns an error.
+    fn is_fallback(function_id: &FunctionId, function_def: &FunctionDefinition) -> Result<bool> {
+        // Fallback function definition (see https://docs.soliditylang.org/en/latest/contracts.html#fallback-function):
+        // A contract can have at most one fallback function, declared using either fallback () external [payable]
+        // or fallback (bytes calldata input) external [payable] returns (bytes memory output) (both without the function keyword).
+        // This function must have external visibility, but it is not required to be payable.
+        // A fallback function can be virtual, can override and can have modifiers.
+
+        const FALLBACK_FUNCTION_NAME: &str = "fallback";
+
+        // Must be named `fallback`. Otherwise, it is not a fallback function.
+        if function_id.identifier != FALLBACK_FUNCTION_NAME {
+            return Ok(false);
+        }
+
+        // Must have external visibility, i.e. it must be entry
+        if !function_def.is_entry {
+            return Err(CompilationContextError::FallbackFunctionBadVisibility);
+        }
+
+        Ok(true)
     }
 }

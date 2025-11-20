@@ -25,6 +25,12 @@ pub struct FunctionData {
 
     /// The init function of the module.
     pub init: Option<FunctionId>,
+
+    /// The receive function of the module.
+    pub receive: Option<FunctionId>,
+
+    /// The fallback function of the module.
+    pub fallback: Option<FunctionId>,
 }
 
 impl FunctionData {
