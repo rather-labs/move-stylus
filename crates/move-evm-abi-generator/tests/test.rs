@@ -39,6 +39,21 @@ use rstest::rstest;
     "modules/events/events_anon_2.move",
     "json_format/events/events_anon_2.json"
 )]
+#[case(
+    "generic_events",
+    "modules/events/generic_events.move",
+    "json_format/events/generic_events.json"
+)]
+#[case(
+    "generics_1",
+    "modules/structs/generics_1.move",
+    "json_format/structs/generics_1.json"
+)]
+#[case(
+    "misc_structs",
+    "modules/structs/misc_structs.move",
+    "json_format/structs/misc_structs.json"
+)]
 fn test_json_abi(#[case] module_name: &str, #[case] module_path: &str, #[case] json_path: &str) {
     let module_path = format!("tests/{module_path}");
     let json_path = format!("tests/{json_path}");
@@ -91,6 +106,11 @@ fn test_json_abi(#[case] module_name: &str, #[case] module_path: &str, #[case] j
     "generics_1",
     "modules/structs/generics_1.move",
     "human_readable/structs/generics_1.abi"
+)]
+#[case(
+    "misc_structs",
+    "modules/structs/misc_structs.move",
+    "human_readable/structs/misc_structs.abi"
 )]
 fn test_human_readable_abi(
     #[case] module_name: &str,

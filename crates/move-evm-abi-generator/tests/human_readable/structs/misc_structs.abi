@@ -1,0 +1,20 @@
+contract MiscStructs {
+
+
+
+    struct GenericStructUint32Uint128 {
+        uint32 a;
+        uint128 b;
+        GenericEnum c;
+        SimpleEnum d;
+        NestedStructUint32Uint128 e;
+    }
+
+    struct NestedStructUint32Uint128 {
+        bool a;
+        bool[] b;
+    }
+
+    function testMisc(uint32 a, uint128 b, GenericEnum c, SimpleEnum d, NestedStructUint32Uint128 e) external (GenericStructUint32Uint128);
+
+}

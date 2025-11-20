@@ -4,6 +4,91 @@
 			"anonymous": true,
 			"inputs": [
 				{
+					"components": [
+						{
+							"internalType": "uint32",
+							"name": "a",
+							"type": "uint32"
+						},
+						{
+							"internalType": "address",
+							"name": "b",
+							"type": "address"
+						},
+						{
+							"internalType": "uint128",
+							"name": "c",
+							"type": "uint128"
+						}
+					],
+					"indexed": true,
+					"internalType": "struct EventsAnon2.NestedStruct",
+					"name": "a",
+					"type": "tuple"
+				},
+				{
+					"components": [
+						{
+							"internalType": "enum EventsAnon2.EventEnum",
+							"name": "a",
+							"type": "uint8"
+						},
+						{
+							"internalType": "enum EventsAnon2.EventEnum[]",
+							"name": "b",
+							"type": "uint8[]"
+						}
+					],
+					"indexed": true,
+					"internalType": "struct EventsAnon2.NestedStructWithEnum",
+					"name": "b",
+					"type": "tuple"
+				}
+			],
+			"name": "Anonymous",
+			"type": "event"
+		},
+		{
+			"anonymous": true,
+			"inputs": [
+				{
+					"indexed": true,
+					"internalType": "enum EventsAnon2.EventEnum",
+					"name": "a",
+					"type": "uint8"
+				},
+				{
+					"indexed": true,
+					"internalType": "enum EventsAnon2.EventEnum[]",
+					"name": "b",
+					"type": "uint8[]"
+				},
+				{
+					"components": [
+						{
+							"internalType": "enum EventsAnon2.EventEnum",
+							"name": "a",
+							"type": "uint8"
+						},
+						{
+							"internalType": "enum EventsAnon2.EventEnum[]",
+							"name": "b",
+							"type": "uint8[]"
+						}
+					],
+					"indexed": true,
+					"internalType": "struct EventsAnon2.NestedStructWithEnum[]",
+					"name": "c",
+					"type": "tuple[]"
+				}
+			],
+			"name": "Anonymous2",
+			"type": "event"
+		},
+		{
+			"anonymous": true,
+			"inputs": [
+				{
 					"indexed": true,
 					"internalType": "uint32",
 					"name": "a",
@@ -223,91 +308,6 @@
 			"outputs": [],
 			"stateMutability": "nonpayable",
 			"type": "function"
-		},
-		{
-			"anonymous": true,
-			"inputs": [
-				{
-					"components": [
-						{
-							"internalType": "uint32",
-							"name": "a",
-							"type": "uint32"
-						},
-						{
-							"internalType": "address",
-							"name": "b",
-							"type": "address"
-						},
-						{
-							"internalType": "uint128",
-							"name": "c",
-							"type": "uint128"
-						}
-					],
-					"indexed": true,
-					"internalType": "struct EventsAnon2.NestedStruct",
-					"name": "a",
-					"type": "tuple"
-				},
-				{
-					"components": [
-						{
-							"internalType": "enum EventsAnon2.EventEnum",
-							"name": "a",
-							"type": "uint8"
-						},
-						{
-							"internalType": "enum EventsAnon2.EventEnum[]",
-							"name": "b",
-							"type": "uint8[]"
-						}
-					],
-					"indexed": true,
-					"internalType": "struct EventsAnon2.NestedStructWithEnum",
-					"name": "b",
-					"type": "tuple"
-				}
-			],
-			"name": "Anonymous",
-			"type": "event"
-		},
-		{
-			"anonymous": true,
-			"inputs": [
-				{
-					"indexed": true,
-					"internalType": "enum EventsAnon2.EventEnum",
-					"name": "a",
-					"type": "uint8"
-				},
-				{
-					"indexed": true,
-					"internalType": "enum EventsAnon2.EventEnum[]",
-					"name": "b",
-					"type": "uint8[]"
-				},
-				{
-					"components": [
-						{
-							"internalType": "enum EventsAnon2.EventEnum",
-							"name": "a",
-							"type": "uint8"
-						},
-						{
-							"internalType": "enum EventsAnon2.EventEnum[]",
-							"name": "b",
-							"type": "uint8[]"
-						}
-					],
-					"indexed": true,
-					"internalType": "struct EventsAnon2.NestedStructWithEnum[]",
-					"name": "c",
-					"type": "tuple[]"
-				}
-			],
-			"name": "Anonymous2",
-			"type": "event"
 		},
 		{
 			"inputs": [

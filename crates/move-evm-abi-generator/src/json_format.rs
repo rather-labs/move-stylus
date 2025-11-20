@@ -117,7 +117,8 @@ pub fn process_abi(abi: &Abi) -> String {
 }
 
 fn process_errors(abi: &Abi) -> Vec<JsonAbiItem> {
-    abi.abi_errors
+    let mut errors: Vec<JsonAbiItem> = abi
+        .abi_errors
         .iter()
         .map(|error| {
             let mut inputs = vec![];
@@ -141,11 +142,20 @@ fn process_errors(abi: &Abi) -> Vec<JsonAbiItem> {
                 inputs,
             }
         })
-        .collect()
+        .collect();
+
+    // Sort errors by name for deterministic output
+    errors.sort_by_key(|item| match item {
+        JsonAbiItem::Error { name, .. } => name.clone(),
+        _ => panic!(),
+    });
+
+    errors
 }
 
 fn process_events(abi: &Abi) -> Vec<JsonAbiItem> {
-    abi.events
+    let mut events: Vec<JsonAbiItem> = abi
+        .events
         .iter()
         .map(|event| {
             let mut inputs = vec![];
@@ -170,11 +180,38 @@ fn process_events(abi: &Abi) -> Vec<JsonAbiItem> {
                 anonymous: event.is_anonymous,
             }
         })
-        .collect()
+        .collect();
+
+    // Sort events by name and field identifiers for deterministic output
+    // This handles event overloading (same name, different fields)
+    events.sort_by(|a, b| {
+        let (name_a, fields_a) = match a {
+            JsonAbiItem::Event { name, inputs, .. } => {
+                let field_ids: Vec<String> =
+                    inputs.iter().map(|input| input.name.clone()).collect();
+                (name.clone(), field_ids)
+            }
+            _ => panic!(),
+        };
+
+        let (name_b, fields_b) = match b {
+            JsonAbiItem::Event { name, inputs, .. } => {
+                let field_ids: Vec<String> =
+                    inputs.iter().map(|input| input.name.clone()).collect();
+                (name.clone(), field_ids)
+            }
+            _ => panic!(),
+        };
+
+        name_a.cmp(&name_b).then_with(|| fields_a.cmp(&fields_b))
+    });
+
+    events
 }
 
 fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
-    abi.functions
+    let mut functions: Vec<JsonAbiItem> = abi
+        .functions
         .iter()
         .map(|f| {
             let fn_type = FunctionType::from_identifier(&f.identifier);
@@ -236,7 +273,15 @@ fn process_functions(abi: &Abi) -> Vec<JsonAbiItem> {
                 state_mutability,
             }
         })
-        .collect()
+        .collect();
+
+    // Sort functions by name for deterministic output
+    functions.sort_by_key(|item| match item {
+        JsonAbiItem::Function { name, .. } => name.as_ref().unwrap().clone(),
+        _ => panic!(),
+    });
+
+    functions
 }
 
 fn map_state_mutability(mods: &[FunctionModifier]) -> &'static str {
