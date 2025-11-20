@@ -37,8 +37,11 @@ pub enum IntermediateTypeError {
     #[error("cannot perform ReadRef on {0:?}")]
     CannotReadRefOfType(IntermediateType),
 
-    #[error("found reference inside enum with index {0}")]
-    FoundReferenceInsideEnum(u16),
+    #[error("found reference inside enum with index {0} and variant index{1}")]
+    FoundReferenceInsideEnum(u16, u16),
+
+    #[error("found reference inside struct with index {0}")]
+    FoundReferenceInsideStruct(u16),
 
     #[error("found a reference of a reference")]
     FoundReferenceOfReference,

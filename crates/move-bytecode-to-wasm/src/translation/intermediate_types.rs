@@ -1,3 +1,15 @@
+pub mod address;
+pub mod boolean;
+pub mod enums;
+pub mod error;
+pub mod heap_integers;
+pub mod reference;
+pub mod signer;
+pub mod simple_integers;
+pub mod structs;
+pub(crate) mod user_type_fields;
+pub mod vector;
+
 use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
@@ -27,17 +39,6 @@ use walrus::{
 };
 
 use super::TranslationError;
-
-pub mod address;
-pub mod boolean;
-pub mod enums;
-pub mod error;
-pub mod heap_integers;
-pub mod reference;
-pub mod signer;
-pub mod simple_integers;
-pub mod structs;
-pub mod vector;
 
 #[derive(Clone, PartialEq, Debug, Eq, Hash)]
 pub enum VmHandledStruct {
@@ -1084,9 +1085,7 @@ impl IntermediateType {
             | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => Ok(false),
-            IntermediateType::ITypeParameter(_) => {
-                return Err(IntermediateTypeError::FoundTypeParameter);
-            }
+            IntermediateType::ITypeParameter(_) => Err(IntermediateTypeError::FoundTypeParameter),
         }
     }
 

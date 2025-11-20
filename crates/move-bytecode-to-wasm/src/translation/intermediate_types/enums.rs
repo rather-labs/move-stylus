@@ -19,7 +19,10 @@ use crate::{
     generics::replace_type_parameters, storage::error::StorageError,
 };
 
-use super::{error::IntermediateTypeError, structs::IStruct};
+use super::{
+    error::IntermediateTypeError,
+    user_type_fields::{FieldsErrorContext, UserTypeFields},
+};
 
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
@@ -81,7 +84,7 @@ impl IEnum {
         variants: Vec<IEnumVariant>,
     ) -> Result<Self, IntermediateTypeError> {
         let is_simple = variants.iter().all(|v| v.fields.is_empty());
-        let heap_size = Self::compute_heap_size(&variants)?;
+        let heap_size = Self::compute_heap_size(index, &variants)?;
 
         Ok(Self {
             identifier,
@@ -99,7 +102,10 @@ impl IEnum {
     ///
     /// If the enum contains a variant with a generic type parameter, returns None, since we can't
     /// know it.
-    fn compute_heap_size(variants: &[IEnumVariant]) -> Result<Option<u32>, IntermediateTypeError> {
+    fn compute_heap_size(
+        enum_index: u16,
+        variants: &[IEnumVariant],
+    ) -> Result<Option<u32>, IntermediateTypeError> {
         let mut size = 0;
         for variant in variants {
             let mut variant_size = 0;
@@ -108,6 +114,7 @@ impl IEnum {
                     IntermediateType::ITypeParameter(_) => return Ok(None),
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
                         return Err(IntermediateTypeError::FoundReferenceInsideEnum(
+                            enum_index,
                             variant.belongs_to,
                         ));
                     }
@@ -188,7 +195,7 @@ impl IEnum {
                 // Copy fields for the active arm, then jump to join
                 self.match_on_variant(then, variant_index, |variant, arm| {
                     // Use the same logic as structs to compare the fields
-                    inner_result = IStruct::compare_fields(
+                    inner_result = UserTypeFields::compare_fields(
                         &variant.fields,
                         arm,
                         module,
@@ -262,7 +269,7 @@ impl IEnum {
         // Copy fields for the active arm, then jump to join
         let mut inner_result = Ok(());
         self.match_on_variant(builder, variant_index, |variant, arm| {
-            inner_result = IStruct::copy_fields(
+            inner_result = UserTypeFields::copy_fields(
                 &variant.fields,
                 arm,
                 module,
@@ -271,6 +278,10 @@ impl IEnum {
                 src_ptr,
                 ptr,
                 4,
+                FieldsErrorContext::Enum {
+                    enum_index: self.index,
+                    variant_index: variant.index,
+                },
             );
         });
         inner_result?;
@@ -300,7 +311,7 @@ impl IEnum {
             .collect();
 
         // Recompute heap_size after instantiating the types.
-        let heap_size = Self::compute_heap_size(&variants).unwrap_or_default();
+        let heap_size = Self::compute_heap_size(self.index, &variants).unwrap_or_default();
 
         Self {
             identifier: self.identifier.clone(),
