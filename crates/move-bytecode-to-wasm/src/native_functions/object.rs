@@ -13,7 +13,7 @@ use crate::{
     storage::storage_layout::field_size,
     translation::intermediate_types::{IntermediateType, address::IAddress, structs::IStruct},
     utils::keccak_string_to_memory,
-    vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
+    vm_handled_types::{VmHandledType, is_uid_or_named_id, named_id::NamedId, uid::Uid},
 };
 use walrus::{
     FunctionBuilder, FunctionId, InstrSeqBuilder, LocalId, Module, ValType,
@@ -303,7 +303,7 @@ pub fn add_delete_storage_struct_instructions(
 
     // Iterate over the fields of the struct and delete them
     for field in struct_.fields.iter() {
-        if field.is_uid_or_named_id(compilation_ctx) {
+        if is_uid_or_named_id(&field, compilation_ctx)? {
             // If the field is a UID or NamedId, do nothing as UIDs are not stored in storage
             continue;
         }
@@ -574,8 +574,8 @@ pub fn add_delete_field_instructions(
         }
         | IntermediateType::IGenericStructInstance {
             module_id, index, ..
-        } if !Uid::is_vm_type(module_id, *index, compilation_ctx)
-            && !NamedId::is_vm_type(module_id, *index, compilation_ctx) =>
+        } if !Uid::is_vm_type(module_id, *index, compilation_ctx)?
+            && !NamedId::is_vm_type(module_id, *index, compilation_ctx)? =>
         {
             // Get child struct by (module_id, index)
             let child_struct = compilation_ctx

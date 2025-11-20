@@ -47,7 +47,10 @@ use std::collections::HashMap;
 
 use crate::{
     CompilationContext,
-    abi_types::{error::AbiEncodingError, packing::Packable},
+    abi_types::{
+        error::{AbiEncodingError, AbiError},
+        packing::Packable,
+    },
     compilation_context::ModuleData,
     generics::replace_type_parameters,
     vm_handled_types::{VmHandledType, string::String_},
@@ -233,7 +236,7 @@ impl IStruct {
     pub fn solidity_abi_encode_is_dynamic(
         &self,
         compilation_ctx: &CompilationContext,
-    ) -> Result<bool, AbiEncodingError> {
+    ) -> Result<bool, AbiError> {
         for field in &self.fields {
             match field {
                 IntermediateType::IBool
@@ -260,12 +263,12 @@ impl IStruct {
                         return Ok(true);
                     }
                 }
-                IntermediateType::ISigner => return Err(AbiEncodingError::FoundSignerType),
+                IntermediateType::ISigner => return Err(AbiEncodingError::FoundSignerType)?,
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                    return Err(AbiEncodingError::RefInsideRef);
+                    return Err(AbiEncodingError::RefInsideRef)?;
                 }
                 IntermediateType::ITypeParameter(_) => {
-                    return Err(AbiEncodingError::GenericTypeParameterIsDynamic);
+                    return Err(AbiEncodingError::GenericTypeParameterIsDynamic)?;
                 }
             }
         }
@@ -277,7 +280,7 @@ impl IStruct {
     pub fn solidity_abi_encode_size(
         &self,
         compilation_ctx: &CompilationContext,
-    ) -> Result<usize, AbiEncodingError> {
+    ) -> Result<usize, AbiError> {
         let mut size = 0;
         for field in &self.fields {
             match field {
@@ -306,12 +309,12 @@ impl IStruct {
                         size += field.encoded_size(compilation_ctx)?;
                     }
                 }
-                IntermediateType::ISigner => return Err(AbiEncodingError::FoundSignerType),
+                IntermediateType::ISigner => return Err(AbiEncodingError::FoundSignerType)?,
                 IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                    return Err(AbiEncodingError::RefInsideRef);
+                    return Err(AbiEncodingError::RefInsideRef)?;
                 }
                 IntermediateType::ITypeParameter(_) => {
-                    return Err(AbiEncodingError::FoundGenericTypeParameter);
+                    return Err(AbiEncodingError::FoundGenericTypeParameter)?;
                 }
             }
         }
