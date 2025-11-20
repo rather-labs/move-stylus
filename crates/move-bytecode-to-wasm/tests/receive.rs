@@ -34,99 +34,19 @@ mod receive {
 }
 
 mod receive_bad {
-    use crate::common::translate_test_package_with_framework_result;
-    use move_bytecode_to_wasm::compilation_context::CompilationContextError;
-    use move_bytecode_to_wasm::error::{CompilationError, ICEErrorKind};
+    use crate::common::translate_test_package_with_framework;
+    use rstest::rstest;
 
-    #[test]
-    fn test_receive_bad_visibility() {
-        const MODULE_NAME: &str = "receive_bad_visibility";
-        const SOURCE_PATH: &str = "tests/receive/receive_bad_visibility.move";
-
-        let result = translate_test_package_with_framework_result(SOURCE_PATH, MODULE_NAME);
-
-        match result {
-            Ok(_) => panic!("Expected translation to fail with ReceiveFunctionBadVisibility error"),
-            Err(CompilationError::ICE(ice_error)) => {
-                match ice_error.kind {
-                    ICEErrorKind::CompilationContext(
-                        CompilationContextError::ReceiveFunctionBadVisibility,
-                    ) => {
-                        // Correct error!
-                    }
-                    other => panic!("Expected ReceiveFunctionBadVisibility, got {other:?}"),
-                }
-            }
-            Err(other) => panic!("Expected ICE error, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn test_receive_bad_returns() {
-        const MODULE_NAME: &str = "receive_bad_returns";
-        const SOURCE_PATH: &str = "tests/receive/receive_bad_returns.move";
-
-        let result = translate_test_package_with_framework_result(SOURCE_PATH, MODULE_NAME);
-
-        match result {
-            Ok(_) => panic!("Expected translation to fail with ReceiveFunctionHasReturns error"),
-            Err(CompilationError::ICE(ice_error)) => {
-                match ice_error.kind {
-                    ICEErrorKind::CompilationContext(
-                        CompilationContextError::ReceiveFunctionHasReturns,
-                    ) => {
-                        // Correct error!
-                    }
-                    other => panic!("Expected ReceiveFunctionHasReturns, got {other:?}"),
-                }
-            }
-            Err(other) => panic!("Expected ICE error, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn test_receive_bad_args() {
-        const MODULE_NAME: &str = "receive_bad_args";
-        const SOURCE_PATH: &str = "tests/receive/receive_bad_args.move";
-
-        let result = translate_test_package_with_framework_result(SOURCE_PATH, MODULE_NAME);
-
-        match result {
-            Ok(_) => panic!("Expected translation to fail with ReceiveFunctionHasArguments error"),
-            Err(CompilationError::ICE(ice_error)) => {
-                match ice_error.kind {
-                    ICEErrorKind::CompilationContext(
-                        CompilationContextError::ReceiveFunctionHasArguments,
-                    ) => {
-                        // Correct error!
-                    }
-                    other => panic!("Expected ReceiveFunctionHasArguments, got {other:?}"),
-                }
-            }
-            Err(other) => panic!("Expected ICE error, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn test_receive_bad_mutability() {
-        const MODULE_NAME: &str = "receive_bad_mutability";
-        const SOURCE_PATH: &str = "tests/receive/receive_bad_mutability.move";
-
-        let result = translate_test_package_with_framework_result(SOURCE_PATH, MODULE_NAME);
-
-        match result {
-            Ok(_) => panic!("Expected translation to fail with ReceiveFunctionIsNotPayable error"),
-            Err(CompilationError::ICE(ice_error)) => {
-                match ice_error.kind {
-                    ICEErrorKind::CompilationContext(
-                        CompilationContextError::ReceiveFunctionIsNotPayable,
-                    ) => {
-                        // Correct error!
-                    }
-                    other => panic!("Expected ReceiveFunctionIsNotPayable, got {other:?}"),
-                }
-            }
-            Err(other) => panic!("Expected ICE error, got {other:?}"),
-        }
+    #[rstest]
+    #[should_panic(expected = "ReceiveFunctionBadVisibility")]
+    #[case("receive_bad_visibility", "tests/receive/receive_bad_visibility.move")]
+    #[should_panic(expected = "ReceiveFunctionHasReturns")]
+    #[case("receive_bad_returns", "tests/receive/receive_bad_returns.move")]
+    #[should_panic(expected = "ReceiveFunctionHasArguments")]
+    #[case("receive_bad_args", "tests/receive/receive_bad_args.move")]
+    #[should_panic(expected = "ReceiveFunctionIsNotPayable")]
+    #[case("receive_bad_mutability", "tests/receive/receive_bad_mutability.move")]
+    fn test_receive_bad(#[case] module_name: &str, #[case] source_path: &str) {
+        translate_test_package_with_framework(source_path, module_name);
     }
 }
