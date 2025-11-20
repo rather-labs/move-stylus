@@ -142,16 +142,18 @@ impl IVector {
 
                 store_offset += 8;
             } else {
-                panic!("Unsupported data size for vector: {data_size}");
+                return Err(IntermediateTypeError::VectorInvalidDataSize(data_size));
             }
 
             builder.local_get(ptr_local);
         }
 
-        assert_eq!(
-            needed_bytes, store_offset as usize,
-            "Store offset is not aligned with the needed bytes"
-        );
+        if needed_bytes != store_offset as usize {
+            return Err(IntermediateTypeError::VectorStoreOffsetNotAligned {
+                needed: needed_bytes,
+                actual: store_offset as usize,
+            });
+        }
 
         Ok(())
     }

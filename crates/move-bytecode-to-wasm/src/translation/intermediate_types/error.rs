@@ -48,4 +48,13 @@ pub enum IntermediateTypeError {
 
     #[error("cannot perform WriteRef on signer type")]
     CannotWriteRefOnSigner,
+
+    #[error("cast error: trying to cast {0:?}")]
+    InvalidCast(IntermediateType),
+
+    #[error("Unsupported data size for vector: {0}")]
+    VectorInvalidDataSize(usize),
+
+    #[error("store offset is not aligned with the needed bytes, needed {needed} got {actual}")]
+    VectorStoreOffsetNotAligned { needed: usize, actual: usize },
 }
