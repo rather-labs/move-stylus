@@ -6,7 +6,7 @@ use crate::{
     vm_handled_types::{VmHandledType, string::String_, tx_context::TxContext},
 };
 
-use super::abi_encoding::struct_fields_sol_name;
+use super::error::AbiError;
 use super::sol_name::SolName;
 
 type AbiEventSignatureHash = [u8; 32];
@@ -14,21 +14,27 @@ type AbiEventSignatureHash = [u8; 32];
 pub fn move_signature_to_event_signature_hash(
     struct_: &IStruct,
     compilation_ctx: &CompilationContext,
-) -> AbiEventSignatureHash {
+) -> Result<AbiEventSignatureHash, AbiError> {
     let field_strings = struct_
         .fields
         .iter()
-        .filter_map(|s| solidity_name(s, compilation_ctx))
+        .map(|s| solidity_name(s, compilation_ctx))
+        .collect::<Result<Vec<Option<String>>, AbiError>>()?
+        .into_iter()
+        .flatten()
         .collect::<Vec<String>>()
         .join(",");
-    *keccak256(format!("{}({})", struct_.identifier, field_strings).as_bytes())
+
+    Ok(*keccak256(
+        format!("{}({})", struct_.identifier, field_strings).as_bytes(),
+    ))
 }
 
 fn solidity_name(
     argument: &IntermediateType,
     compilation_ctx: &CompilationContext,
-) -> Option<String> {
-    match argument {
+) -> Result<Option<String>, AbiError> {
+    Ok(match argument {
         IntermediateType::IBool
         | IntermediateType::IU8
         | IntermediateType::IU16
@@ -38,9 +44,8 @@ fn solidity_name(
         | IntermediateType::IU256
         | IntermediateType::IAddress => argument.sol_name(compilation_ctx),
         IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-            let enum_ = compilation_ctx
-                .get_enum_by_intermediate_type(argument)
-                .unwrap();
+            let enum_ = compilation_ctx.get_enum_by_intermediate_type(argument)?;
+
             if enum_.is_simple {
                 argument.sol_name(compilation_ctx)
             } else {
@@ -48,10 +53,10 @@ fn solidity_name(
             }
         }
         IntermediateType::IRef(inner) | IntermediateType::IMutRef(inner) => {
-            solidity_name(inner, compilation_ctx)
+            solidity_name(inner, compilation_ctx)?
         }
         IntermediateType::IVector(inner) => {
-            solidity_name(inner, compilation_ctx).map(|sol_n| format!("{sol_n}[]"))
+            solidity_name(inner, compilation_ctx)?.map(|sol_n| format!("{sol_n}[]"))
         }
         IntermediateType::IStruct {
             module_id, index, ..
@@ -62,14 +67,26 @@ fn solidity_name(
             argument.sol_name(compilation_ctx)
         }
         IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
-            let struct_ = compilation_ctx
-                .get_struct_by_intermediate_type(argument)
-                .unwrap();
+            let struct_ = compilation_ctx.get_struct_by_intermediate_type(argument)?;
 
-            struct_fields_sol_name(&struct_, compilation_ctx, SolName::sol_name)
+            struct_fields_sol_name(&struct_, compilation_ctx)
         }
         IntermediateType::ISigner | IntermediateType::ITypeParameter(_) => None,
-    }
+    })
+}
+
+#[inline]
+pub fn struct_fields_sol_name(
+    struct_: &IStruct,
+    compilation_ctx: &CompilationContext,
+) -> Option<String> {
+    struct_
+        .fields
+        .iter()
+        .map(|field| SolName::sol_name(field, compilation_ctx))
+        .collect::<Option<Vec<String>>>()
+        .map(|fields| fields.join(","))
+        .map(|fields| format!("({fields})"))
 }
 
 #[cfg(test)]
@@ -149,7 +166,7 @@ mod tests {
 
         compilation_ctx.root_module_data = &module_data;
         assert_eq!(
-            move_signature_to_event_signature_hash(&struct_1, &compilation_ctx),
+            move_signature_to_event_signature_hash(&struct_1, &compilation_ctx).unwrap(),
             *keccak256(
                 "TestStruct(address,uint32[],uint128[],bool,uint8,uint16,uint32,uint64,uint128,uint256,(uint32,uint128))"
             )
@@ -213,7 +230,7 @@ mod tests {
         compilation_ctx.root_module_data = &module_data;
 
         assert_eq!(
-            move_signature_to_event_signature_hash(event_struct, &compilation_ctx),
+            move_signature_to_event_signature_hash(event_struct, &compilation_ctx).unwrap(),
             expected
         );
     }

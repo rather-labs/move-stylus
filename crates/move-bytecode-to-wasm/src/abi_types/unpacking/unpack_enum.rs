@@ -6,7 +6,7 @@ use walrus::{
 
 use crate::{CompilationContext, translation::intermediate_types::enums::IEnum};
 
-use super::unpack_native_int::unpack_i32_type_instructions;
+use super::{error::AbiUnpackError, unpack_native_int::unpack_i32_type_instructions};
 
 impl IEnum {
     // TODO: this only works for simple enums where the variant does not have fields
@@ -16,7 +16,7 @@ impl IEnum {
         module: &mut Module,
         reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiUnpackError> {
         let enum_ptr = module.locals.add(ValType::I32);
         let variant_number = module.locals.add(ValType::I32);
 
@@ -27,7 +27,7 @@ impl IEnum {
             compilation_ctx.memory_id,
             reader_pointer,
             encoded_size,
-        );
+        )?;
 
         // Save the variant to check it later
         block.local_tee(variant_number);
@@ -60,5 +60,7 @@ impl IEnum {
             );
 
         block.local_get(enum_ptr);
+
+        Ok(())
     }
 }

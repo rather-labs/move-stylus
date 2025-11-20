@@ -34,14 +34,15 @@ pub fn add_transfer_object_fn(
     };
 
     // Runtime functions
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
-    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
-    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
     let storage_save_fn =
-        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
+        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype])?;
     let delete_object_fn =
-        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype]);
+        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype])?;
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32, ValType::I32], &[]);
@@ -105,7 +106,7 @@ pub fn add_transfer_object_fn(
 
     // Remove any objects that have been recently transferred into the struct from the original owner's mapping in storage.
     let check_and_delete_struct_tto_fields_fn = RuntimeFunction::CheckAndDeleteStructTtoFields
-        .get_generic(module, compilation_ctx, &[itype]);
+        .get_generic(module, compilation_ctx, &[itype])?;
     builder
         .local_get(struct_ptr)
         .call(check_and_delete_struct_tto_fields_fn);
@@ -166,15 +167,17 @@ pub fn add_share_object_fn(
     };
 
     // Runtime functions
-    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
-    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
     let storage_save_fn =
-        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
+        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype])?;
     let delete_object_fn =
-        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype]);
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
-
+        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype])?;
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
+    let check_and_delete_struct_tto_fields_fn = RuntimeFunction::CheckAndDeleteStructTtoFields
+        .get_generic(module, compilation_ctx, &[itype])?;
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
     let mut builder = function.name(name).func_body();
@@ -228,12 +231,7 @@ pub fn add_share_object_fn(
                 });
 
                 // Remove any objects that have been recently transferred into the struct from the original owner's mapping in storage.
-                let check_and_delete_struct_tto_fields_fn =
-                    RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic(
-                        module,
-                        compilation_ctx,
-                        &[itype],
-                    );
+
                 else_
                     .local_get(struct_ptr)
                     .call(check_and_delete_struct_tto_fields_fn);
@@ -292,14 +290,17 @@ pub fn add_freeze_object_fn(
     };
 
     // Runtime functions
-    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx));
-    let write_object_slot_fn = RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx));
+    let equality_fn = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
+    let get_id_bytes_ptr_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;
+    let write_object_slot_fn =
+        RuntimeFunction::WriteObjectSlot.get(module, Some(compilation_ctx))?;
     let storage_save_fn =
-        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype]);
+        RuntimeFunction::EncodeAndSaveInStorage.get_generic(module, compilation_ctx, &[itype])?;
     let delete_object_fn =
-        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype]);
-    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx));
+        RuntimeFunction::DeleteFromStorage.get_generic(module, compilation_ctx, &[itype])?;
+    let is_zero_fn = RuntimeFunction::IsZero.get(module, Some(compilation_ctx))?;
+    let check_and_delete_struct_tto_fields_fn = RuntimeFunction::CheckAndDeleteStructTtoFields
+        .get_generic(module, compilation_ctx, &[itype])?;
 
     // Function declaration
     let mut function = FunctionBuilder::new(&mut module.types, &[ValType::I32], &[]);
@@ -362,12 +363,7 @@ pub fn add_freeze_object_fn(
                 });
 
                 // Remove any objects that have been recently transferred into the struct from the original owner's mapping in storage.
-                let check_and_delete_struct_tto_fields_fn =
-                    RuntimeFunction::CheckAndDeleteStructTtoFields.get_generic(
-                        module,
-                        compilation_ctx,
-                        &[itype],
-                    );
+
                 else_
                     .local_get(struct_ptr)
                     .call(check_and_delete_struct_tto_fields_fn);

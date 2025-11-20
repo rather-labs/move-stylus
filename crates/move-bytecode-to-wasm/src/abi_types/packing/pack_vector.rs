@@ -55,7 +55,7 @@ impl IVector {
             compilation_ctx.memory_id,
             reference_value,
             writer_pointer,
-        );
+        )?;
 
         // Set the local to point to the first element
         builder
@@ -75,7 +75,7 @@ impl IVector {
             compilation_ctx.memory_id,
             len,
             data_pointer,
-        );
+        )?;
 
         // increment the data pointer
         builder

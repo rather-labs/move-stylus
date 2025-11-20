@@ -12,7 +12,7 @@ use crate::{
     utils::snake_to_upper_camel,
 };
 
-use super::error::AbiError;
+use super::error::{AbiEncodingError, AbiError};
 
 // Error(string) abi encoded selector
 pub const ERROR_SELECTOR: [u8; 4] = [0x08, 0xc3, 0x79, 0xa0];
@@ -25,7 +25,7 @@ pub fn move_signature_to_abi_selector(
     struct_name: &str,
     struct_fields: &[IntermediateType],
     compilation_ctx: &CompilationContext,
-) -> AbiFunctionSelector {
+) -> Result<AbiFunctionSelector, AbiError> {
     abi_encoding::move_signature_to_abi_selector(
         struct_name,
         struct_fields,
@@ -69,7 +69,7 @@ pub fn build_custom_error_message(
         &error_struct.identifier,
         &error_struct.fields,
         compilation_ctx,
-    );
+    )?;
 
     // Allocate memory: 4 bytes for length + 4 bytes for the error selector
     const SELECTOR_SIZE: i32 = 4;
@@ -176,11 +176,11 @@ pub fn build_abort_error_message(
     builder: &mut InstrSeqBuilder,
     module: &mut Module,
     compilation_ctx: &CompilationContext,
-) -> LocalId {
+) -> Result<LocalId, AbiEncodingError> {
     let ptr = module.locals.add(ValType::I32);
 
     // Convert error code to decimal string
-    let u64_to_dec_ascii = RuntimeFunction::U64ToAsciiBase10.get(module, Some(compilation_ctx));
+    let u64_to_dec_ascii = RuntimeFunction::U64ToAsciiBase10.get(module, Some(compilation_ctx))?;
     let error_ptr = module.locals.add(ValType::I32);
     let error_len = module.locals.add(ValType::I32);
 
@@ -275,7 +275,7 @@ pub fn build_abort_error_message(
 
     // Write message length in big-endian format
     const LENGTH_WORD_END: i32 = 64; // last 4 bytes of the 32 bytes length word (offset 68 = 4 + 64)
-    let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None);
+    let swap_i32 = RuntimeFunction::SwapI32Bytes.get(module, None)?;
     builder
         .local_get(ptr)
         .local_get(error_len)
@@ -298,7 +298,7 @@ pub fn build_abort_error_message(
         .local_get(error_len)
         .memory_copy(compilation_ctx.memory_id, compilation_ctx.memory_id);
 
-    ptr
+    Ok(ptr)
 }
 
 #[cfg(test)]
@@ -334,7 +334,7 @@ mod tests {
         let mut func_body = function_builder.func_body();
         func_body.i64_const(error_code as i64);
         let error_ptr =
-            build_abort_error_message(&mut func_body, &mut raw_module, &compilation_ctx);
+            build_abort_error_message(&mut func_body, &mut raw_module, &compilation_ctx).unwrap();
         func_body.local_get(error_ptr);
         let function = function_builder.finish(vec![n], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);

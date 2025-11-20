@@ -234,7 +234,8 @@ pub fn add_emit_log_fn(
 
     // If the event is not anonymous, we should emit its signature in the first topic
     if !is_anonymous {
-        let data = move_signature_to_event_signature_hash(&struct_, compilation_ctx);
+        let data = move_signature_to_event_signature_hash(&struct_, compilation_ctx)
+            .map_err(|e| NativeFunctionError::Abi(Rc::new(e)))?;
 
         builder
             .i32_const(32)

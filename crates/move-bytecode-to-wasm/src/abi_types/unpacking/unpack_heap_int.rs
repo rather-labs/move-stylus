@@ -13,6 +13,8 @@ use crate::{
     },
 };
 
+use super::error::AbiUnpackError;
+
 impl IU128 {
     pub fn add_unpack_instructions(
         block: &mut InstrSeqBuilder,
@@ -20,7 +22,7 @@ impl IU128 {
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiUnpackError> {
         let encoded_size =
             sol_data::Uint::<128>::ENCODED_SIZE.expect("U128 should have a fixed size") as i32;
 
@@ -38,7 +40,7 @@ impl IU128 {
 
         // Big-endian to Little-endian
         let swap_i128_bytes_function =
-            RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx));
+            RuntimeFunction::SwapI128Bytes.get(module, Some(compilation_ctx))?;
         block.call(swap_i128_bytes_function);
 
         // Increment reader pointer
@@ -49,6 +51,8 @@ impl IU128 {
             .local_set(reader_pointer);
 
         block.local_get(unpacked_pointer);
+
+        Ok(())
     }
 }
 
@@ -59,7 +63,7 @@ impl IU256 {
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), AbiUnpackError> {
         let encoded_size =
             sol_data::Uint::<256>::ENCODED_SIZE.expect("U256 should have a fixed size") as i32;
 
@@ -73,7 +77,7 @@ impl IU256 {
 
         // Big-endian to Little-endian
         let swap_i256_bytes_function =
-            RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx));
+            RuntimeFunction::SwapI256Bytes.get(module, Some(compilation_ctx))?;
         block.call(swap_i256_bytes_function);
 
         // Increment reader pointer
@@ -84,6 +88,8 @@ impl IU256 {
             .local_set(reader_pointer);
 
         block.local_get(unpacked_pointer);
+
+        Ok(())
     }
 }
 

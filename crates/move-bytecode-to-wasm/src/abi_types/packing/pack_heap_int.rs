@@ -11,6 +11,8 @@ use crate::{
     },
 };
 
+use super::error::AbiPackError;
+
 impl IU128 {
     pub fn add_pack_instructions(
         block: &mut InstrSeqBuilder,
@@ -18,9 +20,9 @@ impl IU128 {
         local: LocalId,
         writer_pointer: LocalId,
         memory: MemoryId,
-    ) {
+    ) -> Result<(), AbiPackError> {
         // Little-endian to Big-endian
-        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None);
+        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
 
         for i in 0..2 {
             block.local_get(writer_pointer);
@@ -48,6 +50,8 @@ impl IU128 {
                 },
             );
         }
+
+        Ok(())
     }
 }
 
@@ -58,9 +62,9 @@ impl IU256 {
         local: LocalId,
         writer_pointer: LocalId,
         memory: MemoryId,
-    ) {
+    ) -> Result<(), AbiPackError> {
         // Little-endian to Big-endian
-        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None);
+        let swap_i64_bytes_function = RuntimeFunction::SwapI64Bytes.get(module, None)?;
 
         for i in 0..4 {
             block.local_get(writer_pointer);
@@ -87,6 +91,8 @@ impl IU256 {
                 },
             );
         }
+
+        Ok(())
     }
 }
 

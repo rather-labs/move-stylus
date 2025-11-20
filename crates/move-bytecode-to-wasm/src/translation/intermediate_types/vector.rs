@@ -3,9 +3,9 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use crate::runtime::RuntimeFunction;
 use crate::wasm_builder_extensions::WasmBuilderExtension;
 use crate::{CompilationContext, compilation_context::ModuleData};
+use crate::{runtime::RuntimeFunction, translation::TranslationError};
 
 use super::{IntermediateType, heap_integers::IU128};
 
@@ -170,7 +170,7 @@ impl IVector {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) {
+    ) -> Result<(), TranslationError> {
         // === Local declarations ===
         let src_ptr = module.locals.add(ValType::I32); // pointer to the vector to be copied
         let dst_ptr = module.locals.add(ValType::I32); // pointer to the newly copied vector
@@ -232,6 +232,7 @@ impl IVector {
         let dst_elem_ptr = module.locals.add(ValType::I32);
 
         // Outer block: if the vector length is 0, we skip to the end
+        let mut inner_result = Ok(());
         builder.block(None, |outer_block| {
             let outer_block_id = outer_block.id();
 
@@ -335,7 +336,7 @@ impl IVector {
                         );
 
                         loop_block.i32_const(1); // We dont increase the capacity of nested vectors
-                        IVector::copy_local_instructions(
+                        inner_result = IVector::copy_local_instructions(
                             inner_,
                             module,
                             loop_block,
@@ -359,7 +360,7 @@ impl IVector {
                             .get_struct_by_index(module_id, *index)
                             .unwrap();
 
-                        struct_.copy_local_instructions(
+                        inner_result = struct_.copy_local_instructions(
                             module,
                             loop_block,
                             compilation_ctx,
@@ -387,7 +388,7 @@ impl IVector {
                             .unwrap();
                         let struct_ = struct_.instantiate(types);
 
-                        struct_.copy_local_instructions(
+                        inner_result = struct_.copy_local_instructions(
                             module,
                             loop_block,
                             compilation_ctx,
@@ -404,7 +405,7 @@ impl IVector {
                             },
                         );
                         let enum_ = module_data.enums.get_enum_by_index(*index).unwrap();
-                        enum_.copy_local_instructions(
+                        inner_result = enum_.copy_local_instructions(
                             module,
                             loop_block,
                             compilation_ctx,
@@ -441,8 +442,12 @@ impl IVector {
             });
         });
 
+        inner_result?;
+
         // === Return pointer to copied vector ===
         builder.local_get(dst_ptr);
+
+        Ok(())
     }
 
     pub fn equality(
@@ -451,7 +456,8 @@ impl IVector {
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
         inner: &IntermediateType,
-    ) {
+    ) -> Result<(), TranslationError> {
+        let equality_f = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
         let v1_ptr = module.locals.add(ValType::I32);
         let v2_ptr = module.locals.add(ValType::I32);
         let len = module.locals.add(ValType::I32);
@@ -482,6 +488,7 @@ impl IVector {
             .local_tee(len);
 
         // If both lengths are equal, we skip the capacity and compare element by element, otherwise we return false
+        let mut inner_result = Ok(());
         builder.binop(BinaryOp::I32Eq).if_else(
             None,
             |then| {
@@ -495,9 +502,6 @@ impl IVector {
                     | IntermediateType::IU16
                     | IntermediateType::IU32
                     | IntermediateType::IU64 => {
-                        let equality_f =
-                            RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx));
-
                         // Call the generic equality function
                         then.skip_vec_header(v1_ptr)
                             .skip_vec_header(v2_ptr)
@@ -535,7 +539,7 @@ impl IVector {
                                 },
                             );
 
-                            inner.load_equality_instructions(
+                            inner_result = inner.load_equality_instructions(
                                 module,
                                 loop_,
                                 compilation_ctx,
@@ -579,7 +583,11 @@ impl IVector {
             },
         );
 
+        inner_result?;
+
         builder.local_get(result);
+
+        Ok(())
     }
 
     pub fn vec_pack_instructions(
@@ -729,8 +737,8 @@ impl IVector {
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
-    ) {
-        let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None);
+    ) -> Result<(), TranslationError> {
+        let downcast_f = RuntimeFunction::DowncastU64ToU32.get(module, None)?;
 
         match inner {
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -765,8 +773,10 @@ impl IVector {
 
         builder.i32_const(inner.stack_data_size() as i32);
 
-        let borrow_f = RuntimeFunction::VecBorrow.get(module, Some(compilation_ctx));
+        let borrow_f = RuntimeFunction::VecBorrow.get(module, Some(compilation_ctx))?;
         builder.call(borrow_f);
+
+        Ok(())
     }
 
     /// Appends an element to the end of a vector.
@@ -784,7 +794,7 @@ impl IVector {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) {
+    ) -> Result<(), TranslationError> {
         let valtype = inner.into();
         let size = inner.stack_data_size() as i32;
         let vec_ref = module.locals.add(ValType::I32);
@@ -833,13 +843,20 @@ impl IVector {
         );
 
         // Check if len == capacity. If true, we copy the original vector but doubling its capacity.
+        let mut inner_result = Ok(());
         builder.binop(BinaryOp::I32Eq).if_else(
             None,
             |then| {
                 then.local_get(vec_ptr);
                 then.i32_const(2); // Capacity multiplier
 
-                IVector::copy_local_instructions(inner, module, then, compilation_ctx, module_data);
+                inner_result = IVector::copy_local_instructions(
+                    inner,
+                    module,
+                    then,
+                    compilation_ctx,
+                    module_data,
+                );
 
                 // Set vec_ptr to the new vector pointer and store it at *vec_ref
                 // This modifies the original vector reference to point to the new vector
@@ -857,6 +874,8 @@ impl IVector {
             },
             |_| {},
         );
+
+        inner_result?;
 
         // Store the element in the next free position
         builder
@@ -876,10 +895,14 @@ impl IVector {
             );
 
         // length++
+        let vec_increment_len_fn =
+            RuntimeFunction::VecIncrementLen.get(module, Some(compilation_ctx))?;
         builder
             .local_get(vec_ptr)
             .local_get(len)
-            .call(RuntimeFunction::VecIncrementLen.get(module, Some(compilation_ctx)));
+            .call(vec_increment_len_fn);
+
+        Ok(())
     }
 }
 
@@ -961,7 +984,8 @@ mod tests {
             &mut builder,
             &compilation_ctx,
             compilation_ctx.root_module_data,
-        );
+        )
+        .unwrap();
 
         let function = function_builder.finish(vec![], &mut raw_module.funcs);
         raw_module.exports.add("test_copy_vector", function);
@@ -1079,13 +1103,15 @@ mod tests {
             | IntermediateType::IGenericStructInstance { .. }
             | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => {
-                let swap_f =
-                    RuntimeFunction::VecPopBack32.get(&mut raw_module, Some(&compilation_ctx));
+                let swap_f = RuntimeFunction::VecPopBack32
+                    .get(&mut raw_module, Some(&compilation_ctx))
+                    .unwrap();
                 builder.call(swap_f);
             }
             IntermediateType::IU64 => {
-                let swap_f =
-                    RuntimeFunction::VecPopBack64.get(&mut raw_module, Some(&compilation_ctx));
+                let swap_f = RuntimeFunction::VecPopBack64
+                    .get(&mut raw_module, Some(&compilation_ctx))
+                    .unwrap();
                 builder.call(swap_f);
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
@@ -1184,7 +1210,8 @@ mod tests {
             &mut builder,
             &compilation_ctx,
             compilation_ctx.root_module_data,
-        );
+        )
+        .unwrap();
 
         // Second push back pushes the element to the new copied vector, which has capacity
         builder.local_get(vec_ref);
@@ -1195,7 +1222,8 @@ mod tests {
             &mut builder,
             &compilation_ctx,
             compilation_ctx.root_module_data,
-        );
+        )
+        .unwrap();
 
         builder.local_get(vec_ref).load(
             compilation_ctx.memory_id,
@@ -1276,13 +1304,15 @@ mod tests {
 
         match inner_type {
             IntermediateType::IU64 => {
-                let swap_f =
-                    RuntimeFunction::VecSwap64.get(&mut raw_module, Some(&compilation_ctx));
+                let swap_f = RuntimeFunction::VecSwap64
+                    .get(&mut raw_module, Some(&compilation_ctx))
+                    .unwrap();
                 builder.call(swap_f);
             }
             _ => {
-                let swap_f =
-                    RuntimeFunction::VecSwap32.get(&mut raw_module, Some(&compilation_ctx));
+                let swap_f = RuntimeFunction::VecSwap32
+                    .get(&mut raw_module, Some(&compilation_ctx))
+                    .unwrap();
                 builder.call(swap_f);
             }
         }

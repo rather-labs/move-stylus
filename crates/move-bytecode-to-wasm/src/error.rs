@@ -93,7 +93,7 @@ pub enum ICEErrorKind {
     #[error("an error ocurred while handling the function table")]
     FunctionTable(#[from] FunctionTableError),
 
-    #[error("an error ocurred while generating a native funciton's code")]
+    #[error("an error ocurred while generating a native function's code")]
     NativeFunction(#[from] NativeFunctionError),
 
     #[error("an error ocurred whie processing a contract's ABI")]

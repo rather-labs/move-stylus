@@ -181,7 +181,7 @@ impl NativeFunction {
                     Self::NATIVE_HAS_CHILD_OBJECT,
                     STYLUS_FRAMEWORK_ADDRESS,
                     SF_MODULE_NAME_DYNAMIC_FIELD,
-                ) => dynamic_field::add_has_child_object_fn(module, compilation_ctx, module_id),
+                ) => dynamic_field::add_has_child_object_fn(module, compilation_ctx, module_id)?,
                 #[cfg(debug_assertions)]
                 (Self::NATIVE_GET_LAST_MEMORY_POSITION, _, _) => {
                     tests::add_get_last_memory_position_fn(module, compilation_ctx)
@@ -280,7 +280,7 @@ impl NativeFunction {
                     module,
                     compilation_ctx,
                     &[&generics[0]],
-                )
+                )?
             }
             //
             // Event
@@ -394,7 +394,7 @@ impl NativeFunction {
                     module,
                     compilation_ctx,
                     &[&generics[0]],
-                )
+                )?
             }
             // This native function is only available in debug mode to help with testing. It should
             // not be compiled in release mode.
@@ -408,7 +408,7 @@ impl NativeFunction {
                     module,
                     compilation_ctx,
                     &[&generics[0]],
-                )
+                )?
             }
             #[cfg(debug_assertions)]
             (Self::NATIVE_HASH_TYPE_AND_KEY, _, _) => {

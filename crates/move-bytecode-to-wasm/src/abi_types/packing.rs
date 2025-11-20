@@ -85,7 +85,7 @@ pub trait Packable {
         &self,
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
-    ) -> LocalId;
+    ) -> Result<LocalId, AbiPackError>;
 
     /// Returns the ABI encoded size of the type
     fn encoded_size(&self, compilation_ctx: &CompilationContext)
@@ -124,7 +124,7 @@ pub fn build_pack_instructions<T: Packable>(
     let mut locals = Vec::new();
     let mut args_size = 0;
     for signature_token in function_return_signature.iter().rev() {
-        let local = signature_token.add_load_local_instructions(builder, module);
+        let local = signature_token.add_load_local_instructions(builder, module)?;
         locals.push(local);
 
         // If the function returns multiple values, those values will be encoded as a tuple. By
@@ -214,7 +214,7 @@ impl Packable for IntermediateType {
         &self,
         builder: &mut InstrSeqBuilder,
         module: &mut Module,
-    ) -> LocalId {
+    ) -> Result<LocalId, AbiPackError> {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -233,16 +233,14 @@ impl Packable for IntermediateType {
             | IntermediateType::IGenericEnumInstance { .. } => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
-                local
+                Ok(local)
             }
             IntermediateType::IU64 => {
                 let local = module.locals.add(ValType::I64);
                 builder.local_set(local);
-                local
+                Ok(local)
             }
-            IntermediateType::ITypeParameter(_) => {
-                panic!("cannot pack generic type parameter");
-            }
+            IntermediateType::ITypeParameter(_) => Err(AbiPackError::PackingGenericTypeParameter),
         }
     }
 
@@ -266,7 +264,7 @@ impl Packable for IntermediateType {
                     compilation_ctx.memory_id,
                     local,
                     writer_pointer,
-                );
+                )?;
             }
             IntermediateType::IU64 => {
                 pack_i64_type_instructions(
@@ -275,7 +273,7 @@ impl Packable for IntermediateType {
                     compilation_ctx.memory_id,
                     local,
                     writer_pointer,
-                );
+                )?;
             }
             IntermediateType::IU128 => IU128::add_pack_instructions(
                 builder,
@@ -283,14 +281,14 @@ impl Packable for IntermediateType {
                 local,
                 writer_pointer,
                 compilation_ctx.memory_id,
-            ),
+            )?,
             IntermediateType::IU256 => IU256::add_pack_instructions(
                 builder,
                 module,
                 local,
                 writer_pointer,
                 compilation_ctx.memory_id,
-            ),
+            )?,
             IntermediateType::ISigner => return Err(AbiPackError::FoundSignerType),
             IntermediateType::IAddress => IAddress::add_pack_instructions(
                 builder,
@@ -347,7 +345,13 @@ impl Packable for IntermediateType {
                 if !enum_.is_simple {
                     return Err(AbiPackError::EnumIsNotSimple(enum_.identifier.clone()));
                 }
-                enum_.add_pack_instructions(builder, module, local, writer_pointer, compilation_ctx)
+                enum_.add_pack_instructions(
+                    builder,
+                    module,
+                    local,
+                    writer_pointer,
+                    compilation_ctx,
+                )?
             }
             IntermediateType::ITypeParameter(_) => {
                 return Err(AbiPackError::PackingGenericTypeParameter);
@@ -401,7 +405,7 @@ impl Packable for IntermediateType {
                     writer_pointer,
                     calldata_reference_pointer,
                     compilation_ctx,
-                );
+                )?;
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
                 let struct_ = compilation_ctx

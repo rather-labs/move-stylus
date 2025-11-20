@@ -5,9 +5,11 @@ use relooper::BranchMode;
 use walrus::{LocalId, ValType};
 
 use crate::{
+    abi_types::error::AbiError,
     compilation_context::{CompilationContextError, ModuleId},
     error::{CompilationError, ICEError, ICEErrorKind},
     native_functions::error::NativeFunctionError,
+    runtime::error::RuntimeFunctionError,
 };
 
 use super::{
@@ -22,8 +24,14 @@ pub enum TranslationError {
     #[error("compilation context error")]
     CompilationContextError(#[from] CompilationContextError),
 
-    #[error("an error ocurred while generating a native funciton's code")]
+    #[error("an error ocurred while generating a native function's code")]
     NativeFunctionError(#[from] NativeFunctionError),
+
+    #[error("an error ocurred while generating a runtime function's code")]
+    RuntimeFunction(#[from] RuntimeFunctionError),
+
+    #[error("an abi error ocurred while translating a function")]
+    AbiEncoding(#[from] AbiError),
 
     #[error(r#"function "{0}" not found in global functions table"#)]
     FunctionDefinitionNotFound(FunctionId),
@@ -45,6 +53,9 @@ pub enum TranslationError {
         operation: Bytecode,
         operand_type: IntermediateType,
     },
+
+    #[error("cast error: trying to cast {0:?}")]
+    InvalidCast(IntermediateType),
 
     #[error("unsupported operation: {operation:?}")]
     UnsupportedOperation { operation: Bytecode },

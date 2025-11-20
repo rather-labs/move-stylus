@@ -21,9 +21,9 @@ impl IVector {
         calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
     ) -> Result<(), AbiUnpackError> {
-        let mut result: Result<(), AbiUnpackError> = Ok(());
+        let mut inner_result: Result<(), AbiUnpackError> = Ok(());
         // Big-endian to Little-endian
-        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None);
+        let swap_i32_bytes_function = RuntimeFunction::SwapI32Bytes.get(module, None)?;
 
         let data_reader_pointer = module.locals.add(ValType::I32);
 
@@ -152,7 +152,7 @@ impl IVector {
 
             loop_block.local_get(writer_pointer);
             // This will leave in the stack [pointer/value i32/i64, length i32]
-            result = inner.add_unpack_instructions(
+            inner_result = inner.add_unpack_instructions(
                 loop_block,
                 module,
                 data_reader_pointer,
@@ -203,7 +203,9 @@ impl IVector {
         // returned values
         block.local_get(vector_pointer);
 
-        result
+        inner_result?;
+
+        Ok(())
     }
 }
 

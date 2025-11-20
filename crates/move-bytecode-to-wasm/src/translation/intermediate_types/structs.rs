@@ -50,6 +50,7 @@ use crate::{
     abi_types::{error::AbiEncodingError, packing::Packable},
     compilation_context::ModuleData,
     generics::replace_type_parameters,
+    translation::TranslationError,
     vm_handled_types::{VmHandledType, string::String_},
 };
 
@@ -141,7 +142,7 @@ impl IStruct {
         module: &mut Module,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) {
+    ) -> Result<(), TranslationError> {
         let s1_ptr = module.locals.add(ValType::I32);
         let s2_ptr = module.locals.add(ValType::I32);
 
@@ -155,7 +156,9 @@ impl IStruct {
             module_data,
             s1_ptr,
             s2_ptr,
-        );
+        )?;
+
+        Ok(())
     }
 
     pub fn copy_local_instructions(
@@ -164,7 +167,7 @@ impl IStruct {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) {
+    ) -> Result<(), TranslationError> {
         let src_ptr = module.locals.add(ValType::I32);
         let ptr = module.locals.add(ValType::I32);
 
@@ -198,9 +201,11 @@ impl IStruct {
             src_ptr,
             ptr,
             0,
-        );
+        )?;
 
         builder.local_get(ptr);
+
+        Ok(())
     }
 
     /// Common logic for copying fields from source to destination
@@ -215,7 +220,7 @@ impl IStruct {
         src_ptr: LocalId,
         dst_ptr: LocalId,
         start_offset: u32,
-    ) {
+    ) -> Result<(), TranslationError> {
         let val_32 = module.locals.add(ValType::I32);
         let val_64 = module.locals.add(ValType::I64);
         let ptr_to_data = module.locals.add(ValType::I32);
@@ -300,7 +305,7 @@ impl IStruct {
                         compilation_ctx,
                         module_data,
                         ptr_to_data,
-                    );
+                    )?;
 
                     builder.local_set(ptr_to_data);
                 }
@@ -323,6 +328,8 @@ impl IStruct {
 
             offset += 4;
         }
+
+        Ok(())
     }
 
     /// Common logic for comparing fields of two objects (structs or enum variants)
@@ -336,7 +343,7 @@ impl IStruct {
         module_data: &ModuleData,
         ptr_1: LocalId,
         ptr_2: LocalId,
-    ) {
+    ) -> Result<(), TranslationError> {
         let result = module.locals.add(ValType::I32);
         builder.i32_const(1).local_set(result);
 
@@ -362,6 +369,7 @@ impl IStruct {
             }
         };
 
+        let mut inner_result = Ok(());
         builder.block(None, |block| {
             let block_id = block.id();
             let mut offset = 0;
@@ -389,7 +397,8 @@ impl IStruct {
                 }
 
                 // Compare the field values
-                field.load_equality_instructions(module, block, compilation_ctx, module_data);
+                inner_result =
+                    field.load_equality_instructions(module, block, compilation_ctx, module_data);
 
                 block.if_else(
                     None,
@@ -402,7 +411,11 @@ impl IStruct {
                 offset += 4;
             }
         });
+
+        inner_result?;
         builder.local_get(result);
+
+        Ok(())
     }
 
     pub fn index(&self) -> u16 {
