@@ -54,10 +54,10 @@ mod receive_bad {
                     ) => {
                         // Correct error!
                     }
-                    other => panic!("Expected ReceiveFunctionBadVisibility, got {:?}", other),
+                    other => panic!("Expected ReceiveFunctionBadVisibility, got {other:?}"),
                 }
             }
-            Err(other) => panic!("Expected ICE error, got {:?}", other),
+            Err(other) => panic!("Expected ICE error, got {other:?}"),
         }
     }
 
@@ -77,10 +77,10 @@ mod receive_bad {
                     ) => {
                         // Correct error!
                     }
-                    other => panic!("Expected ReceiveFunctionHasReturns, got {:?}", other),
+                    other => panic!("Expected ReceiveFunctionHasReturns, got {other:?}"),
                 }
             }
-            Err(other) => panic!("Expected ICE error, got {:?}", other),
+            Err(other) => panic!("Expected ICE error, got {other:?}"),
         }
     }
 
@@ -100,10 +100,10 @@ mod receive_bad {
                     ) => {
                         // Correct error!
                     }
-                    other => panic!("Expected ReceiveFunctionHasArguments, got {:?}", other),
+                    other => panic!("Expected ReceiveFunctionHasArguments, got {other:?}"),
                 }
             }
-            Err(other) => panic!("Expected ICE error, got {:?}", other),
+            Err(other) => panic!("Expected ICE error, got {other:?}"),
         }
     }
 
@@ -123,10 +123,10 @@ mod receive_bad {
                     ) => {
                         // Correct error!
                     }
-                    other => panic!("Expected ReceiveFunctionIsNotPayable, got {:?}", other),
+                    other => panic!("Expected ReceiveFunctionIsNotPayable, got {other:?}"),
                 }
             }
-            Err(other) => panic!("Expected ICE error, got {:?}", other),
+            Err(other) => panic!("Expected ICE error, got {other:?}"),
         }
     }
 }

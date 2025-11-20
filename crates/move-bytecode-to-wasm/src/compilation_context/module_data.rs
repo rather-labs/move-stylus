@@ -773,7 +773,7 @@ impl ModuleData {
                 )?;
 
                 if is_init {
-                    if init.is_some() {
+                    if reserved_functions.init.is_some() {
                         return Err(CompilationContextError::TwoOrMoreInits);
                     }
                     reserved_functions.init = Some(function_id.clone());
