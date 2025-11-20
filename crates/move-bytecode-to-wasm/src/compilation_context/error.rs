@@ -1,15 +1,23 @@
+use std::rc::Rc;
+
 use move_binary_format::file_format::{
     FieldHandleIndex, FieldInstantiationIndex, SignatureIndex, StructDefInstantiationIndex,
     StructDefinitionIndex,
 };
 
-use crate::error::{CompilationError, ICEError, ICEErrorKind};
+use crate::{
+    error::{CompilationError, ICEError, ICEErrorKind},
+    translation::functions::MappedFunctionError,
+};
 
 use super::ModuleId;
 
 #[derive(Debug, thiserror::Error)]
 #[allow(clippy::enum_variant_names)]
 pub enum CompilationContextError {
+    #[error("creating a mapped function")]
+    MappedFunction(#[source] Rc<MappedFunctionError>),
+
     #[error("struct with index {0} not found in compilation context")]
     StructNotFound(u16),
 
@@ -69,6 +77,29 @@ pub enum CompilationContextError {
 
     #[error("fallback function with bad visibility")]
     FallbackFunctionBadVisibility,
+    #[error(r#"datatype handle index "{0}" not found"#)]
+    DatatypeHanldeIndexNotFound(usize),
+
+    #[error("there can be only a single init function per module")]
+    TwoOrMoreInits,
+
+    #[error("found init funciton with no arguments")]
+    InitFunctionNoAguments,
+
+    #[error("too many arguments for init function")]
+    InitFunctionTooManyArgs,
+
+    #[error("init functions does not have TxContext as parameter")]
+    InitFunctionNoTxContext,
+
+    #[error("init function second argument must be a OTW")]
+    InitFunctionNoOTW,
+
+    #[error("expected no return values for init function")]
+    InitFunctionBadRetrunValues,
+
+    #[error("expected private visibility for init function")]
+    InitFunctionBadPrivacy,
 }
 
 impl From<CompilationContextError> for CompilationError {

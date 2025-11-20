@@ -6,14 +6,13 @@ use walrus::{
 
 use crate::{
     CompilationContext,
+    abi_types::error::AbiError,
     runtime::RuntimeFunction,
     translation::intermediate_types::{
         boolean::IBool,
         simple_integers::{IU8, IU16, IU32, IU64},
     },
 };
-
-use super::error::AbiUnpackError;
 
 impl IBool {
     pub fn add_unpack_instructions(
@@ -22,7 +21,7 @@ impl IBool {
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiUnpackError> {
+    ) -> Result<(), AbiError> {
         let encoded_size = sol_data::Bool::ENCODED_SIZE.expect("Bool should have a fixed size");
         unpack_i32_type_instructions(
             block,
@@ -43,7 +42,7 @@ impl IU8 {
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiUnpackError> {
+    ) -> Result<(), AbiError> {
         let encoded_size = sol_data::Uint::<8>::ENCODED_SIZE.expect("U8 should have a fixed size");
         unpack_i32_type_instructions(
             block,
@@ -64,7 +63,7 @@ impl IU16 {
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiUnpackError> {
+    ) -> Result<(), AbiError> {
         let encoded_size =
             sol_data::Uint::<16>::ENCODED_SIZE.expect("U16 should have a fixed size");
         unpack_i32_type_instructions(
@@ -86,7 +85,7 @@ impl IU32 {
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiUnpackError> {
+    ) -> Result<(), AbiError> {
         let encoded_size =
             sol_data::Uint::<32>::ENCODED_SIZE.expect("U32 should have a fixed size");
         unpack_i32_type_instructions(
@@ -108,7 +107,7 @@ impl IU64 {
         reader_pointer: LocalId,
         _calldata_reader_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiUnpackError> {
+    ) -> Result<(), AbiError> {
         let encoded_size =
             sol_data::Uint::<64>::ENCODED_SIZE.expect("U64 should have a fixed size");
         unpack_i64_type_instructions(
@@ -129,7 +128,7 @@ pub fn unpack_i32_type_instructions(
     memory: MemoryId,
     reader_pointer: LocalId,
     encoded_size: usize,
-) -> Result<(), AbiUnpackError> {
+) -> Result<(), AbiError> {
     // Load the value
     block.local_get(reader_pointer);
     block.load(
@@ -160,7 +159,7 @@ pub fn unpack_i64_type_instructions(
     memory: MemoryId,
     reader_pointer: LocalId,
     encoded_size: usize,
-) -> Result<(), AbiUnpackError> {
+) -> Result<(), AbiError> {
     // Load the value
     block.local_get(reader_pointer);
     block.load(

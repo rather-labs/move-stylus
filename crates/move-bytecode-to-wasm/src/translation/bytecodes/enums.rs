@@ -77,7 +77,7 @@ pub fn pack_variant(
                     | IntermediateType::IU16
                     | IntermediateType::IU32
                     | IntermediateType::IU64 => {
-                        let data_size = pack_type.stack_data_size();
+                        let data_size = pack_type.stack_data_size()?;
                         let (val, store_kind) = if data_size == 8 {
                             (val_64, StoreKind::I64 { atomic: false })
                         } else {
@@ -116,9 +116,7 @@ pub fn pack_variant(
                         builder.local_set(ptr_to_data);
                     }
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                        return Err(TranslationError::FoundReferenceInsideEnum {
-                            enum_index: enum_.index,
-                        });
+                        return Err(TranslationError::FoundReferenceInsideEnum(enum_.index));
                     }
                     IntermediateType::ITypeParameter(_) => {
                         return Err(TranslationError::FoundTypeParameterInsideEnumVariant {
@@ -236,9 +234,7 @@ pub fn unpack_variant_ref(
                     .binop(BinaryOp::I32Add);
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                return Err(TranslationError::FoundReferenceInsideEnum {
-                    enum_index: enum_.index,
-                });
+                return Err(TranslationError::FoundReferenceInsideEnum(enum_.index));
             }
             IntermediateType::ITypeParameter(_) => {
                 return Err(TranslationError::FoundTypeParameterInsideEnumVariant {

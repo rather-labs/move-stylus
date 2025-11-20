@@ -176,7 +176,7 @@ impl<'a> PublicFunction<'a> {
             module,
             &self.signature.returns,
             compilation_ctx.memory_id,
-        );
+        )?;
 
         if self.signature.returns.is_empty() {
             // Set data_ptr and data_len to 0
@@ -543,7 +543,8 @@ mod tests {
             IntermediateType::IU16,
             IntermediateType::IU64,
         ];
-        prepare_function_return(&mut raw_module, &mut func_body, &returns, &compilation_ctx);
+        prepare_function_return(&mut raw_module, &mut func_body, &returns, &compilation_ctx)
+            .unwrap();
 
         let function = function_builder.finish(vec![param1, param2, param3], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);
@@ -609,7 +610,8 @@ mod tests {
         func_body.local_get(param1);
 
         let returns = vec![IntermediateType::IU8, IntermediateType::ISigner];
-        prepare_function_return(&mut raw_module, &mut func_body, &returns, &compilation_ctx);
+        prepare_function_return(&mut raw_module, &mut func_body, &returns, &compilation_ctx)
+            .unwrap();
 
         let function = function_builder.finish(vec![param1, param2], &mut raw_module.funcs);
         raw_module.exports.add("test_function", function);

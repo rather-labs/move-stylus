@@ -50,11 +50,10 @@ use crate::{
     abi_types::{error::AbiEncodingError, packing::Packable},
     compilation_context::ModuleData,
     generics::replace_type_parameters,
-    translation::TranslationError,
     vm_handled_types::{VmHandledType, string::String_},
 };
 
-use super::IntermediateType;
+use super::{IntermediateType, error::IntermediateTypeError};
 use move_binary_format::{
     file_format::{FieldHandleIndex, StructDefinitionIndex},
     internals::ModuleIndex,
@@ -142,7 +141,7 @@ impl IStruct {
         module: &mut Module,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let s1_ptr = module.locals.add(ValType::I32);
         let s2_ptr = module.locals.add(ValType::I32);
 
@@ -167,7 +166,7 @@ impl IStruct {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let src_ptr = module.locals.add(ValType::I32);
         let ptr = module.locals.add(ValType::I32);
 
@@ -220,7 +219,7 @@ impl IStruct {
         src_ptr: LocalId,
         dst_ptr: LocalId,
         start_offset: u32,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let val_32 = module.locals.add(ValType::I32);
         let val_64 = module.locals.add(ValType::I64);
         let ptr_to_data = module.locals.add(ValType::I32);
@@ -234,7 +233,7 @@ impl IStruct {
                 | IntermediateType::IU16
                 | IntermediateType::IU32
                 | IntermediateType::IU64 => {
-                    let data_size = field.stack_data_size();
+                    let data_size = field.stack_data_size()?;
                     let (val, load_kind, store_kind) = if data_size == 8 {
                         (
                             val_64,
@@ -343,72 +342,86 @@ impl IStruct {
         module_data: &ModuleData,
         ptr_1: LocalId,
         ptr_2: LocalId,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let result = module.locals.add(ValType::I32);
         builder.i32_const(1).local_set(result);
 
         let load_value_to_stack = |field: &IntermediateType, builder: &mut InstrSeqBuilder<'_>| {
-            if field.stack_data_size() == 8 {
-                builder.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I64 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
-            } else {
-                builder.load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg {
-                        align: 0,
-                        offset: 0,
-                    },
-                );
+            match field.stack_data_size() {
+                Ok(8) => {
+                    builder.load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I64 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                }
+                Err(e) => return Err(e),
+                _ => {
+                    builder.load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg {
+                            align: 0,
+                            offset: 0,
+                        },
+                    );
+                }
             }
+
+            Ok(())
         };
 
-        let mut inner_result = Ok(());
+        let mut inner_result: Result<(), IntermediateTypeError> = Ok(());
         builder.block(None, |block| {
             let block_id = block.id();
             let mut offset = 0;
             for field in fields.iter() {
                 // Load the first struct field value
-                block.local_get(ptr_1).load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg { align: 0, offset },
-                );
+                inner_result = (|| {
+                    block.local_get(ptr_1).load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg { align: 0, offset },
+                    );
 
-                if field.is_stack_type() {
-                    load_value_to_stack(field, block);
-                }
+                    if field.is_stack_type() {
+                        load_value_to_stack(field, block)?;
+                    }
 
-                // Load the second struct field value
-                block.local_get(ptr_2).load(
-                    compilation_ctx.memory_id,
-                    LoadKind::I32 { atomic: false },
-                    MemArg { align: 0, offset },
-                );
+                    // Load the second struct field value
+                    block.local_get(ptr_2).load(
+                        compilation_ctx.memory_id,
+                        LoadKind::I32 { atomic: false },
+                        MemArg { align: 0, offset },
+                    );
 
-                if field.is_stack_type() {
-                    load_value_to_stack(field, block);
-                }
+                    if field.is_stack_type() {
+                        load_value_to_stack(field, block)?;
+                    }
 
-                // Compare the field values
-                inner_result =
-                    field.load_equality_instructions(module, block, compilation_ctx, module_data);
+                    // Compare the field values
+                    field.load_equality_instructions(
+                        module,
+                        block,
+                        compilation_ctx,
+                        module_data,
+                    )?;
 
-                block.if_else(
-                    None,
-                    |_| {},
-                    |else_| {
-                        else_.i32_const(0).local_set(result).br(block_id);
-                    },
-                );
+                    block.if_else(
+                        None,
+                        |_| {},
+                        |else_| {
+                            else_.i32_const(0).local_set(result).br(block_id);
+                        },
+                    );
 
-                offset += 4;
+                    offset += 4;
+
+                    Ok(())
+                })();
             }
         });
 

@@ -100,7 +100,7 @@ pub fn add_encode_and_save_into_storage_struct_instructions(
             // UIDs are not written in storage, except for referencing nested child structs (wrapped objects).
             continue;
         }
-        let field_size = field_size(field, compilation_ctx) as i32;
+        let field_size = field_size(field, compilation_ctx)? as i32;
         // Update the slot_offset to include the field size.
         // If we've filled the current slot, cache its data and move to the next slot.
         builder
@@ -230,7 +230,15 @@ pub fn add_encode_and_save_into_storage_enum_instructions(
             );
 
         for (index, field) in variant.fields.iter().enumerate() {
-            let field_size = field_size(field, compilation_ctx) as i32;
+            let field_size = field_size(field, compilation_ctx);
+
+            let field_size = match field_size {
+                Ok(fs) => fs as i32,
+                Err(e) => {
+                    inner_result = Err(e);
+                    break;
+                }
+            };
             // Update the slot_offset to include the field size.
             // If we've filled the current slot, cache its data and move to the next slot.
             block
@@ -408,10 +416,12 @@ pub fn add_encode_and_save_into_storage_vector_instructions(
     let len = module.locals.add(ValType::I32);
 
     // Stack size of the inner type
-    let stack_size = inner.stack_data_size() as i32;
+    let stack_size = inner
+        .stack_data_size()
+        .map_err(|e| EncodeError::IntermediateType(e.into()))? as i32;
 
     // Element size in storage
-    let elem_size = field_size(inner, compilation_ctx) as i32;
+    let elem_size = field_size(inner, compilation_ctx)? as i32;
 
     // Wipe the data so we write on it safely
     builder
@@ -691,8 +701,10 @@ pub fn add_encode_intermediate_type_instructions(
     let val_64 = module.locals.add(ValType::I64);
 
     // Stack and storage size of the type
-    let stack_size = itype.stack_data_size() as i32;
-    let storage_size = field_size(itype, compilation_ctx) as i32;
+    let stack_size = itype
+        .stack_data_size()
+        .map_err(|e| EncodeError::IntermediateType(e.into()))? as i32;
+    let storage_size = field_size(itype, compilation_ctx)? as i32;
 
     // Runtime functions
     let get_struct_id_fn = RuntimeFunction::GetIdBytesPtr.get(module, Some(compilation_ctx))?;

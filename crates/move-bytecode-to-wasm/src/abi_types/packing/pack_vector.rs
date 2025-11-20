@@ -1,8 +1,9 @@
 use walrus::{InstrSeqBuilder, LocalId, Module, ValType, ir::BinaryOp};
 
-use super::{Packable, error::AbiPackError, pack_native_int::pack_i32_type_instructions};
+use super::{Packable, pack_native_int::pack_i32_type_instructions};
 use crate::{
     CompilationContext,
+    abi_types::error::AbiError,
     translation::intermediate_types::{IntermediateType, vector::IVector},
 };
 
@@ -15,7 +16,7 @@ impl IVector {
         writer_pointer: LocalId,
         calldata_reference_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiPackError> {
+    ) -> Result<(), AbiError> {
         let data_pointer = module.locals.add(ValType::I32);
         let inner_data_reference = module.locals.add(ValType::I32);
 
@@ -24,7 +25,7 @@ impl IVector {
             builder,
             local,
             compilation_ctx.memory_id,
-        );
+        )?;
 
         let inner_encoded_size = if inner.is_dynamic(compilation_ctx)? {
             32
@@ -101,68 +102,63 @@ impl IVector {
             let i = module.locals.add(ValType::I32);
             outer_block.i32_const(0).local_set(i);
             outer_block.loop_(None, |loop_block| {
-                let loop_block_id = loop_block.id();
+                inner_result = (|| {
+                    let loop_block_id = loop_block.id();
 
-                let inner_local = inner.add_load_memory_to_local_instructions(
-                    module,
-                    loop_block,
-                    local,
-                    compilation_ctx.memory_id,
-                );
+                    let inner_local = inner.add_load_memory_to_local_instructions(
+                        module,
+                        loop_block,
+                        local,
+                        compilation_ctx.memory_id,
+                    )?;
 
-                let is_dynamic = inner.is_dynamic(compilation_ctx);
-                match is_dynamic {
-                    Err(error) => {
-                        inner_result = Err(error.into());
+                    if inner.is_dynamic(compilation_ctx)? {
+                        inner.add_pack_instructions_dynamic(
+                            loop_block,
+                            module,
+                            inner_local,
+                            data_pointer,
+                            inner_data_reference,
+                            compilation_ctx,
+                        )?;
+                    } else {
+                        inner.add_pack_instructions(
+                            loop_block,
+                            module,
+                            inner_local,
+                            data_pointer,
+                            inner_data_reference,
+                            compilation_ctx,
+                        )?;
                     }
-                    Ok(is_dyn) => {
-                        if is_dyn {
-                            inner_result = inner.add_pack_instructions_dynamic(
-                                loop_block,
-                                module,
-                                inner_local,
-                                data_pointer,
-                                inner_data_reference,
-                                compilation_ctx,
-                            );
-                        } else {
-                            inner_result = inner.add_pack_instructions(
-                                loop_block,
-                                module,
-                                inner_local,
-                                data_pointer,
-                                inner_data_reference,
-                                compilation_ctx,
-                            );
-                        }
-                    }
-                }
 
-                // increment the local to point to next first value
-                loop_block
-                    .local_get(local)
-                    .i32_const(inner.stack_data_size() as i32)
-                    .binop(BinaryOp::I32Add)
-                    .local_set(local);
+                    // increment the local to point to next first value
+                    loop_block
+                        .local_get(local)
+                        .i32_const(inner.stack_data_size()? as i32)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(local);
 
-                // increment data pointer
-                loop_block
-                    .local_get(data_pointer)
-                    .i32_const(inner_encoded_size)
-                    .binop(BinaryOp::I32Add)
-                    .local_set(data_pointer);
+                    // increment data pointer
+                    loop_block
+                        .local_get(data_pointer)
+                        .i32_const(inner_encoded_size)
+                        .binop(BinaryOp::I32Add)
+                        .local_set(data_pointer);
 
-                // increment i
-                loop_block
-                    .local_get(i)
-                    .i32_const(1)
-                    .binop(BinaryOp::I32Add)
-                    .local_tee(i);
+                    // increment i
+                    loop_block
+                        .local_get(i)
+                        .i32_const(1)
+                        .binop(BinaryOp::I32Add)
+                        .local_tee(i);
 
-                loop_block
-                    .local_get(len)
-                    .binop(BinaryOp::I32LtU)
-                    .br_if(loop_block_id);
+                    loop_block
+                        .local_get(len)
+                        .binop(BinaryOp::I32LtU)
+                        .br_if(loop_block_id);
+                    Ok(())
+                })();
             });
         });
 

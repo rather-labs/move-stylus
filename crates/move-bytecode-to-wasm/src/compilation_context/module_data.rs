@@ -11,6 +11,7 @@ use crate::{
         intermediate_types::{
             IntermediateType,
             enums::{IEnum, IEnumVariant},
+            error::IntermediateTypeError,
             structs::{IStruct, IStructType},
         },
         table::FunctionId,
@@ -41,6 +42,7 @@ use std::{
     collections::HashMap,
     fmt::{Debug, Display},
     hash::{Hash, Hasher},
+    rc::Rc,
 };
 use struct_data::StructData;
 
@@ -170,7 +172,7 @@ impl ModuleData {
             move_module_unit,
             move_module_dependencies,
             root_compiled_units,
-        );
+        )?;
 
         // Module's structs
         let (module_structs, fields_to_struct_map) = Self::process_concrete_structs(
@@ -244,7 +246,7 @@ impl ModuleData {
         module: &CompiledModule,
         move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
         root_compiled_units: &[&CompiledUnitWithSource],
-    ) -> HashMap<DatatypeHandleIndex, UserDefinedType> {
+    ) -> Result<HashMap<DatatypeHandleIndex, UserDefinedType>> {
         let mut datatype_handles_map = HashMap::new();
 
         for (index, datatype_handle) in module.datatype_handles().iter().enumerate() {
@@ -278,7 +280,7 @@ impl ModuleData {
                         },
                     );
                 } else {
-                    panic!("datatype handle index {index} not found");
+                    return Err(CompilationContextError::DatatypeHanldeIndexNotFound(index));
                 };
             } else {
                 let datatype_module = module.module_handle_at(datatype_handle.module);
@@ -305,7 +307,7 @@ impl ModuleData {
                 }) {
                     &external_module.unit.module
                 } else {
-                    panic!("could not find dependency {module_id}")
+                    return Err(CompilationContextError::ModuleNotFound(module_id));
                 };
 
                 let external_data_name = module.identifier_at(datatype_handle.name);
@@ -344,12 +346,12 @@ impl ModuleData {
                         },
                     );
                 } else {
-                    panic!("datatype handle index {index} not found");
+                    return Err(CompilationContextError::DatatypeHanldeIndexNotFound(index));
                 };
             }
         }
 
-        datatype_handles_map
+        Ok(datatype_handles_map)
     }
 
     fn process_concrete_structs(
@@ -455,7 +457,7 @@ impl ModuleData {
                 .0
                 .iter()
                 .map(|t| IntermediateType::try_from_signature_token(t, datatype_handles_map))
-                .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
                 .unwrap();
 
             module_generic_structs_instances
@@ -522,7 +524,7 @@ impl ModuleData {
                         .map(|t| {
                             IntermediateType::try_from_signature_token(t, datatype_handles_map)
                         })
-                        .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                        .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
                         .unwrap(),
                 ),
             );
@@ -552,7 +554,7 @@ impl ModuleData {
                             datatype_handles_map,
                         )
                     })
-                    .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
                     .unwrap();
 
                 variants.push(IEnumVariant::new(
@@ -612,7 +614,7 @@ impl ModuleData {
                 .0
                 .iter()
                 .map(|t| IntermediateType::try_from_signature_token(t, datatype_handles_map))
-                .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
                 .unwrap();
 
             module_generic_enums_instances.push((enum_def_index, enum_instantiation_types.clone()));
@@ -704,7 +706,7 @@ impl ModuleData {
                     .0
                     .iter()
                     .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                    .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
                     .unwrap(),
             );
 
@@ -715,7 +717,7 @@ impl ModuleData {
                     .0
                     .iter()
                     .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                    .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                    .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
                     .unwrap(),
             );
 
@@ -768,11 +770,11 @@ impl ModuleData {
                     datatype_handles_map,
                     move_module,
                     move_module_dependencies,
-                );
+                )?;
 
                 if is_init {
-                    if reserved_functions.init.is_some() {
-                        panic!("There can be only a single init function per module.");
+                    if init.is_some() {
+                        return Err(CompilationContextError::TwoOrMoreInits);
                     }
                     reserved_functions.init = Some(function_id.clone());
                 }
@@ -808,14 +810,17 @@ impl ModuleData {
                     reserved_functions.fallback = Some(function_id.clone());
                 }
 
-                function_information.push(MappedFunction::new(
-                    function_id.clone(),
-                    move_function_arguments,
-                    move_function_return,
-                    code_locals,
-                    function_def,
-                    datatype_handles_map,
-                ));
+                function_information.push(
+                    MappedFunction::new(
+                        function_id.clone(),
+                        move_function_arguments,
+                        move_function_return,
+                        code_locals,
+                        function_def,
+                        datatype_handles_map,
+                    )
+                    .map_err(|e| CompilationContextError::MappedFunction(Rc::new(e)))?,
+                );
 
                 function_definitions.insert(function_id.clone(), function_def);
             }
@@ -839,7 +844,7 @@ impl ModuleData {
                 .0
                 .iter()
                 .map(|s| IntermediateType::try_from_signature_token(s, datatype_handles_map))
-                .collect::<std::result::Result<Vec<IntermediateType>, anyhow::Error>>()
+                .collect::<std::result::Result<Vec<IntermediateType>, IntermediateTypeError>>()
                 .unwrap();
 
             let function_id = FunctionId {
@@ -893,7 +898,6 @@ impl ModuleData {
     //
 
     /// Checks if the given function (by index) is a valid `init` function.
-    // TODO: Note that we currently trigger a panic if a function named 'init' fails to satisfy certain criteria to qualify as a constructor.
     // This behavior is not enforced by the move compiler itself.
     fn is_init(
         function_id: &FunctionId,
@@ -903,30 +907,26 @@ impl ModuleData {
         datatype_handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
         module: &CompiledModule,
         move_module_dependencies: &[(PackageName, CompiledUnitWithSource)],
-    ) -> bool {
+    ) -> Result<bool> {
         // Constants
         const INIT_FUNCTION_NAME: &str = "init";
 
-        // Error messages
-        const BAD_ARGS_ERROR_MESSAGE: &str = "invalid arguments";
-        const BAD_VISIBILITY_ERROR_MESSAGE: &str = "expected private visibility";
-        const BAD_RETURN_ERROR_MESSAGE: &str = "expected no return values";
-
         // Must be named `init`
         if function_id.identifier != INIT_FUNCTION_NAME {
-            return false;
+            return Ok(false);
         }
 
-        // Must be private
-        assert_eq!(
-            function_def.visibility,
-            Visibility::Private,
-            "{BAD_VISIBILITY_ERROR_MESSAGE}"
-        );
+        if function_def.visibility != Visibility::Private {
+            return Err(CompilationContextError::InitFunctionBadPrivacy);
+        }
 
         // Must have 1 or 2 arguments
         let arg_count = move_function_arguments.len();
-        assert!((1..=2).contains(&arg_count), "{}", BAD_ARGS_ERROR_MESSAGE);
+        if arg_count > 2 {
+            return Err(CompilationContextError::InitFunctionTooManyArgs);
+        } else if arg_count == 0 {
+            return Err(CompilationContextError::InitFunctionNoAguments);
+        }
 
         // Check TxContext in the last argument
         let last_arg = move_function_arguments.0.last().map(|last| {
@@ -971,29 +971,27 @@ impl ModuleData {
             _ => false,
         };
 
-        assert!(is_tx_context_ref, "{}", BAD_ARGS_ERROR_MESSAGE);
+        if !is_tx_context_ref {
+            return Err(CompilationContextError::InitFunctionNoTxContext);
+        }
 
         // Check OTW if 2 arguments
         if arg_count == 2 {
             let SignatureToken::Datatype(idx) = &move_function_arguments.0[0] else {
-                panic!("{}", BAD_ARGS_ERROR_MESSAGE);
+                return Err(CompilationContextError::InitFunctionNoOTW);
             };
 
-            assert!(
-                Self::is_one_time_witness(module, *idx),
-                "{}",
-                BAD_ARGS_ERROR_MESSAGE
-            );
+            if !Self::is_one_time_witness(module, *idx) {
+                return Err(CompilationContextError::InitFunctionNoOTW);
+            }
         }
 
         // Must not return any values
-        assert!(
-            move_function_return.is_empty(),
-            "{}",
-            BAD_RETURN_ERROR_MESSAGE
-        );
+        if !move_function_return.is_empty() {
+            return Err(CompilationContextError::InitFunctionBadRetrunValues);
+        }
 
-        true
+        Ok(true)
     }
 
     /// Checks if the given signature token is a one-time witness type.

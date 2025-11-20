@@ -4,10 +4,9 @@ use walrus::{
 };
 
 use crate::{
-    CompilationContext, runtime::RuntimeFunction, translation::intermediate_types::enums::IEnum,
+    CompilationContext, abi_types::error::AbiError, runtime::RuntimeFunction,
+    translation::intermediate_types::enums::IEnum,
 };
-
-use super::error::AbiPackError;
 
 impl IEnum {
     pub fn add_pack_instructions(
@@ -17,7 +16,7 @@ impl IEnum {
         local: LocalId,
         writer_pointer: LocalId,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), AbiPackError> {
+    ) -> Result<(), AbiError> {
         block.local_get(writer_pointer);
 
         // Little-endian to Big-endian

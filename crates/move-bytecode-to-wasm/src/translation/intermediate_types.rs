@@ -12,6 +12,7 @@ use crate::{
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
+use error::IntermediateTypeError;
 use move_binary_format::file_format::{DatatypeHandleIndex, Signature, SignatureToken};
 
 use address::IAddress;
@@ -30,6 +31,7 @@ use super::TranslationError;
 pub mod address;
 pub mod boolean;
 pub mod enums;
+pub mod error;
 pub mod heap_integers;
 pub mod reference;
 pub mod signer;
@@ -113,8 +115,8 @@ pub enum IntermediateType {
 
 impl IntermediateType {
     /// Returns the size in bytes, that this type needs in memory to be stored
-    pub fn stack_data_size(&self) -> u32 {
-        match self {
+    pub fn stack_data_size(&self) -> Result<u32, IntermediateTypeError> {
+        let size = match self {
             IntermediateType::IU64 => 8,
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -132,15 +134,17 @@ impl IntermediateType {
             | IntermediateType::IEnum { .. }
             | IntermediateType::IGenericEnumInstance { .. } => 4,
             IntermediateType::ITypeParameter(_) => {
-                panic!("type parameter does not have a known stack data size at compile time")
+                return Err(IntermediateTypeError::FoundTypeParameter);
             }
-        }
+        };
+
+        Ok(size)
     }
 
     pub fn try_from_signature_token(
         value: &SignatureToken,
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-    ) -> Result<Self, anyhow::Error> {
+    ) -> Result<Self, IntermediateTypeError> {
         match value {
             SignatureToken::Bool => Ok(Self::IBool),
             SignatureToken::U8 => Ok(Self::IU8),
@@ -177,8 +181,8 @@ impl IntermediateType {
                         },
                     })
                 } else {
-                    Err(anyhow::anyhow!(
-                        "No user defined data with handler index: {datatype_index:?} found"
+                    Err(IntermediateTypeError::UserDefinedTypeNotFound(
+                        *datatype_index,
                     ))
                 }
             }
@@ -188,7 +192,7 @@ impl IntermediateType {
                         .1
                         .iter()
                         .map(|t| Self::try_from_signature_token(t, handles_map))
-                        .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()?;
+                        .collect::<Result<Vec<IntermediateType>, IntermediateTypeError>>()?;
 
                     Ok(match udt {
                         UserDefinedType::Struct { module_id, index } => {
@@ -208,9 +212,7 @@ impl IntermediateType {
                         }
                     })
                 } else {
-                    Err(anyhow::anyhow!(
-                        "No user defined data with handler index: {index:?} found"
-                    ))
+                    Err(IntermediateTypeError::UserDefinedTypeNotFound(index.0))
                 }
             }
             SignatureToken::TypeParameter(index) => Ok(IntermediateType::ITypeParameter(*index)),
@@ -227,7 +229,7 @@ impl IntermediateType {
         builder: &mut InstrSeqBuilder,
         bytes: &mut std::vec::IntoIter<u8>,
         compilation_ctx: &CompilationContext,
-    ) {
+    ) -> Result<(), IntermediateTypeError> {
         match self {
             IntermediateType::IBool => IBool::load_constant_instructions(builder, bytes),
             IntermediateType::IU8 => IU8::load_constant_instructions(builder, bytes),
@@ -243,23 +245,25 @@ impl IntermediateType {
             IntermediateType::IAddress => {
                 IAddress::load_constant_instructions(module, builder, bytes, compilation_ctx)
             }
-            IntermediateType::ISigner => panic!("signer type can't be loaded as a constant"),
+            IntermediateType::ISigner => return Err(IntermediateTypeError::SignerCannotBeConstant),
             IntermediateType::IVector(inner) => {
-                IVector::load_constant_instructions(inner, module, builder, bytes, compilation_ctx)
+                IVector::load_constant_instructions(inner, module, builder, bytes, compilation_ctx)?
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                panic!("cannot load a constant for a reference type");
+                return Err(IntermediateTypeError::CannotLoadConstantForReferenceType);
             }
             IntermediateType::IStruct { .. } | IntermediateType::IGenericStructInstance { .. } => {
-                panic!("structs can't be loaded as constants")
+                return Err(IntermediateTypeError::StructsCannotBeConstants);
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("can't load a type parameter as a constant, expected a concrete type");
+                return Err(IntermediateTypeError::FoundTypeParameter);
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
-                panic!("Enum variants cannot be loaded as constants")
+                return Err(IntermediateTypeError::EnumVariantsCannotBeConstants);
             }
         }
+
+        Ok(())
     }
 
     pub fn move_local_instructions(
@@ -267,7 +271,7 @@ impl IntermediateType {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         local: LocalId,
-    ) {
+    ) -> Result<(), IntermediateTypeError> {
         builder.local_get(local);
         match self {
             IntermediateType::IBool
@@ -331,9 +335,11 @@ impl IntermediateType {
             }
             IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {}
             IntermediateType::ITypeParameter(_) => {
-                panic!("cannot move a type parameter, expected a concrete type");
+                return Err(IntermediateTypeError::FoundTypeParameter);
             }
         }
+
+        Ok(())
     }
 
     pub fn copy_local_instructions(
@@ -343,7 +349,7 @@ impl IntermediateType {
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
         local: LocalId,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         builder.local_get(local);
         match self {
             IntermediateType::IBool
@@ -470,10 +476,10 @@ impl IntermediateType {
                 // Nothing to be done, pointer is already correct
             }
             IntermediateType::ISigner => {
-                panic!(r#"trying to introduce copy instructions for "signer" type"#)
+                return Err(IntermediateTypeError::SignerCannotBeCopied);
             }
             IntermediateType::ITypeParameter(_) => {
-                panic!("cannot copy a type parameter, expected a concrete type");
+                return Err(IntermediateTypeError::FoundTypeParameter);
             }
             IntermediateType::IEnum { .. } | IntermediateType::IGenericEnumInstance { .. } => {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
@@ -498,7 +504,7 @@ impl IntermediateType {
         builder: &mut InstrSeqBuilder,
         pointer: LocalId,
         memory: MemoryId,
-    ) -> LocalId {
+    ) -> Result<LocalId, IntermediateTypeError> {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -528,7 +534,7 @@ impl IntermediateType {
                 );
                 builder.local_set(local);
 
-                local
+                Ok(local)
             }
             IntermediateType::IU64 => {
                 let local = module.locals.add(ValType::I64);
@@ -544,11 +550,9 @@ impl IntermediateType {
                 );
                 builder.local_set(local);
 
-                local
+                Ok(local)
             }
-            IntermediateType::ITypeParameter(_) => {
-                panic!("cannot load a type parameter, expected a concrete type");
-            }
+            IntermediateType::ITypeParameter(_) => Err(IntermediateTypeError::FoundTypeParameter),
         }
     }
 
@@ -558,7 +562,7 @@ impl IntermediateType {
         &self,
         module: &mut Module,
         builder: &mut InstrSeqBuilder,
-    ) -> LocalId {
+    ) -> Result<LocalId, IntermediateTypeError> {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -577,43 +581,14 @@ impl IntermediateType {
             | IntermediateType::IGenericEnumInstance { .. } => {
                 let local = module.locals.add(ValType::I32);
                 builder.local_set(local);
-                local
+                Ok(local)
             }
             IntermediateType::IU64 => {
                 let local = module.locals.add(ValType::I64);
                 builder.local_set(local);
-                local
+                Ok(local)
             }
-            IntermediateType::ITypeParameter(_) => {
-                panic!("cannot load a type parameter, expected a concrete type");
-            }
-        }
-    }
-
-    pub fn add_borrow_local_instructions(&self, builder: &mut InstrSeqBuilder, local: LocalId) {
-        match self {
-            IntermediateType::IBool
-            | IntermediateType::IU8
-            | IntermediateType::IU16
-            | IntermediateType::IU32
-            | IntermediateType::IU64
-            | IntermediateType::IU128
-            | IntermediateType::IU256
-            | IntermediateType::ISigner
-            | IntermediateType::IAddress
-            | IntermediateType::IVector(_)
-            | IntermediateType::IStruct { .. }
-            | IntermediateType::IGenericStructInstance { .. }
-            | IntermediateType::IEnum { .. }
-            | IntermediateType::IGenericEnumInstance { .. } => {
-                builder.local_get(local);
-            }
-            IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                panic!("Cannot ImmBorrowLoc on a reference type");
-            }
-            IntermediateType::ITypeParameter(_) => {
-                panic!("cannot borrow a type parameter, expected a concrete type");
-            }
+            IntermediateType::ITypeParameter(_) => Err(IntermediateTypeError::FoundTypeParameter),
         }
     }
 
@@ -623,7 +598,7 @@ impl IntermediateType {
         module: &mut Module,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         builder.load(
             compilation_ctx.memory_id,
             LoadKind::I32 { atomic: false },
@@ -685,7 +660,7 @@ impl IntermediateType {
                 let enum_ = compilation_ctx.get_enum_by_intermediate_type(self)?;
                 enum_.copy_local_instructions(module, builder, compilation_ctx, module_data)?;
             }
-            _ => panic!("Unsupported ReadRef type: {self:?}"),
+            _ => return Err(IntermediateTypeError::CannotReadRefOfType(self.clone())),
         }
 
         Ok(())
@@ -834,7 +809,7 @@ impl IntermediateType {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         local: LocalId,
-    ) {
+    ) -> Result<(), IntermediateTypeError> {
         match self {
             IntermediateType::IBool
             | IntermediateType::IU8
@@ -847,7 +822,7 @@ impl IntermediateType {
                     .i32_const(4)
                     .call(compilation_ctx.allocator)
                     .local_tee(local)
-                    .i32_const(self.stack_data_size() as i32)
+                    .i32_const(self.stack_data_size()? as i32)
                     .call(compilation_ctx.allocator)
                     .local_tee(ptr)
                     .store(
@@ -930,6 +905,8 @@ impl IntermediateType {
                 panic!("cannot box a type parameter, expected a concrete type");
             }
         }
+
+        Ok(())
     }
 
     pub fn load_equality_instructions(
@@ -938,7 +915,7 @@ impl IntermediateType {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         match self {
             Self::IBool | Self::IU8 | Self::IU16 | Self::IU32 => {
                 builder.binop(BinaryOp::I32Eq);
@@ -1296,24 +1273,20 @@ impl ISignature {
         arguments: &Signature,
         returns: &Signature,
         handles_map: &HashMap<DatatypeHandleIndex, UserDefinedType>,
-    ) -> Self {
+    ) -> Result<Self, IntermediateTypeError> {
         let arguments = arguments
             .0
             .iter()
             .map(|token| IntermediateType::try_from_signature_token(token, handles_map))
-            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-            // TODO: unwrap
-            .unwrap();
+            .collect::<Result<Vec<IntermediateType>, IntermediateTypeError>>()?;
 
         let returns = returns
             .0
             .iter()
             .map(|token| IntermediateType::try_from_signature_token(token, handles_map))
-            .collect::<Result<Vec<IntermediateType>, anyhow::Error>>()
-            // TODO: unwrap
-            .unwrap();
+            .collect::<Result<Vec<IntermediateType>, IntermediateTypeError>>()?;
 
-        Self { arguments, returns }
+        Ok(Self { arguments, returns })
     }
 
     /// Returns the wasm types of the return values
