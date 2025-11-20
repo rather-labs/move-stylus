@@ -500,6 +500,8 @@ impl Abi {
                 })
                 .unwrap();
 
+            let event_identifier = event_struct.identifier.clone();
+
             let event_struct = if let Some(struct_def_instantiation_index) =
                 &event_struct.struct_def_instantiation_index
             {
@@ -530,14 +532,13 @@ impl Abi {
 
             // Collect structs from event fields
             for field_itype in &event_struct.fields {
-                // println!("field_itype: {:#?}", field_itype);
                 if let Some(struct_itype) = Self::should_process_struct(field_itype, modules_data) {
                     structs_to_process.insert(struct_itype);
                 }
             }
 
             result.push(Event {
-                identifier: event_struct.identifier.clone(),
+                identifier: event_identifier,
                 fields: event_struct
                     .fields
                     .iter()

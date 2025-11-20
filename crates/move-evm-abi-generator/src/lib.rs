@@ -167,7 +167,8 @@ fn process_events_and_errors(
                                         });
                                     }
                                     SignatureToken::DatatypeInstantiation(data) => {
-                                        let (datatype_handle_index, _) = data.as_ref();
+                                        let (datatype_handle_index, type_parameters) =
+                                            data.as_ref();
                                         let struct_handle =
                                             module.datatype_handle_at(*datatype_handle_index);
 
@@ -175,6 +176,7 @@ fn process_events_and_errors(
                                             find_struct_def_instantiation_index(
                                                 module,
                                                 *datatype_handle_index,
+                                                type_parameters,
                                             )
                                             .unwrap();
 
@@ -308,10 +310,11 @@ fn process_events_and_errors(
 }
 
 /// Maps a `DatatypeHandleIndex` to a `StructDefInstantiationIndex` by finding the struct definition
-/// and then searching for a matching instantiation. Optionally matches type parameters if provided.
+/// and then searching for a matching instantiation. Matches both the struct definition and type parameters.
 fn find_struct_def_instantiation_index(
     module: &CompiledModule,
     datatype_handle_index: DatatypeHandleIndex,
+    type_parameters: &[SignatureToken],
 ) -> Option<StructDefInstantiationIndex> {
     // Verify the struct definition exists
     module.find_struct_def(datatype_handle_index)?;
@@ -323,13 +326,70 @@ fn find_struct_def_instantiation_index(
         .position(|d| d.struct_handle == datatype_handle_index)
         .map(|idx| StructDefinitionIndex::new(idx as u16))?;
 
-    // Search through struct instantiations to find one that matches
+    // Search through struct instantiations to find one that matches both the struct definition and type parameters
     for (idx, instantiation) in module.struct_instantiations().iter().enumerate() {
         if instantiation.def == struct_def_index {
-            // If no type parameters specified, return the first match
-            return Some(StructDefInstantiationIndex::new(idx as u16));
+            // Get the type parameters for this instantiation
+            let instantiation_type_params = &module.signature_at(instantiation.type_parameters).0;
+
+            // Check if the type parameters match
+            if instantiation_type_params.len() == type_parameters.len() {
+                let mut matches = true;
+                for (inst_param, expected_param) in
+                    instantiation_type_params.iter().zip(type_parameters.iter())
+                {
+                    if !signature_tokens_match(inst_param, expected_param) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if matches {
+                    return Some(StructDefInstantiationIndex::new(idx as u16));
+                }
+            }
         }
     }
 
     None
+}
+
+/// Checks if two signature tokens match (for type parameter comparison)
+fn signature_tokens_match(token1: &SignatureToken, token2: &SignatureToken) -> bool {
+    match (token1, token2) {
+        (SignatureToken::Bool, SignatureToken::Bool)
+        | (SignatureToken::U8, SignatureToken::U8)
+        | (SignatureToken::U16, SignatureToken::U16)
+        | (SignatureToken::U32, SignatureToken::U32)
+        | (SignatureToken::U64, SignatureToken::U64)
+        | (SignatureToken::U128, SignatureToken::U128)
+        | (SignatureToken::U256, SignatureToken::U256)
+        | (SignatureToken::Address, SignatureToken::Address)
+        | (SignatureToken::Signer, SignatureToken::Signer) => true,
+        (SignatureToken::Vector(inner1), SignatureToken::Vector(inner2)) => {
+            signature_tokens_match(inner1, inner2)
+        }
+        (SignatureToken::Datatype(idx1), SignatureToken::Datatype(idx2)) => idx1 == idx2,
+        (
+            SignatureToken::DatatypeInstantiation(inst1),
+            SignatureToken::DatatypeInstantiation(inst2),
+        ) => {
+            let (idx1, params1) = inst1.as_ref();
+            let (idx2, params2) = inst2.as_ref();
+            if idx1 != idx2 || params1.len() != params2.len() {
+                return false;
+            }
+            params1
+                .iter()
+                .zip(params2.iter())
+                .all(|(p1, p2)| signature_tokens_match(p1, p2))
+        }
+        (SignatureToken::TypeParameter(idx1), SignatureToken::TypeParameter(idx2)) => idx1 == idx2,
+        (SignatureToken::Reference(inner1), SignatureToken::Reference(inner2)) => {
+            signature_tokens_match(inner1, inner2)
+        }
+        (SignatureToken::MutableReference(inner1), SignatureToken::MutableReference(inner2)) => {
+            signature_tokens_match(inner1, inner2)
+        }
+        _ => false,
+    }
 }
