@@ -1,6 +1,10 @@
+use std::rc::Rc;
+
 use crate::{
-    compilation_context::CompilationContextError, native_functions::error::NativeFunctionError,
-    runtime::error::RuntimeFunctionError, translation::intermediate_types::IntermediateType,
+    compilation_context::CompilationContextError,
+    native_functions::error::NativeFunctionError,
+    runtime::error::RuntimeFunctionError,
+    translation::intermediate_types::{IntermediateType, error::IntermediateTypeError},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -48,6 +52,11 @@ pub enum StorageError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum DecodeError {
+    #[error(
+        "there was an error processing an intermediate type {0:?} while decoding data from storage"
+    )]
+    IntermediateType(#[source] Rc<IntermediateTypeError>),
+
     #[error("trying to decode an invalid type")]
     InvalidType(IntermediateType),
 
@@ -57,6 +66,11 @@ pub enum DecodeError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum EncodeError {
+    #[error(
+        "there was an error processing an intermediate type {0:?} while encoding data from storage"
+    )]
+    IntermediateType(#[source] Rc<IntermediateTypeError>),
+
     #[error("trying to encode an invalid type")]
     InvalidType(IntermediateType),
 }

@@ -16,10 +16,10 @@
 //! data.
 use crate::{
     CompilationContext, compilation_context::module_data::ModuleData,
-    generics::replace_type_parameters, storage::error::StorageError, translation::TranslationError,
+    generics::replace_type_parameters, storage::error::StorageError,
 };
 
-use super::structs::IStruct;
+use super::{error::IntermediateTypeError, structs::IStruct};
 
 use walrus::{
     InstrSeqBuilder, LocalId, Module, ValType,
@@ -79,7 +79,7 @@ impl IEnum {
         identifier: String,
         index: u16,
         variants: Vec<IEnumVariant>,
-    ) -> Result<Self, TranslationError> {
+    ) -> Result<Self, IntermediateTypeError> {
         let is_simple = variants.iter().all(|v| v.fields.is_empty());
         let heap_size = Self::compute_heap_size(&variants)?;
 
@@ -99,7 +99,7 @@ impl IEnum {
     ///
     /// If the enum contains a variant with a generic type parameter, returns None, since we can't
     /// know it.
-    fn compute_heap_size(variants: &[IEnumVariant]) -> Result<Option<u32>, TranslationError> {
+    fn compute_heap_size(variants: &[IEnumVariant]) -> Result<Option<u32>, IntermediateTypeError> {
         let mut size = 0;
         for variant in variants {
             let mut variant_size = 0;
@@ -107,9 +107,9 @@ impl IEnum {
                 variant_size += match field {
                     IntermediateType::ITypeParameter(_) => return Ok(None),
                     IntermediateType::IRef(_) | IntermediateType::IMutRef(_) => {
-                        return Err(TranslationError::FoundReferenceInsideEnum {
-                            enum_index: variant.belongs_to,
-                        });
+                        return Err(IntermediateTypeError::FoundReferenceInsideEnum(
+                            variant.belongs_to,
+                        ));
                     }
                     _ => 4,
                 };
@@ -132,7 +132,7 @@ impl IEnum {
         module: &mut Module,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let e1_ptr = module.locals.add(ValType::I32);
         let e2_ptr = module.locals.add(ValType::I32);
         builder.local_set(e1_ptr).local_set(e2_ptr);
@@ -223,7 +223,7 @@ impl IEnum {
         builder: &mut InstrSeqBuilder,
         compilation_ctx: &CompilationContext,
         module_data: &ModuleData,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let src_ptr = module.locals.add(ValType::I32);
         let ptr = module.locals.add(ValType::I32);
 
@@ -315,7 +315,7 @@ impl IEnum {
     pub fn storage_size_by_offset(
         &self,
         compilation_ctx: &CompilationContext,
-    ) -> Result<Vec<u32>, TranslationError> {
+    ) -> Result<Vec<u32>, StorageError> {
         // Compute the storage size for each possible slot offset (0-31)
         Ok((0..32)
             .map(|offset| {

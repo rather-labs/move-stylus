@@ -133,7 +133,7 @@ pub fn pack(
                     | IntermediateType::IU16
                     | IntermediateType::IU32
                     | IntermediateType::IU64 => {
-                        let data_size = pack_type.stack_data_size();
+                        let data_size = pack_type.stack_data_size()?;
                         let (val, store_kind) = if data_size == 8 {
                             (val_64, StoreKind::I64 { atomic: false })
                         } else {
@@ -283,7 +283,7 @@ pub fn unpack_fields(
                 // Load the actual value
                 builder.load(
                     compilation_ctx.memory_id,
-                    if field.stack_data_size() == 8 {
+                    if field.stack_data_size()? == 8 {
                         LoadKind::I64 { atomic: false }
                     } else {
                         LoadKind::I32 { atomic: false }

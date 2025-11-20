@@ -3,9 +3,9 @@ use walrus::{
     ir::{BinaryOp, LoadKind, MemArg, StoreKind},
 };
 
-use crate::{CompilationContext, runtime::RuntimeFunction, translation::TranslationError};
+use crate::{CompilationContext, runtime::RuntimeFunction};
 
-use super::IntermediateType;
+use super::{IntermediateType, error::IntermediateTypeError};
 
 fn compare_heap_integers_bitwise(
     builder: &mut walrus::InstrSeqBuilder,
@@ -264,7 +264,7 @@ impl IU128 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let add_function_id = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx))?;
         // Alocate space for the result
         builder
@@ -279,7 +279,7 @@ impl IU128 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let shift_left_function_id =
             RuntimeFunction::HeapIntShiftLeft.get(module, Some(compilation_ctx))?;
         builder
@@ -293,7 +293,7 @@ impl IU128 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let shift_right_function_id =
             RuntimeFunction::HeapIntShiftRight.get(module, Some(compilation_ctx))?;
         builder
@@ -307,7 +307,7 @@ impl IU128 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let sub_function_id = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx))?;
         // Alocate space for the result
         builder
@@ -322,7 +322,7 @@ impl IU128 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let mul_function_id = RuntimeFunction::HeapIntMul.get(module, Some(compilation_ctx))?;
 
         builder.i32_const(Self::HEAP_SIZE).call(mul_function_id);
@@ -334,7 +334,7 @@ impl IU128 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let div_mod_function_id =
             RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx))?;
 
@@ -350,7 +350,7 @@ impl IU128 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let div_mod_function_id =
             RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx))?;
 
@@ -366,7 +366,7 @@ impl IU128 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let equality_f_id = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
         builder.i32_const(Self::HEAP_SIZE).call(equality_f_id);
         Ok(())
@@ -555,7 +555,7 @@ impl IU256 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let add_function_id = RuntimeFunction::HeapIntSum.get(module, Some(compilation_ctx))?;
         builder
             .i32_const(Self::HEAP_SIZE)
@@ -569,7 +569,7 @@ impl IU256 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let shift_left_function_id =
             RuntimeFunction::HeapIntShiftLeft.get(module, Some(compilation_ctx))?;
         builder
@@ -583,7 +583,7 @@ impl IU256 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let shift_right_function_id =
             RuntimeFunction::HeapIntShiftRight.get(module, Some(compilation_ctx))?;
         builder
@@ -597,7 +597,7 @@ impl IU256 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let sub_function_id = RuntimeFunction::HeapIntSub.get(module, Some(compilation_ctx))?;
         builder
             .i32_const(Self::HEAP_SIZE)
@@ -611,7 +611,7 @@ impl IU256 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let mul_function_id = RuntimeFunction::HeapIntMul.get(module, Some(compilation_ctx))?;
         builder.i32_const(Self::HEAP_SIZE).call(mul_function_id);
         Ok(())
@@ -621,7 +621,7 @@ impl IU256 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let div_mod_function_id =
             RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx))?;
 
@@ -637,7 +637,7 @@ impl IU256 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let div_mod_function_id =
             RuntimeFunction::HeapIntDivMod.get(module, Some(compilation_ctx))?;
 
@@ -653,7 +653,7 @@ impl IU256 {
         builder: &mut walrus::InstrSeqBuilder,
         module: &mut walrus::Module,
         compilation_ctx: &CompilationContext,
-    ) -> Result<(), TranslationError> {
+    ) -> Result<(), IntermediateTypeError> {
         let equality_f_id = RuntimeFunction::HeapTypeEquality.get(module, Some(compilation_ctx))?;
         builder.i32_const(Self::HEAP_SIZE).call(equality_f_id);
 

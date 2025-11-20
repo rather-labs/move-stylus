@@ -452,7 +452,9 @@ pub fn add_read_and_decode_storage_vector_instructions(
         .local_set(len);
 
     // Stack size of the inner type
-    let stack_size = inner.stack_data_size() as i32;
+    let stack_size = inner
+        .stack_data_size()
+        .map_err(|e| DecodeError::IntermediateType(e.into()))? as i32;
 
     // Element size in STORAGE
     let elem_size = field_size(inner, compilation_ctx)? as i32;
@@ -606,7 +608,9 @@ pub fn add_decode_intermediate_type_instructions(
     itype: &IntermediateType,
 ) -> Result<(), StorageError> {
     // Stack and storage size of the type
-    let stack_size = itype.stack_data_size() as i32;
+    let stack_size = itype
+        .stack_data_size()
+        .map_err(|e| DecodeError::IntermediateType(e.into()))? as i32;
     let storage_size = field_size(itype, compilation_ctx)? as i32;
 
     // Host functions

@@ -1298,13 +1298,13 @@ fn translate_instruction(
         Bytecode::ImmBorrowLoc(local_id) => {
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
-            local_type.add_borrow_local_instructions(builder, local);
+            builder.local_get(local);
             types_stack.push(IntermediateType::IRef(Box::new(local_type.clone())));
         }
         Bytecode::MutBorrowLoc(local_id) => {
             let local = function_locals[*local_id as usize];
             let local_type = mapped_function.get_local_ir(*local_id as usize).clone();
-            local_type.add_borrow_local_instructions(builder, local);
+            builder.local_get(local);
             types_stack.push(IntermediateType::IMutRef(Box::new(local_type.clone())));
         }
         Bytecode::ImmBorrowField(field_id) => {

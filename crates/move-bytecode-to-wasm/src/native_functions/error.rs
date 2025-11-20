@@ -5,7 +5,10 @@ use crate::{
     compilation_context::{CompilationContextError, ModuleId},
     runtime::error::RuntimeFunctionError,
     storage::error::StorageError,
-    translation::{intermediate_types::IntermediateType, table::FunctionId},
+    translation::{
+        intermediate_types::{IntermediateType, error::IntermediateTypeError},
+        table::FunctionId,
+    },
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -16,6 +19,15 @@ pub enum NativeFunctionError {
     #[error("an storage error ocurred while translating a function")]
     Storage(#[source] Rc<StorageError>),
 
+    #[error("compilation context error ocurred while processing a native function")]
+    CompilationContext(#[from] CompilationContextError),
+
+    #[error("abi error ocurred while processing a native function")]
+    Abi(#[source] Rc<AbiError>),
+
+    #[error("an error ocurred while processing an intermediate type")]
+    IntermediateType(#[from] IntermediateTypeError),
+
     #[error(r#"host function "{0}" not supported yet"#)]
     HostFunctionNotSupported(String),
 
@@ -24,12 +36,6 @@ pub enum NativeFunctionError {
 
     #[error(r#"generic native function "{0}::{1}" not supported yet"#)]
     GenericdNativeFunctionNotSupported(ModuleId, String),
-
-    #[error("compilation context error ocurred while processing a native function")]
-    CompilationContext(#[from] CompilationContextError),
-
-    #[error("abi error ocurred while processing a native function")]
-    Abi(#[source] Rc<AbiError>),
 
     #[error(r#"missing special attributes for external call "{0}::{1}""#)]
     NotExternalCall(ModuleId, String),

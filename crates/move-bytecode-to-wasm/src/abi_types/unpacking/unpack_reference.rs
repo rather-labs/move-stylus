@@ -78,7 +78,7 @@ impl IRef {
             | IntermediateType::IBool => {
                 let ptr_local = module.locals.add(walrus::ValType::I32);
 
-                builder.i32_const(inner.stack_data_size() as i32);
+                builder.i32_const(inner.stack_data_size()? as i32);
                 builder.call(compilation_ctx.allocator);
                 builder.local_tee(ptr_local);
 
