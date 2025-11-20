@@ -9,6 +9,7 @@ use crate::{
         intermediate_types::{IntermediateType, error::IntermediateTypeError},
         table::FunctionId,
     },
+    vm_handled_types::error::VmHandledTypeError,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -27,6 +28,9 @@ pub enum NativeFunctionError {
 
     #[error("an error ocurred while processing an intermediate type")]
     IntermediateType(#[from] IntermediateTypeError),
+
+    #[error("an error ocurred while processing a vm handled type")]
+    VmHandledType(#[from] VmHandledTypeError),
 
     #[error(r#"host function "{0}" not supported yet"#)]
     HostFunctionNotSupported(String),

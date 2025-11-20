@@ -11,7 +11,7 @@ use crate::{
         intermediate_types::{IntermediateType, VmHandledStruct, structs::IStruct},
         types_stack::TypesStack,
     },
-    vm_handled_types::{VmHandledType, named_id::NamedId, uid::Uid},
+    vm_handled_types::{VmHandledType, is_uid_or_named_id, named_id::NamedId, uid::Uid},
 };
 
 /// Borrows a field of a struct.
@@ -162,7 +162,7 @@ pub fn pack(
 
                     // If we find an UID or NamedId struct, in the 4 bytes before its pointer, we
                     // write the address of the struct holding it
-                    pack_type if pack_type.is_uid_or_named_id(compilation_ctx) => {
+                    pack_type if is_uid_or_named_id(&pack_type, compilation_ctx)? => {
                         builder.local_set(ptr_to_data);
 
                         builder
@@ -329,7 +329,7 @@ pub fn unpack_fields(
         match field {
             IntermediateType::IStruct {
                 module_id, index, ..
-            } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+            } if Uid::is_vm_type(module_id, *index, compilation_ctx)? => {
                 let (instance_types, parent_module_id, parent_index) = match parent_type {
                     IntermediateType::IStruct {
                         module_id: parent_module_id,
@@ -364,7 +364,7 @@ pub fn unpack_fields(
                 index,
                 types,
                 ..
-            } if NamedId::is_vm_type(module_id, *index, compilation_ctx) => {
+            } if NamedId::is_vm_type(module_id, *index, compilation_ctx)? => {
                 let (instance_types, parent_module_id, parent_index) = match parent_type {
                     IntermediateType::IStruct {
                         module_id: parent_module_id,

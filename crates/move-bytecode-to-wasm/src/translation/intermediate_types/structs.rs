@@ -249,7 +249,7 @@ impl IStruct {
                 IntermediateType::IVector(_) => return Ok(true),
                 IntermediateType::IStruct {
                     module_id, index, ..
-                } if String_::is_vm_type(module_id, *index, compilation_ctx) => return Ok(true),
+                } if String_::is_vm_type(module_id, *index, compilation_ctx)? => return Ok(true),
                 IntermediateType::IStruct { .. }
                 | IntermediateType::IGenericStructInstance { .. } => {
                     let child_struct = compilation_ctx

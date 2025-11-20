@@ -3,6 +3,7 @@ use crate::{
     error::{CompilationError, ICEError, ICEErrorKind},
     runtime::error::RuntimeFunctionError,
     translation::intermediate_types::error::IntermediateTypeError,
+    vm_handled_types::error::VmHandledTypeError,
 };
 
 use super::{
@@ -58,6 +59,9 @@ pub enum AbiError {
 
     #[error("an error ocurred while processing an intermediate type")]
     IntermediateType(#[from] IntermediateTypeError),
+
+    #[error("an error ocurred while processing a vm handled type")]
+    VmHandledType(#[from] VmHandledTypeError),
 }
 
 impl From<AbiError> for CompilationError {

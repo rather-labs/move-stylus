@@ -14,7 +14,10 @@ pub mod uid;
 use error::VmHandledTypeError;
 use walrus::{InstrSeqBuilder, Module};
 
-use crate::{CompilationContext, compilation_context::ModuleId};
+use crate::{
+    CompilationContext, compilation_context::ModuleId,
+    translation::intermediate_types::IntermediateType,
+};
 
 pub trait VmHandledType {
     const IDENTIFIER: &str;
@@ -34,4 +37,21 @@ pub trait VmHandledType {
         index: u16,
         compilation_ctx: &CompilationContext,
     ) -> Result<bool, VmHandledTypeError>;
+}
+
+/// Auxiliary funtion that returns true if an `IntermediateType` is a valid UID or NamedId struct
+pub fn is_uid_or_named_id(
+    itype: &IntermediateType,
+    compilation_ctx: &CompilationContext,
+) -> Result<bool, VmHandledTypeError> {
+    match itype {
+        IntermediateType::IStruct {
+            module_id, index, ..
+        }
+        | IntermediateType::IGenericStructInstance {
+            module_id, index, ..
+        } => Ok(uid::Uid::is_vm_type(module_id, *index, compilation_ctx)?
+            || named_id::NamedId::is_vm_type(module_id, *index, compilation_ctx)?),
+        _ => Ok(false),
+    }
 }

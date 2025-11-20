@@ -369,7 +369,7 @@ pub fn add_external_contract_call_fn(
         }
         Some(IntermediateType::IGenericStructInstance {
             module_id, index, ..
-        }) if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx) => {
+        }) if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx)? => {
             builder
                 .i32_const(8)
                 .call(compilation_ctx.allocator)
@@ -377,7 +377,7 @@ pub fn add_external_contract_call_fn(
         }
         Some(IntermediateType::IStruct {
             module_id, index, ..
-        }) if ContractCallEmptyResult::is_vm_type(module_id, *index, compilation_ctx) => {
+        }) if ContractCallEmptyResult::is_vm_type(module_id, *index, compilation_ctx)? => {
             builder
                 .i32_const(4)
                 .call(compilation_ctx.allocator)
@@ -422,7 +422,7 @@ pub fn add_external_contract_call_fn(
         function_information.signature.returns.first(),
         Some(IntermediateType::IGenericStructInstance {
             module_id, index, ..
-        }) if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx)
+        }) if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx)?
     ) {
         let mut inner_error = Ok(());
         builder.block(None, |block| {
@@ -473,7 +473,7 @@ pub fn add_external_contract_call_fn(
                 ..
             } = &function_information.signature.returns[0]
             {
-                if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx) {
+                if ContractCallResult::is_vm_type(module_id, *index, compilation_ctx)? {
                     inner_error = (|| {
                         let calldata_reader_pointer = module.locals.add(ValType::I32);
 
@@ -577,7 +577,7 @@ pub fn add_external_contract_call_fn(
                             parent_index,
                             instance_types,
                         },
-                } if Uid::is_vm_type(module_id, *index, compilation_ctx) => {
+                } if Uid::is_vm_type(module_id, *index, compilation_ctx)? => {
                     let (parent_struct_itype, parent_struct) =
                         if let Some(instance_types) = instance_types {
                             let itype = IntermediateType::IGenericStructInstance {

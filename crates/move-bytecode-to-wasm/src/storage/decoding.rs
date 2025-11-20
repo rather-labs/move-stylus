@@ -13,6 +13,7 @@ use crate::{
     runtime::RuntimeFunction,
     storage::storage_layout::field_size,
     translation::intermediate_types::{IntermediateType, vector::IVector},
+    vm_handled_types::is_uid_or_named_id,
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
@@ -124,7 +125,7 @@ pub fn add_read_and_decode_storage_struct_instructions(
     // Iterate through the fields of the struct
     for (index, field) in struct_.fields.iter().enumerate() {
         // If the field is a UID or NamedId, don't call decode_intermediate_type_instructions and process it here
-        if field.is_uid_or_named_id(compilation_ctx) {
+        if is_uid_or_named_id(&field, compilation_ctx)? {
             // Save the struct pointer before the UID
             builder
                 .i32_const(4)

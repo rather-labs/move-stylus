@@ -20,7 +20,6 @@ use crate::{
     compilation_context::{ModuleData, ModuleId, module_data::Address},
     hasher::get_hasher,
     runtime::RuntimeFunction,
-    vm_handled_types::{VmHandledType, named_id, uid},
     wasm_builder_extensions::WasmBuilderExtension,
 };
 
@@ -1210,22 +1209,6 @@ impl IntermediateType {
             _ => {
                 self.hash(&mut hasher);
             }
-        }
-    }
-
-    /// Returns true if this `IntermediateType` represents a UID or NamedId struct
-    pub fn is_uid_or_named_id(&self, compilation_ctx: &CompilationContext) -> bool {
-        match self {
-            IntermediateType::IStruct {
-                module_id, index, ..
-            }
-            | IntermediateType::IGenericStructInstance {
-                module_id, index, ..
-            } => {
-                uid::Uid::is_vm_type(module_id, *index, compilation_ctx)
-                    || named_id::NamedId::is_vm_type(module_id, *index, compilation_ctx)
-            }
-            _ => false,
         }
     }
 }
